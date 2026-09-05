@@ -131,7 +131,7 @@ export class AbsentApiBetterAuthIdentityCeremonies extends BetterAuthIdentityCer
 
   async beforeUserDelete(): Promise<void> {}
 
-  async beforeAccountCreate(): Promise<{ data: { id: string } } | undefined> {
+  async tryBeforeAccountCreate(): Promise<{ data: { id: string } } | undefined> {
     return undefined;
   }
 
@@ -151,7 +151,7 @@ export class AbsentApiBetterAuthPendingInvites extends BetterAuthPendingInvitePo
     super();
   }
 
-  async findPendingByOrganizationAndEmail(input: {
+  async tryFindPendingByOrganizationAndEmail(input: {
     organizationId: string;
     email: string;
   }): Promise<PendingOrganizationInvite | null> {

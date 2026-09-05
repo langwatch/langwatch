@@ -52,7 +52,7 @@ export abstract class ApiTraceReadStackPort {
    */
   abstract readPorts(): Pick<
     TracesV2TrpcPorts,
-    "getVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes" | "codingAgentEnrichment"
+    "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes" | "codingAgentEnrichment"
   >;
   /**
    * The explorer's own: the AI composer, the reserved-metadata write and its
@@ -62,7 +62,7 @@ export abstract class ApiTraceReadStackPort {
   abstract explorerPorts(): Omit<
     TracesV2TrpcPorts,
     | "getViewerProtections"
-    | "getVisibilityCutoffMs"
+    | "tryGetVisibilityCutoffMs"
     | "mappers"
     | "derivedAttrPrefixes"
     | "codingAgentEnrichment"

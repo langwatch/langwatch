@@ -15,7 +15,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { composeApiAutomationApp } from "../../app/api-automation.composition";
 import {
   createAutomationTrpcRouter,

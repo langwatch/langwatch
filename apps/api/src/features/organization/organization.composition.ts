@@ -45,6 +45,7 @@ import {
   MemberSeatLimitReachedError,
   OrganizationNotFoundError,
   assertNoPersonalTeamScope,
+  PostgresPersonalTeamScopeAdapter,
   buildInviteAcceptUrl,
   isCustomRole,
   isTeamRoleAllowedForOrganizationRole,
@@ -84,7 +85,7 @@ import { z } from "zod";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { composeApiOrganizationInvites } from "../../app/api-organization-invites.composition";
 import type { ApiPersonMailPort } from "../../app/api-person-mail.port";
 import type { ApiEnterpriseApplicationPort } from "../enterprise/enterprise.composition";
@@ -124,7 +125,7 @@ export abstract class ApiOrganizationInvitePort {
     | "matchInviteToAcceptor"
     | "maskInvitedAddress"
     | "applyInvite"
-    | "findLandingProjectSlug"
+    | "tryFindLandingProjectSlug"
     | "resolveJoinRequestByInvitation"
     | "withdrawJoinRequestOnInvitationAccepted"
   >;
@@ -405,7 +406,7 @@ function organizationPorts(
       ),
     assertNoPersonalTeamScope: async (_ctx, { teamId }) => {
       await assertNoPersonalTeamScope({
-        client: prisma,
+        reader: PostgresPersonalTeamScopeAdapter.create({ database: prisma }),
         scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
       });
     },
@@ -463,9 +464,9 @@ function organizationPorts(
       inviteports ? inviteports.maskInvitedAddress(email) : maskAddress(email),
     applyInvite: (ctx, input) =>
       inviteports ? inviteports.applyInvite(ctx, input) : refuseInvitations("accept an invitation"),
-    findLandingProjectSlug: (ctx, input) =>
+    tryFindLandingProjectSlug: (ctx, input) =>
       inviteports
-        ? inviteports.findLandingProjectSlug(ctx, input)
+        ? inviteports.tryFindLandingProjectSlug(ctx, input)
         : refuseInvitations("resolve where an accepted invitation lands"),
     inviteNotFoundError: () => new InviteNotFoundError("Invitation not found"),
     inviteExpiredError: () => new InviteExpiredError(),
@@ -857,11 +858,11 @@ const MEMBERSHIP_OPERATIONS = new Set<string>([
   "deleteMember",
   "setMemberDisabled",
   "getAllForUser",
-  "getOrganizationWithMembers",
-  "getMemberById",
+  "tryGetOrganizationWithMembers",
+  "tryGetMemberById",
   "getAllMembers",
-  "getUserOrgRoleByTeamId",
-  "getPrimaryIntent",
+  "tryGetUserOrgRoleByTeamId",
+  "tryGetPrimaryIntent",
   "updateTeamMemberRole",
   "changeMemberRole",
   "getAuditLogs",
@@ -879,7 +880,7 @@ const MEMBERSHIP_OPERATIONS = new Set<string>([
   // provisioned organization would be invisible to the second.
   "createForProvisioning",
   "listProvisioningSummaries",
-  "getProvisioningSummary",
+  "tryGetProvisioningSummary",
   "deleteProvisionedOrganization",
 ]);
 

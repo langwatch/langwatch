@@ -521,7 +521,7 @@ function identityCustomAdapter({
       if (typeof userId !== "string" || typeof providerId !== "string") {
         return null;
       }
-      const pinned = await ceremonies.beforeAccountCreate({
+      const pinned = await ceremonies.tryBeforeAccountCreate({
         id: canonical.id,
         userId,
         providerId,

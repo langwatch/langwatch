@@ -11,7 +11,7 @@ export abstract class AgentStateStorePort {
   abstract set(key: string, value: string, ttlSeconds: number): Promise<void>;
   /** SET NX: writes only when the key is absent; resolves to whether it wrote. */
   abstract setIfAbsent(key: string, value: string, ttlSeconds: number): Promise<boolean>;
-  abstract get(key: string): Promise<string | null>;
+  abstract tryGet(key: string): Promise<string | null>;
   abstract del(key: string): Promise<void>;
   abstract zadd(params: {
     key: string;
@@ -26,7 +26,7 @@ export abstract class AgentStateStorePort {
   /** Members with a score at or above `min`, in score order. */
   abstract zrangebyscore(key: string, min: number): Promise<string[]>;
   abstract hset(key: string, fields: Record<string, string>, ttlSeconds: number): Promise<void>;
-  abstract hgetall(key: string): Promise<Record<string, string> | null>;
+  abstract tryHgetall(key: string): Promise<Record<string, string> | null>;
   abstract incr(key: string, ttlSeconds: number): Promise<number>;
   abstract decr(key: string): Promise<number>;
   /** Publishes; resolves to how many subscribers received it. */

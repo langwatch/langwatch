@@ -36,7 +36,7 @@ class UnavailableResultAtomsRepository extends ResultAtomsReadPort {
   findRunOrdinals(): ReturnType<ResultAtomsReadPort["findRunOrdinals"]> {
     return this.refuse();
   }
-  aggregateTotals(): ReturnType<ResultAtomsReadPort["aggregateTotals"]> {
+  tryAggregateTotals(): ReturnType<ResultAtomsReadPort["tryAggregateTotals"]> {
     return this.refuse();
   }
   aggregateGroups(): ReturnType<ResultAtomsReadPort["aggregateGroups"]> {

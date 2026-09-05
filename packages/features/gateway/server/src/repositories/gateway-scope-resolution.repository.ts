@@ -1,4 +1,4 @@
-import type { ModelProvider } from "@langwatch/prisma-client/generated";
+import type { ModelProvider } from "@langwatch/gateway-contract";
 import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port";
 
 /** A model provider row a virtual key may reach. */
@@ -34,7 +34,7 @@ export abstract class GatewayScopeResolutionRepository {
     projectIds: string[];
     transaction?: GatewayPersistenceTransaction;
   }): Promise<EligibleModelProvider[]>;
-  abstract findRoutingPolicyOrder(input: {
+  abstract tryFindRoutingPolicyOrder(input: {
     routingPolicyId: string;
     transaction?: GatewayPersistenceTransaction;
   }): Promise<GatewayRoutingPolicyOrder | null>;

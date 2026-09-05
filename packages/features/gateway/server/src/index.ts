@@ -117,7 +117,7 @@ export {
   type GatewaySpendCommandSender,
 } from "./transport/api-rest/gateway-internal.api";
 export { GatewayInternalStorePort } from "./ports/gateway-internal-store.port";
-export { PrismaGatewayInternalStoreAdapter } from "./adapters/prisma.gateway-internal-store.adapter";
+export { PrismaGatewayInternalStoreAdapter } from "./adapters/postgres.gateway-internal-store.adapter";
 export {
   createGatewaySpendRestApp,
   type GatewaySpendEnvelope,
@@ -174,7 +174,7 @@ export {
   GatewayRealtimeSessionRepository,
   type ReserveResult,
 } from "./repositories/gateway-realtime-session.repository";
-export { GatewaySpendScopeAdapter } from "./adapters/gateway-spend-scope.adapter";
+export { GatewaySpendScopeAdapter } from "./adapters/postgres.gateway-spend-scope.adapter";
 export {
   GatewayJwtAdapter,
   type GatewayJwtClaims,
@@ -202,7 +202,7 @@ export {
   type GatewayPermissionScope,
 } from "./ports/gateway-scope-permissions.port";
 export { GatewayConfigAssemblyPort } from "./ports/gateway-config-assembly.port";
-export { GatewayConfigAssemblyAdapter } from "./adapters/gateway-config-assembly.adapter";
+export { GatewayConfigAssemblyAdapter } from "./adapters/postgres.gateway-config-assembly.adapter";
 export { GatewayVirtualKeyCryptoPort } from "./ports/gateway-virtual-key-crypto.port";
 export { GatewaySpanIngestionPort } from "./ports/gateway-span-ingestion.port";
 export { GatewaySpendConfirmationPort } from "./ports/gateway-spend-confirmation.port";
@@ -224,20 +224,26 @@ export {
   backfillVirtualKeyConfig,
   VirtualKeyConfigBackfillTask,
   type LegacyVirtualKeyConfig,
-  type VirtualKeyConfigBackfillDatabase,
   type VirtualKeyConfigBackfillOutcome,
-  type VirtualKeyRow,
-  type VirtualKeyScopeRow,
 } from "./tasks/virtual-key-config-backfill.task";
+export { PostgresGatewayVirtualKeyConfigBackfillAdapter } from "./adapters/postgres.gateway-virtual-key-config-backfill.adapter";
+export type {
+  GatewayVirtualKeyConfigBackfillRepository,
+  VirtualKeyRow,
+  VirtualKeyScopeRow,
+} from "./repositories/gateway-virtual-key-config-backfill.repository";
 
 // The pre-migration gate report, main's `report-trace-destination-backfill.ts`.
 export {
   reportTraceDestinationBackfill,
   TRACE_DESTINATION_RESOLUTIONS,
   TraceDestinationReportTask,
-  type TraceDestinationKeyRow,
-  type TraceDestinationProjectRow,
   type TraceDestinationReport,
-  type TraceDestinationReportDatabase,
   type TraceDestinationResolution,
 } from "./tasks/trace-destination-report.task";
+export { PostgresGatewayTraceDestinationReportAdapter } from "./adapters/postgres.gateway-trace-destination-report.adapter";
+export type {
+  GatewayTraceDestinationReportRepository,
+  TraceDestinationKeyRow,
+  TraceDestinationProjectRow,
+} from "./repositories/gateway-trace-destination-report.repository";

@@ -1,4 +1,4 @@
-import type { BugReport } from "@langwatch/prisma-client/generated";
+import type { BugReport } from "@langwatch/ops-contract";
 import { BugReportNotifierPort } from "../ports/bug-report-notifier.port";
 
 /**

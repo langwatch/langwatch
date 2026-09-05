@@ -12,10 +12,10 @@ function row(attrs: Record<string, string>): EventSpanRow {
   };
 }
 
-describe("TraceEventAttributeMappingService.mapEventAttrsToEvent", () => {
+describe("TraceEventAttributeMappingService.tryMapEventAttrsToEvent", () => {
   describe("when the span carries an event.type with metrics and details", () => {
     it("maps it into a typed Event, splitting metrics from details", () => {
-      const event = TraceEventAttributeMappingService.mapEventAttrsToEvent({
+      const event = TraceEventAttributeMappingService.tryMapEventAttrsToEvent({
         row: row({
           "event.type": "thumbs_up_down",
           "event.metrics.vote": "1",
@@ -38,7 +38,7 @@ describe("TraceEventAttributeMappingService.mapEventAttrsToEvent", () => {
 
   describe("when a metric value is not numeric", () => {
     it("drops the non-finite metric rather than emitting NaN", () => {
-      const event = TraceEventAttributeMappingService.mapEventAttrsToEvent({
+      const event = TraceEventAttributeMappingService.tryMapEventAttrsToEvent({
         row: row({
           "event.type": "custom",
           "event.metrics.bad": "not-a-number",
@@ -52,7 +52,7 @@ describe("TraceEventAttributeMappingService.mapEventAttrsToEvent", () => {
 
   describe("when a metric value is empty, whitespace, or hex", () => {
     it("drops it instead of coercing to a bogus number", () => {
-      const event = TraceEventAttributeMappingService.mapEventAttrsToEvent({
+      const event = TraceEventAttributeMappingService.tryMapEventAttrsToEvent({
         row: row({
           "event.type": "thumbs_up_down",
           "event.metrics.empty": "",
@@ -70,7 +70,7 @@ describe("TraceEventAttributeMappingService.mapEventAttrsToEvent", () => {
   describe("when the span has no event.type", () => {
     it("returns null so it is not counted as an event", () => {
       expect(
-        TraceEventAttributeMappingService.mapEventAttrsToEvent({
+        TraceEventAttributeMappingService.tryMapEventAttrsToEvent({
           row: row({ "event.metrics.vote": "1" }),
           projectId: "project-1",
         }),

@@ -6,10 +6,10 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   OrganizationUserRole,
-  type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/authz-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process";
 import type { JoinRequestNotificationMailPort } from "../ports/join-request-notification-mail.port";
 import type {

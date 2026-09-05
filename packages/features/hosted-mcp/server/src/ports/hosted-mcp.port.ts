@@ -11,7 +11,7 @@ export type HostedMcpRedis = Redis | Cluster;
  * The project an MCP caller's API key belongs to.
  */
 export abstract class McpProjectLookupPort {
-  abstract findLiveProjectByApiKey(input: {
+  abstract tryFindLiveProjectByApiKey(input: {
     apiKey: string;
   }): Promise<{ id: string; teamId: string } | null>;
 }

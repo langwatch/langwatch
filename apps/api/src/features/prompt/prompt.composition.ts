@@ -10,7 +10,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { PostgresPromptAdapter, PromptApp, type PromptTrpcPorts } from "@langwatch/prompt-server";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createPromptTrpcRouter } from "./prompt-trpc.mount";
 
 /**

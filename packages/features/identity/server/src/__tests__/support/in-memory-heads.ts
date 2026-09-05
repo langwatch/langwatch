@@ -22,7 +22,7 @@ export class InMemoryHeads implements IdentityHeadsRepository {
   heads = new Map<string, IdentityHeads>();
   activeByValue = new Map<string, { userId: string; identifierId: string }>();
 
-  async findUserHashKey({ userId }: { userId: string }) {
+  async tryFindUserHashKey({ userId }: { userId: string }) {
     return this.hashKeys.get(userId) ?? null;
   }
 
@@ -30,7 +30,7 @@ export class InMemoryHeads implements IdentityHeadsRepository {
     return this.heads.get(userId) ?? emptyIdentityHeads({ userId });
   }
 
-  async findActiveIdentifierByValue({ normalizedValue }: { normalizedValue: string }) {
+  async tryFindActiveIdentifierByValue({ normalizedValue }: { normalizedValue: string }) {
     if (this.activeByValue.has(normalizedValue)) {
       return this.activeByValue.get(normalizedValue) ?? null;
     }
@@ -47,7 +47,7 @@ export class InMemoryHeads implements IdentityHeadsRepository {
     return null;
   }
 
-  async findIdentifier({
+  async tryFindIdentifier({
     userId,
     identifierId,
   }: {
@@ -57,7 +57,7 @@ export class InMemoryHeads implements IdentityHeadsRepository {
     return this.heads.get(userId)?.identifiers[identifierId] ?? null;
   }
 
-  async findIdentifierIdForAccount({
+  async tryFindIdentifierIdForAccount({
     userId,
     accountId,
     providerId,

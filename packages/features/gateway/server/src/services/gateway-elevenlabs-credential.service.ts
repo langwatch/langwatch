@@ -49,7 +49,7 @@ export class GatewayElevenLabsCredentialService {
     organizationId: string;
   } | null> {
     const collaborators = this.collaborators;
-    const provider = await collaborators.providers.findProviderRow({ modelProviderId });
+    const provider = await collaborators.providers.tryFindProviderRow({ modelProviderId });
     if (provider?.provider !== "elevenlabs") {
       return null;
     }
@@ -63,7 +63,7 @@ export class GatewayElevenLabsCredentialService {
   /**
    * Workspace post-call webhook secret on one provider row. Organization comes back with it since the webhook has no other way to know whose session a delivery may close — tenant is the path parameter, so the match scopes to the org owning the secret the delivery was signed with.
    */
-  async getWebhookSecret({
+  async tryGetWebhookSecret({
     modelProviderId,
   }: {
     modelProviderId: string;
@@ -84,7 +84,7 @@ export class GatewayElevenLabsCredentialService {
   /**
    * API key and host to read a conversation back with. Host is validated here as well as on write, since a row stored before the registry constrained the field could send the customer's API key to whatever host it names (SSRF policy only refuses private addresses) — a bad host falls back to the vendor default rather than refusing, since the reconciler still has a real call to settle.
    */
-  async getApiCredential({
+  async tryGetApiCredential({
     modelProviderId,
   }: {
     modelProviderId: string;

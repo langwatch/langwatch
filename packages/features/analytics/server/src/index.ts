@@ -9,13 +9,9 @@ export {
 export { LoggingAnalyticsTripwire } from "./services/analytics-tripwire.service";
 
 /**
- * Filter matching without a query engine.
- *
- * The legacy `filters` grammar decided in memory, and the projection that
- * reads a settled fold state as the trace those filters match. Published
- * because the deciding happens in a background process — a settled automation
- * match is re-checked where there is no ClickHouse round trip to spend and no
- * browser to render the answer.
+ * Filter matching without a query engine: the legacy `filters` grammar
+ * decided in memory, published because a settled automation match is
+ * re-checked in a background process with no ClickHouse round trip to spend.
  */
 export { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service";
 export { PreconditionTraceDataService } from "./services/precondition-trace-data.service";
@@ -39,10 +35,9 @@ export {
 export { createAnalyticsLegacyRestApp } from "./transport/api-rest/analytics-legacy.api";
 
 /**
- * The LangWatchQL workbench: its restricted-identity service, the rollout gate
- * both of its doors ask through, the schemas a caller's period and step arrive
- * as, and the statement ceiling. Moved here with the service, so a process
- * composes the workbench from one package rather than from six platform paths.
+ * The LangWatchQL workbench: its restricted-identity service, rollout gate,
+ * schemas, and statement ceiling — moved here so a process composes it from
+ * one package rather than from six platform paths.
  */
 export { LangWatchQLAdapter } from "./adapters/langwatch-ql.adapter";
 export {

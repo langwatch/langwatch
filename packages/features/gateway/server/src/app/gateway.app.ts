@@ -48,7 +48,7 @@ export type GatewayVirtualKeyBudgetInput = Readonly<{
  */
 export type GatewayVirtualKeyOperations = Readonly<{
   getAll(organizationId: string): Promise<VirtualKeyWithScopes[]>;
-  getById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null>;
+  tryGetById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null>;
   getPage(input: {
     organizationId: string;
     limit: number;

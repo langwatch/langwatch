@@ -89,7 +89,7 @@ export type LimitsTrpcPorts = Readonly<{
    * and nothing has been sent in the current window. Answers the notification
    * row it wrote, or nothing when it sent nothing.
    */
-  checkAndSendWarning(
+  tryCheckAndSendWarning(
     ctx: LimitsTrpcContext,
     input: Readonly<{
       organizationId: string;
@@ -138,7 +138,7 @@ export class LimitsTrpcApi {
       checkAndSendUsageLimitNotification: policy("organization:manage")(
         procedure.input(usageLimitNotificationInputSchema),
       ).mutation(async ({ input, ctx }) => {
-        const notification = await ports.checkAndSendWarning(ctx, {
+        const notification = await ports.tryCheckAndSendWarning(ctx, {
           organizationId: input.organizationId,
           currentMonthMessagesCount: input.currentMonthMessagesCount,
           maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,

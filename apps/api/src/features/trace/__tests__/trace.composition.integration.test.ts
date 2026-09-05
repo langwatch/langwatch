@@ -104,7 +104,7 @@ const overlay = { traceId: "trace-1", patch: { trace: {} }, updatedAt: new Date(
 function testTraceReaders(): TraceAppDependencies["traces"] {
   return stub<TraceAppDependencies["traces"]>("traces", {
     read: {
-      getById: async () => trace,
+      tryGetById: async () => trace,
       getTracesWithSpans: async () => [trace],
     },
     list: { getNewCount: async () => 7 },

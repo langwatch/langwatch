@@ -44,11 +44,11 @@ type ConversationRouting = {
 const CONVERSATION_ROUTING = new Map<string, ConversationRouting>([
   [
     "databricks_genie",
-    { profile: GENIE_ROUTING_PROFILE, map: GenieTraceMapperService.toTraceRequest },
+    { profile: GENIE_ROUTING_PROFILE, map: GenieTraceMapperService.tryToTraceRequest },
   ],
   [
     "copilot_studio_dataverse",
-    { profile: COPILOT_ROUTING_PROFILE, map: CopilotStudioTraceMapperService.toTraceRequest },
+    { profile: COPILOT_ROUTING_PROFILE, map: CopilotStudioTraceMapperService.tryToTraceRequest },
   ],
 ]);
 
@@ -73,7 +73,7 @@ export class IngestionPullWorkerConfiguration {
 
 export class IngestionPullWorkerService {
   /** The routing profile a pulled source's conversations are assembled under. */
-  static conversationRoutingProfileFor(sourceType: string): ConversationRoutingProfile | undefined {
+  static tryConversationRoutingProfileFor(sourceType: string): ConversationRoutingProfile | undefined {
     return CONVERSATION_ROUTING.get(sourceType)?.profile;
   }
 

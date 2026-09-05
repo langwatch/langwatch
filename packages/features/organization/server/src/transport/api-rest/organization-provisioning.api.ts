@@ -40,7 +40,7 @@ export interface OrganizationProvisioningPort {
     slug?: string;
   }): Promise<{ organization: { id: string; name: string }; team: unknown }>;
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
-  getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null>;
+  tryGetProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
 }
 
@@ -190,7 +190,7 @@ export function createOrganizationsRestApp(options: {
             ],
           });
 
-          summary = await service.getProvisioningSummary(created.organization.id);
+          summary = await service.tryGetProvisioningSummary(created.organization.id);
           if (!summary) {
             // The slug is the natural key an infrastructure-as-code caller
             // stores; answering 201 with a blank one moves the failure far
@@ -250,7 +250,7 @@ export function createOrganizationsRestApp(options: {
 
   secured.access(instanceAdminPolicy()).get("/:id", describeRoute(GET_ORGANIZATION), async (c) => {
     const { id } = c.req.param();
-    const organization = await organizations().getProvisioningSummary(id);
+    const organization = await organizations().tryGetProvisioningSummary(id);
     if (!organization) {
       throw new NotFoundError("not_found", "Organization", id);
     }

@@ -145,7 +145,7 @@ async function handleElevenLabsWebhook(
   const modelProviderId = c.req.param("modelProviderId") ?? "";
   const configured = await GatewayElevenLabsCredentialService.create(
     ports.credentials,
-  ).getWebhookSecret({ modelProviderId });
+  ).tryGetWebhookSecret({ modelProviderId });
   if (!configured) {
     // 404 rather than 401: an id with no webhook configured must look the
     // same as an id that does not exist, or the ids are enumerable.
@@ -227,7 +227,7 @@ async function applyPostCallReport(params: {
   }
 
   const startedAtSecs = data?.metadata?.start_time_unix_secs;
-  const session = await realtimeSessions.matchRealtimeSession({
+  const session = await realtimeSessions.tryMatchRealtimeSession({
     vendor: "elevenlabs",
     organizationId: params.organizationId,
     modelProviderId: params.modelProviderId,

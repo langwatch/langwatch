@@ -3,7 +3,7 @@ export class TraceSafeJsonService {
     return new TraceSafeJsonService();
   }
 
-  static safeJsonParse(json: string | null): Record<string, unknown> | null {
+  static trySafeJsonParse(json: string | null): Record<string, unknown> | null {
     if (!json) {
       return null;
     }

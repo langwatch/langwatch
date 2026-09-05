@@ -289,7 +289,7 @@ export class LangyTurnPreparationService {
     const isUiActionSurfaceOpen =
       uiActionsOpenResult.status === "fulfilled" ? uiActionsOpenResult.value : false;
     const { prompt, labelled } = composeLangyTurnPrompt({
-      contextBlock: this.deps.context.render({
+      contextBlock: this.deps.context.tryRender({
         context: args.turnContext,
         isUiActionSurfaceOpen,
       }),

@@ -88,8 +88,8 @@ function computeTraceIO(span: NormalizedSpan) {
   ];
 
   return {
-    input: ioService.extractFirstInput(spans)?.text ?? null,
-    output: ioService.extractLastOutput(spans)?.text ?? null,
+    input: ioService.tryExtractFirstInput(spans)?.text ?? null,
+    output: ioService.tryExtractLastOutput(spans)?.text ?? null,
     appliedRules: canonicalised.appliedRules,
     canonicalAttributes: canonicalised.attributes,
   };

@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
-import { Currency } from "@langwatch/prisma-client/generated";
 import {
+  Currency,
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
   isGrowthSeatPrice,
@@ -291,7 +291,7 @@ export class EEWebhookService implements WebhookService {
         : paymentIntent.customer?.id;
 
     const organization = customerId
-      ? await this.organizationRepository.findByStripeCustomerId(customerId)
+      ? await this.organizationRepository.tryFindByStripeCustomerId(customerId)
       : null;
 
     if (customerId && !organization) {
@@ -467,7 +467,7 @@ export class EEWebhookService implements WebhookService {
       throwOnMissing: true,
     });
 
-    const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
+    const subscriptionRecord = await this.subscriptionRepository.tryFindByStripeId(subscriptionId);
 
     const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
     if (normalizedCurrency && subscriptionRecord) {
@@ -555,7 +555,7 @@ export class EEWebhookService implements WebhookService {
   async handleInvoicePaymentFailed({ subscriptionId }: { subscriptionId: string }): Promise<void> {
     await waitForStripeConsistency();
 
-    const currentSubscription = await this.subscriptionRepository.findByStripeId(subscriptionId);
+    const currentSubscription = await this.subscriptionRepository.tryFindByStripeId(subscriptionId);
 
     if (!currentSubscription) {
       logger.warn(
@@ -580,7 +580,7 @@ export class EEWebhookService implements WebhookService {
     await waitForStripeConsistency();
 
     const existingSubscription =
-      await this.subscriptionRepository.findByStripeId(stripeSubscriptionId);
+      await this.subscriptionRepository.tryFindByStripeId(stripeSubscriptionId);
 
     if (!existingSubscription) {
       logger.warn(
@@ -607,7 +607,7 @@ export class EEWebhookService implements WebhookService {
       label: "cancellation notification",
       context: { stripeSubscriptionId },
       effect: async () => {
-        const org = await this.organizationRepository.findNameById(
+        const org = await this.organizationRepository.tryFindNameById(
           existingSubscription.organizationId,
         );
         await this.host.sendSlackSubscriptionEvent({
@@ -621,7 +621,7 @@ export class EEWebhookService implements WebhookService {
       },
     });
 
-    const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
+    const remainingActive = await this.subscriptionRepository.tryFindLastNonCancelled(
       existingSubscription.organizationId,
     );
     NurturingSubscriptionSyncService.fireSubscriptionSync({
@@ -640,7 +640,7 @@ export class EEWebhookService implements WebhookService {
   }): Promise<void> {
     await waitForStripeConsistency();
 
-    const existingSubForUpdate = await this.subscriptionRepository.findByStripeId(subscription.id);
+    const existingSubForUpdate = await this.subscriptionRepository.tryFindByStripeId(subscription.id);
 
     if (!existingSubForUpdate) {
       logger.warn(
@@ -659,7 +659,7 @@ export class EEWebhookService implements WebhookService {
       // which is handled by handleSubscriptionDeleted.
       await this.subscriptionRepository.cancel({ id: existingSubForUpdate.id });
 
-      const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
+      const remainingActive = await this.subscriptionRepository.tryFindLastNonCancelled(
         existingSubForUpdate.organizationId,
       );
       NurturingSubscriptionSyncService.fireSubscriptionSync({
@@ -707,7 +707,7 @@ export class EEWebhookService implements WebhookService {
         }
       }
 
-      const updatedSubscription = await this.subscriptionRepository.updateQuantities({
+      const updatedSubscription = await this.subscriptionRepository.tryUpdateQuantities({
         id: existingSubForUpdate.id,
         maxMembers: usersQuantity,
         maxMessagesPerMonth: tracesQuantity,
@@ -750,7 +750,7 @@ export class EEWebhookService implements WebhookService {
   }) {
     await waitForStripeConsistency();
 
-    const previousSubscription = await this.subscriptionRepository.findByStripeId(subscriptionId);
+    const previousSubscription = await this.subscriptionRepository.tryFindByStripeId(subscriptionId);
 
     if (!previousSubscription) {
       if (throwOnMissing) {
@@ -796,7 +796,7 @@ export class EEWebhookService implements WebhookService {
       return;
     }
 
-    const updatedSubscription = await this.subscriptionRepository.activate({
+    const updatedSubscription = await this.subscriptionRepository.tryActivate({
       id: previousSubscription.id,
       previousStatus: previousSubscription.status,
     });

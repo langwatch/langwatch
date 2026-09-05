@@ -1,4 +1,4 @@
-import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
 import type { TeamRoleValue } from "./member-role-constraints.service";
 
 export const LITE_MEMBER_VIEWER_ONLY_ERROR = "Lite Member users can only have Viewer team role";

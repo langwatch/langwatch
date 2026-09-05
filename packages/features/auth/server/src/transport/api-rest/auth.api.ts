@@ -6,7 +6,7 @@
 import { publicEndpoint } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { AuthDirectoryPort } from "../../ports/auth-directory.port";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 
@@ -61,7 +61,7 @@ export type AuthRestPorts = Readonly<{
   /**
    * The typed client the born-finalized entrance reads its allowlist through.
    */
-  database: () => PrismaClient;
+  directory: () => AuthDirectoryPort;
   /** The origin every state-changing auth request is checked against. */
   baseUrl: string;
   /** Where a GET logout lands, once the local cookies are cleared. */
@@ -220,7 +220,7 @@ export function createAuthRestApp(options: {
     if (
       await isBornFinalizedSignUp({
         featureFlags: ports.featureFlags(),
-        prisma: ports.database(),
+        directory: ports.directory(),
         request: c.req.raw,
       })
     ) {

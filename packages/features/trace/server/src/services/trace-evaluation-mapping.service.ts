@@ -89,7 +89,7 @@ export class TraceEvaluationMappingService {
       label: record.Label,
       details: record.Details,
       error: record.Error,
-      inputs: TraceSafeJsonService.safeJsonParse(record.Inputs),
+      inputs: TraceSafeJsonService.trySafeJsonParse(record.Inputs),
       timestamps: {
         // CH DateTime64(3) returns UTC strings without timezone suffix; append "Z" only when missing
         scheduledAt: record.ScheduledAt

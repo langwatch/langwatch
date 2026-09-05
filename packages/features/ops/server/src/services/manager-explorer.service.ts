@@ -124,7 +124,7 @@ export class ManagerExplorerService {
     return this.fleet.findUpcomingWakes(params);
   }
 
-  async getInstanceDetail(params: { ref: ProcessRef }): Promise<ProcessInstanceDetail | null> {
+  async tryGetInstanceDetail(params: { ref: ProcessRef }): Promise<ProcessInstanceDetail | null> {
     const instance = await this.store.findByRef({ ref: params.ref });
     if (!instance) {
       return null;
@@ -213,7 +213,7 @@ export class ManagerExplorerService {
   }
 
   /** One dead message back to pending, audited. */
-  async tryRedriveDeadMessage(params: {
+  async redriveDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     actorUserId: string;
@@ -242,7 +242,7 @@ export class ManagerExplorerService {
    * delete — the row stays as its own audit trail
    * (specs/ops/dead-letter-recovery.feature).
    */
-  async tryDiscardDeadMessage(params: {
+  async discardDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     actorUserId: string;
@@ -331,7 +331,7 @@ export class ManagerExplorerService {
    * lapse, so a live delivery keeps its lease; the residual risk — the holder is alive and slow, and completion after this
    * release re-delivers — is absorbed by the message-key idempotency and stated in the confirm copy.
    */
-  async tryReleaseLapsedLease(params: {
+  async releaseLapsedLease(params: {
     ref: ProcessRef;
     messageId: string;
     actorUserId: string;

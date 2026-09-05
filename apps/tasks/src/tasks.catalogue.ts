@@ -5,11 +5,14 @@ import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
 import { WebhookSignatureVectorsTask } from "@langwatch/egress";
 import {
   TraceDestinationReportTask,
+  PostgresGatewayTraceDestinationReportAdapter,
   VirtualKeyConfigBackfillTask,
+  PostgresGatewayVirtualKeyConfigBackfillAdapter,
 } from "@langwatch/gateway-server";
 import { GroupQueueReapStrandedGroupsTask } from "@langwatch/group-queue/operational";
 import {
   DuplicateSubscriptionsReportTask,
+  PostgresDuplicateSubscriptionsReportAdapter,
   StripePricesSyncTask,
   TieredFreeToSeatEventMigrateTask,
 } from "@langwatch/enterprise-billing-server";
@@ -18,7 +21,10 @@ import {
   ModelProviderCustomModelsMigrateTask,
   ModelRegistrySyncTask,
 } from "@langwatch/model-provider-server";
-import { ProcessManagerPurgeTask } from "@langwatch/ops-server";
+import {
+  PostgresProcessManagerPurgeAdapter,
+  ProcessManagerPurgeTask,
+} from "@langwatch/ops-server";
 import type { Task } from "@langwatch/task";
 import { UserDataEraseTask } from "@langwatch/user-server";
 import { buildAnnotationClickHouseBackfillTask } from "./platform/annotation-clickhouse-backfill.composition";
@@ -63,11 +69,23 @@ export function buildTasksCatalogue({
     buildAnnotationClickHouseBackfillTask({ host, eventing }),
     buildDatasetContentBackfillTask({ host }),
     buildSystemMigrationsPassTask({ host, eventing }),
-    ProcessManagerPurgeTask.create({ database: () => host.requirePrisma() }),
+    ProcessManagerPurgeTask.create({
+      repository: () =>
+        PostgresProcessManagerPurgeAdapter.create({ database: host.requirePrisma() }),
+    }),
     AgentAuditLogIdsBackfillTask.create({ database: () => host.requirePrisma() }),
-    DuplicateSubscriptionsReportTask.create({ database: () => host.requirePrisma() }),
-    VirtualKeyConfigBackfillTask.create({ database: () => host.requirePrisma() }),
-    TraceDestinationReportTask.create({ database: () => host.requirePrisma() }),
+    DuplicateSubscriptionsReportTask.create({
+      repository: () =>
+        PostgresDuplicateSubscriptionsReportAdapter.create({ database: host.requirePrisma() }),
+    }),
+    VirtualKeyConfigBackfillTask.create({
+      repository: () =>
+        PostgresGatewayVirtualKeyConfigBackfillAdapter.create({ database: host.requirePrisma() }),
+    }),
+    TraceDestinationReportTask.create({
+      repository: () =>
+        PostgresGatewayTraceDestinationReportAdapter.create({ database: host.requirePrisma() }),
+    }),
     GroupQueueReapStrandedGroupsTask.create({ redis: () => host.requireRedis() }),
     StripePricesSyncTask.create({ secretKey: () => process.env.STRIPE_SECRET_KEY }),
     TieredFreeToSeatEventMigrateTask.create({ database: () => host.requirePrisma() }),

@@ -1,4 +1,4 @@
-import type { BugReport, Prisma } from "@langwatch/prisma-client/generated";
+import type { BugReport, BugReportCreateInput } from "@langwatch/ops-contract";
 
 /**
  * Storage for the reports customers' coding agents file (`langwatch report`
@@ -10,7 +10,7 @@ import type { BugReport, Prisma } from "@langwatch/prisma-client/generated";
  * a search term rather than a scope.
  */
 export abstract class BugReportRepositoryPort {
-  abstract create(input: { data: Prisma.BugReportCreateInput }): Promise<BugReport>;
+  abstract create(input: { data: BugReportCreateInput }): Promise<BugReport>;
 
   /**
    * One page, newest first, WITHOUT the stored transcript.
@@ -25,7 +25,7 @@ export abstract class BugReportRepositoryPort {
     search?: string | undefined;
   }): Promise<Omit<BugReport, "sessionData">[]>;
 
-  abstract findById(input: { id: string }): Promise<BugReport | null>;
+  abstract tryFindById(input: { id: string }): Promise<BugReport | null>;
 
   abstract count(input?: { search?: string | undefined }): Promise<number>;
 }

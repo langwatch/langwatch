@@ -25,7 +25,7 @@ import type { UserService } from "@langwatch/user-contract";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiTraceProducerCommands } from "../trace/trace-producer.composition";
 import {
   createAnnotationScoreTrpcRouter,
@@ -189,13 +189,13 @@ async function writeAnnotationSuggestionToOverlay(input: {
   if (target.kind === "span") {
     const span = { projectId, traceId, spanId: target.spanId, userId };
     await (withdrawn
-      ? overlay.removeSpanFieldEdit({ ...span, field: target.field })
+      ? overlay.tryRemoveSpanFieldEdit({ ...span, field: target.field })
       : overlay.mergeSpanFieldEdit({ ...span, field: target.field, text }));
     return;
   }
   const trace = { projectId, traceId, field: target.field, userId };
   await (withdrawn
-    ? overlay.removeTraceIOEdit(trace)
+    ? overlay.tryRemoveTraceIOEdit(trace)
     : overlay.mergeTraceIOEdit({ ...trace, value: text }));
 }
 

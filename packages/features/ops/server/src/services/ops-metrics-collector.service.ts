@@ -786,7 +786,7 @@ export class OpsMetricsCollectorService {
 
         // Only adopt the artifact the fence ACCEPTED. A rejected write means the lease
         // turned over mid-scan, so this payload was never published; keeping it would
-        // have `getLatestDetail()` report a detail artifact no reader can see. Leaving
+        // have `tryGetLatestDetail()` report a detail artifact no reader can see. Leaving
         // `lastDetailAt` alone is deliberate too — a pod that regains the lease should
         // rescan rather than sit out a cadence it never completed.
         const published = await snapshots.writeDetail({
@@ -812,7 +812,7 @@ export class OpsMetricsCollectorService {
   }
 
   /** The detail artifact this writer most recently produced, if any. */
-  getLatestDetail(): DetailSnapshot | null {
+  tryGetLatestDetail(): DetailSnapshot | null {
     return this.latestDetail;
   }
 
@@ -1041,7 +1041,7 @@ export class OpsMetricsCollectorService {
    */
   private async restoreState(): Promise<void> {
     try {
-      const raw = await this.metrics.readPersistedState();
+      const raw = await this.metrics.tryReadPersistedState();
       if (!raw) {
         return;
       }

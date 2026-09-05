@@ -179,7 +179,7 @@ export class RedisOpsMetricsRepository extends OpsMetricsRepository {
     return Array.from(keys);
   }
 
-  readPersistedState(): Promise<string | null> {
+  tryReadPersistedState(): Promise<string | null> {
     return this.redis.get(REDIS_STATE_KEY);
   }
 

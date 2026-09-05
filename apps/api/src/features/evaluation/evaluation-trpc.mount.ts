@@ -14,7 +14,7 @@ import {
 } from "@langwatch/evaluation-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { listCustomEvaluators } from "./custom-evaluators";
+import { listCustomEvaluators } from "../../platform/infrastructure/postgres.custom-evaluators.adapter";
 
 /**
  * The application ports this mount forwards untouched. Each reaches a

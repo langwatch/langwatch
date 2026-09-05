@@ -98,9 +98,9 @@ export class ConnectGateway {
    * refusal is one `refused` frame followed by a close.
    */
   private async accept(ws: WebSocket, request: IncomingMessage): Promise<void> {
-    const replicaRefusal = this.core.replicaRefusal();
-    if (replicaRefusal) {
-      this.refuse(ws, replicaRefusal);
+    const tryReplicaRefusal = this.core.tryReplicaRefusal();
+    if (tryReplicaRefusal) {
+      this.refuse(ws, tryReplicaRefusal);
       return;
     }
 
@@ -229,7 +229,7 @@ export class ConnectGateway {
 
   /** Reads one envelope and sends it, if it is for an agent of this socket. */
   private async deliverCall(session: Session, callId: string): Promise<void> {
-    const stored = await this.core.readCallForSession(session.info, callId);
+    const stored = await this.core.tryReadCallForSession(session.info, callId);
     if (!stored) return;
     // The call counts as in flight only once the frame is written. A socket
     // that went away between the nudge and the write never carried it, so the

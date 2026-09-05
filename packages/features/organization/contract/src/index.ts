@@ -10,3 +10,4 @@ export * from "./personal-workspace";
 export * from "./team";
 export * from "./team.trpc-schemas";
 export * from "./team.errors";
+export * from "./organization.rows";

@@ -109,7 +109,7 @@ function buildApi() {
     searchBodySchema,
     traces: () => ({
       getAllTracesForProject: mockGetAllTracesForProject,
-      getById: vi.fn(),
+      tryGetById: vi.fn(),
       getEvaluationsMultiple: vi.fn(),
     }),
     getProtections: vi.fn().mockResolvedValue({}),

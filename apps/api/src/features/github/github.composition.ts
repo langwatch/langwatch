@@ -8,7 +8,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createGithubTrpcRouter, type GithubTrpcMountPorts } from "./github-trpc.mount";
 
 /** Builds `github.*` on this process's root, over this process's own graph. */

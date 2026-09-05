@@ -50,7 +50,7 @@ export class GatewayScopeResolutionService {
     }
 
     if (vk.routingPolicyId) {
-      const policy = await this.repository.findRoutingPolicyOrder({
+      const policy = await this.repository.tryFindRoutingPolicyOrder({
         routingPolicyId: vk.routingPolicyId,
         transaction,
       });

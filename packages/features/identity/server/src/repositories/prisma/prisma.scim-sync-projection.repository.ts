@@ -97,7 +97,7 @@ export class PrismaScimSyncProjectionRepository
    * command whose tenant and aggregate disagree resolves to nothing rather
    * than to another organization's sync.
    */
-  async findSync({
+  async tryFindSync({
     scimSyncId,
     organizationId,
   }: {

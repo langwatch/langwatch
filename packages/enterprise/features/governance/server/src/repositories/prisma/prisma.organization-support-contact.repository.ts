@@ -46,7 +46,7 @@ export class PrismaOrganizationSupportContactRepository extends OrganizationSupp
     return new Map(users.map((user) => [user.id, user.email]));
   }
 
-  async findConfiguredSupportContact({
+  async tryFindConfiguredSupportContact({
     organizationId,
   }: {
     organizationId: string;

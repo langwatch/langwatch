@@ -7,7 +7,7 @@ import type { TenantMigrationRecord } from "@langwatch/system-migrations";
  */
 export abstract class IdentityWriteGateStatePort {
   /** One tenant's record for a migration, or null when it has none. */
-  abstract findRecord(input: {
+  abstract tryFindRecord(input: {
     migrationName: string;
     tenantId: string;
   }): Promise<TenantMigrationRecord | null>;

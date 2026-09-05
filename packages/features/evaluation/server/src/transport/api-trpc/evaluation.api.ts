@@ -120,7 +120,7 @@ export type EvaluationTrpcPorts<TMappingsIn, TMappingsOut, TCustomEvaluator> = R
    * different thing from an evaluator being unconfigured: the code for it is
    * not here at all.
    */
-  evaluatorUnavailability(
+  tryEvaluatorUnavailability(
     input: Readonly<{ evaluatorType: string }>,
   ): EvaluatorUnavailability | undefined;
   /**
@@ -216,7 +216,7 @@ export class EvaluationTrpcApi {
                   : ports.missingEnvironmentVariables(evaluator.envVars),
                 // Set when this install does not have the evaluator's code at
                 // all, which is a different thing from it being unconfigured.
-                unavailable: ports.evaluatorUnavailability({ evaluatorType: key }),
+                unavailable: ports.tryEvaluatorUnavailability({ evaluatorType: key }),
               },
             ]),
           );

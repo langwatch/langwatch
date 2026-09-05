@@ -72,7 +72,7 @@ export class ExperimentRunResultsWriterService implements RunResultsWriter {
   }
 
   /** The writer a run gets, or none when the run must leave the board alone. */
-  static writerFor({
+  static tryWriterFor({
     persistence,
     projectId,
     experimentId,

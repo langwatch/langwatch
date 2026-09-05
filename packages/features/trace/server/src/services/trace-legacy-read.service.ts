@@ -136,7 +136,7 @@ export class TraceService {
   }
 
   /**
-   * The single-trace tail shared by every branch of {@link getById}: coding-agent
+   * The single-trace tail shared by every branch of {@link tryGetById}: coding-agent
    * enrichment first, then the reviewer correction if the caller asked for one.
    */
   private async enrichAndCorrect({
@@ -242,14 +242,14 @@ export class TraceService {
    * @param opts.full resolves offloaded blob previews when deps are present; @param opts.withEditOverlay applies a reviewer's saved correction.
    * @returns The trace if found, undefined otherwise
    */
-  async getById(
+  async tryGetById(
     projectId: string,
     traceId: string,
     protections: Protections,
     opts?: { full?: boolean; withEditOverlay?: boolean },
   ): Promise<Trace | undefined> {
     return this.tracer.withActiveSpan(
-      "TraceService.getById",
+      "TraceService.tryGetById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async (span) => {
         const finish = (trace: Trace) =>
@@ -509,7 +509,7 @@ export class TraceService {
    * @param evaluationId - The evaluation to fetch inputs for
    * @returns The parsed inputs, or null when none are available
    */
-  async getEvaluationInputs({
+  async tryGetEvaluationInputs({
     projectId,
     evaluationId,
   }: {
@@ -517,7 +517,7 @@ export class TraceService {
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
     return this.tracer.withActiveSpan(
-      "TraceService.getEvaluationInputs",
+      "TraceService.tryGetEvaluationInputs",
       {
         attributes: {
           "tenant.id": projectId,

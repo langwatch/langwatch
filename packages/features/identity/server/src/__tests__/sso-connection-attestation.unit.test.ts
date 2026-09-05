@@ -147,7 +147,7 @@ describe("operator attestation", () => {
         code: "sso_connection_operator_act_required",
       });
 
-      const held = await connections.findConnection({
+      const held = await connections.tryFindConnection({
         connectionId: CONNECTION,
       });
       expect(held?.state).toBe("APPROVED");
@@ -232,7 +232,7 @@ describe("operator attestation", () => {
       // domain: no deadline was written by the attestation, so none can
       // elapse, and reading the connection a year on answers exactly as it
       // did on the day.
-      const aYearOn = await connections.findConnection({
+      const aYearOn = await connections.tryFindConnection({
         connectionId: CONNECTION,
       });
       expect(aYearOn?.state).toBe("ACTIVE");
@@ -323,7 +323,7 @@ describe("operator attestation", () => {
         code: "sso_connection_invalid_transition",
       });
 
-      const held = await connections.findConnection({
+      const held = await connections.tryFindConnection({
         connectionId: CONNECTION,
       });
       expect(held?.state).toBe("CLAIMED");
@@ -382,12 +382,12 @@ describe("operator attestation", () => {
         }),
       ).rejects.toMatchObject({ code: "sso_connection_domain_taken" });
 
-      const held = await connections.findConnection({
+      const held = await connections.tryFindConnection({
         connectionId: CONNECTION,
       });
       expect(held?.state).toBe("APPROVED");
       expect(held?.verifiedDomains).toEqual([]);
-      expect(await connections.findDomainOwner({ domain: "acme.com" })).toEqual({
+      expect(await connections.tryFindDomainOwner({ domain: "acme.com" })).toEqual({
         connectionId: "ssoc_first",
         organizationId: "org_first",
       });
@@ -477,13 +477,13 @@ describe("operator attestation", () => {
         connectionId: "ssoc_3",
       });
 
-      const attested = await connections.findConnection({
+      const attested = await connections.tryFindConnection({
         connectionId: CONNECTION,
       });
-      const published = await connections.findConnection({
+      const published = await connections.tryFindConnection({
         connectionId: "ssoc_2",
       });
-      const byLicence = await connections.findConnection({
+      const byLicence = await connections.tryFindConnection({
         connectionId: "ssoc_3",
       });
 
@@ -573,7 +573,7 @@ describe("operator attestation", () => {
         code: "sso_connection_operator_act_required",
       });
 
-      const held = await connections.findConnection({
+      const held = await connections.tryFindConnection({
         connectionId: CONNECTION,
       });
       expect(held?.state).toBe("CLAIMED");

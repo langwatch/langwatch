@@ -163,7 +163,6 @@ describe("the traces-with-spans memory-limit fallback", () => {
       clickHouseThatOOMsThenBatches({ spansPerTrace: 200 });
       const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
-        prisma: {} as never,
         traceCanonicalisation,
       });
 
@@ -179,7 +178,6 @@ describe("the traces-with-spans memory-limit fallback", () => {
       clickHouseThatOOMsThenBatches({ spansPerTrace: 200 });
       const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
-        prisma: {} as never,
         traceCanonicalisation,
       });
 
@@ -207,7 +205,6 @@ describe("the traces-with-spans memory-limit fallback", () => {
       });
       const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
-        prisma: {} as never,
         traceCanonicalisation,
       });
 
@@ -226,7 +223,6 @@ describe("the traces-with-spans memory-limit fallback", () => {
       });
       const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
-        prisma: {} as never,
         traceCanonicalisation,
       });
 
@@ -245,7 +241,6 @@ describe("the traces-with-spans memory-limit fallback", () => {
       clickHouseThatOOMsThenBatches({ spansPerTrace: 1 });
       const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
-        prisma: {} as never,
         traceCanonicalisation,
       });
 

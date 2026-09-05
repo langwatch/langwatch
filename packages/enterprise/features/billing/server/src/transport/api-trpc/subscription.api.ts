@@ -73,7 +73,7 @@ type BillingApplication = Readonly<{
       baseUrl: string;
       organizationId: string;
     }): Promise<{ url: string }>;
-    getLastNonCancelledSubscription(organizationId: string): Promise<unknown>;
+    tryGetLastNonCancelledSubscription(organizationId: string): Promise<unknown>;
     previewProration(params: { organizationId: string; newTotalSeats: number }): Promise<unknown>;
     notifyProspective(params: {
       organizationId: string;
@@ -252,7 +252,7 @@ export class SubscriptionTrpcApi {
         procedure.input(z.object({ organizationId: z.string() })),
       ).query(async ({ input, ctx }) => {
         const { subscriptionService } = requireSaasBilling(ctx.app);
-        return await subscriptionService.getLastNonCancelledSubscription(input.organizationId);
+        return await subscriptionService.tryGetLastNonCancelledSubscription(input.organizationId);
       }),
 
       upgradeWithInvites: policy("organization:manage")(

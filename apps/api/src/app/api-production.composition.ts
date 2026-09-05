@@ -244,7 +244,7 @@ import {
   type ComposedGatewayFeature,
 } from "../features/gateway/gateway.composition";
 import { composeEnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition";
-import type { ApiTrpcInfrastructure } from "../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition";
 import {
   composeApiIdempotency,

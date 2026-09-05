@@ -6,7 +6,7 @@ import type { TenantMigrationRecord } from "./types";
  * stored facts - the state machine's rules live in the runner.
  */
 export interface SystemMigrationStateRepository {
-  findRecord(args: {
+  tryFindRecord(args: {
     migrationName: string;
     tenantId: string;
   }): Promise<TenantMigrationRecord | null>;

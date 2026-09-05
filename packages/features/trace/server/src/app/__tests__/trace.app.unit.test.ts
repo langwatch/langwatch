@@ -85,15 +85,15 @@ type ReadCall = { name: string; args: unknown[] };
  */
 function harness(
   reads: Partial<{
-    getById: TraceLegacyReadPort["getById"];
+    tryGetById: TraceLegacyReadPort["tryGetById"];
     getEvaluationsMultiple: TraceLegacyReadPort["getEvaluationsMultiple"];
     getAllTracesForProject: TraceLegacyReadPort["getAllTracesForProject"];
     getTracesWithSpans: TraceLegacyReadPort["getTracesWithSpans"];
     getByTraceId: TraceSummaryReader["getByTraceId"];
   }> = {},
 ) {
-  const getById = vi.fn<TraceLegacyReadPort["getById"]>(
-    reads.getById ?? (async () => traceRow("trace-1")),
+  const tryGetById = vi.fn<TraceLegacyReadPort["tryGetById"]>(
+    reads.tryGetById ?? (async () => traceRow("trace-1")),
   );
   const getEvaluationsMultiple = vi.fn<TraceLegacyReadPort["getEvaluationsMultiple"]>(
     reads.getEvaluationsMultiple ?? (async () => ({})),
@@ -117,7 +117,7 @@ function harness(
     };
 
   const read: Partial<TraceLegacyReadPort> = {
-    getById,
+    tryGetById,
     getEvaluationsMultiple,
     getAllTracesForProject,
     getTracesWithSpans,
@@ -159,7 +159,7 @@ function harness(
   return {
     app,
     spanReads,
-    getById,
+    tryGetById,
     getEvaluationsMultiple,
     getAllTracesForProject,
     getTracesWithSpans,
@@ -171,7 +171,7 @@ describe("TraceApp", () => {
   describe("readTrace", () => {
     describe("given a read that shows the content it fetches", () => {
       it("resolves the trace in full rather than serving the stored preview", async () => {
-        const { app, getById } = harness();
+        const { app, tryGetById } = harness();
 
         await app.readTrace({
           projectId: "project-1",
@@ -179,7 +179,7 @@ describe("TraceApp", () => {
           protections: PROTECTIONS,
         });
 
-        expect(getById).toHaveBeenCalledWith("project-1", "trace-1", PROTECTIONS, {
+        expect(tryGetById).toHaveBeenCalledWith("project-1", "trace-1", PROTECTIONS, {
           full: true,
         });
       });
@@ -187,7 +187,7 @@ describe("TraceApp", () => {
 
     describe("when the caller says nothing about reviewer corrections", () => {
       it("leaves the overlay opt-in rather than asking for it or refusing it", async () => {
-        const { app, getById } = harness();
+        const { app, tryGetById } = harness();
 
         await app.readTrace({
           projectId: "project-1",
@@ -195,13 +195,13 @@ describe("TraceApp", () => {
           protections: PROTECTIONS,
         });
 
-        expect(getById.mock.calls[0]?.[3]).not.toHaveProperty("withEditOverlay");
+        expect(tryGetById.mock.calls[0]?.[3]).not.toHaveProperty("withEditOverlay");
       });
     });
 
     describe("when the caller asks for the corrected trace", () => {
       it("forwards the overlay flag alongside full resolution", async () => {
-        const { app, getById } = harness();
+        const { app, tryGetById } = harness();
 
         await app.readTrace({
           projectId: "project-1",
@@ -210,7 +210,7 @@ describe("TraceApp", () => {
           withEditOverlay: true,
         });
 
-        expect(getById).toHaveBeenCalledWith("project-1", "trace-1", PROTECTIONS, {
+        expect(tryGetById).toHaveBeenCalledWith("project-1", "trace-1", PROTECTIONS, {
           full: true,
           withEditOverlay: true,
         });
@@ -222,7 +222,7 @@ describe("TraceApp", () => {
       // door's business, and both doors depend on getting `undefined` rather
       // than a throw.
       it("answers undefined rather than failing", async () => {
-        const { app } = harness({ getById: async () => undefined });
+        const { app } = harness({ tryGetById: async () => undefined });
 
         await expect(
           app.readTrace({

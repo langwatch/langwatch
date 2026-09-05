@@ -223,8 +223,8 @@ export class TraceOffloadResolutionBatchService {
 
       return {
         resolvedSpans,
-        recomputedInput: ioExtractionService.extractFirstInput(resolvedSpans),
-        recomputedOutput: ioExtractionService.extractLastOutput(resolvedSpans),
+        recomputedInput: ioExtractionService.tryExtractFirstInput(resolvedSpans),
+        recomputedOutput: ioExtractionService.tryExtractLastOutput(resolvedSpans),
         anyResolved: true,
       };
     });

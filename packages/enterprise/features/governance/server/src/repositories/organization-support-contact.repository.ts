@@ -11,5 +11,5 @@ export abstract class OrganizationSupportContactRepository {
   /** The email of each named user that still exists and has one. */
   abstract findEmailsByUserIds(input: { userIds: string[] }): Promise<Map<string, string | null>>;
   /** The admin-configured free-text contact, if the organization set one. */
-  abstract findConfiguredSupportContact(input: { organizationId: string }): Promise<string | null>;
+  abstract tryFindConfiguredSupportContact(input: { organizationId: string }): Promise<string | null>;
 }

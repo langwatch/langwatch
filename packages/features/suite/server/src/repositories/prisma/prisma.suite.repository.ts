@@ -1,5 +1,5 @@
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { isUniqueConstraintError } from "@langwatch/prisma-client";
+import { isUniqueConstraintError } from "@langwatch/prisma-client/errors";
 import {
   CLI_EPHEMERAL_LABEL,
   parseSuiteScope,

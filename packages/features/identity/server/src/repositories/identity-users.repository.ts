@@ -16,7 +16,7 @@
 export interface IdentityUsersRepository {
   storeUserHashKeyIfMissing(args: { userId: string; userHashKey: string }): Promise<void>;
   /** The user's current email, or null — including for a user that is gone. */
-  findEmail(args: { userId: string }): Promise<string | null>;
+  tryFindEmail(args: { userId: string }): Promise<string | null>;
   /**
    * Who holds this address on the LEGACY branch — the half of the
    * cross-population uniqueness question the `Identifier` projection cannot
@@ -37,5 +37,5 @@ export interface IdentityUsersRepository {
    * have let those two rows coexist as well — so this closes the collision
    * the database would have failed on, and nothing wider.
    */
-  findUserIdByEmail(args: { normalizedValue: string }): Promise<string | null>;
+  tryFindUserIdByEmail(args: { normalizedValue: string }): Promise<string | null>;
 }

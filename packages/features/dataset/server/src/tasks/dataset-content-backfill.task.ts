@@ -1,8 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { Task } from "@langwatch/task";
 import { PostgresDatasetMigrationAdapter } from "#adapters/postgres.dataset-migration.adapter";
-import type { DatasetStorageResolver } from "#ports/dataset-storage.port";
 
 const logger = createLogger("langwatch:tasks:backfill-dataset-content-to-object-storage");
 
@@ -10,28 +8,10 @@ const logger = createLogger("langwatch:tasks:backfill-dataset-content-to-object-
  * Moves dataset content out of Postgres and into object storage.
  */
 export class DatasetContentBackfillSweep {
-  private constructor(
-    private readonly migration: {
-      run(input: { dryRun: boolean }): Promise<DatasetBackfillOutcome>;
-    },
-  ) {}
+  private constructor(private readonly migration: DatasetContentMigration) {}
 
-  static create({
-    database,
-    storage,
-  }: {
-    database: PrismaClient;
-    storage: DatasetStorageResolver;
-  }): DatasetContentBackfillSweep {
-    return new DatasetContentBackfillSweep(
-      PostgresDatasetMigrationAdapter.create({ database, storage }),
-    );
-  }
-
-  /** Test seam: the migration is the whole collaborator, so a fake is one method. */
-  static withMigration(migration: {
-    run(input: { dryRun: boolean }): Promise<DatasetBackfillOutcome>;
-  }): DatasetContentBackfillSweep {
+  /** The migration is the whole collaborator, so a fake is one method. */
+  static withMigration(migration: DatasetContentMigration): DatasetContentBackfillSweep {
     return new DatasetContentBackfillSweep(migration);
   }
 
@@ -60,6 +40,11 @@ type DatasetBackfillOutcome = Awaited<
   ReturnType<ReturnType<typeof PostgresDatasetMigrationAdapter.create>["run"]>
 >;
 
+/** What the sweep needs of the Postgres migration adapter, and nothing more. */
+export type DatasetContentMigration = {
+  run(input: { dryRun: boolean }): Promise<DatasetBackfillOutcome>;
+};
+
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task dataset-content-backfill`.
  * Registered in `apps/tasks`' catalogue via `dataset-content-backfill.composition.ts`, which
@@ -70,8 +55,7 @@ export class DatasetContentBackfillTask extends Task {
   readonly description = "Moves dataset content out of Postgres and into object storage.";
 
   private constructor(
-    private readonly database: () => PrismaClient,
-    private readonly storage: () => DatasetStorageResolver,
+    private readonly migration: () => DatasetContentMigration,
     private readonly skipped: boolean,
     private readonly dryRun: boolean,
   ) {
@@ -79,26 +63,21 @@ export class DatasetContentBackfillTask extends Task {
   }
 
   static create({
-    database,
-    storage,
+    migration,
     skipped = false,
     dryRun = false,
   }: {
-    database: () => PrismaClient;
-    storage: () => DatasetStorageResolver;
+    migration: () => DatasetContentMigration;
     /** Leave the content where it is. Stated by the task launcher. */
     skipped?: boolean;
     /** Report what would move without moving it. Stated by the task launcher. */
     dryRun?: boolean;
   }): DatasetContentBackfillTask {
-    return new DatasetContentBackfillTask(database, storage, skipped, dryRun);
+    return new DatasetContentBackfillTask(migration, skipped, dryRun);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    const sweep = DatasetContentBackfillSweep.create({
-      database: this.database(),
-      storage: this.storage(),
-    });
+    const sweep = DatasetContentBackfillSweep.withMigration(this.migration());
     await sweep.execute({ skipped: this.skipped, dryRun: this.dryRun });
   }
 }

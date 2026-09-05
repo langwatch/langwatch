@@ -148,9 +148,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const result = await service.getAllTracesForProject(baseInput, protections);
@@ -169,9 +166,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const inputWithTraceIds = {
@@ -200,9 +194,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const inputWithTraceIds = {
@@ -226,9 +217,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const result = await service.getAllTracesForProject(baseInput, protections);
@@ -272,9 +260,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
-            prisma: {
-              project: { findUnique: mockPrismaFindUnique },
-            } as never,
           });
 
           const result = await service.getAllTracesForProject(baseInput, protections, {
@@ -301,9 +286,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
-            prisma: {
-              project: { findUnique: mockPrismaFindUnique },
-            } as never,
           });
 
           const inputWithScrollId = {
@@ -333,9 +315,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
-            prisma: {
-              project: { findUnique: mockPrismaFindUnique },
-            } as never,
           });
 
           const result = await service.getAllTracesForProject(baseInput, protections);
@@ -360,9 +339,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
-            prisma: {
-              project: { findUnique: mockPrismaFindUnique },
-            } as never,
           });
 
           const result = await service.getAllTracesForProject(baseInput, protections, {
@@ -392,9 +368,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
-            prisma: {
-              project: { findUnique: mockPrismaFindUnique },
-            } as never,
           });
 
           const result = await service.getAllTracesForProject(baseInput, protections, {
@@ -422,9 +395,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
-            prisma: {
-              project: { findUnique: mockPrismaFindUnique },
-            } as never,
           });
 
           const result = await service.getAllTracesForProject(baseInput, protections, {
@@ -455,9 +425,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -480,9 +447,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -505,9 +469,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -525,9 +486,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -554,9 +512,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -579,9 +534,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -604,9 +556,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -643,9 +592,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -668,9 +614,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -691,9 +634,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const result = await service.getAllTracesForProject(
@@ -715,9 +655,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -739,9 +676,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -765,9 +699,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getAllTracesForProject(
@@ -788,9 +719,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const result = await service.getAllTracesForProject(baseInput, protections);
@@ -845,9 +773,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const result = await service.getAllTracesForProject(
@@ -895,9 +820,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const result = await service.getAllTracesForProject(
@@ -931,9 +853,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await expect(service.getAllTracesForProject(baseInput, protections)).rejects.toThrow(
@@ -972,9 +891,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const result = await service.getAllTracesForProject(baseInput, protections);
@@ -1018,9 +934,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const result = await service.getAllTracesForProject(baseInput, protections, {
@@ -1073,9 +986,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const traces = await service.getTracesWithSpans("proj_123", traceIds, protections);
@@ -1116,9 +1026,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const traces = await service.getTracesWithSpans("proj_123", traceIds, protections);
@@ -1138,9 +1045,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await expect(
@@ -1167,9 +1071,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getTracesWithSpans("proj_123", ["trace-0"], protections, {
@@ -1209,9 +1110,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
@@ -1245,9 +1143,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
@@ -1274,9 +1169,6 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
-          prisma: {
-            project: { findUnique: mockPrismaFindUnique },
-          } as never,
         });
 
         const traces = await service.getTracesWithSpans("proj_123", ["trace-0"], protections);

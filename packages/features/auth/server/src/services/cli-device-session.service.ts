@@ -167,7 +167,7 @@ export class CliDeviceSessionService {
   /**
    * Extract the bearer access token from an `Authorization` header, or null.
    */
-  static bearerCliAccessToken(authHeader: string | null | undefined): string | null {
+  static tryBearerCliAccessToken(authHeader: string | null | undefined): string | null {
     if (!authHeader) {
       return null;
     }
@@ -408,7 +408,7 @@ export class CliDeviceSessionService {
   async tryResolveAccessToken(
     authHeader: string | null | undefined,
   ): Promise<CliAccessTokenRecord | null> {
-    const token = CliDeviceSessionService.bearerCliAccessToken(authHeader);
+    const token = CliDeviceSessionService.tryBearerCliAccessToken(authHeader);
     if (!token) {
       return null;
     }
@@ -441,7 +441,7 @@ export class CliDeviceSessionService {
     authHeader: string | null | undefined;
     userId: string;
   }): Promise<void> {
-    const token = CliDeviceSessionService.bearerCliAccessToken(input.authHeader);
+    const token = CliDeviceSessionService.tryBearerCliAccessToken(input.authHeader);
     if (!token) {
       return;
     }

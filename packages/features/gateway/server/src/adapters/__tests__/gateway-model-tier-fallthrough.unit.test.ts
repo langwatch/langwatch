@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { GatewayConfigAssemblyAdapter, MODEL_TIERS } from "../gateway-config-assembly.adapter";
+import { GatewayConfigAssemblyAdapter, MODEL_TIERS } from "../postgres.gateway-config-assembly.adapter";
 
 const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
 

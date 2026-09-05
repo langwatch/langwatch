@@ -113,7 +113,7 @@ export class SessionGroupsService {
       sort: { column: sortColumn, direction: sortDirection },
       // One sentinel row past the page so `nextCursor` is exact.
       limit: params.pageSize + 1,
-      cursor: TraceSessionGroupsCursorService.keysetCursorFor({
+      cursor: TraceSessionGroupsCursorService.tryKeysetCursorFor({
         encoded: params.cursor,
         sortColumn,
         sortDirection,

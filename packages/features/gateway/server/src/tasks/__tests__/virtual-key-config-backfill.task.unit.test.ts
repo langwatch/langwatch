@@ -1,53 +1,48 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  backfillVirtualKeyConfig,
-  type VirtualKeyConfigBackfillDatabase,
+  type BackfillJsonObject,
+  GatewayVirtualKeyConfigBackfillRepository,
+  type MintGuardrailInput,
+  type MintRoutingPolicyInput,
   type VirtualKeyRow,
-} from "../virtual-key-config-backfill.task";
+} from "../../repositories/gateway-virtual-key-config-backfill.repository";
+import { backfillVirtualKeyConfig } from "../virtual-key-config-backfill.task";
 
-/**
- * The picked delegates return branded `PrismaPromise` values, so the double is
- * built untyped and cast once at the seam, and the spies are returned rather
- * than reached for through the typed handle.
- */
-function fakeDatabase(virtualKeys: VirtualKeyRow[]) {
+function fakeRepository(virtualKeys: VirtualKeyRow[]) {
   const updates: Array<{
     id: string;
-    config: Record<string, unknown>;
+    config: BackfillJsonObject;
     routingPolicyId: string | null;
   }> = [];
   let guardrailCount = 0;
-  const createPolicy = vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
-    id: String(data.id),
-  }));
-  const createGuardrail = vi.fn(async (_args: { data: Record<string, unknown> }) => {
+  const mintRoutingPolicy = vi.fn(async (input: MintRoutingPolicyInput) => input.id);
+  const mintGuardrail = vi.fn(async (_input: MintGuardrailInput) => {
     guardrailCount += 1;
-    return { id: `gr-${guardrailCount}` };
+    return `gr-${guardrailCount}`;
   });
-  const database = {
-    organization: { findMany: vi.fn(async () => [{ id: "org-1" }]) },
-    virtualKey: {
-      findMany: vi.fn(async () => virtualKeys),
-      update: vi.fn(
-        async ({
-          where,
-          data,
-        }: {
-          where: { id: string };
-          data: { config: Record<string, unknown>; routingPolicyId: string | null };
-        }) => {
-          updates.push({
-            id: where.id,
-            config: data.config,
-            routingPolicyId: data.routingPolicyId,
-          });
-        },
-      ),
-    },
-    routingPolicy: { create: createPolicy },
-    gatewayGuardrail: { create: createGuardrail },
-  } as unknown as VirtualKeyConfigBackfillDatabase;
-  return { database, updates, createPolicy, createGuardrail };
+
+  class FakeRepository extends GatewayVirtualKeyConfigBackfillRepository {
+    async findOrganizationIds(): Promise<string[]> {
+      return ["org-1"];
+    }
+
+    async findVirtualKeys(): Promise<VirtualKeyRow[]> {
+      return virtualKeys;
+    }
+
+    mintRoutingPolicy = mintRoutingPolicy;
+    mintGuardrail = mintGuardrail;
+
+    async updateVirtualKeyConfig(input: {
+      id: string;
+      config: BackfillJsonObject;
+      routingPolicyId: string | null;
+    }): Promise<void> {
+      updates.push(input);
+    }
+  }
+
+  return { repository: new FakeRepository(), updates, mintRoutingPolicy, mintGuardrail };
 }
 
 function virtualKey(overrides: Partial<VirtualKeyRow>): VirtualKeyRow {
@@ -66,7 +61,7 @@ describe("backfillVirtualKeyConfig", () => {
   describe("given a key carrying legacy aliases and guardrails", () => {
     /** @scenario "The virtual-key config backfill mints the rows that replaced the legacy keys" */
     it("mints a routing policy and a guardrail per reference, then strips the legacy keys", async () => {
-      const { database, updates, createPolicy, createGuardrail } = fakeDatabase([
+      const { repository, updates, mintRoutingPolicy, mintGuardrail } = fakeRepository([
         virtualKey({
           config: {
             modelAliases: { fast: "gpt-5-mini" },
@@ -80,18 +75,15 @@ describe("backfillVirtualKeyConfig", () => {
         }),
       ]);
 
-      const outcome = await backfillVirtualKeyConfig({ database, execute: true });
+      const outcome = await backfillVirtualKeyConfig({ repository, execute: true });
 
       expect(outcome.routingPoliciesMinted).toBe(1);
       expect(outcome.guardrailsMinted).toBe(1);
-      const policy = createPolicy.mock.calls[0]?.[0].data;
-      expect(policy?.scopes).toEqual({
-        create: [
-          { scopeType: "PROJECT", scopeId: "project-1" },
-          { scopeType: "TEAM", scopeId: "team-1" },
-        ],
-      });
-      expect(createGuardrail.mock.calls[0]?.[0].data.failureMode).toBe("FAIL_OPEN");
+      expect(mintRoutingPolicy.mock.calls[0]?.[0].scopes).toEqual([
+        { scopeType: "PROJECT", scopeId: "project-1" },
+        { scopeType: "TEAM", scopeId: "team-1" },
+      ]);
+      expect(mintGuardrail.mock.calls[0]?.[0].failureMode).toBe("FAIL_OPEN");
       expect(updates[0]?.config).toEqual({
         keepMe: "untouched",
         guardrailAttachments: [{ direction: "pre", guardrailIds: ["gr-1"] }],
@@ -102,18 +94,18 @@ describe("backfillVirtualKeyConfig", () => {
   describe("when a key with guardrails is held at team scope only", () => {
     /** @scenario "The virtual-key config backfill refuses to guess a project for a guardrail" */
     it("reports the skip and mints no guardrail", async () => {
-      const { database, updates, createGuardrail } = fakeDatabase([
+      const { repository, updates, mintGuardrail } = fakeRepository([
         virtualKey({
           config: { guardrails: { post: [{ id: "eval-1", evaluator: "pii" }] } },
           scopes: [{ scopeType: "TEAM", scopeId: "team-1" }],
         }),
       ]);
 
-      const outcome = await backfillVirtualKeyConfig({ database, execute: true });
+      const outcome = await backfillVirtualKeyConfig({ repository, execute: true });
 
       expect(outcome.skippedWithoutProjectScope).toBe(1);
       expect(outcome.guardrailsMinted).toBe(0);
-      expect(createGuardrail).not.toHaveBeenCalled();
+      expect(mintGuardrail).not.toHaveBeenCalled();
       expect(updates[0]?.config).toEqual({});
     });
   });
@@ -121,15 +113,15 @@ describe("backfillVirtualKeyConfig", () => {
   describe("when a key was already migrated", () => {
     /** @scenario "The virtual-key config backfill is safe to re-run" */
     it("is left alone entirely", async () => {
-      const { database, updates, createPolicy } = fakeDatabase([
+      const { repository, updates, mintRoutingPolicy } = fakeRepository([
         virtualKey({ config: { guardrailAttachments: [] }, routingPolicyId: "rp-1" }),
       ]);
 
-      const outcome = await backfillVirtualKeyConfig({ database, execute: true });
+      const outcome = await backfillVirtualKeyConfig({ repository, execute: true });
 
       expect(outcome.touched).toBe(0);
       expect(updates).toEqual([]);
-      expect(createPolicy).not.toHaveBeenCalled();
+      expect(mintRoutingPolicy).not.toHaveBeenCalled();
     });
   });
 });

@@ -159,7 +159,7 @@ export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Rea
    */
   getViewerProtections(ctx: unknown, input: Readonly<{ projectId: string }>): Promise<Protections>;
   /** The plan's visibility window for one project, or null when unbounded. */
-  getVisibilityCutoffMs(projectId: string): Promise<number | null>;
+  tryGetVisibilityCutoffMs(projectId: string): Promise<number | null>;
   /** The mapping and redaction ports the shared read mappers take. */
   mappers: TraceReadMapperPorts;
   /** The two ingest-derived content attribute prefixes. */
@@ -214,7 +214,7 @@ export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Rea
    * Token usage with no price on it: the cost-mapping rule a reader could add.
    * Null when the span presents no unmapped-cost symptom.
    */
-  deriveUnmappedCostSuggestion(input: {
+  tryDeriveUnmappedCostSuggestion(input: {
     projectId: string;
     model: string | null;
     cost: number | null | undefined;
@@ -265,7 +265,7 @@ export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Rea
  */
 export type TracesV2ReadPorts = Pick<
   TracesV2TrpcPorts,
-  "getVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes" | "codingAgentEnrichment"
+  "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes" | "codingAgentEnrichment"
 >;
 
 /** The coding-agent log join, in the two shapes the reads need it. */
@@ -445,7 +445,7 @@ async function loadSpansFullWithProtections({
     projectId,
     traceId,
     occurredAtMs,
-    visibilityCutoffMs: await ports.getVisibilityCutoffMs(projectId),
+    visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(projectId),
   });
   // Claude Code's real `llm_request` spans carry tokens + `request_id` but NO
   // message content, which lives in the trace's OTLP log records. Join it on
@@ -482,7 +482,7 @@ async function loadTraceLogsWithProtections({
   protections: Protections;
   codingAgents: CodingAgentService;
 }): Promise<TraceLogRecordDto[]> {
-  const visibilityCutoffMs = await ports.getVisibilityCutoffMs(projectId);
+  const visibilityCutoffMs = await ports.tryGetVisibilityCutoffMs(projectId);
   const rows = await app.readTraceLogRecords({ projectId, traceId, occurredAtMs });
   return rows.map((row) =>
     gateTraceLogVisibility(
@@ -593,7 +593,7 @@ export class TracesV2TrpcApi {
           pageSize: input.pageSize,
           cursor: input.cursor,
           filterWhere: buildFilterWhere(input, ports.queryTranslation),
-          visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
+          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
         });
         return {
           ...page,
@@ -638,7 +638,7 @@ export class TracesV2TrpcApi {
             terms: ports.queryTranslation.extractFreeTextTerms(input.query ?? ""),
             protections,
           }),
-          visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
+          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
         });
         return {
           ...result,
@@ -766,7 +766,7 @@ export class TracesV2TrpcApi {
           page: 1,
           pageSize: 200,
           filterWhere,
-          visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
+          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
         });
         const turns = page.items.map((t) =>
           toConversationContextTurn({
@@ -929,7 +929,7 @@ export class TracesV2TrpcApi {
           projectId: input.projectId,
           traceId: input.traceId,
           occurredAtMs: input.occurredAtMs,
-          visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
+          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
           full: input.full,
         });
         const rawHeader = mapTraceSummaryToHeader(summary);
@@ -1026,7 +1026,7 @@ export class TracesV2TrpcApi {
         const page = await ctx.app.traces.readSpansPage({
           projectId: input.projectId,
           traceId: input.traceId,
-          visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
+          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
           limit: input.limit,
           offset: input.offset,
           occurredAtMs: input.occurredAtMs,
@@ -1065,7 +1065,7 @@ export class TracesV2TrpcApi {
           projectId: input.projectId,
           traceId: input.traceId,
           sinceStartTimeMs: input.sinceStartTimeMs,
-          visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
+          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
           occurredAtMs: input.occurredAtMs,
         });
         const redactions = buildSpanContentRedactions(
@@ -1256,7 +1256,7 @@ export class TracesV2TrpcApi {
             projectId: input.projectId,
             traceId: input.traceId,
             spanId: input.spanId,
-            visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
+            visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
             occurredAtMs: input.occurredAtMs,
           }),
           ctx.app.traces.readSpanEvents({
@@ -1349,7 +1349,7 @@ export class TracesV2TrpcApi {
         // Token usage with no price on it, offer the user a cost mapping.
         // The cheap guards run first; the rule lookup only fires for spans
         // that actually present the unmapped-cost symptom.
-        detail.costSuggestion = await ports.deriveUnmappedCostSuggestion({
+        detail.costSuggestion = await ports.tryDeriveUnmappedCostSuggestion({
           projectId: input.projectId,
           model: detail.model ?? null,
           cost: detail.metrics?.cost,

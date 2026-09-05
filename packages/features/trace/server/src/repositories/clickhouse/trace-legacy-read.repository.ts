@@ -11,7 +11,6 @@ import { createLogger } from "@langwatch/observability";
 import { LLM_PARAMETER_MAP, parsePromptTraceReference } from "@langwatch/prompt-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { TraceRetentionFloorService } from "../../services/trace-retention-floor.service";
 import { TraceLegacyReadRepository } from "../trace-legacy-read.repository";
 import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/trace-windowed-read.service";
@@ -302,7 +301,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    */
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
 
-  private readonly prisma: PrismaClient;
   private readonly resolveClickHouseClient:
     | ((tenantId: string) => Promise<ClickHouseClient>)
     | undefined;
@@ -311,7 +309,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private readonly traceCanonicalisation: TraceCanonicalisationService;
 
   constructor({
-    prisma,
     resolveClickHouseClient,
     filterConditions,
     resolveTraceSpans,
@@ -320,7 +317,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     annotations,
     traceCanonicalisation,
   }: {
-    prisma: PrismaClient;
     resolveClickHouseClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
     filterConditions?: TraceLegacyFilterConditions | undefined;
     resolveTraceSpans?: ResolveTraceSpansFn;
@@ -334,7 +330,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     traceCanonicalisation: TraceCanonicalisationService;
   }) {
     super();
-    this.prisma = prisma;
     this.resolveClickHouseClient = resolveClickHouseClient;
     this.filterConditions = filterConditions;
     this.annotations = annotations;
@@ -379,7 +374,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * canonicalisation and retention dependencies.
    */
   static create({
-    prisma,
     resolveClickHouseClient,
     filterConditions,
     resolveTraceSpans,
@@ -388,7 +382,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     annotations,
     traceCanonicalisation,
   }: {
-    prisma: PrismaClient;
     /** The process's tenant-keyed connection, or none where it composed one. */
     resolveClickHouseClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
     /** The analytics filter translator; absent, a filtered list refuses. */
@@ -400,8 +393,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     traceCanonicalisation: TraceCanonicalisationService;
   }): TraceLegacyReadClickHouseRepository {
     return new TraceLegacyReadClickHouseRepository({
-      prisma,
-      resolveClickHouseClient,
+        resolveClickHouseClient,
       filterConditions,
       resolveTraceSpans,
       resolveTraceSpansBatch,
@@ -2131,7 +2123,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     const rows = (await result.json()) as EventSpanRow[];
     const byTrace = new Map<string, Event[]>();
     for (const row of rows) {
-      const event = TraceEventAttributeMappingService.mapEventAttrsToEvent({ row, projectId });
+      const event = TraceEventAttributeMappingService.tryMapEventAttrsToEvent({ row, projectId });
       if (!event) continue;
       const list = byTrace.get(row.TraceId) ?? [];
       list.push(event);

@@ -9,7 +9,7 @@ export type EventingJoinRequestLifecycleOptions = {
   /** The write surface the expiry wake dispatches its command through. */
   requests: JoinRequestService;
   /** The folded head, read to learn who asked before the state changes. */
-  reads: Pick<PrismaJoinRequestReadRepository, "findRequest">;
+  reads: Pick<PrismaJoinRequestReadRepository, "tryFindRequest">;
   /** Who is told, and how. */
   notifications: JoinRequestNotificationService;
 };
@@ -51,7 +51,7 @@ export class EventingJoinRequestLifecycleAdapter implements JoinRequestLifecycle
     // Read the requester BEFORE the command: the fold that follows it is the
     // only thing that changes here, and reading first keeps the "who do we
     // tell" question independent of when the projection catches up.
-    const request = await this.options.reads.findRequest({ joinRequestId });
+    const request = await this.options.reads.tryFindRequest({ joinRequestId });
 
     const facts = await this.options.requests.expireJoin({
       tenantId: organizationId,

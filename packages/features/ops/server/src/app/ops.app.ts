@@ -130,7 +130,7 @@ export type OpsProcessExplorer = {
     search?: string;
   }): Promise<{ instances: ProcessInstanceRow[]; total: number }>;
   getUpcomingWakes(input: { limit: number }): Promise<ProcessWakeRow[]>;
-  getInstanceDetail(input: { ref: OpsProcessRef }): Promise<ProcessInstanceDetail | null>;
+  tryGetInstanceDetail(input: { ref: OpsProcessRef }): Promise<ProcessInstanceDetail | null>;
   getOutbox(input: {
     ref: OpsProcessRef;
     page: number;
@@ -142,12 +142,12 @@ export type OpsProcessExplorer = {
     ref: OpsProcessRef;
     actorUserId: string;
   }): Promise<{ requeued: number }>;
-  tryRedriveDeadMessage(input: {
+  redriveDeadMessage(input: {
     ref: OpsProcessRef;
     messageId: string;
     actorUserId: string;
   }): Promise<{ redriven: boolean }>;
-  tryDiscardDeadMessage(input: {
+  discardDeadMessage(input: {
     ref: OpsProcessRef;
     messageId: string;
     actorUserId: string;
@@ -161,7 +161,7 @@ export type OpsProcessExplorer = {
     actorUserId: string;
   }): Promise<{ discarded: number }>;
   getOutboxAttempts(input: { outboxId: string; projectId: string }): Promise<OutboxAttemptView[]>;
-  tryReleaseLapsedLease(input: {
+  releaseLapsedLease(input: {
     ref: OpsProcessRef;
     messageId: string;
     actorUserId: string;
@@ -178,7 +178,7 @@ export type OpsProcessExplorer = {
  */
 export type OpsReplayRunner = {
   getHistory(): Promise<ReplayHistoryEntry[]>;
-  findHistoryEntry(input: { runId: string }): Promise<ReplayHistoryEntry | null>;
+  tryFindHistoryEntry(input: { runId: string }): Promise<ReplayHistoryEntry | null>;
   startReplay(input: {
     projectionNames: string[];
     since: string;

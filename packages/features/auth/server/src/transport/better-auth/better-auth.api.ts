@@ -31,7 +31,7 @@ import {
   afterAccountUpdate,
   afterSessionCreate,
   afterUserCreate,
-  beforeAccountCreate,
+  tryBeforeAccountCreate,
   beforeSessionCreate,
   beforeUserCreate,
   type BetterAuthHookCollaborators,
@@ -362,7 +362,7 @@ export const createAuthOptions = ({
     account: {
       create: {
         before: async (account) => {
-          await beforeAccountCreate({
+          await tryBeforeAccountCreate({
             prisma,
             account: {
               userId: account.userId,
@@ -375,7 +375,7 @@ export const createAuthOptions = ({
           // the row data pins its id, which is what makes the live identifier id and the backfill's
           // derived id the same id.
           // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
-          return identity.beforeAccountCreate(account);
+          return identity.tryBeforeAccountCreate(account);
         },
         after: async (account) => {
           if (!account.userId || !account.providerId || !account.accountId) return;

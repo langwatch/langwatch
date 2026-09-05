@@ -158,9 +158,9 @@ export class LongPollTransportService {
     credentials: ConnectCredentials;
     body: unknown;
   }): Promise<RegisterAnswer> {
-    const replicaRefusal = this.core.replicaRefusal();
-    if (replicaRefusal) {
-      return this.refused(replicaRefusal);
+    const tryReplicaRefusal = this.core.tryReplicaRefusal();
+    if (tryReplicaRefusal) {
+      return this.refused(tryReplicaRefusal);
     }
 
     let resolved: Awaited<ReturnType<AgentSessionService["authenticate"]>>;
@@ -361,7 +361,7 @@ export class LongPollTransportService {
 
     // Read under the credential's own project: a token minted in another
     // project names no session here, whatever instance it registered.
-    const raw = await this.core.runtime.store.get(httpSessionKey(resolved.project.id, token));
+    const raw = await this.core.runtime.store.tryGet(httpSessionKey(resolved.project.id, token));
     if (!raw) {
       throw new AgentSessionUnknownError();
     }
@@ -430,14 +430,14 @@ export class LongPollTransportService {
         continue;
       }
 
-      const call = await this.core.readCallForSession(session, callId);
+      const call = await this.core.tryReadCallForSession(session, callId);
       if (call) {
         frames.push(this.core.callFrame(call));
       }
     }
 
     for (const callId of inFlight) {
-      if (await store.get(callKey(session.projectId, callId))) {
+      if (await store.tryGet(callKey(session.projectId, callId))) {
         continue;
       }
 
@@ -529,7 +529,7 @@ export class LongPollTransportService {
     this.watches.delete(watchKey);
     await watch.unsubscribe();
     const { projectId, instanceId } = watch.session;
-    const live = await this.core.runtime.store.hgetall(instanceMetaKey(projectId, instanceId));
+    const live = await this.core.runtime.store.tryHgetall(instanceMetaKey(projectId, instanceId));
     if (live) {
       return;
     }

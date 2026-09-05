@@ -468,7 +468,7 @@ describe.skipIf(!databaseUrl)("virtual keys must have a home for their traces (r
       // deletion happened on another screen. Rerouting would scatter one
       // key's history across two projects, and failing would take its
       // traffic down. The materialiser follows the pointer as it stands.
-      const vk = await service.getById(virtualKey.id, ORG_ARCH_ID);
+      const vk = await service.tryGetById(virtualKey.id, ORG_ARCH_ID);
       const followed = await projects.tryGetTraceDestination(vk!.traceProjectId!);
       expect(followed?.id).toBe(ARCH_DOOMED_PROJECT_ID);
 
@@ -683,7 +683,7 @@ describe.skipIf(!databaseUrl)("virtual keys must have a home for their traces (r
         scopes: [{ scopeType: "PROJECT", scopeId: CHOICE_PROJECT_A_ID }],
       });
 
-      const vk = await service.getById(virtualKey.id, ORG_CHOICE_ID);
+      const vk = await service.tryGetById(virtualKey.id, ORG_CHOICE_ID);
       const dto = virtualKeyDtos.toVirtualKeySnakeDto({
         virtualKey: vk!,
         facts: await virtualKeyDtos.loadTraceDestinationFacts({ projects, virtualKeys: [vk!] }),

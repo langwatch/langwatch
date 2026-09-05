@@ -82,7 +82,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
   /**
    * Returns the stored_objects row with the given id, or null if not found.
    */
-  async findById({
+  async tryFindById({
     projectId,
     id,
   }: {
@@ -90,7 +90,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
     id: string;
   }): Promise<StoredObject | null> {
     return tracer.withActiveSpan(
-      "StoredObjectsRepository.findById",
+      "StoredObjectsRepository.tryFindById",
       {
         kind: SpanKind.CLIENT,
         attributes: {

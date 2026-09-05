@@ -281,9 +281,9 @@ class ApiComposedUsageStats extends ApiUsageStatsPort {
     const warnings = this.warnings;
     return {
       getUsageStats: (_ctx, input) => this.stats.getUsageStats(input.organizationId, input.user),
-      checkAndSendWarning: (_ctx, input) =>
+      tryCheckAndSendWarning: (_ctx, input) =>
         warnings
-          ? warnings.checkAndSendWarning({
+          ? warnings.tryCheckAndSendWarning({
               organizationId: input.organizationId,
               currentMonthMessagesCount: input.currentMonthMessagesCount,
               maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,

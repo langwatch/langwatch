@@ -1,18 +1,18 @@
 import { TraceContentArrayService } from "../trace-content-array.service";
 import { describe, expect, it } from "vitest";
 
-describe("TraceContentArrayService.coerceContentToArray", () => {
+describe("TraceContentArrayService.tryCoerceContentToArray", () => {
   describe("when content is already an array", () => {
     it("returns the array verbatim", () => {
       const arr = [{ type: "text", text: "hi" }];
-      expect(TraceContentArrayService.coerceContentToArray(arr)).toBe(arr);
+      expect(TraceContentArrayService.tryCoerceContentToArray(arr)).toBe(arr);
     });
   });
 
   describe("when content is a JSON-encoded array string", () => {
     it("parses and returns the array", () => {
       const json = '[{"type":"text","text":"hi"}]';
-      expect(TraceContentArrayService.coerceContentToArray(json)).toEqual([
+      expect(TraceContentArrayService.tryCoerceContentToArray(json)).toEqual([
         { type: "text", text: "hi" },
       ]);
     });
@@ -21,14 +21,14 @@ describe("TraceContentArrayService.coerceContentToArray", () => {
   describe("when content is a Python-repr array string", () => {
     it("converts single quotes and parses", () => {
       const repr = "[{'type': 'text', 'text': 'hi'}]";
-      expect(TraceContentArrayService.coerceContentToArray(repr)).toEqual([
+      expect(TraceContentArrayService.tryCoerceContentToArray(repr)).toEqual([
         { type: "text", text: "hi" },
       ]);
     });
 
     it("handles None, True, False", () => {
       const repr = "[{'type': 'flag', 'a': None, 'b': True, 'c': False}]";
-      expect(TraceContentArrayService.coerceContentToArray(repr)).toEqual([
+      expect(TraceContentArrayService.tryCoerceContentToArray(repr)).toEqual([
         { type: "flag", a: null, b: true, c: false },
       ]);
     });
@@ -36,7 +36,7 @@ describe("TraceContentArrayService.coerceContentToArray", () => {
     it("handles input_audio shape from openai-realtime sdk", () => {
       const repr =
         "[{'type': 'input_audio', 'input_audio': {'data': 'UklGRg==', 'format': 'wav'}}]";
-      expect(TraceContentArrayService.coerceContentToArray(repr)).toEqual([
+      expect(TraceContentArrayService.tryCoerceContentToArray(repr)).toEqual([
         {
           type: "input_audio",
           input_audio: { data: "UklGRg==", format: "wav" },
@@ -47,39 +47,39 @@ describe("TraceContentArrayService.coerceContentToArray", () => {
 
   describe("when content is a non-array string", () => {
     it("returns null for plain text", () => {
-      expect(TraceContentArrayService.coerceContentToArray("hello world")).toBeNull();
+      expect(TraceContentArrayService.tryCoerceContentToArray("hello world")).toBeNull();
     });
 
     it("returns null for an empty string", () => {
-      expect(TraceContentArrayService.coerceContentToArray("")).toBeNull();
+      expect(TraceContentArrayService.tryCoerceContentToArray("")).toBeNull();
     });
 
     it("returns null for a JSON object string (not array)", () => {
-      expect(TraceContentArrayService.coerceContentToArray('{"a":1}')).toBeNull();
+      expect(TraceContentArrayService.tryCoerceContentToArray('{"a":1}')).toBeNull();
     });
   });
 
   describe("when content is not a string or array", () => {
     it("returns null for objects", () => {
-      expect(TraceContentArrayService.coerceContentToArray({ a: 1 })).toBeNull();
+      expect(TraceContentArrayService.tryCoerceContentToArray({ a: 1 })).toBeNull();
     });
 
     it("returns null for null", () => {
-      expect(TraceContentArrayService.coerceContentToArray(null)).toBeNull();
+      expect(TraceContentArrayService.tryCoerceContentToArray(null)).toBeNull();
     });
 
     it("returns null for undefined", () => {
-      expect(TraceContentArrayService.coerceContentToArray(undefined)).toBeNull();
+      expect(TraceContentArrayService.tryCoerceContentToArray(undefined)).toBeNull();
     });
 
     it("returns null for numbers", () => {
-      expect(TraceContentArrayService.coerceContentToArray(42)).toBeNull();
+      expect(TraceContentArrayService.tryCoerceContentToArray(42)).toBeNull();
     });
   });
 
   describe("when content is malformed", () => {
     it("returns null for an array-shaped string that fails both parses", () => {
-      expect(TraceContentArrayService.coerceContentToArray("[not parseable at all")).toBeNull();
+      expect(TraceContentArrayService.tryCoerceContentToArray("[not parseable at all")).toBeNull();
     });
   });
 
@@ -92,7 +92,7 @@ describe("TraceContentArrayService.coerceContentToArray", () => {
     it("preserves apostrophes when text part is wrapped in double quotes", () => {
       const repr =
         "[{'type': 'text', 'text': \"[shouting] you charged me [angry] i'm at a noisy cafe\"}]";
-      expect(TraceContentArrayService.coerceContentToArray(repr)).toEqual([
+      expect(TraceContentArrayService.tryCoerceContentToArray(repr)).toEqual([
         {
           type: "text",
           text: "[shouting] you charged me [angry] i'm at a noisy cafe",
@@ -103,7 +103,7 @@ describe("TraceContentArrayService.coerceContentToArray", () => {
     it("handles mixed parts: text with apostrophe + input_audio with base64", () => {
       const repr =
         "[{'type': 'text', 'text': \"i'm at a cafe\"}, {'type': 'input_audio', 'input_audio': {'data': 'UklGRg==', 'format': 'wav'}}]";
-      expect(TraceContentArrayService.coerceContentToArray(repr)).toEqual([
+      expect(TraceContentArrayService.tryCoerceContentToArray(repr)).toEqual([
         { type: "text", text: "i'm at a cafe" },
         {
           type: "input_audio",
@@ -117,7 +117,7 @@ describe("TraceContentArrayService.coerceContentToArray", () => {
       // escaped doubles. JSON needs the inner quotes escaped under double
       // quotes as well.
       const repr = "[{'type': 'text', 'text': 'he said \"hi\" loudly'}]";
-      expect(TraceContentArrayService.coerceContentToArray(repr)).toEqual([
+      expect(TraceContentArrayService.tryCoerceContentToArray(repr)).toEqual([
         { type: "text", text: 'he said "hi" loudly' },
       ]);
     });
@@ -127,14 +127,14 @@ describe("TraceContentArrayService.coerceContentToArray", () => {
       // accepts \uHHHH (4 hex digits). Without translation, JSON.parse
       // rejects the otherwise-valid recovery output.
       const repr = "[{'type': 'text', 'text': 'pre\\x00mid\\x1fpost'}]";
-      expect(TraceContentArrayService.coerceContentToArray(repr)).toEqual([
+      expect(TraceContentArrayService.tryCoerceContentToArray(repr)).toEqual([
         { type: "text", text: "pre\u0000midpost" },
       ]);
     });
 
     it("translates \\xHH inside a python double-quoted string", () => {
       const repr = "[{'type': 'text', 'text': \"i'm\\x07ok\"}]";
-      expect(TraceContentArrayService.coerceContentToArray(repr)).toEqual([
+      expect(TraceContentArrayService.tryCoerceContentToArray(repr)).toEqual([
         { type: "text", text: "i'mok" },
       ]);
     });

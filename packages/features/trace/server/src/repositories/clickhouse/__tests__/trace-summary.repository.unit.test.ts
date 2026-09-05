@@ -1,5 +1,5 @@
 /**
- * Unit tests for `findByTraceId`'s OccurredAt-resolution branch selection.
+ * Unit tests for `tryFindByTraceId`'s OccurredAt-resolution branch selection.
  *
  * The read path first resolves the trace's OccurredAt from a cheap sort-key
  * seek, then chooses how to issue the heavy single-trace read:
@@ -68,7 +68,7 @@ function makeRepo(responder: (sql: string) => unknown[]) {
 
 const isResolve = (sql: string) => sql.includes("count() AS rowCount");
 
-describe("TraceSummaryClickHouseRepository.findByTraceId (tenancy)", () => {
+describe("TraceSummaryClickHouseRepository.tryFindByTraceId (tenancy)", () => {
   describe("given a tenant and a trace", () => {
     it("picks the tenant's own ClickHouse client", () => {
       // The tenant chooses which cluster is read, so a mix-up here is not a
@@ -76,7 +76,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (tenancy)", () => {
       const { repo, resolvedFor } = makeRepo(() => [heavyRow]);
 
       return repo
-        .findByTraceId({ tenantId: "tenant-1", traceId: "t1" })
+        .tryFindByTraceId({ tenantId: "tenant-1", traceId: "t1" })
         .then(() => expect(resolvedFor).toContain("tenant-1"));
     });
 
@@ -85,7 +85,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (tenancy)", () => {
         isResolve(sql) ? [{ rowCount: "1", occurredAtMs: "0" }] : [heavyRow],
       );
 
-      await repo.findByTraceId({ tenantId: "tenant-1", traceId: "t1" });
+      await repo.tryFindByTraceId({ tenantId: "tenant-1", traceId: "t1" });
 
       expect(parameters.length).toBeGreaterThan(0);
       for (const params of parameters) {
@@ -96,13 +96,13 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (tenancy)", () => {
   });
 });
 
-describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
+describe("TraceSummaryClickHouseRepository.tryFindByTraceId (unit)", () => {
   it("issues an unbounded heavy read for the OccurredAt=0 sentinel", async () => {
     const { repo, queries } = makeRepo((sql) =>
       isResolve(sql) ? [{ rowCount: "1", occurredAtMs: "0" }] : [heavyRow],
     );
 
-    const result = await repo.findByTraceId({ tenantId: "tenant-1", traceId: "t1" });
+    const result = await repo.tryFindByTraceId({ tenantId: "tenant-1", traceId: "t1" });
 
     expect(result).not.toBeNull();
     expect(result?.traceId).toBe("t1");
@@ -116,7 +116,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
       isResolve(sql) ? [{ rowCount: "1", occurredAtMs: String(Date.now()) }] : [heavyRow],
     );
 
-    const result = await repo.findByTraceId({ tenantId: "tenant-1", traceId: "t1" });
+    const result = await repo.tryFindByTraceId({ tenantId: "tenant-1", traceId: "t1" });
 
     expect(result?.traceId).toBe("t1");
     const heavy = queries.find((q) => q.includes("ComputedInput"));
@@ -129,7 +129,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
       isResolve(sql) ? [{ rowCount: "0", occurredAtMs: null }] : [heavyRow],
     );
 
-    const result = await repo.findByTraceId({ tenantId: "tenant-1", traceId: "missing" });
+    const result = await repo.tryFindByTraceId({ tenantId: "tenant-1", traceId: "missing" });
 
     expect(result).toBeNull();
     expect(queries.some((q) => q.includes("ComputedInput"))).toBe(false);
@@ -138,7 +138,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
   it("applies an explicit window verbatim as one bounded read", async () => {
     const { repo, queries } = makeRepo(() => [heavyRow]);
 
-    const result = await repo.findByTraceId(
+    const result = await repo.tryFindByTraceId(
       { tenantId: "tenant-1", traceId: "t1" },
       {
         window: { fromMs: 1_000, toMs: 2_000 },
@@ -156,7 +156,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
     // executor is about to re-read anyway.
     const { repo, queries } = makeRepo(() => []);
 
-    const result = await repo.findByTraceId(
+    const result = await repo.tryFindByTraceId(
       { tenantId: "tenant-1", traceId: "t1" },
       {
         window: { fromMs: 1_000, toMs: 2_000 },
@@ -197,7 +197,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
         },
       ]);
 
-      const result = await repo.findByTraceId(
+      const result = await repo.tryFindByTraceId(
         { tenantId: "tenant-1", traceId: "t1" },
         {
           window: { fromMs: baselineMs - 1_000, toMs: baselineMs + 1_000 },
@@ -221,7 +221,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
         },
       ]);
 
-      const result = await repo.findByTraceId(
+      const result = await repo.tryFindByTraceId(
         { tenantId: "tenant-1", traceId: "t1" },
         {
           window: { fromMs: anchorMs - 1_000, toMs: anchorMs + 1_000 },
@@ -246,7 +246,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
         },
       ]);
 
-      const result = await repo.findByTraceId(
+      const result = await repo.tryFindByTraceId(
         { tenantId: "tenant-1", traceId: "t1" },
         {
           window: { fromMs: anchorMs - 1_000, toMs: anchorMs + 1_000 },

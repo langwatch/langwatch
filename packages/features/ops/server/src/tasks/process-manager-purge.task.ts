@@ -1,21 +1,14 @@
 import { createLogger } from "@langwatch/observability";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { Task } from "@langwatch/task";
+import type {
+  ProcessManagerPurgeRepository,
+  ProcessManagerPurgeTarget,
+} from "../repositories/process-manager-purge.repository";
 
 const logger = createLogger("langwatch:task:process-manager-purge");
 
-/**
- * Exactly the raw operations this task performs, PICKED from the real client
- * rather than re-declared, so a typed `PrismaClient` satisfies it with no cast.
- * Narrow on purpose: these predicates are cross-tenant by design.
- */
-export type ProcessManagerPurgeDatabase = Pick<
-  PrismaClient,
-  "$queryRaw" | "$executeRaw" | "$executeRawUnsafe"
->;
-
 export type ProcessManagerPurgeOptions = Readonly<{
-  database: ProcessManagerPurgeDatabase;
+  repository: ProcessManagerPurgeRepository;
   retentionDays?: number;
   batchSize?: number;
   /** Pause between batches so a purge never monopolises the write path. */
@@ -36,7 +29,7 @@ export type ProcessManagerPurgeReport = Readonly<{
  * Dry-run by default; pending and dead outbox rows are never touched.
  */
 export async function purgeProcessManagerTables({
-  database,
+  repository,
   retentionDays = 7,
   batchSize = 10_000,
   sleepMs = 200,
@@ -49,90 +42,31 @@ export async function purgeProcessManagerTables({
   requireWholeNumber({ name: "sleepMs", value: sleepMs, min: 0 });
   requireWholeNumber({ name: "maxBatches", value: maxBatches, min: 1 });
 
-  const targets = [
-    {
-      name: "ProcessManagerOutbox (dispatched)",
-      // Every value is bound, never interpolated. The window is one retention
-      // period wider than the sweep's, so this only removes rows the sweep
-      // would also remove.
-      count: () =>
-        database.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
-          -- @tenancy: cross-tenant process-manager retention; ops-gated
-          SELECT count(*)::bigint AS n FROM "ProcessManagerOutbox"
-          WHERE "status" = 'dispatched'
-            AND "dispatchedAt" < now() - (${retentionDays}::int * interval '1 day')
-        `),
-      deleteBatch: () =>
-        database.$executeRaw(Prisma.sql`
-          -- @tenancy: cross-tenant process-manager retention; ops-gated
-          WITH batch AS (
-            SELECT ctid FROM "ProcessManagerOutbox"
-            WHERE "status" = 'dispatched'
-              AND "dispatchedAt" < now() - (${retentionDays}::int * interval '1 day')
-            LIMIT ${batchSize}
-          )
-          DELETE FROM "ProcessManagerOutbox" o USING batch WHERE o.ctid = batch.ctid
-        `),
-    },
-    {
-      name: "ProcessManagerInbox (consumed)",
-      count: () =>
-        database.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
-          -- @tenancy: cross-tenant process-manager retention; ops-gated
-          SELECT count(*)::bigint AS n FROM "ProcessManagerInbox"
-          WHERE "consumedAt" < now() - (${retentionDays}::int * interval '1 day')
-        `),
-      deleteBatch: () =>
-        database.$executeRaw(Prisma.sql`
-          -- @tenancy: cross-tenant process-manager retention; ops-gated
-          WITH batch AS (
-            SELECT ctid FROM "ProcessManagerInbox"
-            WHERE "consumedAt" < now() - (${retentionDays}::int * interval '1 day')
-            LIMIT ${batchSize}
-          )
-          DELETE FROM "ProcessManagerInbox" i USING batch WHERE i.ctid = batch.ctid
-        `),
-    },
-  ] as const;
+  const targets: ReadonlyArray<{ name: string; target: ProcessManagerPurgeTarget }> = [
+    { name: "ProcessManagerOutbox (dispatched)", target: "outbox-dispatched" },
+    { name: "ProcessManagerInbox (consumed)", target: "inbox-consumed" },
+  ];
 
   const report: Array<{ name: string; eligible: number; deleted: number; capped: boolean }> = [];
-  for (const target of targets) {
-    const rows = await target.count();
-    const eligible = Number(rows[0]?.n ?? 0);
+  for (const { name, target } of targets) {
+    const eligible = await repository.countEligible({ target, retentionDays });
     if (!apply) {
-      report.push({ name: target.name, eligible, deleted: 0, capped: false });
+      report.push({ name, eligible, deleted: 0, capped: false });
       continue;
     }
     const { deleted, capped } = await drain({
-      deleteBatch: target.deleteBatch,
+      deleteBatch: () => repository.deleteBatch({ target, retentionDays, batchSize }),
       maxBatches,
       sleepMs,
       signal,
-      name: target.name,
+      name,
     });
-    report.push({ name: target.name, eligible, deleted, capped });
+    report.push({ name, eligible, deleted, capped });
   }
 
-  if (apply) await vacuum({ database });
+  if (apply) await repository.vacuum();
   logger.info({ mode: apply ? "apply" : "dry-run", report }, "process-manager purge finished");
   return { mode: apply ? "apply" : "dry-run", targets: report };
-}
-
-/**
- * A plain VACUUM marks the pages reusable; VACUUM FULL would reclaim the space
- * under an ACCESS EXCLUSIVE lock the automations pipeline cannot afford. Never
- * fatal — the rows are already gone.
- */
-async function vacuum({ database }: { database: ProcessManagerPurgeDatabase }): Promise<void> {
-  for (const table of ["ProcessManagerOutbox", "ProcessManagerInbox"]) {
-    try {
-      await database.$executeRawUnsafe(
-        `-- @tenancy: cross-tenant process-manager housekeeping; ops-gated\nVACUUM (ANALYZE) "${table}"`,
-      );
-    } catch (error) {
-      logger.warn({ error, table }, "the post-purge vacuum failed; the rows are still deleted");
-    }
-  }
 }
 
 /**
@@ -210,21 +144,21 @@ export class ProcessManagerPurgeTask extends Task {
   readonly description =
     "Clears the ProcessManager inbox and outbox backlog in batches. Dry-run unless --apply is passed.";
 
-  private constructor(private readonly database: () => ProcessManagerPurgeDatabase) {
+  private constructor(private readonly repository: () => ProcessManagerPurgeRepository) {
     super();
   }
 
   static create({
-    database,
+    repository,
   }: {
-    database: () => ProcessManagerPurgeDatabase;
+    repository: () => ProcessManagerPurgeRepository;
   }): ProcessManagerPurgeTask {
-    return new ProcessManagerPurgeTask(database);
+    return new ProcessManagerPurgeTask(repository);
   }
 
   async run({ args, signal }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     await purgeProcessManagerTables({
-      database: this.database(),
+      repository: this.repository(),
       apply: args.includes("--apply"),
       signal,
       ...numberArg({ args, flag: "--retention-days", key: "retentionDays" }),

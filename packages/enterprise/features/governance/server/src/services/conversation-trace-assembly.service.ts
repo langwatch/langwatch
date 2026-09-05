@@ -239,7 +239,7 @@ export class ConversationTraceAssemblyService {
    * every caller treats as "this run produced no conversations" rather than an
    * error — a pull with no conversations in it is the normal case.
    */
-  static assembleTraceRequest(
+  static tryAssembleTraceRequest(
     spans: OtlpJsonSpan[],
     profile: ConversationRoutingProfile,
   ): ExportTraceServiceRequest | null {

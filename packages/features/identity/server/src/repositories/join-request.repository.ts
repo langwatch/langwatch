@@ -11,10 +11,10 @@ import type {
 
 /** The folded head of one request — the `JoinRequest` projection row. */
 export interface JoinRequestReadRepository {
-  findRequest(args: { joinRequestId: string }): Promise<JoinRequestAggregateState | null>;
+  tryFindRequest(args: { joinRequestId: string }): Promise<JoinRequestAggregateState | null>;
 
   /** The one-open-request-per-person-per-organization check. */
-  findPendingRequest(args: {
+  tryFindPendingRequest(args: {
     userId: string;
     organizationId: string;
   }): Promise<JoinRequestAggregateState | null>;

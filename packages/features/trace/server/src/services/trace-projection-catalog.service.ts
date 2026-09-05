@@ -280,7 +280,7 @@ export class TraceProjectionCatalogService {
    * Resolve a single dotted-path to its {@link ResolvedField}, or null when the
    * path is not in the allowlist (the caller collects nulls into a 400).
    */
-  static resolveField(path: string): ResolvedField | null {
+  static tryResolveField(path: string): ResolvedField | null {
     // Reject prototype-pollution segments anywhere in the path (defense in depth
     // alongside the projector's setPath guard).
     if (path.split(".").some((segment) => FORBIDDEN_SEGMENTS.has(segment))) {

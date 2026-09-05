@@ -34,3 +34,10 @@ export type Plan = z.infer<typeof planSchema>;
 
 /** Compatibility name while existing consumers migrate to `Plan`. */
 export type PlanInfo = Plan;
+
+/**
+ * How an organization is billed, restated from the Postgres enum
+ * `PricingModel`: a portable contract cannot depend on the generated client.
+ */
+export const PricingModel = { TIERED: "TIERED", SEAT_EVENT: "SEAT_EVENT" } as const;
+export type PricingModel = (typeof PricingModel)[keyof typeof PricingModel];

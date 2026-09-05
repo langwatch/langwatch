@@ -78,7 +78,7 @@ export class JoinRequestGuards {
    * `join_not_available`, the same nothing every other closed door gives.
    */
   async requestJoin(data: RequestJoinCommandData): Promise<JoinRequestFactInput[]> {
-    const existing = await this.requests.findRequest({
+    const existing = await this.requests.tryFindRequest({
       joinRequestId: data.joinRequestId,
     });
     // The retry leg: the same command id names the same aggregate, and a
@@ -95,7 +95,7 @@ export class JoinRequestGuards {
       throw new JoinNotAvailableError(`join request refused: ${domain} is a public email domain`);
     }
 
-    const open = await this.requests.findPendingRequest({
+    const open = await this.requests.tryFindPendingRequest({
       userId: data.userId,
       organizationId: data.organizationId,
     });
@@ -128,7 +128,7 @@ export class JoinRequestGuards {
    * wants to hand over more sends a formal invitation instead.
    */
   async approveJoin(data: ApproveJoinCommandData): Promise<JoinRequestFactInput[]> {
-    const held = await this.requests.findRequest({
+    const held = await this.requests.tryFindRequest({
       joinRequestId: data.joinRequestId,
     });
     // The retry leg, and the reason an approval is safe to re-run: an
@@ -216,7 +216,7 @@ export class JoinRequestGuards {
    * decides WHEN; this still decides whether.
    */
   async expireJoin(data: ExpireJoinCommandData): Promise<JoinRequestFactInput[]> {
-    const state = await this.requests.findRequest({
+    const state = await this.requests.tryFindRequest({
       joinRequestId: data.joinRequestId,
     });
     // A request that already ended, by any of the other four routes, has
@@ -252,7 +252,7 @@ export class JoinRequestGuards {
     joinRequestId: string;
     verb: JoinRequestCommandType;
   }): Promise<JoinRequestAggregateState | null> {
-    const state = await this.requests.findRequest({ joinRequestId });
+    const state = await this.requests.tryFindRequest({ joinRequestId });
     if (!state) {
       return null;
     }

@@ -1,8 +1,7 @@
 /**
- * The counters, histograms and rolling state GroupQueue keeps beside its
- * queues, and the fleet's own persisted accumulators. Every method answers in
- * the collector's vocabulary rather than handing back a command result, so the
- * key shapes and the pipelining stay on the storage side.
+ * Counters, histograms and rolling state GroupQueue keeps beside its queues.
+ * Every method answers in the collector's vocabulary, so key shapes and
+ * pipelining stay on the storage side.
  */
 export type OpsLatencyHistograms = {
   /** Every queue's most recent 60 minute buckets. */
@@ -30,7 +29,7 @@ export abstract class OpsMetricsRepository {
     jobNames: string[];
   }): Promise<Map<string, OpsQueueTotals>>;
   abstract readPausedJobKeys(input: { queueNames: string[] }): Promise<string[]>;
-  abstract readPersistedState(): Promise<string | null>;
+  abstract tryReadPersistedState(): Promise<string | null>;
   abstract writePersistedState(input: { state: string; ttlSeconds: number }): Promise<void>;
   /** The server's own INFO text, parsed by the caller. */
   abstract readServerInfo(): Promise<string>;

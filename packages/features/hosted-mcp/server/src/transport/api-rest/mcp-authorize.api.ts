@@ -131,7 +131,7 @@ export function createMcpAuthorizeRestApp(options: {
       // that was registered for this client_id — otherwise whoever crafts the authorization
       // request (which can be an attacker, not the approving user) can point it at a URI they
       // control and the approved code is exfiltrated there.
-      const registeredClient = await RedisOAuthClientRepository.get({
+      const registeredClient = await RedisOAuthClientRepository.tryGet({
         redis: ports.redis,
         clientId,
       });

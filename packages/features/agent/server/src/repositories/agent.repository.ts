@@ -62,7 +62,7 @@ export abstract class AgentRepository {
    * Finds a connected agent by its identity key, whatever its state, so a
    * process that registers the same identity writes the row it already has.
    */
-  abstract findByIdentityKey(input: {
+  abstract tryFindByIdentityKey(input: {
     projectId: string;
     identityKey: string;
   }): Promise<Agent | null>;

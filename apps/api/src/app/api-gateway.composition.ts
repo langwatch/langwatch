@@ -351,7 +351,7 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
         virtualKey.scopes,
       ),
     requireVisibleVirtualKeyForUser: async ({ organizationId, id, userId }) =>
-      virtualKeyAuthorization.requireVisibleVk(
+      virtualKeyAuthorization.getVisibleVk(
         virtualKeys,
         await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
         {
@@ -366,7 +366,7 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
       );
     },
     requireVisibleVirtualKeyForProjectCredential: ({ project, id, organizationId }) =>
-      virtualKeyAuthorization.requireVisibleVk(
+      virtualKeyAuthorization.getVisibleVk(
         virtualKeys,
         membershipForProjectCredential(project),
         {
@@ -375,7 +375,7 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
         },
       ),
     requireExistingVirtualKey: ({ organizationId, id }) =>
-      virtualKeyAuthorization.requireExistingVk(virtualKeys, id, organizationId),
+      virtualKeyAuthorization.getExistingVk(virtualKeys, id, organizationId),
 
     assertCanManageAllScopes: ({ actor, scopes }) =>
       virtualKeyAuthorization.assertActorCanManageAllScopes(
@@ -399,7 +399,7 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
         attachments ? [...attachments] : undefined,
       ),
     resolveVirtualKeyProjectId: ({ organizationId, virtualKeyId, scopes, traceProjectId }) =>
-      virtualKeyAuthorization.resolveVkProjectId({
+      virtualKeyAuthorization.tryResolveVkProjectId({
         organizationId,
         vkId: virtualKeyId,
         inputScopes: scopes ? [...scopes] : undefined,

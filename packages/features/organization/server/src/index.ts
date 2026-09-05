@@ -42,8 +42,11 @@ export {
 } from "./services/member-role-constraints.service";
 export {
   assertNoPersonalTeamScope,
-  findSharedTeamIds,
+  assertPersonalTeamScopesOwnedBy,
+  type PersonalTeamScopeReader,
+  type RoleBindingScope,
 } from "./services/personal-team-scope.service";
+export { PostgresPersonalTeamScopeAdapter } from "./adapters/postgres.personal-team-scope.adapter";
 export type {
   AuditLogFilters,
   CreateAndAssignInput,

@@ -172,7 +172,7 @@ interface GenieMessageFrame {
  * Databricks Genie conversations mapped to traces.
  *
  * The sibling of {@link CopilotStudioTraceMapperService} and the same shape: one job
- * with many steps, of which exactly one — `toTraceRequest` — is anybody
+ * with many steps, of which exactly one — `tryToTraceRequest` — is anybody
  * else's business. `flattenThoughts` used to be exported alongside it with no
  * caller anywhere.
  */
@@ -600,7 +600,7 @@ export class GenieTraceMapperService {
    * Without this line an Anthropic Admin source that acquired a destination
    * would have its billing rows rendered as messages someone said.
    */
-  static toTraceRequest({
+  static tryToTraceRequest({
     events,
     origin,
   }: {
@@ -617,6 +617,6 @@ export class GenieTraceMapperService {
       .filter((event) => GenieTraceMapperService.isSettledForRouting(event))
       .flatMap((event) => GenieTraceMapperService.mapMessage(event, origin));
 
-    return ConversationTraceAssemblyService.assembleTraceRequest(spans, origin.profile);
+    return ConversationTraceAssemblyService.tryAssembleTraceRequest(spans, origin.profile);
   }
 }

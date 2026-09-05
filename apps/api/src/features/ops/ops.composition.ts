@@ -27,7 +27,7 @@ import type { UserService } from "@langwatch/user-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiAuditPort } from "../../api-request.policy";
 import { createOpsTrpcRouter } from "./ops-trpc.mount";
 import { opsPolicyKit } from "./ops-policy-kit";

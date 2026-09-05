@@ -79,7 +79,7 @@ export class SsoConnectionGuardChecks {
 
   /** The connection as the fold currently holds it, or nothing. */
   tryFindConnection(input: { connectionId: string }): Promise<SsoConnectionState | null> {
-    return this.connections.findConnection(input);
+    return this.connections.tryFindConnection(input);
   }
 
   /** Whether the organization has a live break-glass binding. */
@@ -96,7 +96,7 @@ export class SsoConnectionGuardChecks {
     data: { connectionId: string },
     command: SsoConnectionCommandType,
   ): Promise<SsoConnectionState> {
-    const state = await this.connections.findConnection({
+    const state = await this.connections.tryFindConnection({
       connectionId: data.connectionId,
     });
     if (!state) {
@@ -165,7 +165,7 @@ export class SsoConnectionGuardChecks {
     domain: string;
     connectionId: string;
   }): Promise<void> {
-    const owner = await this.connections.findDomainOwner({ domain });
+    const owner = await this.connections.tryFindDomainOwner({ domain });
     if (owner && owner.connectionId !== connectionId) {
       throw new SsoConnectionDomainTakenError(
         `domain ${domain} is already verified on connection ${owner.connectionId}`,

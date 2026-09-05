@@ -1,4 +1,4 @@
-import type { BugReport } from "@langwatch/prisma-client/generated";
+import type { BugReport } from "@langwatch/ops-contract";
 
 /** Team alert for a filed report. Best-effort: intake already succeeded. */
 export abstract class BugReportNotifierPort {

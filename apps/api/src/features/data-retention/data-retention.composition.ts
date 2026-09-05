@@ -32,7 +32,7 @@ import type {
   ApiTrpcFeatureApplication,
   ApiTrpcPortsContext,
 } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createDataRetentionTrpcRouter } from "./data-retention-trpc.mount";
 
 /** Reports the one capability this feature can be composed without. */

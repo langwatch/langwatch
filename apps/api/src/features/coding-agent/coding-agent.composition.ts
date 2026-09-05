@@ -24,7 +24,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections";
 import { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount";
 

@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  reportTraceDestinationBackfill,
+  GatewayTraceDestinationReportRepository,
   type TraceDestinationKeyRow,
   type TraceDestinationProjectRow,
-  type TraceDestinationReportDatabase,
-} from "../trace-destination-report.task";
+} from "../../repositories/gateway-trace-destination-report.repository";
+import { reportTraceDestinationBackfill } from "../trace-destination-report.task";
 
 function project(overrides: Partial<TraceDestinationProjectRow>): TraceDestinationProjectRow {
   return {
@@ -27,7 +27,32 @@ function key(overrides: Partial<TraceDestinationKeyRow>): TraceDestinationKeyRow
   } as TraceDestinationKeyRow;
 }
 
-function fakeDatabase({
+class FakeRepository extends GatewayTraceDestinationReportRepository {
+  constructor(
+    private readonly rows: {
+      projects: TraceDestinationProjectRow[];
+      keys: TraceDestinationKeyRow[];
+      organizations: Array<{ id: string }>;
+    },
+  ) {
+    super();
+  }
+
+  async findProjects(): Promise<TraceDestinationProjectRow[]> {
+    return this.rows.projects;
+  }
+
+  /** The second page is empty, which is what ends the keyset walk. */
+  async findKeyPage({ after }: { after: string | null }): Promise<TraceDestinationKeyRow[]> {
+    return after === null ? this.rows.keys : [];
+  }
+
+  async findOrganizationIds(): Promise<string[]> {
+    return this.rows.organizations.map((organization) => organization.id);
+  }
+}
+
+function fakeRepository({
   projects,
   keys,
   organizations = [{ id: "org-1" }],
@@ -35,24 +60,15 @@ function fakeDatabase({
   projects: TraceDestinationProjectRow[];
   keys: TraceDestinationKeyRow[];
   organizations?: Array<{ id: string }>;
-}): TraceDestinationReportDatabase {
-  // The picked delegates return branded `PrismaPromise` values, so the double
-  // is built untyped and cast once at the seam. The second page is empty,
-  // which is what ends the keyset walk.
-  return {
-    project: { findMany: vi.fn(async () => projects) },
-    organization: { findMany: vi.fn(async () => organizations) },
-    virtualKey: {
-      findMany: vi.fn(async ({ where }: { where?: { id: { gt: string } } }) => (where ? [] : keys)),
-    },
-  } as unknown as TraceDestinationReportDatabase;
+}): GatewayTraceDestinationReportRepository {
+  return new FakeRepository({ projects, keys, organizations });
 }
 
 describe("reportTraceDestinationBackfill", () => {
   describe("given keys naming live, archived and foreign projects", () => {
     /** @scenario "The trace-destination report classifies every key by the rule that would answer for it" */
     it("classifies each under the rule that would answer for it", async () => {
-      const database = fakeDatabase({
+      const repository = fakeRepository({
         projects: [
           project({ id: "live" }),
           project({ id: "archived", archivedAt: new Date("2026-01-01") }),
@@ -68,7 +84,7 @@ describe("reportTraceDestinationBackfill", () => {
         ],
       });
 
-      const report = await reportTraceDestinationBackfill({ database });
+      const report = await reportTraceDestinationBackfill({ repository });
 
       expect(report.total).toBe(5);
       expect(report.counts).toEqual({
@@ -86,13 +102,13 @@ describe("reportTraceDestinationBackfill", () => {
   describe("when an organization has no live governance project", () => {
     /** @scenario "The trace-destination report names the organizations that gate the migration" */
     it("counts its keys as destinationless and names the organization", async () => {
-      const database = fakeDatabase({
+      const repository = fakeRepository({
         projects: [project({ id: "live" })],
         keys: [key({ id: "vk-bare" })],
         organizations: [{ id: "org-1" }, { id: "org-empty" }],
       });
 
-      const report = await reportTraceDestinationBackfill({ database });
+      const report = await reportTraceDestinationBackfill({ repository });
 
       expect(report.counts.null).toBe(1);
       expect(report.organizationsWithoutGovernanceProject).toBe(2);

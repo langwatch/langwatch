@@ -1,5 +1,34 @@
-import type { AuditLog } from "@langwatch/prisma-client/generated";
 import type { GetRecentItemsParams } from "../rules/recent-items.rules";
+
+/** A Json column's value, mirroring the generated client's own shape. */
+export type AuditLogJsonObject = { [Key in string]?: AuditLogJsonValue };
+export interface AuditLogJsonArray extends Array<AuditLogJsonValue> {}
+export type AuditLogJsonValue =
+  | string
+  | number
+  | boolean
+  | AuditLogJsonObject
+  | AuditLogJsonArray
+  | null;
+
+/** One audit-trail row, restated so this port names no generated type. */
+export type AuditLog = {
+  id: string;
+  createdAt: Date;
+  userId: string | null;
+  projectId: string | null;
+  organizationId: string | null;
+  action: string;
+  args: AuditLogJsonValue | null;
+  error: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  metadata: AuditLogJsonValue | null;
+  targetKind: string | null;
+  targetId: string | null;
+  before: AuditLogJsonValue | null;
+  after: AuditLogJsonValue | null;
+};
 
 /** The columns the strip needs to render one row and link it. */
 type RecentEntityRow = {

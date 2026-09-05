@@ -1,4 +1,4 @@
-import type { GatewayBudget } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget } from "@langwatch/gateway-contract";
 
 /**
  * The rows behind the cap a key carries on itself: the budgets that target

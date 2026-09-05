@@ -5,12 +5,17 @@ import { bindingScopeTierSchema, storedBindingScopeTierSchema } from "./vocabula
 /** Portable AuthZ vocabulary. Persisted and transport values validate here. */
 export const teamUserRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type TeamUserRole = z.infer<typeof teamUserRoleSchema>;
+/** The same members as values, for code that names one rather than parses it. */
+export const TeamUserRole = teamUserRoleSchema.enum;
 
 export const organizationRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL"]);
 export type OrganizationRole = z.infer<typeof organizationRoleSchema>;
+export const OrganizationUserRole = organizationRoleSchema.enum;
+export type OrganizationUserRole = OrganizationRole;
 
 export const roleBindingScopeTypeSchema = storedBindingScopeTierSchema;
 export type RoleBindingScopeType = z.infer<typeof roleBindingScopeTypeSchema>;
+export const RoleBindingScopeType = roleBindingScopeTypeSchema.enum;
 
 const projectScopeRefSchema = z
   .object({

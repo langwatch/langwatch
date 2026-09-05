@@ -48,7 +48,7 @@ class ClickHouseTraceSummaryProjectionAdapter extends TraceSummaryProjectionPort
     traceId: string;
     window?: TraceSummaryReadWindow;
   }): Promise<TraceSummaryData | null> {
-    return this.repository.findByTraceId(
+    return this.repository.tryFindByTraceId(
       { tenantId: input.tenantId, traceId: input.traceId },
       { window: input.window },
     );

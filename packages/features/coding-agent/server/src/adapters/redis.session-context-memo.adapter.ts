@@ -15,7 +15,7 @@ export class RedisSessionContextMemoAdapter extends CodingAgentSessionContextMem
     return new RedisSessionContextMemoAdapter(redis);
   }
 
-  async get({
+  async tryGet({
     tenantId,
     sessionId,
   }: {

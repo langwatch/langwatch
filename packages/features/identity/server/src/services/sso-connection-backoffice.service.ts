@@ -87,12 +87,12 @@ export class SsoConnectionBackofficeService {
     };
   }
 
-  async getById({
+  async tryGetById({
     connectionId,
   }: {
     connectionId: string;
   }): Promise<BackofficeSsoConnection | null> {
-    const state = await this.deps.reads.findById({ connectionId });
+    const state = await this.deps.reads.tryFindById({ connectionId });
     if (!state) {
       return null;
     }

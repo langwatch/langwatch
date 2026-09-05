@@ -8,7 +8,7 @@
  *   getAllForProject    the rules the project's settings page renders.
  *   createOrUpdate      write one rule at a scope the caller may manage.
  *   delete              remove one, authorized against the STORED row's scope.
- *   getModelLimits      the registry's context/output ceilings for a model.
+ *   tryGetModelLimits      the registry's context/output ceilings for a model.
  *   previewMatchingSpans  which recently-seen models the regex being typed
  *                       would match, and what those spans would have cost.
  *
@@ -92,7 +92,7 @@ export type LlmModelCostTrpcPorts = Readonly<{
    */
   isSafeRegex(pattern: string): boolean;
   /** The registry's context-window and output ceilings for a model id. */
-  getModelLimits(model: string): ModelLimits | null;
+  tryGetModelLimits(model: string): ModelLimits | null;
   /** The live preview behind the cost-rule drawer's regex field. */
   previewMatchingSpans(input: {
     spans: SpanReader;
@@ -195,9 +195,9 @@ export class LlmModelCostTrpcApi {
        * @param input - Input containing the project ID and model name
        * @returns Model limits or null if not found
        */
-      getModelLimits: policy("project:view")(
+      tryGetModelLimits: policy("project:view")(
         procedure.input(modelCostModelLimitsTrpcInputSchema),
-      ).query(async ({ input }) => ports.getModelLimits(input.model)),
+      ).query(async ({ input }) => ports.tryGetModelLimits(input.model)),
 
       /**
        * Live preview for the cost rule drawer: which recently-seen models (and

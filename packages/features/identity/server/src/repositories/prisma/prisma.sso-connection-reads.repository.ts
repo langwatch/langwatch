@@ -24,7 +24,7 @@ export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepos
 
   constructor(private readonly prisma: PrismaSsoConnectionReadDatabase) {}
 
-  async findConnection({
+  async tryFindConnection({
     connectionId,
   }: {
     connectionId: string;
@@ -38,7 +38,7 @@ export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepos
   /**
    * First verifier owns, and this is where the scope of "owns" is decided.
    */
-  async findDomainOwner({
+  async tryFindDomainOwner({
     domain,
   }: {
     domain: string;

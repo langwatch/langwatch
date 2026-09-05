@@ -104,7 +104,7 @@ export class GatewayUsageTrpcApi {
       })(procedure.input(summaryForVirtualKeyInputSchema)).query(async ({ ctx, input }) => {
         // Same visibility rule as virtualKeys.get: a key the caller can't
         // see is indistinguishable from one that doesn't exist.
-        const vk = await ctx.app.gateway.virtualKeys.getById(
+        const vk = await ctx.app.gateway.virtualKeys.tryGetById(
           input.virtualKeyId,
           input.organizationId,
         );

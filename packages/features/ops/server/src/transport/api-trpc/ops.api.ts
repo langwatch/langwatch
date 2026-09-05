@@ -582,7 +582,7 @@ export class OpsTrpcApi {
 
       getProcessInstance: view(procedure.input(opsProcessRefInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.ops.processes.getInstanceDetail({ ref: input });
+          return ctx.app.ops.processes.tryGetInstanceDetail({ ref: input });
         },
       ),
 
@@ -620,7 +620,7 @@ export class OpsTrpcApi {
       processRedriveDeadMessage: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
         async ({ ctx, input }) => {
           const { messageId, ...ref } = input;
-          return ctx.app.ops.processes.tryRedriveDeadMessage({
+          return ctx.app.ops.processes.redriveDeadMessage({
             ref,
             messageId,
             actorUserId: ctx.actor().id,
@@ -632,7 +632,7 @@ export class OpsTrpcApi {
       processDiscardDeadMessage: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
         async ({ ctx, input }) => {
           const { messageId, ...ref } = input;
-          return ctx.app.ops.processes.tryDiscardDeadMessage({
+          return ctx.app.ops.processes.discardDeadMessage({
             ref,
             messageId,
             actorUserId: ctx.actor().id,
@@ -681,7 +681,7 @@ export class OpsTrpcApi {
       processReleaseLapsedLease: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
         async ({ ctx, input }) => {
           const { messageId, ...ref } = input;
-          return ctx.app.ops.processes.tryReleaseLapsedLease({
+          return ctx.app.ops.processes.releaseLapsedLease({
             ref,
             messageId,
             actorUserId: ctx.actor().id,
@@ -722,7 +722,7 @@ export class OpsTrpcApi {
 
       getReplayRun: view(procedure.input(opsGetReplayRunInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.ops.replay.findHistoryEntry({ runId: input.runId });
+          return ctx.app.ops.replay.tryFindHistoryEntry({ runId: input.runId });
         },
       ),
 

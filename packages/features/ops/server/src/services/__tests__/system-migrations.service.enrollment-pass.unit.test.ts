@@ -21,7 +21,7 @@ import {
 class InMemoryStateRepository implements SystemMigrationStateRepository {
   private readonly rows = new Map<string, TenantMigrationRecord>();
 
-  async findRecord({
+  async tryFindRecord({
     migrationName,
     tenantId,
   }: {
@@ -39,7 +39,7 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
     // The production contract: an operator's `rolled_back` pin refuses the
     // write. The fake honors it so a pass that WOULD overwrite a pin fails
     // here instead of passing against a stub looser than the real store.
-    const existing = await this.findRecord({
+    const existing = await this.tryFindRecord({
       migrationName: record.migrationName,
       tenantId: record.tenantId,
     });
@@ -169,7 +169,7 @@ describe("the migration pass under its cohort rules", () => {
       // Never attempted means never reported either: no state row exists for
       // the unreleased migration, so nothing reads as parked or held.
       expect(
-        await state.findRecord({
+        await state.tryFindRecord({
           migrationName: "unreleased",
           tenantId: "acme",
         }),
@@ -265,7 +265,7 @@ describe("the migration pass under its cohort rules", () => {
       // Untouched means no state either: "not enrolled yet" and "not
       // started" stay the same pending state for the unenrolled migration.
       expect(
-        await state.findRecord({
+        await state.tryFindRecord({
           migrationName: "cutover-like",
           tenantId: "acme",
         }),

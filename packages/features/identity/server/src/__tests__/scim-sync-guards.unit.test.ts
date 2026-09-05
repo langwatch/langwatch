@@ -28,7 +28,7 @@ const commandIdentity = {
 
 function guardsOver(state: ScimSyncState | null) {
   return new ScimSyncGuards({
-    syncs: { findSync: async () => state },
+    syncs: { tryFindSync: async () => state },
   });
 }
 

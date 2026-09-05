@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+export { PostgresGovernanceDirectoryAdapter } from "./adapters/postgres.governance-directory.adapter";
+export { PostgresOrganizationSupportContactAdapter } from "./adapters/postgres.organization-support-contact.adapter";
+
+export {
+  GovernanceDirectoryPort,
+  type GovernanceDirectoryProject,
+  type GovernanceMembershipStatus,
+} from "./ports/governance-directory.port";
 export { GovernanceService } from "@langwatch/enterprise-governance-contract";
 /**
  * The landing decision, re-exported beside the service it gathers signals from.

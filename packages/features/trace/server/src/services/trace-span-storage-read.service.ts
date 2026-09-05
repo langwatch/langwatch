@@ -20,7 +20,7 @@ import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 
 /**
- * Optional blob-offload resolution dependencies for the v2 read path (ADR-022). When provided, `getSpansByTraceId`/`getSpanById` resolve any `langwatch.reserved.eventref.*` pointers before mapping to `Span[]`; when omitted, the service falls back to the preview values already stored in `stored_spans` — identical to pre-ADR-022 behaviour.
+ * Optional blob-offload resolution dependencies for the v2 read path (ADR-022). When provided, `getSpansByTraceId`/`tryGetSpanById` resolve any `langwatch.reserved.eventref.*` pointers before mapping to `Span[]`; when omitted, the service falls back to the preview values already stored in `stored_spans` — identical to pre-ADR-022 behaviour.
  */
 export interface SpanReadBlobResolutionDeps {
   blobStore: TraceBlobStoreService;
@@ -119,16 +119,16 @@ export class SpanStorageService {
   }
 
   /**
-   * Claim-check resolution read (ADR-069): one canonical span by identity for internal derivation consumers (the coding-agent facts lift). Deliberately ungated and unresolved — consumers lift scalar span attributes only, never offloaded bodies, and run server-side, so neither the visibility gate nor blob resolution applies; `null` means "not readable yet", so queue callers retry rather than treating it as absence. The partition hint is required, not optional: the repository read behind this has no unbounded fallback, so a hintless call would widen into a full-table scan. Derivation-shaped: the span comes back with empty `events`/`links` (omitted because no consumer here reads them and they are what it fails on) — rendering a span is `getSpanById`'s job, not this.
+   * Claim-check resolution read (ADR-069): one canonical span by identity for internal derivation consumers (the coding-agent facts lift). Deliberately ungated and unresolved — consumers lift scalar span attributes only, never offloaded bodies, and run server-side, so neither the visibility gate nor blob resolution applies; `null` means "not readable yet", so queue callers retry rather than treating it as absence. The partition hint is required, not optional: the repository read behind this has no unbounded fallback, so a hintless call would widen into a full-table scan. Derivation-shaped: the span comes back with empty `events`/`links` (omitted because no consumer here reads them and they are what it fails on) — rendering a span is `tryGetSpanById`'s job, not this.
    */
-  async getNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
+  async tryGetNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
     return this.repository.tryFindNormalizedSpanById(params);
   }
 
   /**
    * Returns a single span by its ID, resolving any ADR-022 offloaded eventref pointers when `blobResolutionDeps` were supplied at construction. Resolution fetches normalized spans for the whole trace and isolates the requested span after resolution, reusing the same `TraceOffloadResolutionService.resolveOffloadedTraces` path as `getSpansByTraceId` so sibling eventref pointers on the same trace are also resolved consistently.
    */
-  async getSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
+  async tryGetSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
     const gateOne = (span: Span | null): Span | null =>
       span ? (applyVisibilityGate([span], params.visibilityCutoffMs)[0] ?? null) : null;
 

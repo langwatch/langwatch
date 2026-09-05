@@ -1,4 +1,4 @@
-import type { ModelProvider } from "@langwatch/prisma-client/generated";
+import type { ModelProvider } from "@langwatch/gateway-contract";
 import type { GatewayModelProviderCredentialsPort } from "./gateway-model-provider-credentials.port";
 import type { VirtualKeyWithScopes } from "./gateway-virtual-key.port";
 
@@ -16,7 +16,7 @@ export abstract class GatewayConfigAssemblyPort {
   }): Record<string, string>;
 
   /** The models a provider row declares, or undefined when it declares none. */
-  abstract declaredModelsForProvider(modelProvider: {
+  abstract tryDeclaredModelsForProvider(modelProvider: {
     provider: string;
     customModels: unknown;
     customEmbeddingsModels: unknown;

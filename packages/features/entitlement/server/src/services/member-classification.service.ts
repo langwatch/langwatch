@@ -1,7 +1,7 @@
 /**
  * Whether a seat is a full member or a lite one.
  */
-import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole } from "@langwatch/authz-contract";
 
 /**
  * What a seat counts as against the plan's two member allowances.

@@ -100,7 +100,7 @@ type OrganizationInvitePortShape = Pick<
   | "matchInviteToAcceptor"
   | "maskInvitedAddress"
   | "applyInvite"
-  | "findLandingProjectSlug"
+  | "tryFindLandingProjectSlug"
   | "resolveJoinRequestByInvitation"
   | "withdrawJoinRequestOnInvitationAccepted"
 >;
@@ -206,7 +206,7 @@ export function composeApiOrganizationInvites(
         invite: input.invite,
         ...(input.viaIdentifierId === undefined ? {} : { viaIdentifierId: input.viaIdentifierId }),
       }),
-    findLandingProjectSlug: (_ctx, input) => invites.findLandingProjectSlug(input.invite),
+    tryFindLandingProjectSlug: (_ctx, input) => invites.tryFindLandingProjectSlug(input.invite),
     // Both of these tidy a request the same person already made — an invitation that
     // ANSWERS one, and an acceptance that WITHDRAWS one — and the transport wraps each in
     // its own try/catch because the invitation and the membership are the durable

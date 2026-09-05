@@ -150,7 +150,7 @@ export class IdentityGuards {
     if (normalizedValue === null) {
       return;
     }
-    const holder = await this.users.findUserIdByEmail({ normalizedValue });
+    const holder = await this.users.tryFindUserIdByEmail({ normalizedValue });
     if (holder === null || holder === userId) {
       return;
     }
@@ -187,7 +187,7 @@ export class IdentityGuards {
     if (heads.identifiers[identifierId]) {
       return [];
     }
-    const userHashKey = await this.heads.findUserHashKey({ userId });
+    const userHashKey = await this.heads.tryFindUserHashKey({ userId });
     // Non-email providers arrive VERIFIED with no verify ceremony to
     // re-check them, so the attach itself is where a cross-user race
     // resolves — and the address lock is what resolves it, atomically. The
@@ -273,7 +273,7 @@ export class IdentityGuards {
     const holder =
       head.value === null
         ? null
-        : await this.heads.findActiveIdentifierByValue({
+        : await this.heads.tryFindActiveIdentifierByValue({
             normalizedValue: head.value,
           });
     if (holder && holder.userId !== userId) {

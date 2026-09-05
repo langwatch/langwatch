@@ -101,8 +101,8 @@ function harness({
     write: vi.fn(async () => undefined),
   };
   const reads = {
-    findRequest: vi.fn(async () => held),
-    findPendingRequest: vi.fn(async () => pending),
+    tryFindRequest: vi.fn(async () => held),
+    tryFindPendingRequest: vi.fn(async () => pending),
     tryFindLastRejectionAt: vi.fn(async () => lastRejectionAt),
     findPendingForOrganization: vi.fn(async () => []),
     findPendingForUser: vi.fn(async () => []),
@@ -367,7 +367,7 @@ describe("given a domain that admits colleagues automatically", () => {
         ],
       });
 
-      const joined = await service.joinAutomaticallyIfAdmitted({
+      const joined = await service.tryJoinAutomaticallyIfAdmitted({
         userId: "user_sam",
         verifiedEmail: "sam@acme.com",
       });
@@ -407,7 +407,7 @@ describe("given a domain that admits colleagues automatically", () => {
       });
 
       expect(
-        await service.joinAutomaticallyIfAdmitted({
+        await service.tryJoinAutomaticallyIfAdmitted({
           userId: "user_sam",
           verifiedEmail: "sam@acme.com",
         }),

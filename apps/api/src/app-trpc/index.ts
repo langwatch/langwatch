@@ -11,7 +11,7 @@ export { createCodingAgentTrpcRouter } from "../features/coding-agent/coding-age
 export { createHttpProxyTrpcRouter } from "../features/agent/http-proxy-trpc.mount";
 export { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount";
 export { createTranslateTrpcRouter } from "../features/model-provider/translate-trpc.mount";
-export { listCustomEvaluators } from "../features/evaluation/custom-evaluators";
+export { listCustomEvaluators } from "../platform/infrastructure/postgres.custom-evaluators.adapter";
 export {
   createPromptTagTrpcRouter,
   createPromptTrpcRouter,

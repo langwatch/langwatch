@@ -15,7 +15,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createBatchRecordTrpcRouter, createDatasetTrpcRouter } from "./dataset-trpc.mount";
 
 /**

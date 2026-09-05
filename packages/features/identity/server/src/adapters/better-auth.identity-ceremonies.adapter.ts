@@ -40,13 +40,13 @@ export function bridgeAccountCeremonies({
 }: {
   ceremonies: IdentityAccountCeremonies;
   routesToIdentity: IdentityUserGate;
-}): Pick<IdentityAccountCeremonies, "beforeAccountCreate" | "beforeAccountDelete"> {
+}): Pick<IdentityAccountCeremonies, "tryBeforeAccountCreate" | "beforeAccountDelete"> {
   const deferred = async (userId: unknown): Promise<boolean> =>
     typeof userId === "string" && (await routesToIdentity({ userId }));
   return {
-    async beforeAccountCreate(account) {
+    async tryBeforeAccountCreate(account) {
       if (await deferred(account.userId)) return;
-      return ceremonies.beforeAccountCreate(account);
+      return ceremonies.tryBeforeAccountCreate(account);
     },
     async beforeAccountDelete(account) {
       if (await deferred(account.userId)) return;
@@ -67,7 +67,7 @@ interface UserRow {
  * The app wires three hooks to the three methods here, and better-auth does
  * the rest of the work this used to do by hand:
  *
- *   account.create.before → beforeAccountCreate   attach an identifier
+ *   account.create.before → tryBeforeAccountCreate   attach an identifier
  *   account.delete.before → beforeAccountDelete   detach it
  *   user.delete.before    → beforeUserDelete      erase the user
  *
@@ -118,14 +118,14 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
    * carries. Answers the row data better-auth must write — the same data
    * with the id this ceremony pinned — or nothing, when no ceremony ran.
    */
-  async beforeAccountCreate(
+  async tryBeforeAccountCreate(
     account: CeremonyAccountRow,
   ): Promise<{ data: { id: string } } | undefined> {
     const { userId, providerId } = account;
     if (typeof userId !== "string" || typeof providerId !== "string") return;
     if (!(await this.isLatched({ userId }))) return;
 
-    const value = await this.users.findEmail({ userId });
+    const value = await this.users.tryFindEmail({ userId });
     if (!value) {
       logger.warn(
         { userId, providerId },
@@ -205,7 +205,7 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
       return;
     }
     if (!(await this.isLatched({ userId }))) return;
-    const identifierId = await this.heads.findIdentifierIdForAccount({
+    const identifierId = await this.heads.tryFindIdentifierIdForAccount({
       userId,
       accountId: id,
       // better-auth's own id, verbatim: the fallback inside must not match

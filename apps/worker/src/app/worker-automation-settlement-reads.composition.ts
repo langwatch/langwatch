@@ -140,7 +140,6 @@ export class WorkerTraceRecordReader {
   }): WorkerTraceRecordReader {
     return new WorkerTraceRecordReader(
       TraceLegacyReadClickHouseRepository.create({
-        prisma: options.connection.client,
         // The deployment's real ClickHouse client, which this graph narrows to
         // the two methods the event store uses and the legacy read has not
         // been narrowed to. `apps/api` crosses the same seam the same way.
@@ -170,7 +169,7 @@ export class WorkerTraceRecordReader {
   private async visibilityCutoffMs(projectId: string): Promise<number | null> {
     try {
       const organizationId = await this.projects.getOrganizationId(projectId);
-      return await this.window.getVisibilityCutoffMs({ organizationId });
+      return await this.window.tryGetVisibilityCutoffMs({ organizationId });
     } catch (error) {
       this.logger.error(
         { projectId, error },

@@ -1,7 +1,7 @@
 import type {
   GatewayRealtimeSession,
   GatewayRealtimeSessionStatus,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/gateway-contract";
 
 /** What a reserve attempt answers. */
 export type ReserveResult =
@@ -23,12 +23,8 @@ export type NewGatewayRealtimeSession = {
 };
 
 /**
- * The record of brokered realtime voice sessions.
- *
- * `reserve` is one method rather than a read and a write because the cap only
- * holds if the count and the insert happen under the same per-key lock: two
- * racing mints that both read the count before either insert lands would each
- * see room, and a key limited to one would hold two sessions.
+ * The record of brokered realtime voice sessions. `reserve` is one method,
+ * not a read and a write, because the cap only holds under one per-key lock.
  */
 export abstract class GatewayRealtimeSessionRepository {
   abstract reserve(input: {

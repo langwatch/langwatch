@@ -21,7 +21,7 @@ import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import type { ZodTypeAny } from "zod";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { permissiveMappingsSchema } from "../trace/trace-mappings";
 import type { ApiWorkflowRuntime } from "../workflow/workflow.composition";
 import { createEvaluationTrpcRouter, type EvaluationMountPorts } from "./evaluation-trpc.mount";
@@ -104,8 +104,8 @@ export function composeEvaluationFeature(options: {
       };
     },
 
-    evaluatorUnavailability: (input) =>
-      EvaluatorAvailabilityService.evaluatorUnavailability({
+    tryEvaluatorUnavailability: (input) =>
+      EvaluatorAvailabilityService.tryEvaluatorUnavailability({
         evaluatorType: input.evaluatorType,
         environment,
       }),

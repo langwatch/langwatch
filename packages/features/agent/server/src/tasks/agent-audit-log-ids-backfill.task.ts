@@ -1,6 +1,12 @@
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { Task } from "@langwatch/task";
+import type {
+  AgentAuditLogArgs,
+  AgentAuditLogArgsInput,
+  AgentAuditLogArgsValue,
+  AgentAuditLogBackfillDatabase,
+  AgentAuditLogRow,
+} from "../repositories/prisma/prisma.agent-audit-log-backfill.repository";
 
 const logger = createLogger("langwatch:task:agent-audit-log-ids-backfill");
 
@@ -8,25 +14,6 @@ const logger = createLogger("langwatch:task:agent-audit-log-ids-backfill");
  *  created. Wide enough for a slow write, narrow enough that two agents
  *  created in the same project inside it are genuinely ambiguous. */
 const WINDOW_MS = 60_000;
-
-/**
- * Exactly the delegate methods this backfill calls, PICKED from the real
- * client rather than re-declared, so a typed `PrismaClient` satisfies it with
- * no cast and every row type comes from its own call site.
- */
-type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClient[Model]> = Pick<
-  PrismaClient[Model],
-  Methods
->;
-
-export type AgentAuditLogBackfillDatabase = {
-  auditLog: Delegate<"auditLog", "findMany" | "update">;
-  agent: Delegate<"agent", "findMany">;
-};
-
-type AuditLogRow = Prisma.AuditLogGetPayload<{
-  select: { id: true; projectId: true; createdAt: true; args: true };
-}>;
 
 export type AgentAuditLogBackfillOutcome = Readonly<{
   mode: "dry-run" | "execute";
@@ -68,7 +55,7 @@ export async function backfillAgentAuditLogIds({
   return { mode: execute ? "execute" : "dry-run", actions: [create, copy] };
 }
 
-function windowOf(log: AuditLogRow): { gte: Date; lte: Date } {
+function windowOf(log: AgentAuditLogRow): { gte: Date; lte: Date } {
   return {
     gte: new Date(log.createdAt.getTime() - WINDOW_MS),
     lte: new Date(log.createdAt.getTime() + WINDOW_MS),
@@ -91,7 +78,7 @@ async function backfillAction({
   execute: boolean;
   action: string;
   missingKey: string;
-  candidates: (input: { log: AuditLogRow; args: Prisma.JsonObject }) => {
+  candidates: (input: { log: AgentAuditLogRow; args: AgentAuditLogArgs }) => {
     projectId: string;
     window: { gte: Date; lte: Date };
     copiedFromAgentId?: string;
@@ -133,7 +120,7 @@ async function backfillAction({
     if (execute) {
       await database.auditLog.update({
         where: { id: log.id },
-        data: { args: { ...args, [missingKey]: only.id } as Prisma.InputJsonObject },
+        data: { args: { ...args, [missingKey]: only.id } as AgentAuditLogArgsInput },
       });
     }
     patched += 1;
@@ -145,8 +132,8 @@ async function backfillAction({
 
 /** `args` is a nullable Json column, so anything but an object reads as
  *  empty rather than throwing — a malformed row is skipped, not crashed on. */
-function argsOf(log: AuditLogRow): Prisma.JsonObject {
-  const args: Prisma.JsonValue | null = log.args;
+function argsOf(log: AgentAuditLogRow): AgentAuditLogArgs {
+  const args: AgentAuditLogArgsValue | null = log.args;
   return typeof args === "object" && args !== null && !Array.isArray(args) ? args : {};
 }
 

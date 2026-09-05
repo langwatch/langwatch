@@ -7,7 +7,7 @@ export class TraceNumberCoercionService {
    * Coerces a value to a finite number or returns null.
    * Handles ClickHouse Map(String, String) where all values are strings.
    */
-  static coerceToNumber(v: unknown): number | null {
+  static tryCoerceToNumber(v: unknown): number | null {
     if (typeof v === "number" && Number.isFinite(v)) {
       return v;
     }

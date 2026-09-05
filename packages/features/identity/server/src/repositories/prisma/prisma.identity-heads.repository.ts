@@ -33,7 +33,7 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
 
   private constructor(private readonly database: PrismaIdentityHeadsDatabase) {}
 
-  async findUserHashKey({ userId }: { userId: string }): Promise<string | null> {
+  async tryFindUserHashKey({ userId }: { userId: string }): Promise<string | null> {
     const user = await this.database.user.findUnique({
       where: { id: userId },
       select: { userHashKey: true },
@@ -54,7 +54,7 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
     };
   }
 
-  async findActiveIdentifierByValue({
+  async tryFindActiveIdentifierByValue({
     normalizedValue,
   }: {
     normalizedValue: string;
@@ -69,7 +69,7 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
     return row === null ? null : { userId: row.userId, identifierId: row.id };
   }
 
-  async findIdentifier({
+  async tryFindIdentifier({
     userId,
     identifierId,
   }: {
@@ -90,7 +90,7 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
    * `take: 2` is the ambiguity guard: two matches answer null rather than a
    * guess, and so does none.
    */
-  async findIdentifierIdForAccount({
+  async tryFindIdentifierIdForAccount({
     userId,
     accountId,
     providerId,

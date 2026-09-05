@@ -14,7 +14,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { PrismaGatewayInternalStoreAdapter } from "../../../adapters/prisma.gateway-internal-store.adapter";
+import { PrismaGatewayInternalStoreAdapter } from "../../../adapters/postgres.gateway-internal-store.adapter";
 import { GatewaySpendRatingPort } from "../../../ports/gateway-spend-rating.port";
 import {
   buildGatewayCanonicalString,

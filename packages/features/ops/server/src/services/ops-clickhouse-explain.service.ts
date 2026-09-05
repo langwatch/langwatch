@@ -40,7 +40,7 @@ export class OpsExplainService {
     /** Redacted request shape for the audit log — never the raw query. */
     auditFields: Record<string, unknown>;
   }): Promise<OpsExplainOutcome> {
-    const resolved = this.repository.resolveClient();
+    const resolved = this.repository.tryResolveClient();
     if (!resolved) {
       return { status: "unavailable" };
     }

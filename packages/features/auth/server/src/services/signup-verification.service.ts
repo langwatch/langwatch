@@ -16,7 +16,7 @@ export interface SignUpVerificationTokenStore {
    * answers null for a token that never existed, was already spent, or has expired. One
    * answer for all three on purpose — see `completeVerification`.
    */
-  claim(input: { token: string; now: Date }): Promise<{
+  tryClaim(input: { token: string; now: Date }): Promise<{
     identifier: string;
   } | null>;
 }
@@ -109,7 +109,7 @@ export class SignUpVerificationService {
     accountCreated: boolean;
     accountExists: boolean;
   }> {
-    const claimed = await this.deps.tokens.claim({ token, now: this.now() });
+    const claimed = await this.deps.tokens.tryClaim({ token, now: this.now() });
     const pending = claimed ? readPendingSignUp(claimed.identifier) : null;
 
     if (!pending) {

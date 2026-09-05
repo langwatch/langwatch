@@ -99,7 +99,7 @@ export class ConnectedAgentRegistryAdapter extends ConnectedAgentRegistryPort {
     meta: InstanceMeta | undefined;
   }): Promise<void> {
     const key = instanceMetaKey(projectId, instanceId);
-    const current = await this.store.hgetall(key);
+    const current = await this.store.tryHgetall(key);
     const fields = current ?? (meta ? fieldsOf({ meta, agentIds }) : null);
     if (fields) {
       await this.store.hset(key, fields, PRESENCE_TTL_SECONDS);
@@ -147,8 +147,8 @@ export class ConnectedAgentRegistryAdapter extends ConnectedAgentRegistryPort {
     const live = await Promise.all(
       instanceIds.map(async (instanceId) => {
         const [fields, inflightRaw] = await Promise.all([
-          this.store.hgetall(instanceMetaKey(projectId, instanceId)),
-          this.store.get(inflightKey(projectId, instanceId)),
+          this.store.tryHgetall(instanceMetaKey(projectId, instanceId)),
+          this.store.tryGet(inflightKey(projectId, instanceId)),
         ]);
         if (!fields) return null;
         return {
@@ -185,7 +185,7 @@ export class ConnectedAgentRegistryAdapter extends ConnectedAgentRegistryPort {
     projectId: string;
     instanceId: string;
   }): Promise<string[]> {
-    const fields = await this.store.hgetall(instanceMetaKey(projectId, instanceId));
+    const fields = await this.store.tryHgetall(instanceMetaKey(projectId, instanceId));
     return fields?.agentIds ? fields.agentIds.split(",").filter(Boolean) : [];
   }
 

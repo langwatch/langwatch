@@ -28,7 +28,7 @@ import type {
  */
 export abstract class TraceLegacyReadPort {
   /** One trace with its spans, or undefined when the project holds no such trace. */
-  abstract getById(
+  abstract tryGetById(
     projectId: string,
     traceId: string,
     protections: unknown,
@@ -84,7 +84,7 @@ export abstract class TraceLegacyReadPort {
   ): Promise<Record<string, Evaluation[]>>;
 
   /** One evaluation's inputs, resolved lazily when its card is expanded. */
-  abstract getEvaluationInputs(input: {
+  abstract tryGetEvaluationInputs(input: {
     projectId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null>;

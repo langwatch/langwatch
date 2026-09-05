@@ -1,4 +1,4 @@
-import type { GatewayBudget } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget } from "@langwatch/gateway-contract";
 import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port";
 
 /** The cap fields a key's own drawer sets. */
@@ -25,7 +25,7 @@ export type GatewayKeyBudgetScope = "drawerManaged" | "scopedToKey";
  */
 export abstract class GatewayKeyBudgetRepository {
   /** The one live row this key's drawer manages, if it has one. */
-  abstract findDrawerManaged(
+  abstract tryFindDrawerManaged(
     input: { organizationId: string; virtualKeyId: string },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget | null>;

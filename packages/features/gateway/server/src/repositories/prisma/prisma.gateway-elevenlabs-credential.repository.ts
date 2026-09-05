@@ -19,7 +19,7 @@ export class PrismaGatewayElevenLabsCredentialRepository extends GatewayElevenLa
     super();
   }
 
-  findProviderRow({
+  tryFindProviderRow({
     modelProviderId,
   }: {
     modelProviderId: string;

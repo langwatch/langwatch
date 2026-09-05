@@ -23,7 +23,6 @@ import {
   type MountableRestApp,
   type ServiceContext,
 } from "@langwatch/api/rest";
-import type { Organization } from "@langwatch/prisma-client/generated";
 import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ScimApp } from "#app/scim.app";
@@ -52,7 +51,8 @@ const createTokenSchema = z.object({
   connectionId: z.string().trim().min(1).optional(),
 });
 
-const organizationOf = (c: Context): Organization => c.get("organization") as Organization;
+/** Only the id is read here; the middleware puts the whole row on the context. */
+const organizationOf = (c: Context): { id: string } => c.get("organization") as { id: string };
 
 /**
  * REST for the organization's SCIM bearer tokens.

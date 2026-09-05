@@ -48,7 +48,45 @@ import {
   type Trace,
   type TraceService as TraceTreeService,
 } from "@langwatch/trace-contract";
-import { TraceBlobStoreService, ClickHouseTraceAdapter, DERIVED_INPUT_ATTR_PREFIX, DERIVED_OUTPUT_ATTR_PREFIX, TraceAiQueryService, LogRecordStorageClickHouseRepository, LogRecordStorageService, NullLogRecordStorageRepository, NullSessionGroupsRepository, NullSpanStorageRepository, NullTraceListAdapter, NullTraceSummaryRepository, SessionGroupsClickHouseRepository, SessionGroupsService, SpanStorageClickHouseRepository, SpanStorageService, TraceCanonicalisationService, ClickHouseTraceLegacyReadAdapter, PrismaTraceEditOverlayRepository, TraceEditOverlayService, TraceIOExtractionService, TraceListClickHouseRepository, TraceListService, TraceLegacyReadService, TraceNotFoundError, TraceFullIoPort, TracePayloadReaderPort, TraceQueryClassificationAdapter, TraceSpanIngestPort, TraceSummaryClickHouseRepository, TraceSummaryService, traceMetadataUpdateSchema, VisibilityWindowService, type ClaudeSpanRef, type TraceLegacyFilterConditions, type TracesV2TrpcPorts, type TraceAppDependencies } from "@langwatch/trace-server";
+import {
+  TraceBlobStoreService,
+  ClickHouseTraceAdapter,
+  DERIVED_INPUT_ATTR_PREFIX,
+  DERIVED_OUTPUT_ATTR_PREFIX,
+  TraceAiQueryService,
+  LogRecordStorageClickHouseRepository,
+  LogRecordStorageService,
+  NullLogRecordStorageRepository,
+  NullSessionGroupsRepository,
+  NullSpanStorageRepository,
+  NullTraceListAdapter,
+  NullTraceSummaryRepository,
+  SessionGroupsClickHouseRepository,
+  SessionGroupsService,
+  SpanStorageClickHouseRepository,
+  SpanStorageService,
+  TraceCanonicalisationService,
+  ClickHouseTraceLegacyReadAdapter,
+  PrismaTraceEditOverlayRepository,
+  TraceEditOverlayService,
+  TraceIOExtractionService,
+  TraceListClickHouseRepository,
+  TraceListService,
+  TraceLegacyReadService,
+  TraceNotFoundError,
+  TraceFullIoPort,
+  TracePayloadReaderPort,
+  TraceQueryClassificationAdapter,
+  TraceSpanIngestPort,
+  TraceSummaryClickHouseRepository,
+  TraceSummaryService,
+  traceMetadataUpdateSchema,
+  VisibilityWindowService,
+  type ClaudeSpanRef,
+  type TraceLegacyFilterConditions,
+  type TracesV2TrpcPorts,
+  type TraceAppDependencies,
+} from "@langwatch/trace-server";
 import type { TracesTrpcPorts } from "@langwatch/trace-server";
 import {
   findPromptReferenceInAncestors,
@@ -310,10 +348,10 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
 
   readPorts(): Pick<
     TracesV2TrpcPorts,
-    "getVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes" | "codingAgentEnrichment"
+    "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes" | "codingAgentEnrichment"
   > {
     return {
-      getVisibilityCutoffMs: (projectId) => this.protections.visibilityCutoffMs(projectId),
+      tryGetVisibilityCutoffMs: (projectId) => this.protections.visibilityCutoffMs(projectId),
       derivedAttrPrefixes: {
         input: DERIVED_INPUT_ATTR_PREFIX,
         output: DERIVED_OUTPUT_ATTR_PREFIX,
@@ -356,7 +394,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
   explorerPorts(): Omit<
     TracesV2TrpcPorts,
     | "getViewerProtections"
-    | "getVisibilityCutoffMs"
+    | "tryGetVisibilityCutoffMs"
     | "mappers"
     | "derivedAttrPrefixes"
     | "codingAgentEnrichment"
@@ -387,14 +425,14 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       // The unmapped-cost hint is the MODEL PROVIDER feature's reading, and it
       // reaches this process's gateway rather than the trace store. It is
       // filled in by the trace-group composition, which holds both.
-      deriveUnmappedCostSuggestion: () => Promise.resolve(null),
+      tryDeriveUnmappedCostSuggestion: () => Promise.resolve(null),
       resolveAncestorPromptParams: (input) => this.resolveAncestorPromptParams(input),
       hasOwnPromptAttrs,
       traceNotFound: (id) => new TraceNotFoundError(id),
     } as Omit<
       TracesV2TrpcPorts,
       | "getViewerProtections"
-      | "getVisibilityCutoffMs"
+      | "tryGetVisibilityCutoffMs"
       | "mappers"
       | "derivedAttrPrefixes"
       | "codingAgentEnrichment"
@@ -491,7 +529,6 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     const read = TraceLegacyReadService.create({
       traceCanonicalisation: this.canonicalisation,
       traceRead: ClickHouseTraceLegacyReadAdapter.create({
-        prisma: options.prisma,
         traceCanonicalisation: this.canonicalisation,
         ...(resolve ? { resolveClickHouseClient: resolve } : {}),
         ...(options.filterConditions ? { filterConditions: options.filterConditions } : {}),
@@ -774,7 +811,7 @@ class ApiTraceProtections {
         );
         return Date.now() - FREE_VISIBILITY_DAYS * dayMs;
       }
-      return await this.window.getVisibilityCutoffMs({ organizationId });
+      return await this.window.tryGetVisibilityCutoffMs({ organizationId });
     } catch (error) {
       this.logger.error(
         { projectId, error },

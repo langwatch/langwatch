@@ -95,7 +95,7 @@ class ApiComposedModelProviderHost extends ApiModelProviderHostPort {
     const preview = ModelCostPreviewService.create({ regexSafety });
     return {
       isSafeRegex: (pattern) => regexSafety.isSafeRegex(pattern),
-      getModelLimits: (model) => modelLimits.getModelLimits(model),
+      tryGetModelLimits: (model) => modelLimits.tryGetModelLimits(model),
       previewMatchingSpans: ({ spans, input }) => {
         // The reader is the trace read stack's, carried through the application as an
         // opaque handle: only a process that composed one knows its concrete type, and a

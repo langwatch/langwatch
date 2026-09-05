@@ -108,7 +108,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
     it("returns the stored preview unchanged", async () => {
       const service = TraceSummaryService.create({
         repository: {
-          findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+          tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
       });
@@ -138,7 +138,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
       it("returns the recomputed full input instead of the stored preview", async () => {
         const service = TraceSummaryService.create({
           repository: {
-            findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+            tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
             upsert: vi.fn(),
           } as never,
           fullResolutionDeps: {
@@ -161,7 +161,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         const spanRepo = makeSpanRepo([spanWithRef]);
         const service = TraceSummaryService.create({
           repository: {
-            findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+            tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
             upsert: vi.fn(),
           } as never,
           fullResolutionDeps: {
@@ -187,7 +187,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
       const blobStore = fakeBlobStore({});
       const service = TraceSummaryService.create({
         repository: {
-          findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+          tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
         fullResolutionDeps: {
@@ -219,7 +219,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
       });
       const service = TraceSummaryService.create({
         repository: {
-          findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+          tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
         fullResolutionDeps: {
@@ -241,7 +241,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
     it("falls back to the stored preview instead of throwing", async () => {
       const service = TraceSummaryService.create({
         repository: {
-          findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+          tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
         fullResolutionDeps: {

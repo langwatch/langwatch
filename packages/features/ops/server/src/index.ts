@@ -157,10 +157,14 @@ export { SystemMigrationsPassTask } from "./tasks/system-migrations-pass.task";
 export {
   ProcessManagerPurgeTask,
   purgeProcessManagerTables,
-  type ProcessManagerPurgeDatabase,
   type ProcessManagerPurgeOptions,
   type ProcessManagerPurgeReport,
 } from "./tasks/process-manager-purge.task";
+export { PostgresProcessManagerPurgeAdapter } from "./adapters/postgres.process-manager-purge.adapter";
+export type {
+  ProcessManagerPurgeRepository,
+  ProcessManagerPurgeTarget,
+} from "./repositories/process-manager-purge.repository";
 
 // The back-office REST transport: impersonation, and the React Admin resource
 // operations. Its two session reads are ports, because who is acting and which

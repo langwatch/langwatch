@@ -373,7 +373,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
       // server writes them so the board does not depend on the tab surviving:
       // a background tab holds its save timer, and a dropped connection loses
       // the cells the page was holding, while the run reads as complete.
-      const resultsWriter = ExperimentRunResultsWriterService.writerFor({
+      const resultsWriter = ExperimentRunResultsWriterService.tryWriterFor({
         persistence: {
           experiments: ports.experiments().experimentService,
           actor: { userId: session.user.id, label: "user" },
@@ -494,7 +494,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     // its runId. In-flight runs register their owner through the abort port, which is set before the first frame of
     // either path. The progress store is the fallback: it also holds the owner, for as long as the run state lives.
     const ownerProjectId =
-      (await runPorts.abort.getRunningProjectId(runId)) ??
+      (await runPorts.abort.tryGetRunningProjectId(runId)) ??
       (await progress.tryGetRunState(runId))?.projectId;
     if (!ownerProjectId || ownerProjectId !== projectId) {
       throw new RunNotFoundError(runId);

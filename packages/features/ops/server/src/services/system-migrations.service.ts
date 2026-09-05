@@ -82,7 +82,7 @@ export interface SystemMigrationStateReader {
     limit: number;
   }): Promise<Array<TenantMigrationRecord & { updatedAt: Date }>>;
 
-  findRecord(args: {
+  tryFindRecord(args: {
     migrationName: string;
     tenantId: string;
   }): Promise<TenantMigrationRecord | null>;
@@ -575,7 +575,7 @@ export class SystemMigrationsService {
     migrationName: string;
     organizationId: string;
   }): Promise<{ status: TenantMigrationStatus | null; waiting: boolean }> {
-    const record = await this.deps.state.findRecord({
+    const record = await this.deps.state.tryFindRecord({
       migrationName,
       tenantId: organizationId,
     });
@@ -702,7 +702,7 @@ export class SystemMigrationsService {
     minimumWriterGeneration: string;
     actorUserId: string;
   }): Promise<void> {
-    const record = await this.deps.state.findRecord({
+    const record = await this.deps.state.tryFindRecord({
       migrationName,
       tenantId,
     });
@@ -759,7 +759,7 @@ export class SystemMigrationsService {
     actorUserId: string;
   }): Promise<void> {
     this.requireRegisteredMigration(migrationName);
-    const record = await this.deps.state.findRecord({
+    const record = await this.deps.state.tryFindRecord({
       migrationName,
       tenantId,
     });

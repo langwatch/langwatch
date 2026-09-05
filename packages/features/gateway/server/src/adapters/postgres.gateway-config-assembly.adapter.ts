@@ -86,7 +86,7 @@ export class GatewayConfigAssemblyAdapter extends GatewayConfigAssemblyPort {
     return withTiers;
   }
 
-  declaredModelsForProvider(mp: {
+  tryDeclaredModelsForProvider(mp: {
     provider: string;
     customModels: unknown;
     customEmbeddingsModels: unknown;

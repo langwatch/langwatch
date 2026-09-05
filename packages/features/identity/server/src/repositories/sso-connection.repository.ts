@@ -12,7 +12,7 @@ import type { SsoConnectionState } from "@langwatch/identity-contract";
  */
 export interface SsoConnectionReadRepository {
   /** One connection's folded state, or null when it has no history yet. */
-  findConnection(args: { connectionId: string }): Promise<SsoConnectionState | null>;
+  tryFindConnection(args: { connectionId: string }): Promise<SsoConnectionState | null>;
 
   /**
    * The connection that already holds a domain as VERIFIED on an ACTIVE
@@ -21,7 +21,7 @@ export interface SsoConnectionReadRepository {
    * guard states the rule; where the rule reaches is a deployment fact and
    * belongs where the deployment is known.
    */
-  findDomainOwner(args: {
+  tryFindDomainOwner(args: {
     domain: string;
   }): Promise<{ connectionId: string; organizationId: string } | null>;
 }

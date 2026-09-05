@@ -29,7 +29,7 @@
 import { type ZodRawShape, z } from "zod";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently
@@ -69,7 +69,7 @@ const FORBIDDEN_PREFIX = "FORBIDDEN: ";
 const NEEDS_OAUTH_PREFIX = "AUTH_REQUIRED: ";
 
 export interface GovernanceMcpContext {
-  prisma: PrismaClient;
+  directory: GovernanceDirectoryPort;
   governance: GovernanceService;
   /** The organization permission decision this surface is judged by. */
   permissions: GovernanceMcpPermissionProbePort;
@@ -98,19 +98,13 @@ export function registerGovernanceMcpTools(server: McpServerLike, ctx: Governanc
   const resolve = async (): Promise<ResolvedContext> => {
     if (!resolvedPromise) {
       resolvedPromise = (async () => {
-        const project = await ctx.prisma.project.findUnique({
-          where: { apiKey: ctx.apiKey, archivedAt: null },
-          select: { team: { select: { organizationId: true } } },
-        });
-        if (!project) {
+        const organizationId = await ctx.directory.tryFindOrganizationIdByProjectApiKey(ctx.apiKey);
+        if (organizationId === null) {
           throw new Error(
             "MCP session apiKey did not resolve to a project — cannot derive organization context for governance tools.",
           );
         }
-        return {
-          organizationId: project.team.organizationId,
-          callerUserId: ctx.callerUserId,
-        };
+        return { organizationId, callerUserId: ctx.callerUserId };
       })();
     }
     return resolvedPromise;

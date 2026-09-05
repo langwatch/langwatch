@@ -31,7 +31,7 @@ export abstract class BaseMemoryProjectionStore<
    */
   protected abstract getKey(tenantId: string, aggregateId: string): string;
 
-  async getProjection(aggregateId: string, context: ProjectionStoreReadContext): Promise<T | null> {
+  async tryGetProjection(aggregateId: string, context: ProjectionStoreReadContext): Promise<T | null> {
     const key = this.getKey(context.tenantId, aggregateId);
     return this.store.get(key) ?? null;
   }

@@ -215,8 +215,8 @@ export class TraceOffloadResolutionService {
 
     // At least one span was resolved — recompute trace-level IO from the full
     // span values.
-    const recomputedInput = ioExtractionService.extractFirstInput(resolvedSpans);
-    const recomputedOutput = ioExtractionService.extractLastOutput(resolvedSpans);
+    const recomputedInput = ioExtractionService.tryExtractFirstInput(resolvedSpans);
+    const recomputedOutput = ioExtractionService.tryExtractLastOutput(resolvedSpans);
 
     return {
       resolvedSpans,

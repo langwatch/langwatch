@@ -48,7 +48,7 @@ export class ExperimentRunStateStore implements FoldProjectionStore<ExperimentRu
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<ExperimentRunStateData | null> {
-    const projection = await this.repository.getProjection(aggregateId, {
+    const projection = await this.repository.tryGetProjection(aggregateId, {
       tenantId: context.tenantId,
     });
 

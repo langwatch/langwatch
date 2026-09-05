@@ -18,7 +18,7 @@ import type { MiddlewareHandler } from "hono";
 
 import { FixedGatewaySettlementPolicyAdapter } from "../../../adapters/fixed-gateway-settlement.adapter";
 import { GatewayEndUserCapsAdapter } from "../../../adapters/gateway-end-user-caps.adapter";
-import { GatewaySpendScopeAdapter } from "../../../adapters/gateway-spend-scope.adapter";
+import { GatewaySpendScopeAdapter } from "../../../adapters/postgres.gateway-spend-scope.adapter";
 import { GatewayBudgetClickHouseRepository } from "../../../repositories/clickhouse/clickhouse.gateway-budget.repository";
 import { GatewaySpendEventsRepository } from "../../../repositories/clickhouse/clickhouse.gateway-spend-events.repository";
 import {

@@ -11,12 +11,9 @@ import { createDatasetNormalizeHandler } from "../adapters/dataset-normalize.ada
 import { UploadNotPendingError } from "./dataset-errors.service";
 
 /**
- * Process-owned Dataset normalization capability.
- *
- * The service owns both sides of the queue seam: Dataset commands enqueue by
- * aggregate identity, while the worker registers the durable sender and invokes
- * the package-owned handler. With no worker queue, one process-local chain
- * preserves the documented inline fallback without a module-global registry.
+ * Process-owned Dataset normalization capability. Owns both sides of the
+ * queue seam: commands enqueue by aggregate identity, and the worker
+ * registers the durable sender that invokes the package-owned handler.
  */
 export class DatasetNormalizationService
   extends DatasetNormalizeQueuePort

@@ -42,10 +42,10 @@ export class LangyTitleGeneratorService {
 
   /** The generator as the conversation runtime's effect ports take it. */
   generator(): LangyTitleGenerator {
-    return (input) => this.generate(input);
+    return (input) => this.tryGenerate(input);
   }
 
-  async generate(input: {
+  async tryGenerate(input: {
     projectId: string;
     conversationId: string;
   }): Promise<{ title: string; model: string } | null> {

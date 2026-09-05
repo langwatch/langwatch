@@ -135,7 +135,7 @@ export class ModelCostPreviewService {
     spans: ModelCostPreviewSpanReader;
     input: CostRulePreviewInput;
   }): Promise<CostRuleMatchingSpansPreview> {
-    if (!this.regexSafety.compileSafeRegex(input.regex)) {
+    if (!this.regexSafety.tryCompileSafeRegex(input.regex)) {
       throw new ValidationError("Invalid or unsafe regular expression");
     }
 
@@ -205,7 +205,7 @@ export class ModelCostPreviewService {
    * and carries token usage, yet no cost was computed for it AND no stored rule matches the model. The
    * last check keeps the suggestion off spans that pre-date a rule the reader already created.
    */
-  async deriveUnmappedCostSuggestion({
+  async tryDeriveUnmappedCostSuggestion({
     costs,
     projectId,
     model,

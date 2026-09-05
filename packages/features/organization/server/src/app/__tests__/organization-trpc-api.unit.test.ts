@@ -84,7 +84,7 @@ function stubPorts(overrides: Partial<OrganizationTrpcPorts> = {}) {
     matchInviteToAcceptor: vi.fn(async () => ({ matches: true, viaIdentifierId: null })),
     maskInvitedAddress: (email: string) => `•••@${email.split("@")[1] ?? ""}`,
     applyInvite: vi.fn(async () => {}),
-    findLandingProjectSlug: vi.fn(async () => null),
+    tryFindLandingProjectSlug: vi.fn(async () => null),
     inviteNotFoundError: () => new Error("Invitation not found"),
     inviteExpiredError: () => new Error("Invitation expired"),
     inviteWrongAccountError: (masked: string) => new Error(`Wrong account: ${masked}`),
@@ -183,7 +183,7 @@ describe("OrganizationTrpcApi", () => {
     describe("given the invitation is PENDING", () => {
       it("applies it and answers with the landing project", async () => {
         const ports = stubPorts({
-          findLandingProjectSlug: vi.fn(async () => "acme-project"),
+          tryFindLandingProjectSlug: vi.fn(async () => "acme-project"),
         });
         const { caller } = harness({
           organizations: { ensurePersonalWorkspace: vi.fn(async () => ({})) },

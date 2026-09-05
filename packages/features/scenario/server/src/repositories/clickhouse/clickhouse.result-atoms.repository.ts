@@ -551,7 +551,7 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsReadPort {
   }
 
   /** The stat strip counts, over every atom in scope. */
-  async aggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow | null> {
+  async tryAggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow | null> {
     if (isEmptyScope(filter)) return null;
     const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
     const rows = await this.queryRows<RawTotalsRow>(

@@ -7,6 +7,6 @@ export abstract class OpsSnapshotRedisPort {
     expirySeconds: number,
     condition: "NX",
   ): Promise<unknown>;
-  abstract get(key: string): Promise<string | null>;
+  abstract tryGet(key: string): Promise<string | null>;
   abstract incr(key: string): Promise<number>;
 }

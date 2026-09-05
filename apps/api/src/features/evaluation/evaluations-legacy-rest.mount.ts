@@ -49,7 +49,7 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { ApiEvaluatorExecution } from "../../app/api-evaluator-execution.composition";
 import type { ApiHandlerManagedCredentialPort } from "../../app-rest/app-rest.process-features";
-import { listCustomEvaluators } from "./custom-evaluators";
+import { listCustomEvaluators } from "../../platform/infrastructure/postgres.custom-evaluators.adapter";
 
 /** Everything `POST /api/evaluations/batch/log_results` binds to. */
 export type ApiEvaluationBatchRestCollaborators = Readonly<{

@@ -25,7 +25,7 @@ export class ModelLimitsService {
   private constructor() {}
 
   /** The ceilings for a model id, or null when the catalogue does not name it. */
-  getModelLimits(modelName: string): ModelLimits | null {
+  tryGetModelLimits(modelName: string): ModelLimits | null {
     try {
       for (const variation of modelNameVariations(modelName)) {
         const model = getModelById(variation);

@@ -18,7 +18,7 @@ import type { Logger } from "@langwatch/observability";
 import type { TraceAppDependencies } from "@langwatch/trace-server";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import {
   createLlmModelCostTrpcRouter,
   createModelProviderTrpcRouter,
@@ -249,7 +249,7 @@ function conservativeCostRules(): LlmModelCostTrpcPorts {
   const nestedQuantifier = /\([^)]*[+*][^)]*\)\s*[+*]/;
   return {
     isSafeRegex: (pattern) => !nestedQuantifier.test(pattern),
-    getModelLimits: () => null,
+    tryGetModelLimits: () => null,
     previewMatchingSpans: () =>
       Promise.reject(new ApiModelProviderUnavailableError("the cost rule's span preview")),
   };

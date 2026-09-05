@@ -32,7 +32,7 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
 
   private constructor(private readonly prisma: PrismaClient) {}
 
-  async findRecord({
+  async tryFindRecord({
     migrationName,
     tenantId,
   }: {

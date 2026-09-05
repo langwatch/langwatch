@@ -252,11 +252,11 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     }
   }
 
-  async findByTraceId(
+  async tryFindByTraceId(
     { tenantId, traceId }: { tenantId: string; traceId: string },
     options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {
-    EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.findByTraceId");
+    EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.tryFindByTraceId");
 
     // Fold read-back path (ADR-066): an explicit window is applied verbatim
     // with NO internal fallback — the caller (the fold executor) owns the miss
@@ -379,7 +379,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
 
   /**
    * Resolve a trace's OccurredAt (the `PARTITION BY toYearWeek(...)` column)
-   * so {@link findByTraceId} can prune partitions even when the caller never
+   * so {@link tryFindByTraceId} can prune partitions even when the caller never
    * threaded an `occurredAtMs` hint (or the hint window missed). The table is
    * `ORDER BY (TenantId, TraceId)`, so this is a sort-key point seek over a
    * couple of granules of small columns — far cheaper than letting the heavy

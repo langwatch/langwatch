@@ -265,7 +265,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
       const onOverview = overview.budgets.find((b) => b.id === BUDGET_ARCHIVED_ID);
       expect(onOverview).toBeDefined();
 
-      const detail = await service.overviewForBudget({
+      const detail = await service.tryOverviewForBudget({
         organizationId: ORG_ID,
         budgetId: BUDGET_ARCHIVED_ID,
       });

@@ -1,7 +1,7 @@
 import { extractEmailDomain, normalizedRequestPathname } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { AuthDirectoryPort } from "../../ports/auth-directory.port";
 
 const logger = createLogger("langwatch:identity:born-finalized-opt-in.api");
 
@@ -22,11 +22,11 @@ const SIGN_UP_PATH_SUFFIX = "/sign-up/email";
  */
 export async function isBornFinalizedSignUp({
   featureFlags,
-  prisma,
+  directory,
   request,
 }: {
   featureFlags: FeatureFlagService;
-  prisma: PrismaClient;
+  directory: AuthDirectoryPort;
   request: Request;
 }): Promise<boolean> {
   if (request.method !== "POST") return false;
@@ -37,7 +37,7 @@ export async function isBornFinalizedSignUp({
   if (email === null) return false;
 
   try {
-    const organizationId = await organizationForDomain({ prisma, email });
+    const organizationId = await organizationForDomain({ directory, email });
     // Sign-up time: the person has no project and no user id yet, and an
     // organization only when their email domain matches one. With no
     // organization the read carries no targeting identity at all, so no rule
@@ -74,17 +74,13 @@ async function signUpEmailOf(request: Request): Promise<string | null> {
 
 /** The organization the address's domain names, when one claims it. */
 async function organizationForDomain({
-  prisma,
+  directory,
   email,
 }: {
-  prisma: PrismaClient;
+  directory: AuthDirectoryPort;
   email: string;
 }): Promise<string | null> {
   const domain = extractEmailDomain(email);
   if (domain === null) return null;
-  const organization = await prisma.organization.findUnique({
-    where: { ssoDomain: domain },
-    select: { id: true },
-  });
-  return organization?.id ?? null;
+  return await directory.tryFindOrganizationIdBySsoDomain(domain);
 }

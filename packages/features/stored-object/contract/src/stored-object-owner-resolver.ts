@@ -3,7 +3,7 @@
  * It is deliberately separate from ordinary project-scoped Stored Object I/O.
  */
 export abstract class StoredObjectOwnerResolver {
-  abstract resolve(input: { id: string }): Promise<{ projectId: string } | null>;
+  abstract tryResolve(input: { id: string }): Promise<{ projectId: string } | null>;
 }
 
 /** The cross-tenant resolver could not rule out an owner during a partial outage. */

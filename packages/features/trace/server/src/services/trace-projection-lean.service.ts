@@ -144,7 +144,7 @@ function leanSpanReceivedEvent(event: Event): Event {
         // VALID JSON under the budget so the fold still extracts the real
         // user/assistant text. The byte cut is the fallback for non-JSON.
         const preview =
-          TraceProjectionLeanService.structuredIoPreview(
+          TraceProjectionLeanService.tryStructuredIoPreview(
             attr.value.stringValue,
             IO_PREVIEW_BYTES,
           ) ?? TraceProjectionLeanService.utf8Preview(attr.value.stringValue, IO_PREVIEW_BYTES);
@@ -238,7 +238,7 @@ export class TraceProjectionLeanService {
   /**
    * Structure-preserving preview for an over-budget IO attribute holding JSON (the shape every gen_ai.input/output.messages value has) — a blind byte cut (`utf8Preview`) turns a chat-messages array into unparseable JSON, degrading everything computed from the leaned span (fold IO, trace list, Summary/Conversation views) to a raw blob; a Langy turn's system prompt alone exceeds 64 KB, so every such turn used to lose its "hi". Strategy, always staying under `maxBytes`: clamp long string leaves to a per-string cap; if still over and the top level is an array, drop MIDDLE items keeping the first message and as much of the TAIL as fits (where IO extraction actually reads); anything still too big reports null and the caller falls back to the byte cut, so this can only ever improve on it. Shapes ONLY the preview — the full value is untouched in event_log.
    */
-  static structuredIoPreview(value: string, maxBytes: number): string | null {
+  static tryStructuredIoPreview(value: string, maxBytes: number): string | null {
     if (Buffer.byteLength(value, "utf8") > PREVIEW_MAX_SOURCE_BYTES) {
       return null;
     }

@@ -54,7 +54,7 @@ export class OpsWorkerAdapter extends OpsWorkerPort {
     return new OpsWorkerAdapter(options);
   }
 
-  startAnomalyWorker(): OpsWorkerHandle | undefined {
+  tryStartAnomalyWorker(): OpsWorkerHandle | undefined {
     const redis = this.options.anomaly.redis;
     if (!redis) {
       anomalyLogger.warn("Redis connection unavailable, anomaly worker disabled");
@@ -74,7 +74,7 @@ export class OpsWorkerAdapter extends OpsWorkerPort {
     return AnomalyWorkerContribution.create({ detector }).start();
   }
 
-  startUsageStatsWorker(): OpsWorkerHandle | undefined {
+  tryStartUsageStatsWorker(): OpsWorkerHandle | undefined {
     const usageStats = this.options.usageStats;
     const collector = UsageStatsCollectionService.create({
       projects: PrismaUsageStatsProjectRepository.create(usageStats.database),

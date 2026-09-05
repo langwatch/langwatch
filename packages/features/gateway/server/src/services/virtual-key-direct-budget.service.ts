@@ -1,7 +1,7 @@
 /**
  * The budget a key carries on itself, with spend in its own current period — distinct from calendar-month spend (a daily cap measures against today, so $2.50/month spent can still be $0.50 of a $1.00 day, both true, neither substituting). Spend comes from the same rollup read the drawer's "already applies" list and Budgets page use, so a limit and its "spent so far" agree everywhere.
  */
-import type { GatewayBudget } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
 import type { VirtualKeyDirectBudgetRepository } from "../repositories/gateway-virtual-key-direct-budget.repository";

@@ -3,7 +3,7 @@
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthService } from "@langwatch/auth-contract";
-import type { AuthRestPorts } from "@langwatch/auth-server";
+import { PostgresAuthDirectoryAdapter, type AuthRestPorts } from "@langwatch/auth-server";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { runWithIdentityBirth } from "@langwatch/identity-server/adapters/better-auth-identity-birth";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -47,7 +47,7 @@ export function composeApiAuthRest(options: ApiAuthRestOptions): AuthRestPorts |
       return resolved?.project.slug ?? null;
     },
     featureFlags: () => featureFlags,
-    database: () => prisma,
+    directory: () => PostgresAuthDirectoryAdapter.create({ database: prisma }),
     baseUrl: betterAuth.baseUrl,
     federatedLogout: () => Promise.resolve(null),
     runWithIdentityBirth,

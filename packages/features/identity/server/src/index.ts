@@ -224,7 +224,7 @@ export {
   JoinRequestLifecycleDispatcher,
   PrismaJoinMembership,
   PrismaJoinSettings,
-} from "./adapters/join-request.adapter";
+} from "./adapters/postgres.join-request.adapter";
 export { JoinRequestNotificationMailPort } from "./ports/join-request-notification-mail.port";
 export { InProcessBreakGlassLimiterAdapter } from "./adapters/in-process-break-glass-limiter.adapter";
 export { LocalDoorBreakGlassBindingAdapter } from "./adapters/local-door-break-glass-binding.adapter";

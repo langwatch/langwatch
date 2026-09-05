@@ -1,7 +1,7 @@
 /**
  * Which unit an organization's usage is counted in, and why.
  */
-import { PricingModel } from "@langwatch/prisma-client/generated";
+import { PricingModel } from "@langwatch/entitlement-contract";
 import type { UsageUnit } from "@langwatch/entitlement-contract";
 
 /**

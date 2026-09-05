@@ -216,7 +216,6 @@ describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-
 
           const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
-            prisma: { project: { findUnique: vi.fn() } } as never,
             resolveTraceSpans: resolveTraceSpansFn,
             traceCanonicalisation,
           });

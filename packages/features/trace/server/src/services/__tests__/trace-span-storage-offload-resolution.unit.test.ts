@@ -1,5 +1,5 @@
 /**
- * Unit tests proving the v2 read path (getSpansByTraceId, getSpanById) resolves ADR-022 offloaded eventref pointers before returning spans. The fix: SpanStorageService now accepts optional SpanReadBlobResolutionDeps; when present, both calls route through getNormalizedSpansByTraceId -> resolveOffloadedTraces -> mapNormalizedSpansToSpans instead of delegating directly to the repository.
+ * Unit tests proving the v2 read path (getSpansByTraceId, tryGetSpanById) resolves ADR-022 offloaded eventref pointers before returning spans. The fix: SpanStorageService now accepts optional SpanReadBlobResolutionDeps; when present, both calls route through getNormalizedSpansByTraceId -> resolveOffloadedTraces -> mapNormalizedSpansToSpans instead of delegating directly to the repository.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -181,7 +181,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       });
     });
 
-    describe("when getSpanById is called with BlobResolutionDeps wired", () => {
+    describe("when tryGetSpanById is called with BlobResolutionDeps wired", () => {
       it("returns the span with the full output value, not the preview", async () => {
         const repo = makeStubRepository([spanWithRef]);
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
@@ -195,7 +195,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
           },
         });
 
-        const span = await service.getSpanById({
+        const span = await service.tryGetSpanById({
           tenantId: "proj-1",
           traceId: "trace-1",
           spanId: "span-1",
@@ -223,7 +223,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
           },
         });
 
-        const span = await service.getSpanById({
+        const span = await service.tryGetSpanById({
           tenantId: "proj-1",
           traceId: "trace-1",
           spanId: "non-existent-span",

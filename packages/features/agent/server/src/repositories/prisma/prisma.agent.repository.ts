@@ -237,7 +237,7 @@ export class PrismaAgentRepository extends AgentRepository {
     });
   }
 
-  async findByIdentityKey(input: {
+  async tryFindByIdentityKey(input: {
     projectId: string;
     identityKey: string;
   }): Promise<Agent | null> {

@@ -88,7 +88,7 @@ export class VerificationCeremonyService {
     codeChallenge: string;
   }): Promise<MintedEmailVerification> {
     const { userId, identifierId, codeChallenge } = args;
-    const head = await this.heads.findIdentifier({ userId, identifierId });
+    const head = await this.heads.tryFindIdentifier({ userId, identifierId });
     if (head?.provider !== "email" || head.state !== "ATTACHED") {
       logger.warn(
         { userId, identifierId, state: head?.state ?? "missing" },

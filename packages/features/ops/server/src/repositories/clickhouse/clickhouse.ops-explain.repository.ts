@@ -28,8 +28,8 @@ export class OpsExplainClickHouseRepository extends OpsExplainRepository {
    * is configured, else the injected shared client as a fallback.
    * Null when neither is configured on this instance.
    */
-  resolveClient(): OpsExplainClientResolution | null {
-    return this.resolver.resolve();
+  tryResolveClient(): OpsExplainClientResolution | null {
+    return this.resolver.tryResolve();
   }
 
   /**

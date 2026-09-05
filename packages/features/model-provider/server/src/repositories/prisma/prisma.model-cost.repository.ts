@@ -9,16 +9,6 @@ import { ModelCostRepository } from "../../ports/model-provider.port";
 type Database = Pick<PrismaClient, "customLLMModelCost">;
 
 export class PrismaModelCostRepository extends ModelCostRepository {
-  /**
-   * The runtime check that belongs to the UNTYPED seam, and only to it.
-   */
-  static requireModelCostDatabase(database: object): Database {
-    if (!isModelCostDatabase(database)) {
-      throw new Error("Model Cost repository requires a Prisma database adapter");
-    }
-    return database;
-  }
-
   private constructor(private readonly database: Database) {
     super();
   }
@@ -65,10 +55,6 @@ export class PrismaModelCostRepository extends ModelCostRepository {
   async delete(id: string): Promise<void> {
     await this.database.customLLMModelCost.delete({ where: { id } });
   }
-}
-
-function isModelCostDatabase(database: object): database is Database {
-  return "customLLMModelCost" in database;
 }
 
 function toCost(row: CustomLLMModelCost): ModelCost {

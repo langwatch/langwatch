@@ -2,9 +2,9 @@ import {
   reportNurturingFailure,
   tryNurturingOrganizationAdminResolver,
   tryNurturingSink,
-} from "./nurturing-sink";
+} from "../adapters/nurturing-sink.adapter";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { NurturingPromptCountRepository } from "../repositories/nurturing-prompt-count.repository";
 
 const logger = createLogger("ee:nurturing:prompt-creation");
 
@@ -51,16 +51,16 @@ export class NurturingPromptCreationService {
   }
 
   /**
-   * @param prisma - PrismaClient for database queries
+   * @param repository - The org-wide prompt count reads, over its own repository seam
    * @param projectId - The project where the prompt was created
    * @param userId - The user who created the prompt (optional; resolved via resolveOrgAdmin if missing)
    */
   static afterPromptCreated({
-    prisma,
+    repository,
     projectId,
     userId,
   }: {
-    prisma: PrismaClient;
+    repository: NurturingPromptCountRepository;
     projectId: string;
     userId?: string | null;
   }): void {
@@ -88,11 +88,7 @@ export class NurturingPromptCreationService {
 
         // Get organizationId if we don't have it yet
         if (!organizationId) {
-          const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { team: { select: { organizationId: true } } },
-          });
-          organizationId = project?.team?.organizationId ?? undefined;
+          organizationId = await repository.tryFindOrganizationId(projectId);
         }
 
         if (!organizationId) {
@@ -105,13 +101,7 @@ export class NurturingPromptCreationService {
         }
 
         // Count org-wide non-deleted prompts with at least one version
-        const orgPromptCount = await prisma.llmPromptConfig.count({
-          where: {
-            organizationId,
-            deletedAt: null,
-            versions: { some: {} },
-          },
-        });
+        const orgPromptCount = await repository.countOrganizationPrompts(organizationId);
 
         NurturingPromptCreationService.firePromptCreated({
           userId: resolvedUserId,

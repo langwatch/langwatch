@@ -1137,7 +1137,7 @@ export class WorkerProductionComposition {
             computeRunMetrics: traceProducers.computeRunMetrics,
             computeExperimentRunMetrics: experiment.commands.computeExperimentRunMetrics,
             lookupExperimentId: (tenantId, runId) =>
-              experimentIdLookup.findExperimentId({ tenantId, runId }),
+              experimentIdLookup.tryFindExperimentId({ tenantId, runId }),
             bootstrapTopicClustering: (projectId) =>
               topic.commands.bootstrapTopicClustering(projectId),
             contributeSpanFacts: codingAgent.commands.contributeSpanFacts,

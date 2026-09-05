@@ -606,7 +606,7 @@ export class ClaudeCodeSpanEnrichmentService {
   /**
    * The interaction (turn) span's OUTPUT: the last conversational assistant reply falling inside the turn's window (+slackMs for the exporter flushing just after close). api_response_body beats assistant_response at the same timestamp (parsed body keeps tool_use markers); both gated on isConversationalQuerySource so a utility reply (title gen, autosuggest) can never headline the turn.
    */
-  static computeClaudeInteractionOutput({
+  static tryComputeClaudeInteractionOutput({
     logs,
     windowStartMs,
     windowEndMs,

@@ -23,7 +23,7 @@ export class TraceEventAttributeMappingService {
     return new TraceEventAttributeMappingService();
   }
 
-  static mapEventAttrsToEvent({
+  static tryMapEventAttrsToEvent({
     row,
     projectId,
   }: {

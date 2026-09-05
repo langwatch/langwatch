@@ -24,8 +24,8 @@ export class OpsWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   ) {}
 
   install(): Promise<WorkerFeatureCloser | undefined> {
-    const anomaly = this.options.workers.startAnomalyWorker();
-    const usageStats = this.options.workers.startUsageStatsWorker();
+    const anomaly = this.options.workers.tryStartAnomalyWorker();
+    const usageStats = this.options.workers.tryStartUsageStatsWorker();
     const storageStats = this.options.storageStats?.start();
 
     return Promise.resolve(async () => {

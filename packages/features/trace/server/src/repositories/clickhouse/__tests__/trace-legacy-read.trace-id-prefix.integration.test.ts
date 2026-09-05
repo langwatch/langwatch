@@ -77,7 +77,6 @@ integration("TraceLegacyReadClickHouseRepository.resolveTraceIdByPrefix (integra
   beforeAll(async () => {
     ch = createTestClickHouseClient(clickHouseUrl!);
     service = TraceLegacyReadClickHouseRepository.create({
-      prisma: {} as never,
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),
     });

@@ -181,7 +181,7 @@ export class TraceContentArrayService {
   /**
    * Coerces a message's content field to an array we can walk. Some SDK callers (notably python-sdk) used to send content as a stringified Python-repr of a list instead of JSON; newer SDKs emit JSON directly, this keeps the repr fallback for older clients in flight. Returns the array verbatim if already one, a parsed array if content decodes (JSON or Python-repr) to an array of objects, or null otherwise (caller passes through unchanged).
    */
-  static coerceContentToArray(content: unknown): unknown[] | null {
+  static tryCoerceContentToArray(content: unknown): unknown[] | null {
     if (Array.isArray(content)) {
       return content;
     }

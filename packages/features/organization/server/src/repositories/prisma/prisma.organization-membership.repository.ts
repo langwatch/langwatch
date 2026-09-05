@@ -19,22 +19,25 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
-import { findPersonalTeamInScopes, findSharedTeamIds } from "../../services/personal-team-scope";
-import { projectAdminUserIdsWithoutDirectRole } from "../../services/effective-team-admins";
+import {
+  tryFindPersonalTeamInScopes,
+  findSharedTeamIds,
+} from "./prisma.personal-team-scope.repository";
+import { projectAdminUserIdsWithoutDirectRole } from "./prisma.effective-team-admins.repository";
 import {
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
-} from "../../services/member-role-constraints";
-import { isCustomRole } from "../../services/custom-role-naming";
-import { CustomRoleNotAssignableError } from "../../services/organization-membership.errors";
+} from "../../services/member-role-constraints.service";
+import { isCustomRole } from "../../rules/custom-role-naming.rules";
+import { CustomRoleNotAssignableError } from "../../services/organization-membership-errors.service";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
   MemberNotFoundError,
   OrganizationSlugTakenError,
-} from "../../services/organization-membership.errors";
+} from "../../services/organization-membership-errors.service";
 import type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -272,10 +275,10 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     private readonly writer: AuthzGrantsService,
   ) {}
 
-  findPersonalTeamInScopes(params: {
+  tryFindPersonalTeamInScopes(params: {
     scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
   }): Promise<{ name: string } | null> {
-    return findPersonalTeamInScopes({ client: this.prisma, scopes: params.scopes });
+    return tryFindPersonalTeamInScopes({ client: this.prisma, scopes: params.scopes });
   }
 
   findSharedTeamIds({ organizationId }: { organizationId: string }): Promise<string[]> {
@@ -334,7 +337,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return orgUser.role;
   }
 
-  async getUserOrgRoleByTeamId({
+  async tryGetUserOrgRoleByTeamId({
     userId,
     teamId,
   }: {
@@ -590,7 +593,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     }) as Promise<FullyLoadedOrganization[]>;
   }
 
-  async getOrganizationWithMembers(params: {
+  async tryGetOrganizationWithMembers(params: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
@@ -632,7 +635,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     }) as Promise<OrganizationWithMembersAndTheirTeams | null>;
   }
 
-  async getMemberById(params: {
+  async tryGetMemberById(params: {
     organizationId: string;
     userId: string;
     currentUserId: string;
@@ -1412,15 +1415,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           },
         });
 
-        if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
-          if (
-            !isTeamRoleAllowedForOrganizationRole({
-              organizationRole: OrganizationUserRole.EXTERNAL,
-              teamRole: role as TeamRoleValue,
-            })
-          ) {
-            throw new LiteMemberViewerOnlyError(team.name);
-          }
+        if (
+          orgMembership?.role === OrganizationUserRole.EXTERNAL &&
+          !isTeamRoleAllowedForOrganizationRole({
+            organizationRole: OrganizationUserRole.EXTERNAL,
+            teamRole: role as TeamRoleValue,
+          })
+        ) {
+          throw new LiteMemberViewerOnlyError(team.name);
         }
 
         const targetUserBinding = await tx.roleBinding.findFirst({

@@ -1,6 +1,6 @@
 import type { Protections } from "@langwatch/trace-contract";
 /**
- * TraceService.getById read-time Claude Code content enrichment, exercised at the real seam: the ClickHouse trace
+ * TraceService.tryGetById read-time Claude Code content enrichment, exercised at the real seam: the ClickHouse trace
  * read + the log-record store are mocked boundaries (no Docker), the enrichment adapter + pure join run for real.
  * @vitest-environment node
  */
@@ -160,7 +160,7 @@ function makeService(getLogsByTraceId: TraceLogRecordReader["getLogsByTraceId"])
   });
 }
 
-describe("TraceService.getById — Claude Code log content enrichment", () => {
+describe("TraceService.tryGetById — Claude Code log content enrichment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -173,7 +173,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
       const service = makeService(getLogs);
 
-      const trace = await service.getById(PROJECT_ID, TRACE_ID, protections);
+      const trace = await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
       const span = trace?.spans?.[0];
 
       expect(span?.input).toEqual({
@@ -194,7 +194,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
       const service = makeService(getLogs);
 
-      await service.getById(PROJECT_ID, TRACE_ID, protections);
+      await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
 
       expect(getLogs).toHaveBeenCalledTimes(1);
       expect(getLogs).toHaveBeenCalledWith(PROJECT_ID, TRACE_ID, 1_700_000_000_000);
@@ -206,7 +206,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       ]);
       const service = makeService(vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS));
 
-      const trace = await service.getById(PROJECT_ID, TRACE_ID, protections);
+      const trace = await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
 
       expect(trace?.spans?.[0]?.metrics?.prompt_tokens).toBe(120);
       expect(trace?.spans?.[0]?.metrics?.completion_tokens).toBe(8);
@@ -222,7 +222,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
       const service = makeService(getLogs);
 
-      const trace = await service.getById(PROJECT_ID, TRACE_ID, protections);
+      const trace = await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
 
       expect(getLogs).not.toHaveBeenCalled();
       expect(trace?.spans?.[0]?.input ?? null).toBeNull();
@@ -237,7 +237,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       ]);
       const service = makeService(vi.fn().mockResolvedValue([]));
 
-      const trace = await service.getById(PROJECT_ID, TRACE_ID, protections);
+      const trace = await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
 
       expect(trace?.spans?.[0]?.input ?? null).toBeNull();
       expect(trace?.spans?.[0]?.metrics?.cost).toBe(STORED_COST);
@@ -251,7 +251,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       ]);
       const service = makeService(vi.fn().mockRejectedValue(new Error("clickhouse down")));
 
-      const trace = await service.getById(PROJECT_ID, TRACE_ID, protections);
+      const trace = await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
 
       expect(trace?.spans?.[0]?.input ?? null).toBeNull();
     });
@@ -259,7 +259,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
 });
 
 /**
- * Enrichment must also reach the multi-trace read paths (evals, export, legacy thread reads), not just `getById`.
+ * Enrichment must also reach the multi-trace read paths (evals, export, legacy thread reads), not just `tryGetById`.
  * Each of these methods returns whole spans that exports + evaluators read, so a coding-agent trace fetched
  * through them must be enriched the same way, and a non-coding-agent trace must never trigger a log read.
  */

@@ -12,7 +12,7 @@ import type {
   GatewayBudget,
   VirtualKey,
   VirtualKeyRoutingMode,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/gateway-contract";
 import { GatewayAuditPort } from "../ports/gateway-audit.port";
 import {
   serializeRowForAudit,
@@ -279,7 +279,7 @@ export class VirtualKeyService {
    * rather than forbidden — the caller has no legitimate use for one, and a
    * distinct error would confirm the id exists.
    */
-  async getById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null> {
+  async tryGetById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null> {
     const vk = await this.repository.tryFindById({ id, organizationId });
     if (!vk || isProductManaged(vk)) {
       return null;
@@ -289,13 +289,13 @@ export class VirtualKeyService {
   }
 
   /** Used by the `/resolve-key` hot path — do not expose on public tRPC. */
-  async getByHashedSecretInternal(hashedSecret: string): Promise<VirtualKeyWithScopes | null> {
+  async tryGetByHashedSecretInternal(hashedSecret: string): Promise<VirtualKeyWithScopes | null> {
     return this.repository.tryFindByHashedSecret(hashedSecret);
   }
 
   /** Used by internal Gateway transports after their format check succeeds. */
-  async getBySecretInternal(secret: string): Promise<VirtualKeyWithScopes | null> {
-    return this.getByHashedSecretInternal(this.crypto.hashSecret(secret));
+  async tryGetBySecretInternal(secret: string): Promise<VirtualKeyWithScopes | null> {
+    return this.tryGetByHashedSecretInternal(this.crypto.hashSecret(secret));
   }
 
   async create(input: CreateVirtualKeyInput): Promise<CreatedVirtualKey> {
@@ -837,7 +837,7 @@ export class VirtualKeyService {
   /**
    * Loads a key for mutation. Product-managed keys are rejected here rather
    * than in each caller, so `update` / `rotate` / `revoke` cannot drift apart
-   * — NOT_FOUND for the same reason `getById` returns null.
+   * — NOT_FOUND for the same reason `tryGetById` returns null.
    */
   private async requireOwn(id: string, organizationId: string): Promise<VirtualKeyWithScopes> {
     const existing = await this.repository.tryFindById({ id, organizationId });
@@ -868,7 +868,7 @@ export class VirtualKeyService {
     // linkage rather than by shape: matching on target/window would also
     // catch caps created independently on the Budgets page, whose
     // lifecycle (and delete permission) is not the drawer's to touch.
-    const existing = await this.keyBudgets.findDrawerManaged(
+    const existing = await this.keyBudgets.tryFindDrawerManaged(
       { organizationId: vk.organizationId, virtualKeyId: vk.id },
       tx,
     );

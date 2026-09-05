@@ -464,7 +464,7 @@ export class TraceListService {
       timeRange: { from: snapped.from, to: snapped.to },
     };
     const cacheKey = discoverCacheKey(params.tenantId, snapped);
-    const cached = await DISCOVER_CACHE.get(cacheKey);
+    const cached = await DISCOVER_CACHE.tryGet(cacheKey);
 
     if (cached) {
       // Stale-while-revalidate: hand back the cached payload and kick
@@ -800,7 +800,7 @@ export class TraceListService {
 
   async getFacetValues(params: FacetValuesParams): Promise<FacetValuesResult> {
     const cacheKey = facetValuesCacheKey(params);
-    const cached = await FACET_VALUES_CACHE.get(cacheKey);
+    const cached = await FACET_VALUES_CACHE.tryGet(cacheKey);
 
     if (cached) {
       // Always serve the cached value immediately. If it's older than the

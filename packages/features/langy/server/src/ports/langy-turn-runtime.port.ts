@@ -86,7 +86,7 @@ export abstract class LangyTurnMetricsPort {
 
 /** Renders the already-validated transport context into Langy's system prompt. */
 export abstract class LangyTurnContextPort {
-  abstract render(input: { context: object; isUiActionSurfaceOpen: boolean }): string | null;
+  abstract tryRender(input: { context: object; isUiActionSurfaceOpen: boolean }): string | null;
 }
 
 /** The rollout flag `LangyUiActionSurfacePort.resolve` evaluates. */

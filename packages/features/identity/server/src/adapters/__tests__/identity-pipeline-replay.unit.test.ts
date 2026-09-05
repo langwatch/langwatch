@@ -42,11 +42,11 @@ class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
 class ProjectionHeads implements IdentityHeadsRepository {
   constructor(private readonly store: InMemoryStateStore) {}
 
-  async findUserHashKey() {
+  async tryFindUserHashKey() {
     return "key_material";
   }
 
-  async findActiveIdentifierByValue() {
+  async tryFindActiveIdentifierByValue() {
     return null;
   }
 
@@ -56,11 +56,11 @@ class ProjectionHeads implements IdentityHeadsRepository {
     return { userId, identifiers: stored.state.identifiers };
   }
 
-  async findIdentifier({ userId, identifierId }: { userId: string; identifierId: string }) {
+  async tryFindIdentifier({ userId, identifierId }: { userId: string; identifierId: string }) {
     return this.store.stored.get(userId)?.state.identifiers[identifierId] ?? null;
   }
 
-  async findIdentifierIdForAccount() {
+  async tryFindIdentifierIdForAccount() {
     return null;
   }
 }

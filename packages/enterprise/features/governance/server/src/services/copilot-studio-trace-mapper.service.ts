@@ -680,7 +680,7 @@ export class CopilotStudioTraceMapperService {
     // Said something, cannot be attributed to either side. Counting it is the
     // whole point: the alternative is a conversation whose every message has
     // an unreadable role producing no turns at all, which reaches
-    // `assembleTraceRequest` as an empty span list and disappears with no
+    // `tryAssembleTraceRequest` as an empty span list and disappears with no
     // log, no attribute and no error — indistinguishable from a pull that
     // found nothing.
     state.skipped += 1;
@@ -1129,7 +1129,7 @@ export class CopilotStudioTraceMapperService {
     });
   }
 
-  static toTraceRequest({
+  static tryToTraceRequest({
     events,
     origin,
   }: {
@@ -1145,6 +1145,6 @@ export class CopilotStudioTraceMapperService {
       (group) => CopilotStudioTraceMapperService.conversationSpans({ origin, group }),
     );
 
-    return ConversationTraceAssemblyService.assembleTraceRequest(spans, origin.profile);
+    return ConversationTraceAssemblyService.tryAssembleTraceRequest(spans, origin.profile);
   }
 }

@@ -58,13 +58,12 @@ import {
   type GovernanceService,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port";
 import { randomBytes } from "node:crypto";
 import type { Context } from "hono";
 import { z } from "zod";
 
 import { OrganizationSupportContactService } from "../../services/organization-support-contact.service";
-import { PrismaOrganizationSupportContactRepository } from "../../repositories/prisma/prisma.organization-support-contact.repository";
 
 const logger = createLogger("langwatch:governance-cli");
 
@@ -142,8 +141,10 @@ export type GovernanceCliRestPorts = Readonly<{
   accessTokens: GovernanceCliAccessTokenPort;
   /** The SAME governance service the console's tRPC procedures read. */
   governance: () => GovernanceService;
-  /** The typed client the identity, membership and project reads run on. */
-  database: () => PrismaClient;
+  /** The identity, membership and project reads this family performs. */
+  directory: () => GovernanceDirectoryPort;
+  /** Who to point a blocked caller at, when a budget refuses the request. */
+  supportContacts: () => OrganizationSupportContactService;
   /** Resolves — creating if needed — the caller's personal workspace. */
   ensurePersonalWorkspace: (input: {
     organizationId: string;
@@ -337,27 +338,15 @@ export function createGovernanceCliRestApp(options: {
     c: Context,
     caller: GovernanceCliCaller,
   ): Promise<Response | null> => {
-    const prisma = ports.database();
-    const [user, membership] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: caller.user_id },
-        select: { deactivatedAt: true },
-      }),
-      // `disabledAt` is part of the predicate: a seat an admin disabled to
-      // reclaim it is not an active membership, and the keys minted here are
-      // the ones the owner ceiling never reaches — a project key has no owner,
-      // and the gateway honours a personal virtual key on its own status.
-      prisma.organizationUser.findFirst({
-        where: {
-          userId: caller.user_id,
-          organizationId: caller.organization_id,
-          disabledAt: null,
-        },
-        select: { userId: true },
-      }),
-    ]);
-
-    if (!!user && user.deactivatedAt === null && !!membership) return null;
+    // A seat an admin disabled to reclaim it is not an active membership, and
+    // the keys minted here are the ones the owner ceiling never reaches — a
+    // project key has no owner, and the gateway honours a personal virtual key
+    // on its own status.
+    const status = await ports.directory().membershipStatus({
+      userId: caller.user_id,
+      organizationId: caller.organization_id,
+    });
+    if (status === "active") return null;
 
     try {
       await ports.accessTokens.revoke({
@@ -375,11 +364,7 @@ export function createGovernanceCliRestApp(options: {
       {
         userId: caller.user_id,
         organizationId: caller.organization_id,
-        reason: !user
-          ? "user_missing"
-          : user.deactivatedAt !== null
-            ? "user_deactivated"
-            : "not_org_member",
+        reason: status,
       },
       "[governance-cli] refusing key-minting request from non-active org member; session revoked",
     );
@@ -477,9 +462,9 @@ export function createGovernanceCliRestApp(options: {
     // The most restrictive blocker. The check result orders by strictness, so
     // the first entry is the binding one.
     const blocker = decision.blockedBy[0]!;
-    const adminEmail = await OrganizationSupportContactService.create({
-      repository: PrismaOrganizationSupportContactRepository.create({ prisma: ports.database() }),
-    }).resolveSupportContact({ organizationId: caller.organization_id });
+    const adminEmail = await ports
+      .supportContacts()
+      .tryResolveSupportContact({ organizationId: caller.organization_id });
     const params = new URLSearchParams({
       scope: blocker.scope.toLowerCase(),
       scope_id: blocker.scopeId,
@@ -546,10 +531,7 @@ export function createGovernanceCliRestApp(options: {
     const denied = await refuseInactiveMember(c, caller);
     if (denied) return denied;
 
-    const user = await ports.database().user.findUnique({
-      where: { id: caller.user_id },
-      select: { name: true, email: true },
-    });
+    const user = await ports.directory().tryFindPersonProfile(caller.user_id);
     try {
       const workspace = await ports.ensurePersonalWorkspace({
         organizationId: caller.organization_id,
@@ -604,10 +586,7 @@ export function createGovernanceCliRestApp(options: {
       );
     }
 
-    const user = await ports.database().user.findUnique({
-      where: { id: caller.user_id },
-      select: { name: true, email: true },
-    });
+    const user = await ports.directory().tryFindPersonProfile(caller.user_id);
 
     try {
       const issued = await issuePersonalVirtualKey({
@@ -685,20 +664,9 @@ export function createGovernanceCliRestApp(options: {
     if (!parsed.success) {
       return c.json({ error: "invalid_request", error_description: "slug is required" }, 400);
     }
-    const project = await ports.database().project.findFirst({
-      where: {
-        slug: parsed.data.slug,
-        archivedAt: null,
-        team: { organizationId: caller.organization_id },
-      },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        apiKey: true,
-        isPersonal: true,
-        ownerUserId: true,
-      },
+    const project = await ports.directory().tryFindLiveProjectBySlug({
+      slug: parsed.data.slug,
+      organizationId: caller.organization_id,
     });
     if (!project) {
       return c.json(
@@ -949,21 +917,10 @@ export function createGovernanceCliRestApp(options: {
       deviceLabel: string | null;
     },
   ): Promise<Response> {
-    const prisma = ports.database();
-    const select = {
-      id: true,
-      slug: true,
-      name: true,
-      isPersonal: true,
-      ownerUserId: true,
-    } as const;
-    const inOrg = {
-      archivedAt: null,
-      team: { organizationId: input.caller.organization_id },
-    };
-    const project =
-      (await prisma.project.findFirst({ where: { id: input.projectRef, ...inOrg }, select })) ??
-      (await prisma.project.findFirst({ where: { slug: input.projectRef, ...inOrg }, select }));
+    const project = await ports.directory().tryFindLiveProjectByRef({
+      projectRef: input.projectRef,
+      organizationId: input.caller.organization_id,
+    });
     if (!project) {
       return c.json(
         {

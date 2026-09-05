@@ -157,7 +157,7 @@ export class ResultAtomsService {
     });
 
     const [totalsRow, groupRows, trendRows, seriesRows, plans] = await Promise.all([
-      this.repository.aggregateTotals(scopedFilter),
+      this.repository.tryAggregateTotals(scopedFilter),
       this.repository.aggregateGroups({ filter: scopedFilter, groupBy }),
       this.repository.aggregateTrend({ filter: scopedFilter, groupBy }),
       this.repository.aggregateSeries({ filter: scopedFilter, bucketSeconds }),

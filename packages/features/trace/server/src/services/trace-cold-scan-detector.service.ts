@@ -30,7 +30,7 @@ export class TraceColdScanDetectorService {
   /**
    * Returns the name of a time-partitioned table the query reads without a filter predicate on its partition time column, or null if fine (or not a tracked SELECT). Errs toward flagging: a projection/ORDER BY mention does NOT clear it, since neither enables pruning — a false positive is a cheap log line, a false negative misses real S3 cost.
    */
-  static detectColdScan(query: string): string | null {
+  static tryDetectColdScan(query: string): string | null {
     if (typeof query !== "string" || query.length === 0) {
       return null;
     }

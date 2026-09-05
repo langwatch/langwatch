@@ -208,7 +208,7 @@ describe("sharedTrace share-safe gates", () => {
     });
 
     /**
-     * @scenario Fail-closed on a policy outage. `getUserProtectionsForProject`
+     * Fail-closed on a policy outage: `getUserProtectionsForProject`
      * returns a catch-all `*` rule when the privacy policy cannot be resolved;
      * `gateResources` must then redact EVERY attribute. An empty list would
      * redact nothing, so this pins the "catch-all means hide all" invariant.
@@ -339,7 +339,7 @@ describe("sharedTrace share-safe gates", () => {
     });
 
     describe("when the viewer may read output but not input", () => {
-      /** @scenario Asymmetric policy: evaluator free text quotes both sides, so
+      /** Asymmetric policy: evaluator free text quotes both sides, so
        *  a viewer allowed only one side must still get neither, or they could
        *  reconstruct the hidden side from `details` / `error.message`. */
       it("strips details and error text despite output being visible", () => {

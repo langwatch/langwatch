@@ -5,7 +5,7 @@ import type { IdentityUsersRepository } from "../../repositories/identity-users.
  * The `User` table as identity reads it, in memory: `email` per user and the
  * `userHashKey` write, nothing else.
  *
- * It exists mainly for the reverse read — `findUserIdByEmail`, the legacy
+ * It exists mainly for the reverse read — `tryFindUserIdByEmail`, the legacy
  * half of the cross-population collision guard (ADR-116 §6). A suite that
  * seeds no rows gets a population with no legacy holders, which is what
  * every guard test that is not ABOUT collisions wants; a suite that seeds
@@ -26,13 +26,13 @@ export class InMemoryUsers implements IdentityUsersRepository {
     if (!this.hashKeys.has(userId)) this.hashKeys.set(userId, userHashKey);
   }
 
-  async findEmail({ userId }: { userId: string }): Promise<string | null> {
+  async tryFindEmail({ userId }: { userId: string }): Promise<string | null> {
     return this.emails.get(userId) ?? null;
   }
 
   /** The production comparison: case-insensitive equality against the column
    *  as stored, never a re-normalization of it. */
-  async findUserIdByEmail({
+  async tryFindUserIdByEmail({
     normalizedValue,
   }: {
     normalizedValue: string;

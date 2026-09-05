@@ -1,7 +1,7 @@
 /**
  * Aggregate read-side queries for AI Gateway usage surfaces. Spend comes from trace_summaries (enriched per-trace cost, keyed on langwatch.virtual_key_id), not gateway_budget_ledger_events — the ledger writes once per applicable budget and never for an uncapped key, structurally showing $0.00 forever or double/triple-counting a multi-budget key (it stays the source for a budget's own debit list, where one-row-per-budget is the point). The VK table's spend column reads the same repository so a clickable number matches its page. Every read spans the org's projects, not one, since traces land in a key's trace destination (explicit project, else PROJECT scope, else governance project) — reading one project is how Usage showed no data while the keys table showed spend.
  */
-import { Prisma } from "@langwatch/prisma-client/generated";
+import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
 import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
 import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port";
@@ -154,15 +154,15 @@ export class GatewayUsageService {
       return this.emptySummary();
     }
 
-    const byVk = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
-    const byModel = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
-    const byDay = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
-    let totalUsd = new Prisma.Decimal(0);
+    const byVk = new Map<string, { totalUsd: bigint; requests: number }>();
+    const byModel = new Map<string, { totalUsd: bigint; requests: number }>();
+    const byDay = new Map<string, { totalUsd: bigint; requests: number }>();
+    let totalUsd = 0n;
     let totalRequests = 0;
     let blockedRequests = 0;
 
     for (const bucket of buckets) {
-      totalUsd = totalUsd.plus(bucket.totalUsd);
+      totalUsd += usdToNanoUsd(bucket.totalUsd);
       totalRequests += bucket.requests;
       blockedRequests += bucket.blockedRequests;
       this.bumpBucket(byVk, bucket.virtualKeyId, bucket.totalUsd, bucket.requests);
@@ -173,7 +173,7 @@ export class GatewayUsageService {
     const vkMeta = await this.loadVirtualKeyMeta(args.organizationId, [...byVk.keys()]);
 
     return {
-      totalUsd: totalUsd.toFixed(6),
+      totalUsd: nanoUsdToFixed6(totalUsd),
       totalRequests,
       blockedRequests,
       avgUsdPerRequest: this.averagePerRequest(totalUsd, totalRequests),
@@ -182,13 +182,13 @@ export class GatewayUsageService {
           virtualKeyId,
           name: vkMeta.get(virtualKeyId)?.name ?? virtualKeyId,
           displayPrefix: vkMeta.get(virtualKeyId)?.displayPrefix ?? "",
-          totalUsd: bucketUsd.toFixed(6),
+          totalUsd: nanoUsdToFixed6(bucketUsd),
           requests,
         }),
       ),
       byModel: this.topEntries(byModel).map(([model, { totalUsd: bucketUsd, requests }]) => ({
         model,
-        totalUsd: bucketUsd.toFixed(6),
+        totalUsd: nanoUsdToFixed6(bucketUsd),
         requests,
       })),
       byDay: this.sortedDays(byDay),
@@ -233,14 +233,14 @@ export class GatewayUsageService {
       }),
     ]);
 
-    const byModel = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
-    const byDay = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
-    let totalUsd = new Prisma.Decimal(0);
+    const byModel = new Map<string, { totalUsd: bigint; requests: number }>();
+    const byDay = new Map<string, { totalUsd: bigint; requests: number }>();
+    let totalUsd = 0n;
     let totalRequests = 0;
     let blockedRequests = 0;
 
     for (const bucket of buckets) {
-      totalUsd = totalUsd.plus(bucket.totalUsd);
+      totalUsd += usdToNanoUsd(bucket.totalUsd);
       totalRequests += bucket.requests;
       blockedRequests += bucket.blockedRequests;
       this.bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
@@ -248,13 +248,13 @@ export class GatewayUsageService {
     }
 
     return {
-      totalUsd: totalUsd.toFixed(6),
+      totalUsd: nanoUsdToFixed6(totalUsd),
       totalRequests,
       blockedRequests,
       avgUsdPerRequest: this.averagePerRequest(totalUsd, totalRequests),
       byModel: this.topEntries(byModel).map(([model, { totalUsd: bucketUsd, requests }]) => ({
         model,
-        totalUsd: bucketUsd.toFixed(6),
+        totalUsd: nanoUsdToFixed6(bucketUsd),
         requests,
       })),
       byDay: this.sortedDays(byDay),
@@ -290,43 +290,45 @@ export class GatewayUsageService {
     return this.projects.listIdsByOrganization({ organizationId });
   }
 
-  private averagePerRequest(totalUsd: Prisma.Decimal, requests: number): string {
-    return requests > 0 ? totalUsd.div(requests).toFixed(6) : "0.000000";
+  private averagePerRequest(totalUsd: bigint, requests: number): string {
+    return requests > 0
+      ? microUsdToFixed6(roundedQuotient(totalUsd, 1000n * BigInt(requests)))
+      : "0.000000";
   }
 
   private topEntries(
-    map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
+    map: Map<string, { totalUsd: bigint; requests: number }>,
     limit = 10,
-  ): Array<[string, { totalUsd: Prisma.Decimal; requests: number }]> {
+  ): Array<[string, { totalUsd: bigint; requests: number }]> {
     return [...map.entries()]
-      .sort((a, b) => b[1].totalUsd.comparedTo(a[1].totalUsd) || a[0].localeCompare(b[0]))
+      .sort((a, b) => compareBigInt(b[1].totalUsd, a[1].totalUsd) || a[0].localeCompare(b[0]))
       .slice(0, limit);
   }
 
   private sortedDays(
-    map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
+    map: Map<string, { totalUsd: bigint; requests: number }>,
   ): Array<{ day: string; totalUsd: string; requests: number }> {
     return [...map.entries()]
       .sort((a, b) => (a[0] < b[0] ? -1 : 1))
       .map(([day, { totalUsd, requests }]) => ({
         day,
-        totalUsd: totalUsd.toFixed(6),
+        totalUsd: nanoUsdToFixed6(totalUsd),
         requests,
       }));
   }
 
   private bumpBucket(
-    map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
+    map: Map<string, { totalUsd: bigint; requests: number }>,
     key: string,
-    amount: Prisma.Decimal | string,
+    amount: string,
     requests: number,
   ) {
     const existing = map.get(key);
     if (existing) {
-      existing.totalUsd = existing.totalUsd.plus(amount);
+      existing.totalUsd += usdToNanoUsd(amount);
       existing.requests += requests;
     } else {
-      map.set(key, { totalUsd: new Prisma.Decimal(amount), requests });
+      map.set(key, { totalUsd: usdToNanoUsd(amount), requests });
     }
   }
 
@@ -353,4 +355,31 @@ export class GatewayUsageService {
       recentDebits: [],
     };
   }
+}
+
+/** Descending-friendly comparison of two nano-USD integers. */
+function compareBigInt(left: bigint, right: bigint): number {
+  if (left === right) return 0;
+  return left > right ? 1 : -1;
+}
+
+/** Half-away-from-zero division, the rounding a money display string promises. */
+function roundedQuotient(value: bigint, divisor: bigint): bigint {
+  const negative = value < 0n;
+  const magnitude = negative ? -value : value;
+  const rounded = (magnitude * 2n + divisor) / (2n * divisor);
+  return negative ? -rounded : rounded;
+}
+
+/** A micro-USD integer as a six-decimal money string. */
+function microUsdToFixed6(micro: bigint): string {
+  const negative = micro < 0n;
+  const magnitude = negative ? -micro : micro;
+  const fraction = (magnitude % 1_000_000n).toString().padStart(6, "0");
+  return `${negative ? "-" : ""}${magnitude / 1_000_000n}.${fraction}`;
+}
+
+/** A nano-USD integer as a six-decimal money string. */
+function nanoUsdToFixed6(nano: bigint): string {
+  return microUsdToFixed6(roundedQuotient(nano, 1000n));
 }

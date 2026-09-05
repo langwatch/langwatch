@@ -1,32 +1,38 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-import type { Organization, Subscription } from "@langwatch/prisma-client/generated";
+import type {
+  BillingOrganizationRecord,
+  BillingSubscriptionRecord,
+} from "./subscription.port";
 
-export type SubscriptionWithOrg = Subscription & { organization: Organization };
+export type SubscriptionWithOrg = BillingSubscriptionRecord & {
+  /** The trial licence a paid subscription retires. */
+  organization: BillingOrganizationRecord & { license: string | null };
+};
 export type CancelledSubscription = { stripeSubscriptionId: string | null };
 
 export abstract class BillingWebhookSubscriptionPort {
-  abstract findLastNonCancelled(organizationId: string): Promise<Subscription | null>;
+  abstract tryFindLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null>;
 
-  abstract createPending(input: {
+  abstract tryCreatePending(input: {
     organizationId: string;
     plan: string;
-  }): Promise<Subscription | null>;
+  }): Promise<BillingSubscriptionRecord | null>;
 
-  abstract updateStatus(input: { id: string; status: string }): Promise<Subscription | null>;
+  abstract tryUpdateStatus(input: { id: string; status: string }): Promise<BillingSubscriptionRecord | null>;
 
-  abstract updatePlan(input: { id: string; plan: string }): Promise<Subscription | null>;
+  abstract tryUpdatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord | null>;
 
   // --- Webhook handler methods ---
 
-  abstract findByStripeId(stripeSubscriptionId: string): Promise<Subscription | null>;
+  abstract tryFindByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null>;
 
   abstract linkStripeId(input: {
     id: string;
     stripeSubscriptionId: string;
   }): Promise<{ count: number }>;
 
-  abstract activate(input: {
+  abstract tryActivate(input: {
     id: string;
     previousStatus: string;
   }): Promise<SubscriptionWithOrg | null>;
@@ -42,7 +48,7 @@ export abstract class BillingWebhookSubscriptionPort {
     excludeSubscriptionId: string;
   }): Promise<CancelledSubscription[]>;
 
-  abstract updateQuantities(input: {
+  abstract tryUpdateQuantities(input: {
     id: string;
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;
@@ -50,26 +56,26 @@ export abstract class BillingWebhookSubscriptionPort {
 }
 
 export class NullBillingWebhookSubscriptionAdapter extends BillingWebhookSubscriptionPort {
-  async findLastNonCancelled(_organizationId: string): Promise<Subscription | null> {
+  async tryFindLastNonCancelled(_organizationId: string): Promise<BillingSubscriptionRecord | null> {
     return null;
   }
 
-  async createPending(_input: {
+  async tryCreatePending(_input: {
     organizationId: string;
     plan: string;
-  }): Promise<Subscription | null> {
+  }): Promise<BillingSubscriptionRecord | null> {
     return null;
   }
 
-  async updateStatus(_input: { id: string; status: string }): Promise<Subscription | null> {
+  async tryUpdateStatus(_input: { id: string; status: string }): Promise<BillingSubscriptionRecord | null> {
     return null;
   }
 
-  async updatePlan(_input: { id: string; plan: string }): Promise<Subscription | null> {
+  async tryUpdatePlan(_input: { id: string; plan: string }): Promise<BillingSubscriptionRecord | null> {
     return null;
   }
 
-  async findByStripeId(_stripeSubscriptionId: string): Promise<Subscription | null> {
+  async tryFindByStripeId(_stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
     return null;
   }
 
@@ -80,7 +86,7 @@ export class NullBillingWebhookSubscriptionAdapter extends BillingWebhookSubscri
     return { count: 0 };
   }
 
-  async activate(_input: {
+  async tryActivate(_input: {
     id: string;
     previousStatus: string;
   }): Promise<SubscriptionWithOrg | null> {
@@ -100,7 +106,7 @@ export class NullBillingWebhookSubscriptionAdapter extends BillingWebhookSubscri
     return [];
   }
 
-  async updateQuantities(_input: {
+  async tryUpdateQuantities(_input: {
     id: string;
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;

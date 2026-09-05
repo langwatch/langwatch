@@ -10,7 +10,7 @@ import {
 } from "@langwatch/project-server";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createHomeTrpcRouter } from "./project-trpc.mount";
 
 /** The one namespace this feature mounts. */

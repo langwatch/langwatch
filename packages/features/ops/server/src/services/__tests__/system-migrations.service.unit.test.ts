@@ -125,7 +125,7 @@ function serviceWith({
       rolled_back: 0,
     }),
     findRecordsByStatus: vi.fn().mockResolvedValue([]),
-    findRecord: vi.fn().mockImplementation(() => Promise.resolve(stored)),
+    tryFindRecord: vi.fn().mockImplementation(() => Promise.resolve(stored)),
     upsertRecord: vi.fn().mockImplementation((written) => {
       stored = written as TenantMigrationRecord;
       upserts.push(written as TenantMigrationRecord);

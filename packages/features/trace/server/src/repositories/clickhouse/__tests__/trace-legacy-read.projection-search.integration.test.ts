@@ -7,7 +7,6 @@ import type { Protections } from "@langwatch/trace-contract";
 import { TraceProjectionCompileService } from "../../../services/trace-projection-compile.service";
 import type { AnnotationScoreName } from "@langwatch/annotation-contract";
 import { AnnotationService, type ProjectionAnnotation } from "@langwatch/annotation-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -270,7 +269,6 @@ integration("trace search projection (integration)", () => {
     ch = createTestClickHouseClient(clickHouseUrl);
 
     service = TraceLegacyReadClickHouseRepository.create({
-      prisma: {} as PrismaClient,
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),
       annotations,

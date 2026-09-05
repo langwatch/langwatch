@@ -137,11 +137,11 @@ export function identityStack({
    *  better-auth is writing. */
   const users: IdentityUsersRepository = {
     async storeUserHashKeyIfMissing() {},
-    async findEmail({ userId }) {
+    async tryFindEmail({ userId }) {
       const row = db.user?.find((candidate) => candidate.id === userId);
       return typeof row?.email === "string" ? row.email : null;
     },
-    async findUserIdByEmail({ normalizedValue }) {
+    async tryFindUserIdByEmail({ normalizedValue }) {
       const row = db.user?.find(
         (candidate) =>
           typeof candidate.email === "string" &&
@@ -237,7 +237,7 @@ export function identityStack({
     withDatabaseHooks
       ? {
           account: {
-            create: { before: (account) => bridge.beforeAccountCreate(account) },
+            create: { before: (account) => bridge.tryBeforeAccountCreate(account) },
             delete: { before: (account) => bridge.beforeAccountDelete(account) },
           },
         }

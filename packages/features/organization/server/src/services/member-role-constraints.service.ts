@@ -1,4 +1,4 @@
-import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
 
 export type TeamRoleValue = TeamUserRole | `custom:${string}`;
 

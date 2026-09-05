@@ -36,7 +36,7 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     });
   }
 
-  async findEmail({ userId }: { userId: string }): Promise<string | null> {
+  async tryFindEmail({ userId }: { userId: string }): Promise<string | null> {
     const user = await this.database.user.findUnique({
       where: { id: userId },
       select: { email: true },
@@ -57,7 +57,7 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
    * and the unique index keeps enforcing it, so calling it free here would
    * hand the customer a refusal from Postgres one step later.
    */
-  async findUserIdByEmail({
+  async tryFindUserIdByEmail({
     normalizedValue,
   }: {
     normalizedValue: string;

@@ -53,7 +53,7 @@ import {
   type Organization,
   type OrganizationInvite,
   type OrganizationUser,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/organization-contract";
 import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 

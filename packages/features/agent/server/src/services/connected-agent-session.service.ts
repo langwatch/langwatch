@@ -118,7 +118,7 @@ export class AgentSessionService {
    * several replicas and no Redis, a call on one pod could never reach an
    * instance held by another.
    */
-  replicaRefusal(): AgentRegisterRefusedError | null {
+  tryReplicaRefusal(): AgentRegisterRefusedError | null {
     if (this.runtime.store.shared || this.replicaCount <= 1) {
       return null;
     }
@@ -329,8 +329,8 @@ export class AgentSessionService {
    * or it was routed at an instance that never registered its agent, in
    * which case the call is refused for that instance here and now.
    */
-  async readCallForSession(session: SessionInfo, callId: string): Promise<StoredCall | null> {
-    const raw = await this.runtime.store.get(callKey(session.projectId, callId));
+  async tryReadCallForSession(session: SessionInfo, callId: string): Promise<StoredCall | null> {
+    const raw = await this.runtime.store.tryGet(callKey(session.projectId, callId));
     if (!raw) {
       return null;
     }
@@ -374,7 +374,7 @@ export class AgentSessionService {
    * run the turn on another instance. The function cannot have started.
    */
   async undeliver(session: SessionInfo, callId: string): Promise<void> {
-    const stored = await this.readStoredCall(session, callId);
+    const stored = await this.tryReadStoredCall(session, callId);
     if (!stored || stored.instanceId !== session.instanceId) {
       return;
     }
@@ -391,7 +391,7 @@ export class AgentSessionService {
 
   /** The instance started the function: the call can no longer be retried elsewhere. */
   async ack(session: SessionInfo, callId: string): Promise<void> {
-    const stored = await this.readStoredCall(session, callId);
+    const stored = await this.tryReadStoredCall(session, callId);
     if (!stored || stored.instanceId !== session.instanceId) {
       return;
     }
@@ -406,7 +406,7 @@ export class AgentSessionService {
 
   /** The instance answered: the result lands under its cap or as a payload error. */
   async result(session: SessionInfo, frame: ResultFrame): Promise<void> {
-    const stored = await this.readStoredCall(session, frame.callId);
+    const stored = await this.tryReadStoredCall(session, frame.callId);
     if (!stored || stored.instanceId !== session.instanceId) {
       return;
     }
@@ -459,7 +459,7 @@ export class AgentSessionService {
       now: this.now(),
     });
     for (const callId of activeCallIds) {
-      const stored = await this.readStoredCall(session, callId);
+      const stored = await this.tryReadStoredCall(session, callId);
       if (!stored || stored.instanceId !== session.instanceId) {
         continue;
       }
@@ -483,8 +483,8 @@ export class AgentSessionService {
     );
   }
 
-  async readStoredCall(session: SessionInfo, callId: string): Promise<StoredCall | null> {
-    const raw = await this.runtime.store.get(callKey(session.projectId, callId));
+  async tryReadStoredCall(session: SessionInfo, callId: string): Promise<StoredCall | null> {
+    const raw = await this.runtime.store.tryGet(callKey(session.projectId, callId));
     if (!raw) {
       return null;
     }

@@ -1,6 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { Task } from "@langwatch/task";
+import type {
+  GatewayTraceDestinationReportRepository,
+  TraceDestinationKeyRow,
+  TraceDestinationProjectRow,
+} from "../repositories/gateway-trace-destination-report.repository";
 
 const logger = createLogger("langwatch:task:trace-destination-report");
 
@@ -19,45 +23,6 @@ export const TRACE_DESTINATION_RESOLUTIONS = [
 
 export type TraceDestinationResolution = (typeof TRACE_DESTINATION_RESOLUTIONS)[number];
 
-const PROJECT_SELECT = {
-  id: true,
-  kind: true,
-  archivedAt: true,
-  createdAt: true,
-  team: { select: { organizationId: true } },
-} as const;
-
-const KEY_SELECT = {
-  id: true,
-  organizationId: true,
-  traceProjectId: true,
-  scopes: { select: { scopeType: true, scopeId: true } },
-} as const;
-
-export type TraceDestinationProjectRow = Prisma.ProjectGetPayload<{
-  select: typeof PROJECT_SELECT;
-}>;
-
-export type TraceDestinationKeyRow = Prisma.VirtualKeyGetPayload<{
-  select: typeof KEY_SELECT;
-}>;
-
-/**
- * Read-only, and PICKED from the real client rather than re-declared: three
- * delegates, one method each, so a typed `PrismaClient` satisfies it with no
- * cast and this stays visibly SELECT and nothing else.
- */
-type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClient[Model]> = Pick<
-  PrismaClient[Model],
-  Methods
->;
-
-export type TraceDestinationReportDatabase = {
-  project: Delegate<"project", "findMany">;
-  organization: Delegate<"organization", "findMany">;
-  virtualKey: Delegate<"virtualKey", "findMany">;
-};
-
 export type TraceDestinationReport = Readonly<{
   counts: Readonly<Record<TraceDestinationResolution, number>>;
   total: number;
@@ -72,14 +37,11 @@ export type TraceDestinationReport = Readonly<{
  * main's `report-trace-destination-backfill.ts`.
  */
 export async function reportTraceDestinationBackfill({
-  database,
+  repository,
 }: {
-  database: TraceDestinationReportDatabase;
+  repository: GatewayTraceDestinationReportRepository;
 }): Promise<TraceDestinationReport> {
-  const projects = await database.project.findMany({
-    select: PROJECT_SELECT,
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-  });
+  const projects = await repository.findProjects();
   const byId = new Map(projects.map((project) => [project.id, project]));
   const governanceByOrganization = oldestLiveGovernanceByOrganization(projects);
 
@@ -95,14 +57,10 @@ export async function reportTraceDestinationBackfill({
   let cursor: string | null = null;
   for (;;) {
     // Annotated, not inferred: the page's own type would otherwise be read
-    // out of a call whose `where` reads the cursor this loop assigns FROM the
-    // page, and a self-referencing initializer infers `any` (TS7022).
-    // `undefined` rather than a conditional spread — Prisma reads an absent
-    // predicate exactly that way.
-    const page: TraceDestinationKeyRow[] = await database.virtualKey.findMany({
-      where: cursor === null ? undefined : { id: { gt: cursor } },
-      select: KEY_SELECT,
-      orderBy: { id: "asc" },
+    // out of a call whose cursor this loop assigns FROM the page, and a
+    // self-referencing initializer infers `any` (TS7022).
+    const page: TraceDestinationKeyRow[] = await repository.findKeyPage({
+      after: cursor,
       take: KEY_PAGE_SIZE,
     });
     if (page.length === 0) break;
@@ -119,12 +77,12 @@ export async function reportTraceDestinationBackfill({
   // Read from Organization, not from the projects: an organization with no
   // projects at all has no governance project either, and counting it off the
   // project rows would leave it out of the very number it belongs in.
-  const organizations = await database.organization.findMany({ select: { id: true } });
+  const organizationIds = await repository.findOrganizationIds();
   const report: TraceDestinationReport = {
     counts,
     total,
-    organizationsWithoutGovernanceProject: organizations.filter(
-      (organization) => !governanceByOrganization.has(organization.id),
+    organizationsWithoutGovernanceProject: organizationIds.filter(
+      (organizationId) => !governanceByOrganization.has(organizationId),
     ).length,
     organizationsWithDestinationlessKeys: [...destinationless].sort(),
   };
@@ -203,19 +161,21 @@ export class TraceDestinationReportTask extends Task {
   readonly description =
     "Reports which virtual keys the stored-trace-destination backfill would leave without a destination.";
 
-  private constructor(private readonly database: () => TraceDestinationReportDatabase) {
+  private constructor(
+    private readonly repository: () => GatewayTraceDestinationReportRepository,
+  ) {
     super();
   }
 
   static create({
-    database,
+    repository,
   }: {
-    database: () => TraceDestinationReportDatabase;
+    repository: () => GatewayTraceDestinationReportRepository;
   }): TraceDestinationReportTask {
-    return new TraceDestinationReportTask(database);
+    return new TraceDestinationReportTask(repository);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    await reportTraceDestinationBackfill({ database: this.database() });
+    await reportTraceDestinationBackfill({ repository: this.repository() });
   }
 }

@@ -55,7 +55,7 @@ export class PrismaMcpProjectLookupAdapter extends McpProjectLookupPort {
     return new PrismaMcpProjectLookupAdapter(prisma);
   }
 
-  async findLiveProjectByApiKey({
+  async tryFindLiveProjectByApiKey({
     apiKey,
   }: {
     apiKey: string;

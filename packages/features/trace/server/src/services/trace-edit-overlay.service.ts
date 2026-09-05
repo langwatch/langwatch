@@ -29,7 +29,7 @@ export class TraceEditOverlayService {
     return new TraceEditOverlayService(repository);
   }
 
-  async getByTraceId({
+  async tryGetByTraceId({
     projectId,
     traceId,
   }: {
@@ -134,7 +134,7 @@ export class TraceEditOverlayService {
   /**
    * Takes a corrected trace input or output back off, leaving every other edit in place — what clearing a suggestion writes: only that field's proposal is withdrawn, not span renames or deletions made elsewhere. When that field was the only edit, the row goes with it, so withdrawal returns the trace to uncorrected rather than leaving an inert row.
    */
-  async removeTraceIOEdit({
+  async tryRemoveTraceIOEdit({
     projectId,
     traceId,
     field,
@@ -217,7 +217,7 @@ export class TraceEditOverlayService {
   /**
    * Takes a corrected span field back off, leaving every other edit in place. A span left with no corrected field goes with it, and a correction left with no edits returns the trace to uncorrected, so a withdrawn suggestion never leaves an inert row behind.
    */
-  async removeSpanFieldEdit({
+  async tryRemoveSpanFieldEdit({
     projectId,
     traceId,
     spanId,

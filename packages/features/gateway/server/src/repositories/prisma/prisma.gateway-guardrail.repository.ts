@@ -15,11 +15,8 @@ import {
 } from "../gateway-guardrail.repository";
 
 /**
- * The client slice the guardrail catalogue binds to.
- *
- * Named here, where the generated client may be spoken of, so the
- * composition adapter above can state what it needs without importing the
- * generated declaration itself.
+ * The client slice the guardrail catalogue binds to, named here so the
+ * composition adapter can state what it needs without importing it directly.
  */
 export type GatewayGuardrailDatabase = Pick<PrismaClient, "gatewayGuardrail">;
 

@@ -215,7 +215,7 @@ describe("snapshot writer lease gate", () => {
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(snapshots.writeDetail).toHaveBeenCalled();
-      expect(collector.getLatestDetail()).toBeNull();
+      expect(collector.tryGetLatestDetail()).toBeNull();
     });
   });
 

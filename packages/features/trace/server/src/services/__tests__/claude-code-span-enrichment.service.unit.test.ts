@@ -29,13 +29,13 @@ function computeClaudeToolSpanEnrichment(input: {
   });
 }
 
-function computeClaudeInteractionOutput(input: {
+function tryComputeClaudeInteractionOutput(input: {
   logs: ClaudeContentLog[];
   windowStartMs: number;
   windowEndMs: number;
   slackMs?: number;
 }) {
-  return ClaudeCodeSpanEnrichmentService.computeClaudeInteractionOutput({
+  return ClaudeCodeSpanEnrichmentService.tryComputeClaudeInteractionOutput({
     ...input,
     traceCanonicalisation,
   });
@@ -625,10 +625,10 @@ describe("computeClaudeToolSpanEnrichment", () => {
   });
 });
 
-describe("computeClaudeInteractionOutput", () => {
+describe("tryComputeClaudeInteractionOutput", () => {
   describe("given conversational replies inside the turn window", () => {
     it("picks the LAST reply as the turn's output", () => {
-      const output = computeClaudeInteractionOutput({
+      const output = tryComputeClaudeInteractionOutput({
         logs: [
           contentLog({
             eventName: "assistant_response",
@@ -651,7 +651,7 @@ describe("computeClaudeInteractionOutput", () => {
     });
 
     it("prefers the parsed response body over the raw text at the same timestamp", () => {
-      const output = computeClaudeInteractionOutput({
+      const output = tryComputeClaudeInteractionOutput({
         logs: [
           contentLog({
             eventName: "assistant_response",
@@ -676,7 +676,7 @@ describe("computeClaudeInteractionOutput", () => {
 
   describe("given a utility reply (non-conversational query source)", () => {
     it("never lets it headline the turn", () => {
-      const output = computeClaudeInteractionOutput({
+      const output = tryComputeClaudeInteractionOutput({
         logs: [
           contentLog({
             eventName: "assistant_response",
@@ -696,7 +696,7 @@ describe("computeClaudeInteractionOutput", () => {
 
   describe("given a reply flushed just after the span closed", () => {
     it("accepts it within the 2s slack", () => {
-      const output = computeClaudeInteractionOutput({
+      const output = tryComputeClaudeInteractionOutput({
         logs: [
           contentLog({
             eventName: "assistant_response",
@@ -713,7 +713,7 @@ describe("computeClaudeInteractionOutput", () => {
     });
 
     it("rejects replies beyond the slack (another turn's reply)", () => {
-      const output = computeClaudeInteractionOutput({
+      const output = tryComputeClaudeInteractionOutput({
         logs: [
           contentLog({
             eventName: "assistant_response",
@@ -733,7 +733,7 @@ describe("computeClaudeInteractionOutput", () => {
   describe("given no logs", () => {
     it("returns null", () => {
       expect(
-        computeClaudeInteractionOutput({
+        tryComputeClaudeInteractionOutput({
           logs: [],
           windowStartMs: 0,
           windowEndMs: 1,

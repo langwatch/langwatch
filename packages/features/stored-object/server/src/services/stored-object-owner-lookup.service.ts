@@ -28,7 +28,7 @@ export class StoredObjectOwnerLookupService extends StoredObjectOwnerResolver {
     super();
   }
 
-  resolve(input: { id: string }): Promise<{ projectId: string } | null> {
+  tryResolve(input: { id: string }): Promise<{ projectId: string } | null> {
     return this.telemetry.withLookupSpan(input, async (span) => {
       const result = await this.repository.findOwner(input.id);
       this.recordResult(span, result);

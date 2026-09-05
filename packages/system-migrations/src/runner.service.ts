@@ -258,7 +258,7 @@ export class SystemMigrationRunnerService {
     summary: MigrationPassSummary;
   }): Promise<void> {
     const { state } = this.deps;
-    const existing = await state.findRecord({
+    const existing = await state.tryFindRecord({
       migrationName: migration.name,
       tenantId,
     });

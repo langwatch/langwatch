@@ -46,7 +46,7 @@ import {
   type GatewayRealtimeSessionCollaborators,
 } from "../../services/gateway-realtime-session.service";
 import type { VirtualKeyService } from "../../services/virtual-key.service";
-import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget } from "@langwatch/gateway-contract";
 import type { GatewayGuardrailRepository } from "../../repositories/gateway-guardrail.repository";
 
 const realtimeSessionService = GatewayRealtimeSessionService.create();
@@ -837,7 +837,7 @@ export function createGatewayInternalRestApp(options: {
     }
 
     const service = ports.virtualKeys();
-    const vk = await service.getBySecretInternal(presented);
+    const vk = await service.tryGetBySecretInternal(presented);
     if (!vk) {
       logAuthDecision(c, "virtual_key_not_found", 401);
       return c.json(
@@ -972,7 +972,7 @@ export function createGatewayInternalRestApp(options: {
    */
   secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
     const vkId = c.req.param("vk_id");
-    const vk = await ports.store().findVirtualKeyForConfig(vkId);
+    const vk = await ports.store().tryFindVirtualKeyForConfig(vkId);
     if (!vk) {
       return c.json(
         {
@@ -1168,7 +1168,7 @@ export function createGatewayInternalRestApp(options: {
       );
     }
     const store = ports.store();
-    const budget = await store.findBudget(budgetId);
+    const budget = await store.tryFindBudget(budgetId);
     if (!budget || budget.archivedAt || budget.scopeType !== "ATTRIBUTED_USER") {
       return c.json(
         {
@@ -1191,7 +1191,7 @@ export function createGatewayInternalRestApp(options: {
       budget,
       attributedUserBucketScopeId(budget.scopeId, endUserId),
     );
-    const boundary = await store.findBucketBoundary({ budgetId: budget.id, bucketScopeId });
+    const boundary = await store.tryFindBucketBoundary({ budgetId: budget.id, bucketScopeId });
     const spentMicroUsd = await bucketSpentMicroUsd({
       store,
       budgetRepository,

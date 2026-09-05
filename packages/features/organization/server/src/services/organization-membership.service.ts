@@ -10,7 +10,7 @@ import {
   RoleBindingScopeType,
   type TeamUserRole,
   type User,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/organization-contract";
 import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
@@ -205,18 +205,18 @@ export class OrganizationMembershipService {
     return this.repo.tryGetUserOrgRole(params);
   }
 
-  async getUserOrgRoleByTeamId(params: {
+  async tryGetUserOrgRoleByTeamId(params: {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null> {
-    return this.repo.getUserOrgRoleByTeamId(params);
+    return this.repo.tryGetUserOrgRoleByTeamId(params);
   }
 
   /**
    * The org's declared primary intent (ADR-038); null = intent unset
    * (legacy org). Consumed by the home resolver to pin the "/" landing.
    */
-  async getPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
+  async tryGetPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
     return this.repo.tryFindPrimaryIntentById(organizationId);
   }
 
@@ -333,7 +333,7 @@ export class OrganizationMembershipService {
   }
 
   /** One organization's provisioning summary, or null when the id is unknown. */
-  async getProvisioningSummary(
+  async tryGetProvisioningSummary(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null> {
     return this.repo.tryFindProvisioningSummaryById(organizationId);
@@ -356,12 +356,12 @@ export class OrganizationMembershipService {
    * Returns an organization with its members and their team memberships.
    * Returns null when the user is not a member of the organization.
    */
-  async getOrganizationWithMembers(params: {
+  async tryGetOrganizationWithMembers(params: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
   }): Promise<OrganizationWithMembersAndTheirTeams | null> {
-    return this.repo.getOrganizationWithMembers(params);
+    return this.repo.tryGetOrganizationWithMembers(params);
   }
 
   /**
@@ -369,12 +369,12 @@ export class OrganizationMembershipService {
    * Returns null when the current user is not a member (not found) or the target member
    * does not exist.
    */
-  async getMemberById(params: {
+  async tryGetMemberById(params: {
     organizationId: string;
     userId: string;
     currentUserId: string;
   }): Promise<OrganizationMemberWithUser | null> {
-    return this.repo.getMemberById(params);
+    return this.repo.tryGetMemberById(params);
   }
 
   /**
@@ -549,7 +549,7 @@ export class OrganizationMembershipService {
     // A caller who names a personal workspace outright is told so. Without
     // this the shared-teams-only set below would answer "that team is not in
     // the organization", which is both wrong and no help.
-    const personalTeam = await this.repo.findPersonalTeamInScopes({
+    const personalTeam = await this.repo.tryFindPersonalTeamInScopes({
       scopes: (teamRoleUpdates ?? []).map((update) => ({
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: update.teamId,

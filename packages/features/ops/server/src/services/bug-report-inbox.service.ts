@@ -1,7 +1,7 @@
 /**
  * The two reads the operator back office makes of the support inbox.
  */
-import type { BugReport } from "@langwatch/prisma-client/generated";
+import type { BugReport } from "@langwatch/ops-contract";
 import type { BugReportRepositoryPort } from "../ports/bug-report.port";
 
 /** One page of the inbox, with the count the pager renders. */
@@ -30,7 +30,7 @@ export class BugReportInboxService {
     return { reports, total };
   }
 
-  getById(input: { id: string }): Promise<BugReport | null> {
-    return this.reports.findById(input);
+  tryGetById(input: { id: string }): Promise<BugReport | null> {
+    return this.reports.tryFindById(input);
   }
 }

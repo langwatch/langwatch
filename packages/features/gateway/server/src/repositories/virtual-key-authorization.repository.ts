@@ -1,10 +1,7 @@
 /**
  * The organization directory a virtual-key authorization decision reads:
- * which team a project belongs to, which teams and projects a person is a
- * member of, and whether a named row is inside the organization at all.
- *
- * Every lookup is org-scoped, so an id naming another tenant's row simply
- * does not come back and absence from the result IS the refusal.
+ * team/project membership, and whether a row is in the organization at all.
+ * Every lookup is org-scoped; absence from the result IS the refusal.
  */
 export abstract class VirtualKeyAuthorizationRepository {
   /** The team a project hangs off, or null for a dangling reference. */

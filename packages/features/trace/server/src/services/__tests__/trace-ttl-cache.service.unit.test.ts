@@ -30,7 +30,7 @@ describe("TtlCache", () => {
       const cache = new TtlCache<number>(30_000, "test:");
 
       await cache.set("key1", 42);
-      const result = await cache.get("key1");
+      const result = await cache.tryGet("key1");
 
       expect(result).toBe(42);
       expect(mockRedis.setex).toHaveBeenCalledOnce();
@@ -40,7 +40,7 @@ describe("TtlCache", () => {
     it("returns undefined for missing keys", async () => {
       const cache = new TtlCache<string>(30_000, "test:");
 
-      const result = await cache.get("nonexistent");
+      const result = await cache.tryGet("nonexistent");
 
       expect(result).toBeUndefined();
     });
@@ -50,7 +50,7 @@ describe("TtlCache", () => {
 
       await cache.set("key1", "value");
       await cache.delete("key1");
-      const result = await cache.get("key1");
+      const result = await cache.tryGet("key1");
 
       expect(result).toBeUndefined();
       expect(mockRedis.del).toHaveBeenCalledOnce();
@@ -81,7 +81,7 @@ describe("TtlCache", () => {
       const obj = { name: "test", count: 42 };
 
       await cache.set("obj1", obj);
-      const result = await cache.get("obj1");
+      const result = await cache.tryGet("obj1");
 
       expect(result).toEqual(obj);
     });
@@ -94,7 +94,7 @@ describe("TtlCache", () => {
       const result = await cache.claim("lock1", true);
 
       expect(result).toBe(true);
-      expect(await cache.get("lock1")).toBe(true);
+      expect(await cache.tryGet("lock1")).toBe(true);
     });
 
     it("returns false when key already exists", async () => {
@@ -150,7 +150,7 @@ describe("TtlCache", () => {
       // Nothing was recorded, so no later read finds a key this process
       // alone believes it holds.
       mockRedis.get.mockRejectedValueOnce(new Error("connection reset"));
-      expect(await cache.get("lock1")).toBeUndefined();
+      expect(await cache.tryGet("lock1")).toBeUndefined();
     });
   });
 
@@ -165,7 +165,7 @@ describe("TtlCache", () => {
       mockRedis.get.mockRejectedValueOnce(new Error("connection reset"));
 
       // Should fall back to memory
-      const result = await cache.get("key1");
+      const result = await cache.tryGet("key1");
       expect(result).toBe(42);
     });
   });
@@ -182,7 +182,7 @@ describe("TtlCache", () => {
       mockRedis.get.mockRejectedValueOnce(new Error("connection reset"));
 
       // Should still return from memory
-      const result = await cache.get("key1");
+      const result = await cache.tryGet("key1");
       expect(result).toBe(42);
     });
   });
@@ -196,7 +196,7 @@ describe("TtlCache", () => {
       const cache = new TtlCache<number>(30_000, "test:");
 
       await cache.set("key1", 42);
-      const result = await cache.get("key1");
+      const result = await cache.tryGet("key1");
 
       expect(result).toBe(42);
       expect(mockRedis.get).not.toHaveBeenCalled();
@@ -207,10 +207,10 @@ describe("TtlCache", () => {
       const cache = new TtlCache<number>(50, "test:"); // 50ms
 
       await cache.set("key1", 42);
-      expect(await cache.get("key1")).toBe(42);
+      expect(await cache.tryGet("key1")).toBe(42);
 
       await new Promise((r) => setTimeout(r, 60));
-      expect(await cache.get("key1")).toBeUndefined();
+      expect(await cache.tryGet("key1")).toBeUndefined();
     });
 
     it("deletes from memory", async () => {
@@ -219,7 +219,7 @@ describe("TtlCache", () => {
       await cache.set("key1", 42);
       await cache.delete("key1");
 
-      expect(await cache.get("key1")).toBeUndefined();
+      expect(await cache.tryGet("key1")).toBeUndefined();
     });
 
     // With no connection the memory map is the whole cache, so a claim

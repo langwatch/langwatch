@@ -41,7 +41,7 @@ export class TtlCache<T> {
     return registeredRedis;
   }
 
-  async get(key: string): Promise<T | undefined> {
+  async tryGet(key: string): Promise<T | undefined> {
     const r = this.redis;
     if (r) {
       try {

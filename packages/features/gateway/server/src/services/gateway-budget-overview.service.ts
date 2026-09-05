@@ -4,7 +4,7 @@
 
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/gateway-contract";
 
 import {
   type ApplicableBudget,
@@ -230,7 +230,7 @@ export class BudgetOverviewService {
   /**
    * One budget in the same item shape, for surfaces looking at the budget itself (settings detail page) rather than a person. No user in context, so a GROUP budget reports the whole group's spend and person-relative labels fall back to absolute phrases.
    */
-  async overviewForBudget(input: {
+  async tryOverviewForBudget(input: {
     organizationId: string;
     budgetId: string;
   }): Promise<BudgetOverviewItem | null> {

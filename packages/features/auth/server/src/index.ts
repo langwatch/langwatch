@@ -1,4 +1,6 @@
 export { PostgresAuthAdapter } from "./adapters/postgres.auth.adapter";
+export { PostgresAuthDirectoryAdapter } from "./adapters/postgres.auth-directory.adapter";
+export { AuthDirectoryPort, type AuthDirectoryProject } from "./ports/auth-directory.port";
 export { AuthService } from "./services/auth.service";
 export {
   AuthApp,
@@ -43,7 +45,7 @@ export {
   afterAccountUpdate,
   afterSessionCreate,
   afterUserCreate,
-  beforeAccountCreate,
+  tryBeforeAccountCreate,
   beforeSessionCreate,
   beforeUserCreate,
   type BetterAuthHookCollaborators,

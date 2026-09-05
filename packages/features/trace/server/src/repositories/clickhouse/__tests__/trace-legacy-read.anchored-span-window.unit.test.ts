@@ -117,9 +117,6 @@ async function readTraces(traceIds: string[]) {
   const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
   const service = new TraceLegacyReadClickHouseRepository({
     resolveClickHouseClient: testResolveClickHouseClient,
-    prisma: {
-      project: { findUnique: vi.fn() },
-    } as never,
     traceCanonicalisation,
   });
   await service.getTracesWithSpans("proj-1", traceIds, protections);

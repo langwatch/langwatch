@@ -14,16 +14,16 @@ import type { IdentifierFact, IdentityHeads } from "@langwatch/identity-contract
 export interface IdentityHeadsRepository {
   /** The per-user HMAC key (`User.userHashKey`); null when not yet minted —
    *  the attach then records a null hash rather than failing the ceremony. */
-  findUserHashKey(args: { userId: string }): Promise<string | null>;
+  tryFindUserHashKey(args: { userId: string }): Promise<string | null>;
   /** The user's current identifier heads, as the projection knows them. */
   findHeads(args: { userId: string }): Promise<IdentityHeads>;
   /** An ACTIVE (VERIFIED or PRIMARY) identifier holding this normalized
    *  value, whoever holds it — the cross-user uniqueness guard's read. */
-  findActiveIdentifierByValue(args: {
+  tryFindActiveIdentifierByValue(args: {
     normalizedValue: string;
   }): Promise<{ userId: string; identifierId: string } | null>;
   /** One head of this user's, or null — the verification mint's guard. */
-  findIdentifier(args: { userId: string; identifierId: string }): Promise<IdentifierFact | null>;
+  tryFindIdentifier(args: { userId: string; identifierId: string }): Promise<IdentifierFact | null>;
   /**
    * The identifier a protocol `Account` row mirrors: by accountId first. A
    * row adopted before the projection carried accountIds falls back to the
@@ -40,7 +40,7 @@ export interface IdentityHeadsRepository {
    * backfill adopted carries it, so the historical rows this exists for are
    * still found.
    */
-  findIdentifierIdForAccount(args: {
+  tryFindIdentifierIdForAccount(args: {
     userId: string;
     accountId: string;
     providerId: string;

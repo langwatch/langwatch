@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ModelProviderService as ModelProviderServiceContract } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -17,7 +18,7 @@ import { ModelProviderService } from "../services/model-provider.service";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service";
 
 export interface PostgresModelProviderAdapterOptions {
-  database: object;
+  database: PrismaClient;
   projects: ProjectService;
   organizations: OrganizationService;
   catalog: ModelProviderCatalog;
@@ -49,9 +50,7 @@ export class PostgresModelProviderAdapter {
       codexTokenRefresher: this.options.codexTokenRefresher,
       connectionRateLimiter: this.options.connectionRateLimiter,
       defaults: PrismaModelDefaultRepository.create(this.options.database),
-      costs: PrismaModelCostRepository.create(
-        PrismaModelCostRepository.requireModelCostDatabase(this.options.database),
-      ),
+      costs: PrismaModelCostRepository.create(this.options.database),
       catalog: this.options.catalog,
       authorization: this.options.authorization,
       translation: this.options.translation,

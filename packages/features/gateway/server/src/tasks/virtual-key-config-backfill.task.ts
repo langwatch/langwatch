@@ -1,58 +1,23 @@
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { Task } from "@langwatch/task";
 import { nanoid } from "nanoid";
+import type {
+  BackfillJsonObject,
+  BackfillJsonValue,
+  GatewayVirtualKeyConfigBackfillRepository,
+  VirtualKeyRow,
+} from "../repositories/gateway-virtual-key-config-backfill.repository";
 
 const logger = createLogger("langwatch:task:virtual-key-config-backfill");
-
-/**
- * Exactly the delegate methods this walk calls, PICKED from the real client
- * rather than re-declared, so a typed `PrismaClient` satisfies it with no cast
- * and every row type comes from its own call site.
- */
-type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClient[Model]> = Pick<
-  PrismaClient[Model],
-  Methods
->;
-
-export type VirtualKeyConfigBackfillDatabase = {
-  organization: Delegate<"organization", "findMany">;
-  virtualKey: Delegate<"virtualKey", "findMany" | "update">;
-  routingPolicy: Delegate<"routingPolicy", "create">;
-  gatewayGuardrail: Delegate<"gatewayGuardrail", "create">;
-};
-
-/** The key with the scope rows the walk clones onto the new policy. */
-export type VirtualKeyRow = Prisma.VirtualKeyGetPayload<{
-  select: {
-    id: true;
-    name: true;
-    organizationId: true;
-    routingPolicyId: true;
-    config: true;
-    scopes: { select: { scopeType: true; scopeId: true } };
-  };
-}>;
-
-export type VirtualKeyScopeRow = VirtualKeyRow["scopes"][number];
 
 /** What the walk reads out of the key's Json config column. */
 export type LegacyVirtualKeyConfig = Readonly<{
   modelAliases: Record<string, string>;
-  policyRules: Prisma.JsonObject | undefined;
+  policyRules: BackfillJsonObject | undefined;
   guardrails: Readonly<Record<Direction, ReadonlyArray<{ id: string; evaluator: string }>>>;
   requestFailOpen: boolean;
   responseFailOpen: boolean;
 }>;
-
-const VIRTUAL_KEY_SELECT = {
-  id: true,
-  name: true,
-  organizationId: true,
-  routingPolicyId: true,
-  config: true,
-  scopes: { select: { scopeType: true, scopeId: true } },
-} as const;
 
 /**
  * `VirtualKeyScopeType` and `RoutingPolicyScopeType` are separate enums with
@@ -90,26 +55,18 @@ export type VirtualKeyConfigBackfillOutcome = Readonly<{
  * by path and RAISEs on leftover content; this is that script.
  */
 export async function backfillVirtualKeyConfig({
-  database,
+  repository,
   execute,
   now = () => new Date(),
 }: {
-  database: VirtualKeyConfigBackfillDatabase;
+  repository: GatewayVirtualKeyConfigBackfillRepository;
   execute: boolean;
   now?: () => Date;
 }): Promise<VirtualKeyConfigBackfillOutcome> {
-  // The tenancy guard needs a scope predicate on every VirtualKey read, so the
-  // walk goes organization by organization rather than over the whole table.
-  const organizations = await database.organization.findMany({ select: { id: true } });
+  const organizationIds = await repository.findOrganizationIds();
   const virtualKeys: VirtualKeyRow[] = [];
-  for (const organization of organizations) {
-    virtualKeys.push(
-      ...(await database.virtualKey.findMany({
-        where: { organizationId: organization.id },
-        select: VIRTUAL_KEY_SELECT,
-        orderBy: { createdAt: "asc" },
-      })),
-    );
+  for (const organizationId of organizationIds) {
+    virtualKeys.push(...(await repository.findVirtualKeys({ organizationId })));
   }
 
   let touched = 0;
@@ -129,12 +86,12 @@ export async function backfillVirtualKeyConfig({
 
     let routingPolicyId = virtualKey.routingPolicyId;
     if ((carries.aliases || carries.rules) && !routingPolicyId) {
-      routingPolicyId = await mintRoutingPolicy({ database, execute, virtualKey, config, now });
+      routingPolicyId = await mintRoutingPolicy({ repository, execute, virtualKey, config, now });
       routingPoliciesMinted += 1;
     }
 
     const guardrails = carries.guardrails
-      ? await mintGuardrails({ database, execute, virtualKey, config })
+      ? await mintGuardrails({ repository, execute, virtualKey, config })
       : { attachments: [], minted: 0, skipped: false };
     guardrailsMinted += guardrails.minted;
     if (guardrails.skipped) skippedWithoutProjectScope += 1;
@@ -146,11 +103,10 @@ export async function backfillVirtualKeyConfig({
     if (guardrails.attachments.length > 0) next.guardrailAttachments = guardrails.attachments;
 
     if (execute) {
-      await database.virtualKey.update({
-        where: { id: virtualKey.id },
-        // `config` is a Json column and this object is assembled from one that
-        // was read back, so it is narrowed to Prisma's input JSON at the write.
-        data: { config: next as Prisma.InputJsonObject, routingPolicyId },
+      await repository.updateVirtualKeyConfig({
+        id: virtualKey.id,
+        config: next as BackfillJsonObject,
+        routingPolicyId,
       });
     }
     touched += 1;
@@ -174,13 +130,13 @@ export async function backfillVirtualKeyConfig({
  * `scope`/`scopeId` columns; the schema has neither now.
  */
 async function mintRoutingPolicy({
-  database,
+  repository,
   execute,
   virtualKey,
   config,
   now,
 }: {
-  database: VirtualKeyConfigBackfillDatabase;
+  repository: GatewayVirtualKeyConfigBackfillRepository;
   execute: boolean;
   virtualKey: VirtualKeyRow;
   config: LegacyVirtualKeyConfig;
@@ -188,24 +144,18 @@ async function mintRoutingPolicy({
 }): Promise<string> {
   const id = `rp_migr_${nanoid()}`;
   if (!execute) return id;
-  const created = await database.routingPolicy.create({
-    data: {
-      id,
-      organizationId: virtualKey.organizationId,
-      name: `${virtualKey.name}-migrated-aliases-${stamp(now())}`,
-      description: `Auto-migrated from VirtualKey ${virtualKey.id} (${virtualKey.name}).`,
-      modelProviderIds: [],
-      modelAliases: config.modelAliases,
-      policyRules: config.policyRules ?? {},
-      scopes: {
-        create: virtualKey.scopes.map((scope) => ({
-          scopeType: POLICY_SCOPE_TYPE[scope.scopeType],
-          scopeId: scope.scopeId,
-        })),
-      },
-    },
+  return repository.mintRoutingPolicy({
+    id,
+    organizationId: virtualKey.organizationId,
+    name: `${virtualKey.name}-migrated-aliases-${stamp(now())}`,
+    description: `Auto-migrated from VirtualKey ${virtualKey.id} (${virtualKey.name}).`,
+    modelAliases: config.modelAliases,
+    policyRules: config.policyRules ?? {},
+    scopes: virtualKey.scopes.map((scope) => ({
+      scopeType: POLICY_SCOPE_TYPE[scope.scopeType],
+      scopeId: scope.scopeId,
+    })),
   });
-  return created.id;
 }
 
 /**
@@ -214,12 +164,12 @@ async function mintRoutingPolicy({
  * skipped rather than guessed at.
  */
 async function mintGuardrails({
-  database,
+  repository,
   execute,
   virtualKey,
   config,
 }: {
-  database: VirtualKeyConfigBackfillDatabase;
+  repository: GatewayVirtualKeyConfigBackfillRepository;
   execute: boolean;
   virtualKey: VirtualKeyRow;
   config: LegacyVirtualKeyConfig;
@@ -250,16 +200,14 @@ async function mintGuardrails({
         guardrailIds.push(`gr_dryrun_${ref.id}`);
         continue;
       }
-      const created = await database.gatewayGuardrail.create({
-        data: {
-          projectId: projectScope.scopeId,
-          name: `${ref.evaluator}-${direction}`,
-          evaluatorId: ref.id,
-          direction: GUARDRAIL_DIRECTION[direction],
-          failureMode: failOpen ? "FAIL_OPEN" : "FAIL_CLOSED",
-        },
+      const guardrailId = await repository.mintGuardrail({
+        projectId: projectScope.scopeId,
+        name: `${ref.evaluator}-${direction}`,
+        evaluatorId: ref.id,
+        direction: GUARDRAIL_DIRECTION[direction],
+        failureMode: failOpen ? "FAIL_OPEN" : "FAIL_CLOSED",
       });
-      guardrailIds.push(created.id);
+      guardrailIds.push(guardrailId);
     }
     attachments.push({ direction, guardrailIds });
   }
@@ -267,7 +215,7 @@ async function mintGuardrails({
 }
 
 /** The Json column as an object, or nothing usable at all. */
-function objectOf(value: Prisma.JsonValue | undefined): Prisma.JsonObject {
+function objectOf(value: BackfillJsonValue | undefined): BackfillJsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
 }
 
@@ -276,7 +224,7 @@ function objectOf(value: Prisma.JsonValue | undefined): Prisma.JsonObject {
  * as absent rather than throwing: a key whose config is not what this expects
  * carries nothing to migrate, and the migration's guard agrees.
  */
-function readLegacyConfig(raw: Prisma.JsonObject): LegacyVirtualKeyConfig {
+function readLegacyConfig(raw: BackfillJsonObject): LegacyVirtualKeyConfig {
   const guardrails = objectOf(raw.guardrails);
   return {
     modelAliases: Object.fromEntries(
@@ -296,7 +244,7 @@ function readLegacyConfig(raw: Prisma.JsonObject): LegacyVirtualKeyConfig {
 }
 
 /** Only refs carrying both an evaluator id and its name are migratable. */
-function refsOf(value: Prisma.JsonValue | undefined): Array<{ id: string; evaluator: string }> {
+function refsOf(value: BackfillJsonValue | undefined): Array<{ id: string; evaluator: string }> {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
     const ref = objectOf(entry);
@@ -339,21 +287,23 @@ export class VirtualKeyConfigBackfillTask extends Task {
   readonly description =
     "Mints the routing policies and guardrails that replaced the legacy virtual-key config keys, then strips them. Dry-run unless --execute.";
 
-  private constructor(private readonly database: () => VirtualKeyConfigBackfillDatabase) {
+  private constructor(
+    private readonly repository: () => GatewayVirtualKeyConfigBackfillRepository,
+  ) {
     super();
   }
 
   static create({
-    database,
+    repository,
   }: {
-    database: () => VirtualKeyConfigBackfillDatabase;
+    repository: () => GatewayVirtualKeyConfigBackfillRepository;
   }): VirtualKeyConfigBackfillTask {
-    return new VirtualKeyConfigBackfillTask(database);
+    return new VirtualKeyConfigBackfillTask(repository);
   }
 
   async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     await backfillVirtualKeyConfig({
-      database: this.database(),
+      repository: this.repository(),
       execute: args.includes("--execute"),
     });
   }

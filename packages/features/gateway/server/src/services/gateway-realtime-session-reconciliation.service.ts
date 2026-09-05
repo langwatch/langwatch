@@ -48,7 +48,7 @@ export interface RealtimeSessionReconciliationRepository {
 }
 
 export interface ElevenLabsCredentialReader {
-  getApiCredential(input: {
+  tryGetApiCredential(input: {
     modelProviderId: string;
   }): Promise<{ apiKey: string; baseUrl: string } | null>;
 }
@@ -187,7 +187,7 @@ export class GatewayRealtimeSessionReconciliationService {
       return false;
     }
 
-    const credential = await this.credentials.getApiCredential({
+    const credential = await this.credentials.tryGetApiCredential({
       modelProviderId: session.modelProviderId,
     });
     if (!credential) {

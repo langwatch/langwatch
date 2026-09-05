@@ -13,3 +13,4 @@ export * from "./gateway.service";
 export * from "./virtual-key-config";
 export * from "./virtual-key.schemas";
 export * from "./gateway-wire-enums";
+export * from "./gateway.rows";

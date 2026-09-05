@@ -3,37 +3,13 @@ import {
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { Task } from "@langwatch/task";
+import type {
+  DuplicateSubscriptionsReportRepository,
+  SubscriptionReportRow,
+} from "../repositories/duplicate-subscriptions-report.repository";
 
 const logger = createLogger("langwatch:task:duplicate-subscriptions-report");
-
-const SUBSCRIPTION_SELECT = {
-  id: true,
-  organizationId: true,
-  plan: true,
-  status: true,
-  createdAt: true,
-  stripeSubscriptionId: true,
-} as const;
-
-/**
- * Derived from the selection rather than written out, so dropping a field from
- * {@link SUBSCRIPTION_SELECT} is a compile error here instead of an
- * `undefined` the report reads at runtime.
- */
-export type SubscriptionReportRow = Prisma.SubscriptionGetPayload<{
-  select: typeof SUBSCRIPTION_SELECT;
-}>;
-
-/**
- * Read-only, and PICKED from the real client rather than re-declared: one
- * delegate, one method, so a typed `PrismaClient` satisfies it with no cast
- * and this stays visibly a SELECT and nothing else.
- */
-export type DuplicateSubscriptionsDatabase = {
-  subscription: Pick<PrismaClient["subscription"], "findMany">;
-};
 
 export type DuplicateSubscriptionsReport = Readonly<{
   activeSubscriptions: number;
@@ -57,18 +33,12 @@ export type DuplicateSubscriptionsReport = Readonly<{
  * `report-duplicate-subscriptions.ts`; SELECT only, safe against production.
  */
 export async function reportDuplicateSubscriptions({
-  database,
+  repository,
 }: {
-  database: DuplicateSubscriptionsDatabase;
+  repository: DuplicateSubscriptionsReportRepository;
 }): Promise<DuplicateSubscriptionsReport> {
-  const active = await database.subscription.findMany({
-    where: { status: SubscriptionStatus.ACTIVE },
-    select: SUBSCRIPTION_SELECT,
-  });
-  const pending = await database.subscription.findMany({
-    where: { status: SubscriptionStatus.PENDING },
-    select: SUBSCRIPTION_SELECT,
-  });
+  const active = await repository.findByStatus(SubscriptionStatus.ACTIVE);
+  const pending = await repository.findByStatus(SubscriptionStatus.PENDING);
 
   const byOrganization = groupByOrganization(active);
   const duplicates = [...byOrganization.entries()]
@@ -126,20 +96,22 @@ export class DuplicateSubscriptionsReportTask extends Task {
   readonly description =
     "Reports organizations holding more than one active subscription, and which row plan resolution picks.";
 
-  private constructor(private readonly database: () => DuplicateSubscriptionsDatabase) {
+  private constructor(
+    private readonly repository: () => DuplicateSubscriptionsReportRepository,
+  ) {
     super();
   }
 
   static create({
-    database,
+    repository,
   }: {
-    database: () => DuplicateSubscriptionsDatabase;
+    repository: () => DuplicateSubscriptionsReportRepository;
   }): DuplicateSubscriptionsReportTask {
-    return new DuplicateSubscriptionsReportTask(database);
+    return new DuplicateSubscriptionsReportTask(repository);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    const report = await reportDuplicateSubscriptions({ database: this.database() });
+    const report = await reportDuplicateSubscriptions({ repository: this.repository() });
     logger.info({ report }, "duplicate subscription report");
   }
 }

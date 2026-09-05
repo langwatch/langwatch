@@ -80,7 +80,7 @@ export class BillingSubscriptionService {
     );
   }
 
-  async getLastNonCancelledSubscription(
+  async tryGetLastNonCancelledSubscription(
     organizationId: string,
   ): Promise<BillingSubscriptionRecord | null> {
     return this.repository.tryFindLastNonCancelled(organizationId);

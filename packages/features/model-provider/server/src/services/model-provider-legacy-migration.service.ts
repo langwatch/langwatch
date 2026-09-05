@@ -177,7 +177,7 @@ export class ModelProviderLegacyMigrationService {
    * The ciphertext one row's `customKeys` becomes, or `null` when the row needs
    * no update — already encrypted, or holding nothing.
    */
-  migrateModelProviderKeysRow({
+  tryMigrateModelProviderKeysRow({
     row,
     cipher,
   }: {

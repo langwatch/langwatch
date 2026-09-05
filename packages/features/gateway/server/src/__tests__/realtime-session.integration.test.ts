@@ -458,7 +458,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
       }),
     ).toBe(true);
 
-    const matched = await realtimeSessions.matchRealtimeSession({
+    const matched = await realtimeSessions.tryMatchRealtimeSession({
       vendor: "elevenlabs",
       organizationId: ORG_ID,
       modelProviderId: PROVIDER_ID,
@@ -473,7 +473,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
     const sessionId = `e-${nanoid(6)}`;
     await realtimeSessions.reserveRealtimeSession(reservation(vk, sessionId));
 
-    const matched = await realtimeSessions.matchRealtimeSession({
+    const matched = await realtimeSessions.tryMatchRealtimeSession({
       vendor: "elevenlabs",
       organizationId: ORG_ID,
       modelProviderId: PROVIDER_ID,
@@ -491,7 +491,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
 
     // Charging a call to the wrong session is a wrong bill that looks right.
     // An unmatched call settles visibly as cost unknown instead.
-    const matched = await realtimeSessions.matchRealtimeSession({
+    const matched = await realtimeSessions.tryMatchRealtimeSession({
       vendor: "elevenlabs",
       organizationId: ORG_ID,
       modelProviderId: PROVIDER_ID,
@@ -514,7 +514,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
 
     // A conversation id is the vendor's, not ours, so the lookup is scoped to
     // the organization that owns the credential the delivery was signed for.
-    const matched = await realtimeSessions.matchRealtimeSession({
+    const matched = await realtimeSessions.tryMatchRealtimeSession({
       vendor: "elevenlabs",
       organizationId: `${ORG_ID}-other`,
       modelProviderId: PROVIDER_ID,

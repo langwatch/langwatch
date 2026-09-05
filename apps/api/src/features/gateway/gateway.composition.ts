@@ -12,7 +12,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import {
   composeApiGateway,
   type ApiGatewayClickHousePort,

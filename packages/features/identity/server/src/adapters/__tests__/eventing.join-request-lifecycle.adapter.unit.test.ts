@@ -17,8 +17,8 @@ function compose(input: { facts?: JoinRequestFact[]; request?: { userId: string 
     order.push("expireJoin");
     return input.facts ?? ([{ type: "lw.identity.join_expired" }] as unknown as JoinRequestFact[]);
   });
-  const findRequest = vi.fn(async () => {
-    order.push("findRequest");
+  const tryFindRequest = vi.fn(async () => {
+    order.push("tryFindRequest");
     return input.request === undefined ? { userId: REQUESTER } : input.request;
   });
   const requestStillWaiting = vi.fn(async () => void 0);
@@ -26,13 +26,13 @@ function compose(input: { facts?: JoinRequestFact[]; request?: { userId: string 
 
   const adapter = EventingJoinRequestLifecycleAdapter.create({
     requests: { expireJoin } as unknown as JoinRequestService,
-    reads: { findRequest } as never,
+    reads: { tryFindRequest } as never,
     notifications: {
       requestStillWaiting,
       requestExpired,
     } as unknown as JoinRequestNotificationService,
   });
-  return { adapter, expireJoin, findRequest, requestStillWaiting, requestExpired, order };
+  return { adapter, expireJoin, tryFindRequest, requestStillWaiting, requestExpired, order };
 }
 
 describe("given a composed join-request pipeline", () => {
@@ -89,7 +89,7 @@ describe("given a composed join-request pipeline", () => {
       // The fold that follows the command is the only thing that changes here,
       // so reading first keeps "who do we tell" independent of when the
       // projection catches up.
-      expect(order).toEqual(["findRequest", "expireJoin"]);
+      expect(order).toEqual(["tryFindRequest", "expireJoin"]);
     });
 
     /** @scenario "The expiry wake dispatches a command rather than writing the row" */

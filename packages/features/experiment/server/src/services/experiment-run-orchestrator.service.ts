@@ -145,7 +145,7 @@ export type { ComparisonSkipReason } from "../processes/experiment-comparison-sk
 const sandboxKey = ExperimentRunSandboxKeyService.create();
 
 /** Mints the run's sandbox credential, when a target executes code. Delegates to {@link ExperimentRunSandboxKeyService}. */
-async function mintRunSandboxApiKey({
+async function tryMintRunSandboxApiKey({
   sandboxCredentials,
   projectId,
   loadedAgents,
@@ -156,7 +156,7 @@ async function mintRunSandboxApiKey({
   loadedAgents: Map<string, TypedAgent>;
   loadedWorkflows?: Map<string, LoadedWorkflow>;
 }): Promise<string | undefined> {
-  return sandboxKey.mintRunSandboxApiKey({
+  return sandboxKey.tryMintRunSandboxApiKey({
     sandboxCredentials,
     projectId,
     loadedAgents,
@@ -321,7 +321,7 @@ export class ExperimentRunOrchestratorService {
    * entry does not need one: it was already produced this run, its key does not parse to a row/target pair, its row
    * is outside this run's scope, the row no longer exists, or the seeded output itself is absent.
    */
-  static buildSeededTargetResultEvent(
+  static tryBuildSeededTargetResultEvent(
     key: string,
     seeded: SeededTargetOutput,
     options: {
@@ -345,12 +345,15 @@ export class ExperimentRunOrchestratorService {
     if (!Number.isInteger(rowIndex)) {
       return null;
     }
+
     if (!rowsThisRunOwns.has(rowIndex)) {
       return null;
     }
+
     if (!datasetRows[rowIndex]) {
       return null;
     }
+
     if (seeded.output === null || seeded.output === undefined) {
       return null;
     }
@@ -653,7 +656,7 @@ export class ExperimentRunOrchestratorService {
     // One agent cache credential for this whole run, minted only when a target
     // actually runs Python. Undefined when nothing does, or when the mint
     // failed, and the engine then injects nothing.
-    const sandboxApiKey = await mintRunSandboxApiKey({
+    const sandboxApiKey = await tryMintRunSandboxApiKey({
       sandboxCredentials: ports.sandboxCredentials,
       projectId,
       loadedAgents,
@@ -952,7 +955,7 @@ export class ExperimentRunOrchestratorService {
             );
             const backfillEvents = Object.entries(seedTargetOutputs)
               .map(([key, seeded]) =>
-                ExperimentRunOrchestratorService.buildSeededTargetResultEvent(key, seeded, {
+                ExperimentRunOrchestratorService.tryBuildSeededTargetResultEvent(key, seeded, {
                   storage,
                   rowsThisRunOwns,
                   datasetRows,

@@ -59,7 +59,7 @@ class ApiOpsExplainClientResolver extends OpsExplainClientResolver {
     super();
   }
 
-  resolve(): OpsExplainClientResolution | null {
+  tryResolve(): OpsExplainClientResolution | null {
     const client = this.runtime.resolveClient();
     return client ? { client, usingFallback: false } : null;
   }

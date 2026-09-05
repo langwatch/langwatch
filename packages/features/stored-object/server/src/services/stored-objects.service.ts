@@ -135,7 +135,7 @@ export class StoredObjectsService {
         // it's already known here — no extra computation. 2. The stored_objects table's `ORDER BY
         // (project_id, id)` makes this a primary-key seek with partition pruning; a sha256 lookup
         // would scan every weekly partition incl. cold S3 because sha256 is not in the sort key.
-        const existing = await this.repository.findById({ projectId, id });
+        const existing = await this.repository.tryFindById({ projectId, id });
         if (existing) {
           this.telemetry.recordDedupHit(purpose);
           span.setAttribute("stored_object.dedup_hit", true);
@@ -230,7 +230,7 @@ export class StoredObjectsService {
     | { status: "missing"; mediaType: string }
     | { status: "not_found" }
   > {
-    const row = await this.repository.findById({ projectId, id });
+    const row = await this.repository.tryFindById({ projectId, id });
     if (!row) {
       return { status: "not_found" };
     }
@@ -245,7 +245,7 @@ export class StoredObjectsService {
   /**
    * Retrieves a stored object row and a readable stream of its bytes.
    */
-  async getById({
+  async tryGetById({
     projectId,
     id,
   }: {
@@ -255,7 +255,7 @@ export class StoredObjectsService {
     { row: StoredObject; stream: Readable } | { row: StoredObject; status: "missing" } | null
   > {
     return tracer.withActiveSpan(
-      "StoredObjectsService.getById",
+      "StoredObjectsService.tryGetById",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -264,7 +264,7 @@ export class StoredObjectsService {
         },
       },
       async (span) => {
-        const row = await this.repository.findById({ projectId, id });
+        const row = await this.repository.tryFindById({ projectId, id });
 
         span.setAttribute("result.found", row !== null);
 

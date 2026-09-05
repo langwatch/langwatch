@@ -97,7 +97,7 @@ export interface TracesRestReadPort {
       projection?: CompiledProjection["plan"];
     }>,
   ): Promise<TracesForProjectResult>;
-  getById(
+  tryGetById(
     projectId: string,
     traceId: string,
     protections: unknown,
@@ -455,7 +455,7 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
 
         let trace: Trace | undefined;
         try {
-          trace = await ports.traces().getById(project.id, traceId, protections);
+          trace = await ports.traces().tryGetById(project.id, traceId, protections);
         } catch (err) {
           if (err instanceof AmbiguousTraceIdPrefixError) {
             return c.json(
@@ -611,7 +611,7 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
 
       let trace: Trace | undefined;
       try {
-        trace = await traceService.getById(project.id, traceId, protections, {
+        trace = await traceService.tryGetById(project.id, traceId, protections, {
           full: true,
         });
       } catch (err) {

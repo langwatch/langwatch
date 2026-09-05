@@ -2,7 +2,6 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnnotationService } from "@langwatch/annotation-contract";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { NormalizedSpan, TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
   TraceLegacyReadClickHouseRepository,
@@ -52,7 +51,6 @@ class OffloadedSpanResolver {
 }
 
 export interface ClickHouseTraceLegacyReadOptions {
-  prisma: PrismaClient;
   traceCanonicalisation: TraceCanonicalisationService;
   /** The process's tenant-keyed connection; absent, every read refuses. */
   resolveClickHouseClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
@@ -72,7 +70,6 @@ export class ClickHouseTraceLegacyReadAdapter {
         : undefined;
 
     return new TraceLegacyReadClickHouseRepository({
-      prisma: options.prisma,
       resolveClickHouseClient: options.resolveClickHouseClient,
       filterConditions: options.filterConditions,
       resolveTraceSpans: offloadedSpanResolver?.toResolverFn(),

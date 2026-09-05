@@ -50,7 +50,7 @@ describe("TraceIOExtractionService", () => {
         },
       });
 
-      const result = service.extractRichIOFromSpan(span, "output");
+      const result = service.tryExtractRichIOFromSpan(span, "output");
 
       expect(result).toEqual({
         raw: messages,
@@ -60,7 +60,7 @@ describe("TraceIOExtractionService", () => {
     });
   });
 
-  describe("extractRichIOFromSpan", () => {
+  describe("tryExtractRichIOFromSpan", () => {
     describe("when langwatch.input is a JSON object with 'input' key", () => {
       it("extracts the text from the input key", () => {
         const span = createTestSpan({
@@ -69,7 +69,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("🐥");
@@ -85,7 +85,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("What is 2+2?");
@@ -100,7 +100,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("search term");
@@ -115,7 +115,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "output");
+        const result = service.tryExtractRichIOFromSpan(span, "output");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("The answer is 4");
@@ -130,7 +130,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("42");
@@ -145,7 +145,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("hello world");
@@ -160,7 +160,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("nested hello");
@@ -169,9 +169,9 @@ describe("TraceIOExtractionService", () => {
 
     describe("when langwatch.input is a JSON object with no recognized keys", () => {
       it("returns null from the semantic path — fallback happens in callers", () => {
-        // This is the key invariant: `extractRichIOFromSpan` must NOT return a
+        // This is the key invariant: `tryExtractRichIOFromSpan` must NOT return a
         // non-null result for pure-fallback cases. Otherwise ranking logic
-        // (`extractLastOutput`, `accumulateIO`) would treat a random
+        // (`tryExtractLastOutput`, `accumulateIO`) would treat a random
         // `{foo:"bar"}` span as equivalent to a span with a real `content`
         // match and let the former shadow the latter.
         const span = createTestSpan({
@@ -180,17 +180,17 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        expect(service.extractRichIOFromSpan(span, "input")).toBeNull();
+        expect(service.tryExtractRichIOFromSpan(span, "input")).toBeNull();
       });
 
-      it("extractFallbackIOFromSpan returns a stringified representation", () => {
+      it("tryExtractFallbackIOFromSpan returns a stringified representation", () => {
         const span = createTestSpan({
           spanAttributes: {
             "langwatch.input": { foo: "bar", baz: 123 },
           },
         });
 
-        const fb = service.extractFallbackIOFromSpan(span, "input");
+        const fb = service.tryExtractFallbackIOFromSpan(span, "input");
 
         expect(fb).not.toBeNull();
         expect(fb!.source).toBe("langwatch");
@@ -198,14 +198,14 @@ describe("TraceIOExtractionService", () => {
         expect(JSON.parse(fb!.text)).toEqual({ foo: "bar", baz: 123 });
       });
 
-      it("extractFirstInput falls back to stringified payload when no semantic match exists", () => {
+      it("tryExtractFirstInput falls back to stringified payload when no semantic match exists", () => {
         const span = createTestSpan({
           spanAttributes: {
             "langwatch.input": { foo: "bar", baz: 123 },
           },
         });
 
-        const result = service.extractFirstInput([span]);
+        const result = service.tryExtractFirstInput([span]);
 
         expect(result).not.toBeNull();
         expect(JSON.parse(result!.text)).toEqual({ foo: "bar", baz: 123 });
@@ -213,7 +213,7 @@ describe("TraceIOExtractionService", () => {
     });
 
     describe("ranking: fallback must never shadow a semantic match on another span", () => {
-      it("extractLastOutput prefers the span with a semantic content match even when another span is fallback-only", () => {
+      it("tryExtractLastOutput prefers the span with a semantic content match even when another span is fallback-only", () => {
         // Span A has real content. Span B has an unrecognized shape. Without
         // the semantic/fallback split, B could shadow A by finishing later.
         const spanA = createTestSpan({
@@ -233,7 +233,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractLastOutput([spanA, spanB]);
+        const result = service.tryExtractLastOutput([spanA, spanB]);
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("the real answer");
@@ -250,7 +250,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "output");
+        const result = service.tryExtractRichIOFromSpan(span, "output");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("COMPANY_ANALYSIS");
@@ -265,7 +265,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("message content");
@@ -280,7 +280,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("Tell me about AI");
@@ -303,7 +303,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe(
@@ -321,7 +321,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("{not really json");
@@ -340,7 +340,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "output");
+        const result = service.tryExtractRichIOFromSpan(span, "output");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("The answer is 42");
@@ -357,7 +357,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "output");
+        const result = service.tryExtractRichIOFromSpan(span, "output");
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("found at depth 4");
@@ -365,7 +365,7 @@ describe("TraceIOExtractionService", () => {
     });
 
     describe("when langwatch.output is a wrapper whose value is a non-empty primitive", () => {
-      it("semantic path returns null; extractLastOutput falls back to stringified", () => {
+      it("semantic path returns null; tryExtractLastOutput falls back to stringified", () => {
         const span = createTestSpan({
           spanAttributes: {
             "langwatch.output": { customWrapper: "the actual answer" },
@@ -373,10 +373,10 @@ describe("TraceIOExtractionService", () => {
         });
 
         // Heuristic can't extract — we don't know which key holds the answer.
-        expect(service.extractRichIOFromSpan(span, "output")).toBeNull();
+        expect(service.tryExtractRichIOFromSpan(span, "output")).toBeNull();
 
         // But the caller still gets a stringified fallback rather than null.
-        const lastOutput = service.extractLastOutput([span]);
+        const lastOutput = service.tryExtractLastOutput([span]);
         expect(lastOutput).not.toBeNull();
         expect(lastOutput!.text).toBe('{"customWrapper":"the actual answer"}');
       });
@@ -393,8 +393,8 @@ describe("TraceIOExtractionService", () => {
         });
 
         // Should not throw — the try/catch around JSON.stringify handles it.
-        expect(service.extractRichIOFromSpan(span, "output")).toBeNull();
-        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
+        expect(service.tryExtractRichIOFromSpan(span, "output")).toBeNull();
+        expect(service.tryExtractFallbackIOFromSpan(span, "output")).toBeNull();
       });
     });
 
@@ -406,8 +406,8 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        expect(service.extractRichIOFromSpan(span, "output")).toBeNull();
-        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
+        expect(service.tryExtractRichIOFromSpan(span, "output")).toBeNull();
+        expect(service.tryExtractFallbackIOFromSpan(span, "output")).toBeNull();
       });
 
       it("returns null for an empty array", () => {
@@ -417,8 +417,8 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        expect(service.extractRichIOFromSpan(span, "output")).toBeNull();
-        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
+        expect(service.tryExtractRichIOFromSpan(span, "output")).toBeNull();
+        expect(service.tryExtractFallbackIOFromSpan(span, "output")).toBeNull();
       });
     });
 
@@ -430,7 +430,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
+        expect(service.tryExtractFallbackIOFromSpan(span, "output")).toBeNull();
       });
 
       it("returns null for { result: [] }", () => {
@@ -440,7 +440,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
+        expect(service.tryExtractFallbackIOFromSpan(span, "output")).toBeNull();
       });
 
       it("returns null for deeply nested empty leaves like { a: { b: '' } }", () => {
@@ -450,7 +450,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
+        expect(service.tryExtractFallbackIOFromSpan(span, "output")).toBeNull();
       });
 
       it("still surfaces a wrapper that has at least one meaningful leaf", () => {
@@ -460,7 +460,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const fb = service.extractFallbackIOFromSpan(span, "output");
+        const fb = service.tryExtractFallbackIOFromSpan(span, "output");
         expect(fb).not.toBeNull();
         expect(fb!.text).toBe('{"data":{"nested":"real"}}');
       });
@@ -491,7 +491,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         const messages = result!.raw as Array<{
@@ -523,7 +523,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         const messages = result!.raw as Array<{
@@ -557,7 +557,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         const messages = result!.raw as Array<{
@@ -591,7 +591,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         const messages = result!.raw as Array<{
@@ -623,7 +623,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         const messages = result!.raw as Array<{
@@ -657,7 +657,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         const messages = result!.raw as Array<{
@@ -690,7 +690,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         const messages = result!.raw as Array<{
@@ -724,7 +724,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         const messages = result!.raw as Array<{
@@ -760,7 +760,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         const messages = result!.raw as Array<{
@@ -788,7 +788,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         expect(result!.raw).toBe("hey, can you help me with my order?");
@@ -803,7 +803,7 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
         // Wrapper-key extraction still works.
@@ -830,7 +830,7 @@ describe("TraceIOExtractionService", () => {
       { role: "user", content: [{ type: "input_text", text: "hi" }] },
     ]);
     // Exactly what ingest stores inline after leanForProjection (ADR-022).
-    const leanedInput = TraceProjectionLeanService.structuredIoPreview(
+    const leanedInput = TraceProjectionLeanService.tryStructuredIoPreview(
       fullInput,
       IO_PREVIEW_BYTES,
     )!;
@@ -858,14 +858,14 @@ describe("TraceIOExtractionService", () => {
 
     describe("when extracting the trace input", () => {
       it("extracts the latest user message text, not the raw JSON", () => {
-        const input = service.extractFirstInput(makeTurnSpans());
+        const input = service.tryExtractFirstInput(makeTurnSpans());
 
         expect(input).not.toBeNull();
         expect(input!.text).toBe("hi");
       });
 
       it("keeps parsed messages (developer role intact) as the raw value for the message views", () => {
-        const input = service.extractFirstInput(makeTurnSpans());
+        const input = service.tryExtractFirstInput(makeTurnSpans());
 
         const messages = input!.raw as Array<{ role: string }>;
         expect(Array.isArray(messages)).toBe(true);
@@ -876,7 +876,7 @@ describe("TraceIOExtractionService", () => {
 
     describe("when extracting the trace output", () => {
       it("extracts the assistant reply text", () => {
-        const output = service.extractLastOutput(makeTurnSpans());
+        const output = service.tryExtractLastOutput(makeTurnSpans());
 
         expect(output).not.toBeNull();
         expect(output!.text).toBe("Langy, the LangWatch agent. Hi!");

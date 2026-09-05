@@ -33,7 +33,7 @@ class FakeRedis extends OpsSnapshotRedisPort {
     return "OK";
   }
 
-  async get(key: string): Promise<string | null> {
+  async tryGet(key: string): Promise<string | null> {
     return this.store.get(key) ?? null;
   }
 
@@ -224,7 +224,7 @@ describe("RedisOpsSnapshotRepository", () => {
         await lapsed.releaseLease();
 
         expect(renewAttempt.isHeld).toBe(false);
-        expect(await redis.get(SNAPSHOT_LEASE_KEY)).toBe(held.token);
+        expect(await redis.tryGet(SNAPSHOT_LEASE_KEY)).toBe(held.token);
       });
     });
   });

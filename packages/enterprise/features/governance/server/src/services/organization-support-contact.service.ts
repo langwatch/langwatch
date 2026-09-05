@@ -4,8 +4,8 @@
  * "Contact your admin", resolved for one organization.
  *
  * Two readings of the same question, kept apart because their answers are not
- * interchangeable: `resolveSupportContact` may return free text or a URL and is
- * for DISPLAY, `resolveOrgAdminEmail` is strictly an address and is what a
+ * interchangeable: `tryResolveSupportContact` may return free text or a URL and is
+ * for DISPLAY, `tryResolveOrgAdminEmail` is strictly an address and is what a
  * budget-increase request is actually sent to.
  *
  * They live beside the governance CLI family because that family is what asks:
@@ -40,7 +40,7 @@ export class OrganizationSupportContactService {
    * Nothing when the organization has no admin membership, or when every admin
    * membership is orphaned.
    */
-  async resolveOrgAdminEmail({
+  async tryResolveOrgAdminEmail({
     organizationId,
   }: {
     organizationId: string;
@@ -74,17 +74,17 @@ export class OrganizationSupportContactService {
    * no contact to surface, and inventing one would send a blocked person
    * nowhere.
    */
-  async resolveSupportContact({
+  async tryResolveSupportContact({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<string | null> {
-    const configured = await this.repository.findConfiguredSupportContact({ organizationId });
+    const configured = await this.repository.tryFindConfiguredSupportContact({ organizationId });
     const trimmed = configured?.trim();
     if (trimmed) {
       return trimmed;
     }
 
-    return this.resolveOrgAdminEmail({ organizationId });
+    return this.tryResolveOrgAdminEmail({ organizationId });
   }
 }

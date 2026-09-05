@@ -19,7 +19,7 @@ export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStorePort 
     super();
   }
 
-  async findVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null> {
+  async tryFindVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null> {
     const found = await this.database.virtualKey.findUnique({
       where: { id: virtualKeyId },
       include: {
@@ -37,11 +37,11 @@ export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStorePort 
     return (found as VirtualKeyWithScopes | null) ?? null;
   }
 
-  findBudget(budgetId: string) {
+  tryFindBudget(budgetId: string) {
     return this.database.gatewayBudget.findUnique({ where: { id: budgetId } });
   }
 
-  findBucketBoundary(input: { budgetId: string; bucketScopeId: string }) {
+  tryFindBucketBoundary(input: { budgetId: string; bucketScopeId: string }) {
     return this.database.gatewayBudgetBucketBoundary.findUnique({
       where: {
         budgetId_bucketScopeId: {

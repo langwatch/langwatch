@@ -53,7 +53,7 @@ import {
 } from "@langwatch/api-key-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { AuthDirectoryPort } from "../../ports/auth-directory.port";
 import type { Context } from "hono";
 import { z } from "zod";
 
@@ -100,7 +100,7 @@ export type AuthCliDeviceFlowRestPorts = Readonly<{
    * admin can disable a seat between approve and exchange, and every branch
    * below hands out a credential the owner ceiling never reaches.
    */
-  database: () => PrismaClient;
+  directory: () => AuthDirectoryPort;
   /** The person a browser cookie names, for the three approval-page routes. */
   session: CliBrowserSessionPort;
   /**
@@ -428,15 +428,9 @@ export function createAuthCliDeviceFlowRestApp(options: {
       );
     }
 
-    const prisma = ports.database();
-    const user = await prisma.user.findUnique({
-      where: { id: record.user_id },
-      select: { id: true, email: true, name: true },
-    });
-    const organization = await prisma.organization.findUnique({
-      where: { id: record.organization_id },
-      select: { id: true, name: true, slug: true },
-    });
+    const directory = ports.directory();
+    const user = await directory.tryFindPerson(record.user_id);
+    const organization = await directory.tryFindOrganization(record.organization_id);
     if (!user || !organization) {
       logger.error(
         `[auth-cli] approved device_code refers to missing user (${record.user_id}) or org (${record.organization_id})`,
@@ -453,9 +447,9 @@ export function createAuthCliDeviceFlowRestApp(options: {
     // device code is consumed and the answer is the same fatal 410 the mint
     // below already gives a removed member, so the CLI stops polling for a
     // session it will never get.
-    const activeMembership = await prisma.organizationUser.findFirst({
-      where: { userId: user.id, organizationId: organization.id, disabledAt: null },
-      select: { userId: true },
+    const activeMembership = await ports.directory().hasActiveMembership({
+      userId: user.id,
+      organizationId: organization.id,
     });
     if (!activeMembership) {
       await ports.sessions.consumeDeviceCode({ record, alsoPollWindow: true });
@@ -665,13 +659,8 @@ export function createAuthCliDeviceFlowRestApp(options: {
     // `client_info.session_started_at` (set at exchange and preserved across
     // rotations), falling back to the record's issue time for sessions started
     // before device metadata was captured.
-    const prisma = ports.database();
     const sessionAnchorMs = record.client_info?.session_started_at ?? record.issued_at;
-    const org = await prisma.organization.findUnique({
-      where: { id: record.organization_id },
-      select: { maxSessionDurationDays: true },
-    });
-    const maxDurationDays = org?.maxSessionDurationDays ?? 0;
+    const maxDurationDays = await ports.directory().maxSessionDurationDays(record.organization_id);
     if (maxDurationDays > 0) {
       const sessionAgeMs = Date.now() - sessionAnchorMs;
       if (sessionAgeMs > maxDurationDays * 24 * 60 * 60 * 1000) {
@@ -702,13 +691,9 @@ export function createAuthCliDeviceFlowRestApp(options: {
     // the access token already in hand until it expires — one hour, the same
     // window a removed member has; this is what stops that window from rolling
     // forward for a quarter.
-    const activeMembership = await prisma.organizationUser.findFirst({
-      where: {
-        userId: record.user_id,
-        organizationId: record.organization_id,
-        disabledAt: null,
-      },
-      select: { userId: true },
+    const activeMembership = await ports.directory().hasActiveMembership({
+      userId: record.user_id,
+      organizationId: record.organization_id,
     });
     if (!activeMembership) {
       await ports.sessions.dropRefreshToken(refresh_token);
@@ -817,15 +802,14 @@ export function createAuthCliDeviceFlowRestApp(options: {
     }
     const { user_code, organization_id, project_id } = parsed.data;
 
-    const prisma = ports.database();
     // Verify the caller is an ACTIVE member of the organization they are
     // issuing a credential for: a membership an admin disabled to reclaim its
     // seat must not approve a device and hand out a key it could not use.
-    const membership = await prisma.organizationUser.findFirst({
-      where: { userId: person.id, organizationId: organization_id, disabledAt: null },
-      select: { userId: true },
+    const isMember = await ports.directory().hasActiveMembership({
+      userId: person.id,
+      organizationId: organization_id,
     });
-    if (!membership) {
+    if (!isMember) {
       return c.json(
         {
           error: "forbidden",
@@ -870,20 +854,9 @@ export function createAuthCliDeviceFlowRestApp(options: {
       // write-permission check below is, and it inspects project-, team- and
       // org-scoped bindings. The org-scoping predicate here plus that check
       // together stop a spoofed `project_id` from leaking another org's key.
-      const project = await prisma.project.findFirst({
-        where: {
-          id: project_id,
-          archivedAt: null,
-          team: { organizationId: organization_id },
-        },
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-          apiKey: true,
-          isPersonal: true,
-          ownerUserId: true,
-        },
+      const project = await ports.directory().tryFindLiveProject({
+        projectId: project_id,
+        organizationId: organization_id,
       });
       if (!project) {
         return c.json(

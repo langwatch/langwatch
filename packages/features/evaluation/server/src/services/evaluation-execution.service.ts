@@ -124,7 +124,7 @@ export class EvaluationExecutionService {
    * needs both pieces (32-hex trace_id + 16-hex root span_id) so its emitted spans land as
    * children of the parent trace in Studio's waterfall rather than as a separate orphan trace.
    */
-  static extractParentTraceForNlpgo(
+  static tryExtractParentTraceForNlpgo(
     trace: Trace | undefined,
   ): { traceId: string; parentSpanId: string } | undefined {
     if (!trace?.trace_id || !TRACE_ID_HEX.test(trace.trace_id)) {
@@ -445,7 +445,7 @@ export class EvaluationExecutionService {
     // An evaluator this install skipped is not a broken one. Say which it is,
     // and how to get it, rather than letting the request reach an evaluator
     // service with no route for it and come back as a bare 404.
-    const unavailable = EvaluatorAvailabilityService.evaluatorUnavailability({
+    const unavailable = EvaluatorAvailabilityService.tryEvaluatorUnavailability({
       evaluatorType,
       environment: this.deps.installEnvironment,
     });
@@ -581,7 +581,7 @@ export class EvaluationExecutionService {
           data: data.data,
           traceId: trace?.trace_id,
           parentCausalityDepth,
-          parentTrace: EvaluationExecutionService.extractParentTraceForNlpgo(trace),
+          parentTrace: EvaluationExecutionService.tryExtractParentTraceForNlpgo(trace),
         });
       }
 
@@ -676,7 +676,7 @@ export class EvaluationExecutionService {
     // trace's root span so Studio's waterfall renders them as a child
     // sub-tree (not a separate orphan trace, which is the 2026-05-14
     // bug rchaves caught in prod).
-    const parentTrace = EvaluationExecutionService.extractParentTraceForNlpgo(trace);
+    const parentTrace = EvaluationExecutionService.tryExtractParentTraceForNlpgo(trace);
 
     const response = await this.deps.workflowExecutor.runEvaluationWorkflow(
       resolvedWorkflowId,

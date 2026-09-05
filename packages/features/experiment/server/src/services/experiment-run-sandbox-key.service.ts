@@ -43,7 +43,7 @@ export class ExperimentRunSandboxKeyService {
    * The credential every code node of this run authenticates with, or
    * undefined. A run that cannot get one still runs.
    */
-  async mintRunSandboxApiKey({
+  async tryMintRunSandboxApiKey({
     sandboxCredentials,
     projectId,
     loadedAgents,

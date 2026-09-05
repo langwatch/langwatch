@@ -9,7 +9,7 @@ export class MemoryExperimentIdLookupRepository extends ExperimentIdLookupReposi
   // Parameter declared though unused: a caller holding this type still passes
   // it, and a zero-arity signature makes that a type error even though it
   // satisfies the interface.
-  async findExperimentId(_input: { tenantId: string; runId: string }): Promise<string | null> {
+  async tryFindExperimentId(_input: { tenantId: string; runId: string }): Promise<string | null> {
     return null;
   }
 }

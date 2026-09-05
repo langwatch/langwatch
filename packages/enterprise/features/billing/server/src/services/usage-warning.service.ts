@@ -57,7 +57,7 @@ export class UsageWarningService {
   /**
    * Sends a usage-limit warning email if one is due, and records that it went.
    */
-  async checkAndSendWarning(data: UsageLimitData): Promise<Notification | null> {
+  async tryCheckAndSendWarning(data: UsageLimitData): Promise<Notification | null> {
     const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } = data;
 
     const usagePercentage =
@@ -293,7 +293,7 @@ export class UsageWarningService {
   }
 
   // -------------------------------------------------------------------------
-  // Private helpers for checkAndSendWarning
+  // Private helpers for tryCheckAndSendWarning
   // -------------------------------------------------------------------------
 
   /**

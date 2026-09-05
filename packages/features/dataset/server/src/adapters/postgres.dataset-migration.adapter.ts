@@ -31,13 +31,9 @@ export type DatasetMigrationRunResult =
   | { status: "schema-pending" };
 
 /**
- * Process adapter for the one-off Postgres-to-object-storage migration.
- *
- * Takes the process's own typed client. The structural port that used to stand
- * here promised more than Prisma delivers — `aggregate` returns a shape derived
- * from the arguments it was called with, so no hand-written delegate can state
- * its return type — and the promise was only kept because the composition root
- * never had to prove it.
+ * Process adapter for the one-off Postgres-to-object-storage migration. Takes
+ * the process's own typed client, since Prisma's `aggregate` return type is
+ * derived from its call arguments and no hand-written delegate can state it.
  */
 export class PostgresDatasetMigrationAdapter {
   static create(options: {

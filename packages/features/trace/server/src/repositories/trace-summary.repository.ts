@@ -23,7 +23,7 @@ export abstract class TraceSummaryRepository {
       retentionDays?: number;
     }>,
   ): Promise<void>;
-  abstract findByTraceId(
+  abstract tryFindByTraceId(
     trace: { tenantId: string; traceId: string },
     options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null>;
@@ -32,7 +32,7 @@ export abstract class TraceSummaryRepository {
 export class NullTraceSummaryRepository implements TraceSummaryRepository {
   async upsert(_data: TraceSummaryData, _tenantId: string): Promise<void> {}
 
-  async findByTraceId(
+  async tryFindByTraceId(
     _trace: { tenantId: string; traceId: string },
     _options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {

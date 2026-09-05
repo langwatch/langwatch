@@ -163,11 +163,11 @@ export class ClickHouseExperimentRunStateRepository<
     };
   }
 
-  async getProjection(
+  async tryGetProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null> {
-    EventUtils.validateTenantId(context, "ClickHouseExperimentRunStateRepository.getProjection");
+    EventUtils.validateTenantId(context, "ClickHouseExperimentRunStateRepository.tryGetProjection");
 
     // aggregateId is the composite key (experimentId:runId) — parse to raw values
     const { experimentId, runId } = parseExperimentRunKey(String(aggregateId));
@@ -238,7 +238,7 @@ export class ClickHouseExperimentRunStateRepository<
         "Failed to get projection from ClickHouse",
       );
       throw new StoreError(
-        "getProjection",
+        "tryGetProjection",
         "ClickHouseExperimentRunStateRepository",
         `Failed to get projection for run ${runId}: ${errorMessage}`,
         classifyClickHouseError(error),

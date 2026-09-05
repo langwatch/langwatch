@@ -9,7 +9,7 @@ import type {
   AuthzPermission,
   TeamUserRole,
 } from "@langwatch/authz-contract";
-import { type Organization, type OrganizationInvite } from "@langwatch/prisma-client/generated";
+import { type Organization, type OrganizationInvite } from "@langwatch/organization-contract";
 import {
   organizationApiAcceptInviteInputSchema,
   organizationApiAuditLogsInputSchema,
@@ -313,7 +313,7 @@ export type OrganizationTrpcPorts<TSignUpDataSchema extends z.ZodTypeAny = z.Zod
         viaIdentifierId?: string | null;
       }>,
     ): Promise<void>;
-    findLandingProjectSlug(
+    tryFindLandingProjectSlug(
       ctx: OrganizationTrpcContext,
       input: Readonly<{ invite: InviteWithOrganization }>,
     ): Promise<string | null>;
@@ -466,14 +466,12 @@ export class OrganizationTrpcApi {
               path: ["customRoleId"],
             });
           }
-        } else {
-          if (data.customRoleId !== undefined) {
-            issues.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: "customRoleId must not be provided when using a built-in role",
-              path: ["customRoleId"],
-            });
-          }
+        } else if (data.customRoleId !== undefined) {
+          issues.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "customRoleId must not be provided when using a built-in role",
+            path: ["customRoleId"],
+          });
         }
       });
 
@@ -770,7 +768,7 @@ export class OrganizationTrpcApi {
       getOrganizationWithMembersAndTheirTeams: policy(ORGANIZATION_VIEW)(
         procedure.input(organizationApiWithMembersInputSchema),
       ).query(async ({ input, ctx }) => {
-        const organization = await ctx.app.organizations.getOrganizationWithMembers(
+        const organization = await ctx.app.organizations.tryGetOrganizationWithMembers(
           {
             organizationId: input.organizationId,
             includeDeactivated: input.includeDeactivated ?? false,
@@ -825,7 +823,7 @@ export class OrganizationTrpcApi {
       getMemberById: policy(ORGANIZATION_MANAGE)(
         procedure.input(organizationApiMemberScopeSchema),
       ).query(async ({ input, ctx }) => {
-        const member = await ctx.app.organizations.getMemberById(
+        const member = await ctx.app.organizations.tryGetMemberById(
           { organizationId: input.organizationId, userId: input.userId },
           sessionUser(ctx),
         );
@@ -1110,7 +1108,7 @@ export class OrganizationTrpcApi {
           organizationName: invite.organization.name,
         });
 
-        const projectSlug = await ports.findLandingProjectSlug(ctx, { invite });
+        const projectSlug = await ports.tryFindLandingProjectSlug(ctx, { invite });
 
         return {
           success: true,

@@ -43,7 +43,7 @@ const buildService = (stored: unknown | null) => {
 };
 
 const removeOutput = (service: TraceEditOverlayService) =>
-  service.removeTraceIOEdit({
+  service.tryRemoveTraceIOEdit({
     projectId: "project-1",
     traceId: "trace-1",
     field: "output",
@@ -51,7 +51,7 @@ const removeOutput = (service: TraceEditOverlayService) =>
   });
 
 const removeInput = (service: TraceEditOverlayService) =>
-  service.removeTraceIOEdit({
+  service.tryRemoveTraceIOEdit({
     projectId: "project-1",
     traceId: "trace-1",
     field: "input",
@@ -208,7 +208,7 @@ describe("TraceEditOverlayService", () => {
       const { service } = buildService({ version: 99 });
 
       expect(
-        await service.getByTraceId({
+        await service.tryGetByTraceId({
           projectId: "project-1",
           traceId: "trace-1",
         }),
@@ -503,7 +503,7 @@ describe("TraceEditOverlayService", () => {
       it("keeps the span's other edits", async () => {
         const { service, deleteRow } = buildService(storedSuggestion);
 
-        const remaining = await service.removeSpanFieldEdit({
+        const remaining = await service.tryRemoveSpanFieldEdit({
           projectId: "project-1",
           traceId: "trace-1",
           spanId: "span-1",
@@ -528,7 +528,7 @@ describe("TraceEditOverlayService", () => {
           deletedSpanIds: [],
         });
 
-        const remaining = await service.removeSpanFieldEdit({
+        const remaining = await service.tryRemoveSpanFieldEdit({
           projectId: "project-1",
           traceId: "trace-1",
           spanId: "span-1",
@@ -552,7 +552,7 @@ describe("TraceEditOverlayService", () => {
         });
 
         expect(
-          await service.removeSpanFieldEdit({
+          await service.tryRemoveSpanFieldEdit({
             projectId: "project-1",
             traceId: "trace-1",
             spanId: "span-1",
@@ -577,7 +577,7 @@ describe("TraceEditOverlayService", () => {
           deletedSpanIds: [],
         });
 
-        const remaining = await service.removeSpanFieldEdit({
+        const remaining = await service.tryRemoveSpanFieldEdit({
           projectId: "project-1",
           traceId: "trace-1",
           spanId: "span-1",
@@ -597,7 +597,7 @@ describe("TraceEditOverlayService", () => {
         const { service, deleteRow, upsert } = buildService(storedSuggestion);
 
         expect(
-          await service.removeSpanFieldEdit({
+          await service.tryRemoveSpanFieldEdit({
             projectId: "project-1",
             traceId: "trace-1",
             spanId: "span-1",
@@ -613,7 +613,7 @@ describe("TraceEditOverlayService", () => {
         const { service, deleteRow, upsert } = buildService(storedSuggestion);
 
         expect(
-          await service.removeSpanFieldEdit({
+          await service.tryRemoveSpanFieldEdit({
             projectId: "project-1",
             traceId: "trace-1",
             spanId: "span-9",
@@ -670,7 +670,7 @@ describe("TraceEditOverlayService", () => {
     it("returns no correction", async () => {
       const { service } = buildService(null);
 
-      expect(await service.getByTraceId({ projectId: "project-1", traceId: "trace-1" })).toBeNull();
+      expect(await service.tryGetByTraceId({ projectId: "project-1", traceId: "trace-1" })).toBeNull();
     });
   });
 
@@ -780,7 +780,7 @@ describe("TraceEditOverlayService", () => {
       await service.delete({ projectId: "project-1", traceId: "trace-1" });
 
       expect(deleteRow).toHaveBeenCalledTimes(2);
-      expect(await service.getByTraceId({ projectId: "project-1", traceId: "trace-1" })).toBeNull();
+      expect(await service.tryGetByTraceId({ projectId: "project-1", traceId: "trace-1" })).toBeNull();
     });
   });
 

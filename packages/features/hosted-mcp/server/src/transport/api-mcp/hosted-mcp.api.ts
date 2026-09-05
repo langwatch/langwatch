@@ -650,7 +650,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
    */
   async function validateApiKey(apiKey: string): Promise<{ id: string; teamId: string } | null> {
     try {
-      return await projects.findLiveProjectByApiKey({ apiKey });
+      return await projects.tryFindLiveProjectByApiKey({ apiKey });
     } catch (err) {
       logger.error({ error: err }, "Database API key validation failed");
       return null;
@@ -1201,7 +1201,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       // registration is gone that its *code* was bad sends it round the
       // authorize loop forever; `invalid_client` is the code that makes it
       // register again (RFC 6749 §5.2).
-      const registeredClient = await RedisOAuthClientRepository.get({
+      const registeredClient = await RedisOAuthClientRepository.tryGet({
         redis,
         clientId: clientIdParam,
       }).catch(() => null);

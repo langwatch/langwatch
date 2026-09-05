@@ -6,9 +6,8 @@ const BUDGET_CHANGE_EVENT_KEY_PREFIX = "gateway_budget_change:";
 
 /**
  * Redis SET NX with a TTL, mirroring the span/share-view dedupe repositories.
- * The window is fixed from the first claim rather than sliding, so a busy
- * project refreshes on a fixed cadence rather than pushing its own refresh
- * back with its own traffic.
+ * Fixed from the first claim, not sliding, so a busy project can't push its
+ * own refresh back with its own traffic.
  */
 export class RedisGatewayBudgetChangeDedupeRepository extends GatewayBudgetChangeDedupeRepository {
   static create(redis: IORedis | Cluster): RedisGatewayBudgetChangeDedupeRepository {

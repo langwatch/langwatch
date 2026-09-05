@@ -80,7 +80,7 @@ export class PrismaGatewayScopeResolutionRepository extends GatewayScopeResoluti
     });
   }
 
-  async findRoutingPolicyOrder({
+  async tryFindRoutingPolicyOrder({
     routingPolicyId,
     transaction,
   }: {

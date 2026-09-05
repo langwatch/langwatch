@@ -73,7 +73,7 @@ export class SignInMethodPolicyService implements SignInMethodPolicyPort {
   }
 
   /** The federated method a deployment offers, or null for email mode. */
-  static async resolveFederatedMethod(
+  static async tryResolveFederatedMethod(
     resolveAuthProvider: () => Promise<string>,
   ): Promise<SignInMethod | null> {
     const provider = await resolveAuthProvider();
@@ -83,7 +83,7 @@ export class SignInMethodPolicyService implements SignInMethodPolicyPort {
 
   async resolvePolicy(): Promise<SignInMethodPolicy> {
     const federationLicensed = await this.inputs.federationLicensed();
-    const federated = await SignInMethodPolicyService.resolveFederatedMethod(
+    const federated = await SignInMethodPolicyService.tryResolveFederatedMethod(
       this.inputs.resolveAuthProvider,
     );
     // Offered alongside whatever else answers, never instead of it: somebody

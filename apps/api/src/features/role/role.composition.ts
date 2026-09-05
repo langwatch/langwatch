@@ -8,7 +8,11 @@ import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract
 import { authzPermissionSchema, bindingScopeCanGrantPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { assertNoPersonalTeamScope, type TeamTrpcPorts } from "@langwatch/organization-server";
+import {
+  assertNoPersonalTeamScope,
+  PostgresPersonalTeamScopeAdapter,
+  type TeamTrpcPorts,
+} from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RoleBindingScopeType, RoleService } from "@langwatch/role-contract";
 import {
@@ -20,7 +24,7 @@ import {
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createTeamTrpcRouter } from "../organization/organization-trpc.mount";
 import { createRoleTrpcRouter, type RoleTrpcPorts } from "./role-trpc.mount";
 
@@ -229,7 +233,10 @@ class ApiRoleScope extends RoleScopePort {
   async assertNoPersonalTeamScope(input: {
     scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
   }): Promise<void> {
-    await assertNoPersonalTeamScope({ client: this.prisma, scopes: input.scopes });
+    await assertNoPersonalTeamScope({
+      reader: PostgresPersonalTeamScopeAdapter.create({ database: this.prisma }),
+      scopes: input.scopes,
+    });
   }
 }
 

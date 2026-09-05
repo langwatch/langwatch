@@ -1,15 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  reportDuplicateSubscriptions,
-  type DuplicateSubscriptionsDatabase,
+  DuplicateSubscriptionsReportRepository,
   type SubscriptionReportRow,
-} from "../duplicate-subscriptions-report.task";
+} from "../../repositories/duplicate-subscriptions-report.repository";
+import { reportDuplicateSubscriptions } from "../duplicate-subscriptions-report.task";
 
-/**
- * `SubscriptionReportRow` comes from the schema now, so the double builds real
- * row shapes and is cast once at the seam — the picked `findMany` returns a
- * branded `PrismaPromise` a plain `vi.fn()` cannot satisfy.
- */
 function row(overrides: Partial<SubscriptionReportRow>): SubscriptionReportRow {
   return {
     id: "sub-1",
@@ -19,23 +14,21 @@ function row(overrides: Partial<SubscriptionReportRow>): SubscriptionReportRow {
     createdAt: new Date("2026-01-01T00:00:00Z"),
     stripeSubscriptionId: null,
     ...overrides,
-  } as SubscriptionReportRow;
+  };
 }
 
-function fakeDatabase({
+function fakeRepository({
   active,
   pending,
 }: {
   active: SubscriptionReportRow[];
   pending: SubscriptionReportRow[];
-}): DuplicateSubscriptionsDatabase {
-  return {
-    subscription: {
-      findMany: vi.fn(async ({ where }: { where: { status: string } }) =>
-        where.status === "ACTIVE" ? active : pending,
-      ),
-    },
-  } as unknown as DuplicateSubscriptionsDatabase;
+}): DuplicateSubscriptionsReportRepository {
+  return new (class extends DuplicateSubscriptionsReportRepository {
+    async findByStatus(status: string): Promise<SubscriptionReportRow[]> {
+      return status === "ACTIVE" ? active : pending;
+    }
+  })();
 }
 
 describe("reportDuplicateSubscriptions", () => {
@@ -48,9 +41,9 @@ describe("reportDuplicateSubscriptions", () => {
         plan: "ENTERPRISE",
         createdAt: new Date("2026-06-01T00:00:00Z"),
       });
-      const database = fakeDatabase({ active: [older, newer], pending: [] });
+      const repository = fakeRepository({ active: [older, newer], pending: [] });
 
-      const report = await reportDuplicateSubscriptions({ database });
+      const report = await reportDuplicateSubscriptions({ repository });
 
       expect(report.activeSubscriptions).toBe(2);
       expect(report.organizationsHoldingOne).toBe(1);
@@ -63,7 +56,7 @@ describe("reportDuplicateSubscriptions", () => {
   describe("when abandoned checkouts have accumulated", () => {
     /** @scenario "The duplicate-subscription report censuses the pending backlog" */
     it("counts them by plan and names the oldest", async () => {
-      const database = fakeDatabase({
+      const repository = fakeRepository({
         active: [],
         pending: [
           row({ id: "p1", plan: "PRO", createdAt: new Date("2025-02-01T00:00:00Z") }),
@@ -72,7 +65,7 @@ describe("reportDuplicateSubscriptions", () => {
         ],
       });
 
-      const report = await reportDuplicateSubscriptions({ database });
+      const report = await reportDuplicateSubscriptions({ repository });
 
       expect(report.pendingSubscriptions).toBe(3);
       expect(report.organizationsWithPending).toBe(3);

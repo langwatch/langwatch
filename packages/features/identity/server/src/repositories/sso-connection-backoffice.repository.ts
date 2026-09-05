@@ -23,7 +23,7 @@ export interface SsoConnectionBackofficeRepository {
     search?: string;
   }): Promise<SsoConnectionBackofficePage>;
   /** One connection's state, or null when no row carries that id. */
-  findById(args: { connectionId: string }): Promise<SsoConnectionState | null>;
+  tryFindById(args: { connectionId: string }): Promise<SsoConnectionState | null>;
   /** The display names of the organizations a page names, by id. */
   findOrganizationNames(args: { organizationIds: string[] }): Promise<Map<string, string>>;
 }

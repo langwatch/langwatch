@@ -12,6 +12,6 @@ export interface UsageStatsWorkerConfig {
 
 /** Process controls for the complete Ops worker graph. */
 export abstract class OpsWorkerPort {
-  abstract startAnomalyWorker(): OpsWorkerHandle | undefined;
-  abstract startUsageStatsWorker(): OpsWorkerHandle | undefined;
+  abstract tryStartAnomalyWorker(): OpsWorkerHandle | undefined;
+  abstract tryStartUsageStatsWorker(): OpsWorkerHandle | undefined;
 }

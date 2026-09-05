@@ -19,7 +19,7 @@ const makeSummary = (occurredDaysAgo: number) => ({
 const makeService = (summary: unknown) =>
   TraceSummaryService.create({
     repository: {
-      findByTraceId: vi.fn().mockResolvedValue(summary),
+      tryFindByTraceId: vi.fn().mockResolvedValue(summary),
       upsert: vi.fn(),
     } as never,
   });

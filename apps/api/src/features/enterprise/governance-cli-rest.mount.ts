@@ -32,6 +32,11 @@
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
+import {
+  OrganizationSupportContactService,
+  PostgresGovernanceDirectoryAdapter,
+  PostgresOrganizationSupportContactAdapter,
+} from "@langwatch/enterprise-governance-server";
 import type {
   GovernanceCliAccessTokenPort,
   GovernanceCliBudgetPort,
@@ -106,7 +111,11 @@ export function composeApiGovernanceCliRest(
   return {
     accessTokens,
     governance: () => governance,
-    database: () => prisma,
+    directory: () => PostgresGovernanceDirectoryAdapter.create({ database: prisma }),
+    supportContacts: () =>
+      OrganizationSupportContactService.create({
+        repository: PostgresOrganizationSupportContactAdapter.create({ database: prisma }),
+      }),
     ensurePersonalWorkspace,
     tryFindPersonalWorkspace,
     plans: () => plans,

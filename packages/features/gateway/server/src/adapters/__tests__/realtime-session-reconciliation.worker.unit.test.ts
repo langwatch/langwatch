@@ -39,7 +39,7 @@ function buildWorker(options?: {
   const worker = GatewayRealtimeSessionReconciliationService.create({
     repository,
     credentials: {
-      getApiCredential: vi.fn().mockResolvedValue({
+      tryGetApiCredential: vi.fn().mockResolvedValue({
         apiKey: "key",
         baseUrl: "https://api.elevenlabs.io",
       }),

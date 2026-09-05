@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   GatewayRealtimeSession,
   GatewayRealtimeSessionStatus,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/gateway-contract";
 import type {
   GatewayRealtimeSessionRepository,
   ReserveResult,
@@ -19,7 +19,6 @@ import type { GatewaySpendConfirmationPort } from "../ports/gateway-spend-confir
 import type { GatewaySpendRatingPort } from "../ports/gateway-spend-rating.port";
 import { createHash } from "crypto";
 import { ATTR_KEYS as ATTR, DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
-import { parseVirtualKeyConfig } from "@langwatch/gateway-contract";
 
 const logger = createLogger("langwatch:gateway:realtime-session");
 
@@ -134,7 +133,7 @@ export class GatewayRealtimeSessionService {
   /**
    * Finds the session a vendor's post-call report belongs to, three ways in order of certainty: (1) the vendor's own conversation id recorded at mint (exact); (2) the LangWatch session id echoed into the conversation's variables, if the vendor sends it back; (3) the one session open for this credential in the report's window — which stops at exactly one candidate, since two opens in the same window are indistinguishable and a wrong match (a wrong bill that looks right) is worse than an unmatched call settling visibly as cost-unknown.
    */
-  async matchRealtimeSession(params: {
+  async tryMatchRealtimeSession(params: {
     vendor: string;
     organizationId: string;
     modelProviderId: string;

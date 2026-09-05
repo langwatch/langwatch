@@ -13,7 +13,7 @@ const USER = "user_sam";
 
 function stateWithStatus(status: TenantMigrationStatus | null): SystemMigrationStateRepository {
   return {
-    findRecord: vi.fn(
+    tryFindRecord: vi.fn(
       async ({ migrationName, tenantId }: { migrationName: string; tenantId: string }) =>
         status === null ? null : { migrationName, tenantId, status, report: null },
     ),
@@ -41,7 +41,7 @@ describe("identifier write gate", () => {
         IdentityWriteGateService.create({ state }).isUserOnIdentityWrites({ userId: USER }),
       ).resolves.toBe(false);
       // The whole point of the short-circuit: no per-user read is issued.
-      expect(state.findRecord).not.toHaveBeenCalled();
+      expect(state.tryFindRecord).not.toHaveBeenCalled();
     });
 
     it("reads once per pod, not once per user", async () => {
@@ -62,7 +62,7 @@ describe("identifier write gate", () => {
       await expect(
         IdentityWriteGateService.create({ state }).isUserOnIdentityWrites({ userId: USER }),
       ).resolves.toBe(false);
-      expect(state.findRecord).toHaveBeenCalledWith({
+      expect(state.tryFindRecord).toHaveBeenCalledWith({
         migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
         tenantId: USER,
       });
@@ -105,7 +105,7 @@ describe("identifier write gate", () => {
   describe("when the state table is unreadable", () => {
     it("fails safe to closed", async () => {
       const state: SystemMigrationStateRepository = {
-        findRecord: vi.fn(async () => {
+        tryFindRecord: vi.fn(async () => {
           throw new Error("postgres unavailable");
         }),
         upsertRecord: vi.fn(async () => undefined),

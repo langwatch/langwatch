@@ -84,7 +84,7 @@ export abstract class BetterAuthIdentityCeremoniesPort {
    * the reason the identity package gives: neither side should track that
    * type version to version.
    */
-  abstract beforeAccountCreate(
+  abstract tryBeforeAccountCreate(
     account: BetterAuthAccountRow,
   ): Promise<{ data: { id: string } } | undefined>;
 
@@ -115,7 +115,7 @@ export type PendingOrganizationInvite = Readonly<{
  * looking unused.
  */
 export abstract class BetterAuthPendingInvitePort {
-  abstract findPendingByOrganizationAndEmail(input: {
+  abstract tryFindPendingByOrganizationAndEmail(input: {
     organizationId: string;
     email: string;
   }): Promise<PendingOrganizationInvite | null>;

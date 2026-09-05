@@ -20,7 +20,7 @@ import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
-import { GatewaySpendScopeAdapter } from "../gateway-spend-scope.adapter";
+import { GatewaySpendScopeAdapter } from "../postgres.gateway-spend-scope.adapter";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

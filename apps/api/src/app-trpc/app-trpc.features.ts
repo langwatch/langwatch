@@ -2,7 +2,7 @@
  * Every tRPC surface this package owns, mounted on one process's root.
  */
 import type { ApiTrpcFeatureMount } from "../api.application";
-import type { ApiTrpcInfrastructure } from "./app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure";
 import type { ComposedApiFeatures } from "./app-trpc.composed";
 
 import { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount";

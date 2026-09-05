@@ -67,7 +67,7 @@ export class PrismaSsoConnectionBackofficeRepository implements SsoConnectionBac
     };
   }
 
-  async findById({ connectionId }: { connectionId: string }): Promise<SsoConnectionState | null> {
+  async tryFindById({ connectionId }: { connectionId: string }): Promise<SsoConnectionState | null> {
     const row = await this.prisma.ssoConnection.findUnique({
       where: { id: connectionId },
     });

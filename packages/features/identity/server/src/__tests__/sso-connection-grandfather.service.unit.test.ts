@@ -136,7 +136,7 @@ describe("the sso connection grandfather migration", () => {
 
         // The backfilled connection is live from the append alone — nobody
         // ran a separate activation step.
-        const state = await connections.findConnection({
+        const state = await connections.tryFindConnection({
           connectionId: "ssoc_gf_org_acme",
         });
         expect(state).toMatchObject({ state: "ACTIVE" });

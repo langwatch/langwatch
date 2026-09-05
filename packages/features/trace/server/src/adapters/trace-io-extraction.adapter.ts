@@ -24,10 +24,10 @@ export class TraceIoExtractionAdapter extends TraceIoExtractionPort {
   }
 
   tryExtractRichIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
-    return this.service.extractRichIOFromSpan(span, side);
+    return this.service.tryExtractRichIOFromSpan(span, side);
   }
 
   tryExtractFallbackIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
-    return this.service.extractFallbackIOFromSpan(span, side);
+    return this.service.tryExtractFallbackIOFromSpan(span, side);
   }
 }

@@ -26,7 +26,7 @@ export class InMemorySessionContextMemoAdapter extends CodingAgentSessionContext
     return new InMemorySessionContextMemoAdapter(now);
   }
 
-  async get({
+  async tryGet({
     tenantId,
     sessionId,
   }: {

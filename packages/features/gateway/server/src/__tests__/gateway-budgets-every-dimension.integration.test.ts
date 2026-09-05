@@ -31,7 +31,7 @@ import { VirtualKeyService } from "../services/virtual-key.service";
 import { TestProjectService } from "./support/test-project-service";
 
 import { createVirtualKeyServiceForTest } from "../testing";
-import { GatewayConfigAssemblyAdapter } from "../adapters/gateway-config-assembly.adapter";
+import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository";
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service";
 /**

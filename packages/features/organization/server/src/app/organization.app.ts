@@ -71,11 +71,11 @@ import type {
   OrganizationIntent,
   OrganizationUser,
   OrganizationUserRole,
-  Project as ProjectRow,
+  ProjectRow,
   Team,
   TeamUser,
   User,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/organization-contract";
 import type { PaginatedProjects, Project, ProjectService } from "@langwatch/project-contract";
 
 // ---------------------------------------------------------------------------
@@ -154,22 +154,22 @@ type OrganizationsAppService = Readonly<{
     demoProjectUserId: string;
     demoProjectId: string;
   }): Promise<FullyLoadedOrganization[]>;
-  getOrganizationWithMembers(input: {
+  tryGetOrganizationWithMembers(input: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
   }): Promise<OrganizationWithMembersAndTheirTeams | null>;
-  getMemberById(input: {
+  tryGetMemberById(input: {
     organizationId: string;
     userId: string;
     currentUserId: string;
   }): Promise<OrganizationMemberWithUser | null>;
   getAllMembers(organizationId: string): Promise<User[]>;
-  getUserOrgRoleByTeamId(input: {
+  tryGetUserOrgRoleByTeamId(input: {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null>;
-  getPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null>;
+  tryGetPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null>;
   ensurePersonalWorkspace(input: {
     userId: string;
     organizationId: string;
@@ -370,22 +370,22 @@ export class OrganizationApp {
   }
 
   /** One organization with its members and each member's teams. */
-  getOrganizationWithMembers(
-    input: Omit<Parameters<OrganizationsAppService["getOrganizationWithMembers"]>[0], "userId">,
+  tryGetOrganizationWithMembers(
+    input: Omit<Parameters<OrganizationsAppService["tryGetOrganizationWithMembers"]>[0], "userId">,
     by: OrganizationCaller,
   ): Promise<OrganizationWithMembersAndTheirTeams | null> {
-    return this.dependencies.organizations.getOrganizationWithMembers({
+    return this.dependencies.organizations.tryGetOrganizationWithMembers({
       ...input,
       userId: by.id,
     });
   }
 
   /** One member, redacted to what the calling member may see. */
-  getMemberById(
-    input: Omit<Parameters<OrganizationsAppService["getMemberById"]>[0], "currentUserId">,
+  tryGetMemberById(
+    input: Omit<Parameters<OrganizationsAppService["tryGetMemberById"]>[0], "currentUserId">,
     by: OrganizationCaller,
   ): Promise<OrganizationMemberWithUser | null> {
-    return this.dependencies.organizations.getMemberById({ ...input, currentUserId: by.id });
+    return this.dependencies.organizations.tryGetMemberById({ ...input, currentUserId: by.id });
   }
 
   /** Every member of one organization, for the member pickers. */
@@ -401,11 +401,11 @@ export class OrganizationApp {
    * role, and that is the read which says so. Keyed on the TEAM rather than
    * the organization because a project names its team, not its tenant.
    */
-  getUserOrgRoleByTeamId(input: {
+  tryGetUserOrgRoleByTeamId(input: {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null> {
-    return this.dependencies.organizations.getUserOrgRoleByTeamId(input);
+    return this.dependencies.organizations.tryGetUserOrgRoleByTeamId(input);
   }
 
   /**
@@ -413,8 +413,8 @@ export class OrganizationApp {
    * never set. The governance setup screen reads it to decide which checklist
    * the organization is being walked through.
    */
-  getPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
-    return this.dependencies.organizations.getPrimaryIntent(organizationId);
+  tryGetPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
+    return this.dependencies.organizations.tryGetPrimaryIntent(organizationId);
   }
 
   /** Makes the caller's personal workspace in this organization exist. */

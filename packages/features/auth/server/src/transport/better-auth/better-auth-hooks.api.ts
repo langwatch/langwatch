@@ -168,7 +168,7 @@ const joinSsoOrganization = async ({
   org: { id: string; name: string };
 }): Promise<void> => {
   const { announcements, invites, authzGrants: writer } = collaborators;
-  const pendingInvite = await invites.findPendingByOrganizationAndEmail({
+  const pendingInvite = await invites.tryFindPendingByOrganizationAndEmail({
     organizationId: org.id,
     email: user.email,
   });
@@ -280,7 +280,7 @@ export const afterUserCreate = async ({
  * Called before a new Account row is created. Ports the provider-linking and
  * pendingSsoSetup logic from the NextAuth signIn callback.
  */
-export const beforeAccountCreate = async ({
+export const tryBeforeAccountCreate = async ({
   prisma,
   account,
   federation,
@@ -386,7 +386,7 @@ export const beforeAccountCreate = async ({
 
 /**
  * Called after a new Account row is created. Runs the SSO reconciliation that
- * `beforeAccountCreate` used to perform inline, but deferred to this hook so the cleanup
+ * `tryBeforeAccountCreate` used to perform inline, but deferred to this hook so the cleanup
  * only commits once the new Account row exists.
  */
 export const afterAccountCreate = async ({

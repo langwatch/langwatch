@@ -29,11 +29,11 @@ export class PrismaSignUpVerificationTokenRepository implements SignUpVerificati
   }
 
   /**
-   * Deleting is the claim. A token that survived the delete never existed or was already
+   * Deleting is the tryClaim. A token that survived the delete never existed or was already
    * spent, and one that is deleted but out of date is refused all the same — the row goes
    * either way, so a spent link cannot be replayed even by the racer that lost.
    */
-  async claim({
+  async tryClaim({
     token,
     now,
   }: {

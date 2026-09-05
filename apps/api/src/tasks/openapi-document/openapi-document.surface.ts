@@ -283,7 +283,7 @@ function processPorts(): ApiProcessRestPorts {
       resolveSession: refuse("Browser session resolution") as never,
       tryFindProjectSlugByToken: refuse<Promise<string | null>>("Legacy token project lookup"),
       featureFlags: refuse("The feature-flag store"),
-      database: refuse("The member directory") as AuthRestPorts["database"],
+      directory: refuse("The member directory") as AuthRestPorts["directory"],
       baseUrl: PUBLIC_BASE_URL,
       federatedLogout: refuse<Promise<string | null>>("Federated logout"),
       runWithIdentityBirth: (run) => run(),
@@ -305,7 +305,7 @@ function processPorts(): ApiProcessRestPorts {
       // Named through the port rather than through the client type it returns:
       // only `repositories/prisma/**` and the Postgres adapters may spell
       // `PrismaClient`, and a description task is neither.
-      database: refuse("The member directory") as GovernanceIngestRestPorts["database"],
+      directory: refuse("The member directory") as GovernanceIngestRestPorts["directory"],
       keyProvenance: ApiGovernanceIngestKeyProvenance.create(),
     },
     publicBaseUrl: PUBLIC_BASE_URL,

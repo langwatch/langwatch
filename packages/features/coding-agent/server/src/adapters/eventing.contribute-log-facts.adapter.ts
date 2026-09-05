@@ -141,7 +141,7 @@ export class EventingContributeLogFactsAdapter implements CommandHandler<
     data: ContributeLogFactsCommandData,
   ): Promise<SessionWorkingContext | null> {
     try {
-      const context = await this.deps.contextMemo.get({
+      const context = await this.deps.contextMemo.tryGet({
         tenantId: data.tenantId,
         sessionId: data.sessionId,
       });

@@ -71,7 +71,7 @@ export class TraceSessionGroupsCursorService {
   /**
    * The repository's keyset boundary for this request. A cursor minted under another sort points at a boundary the repository would compare against a different aggregate expression, so a dollar amount would be measured against a timestamp and the caller would walk an arbitrary window with no error. Refuse it instead.
    */
-  static keysetCursorFor({
+  static tryKeysetCursorFor({
     encoded,
     sortColumn,
     sortDirection,

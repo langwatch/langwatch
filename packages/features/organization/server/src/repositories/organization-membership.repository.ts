@@ -8,13 +8,13 @@ import type {
   OrganizationUser,
   OrganizationUserRole,
   PricingModel,
-  Project,
+  ProjectRow as Project,
   RoleBindingScopeType,
   Team,
   TeamUser,
   TeamUserRole,
   User,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/organization-contract";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service";
 
 export type TeamWithProjects = Team & {
@@ -264,7 +264,7 @@ export abstract class OrganizationMembershipRepository {
     userId: string;
     organizationId: string;
   }): Promise<OrganizationUserRole | null>;
-  abstract getUserOrgRoleByTeamId(params: {
+  abstract tryGetUserOrgRoleByTeamId(params: {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null>;
@@ -302,13 +302,13 @@ export abstract class OrganizationMembershipRepository {
     demoProjectId: string;
   }): Promise<FullyLoadedOrganization[]>;
 
-  abstract getOrganizationWithMembers(params: {
+  abstract tryGetOrganizationWithMembers(params: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
   }): Promise<OrganizationWithMembersAndTheirTeams | null>;
 
-  abstract getMemberById(params: {
+  abstract tryGetMemberById(params: {
     organizationId: string;
     userId: string;
     currentUserId: string;
@@ -318,7 +318,7 @@ export abstract class OrganizationMembershipRepository {
 
   /**
    * A single membership row with its user, disabled or not. Unlike
-   * `getMemberById` there is no caller pre-check: the management surface
+   * `tryGetMemberById` there is no caller pre-check: the management surface
    * authenticates through the organization credential, not a session user.
    */
   abstract tryFindMembership(params: {
@@ -350,10 +350,9 @@ export abstract class OrganizationMembershipRepository {
   /**
    * The personal team a set of role-binding scopes reaches, by the name its
    * owner sees, or null when they reach only shared ground. Both TEAM and
-   * PROJECT scopes resolve, since a binding on the personal project reaches
-   * the same private space as one on the personal team.
+   * PROJECT scopes resolve to the same private space.
    */
-  abstract findPersonalTeamInScopes(params: {
+  abstract tryFindPersonalTeamInScopes(params: {
     scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
   }): Promise<{ name: string } | null>;
 

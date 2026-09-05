@@ -126,7 +126,7 @@ describe("BillingSubscriptionService", () => {
       expect(typeof localService.updateSubscriptionItems).toBe("function");
       expect(typeof localService.createOrUpdateSubscription).toBe("function");
       expect(typeof localService.createBillingPortalSession).toBe("function");
-      expect(typeof localService.getLastNonCancelledSubscription).toBe("function");
+      expect(typeof localService.tryGetLastNonCancelledSubscription).toBe("function");
       expect(typeof localService.notifyProspective).toBe("function");
     });
   });
@@ -469,13 +469,13 @@ describe("BillingSubscriptionService", () => {
     });
   });
 
-  describe("getLastNonCancelledSubscription()", () => {
+  describe("tryGetLastNonCancelledSubscription()", () => {
     describe("when querying for an organization", () => {
       it("delegates to repository and returns the result", async () => {
         const mockSub = { id: "sub_1", status: "ACTIVE" };
         repository.tryFindLastNonCancelled.mockResolvedValue(mockSub);
 
-        const result = await service.getLastNonCancelledSubscription("org_123");
+        const result = await service.tryGetLastNonCancelledSubscription("org_123");
 
         expect(result).toEqual(mockSub);
         expect(repository.tryFindLastNonCancelled).toHaveBeenCalledWith("org_123");

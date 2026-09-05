@@ -31,7 +31,7 @@ import {
 } from "@langwatch/stored-object-server";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiStoredObjectsConfigResolution } from "../../platform/config/api.config";
 import { createStoredObjectTrpcRouter } from "./stored-object-trpc.mount";
 
@@ -361,7 +361,7 @@ class ApiStoredObjectOwnerAbsence extends StoredObjectOwnerResolver {
     super();
   }
 
-  async resolve(input: { id: string }): Promise<{ projectId: string } | null> {
+  async tryResolve(input: { id: string }): Promise<{ projectId: string } | null> {
     this.logger.warn(
       { storedObjectId: input.id },
       "API process composed no stored-object owner directory: an id-only stored-object reference cannot be resolved to a project here.",

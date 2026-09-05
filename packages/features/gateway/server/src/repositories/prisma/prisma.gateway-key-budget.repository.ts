@@ -19,7 +19,7 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
     super();
   }
 
-  findDrawerManaged(
+  tryFindDrawerManaged(
     { organizationId, virtualKeyId }: { organizationId: string; virtualKeyId: string },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget | null> {
@@ -82,11 +82,8 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
               OR: [
                 { managedByVirtualKeyId: virtualKeyId },
                 // Scoped to this key and nothing else. ATTRIBUTED_USER counts
-                // when the key is its anchor: the per-end-user allowance hangs
-                // off the key's traffic, so a dead key means a template that
-                // can never open another bucket. The same scope type anchored
-                // on a project is untouched, and so is every PROJECT, TEAM or
-                // ORGANIZATION budget, because those outlive any one key.
+                // only when the key is its anchor; PROJECT/TEAM/ORGANIZATION
+                // budgets outlive any one key and stay untouched.
                 { scopeType: { in: ["VIRTUAL_KEY", "ATTRIBUTED_USER"] }, scopeId: virtualKeyId },
               ],
             }),

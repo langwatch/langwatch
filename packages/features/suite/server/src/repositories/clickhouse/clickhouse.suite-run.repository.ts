@@ -41,11 +41,11 @@ export class ClickHouseSuiteRunRepository
     super();
   }
 
-  async getProjection(
+  async tryGetProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<Projection<SuiteRunStateData> | null> {
-    EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.getProjection");
+    EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.tryGetProjection");
     try {
       const client = await this.options.resolveClient(String(context.tenantId));
       const result = await client.query({
@@ -65,7 +65,7 @@ export class ClickHouseSuiteRunRepository
       };
     } catch (error) {
       throw this.storeError({
-        operation: "getProjection",
+        operation: "tryGetProjection",
         message: `Failed to get projection for batch run ${aggregateId}`,
         context: { batchRunId: aggregateId },
         logContext: { batchRunId: aggregateId, tenantId: context.tenantId },

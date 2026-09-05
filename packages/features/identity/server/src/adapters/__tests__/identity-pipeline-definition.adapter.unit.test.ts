@@ -43,7 +43,7 @@ function fact(overrides: Partial<IdentifierFact>): IdentifierFact {
 class HeadsOf implements IdentityHeadsRepository {
   constructor(private readonly heads: IdentityHeads) {}
 
-  async findUserHashKey() {
+  async tryFindUserHashKey() {
     return "key_material";
   }
 
@@ -51,15 +51,15 @@ class HeadsOf implements IdentityHeadsRepository {
     return this.heads;
   }
 
-  async findActiveIdentifierByValue() {
+  async tryFindActiveIdentifierByValue() {
     return null;
   }
 
-  async findIdentifier({ identifierId }: { identifierId: string }) {
+  async tryFindIdentifier({ identifierId }: { identifierId: string }) {
     return this.heads.identifiers[identifierId] ?? null;
   }
 
-  async findIdentifierIdForAccount() {
+  async tryFindIdentifierIdForAccount() {
     return null;
   }
 }

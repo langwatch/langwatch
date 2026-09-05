@@ -72,14 +72,16 @@ export type StoredObjectFileRead =
  * Separate from {@link StoredObjectService} because it is shaped differently,
  * not merely narrower: the file surface streams bytes and needs the ROW — its
  * purpose gates the read, its size and media type build the response — where
- * the portable service answers `getById` with metadata and an async iterable.
+ * the portable service answers `tryGetById` with metadata and an async iterable.
  * The process's own stored-object service satisfies both, which is why one
  * object can be passed for both keys; naming the difference is what stops the
  * two being confused for each other again.
  */
 export interface StoredObjectFileReadPort {
   headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead>;
-  getById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectFileRead | null>;
+  tryGetById(
+    input: Readonly<{ projectId: string; id: string }>,
+  ): Promise<StoredObjectFileRead | null>;
 }
 
 /** What the process composes this feature's application from. */
@@ -128,7 +130,7 @@ export class StoredObjectApp {
   readById(
     input: Readonly<{ projectId: string; id: string }>,
   ): Promise<StoredObjectFileRead | null> {
-    return this.dependencies.files.getById(input);
+    return this.dependencies.files.tryGetById(input);
   }
 
   /**
@@ -139,6 +141,6 @@ export class StoredObjectApp {
    * degraded instance must not read as a deleted object.
    */
   resolveOwner(input: { id: string }): Promise<{ projectId: string } | null> {
-    return this.dependencies.owners.resolve(input);
+    return this.dependencies.owners.tryResolve(input);
   }
 }

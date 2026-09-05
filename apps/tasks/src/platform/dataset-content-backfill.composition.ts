@@ -3,6 +3,7 @@ import {
   DatasetObjectStorageResolverAdapter,
   DatasetObjectStorageS3ClientResolverAdapter,
   DatasetStorageDestinationPort,
+  PostgresDatasetMigrationAdapter,
   type DatasetStorageDestination,
 } from "@langwatch/dataset-server";
 import type { TasksObjectStorage } from "./infrastructure/tasks-stored-object-storage.adapter";
@@ -37,10 +38,9 @@ export function buildDatasetContentBackfillTask({
   return DatasetContentBackfillTask.create({
     skipped: process.env.SKIP_DATASET_S3_MIGRATE === "true",
     dryRun: process.env.DATASET_S3_MIGRATE_DRY_RUN === "true",
-    database: () => host.requirePrisma(),
-    storage: () => {
+    migration: () => {
       const objectStorage = host.requireObjectStorage();
-      return DatasetObjectStorageResolverAdapter.create({
+      const storage = DatasetObjectStorageResolverAdapter.create({
         destination: new TasksDatasetStorageDestination(objectStorage.destination),
         s3ClientResolver: DatasetObjectStorageS3ClientResolverAdapter.create({
           aws: objectStorage.aws,
@@ -48,6 +48,7 @@ export function buildDatasetContentBackfillTask({
           globalS3: objectStorage.globalS3,
         }),
       });
+      return PostgresDatasetMigrationAdapter.create({ database: host.requirePrisma(), storage });
     },
   });
 }

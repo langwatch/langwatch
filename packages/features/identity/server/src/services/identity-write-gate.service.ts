@@ -80,7 +80,7 @@ export class IdentityWriteGateService {
 
   private async readUserOnIdentityWrites({ userId }: { userId: string }): Promise<boolean> {
     try {
-      const record = await this.state.findRecord({
+      const record = await this.state.tryFindRecord({
         migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
         tenantId: userId,
       });

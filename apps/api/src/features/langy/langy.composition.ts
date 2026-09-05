@@ -29,7 +29,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiAuditPort } from "../../api-request.policy";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import {
   createLangyEgressTrpcRouter,
@@ -210,7 +210,7 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     },
     // The one turn port that answers for real here: rendering the composer's
     // context chips is pure, and the contract package owns it.
-    context: { render: renderLangyTurnContext },
+    context: { tryRender: renderLangyTurnContext },
     uiActionSurface: FeatureFlagLangyUiActionSurfaceAdapter.create(options.featureFlags),
     metrics: { count: () => undefined },
     accessStore: redis ? LangyTurnAccessStore.create({ redis }) : null,

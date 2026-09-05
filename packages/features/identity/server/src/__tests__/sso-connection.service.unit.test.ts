@@ -130,7 +130,7 @@ describe("the sso connection write surface", () => {
           expect(fact.data.actor).toEqual(OPS);
         }
       }
-      expect((await connections.findConnection({ connectionId: CONNECTION }))?.state).toBe(
+      expect((await connections.tryFindConnection({ connectionId: CONNECTION }))?.state).toBe(
         "ACTIVE",
       );
     });

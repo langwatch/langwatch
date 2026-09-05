@@ -1,4 +1,4 @@
-import type { PricingModel } from "@langwatch/prisma-client/generated";
+import type { PricingModel } from "@langwatch/entitlement-contract";
 import type { UsageUnit } from "@langwatch/entitlement-contract";
 
 /**

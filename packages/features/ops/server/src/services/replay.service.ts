@@ -48,7 +48,7 @@ export class ReplayService {
     return this.repo.getHistory();
   }
 
-  async findHistoryEntry(params: { runId: string }): Promise<ReplayHistoryEntry | null> {
+  async tryFindHistoryEntry(params: { runId: string }): Promise<ReplayHistoryEntry | null> {
     const history = await this.repo.getHistory();
 
     return history.find((entry) => entry.runId === params.runId) ?? null;

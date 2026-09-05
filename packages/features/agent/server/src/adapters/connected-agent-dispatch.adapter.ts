@@ -200,7 +200,7 @@ export class CallDispatcherAdapter extends ConnectedAgentDispatchPort {
     now: () => number;
   }): Promise<LiveInstance> {
     const pinKey = threadPinKey(projectId, agent.id, call.threadId);
-    const pinned = agent.isSticky ? await this.store.get(pinKey) : null;
+    const pinned = agent.isSticky ? await this.store.tryGet(pinKey) : null;
 
     const waitUntil = now() + this.firstTurnGraceMs;
     for (;;) {
@@ -490,7 +490,7 @@ export class CallDispatcherAdapter extends ConnectedAgentDispatchPort {
       // reconnecting when the gateway published never sees the message.
       const poll = async () => {
         if (settled) return;
-        const result = await this.store.get(resultKey(projectId, callId)).catch(() => null);
+        const result = await this.store.tryGet(resultKey(projectId, callId)).catch(() => null);
         if (result) {
           finish({ kind: "result" });
           return;
@@ -506,7 +506,7 @@ export class CallDispatcherAdapter extends ConnectedAgentDispatchPort {
   }
 
   private async readResult({ projectId, callId }: { projectId: string; callId: string }) {
-    const raw = await this.store.get(resultKey(projectId, callId));
+    const raw = await this.store.tryGet(resultKey(projectId, callId));
     return raw ? parse(storedResultSchema, raw) : null;
   }
 

@@ -205,7 +205,7 @@ export class ScimSyncGuards {
     scimSyncId: string;
     organizationId: string;
   }): Promise<ScimSyncState | null> {
-    return this.deps.syncs.findSync({ scimSyncId, organizationId });
+    return this.deps.syncs.tryFindSync({ scimSyncId, organizationId });
   }
 
   /** The recovery fact, when there is a standing failure for a push to end. */

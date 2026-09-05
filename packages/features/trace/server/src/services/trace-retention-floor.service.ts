@@ -15,7 +15,7 @@ const logger = createLogger("langwatch:clickhouse:retention-floor");
 class PlatformRetentionDaysProvider implements RetentionDaysProvider {
   constructor(private readonly resolver: DataRetentionService) {}
 
-  async getRetentionDays({
+  async tryGetRetentionDays({
     tenantId,
     table,
   }: {

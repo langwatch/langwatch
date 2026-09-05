@@ -37,11 +37,11 @@ function harness() {
 
   const users: IdentityUsersRepository = {
     async storeUserHashKeyIfMissing() {},
-    async findEmail({ userId }) {
+    async tryFindEmail({ userId }) {
       const row = db.user?.find((candidate) => candidate.id === userId);
       return typeof row?.email === "string" ? row.email : null;
     },
-    async findUserIdByEmail({ normalizedValue }) {
+    async tryFindUserIdByEmail({ normalizedValue }) {
       const row = db.user?.find(
         (candidate) =>
           typeof candidate.email === "string" &&
@@ -70,7 +70,7 @@ function harness() {
     databaseHooks: {
       account: {
         create: {
-          before: async (account) => ceremonies.beforeAccountCreate(account),
+          before: async (account) => ceremonies.tryBeforeAccountCreate(account),
         },
         delete: {
           before: async (account) => {

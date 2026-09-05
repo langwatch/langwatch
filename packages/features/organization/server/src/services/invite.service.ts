@@ -9,7 +9,7 @@ import {
   type OrganizationUser,
   OrganizationUserRole,
   RoleBindingScopeType,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/organization-contract";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
 import type { RoleService } from "@langwatch/role-contract";
 import { isCustomRole } from "../rules/custom-role-naming.rules";
@@ -56,7 +56,7 @@ const INVITE_BATCH_TXN_TIMEOUT_MS = 20_000;
 const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
 
 import { createLogger } from "@langwatch/observability";
-import { TeamUserRole } from "@langwatch/prisma-client/generated";
+import { TeamUserRole } from "@langwatch/organization-contract";
 import { LiteMemberViewerOnlyError } from "@langwatch/organization-contract";
 import type { PlanProvider, PlanProviderUser } from "@langwatch/entitlement-contract";
 import type {
@@ -359,7 +359,7 @@ export class InviteService {
   /**
    * Validates that an invite can be created:
    */
-  async checkDuplicateInvite({
+  async tryCheckDuplicateInvite({
     email,
     organizationId,
   }: {
@@ -533,7 +533,7 @@ export class InviteService {
    * Attempts to send an invite email, catching failures gracefully.
    * Returns whether the email was not sent (due to missing provider or error).
    */
-  async trySendInviteEmail({
+  async sendInviteEmail({
     email,
     organization,
     inviteCode,
@@ -620,7 +620,7 @@ export class InviteService {
     // hand a second person the workspace its owner was promised privacy in.
     // Refused loudly on every path, lenient mode included: this is an
     // invariant, not a strictness option (issue #6338).
-    const personalTeam = await this.invites.findPersonalTeamInScopes({
+    const personalTeam = await this.invites.tryFindPersonalTeamInScopes({
       scopes: validInvites.flatMap(
         (invite) =>
           invite.teamAssignments?.map((assignment) => ({
@@ -652,7 +652,7 @@ export class InviteService {
     // never roll back a committed invite.
     const results = await Promise.all(
       createdRecords.map(async (record) => {
-        const { emailNotSent } = await this.trySendInviteEmail({
+        const { emailNotSent } = await this.sendInviteEmail({
           email: record.invite.email,
           organization: record.organization,
           inviteCode: record.invite.inviteCode,
@@ -687,7 +687,7 @@ export class InviteService {
     }> = [];
 
     for (const invite of invites) {
-      const existingInvite = await txInviteService.checkDuplicateInvite({
+      const existingInvite = await txInviteService.tryCheckDuplicateInvite({
         email: invite.email,
         organizationId: invite.organizationId,
       });
@@ -739,7 +739,7 @@ export class InviteService {
 
     return {
       // Stored trimmed, because the reads look the address up as it was
-      // typed: `checkDuplicateInvite` and `findPendingByOrgAndEmail` both miss
+      // typed: `tryCheckDuplicateInvite` and `tryFindPendingByOrgAndEmail` both miss
       // a row written as " a@b.com ", so the duplicate check never fires and
       // SSO onboarding never finds the invite it should adopt.
       email,
@@ -1058,7 +1058,7 @@ export class InviteService {
 
     // Same contract as approval: an email failure never reverts the resend —
     // the fresh link exists and is shown as the fallback.
-    const { emailNotSent } = await this.trySendInviteEmail({
+    const { emailNotSent } = await this.sendInviteEmail({
       email: existing.email,
       organization: existing.organization,
       inviteCode: freshCode,
@@ -1161,7 +1161,7 @@ export class InviteService {
    * assigned team first, then falls back to any non-archived project in the org so the
    * client can land directly in the app rather than hitting the onboarding flow.
    */
-  async findLandingProjectSlug(invite: OrganizationInvite): Promise<string | null> {
+  async tryFindLandingProjectSlug(invite: OrganizationInvite): Promise<string | null> {
     // Collect all invited team IDs from either format
     const invitedTeamIds = (() => {
       if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
@@ -1195,7 +1195,7 @@ export class InviteService {
    * Finds a PENDING, non-expired invite matching the given organization and
    * email (case-insensitive). Returns null when no such invite exists.
    */
-  async findPendingByOrgAndEmail({
+  async tryFindPendingByOrgAndEmail({
     organizationId,
     email,
   }: {
@@ -1450,7 +1450,7 @@ export class InviteService {
       });
 
       if (invite.organization) {
-        await this.trySendInviteEmail({
+        await this.sendInviteEmail({
           email: invite.email,
           organization: invite.organization,
           inviteCode: invite.inviteCode,

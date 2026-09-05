@@ -1,6 +1,6 @@
 import {
   reportNurturingFailure,
-  tryNurturingDatabase,
+  tryNurturingProfiles,
   tryNurturingSink,
 } from "../adapters/nurturing-sink.adapter";
 
@@ -16,20 +16,17 @@ async function syncSubscriptionTrait({
     return;
   }
 
-  const database = tryNurturingDatabase();
-  if (!database) {
+  const profiles = tryNurturingProfiles();
+  if (!profiles) {
     return;
   }
 
-  const orgUsers = await database.organizationUser.findMany({
-    where: { organizationId },
-    select: { userId: true },
-  });
+  const memberUserIds = await profiles.memberUserIds(organizationId);
 
   await Promise.all(
-    orgUsers.map((ou) =>
+    memberUserIds.map((userId) =>
       nurturing.identifyUser({
-        userId: ou.userId,
+        userId,
         traits: { has_subscription: hasSubscription },
       }),
     ),

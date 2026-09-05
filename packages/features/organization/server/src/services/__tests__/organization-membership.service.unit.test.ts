@@ -19,12 +19,12 @@ const mockRevokeAllBrowserSessions = vi.fn();
 
 describe("OrganizationMembershipService", () => {
   const mockRepo: OrganizationMembershipRepository = {
-    findPersonalTeamInScopes: vi.fn(),
+    tryFindPersonalTeamInScopes: vi.fn(),
     findSharedTeamIds: vi.fn(),
     findTeamRoleBindings: vi.fn(),
     findCustomRolePermissions: vi.fn(),
     tryGetUserOrgRole: vi.fn(),
-    getUserOrgRoleByTeamId: vi.fn(),
+    tryGetUserOrgRoleByTeamId: vi.fn(),
     tryFindPrimaryIntentById: vi.fn(),
     createAndAssign: vi.fn(),
     createForProvisioning: vi.fn(),
@@ -32,8 +32,8 @@ describe("OrganizationMembershipService", () => {
     tryFindProvisioningSummaryById: vi.fn(),
     deleteProvisionedOrganization: vi.fn(),
     getAllForUser: vi.fn(),
-    getOrganizationWithMembers: vi.fn(),
-    getMemberById: vi.fn(),
+    tryGetOrganizationWithMembers: vi.fn(),
+    tryGetMemberById: vi.fn(),
     getAllMembers: vi.fn(),
     tryFindMembership: vi.fn(),
     findAllMembers: vi.fn(),
@@ -66,7 +66,7 @@ describe("OrganizationMembershipService", () => {
     vi.clearAllMocks();
     // The directory reads the role-change flow makes, answered empty unless a
     // test states otherwise.
-    vi.mocked(mockRepo.findPersonalTeamInScopes).mockResolvedValue(null);
+    vi.mocked(mockRepo.tryFindPersonalTeamInScopes).mockResolvedValue(null);
     vi.mocked(mockRepo.findSharedTeamIds).mockResolvedValue([]);
     vi.mocked(mockRepo.findTeamRoleBindings).mockResolvedValue([]);
     vi.mocked(mockRepo.findCustomRolePermissions).mockResolvedValue([]);

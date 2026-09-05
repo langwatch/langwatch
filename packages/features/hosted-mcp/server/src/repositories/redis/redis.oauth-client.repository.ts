@@ -49,7 +49,7 @@ export class RedisOAuthClientRepository {
     );
   }
 
-  static async get({
+  static async tryGet({
     redis,
     clientId,
   }: {

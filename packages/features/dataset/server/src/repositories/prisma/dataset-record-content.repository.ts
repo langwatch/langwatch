@@ -183,7 +183,7 @@ export class DatasetRecordContentRepository {
   /**
    * Finds a single record by id within a dataset and project.
    */
-  async findOne(input: {
+  async tryFindOne(input: {
     id: string;
     datasetId: string;
     projectId: string;

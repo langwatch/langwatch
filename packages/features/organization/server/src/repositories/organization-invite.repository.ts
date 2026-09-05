@@ -4,7 +4,7 @@ import type {
   OrganizationUser,
   OrganizationUserRole,
   RoleBindingScopeType,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/organization-contract";
 
 /** The columns a pending or payment-pending invite is written with. */
 export type WriteInviteInput = {
@@ -65,7 +65,7 @@ export abstract class OrganizationInviteRepository {
     organizationId: string;
   }): Promise<(Organization & { members: OrganizationUser[] }) | null>;
   /** The personal team a set of role-binding scopes reaches, by its owner's name for it. */
-  abstract findPersonalTeamInScopes(input: {
+  abstract tryFindPersonalTeamInScopes(input: {
     scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
   }): Promise<{ name: string } | null>;
 

@@ -414,7 +414,7 @@ export class AgentService extends AgentServiceContract {
     config: ConnectedAgentConfig;
     identity: ConnectedAgentIdentity;
   }): Promise<Agent> {
-    const existing = await this.repository.findByIdentityKey({
+    const existing = await this.repository.tryFindByIdentityKey({
       projectId: input.projectId,
       identityKey: input.identity.identityKey,
     });
@@ -436,7 +436,7 @@ export class AgentService extends AgentServiceContract {
         throw error;
       }
 
-      const raced = await this.repository.findByIdentityKey({
+      const raced = await this.repository.tryFindByIdentityKey({
         projectId: input.projectId,
         identityKey: input.identity.identityKey,
       });

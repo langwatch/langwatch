@@ -11,7 +11,7 @@ export type GatewayElevenLabsProviderRow = {
  * which the service holds separately.
  */
 export abstract class GatewayElevenLabsCredentialRepository {
-  abstract findProviderRow(input: {
+  abstract tryFindProviderRow(input: {
     modelProviderId: string;
   }): Promise<GatewayElevenLabsProviderRow | null>;
 }

@@ -23,7 +23,7 @@ export interface OpsExplainClientResolution {
 
 /** Complete composition port for selecting the dedicated or shared client. */
 export abstract class OpsExplainClientResolver {
-  abstract resolve(): OpsExplainClientResolution | null;
+  abstract tryResolve(): OpsExplainClientResolution | null;
 }
 
 /**
@@ -35,7 +35,7 @@ export abstract class OpsExplainRepository {
    * is configured, else the injected shared client as a fallback.
    * Null when neither is configured on this instance.
    */
-  abstract resolveClient(): OpsExplainClientResolution | null;
+  abstract tryResolveClient(): OpsExplainClientResolution | null;
 
   /**
    * Runs the (already server-wrapped) EXPLAIN query. `guardrails` are ClickHouse settings sent only for

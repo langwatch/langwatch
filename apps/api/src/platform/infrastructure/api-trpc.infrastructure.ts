@@ -8,7 +8,7 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { ApiAuditPort } from "../api-request.policy";
+import type { ApiAuditPort } from "../../api-request.policy";
 
 export type ApiTrpcInfrastructure = Readonly<{
   /** The one guarded connection every row read runs on. */

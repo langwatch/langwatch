@@ -8,7 +8,7 @@ import type {
 export abstract class SimulationRunStateRepository<
   ProjectionType extends Projection = Projection,
 > implements ProjectionStore<ProjectionType> {
-  abstract getProjection(
+  abstract tryGetProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null>;

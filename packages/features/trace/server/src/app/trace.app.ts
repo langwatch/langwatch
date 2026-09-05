@@ -122,7 +122,7 @@ export type TracesV2SpanReader = Readonly<{
   getSpansByTraceId(
     params: ByTrace & { limit?: number; visibilityCutoffMs?: number | null },
   ): Promise<Span[]>;
-  getSpanById(
+  tryGetSpanById(
     params: ByTrace & { spanId: string; visibilityCutoffMs?: number | null },
   ): Promise<Span | null>;
   getSpanEvents(params: ByTrace & { spanId: string }): Promise<ElasticSearchEvent[]>;
@@ -172,7 +172,7 @@ export type TraceLogRecordReader = Readonly<{
 
 /** The stored reviewer corrections, as this feature reads and writes them. */
 export type TraceEditOverlayStore = Readonly<{
-  getByTraceId(
+  tryGetByTraceId(
     input: Readonly<{ projectId: string; traceId: string }>,
   ): Promise<TraceEditOverlayDto | null>;
   upsert(
@@ -333,7 +333,7 @@ export class TraceApp {
     protections: unknown;
     withEditOverlay?: boolean;
   }): Promise<Trace | undefined> {
-    return this.dependencies.traces.read.getById(
+    return this.dependencies.traces.read.tryGetById(
       input.projectId,
       input.traceId,
       input.protections,
@@ -487,7 +487,7 @@ export class TraceApp {
     projectId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
-    return this.dependencies.traces.read.getEvaluationInputs(input);
+    return this.dependencies.traces.read.tryGetEvaluationInputs(input);
   }
 
   /** Topic and subtopic counts for the filtered window. */
@@ -725,7 +725,7 @@ export class TraceApp {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<Span | null> {
-    return this.dependencies.traces.spans.getSpanById({
+    return this.dependencies.traces.spans.tryGetSpanById({
       tenantId: input.projectId,
       traceId: input.traceId,
       spanId: input.spanId,
@@ -861,7 +861,7 @@ export class TraceApp {
     projectId: string;
     traceId: string;
   }): Promise<TraceEditOverlayDto | null> {
-    return this.dependencies.traces.editOverlay.getByTraceId({
+    return this.dependencies.traces.editOverlay.tryGetByTraceId({
       projectId: input.projectId,
       traceId: input.traceId,
     });

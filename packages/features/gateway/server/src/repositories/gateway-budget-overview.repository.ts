@@ -1,4 +1,4 @@
-import type { GatewayBudget } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget } from "@langwatch/gateway-contract";
 
 /**
  * The one row a budget-detail overview starts from. Scoped by organization as

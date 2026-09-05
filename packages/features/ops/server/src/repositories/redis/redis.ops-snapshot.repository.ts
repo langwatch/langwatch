@@ -206,10 +206,10 @@ export class RedisOpsSnapshotRepository extends OpsSnapshotRepository {
   }
 
   async tryReadLive(): Promise<LiveSnapshot | null> {
-    return tryParseLiveSnapshot(await this.redis.get(SNAPSHOT_LIVE_KEY));
+    return tryParseLiveSnapshot(await this.redis.tryGet(SNAPSHOT_LIVE_KEY));
   }
 
   async tryReadDetail(): Promise<DetailSnapshot | null> {
-    return tryParseDetailSnapshot(await this.redis.get(SNAPSHOT_DETAIL_KEY));
+    return tryParseDetailSnapshot(await this.redis.tryGet(SNAPSHOT_DETAIL_KEY));
   }
 }

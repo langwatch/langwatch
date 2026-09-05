@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   GatewayGuardrailProjectMismatchError,
@@ -10,6 +9,7 @@ import {
 import type { GatewayScopePermissionsPort } from "../ports/gateway-scope-permissions.port";
 import type { GuardrailAttachment } from "@langwatch/gateway-contract";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository";
+import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
 import type { VirtualKeyService } from "./virtual-key.service";
 
 /**
@@ -83,7 +83,7 @@ async function assertAllResolve(
 }
 
 /** A virtual-key loader. Structurally satisfied by {@link VirtualKeyService}. */
-export type VirtualKeyReader = Pick<VirtualKeyService, "getById">;
+export type VirtualKeyReader = Pick<VirtualKeyService, "tryGetById">;
 
 /**
  * Scope-aware authorization for the virtual-key write paths. Every call names
@@ -265,7 +265,7 @@ export class VirtualKeyAuthorizationService {
 
     return {
       isOrgMember: organizationRole !== null,
-      isOrgAdmin: organizationRole?.role === OrganizationUserRole.ADMIN,
+      isOrgAdmin: organizationRole?.role === "ADMIN",
       teamIds,
       projectIds: new Set(projectIds),
     };
@@ -300,7 +300,7 @@ export class VirtualKeyAuthorizationService {
   /**
    * Resolve the single PROJECT scope a VK is reachable from — guardrails are project-scoped, so a VK can only attach guardrails from this one (trace) project. Returns null for zero or multiple PROJECT scopes, neither having a well-defined guardrail surface.
    */
-  async resolveVkProjectId({
+  async tryResolveVkProjectId({
     organizationId,
     vkId,
     inputScopes,
@@ -426,8 +426,12 @@ export class VirtualKeyAuthorizationService {
   /**
    * Precondition every by-id MUTATION shares: the key must exist. Authorization is a separate, permission-based decision on the returned key's scopes, so this deliberately doesn't filter by visibility — a scope role-binding holder can operate on a key its membership set never surfaces.
    */
-  async requireExistingVk(reader: VirtualKeyReader, id: string, organizationId: string) {
-    const vk = await reader.getById(id, organizationId);
+  async getExistingVk(
+    reader: VirtualKeyReader,
+    id: string,
+    organizationId: string,
+  ): Promise<VirtualKeyWithScopes> {
+    const vk = await reader.tryGetById(id, organizationId);
     if (!vk) {
       throw new VirtualKeyNotFoundError();
     }
@@ -438,12 +442,12 @@ export class VirtualKeyAuthorizationService {
   /**
    * Precondition every by-id READ shares: the key must exist AND fall inside the caller's membership set. Both answer virtual_key_not_found — a distinguishable forbidden would be an existence oracle for keys in teams the caller has no part in. Membership set is derived per door (session loads it from the user's rows; a project credential synthesizes the one its project implies) but the check itself is shared, so doors can't drift on what "visible" means.
    */
-  async requireVisibleVk(
+  async getVisibleVk(
     reader: VirtualKeyReader,
     membership: MembershipSet,
     { id, organizationId }: { id: string; organizationId: string },
-  ) {
-    const vk = await this.requireExistingVk(reader, id, organizationId);
+  ): Promise<VirtualKeyWithScopes> {
+    const vk = await this.getExistingVk(reader, id, organizationId);
     if (!this.isVisibleToMembership(membership, vk.scopes)) {
       throw new VirtualKeyNotFoundError();
     }

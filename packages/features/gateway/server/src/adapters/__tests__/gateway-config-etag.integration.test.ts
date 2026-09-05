@@ -13,7 +13,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { GatewayConfigAssemblyAdapter } from "../gateway-config-assembly.adapter";
+import { GatewayConfigAssemblyAdapter } from "../postgres.gateway-config-assembly.adapter";
 import type { VirtualKeyWithScopes } from "../../ports/gateway-virtual-key.port";
 
 class AllowTestQueries extends PrismaQueryGuard {

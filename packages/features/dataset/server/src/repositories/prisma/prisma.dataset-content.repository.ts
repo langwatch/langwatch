@@ -142,7 +142,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   async create(input: CreateDatasetInput): Promise<DatasetRow> {
     const client = this.prisma;
     return await client.dataset.create({
-      data: input,
+      data: input as Prisma.DatasetUncheckedCreateInput,
     });
   }
 
@@ -159,7 +159,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
         id: input.id,
         projectId: input.projectId,
       },
-      data: input.data,
+      data: input.data as Prisma.DatasetUncheckedUpdateInput,
     });
   }
 
@@ -180,10 +180,8 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
       projectId: input.projectId,
       data: {
         ...scalars,
-        ...(chunkOffsets !== undefined
-          ? { chunkOffsets: chunkOffsets as Prisma.InputJsonValue }
-          : {}),
-        ...(columnTypes !== undefined ? { columnTypes: columnTypes as Prisma.InputJsonValue } : {}),
+        ...(chunkOffsets !== undefined ? { chunkOffsets } : {}),
+        ...(columnTypes !== undefined ? { columnTypes } : {}),
       },
     });
   }

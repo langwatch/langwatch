@@ -18,7 +18,7 @@ export abstract class ExperimentRunAbortPort {
   /** Records which project owns an in-flight run. */
   abstract setRunning(input: { runId: string; projectId: string }): Promise<void>;
   /** The project that owns an in-flight run, or null when none is running. */
-  abstract getRunningProjectId(runId: string): Promise<string | null>;
+  abstract tryGetRunningProjectId(runId: string): Promise<string | null>;
   /** Drops the owner record once the run has finished. */
   abstract clearRunning(runId: string): Promise<void>;
 }

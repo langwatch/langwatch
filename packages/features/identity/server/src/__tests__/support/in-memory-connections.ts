@@ -20,7 +20,7 @@ import type {
 export class InMemoryConnections implements SsoConnectionReadRepository {
   private readonly states = new Map<string, SsoConnectionState>();
 
-  async findConnection({
+  async tryFindConnection({
     connectionId,
   }: {
     connectionId: string;
@@ -28,7 +28,7 @@ export class InMemoryConnections implements SsoConnectionReadRepository {
     return this.states.get(connectionId) ?? null;
   }
 
-  async findDomainOwner({
+  async tryFindDomainOwner({
     domain,
   }: {
     domain: string;

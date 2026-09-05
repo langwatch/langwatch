@@ -16,7 +16,7 @@ const NOW = Date.UTC(2026, 7, 17, 12, 0, 0);
 const DEFAULT_LOOKBACK = DEFAULT_DAYS * DAY_MS + DEFAULT_RETENTION_FLOOR_MARGIN_MS;
 
 function providerReturning(days: number | null): RetentionDaysProvider {
-  return { getRetentionDays: vi.fn(async () => days) };
+  return { tryGetRetentionDays: vi.fn(async () => days) };
 }
 
 function serviceWith(provider?: RetentionDaysProvider) {
@@ -56,7 +56,7 @@ describe("resolving a retention floor for a read", () => {
     /** @scenario "A retention lookup that fails falls back to the platform default" */
     it("falls back to the default rather than an unbounded read", async () => {
       const service = serviceWith({
-        getRetentionDays: vi.fn(async () => {
+        tryGetRetentionDays: vi.fn(async () => {
           throw new Error("cascade unavailable");
         }),
       });
@@ -117,11 +117,11 @@ describe("resolving a retention floor for a read", () => {
       const inFlight = new Promise<void>((resolve) => {
         release = resolve;
       });
-      const getRetentionDays = vi.fn(async () => {
+      const tryGetRetentionDays = vi.fn(async () => {
         await inFlight;
         return 400;
       });
-      const service = serviceWith({ getRetentionDays });
+      const service = serviceWith({ tryGetRetentionDays });
 
       const reads = Array.from({ length: 20 }, () =>
         service.getFloorMs({
@@ -133,16 +133,16 @@ describe("resolving a retention floor for a read", () => {
       release();
       const floors = await Promise.all(reads);
 
-      expect(getRetentionDays).toHaveBeenCalledTimes(1);
+      expect(tryGetRetentionDays).toHaveBeenCalledTimes(1);
       expect(new Set(floors).size).toBe(1);
     });
 
     /** @scenario "A cold retention lookup is shared by everyone waiting on it" */
     it("gives every waiter an answer when the shared lookup fails", async () => {
-      const getRetentionDays = vi.fn(async () => {
+      const tryGetRetentionDays = vi.fn(async () => {
         throw new Error("cascade down");
       });
-      const service = serviceWith({ getRetentionDays });
+      const service = serviceWith({ tryGetRetentionDays });
 
       const floors = await Promise.all(
         Array.from({ length: 5 }, () =>
@@ -154,7 +154,7 @@ describe("resolving a retention floor for a read", () => {
         ),
       );
 
-      expect(getRetentionDays).toHaveBeenCalledTimes(1);
+      expect(tryGetRetentionDays).toHaveBeenCalledTimes(1);
       expect(floors.every((floor) => NOW - floor === DEFAULT_LOOKBACK)).toBe(true);
     });
   });
@@ -215,13 +215,13 @@ describe("resolving a retention floor for a read", () => {
         });
       }
 
-      expect(provider.getRetentionDays).toHaveBeenCalledTimes(1);
+      expect(provider.tryGetRetentionDays).toHaveBeenCalledTimes(1);
     });
 
     /** @scenario "The retention lookup is not repeated for every read" */
     it("keeps one tenant's answer from being served to another", async () => {
       const provider: RetentionDaysProvider = {
-        getRetentionDays: vi.fn(async ({ tenantId }) => (tenantId === "project_long" ? 400 : 10)),
+        tryGetRetentionDays: vi.fn(async ({ tenantId }) => (tenantId === "project_long" ? 400 : 10)),
       };
       const service = serviceWith(provider);
 
@@ -235,7 +235,7 @@ describe("resolving a retention floor for a read", () => {
       });
 
       expect(long).toBeGreaterThan(short);
-      expect(provider.getRetentionDays).toHaveBeenCalledTimes(2);
+      expect(provider.tryGetRetentionDays).toHaveBeenCalledTimes(2);
     });
 
     /** @scenario "The retention lookup is not repeated for every read" */
@@ -250,13 +250,13 @@ describe("resolving a retention floor for a read", () => {
       await service.getLookbackMs({ table: "x", tenantId: "t" });
       await service.getLookbackMs({ table: "x", tenantId: "t" });
 
-      expect(provider.getRetentionDays).toHaveBeenCalledTimes(2);
+      expect(provider.tryGetRetentionDays).toHaveBeenCalledTimes(2);
     });
 
     /** @scenario "The retention lookup is not repeated for every read" */
     it("caches a failed lookup too, so a broken cascade is not hammered", async () => {
       const provider: RetentionDaysProvider = {
-        getRetentionDays: vi.fn(async () => {
+        tryGetRetentionDays: vi.fn(async () => {
           throw new Error("cascade unavailable");
         }),
       };
@@ -265,7 +265,7 @@ describe("resolving a retention floor for a read", () => {
       await service.getLookbackMs({ table: "x", tenantId: "t" });
       await service.getLookbackMs({ table: "x", tenantId: "t" });
 
-      expect(provider.getRetentionDays).toHaveBeenCalledTimes(1);
+      expect(provider.tryGetRetentionDays).toHaveBeenCalledTimes(1);
     });
 
     /** @scenario "The retention lookup is not repeated for every read" */
@@ -283,7 +283,7 @@ describe("resolving a retention floor for a read", () => {
       // The first tenant was evicted long ago, so it costs a fresh lookup.
       await service.getLookbackMs({ table: "x", tenantId: "tenant_0" });
 
-      expect(provider.getRetentionDays).toHaveBeenCalledTimes(51);
+      expect(provider.tryGetRetentionDays).toHaveBeenCalledTimes(51);
     });
   });
 });

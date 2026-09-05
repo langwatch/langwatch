@@ -31,6 +31,7 @@
 import {
   CliDeviceSessionService,
   CliDeviceSessionStorePort,
+  PostgresAuthDirectoryAdapter,
   type AuthCliDeviceFlowRestPorts,
   type CliBrowserSessionPort,
   type CliPersonalWorkspace,
@@ -160,7 +161,7 @@ export function composeApiAuthCliDeviceFlow(
       store: ApiCliDeviceSessionStore.create(redis),
       refreshTokenTtlSeconds: options.refreshTokenTtlSeconds,
     }),
-    database: () => prisma,
+    directory: () => PostgresAuthDirectoryAdapter.create({ database: prisma }),
     session: resolveSession,
     apiKeys: () => apiKeys,
     ensurePersonalWorkspace,

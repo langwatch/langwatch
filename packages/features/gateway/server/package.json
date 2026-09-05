@@ -54,8 +54,8 @@
       "default": "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts"
     },
     "./composition/gateway-transactions": {
-      "types": "./src/adapters/prisma.gateway-transaction.adapter.ts",
-      "default": "./src/adapters/prisma.gateway-transaction.adapter.ts"
+      "types": "./src/adapters/postgres.gateway-transaction.adapter.ts",
+      "default": "./src/adapters/postgres.gateway-transaction.adapter.ts"
     },
     "./composition/gateway-virtual-key-direct-budgets": {
       "types": "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts",

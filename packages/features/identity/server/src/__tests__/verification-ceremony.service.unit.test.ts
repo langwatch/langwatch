@@ -62,7 +62,7 @@ function harness(options?: {
   const service = new VerificationCeremonyService(
     store,
     {
-      findIdentifier: async ({ identifierId }) =>
+      tryFindIdentifier: async ({ identifierId }) =>
         identifierId === WORK || identifierId === PERSONAL
           ? fact({
               identifierId,
@@ -72,10 +72,10 @@ function harness(options?: {
           : null,
       // The ceremony reads exactly one head; the rest of the port is
       // present so the double is the contract, not a slice of it.
-      findUserHashKey: async () => null,
+      tryFindUserHashKey: async () => null,
       findHeads: async ({ userId }) => emptyIdentityHeads({ userId }),
-      findActiveIdentifierByValue: async () => null,
-      findIdentifierIdForAccount: async () => null,
+      tryFindActiveIdentifierByValue: async () => null,
+      tryFindIdentifierIdForAccount: async () => null,
     },
     { verifyIdentifier: verifyIdentifier as never },
     {

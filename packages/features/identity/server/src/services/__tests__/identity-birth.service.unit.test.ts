@@ -22,14 +22,14 @@ function harness(overrides?: {
 }) {
   const order: string[] = [];
   const heads = {
-    findUserHashKey: async () => "key_material",
+    tryFindUserHashKey: async () => "key_material",
     findHeads: async ({ userId }: { userId: string }) => ({
       userId,
       identifiers: {},
     }),
-    findActiveIdentifierByValue: async () => null,
-    findIdentifier: async () => null,
-    findIdentifierIdForAccount: async () => null,
+    tryFindActiveIdentifierByValue: async () => null,
+    tryFindIdentifier: async () => null,
+    tryFindIdentifierIdForAccount: async () => null,
   };
 
   const ledger = {

@@ -1,7 +1,7 @@
 /**
  * What both one-off ModelProvider migrations share: the table shape they
  * walk and the outcome shape they report. The per-row conversions
- * (`migrateCustomModelsRow`, `migrateModelProviderKeysRow`) live in
+ * (`migrateCustomModelsRow`, `tryMigrateModelProviderKeysRow`) live in
  * `#services/model-provider-legacy-migration.service`, since neither task
  * here decides anything about a row — this module is only the walk's common
  * vocabulary.

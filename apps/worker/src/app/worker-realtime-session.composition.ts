@@ -169,13 +169,13 @@ class WorkerElevenLabsCredentials implements ElevenLabsCredentialReader {
     private readonly encryption: AesGcmSecretEncryptionAdapter,
   ) {}
 
-  getApiCredential(input: {
+  tryGetApiCredential(input: {
     modelProviderId: string;
   }): Promise<{ apiKey: string; baseUrl: string } | null> {
     return GatewayElevenLabsCredentialService.create({
       providers: PrismaGatewayElevenLabsCredentialRepository.create({ database: this.database }),
       credentials: WorkerGatewayModelProviderCredentials.create(this.encryption),
-    }).getApiCredential({ modelProviderId: input.modelProviderId });
+    }).tryGetApiCredential({ modelProviderId: input.modelProviderId });
   }
 }
 

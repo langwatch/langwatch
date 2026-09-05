@@ -12,7 +12,7 @@ import {
 import type { BugReport } from "@langwatch/prisma-client/generated";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createBugReportTrpcRouter } from "./bug-report-trpc.mount";
 
 /** The one namespace, built over the composed inbox. */
@@ -34,7 +34,7 @@ export function composeBugReportFeature(options: {
 
   const ports: ApiBugReportPorts = {
     getAll: (input) => reports.getAll(input),
-    getById: (input) => reports.getById(input),
+    getById: (input) => reports.tryGetById(input),
     /**
      * Unlike the API-key sink this one is AWAITED: the row is the record of who
      * opened somebody's transcript, and it is written before they see it.

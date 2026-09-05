@@ -1,7 +1,7 @@
 import type {
   GatewayBudget,
   GatewayBudgetBucketBoundary,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/gateway-contract";
 
 import type { VirtualKeyWithScopes } from "./gateway-virtual-key.port";
 
@@ -15,7 +15,7 @@ import type { VirtualKeyWithScopes } from "./gateway-virtual-key.port";
  * they are ONE port rather than four because they are one caller: the internal
  * family, whose six methods are exactly what its five routes read.
  *
- * The shapes are the reads as they were, not narrowed: `findVirtualKeyForConfig`
+ * The shapes are the reads as they were, not narrowed: `tryFindVirtualKeyForConfig`
  * returns the record the config materialiser is typed against, including the
  * routing policy that carries the model aliases, because a key materialised
  * without it emits an empty alias map and the gateway silently stops resolving
@@ -27,10 +27,10 @@ export abstract class GatewayInternalStorePort {
    *
    * `null` when no key has that id, which the route answers 404 for.
    */
-  abstract findVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null>;
+  abstract tryFindVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null>;
 
   /** One budget by id, whatever its state; the route decides what it may serve. */
-  abstract findBudget(budgetId: string): Promise<GatewayBudget | null>;
+  abstract tryFindBudget(budgetId: string): Promise<GatewayBudget | null>;
 
   /**
    * The per-user reset boundary for one bucket of an attributed-user budget.
@@ -38,7 +38,7 @@ export abstract class GatewayInternalStorePort {
    * `null` where the bucket has never been reset, which means the template's
    * own period boundary is the only one bounding the sum.
    */
-  abstract findBucketBoundary(input: {
+  abstract tryFindBucketBoundary(input: {
     budgetId: string;
     bucketScopeId: string;
   }): Promise<Pick<GatewayBudgetBucketBoundary, "periodStartedAt"> | null>;

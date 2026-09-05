@@ -114,13 +114,13 @@ export function composeAuthFeature(options: {
       ? SsoConnectionDomainRoutingRepository.create({
           prisma,
           isMethodConfigured: async (methodId) =>
-            (await SignInMethodPolicyService.resolveFederatedMethod(resolveAuthProvider))?.id ===
+            (await SignInMethodPolicyService.tryResolveFederatedMethod(resolveAuthProvider))?.id ===
             methodId,
         })
       : LegacySsoDomainRoutingRepository.create({
           prisma,
           instanceMethod: () =>
-            SignInMethodPolicyService.resolveFederatedMethod(resolveAuthProvider),
+            SignInMethodPolicyService.tryResolveFederatedMethod(resolveAuthProvider),
         }),
     policy: SignInMethodPolicyService.create({
       resolveAuthProvider,

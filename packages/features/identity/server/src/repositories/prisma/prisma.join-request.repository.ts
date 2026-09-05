@@ -30,7 +30,7 @@ export class PrismaJoinRequestReadRepository implements JoinRequestListReadRepos
 
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findRequest({
+  async tryFindRequest({
     joinRequestId,
   }: {
     joinRequestId: string;
@@ -41,7 +41,7 @@ export class PrismaJoinRequestReadRepository implements JoinRequestListReadRepos
     return row ? PrismaJoinRequestProjectionRepository.rowToJoinRequest(row) : null;
   }
 
-  async findPendingRequest({
+  async tryFindPendingRequest({
     userId,
     organizationId,
   }: {

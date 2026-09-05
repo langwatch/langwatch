@@ -15,7 +15,7 @@ export class ModelCostRegexSafetyService {
    * backtracking. Null when the pattern is invalid OR unsafe — the caller cannot
    * tell the two apart, and does not need to: both mean "do not run this".
    */
-  compileSafeRegex(pattern: string): RegExp | null {
+  tryCompileSafeRegex(pattern: string): RegExp | null {
     try {
       const compiled = new RegExp(pattern);
 
@@ -27,6 +27,6 @@ export class ModelCostRegexSafetyService {
 
   /** The pass/fail verdict, for call sites that do not need the compiled form. */
   isSafeRegex(pattern: string): boolean {
-    return this.compileSafeRegex(pattern) !== null;
+    return this.tryCompileSafeRegex(pattern) !== null;
   }
 }

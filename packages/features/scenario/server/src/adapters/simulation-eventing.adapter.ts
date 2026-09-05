@@ -120,11 +120,11 @@ export class SimulationRunStateStoreAdapter implements ProjectionStore {
     );
   }
 
-  getProjection(
+  tryGetProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<Projection | null> {
-    return this.store.getProjection(aggregateId, context);
+    return this.store.tryGetProjection(aggregateId, context);
   }
 
   storeProjection(projection: Projection, context: ProjectionStoreWriteContext): Promise<void> {

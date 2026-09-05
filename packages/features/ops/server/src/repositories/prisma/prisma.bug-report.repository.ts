@@ -5,7 +5,8 @@
  * ordering and return shape is the one the back office has always been served.
  */
 import { generate } from "@langwatch/ksuid";
-import type { BugReport, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { BugReport, BugReportCreateInput } from "@langwatch/ops-contract";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { BugReportRepositoryPort } from "../../ports/bug-report.port";
 
 /**
@@ -27,11 +28,14 @@ export class PrismaBugReportRepository extends BugReportRepositoryPort {
     super();
   }
 
-  create({ data }: { data: Prisma.BugReportCreateInput }): Promise<BugReport> {
+  create({ data }: { data: BugReportCreateInput }): Promise<BugReport> {
     return this.prisma.bugReport.create({
       data: {
-        id: generate(BUG_REPORT_KSUID_RESOURCE).toString(),
         ...data,
+        // The Json column is written from a value this feature's own contract
+        // shapes, so it is narrowed to Prisma's input JSON at the write.
+        metadata: (data.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
+        id: generate(BUG_REPORT_KSUID_RESOURCE).toString(),
       },
     });
   }
@@ -67,7 +71,7 @@ export class PrismaBugReportRepository extends BugReportRepositoryPort {
     });
   }
 
-  findById({ id }: { id: string }): Promise<BugReport | null> {
+  tryFindById({ id }: { id: string }): Promise<BugReport | null> {
     return this.prisma.bugReport.findUnique({ where: { id } });
   }
 

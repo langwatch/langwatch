@@ -48,7 +48,7 @@ import {
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { parseOtlpLogs, parseOtlpMetrics, parseOtlpTraces, readOtlpBody } from "@langwatch/otlp";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port";
 import type { GovernanceIngestKeyProvenancePort } from "../../ports/governance-ingest-key-provenance.port";
 import type { GovernanceProjectPort } from "../../ports/governance-project.port";
 import type {
@@ -164,7 +164,7 @@ export type GovernanceIngestRestPorts = Readonly<{
    * organization. A non-member resolves to no principal and the spend still
    * rolls up at organization, team and project scope.
    */
-  database: () => PrismaClient;
+  directory: () => GovernanceDirectoryPort;
   /** The per-caller throttle, where this deployment composed a counter. */
   rateLimit?: GovernanceIngestRateLimitPort | undefined;
   /** Drops a payload-supplied API-key attribution before anything folds it. */
@@ -685,7 +685,7 @@ export function createGovernanceIngestRestApp(options: {
                 events,
                 source,
                 spend,
-                database: ports.database(),
+                directory: ports.directory(),
                 governanceProjectId: govProject.id,
               });
             }
@@ -886,10 +886,10 @@ async function priceCostEvents(input: {
   events: readonly CanonicalCostEvent[];
   source: GovernanceIngestionSource;
   spend: GovernanceIngestSpendPort;
-  database: PrismaClient;
+  directory: GovernanceDirectoryPort;
   governanceProjectId: string;
 }): Promise<number> {
-  const { events, source, spend, database, governanceProjectId } = input;
+  const { events, source, spend, directory, governanceProjectId } = input;
   let ledgerRowsWritten = 0;
 
   for (const event of events) {
@@ -899,14 +899,10 @@ async function priceCostEvents(input: {
       // still rolls up at organization, team and project scope.
       let principalUserId: string | null = null;
       if (event.userEmail) {
-        const user = await database.user.findFirst({
-          where: {
-            email: event.userEmail,
-            orgMemberships: { some: { organizationId: source.organizationId } },
-          },
-          select: { id: true },
+        principalUserId = await directory.tryFindMemberIdByEmail({
+          email: event.userEmail,
+          organizationId: source.organizationId,
         });
-        principalUserId = user?.id ?? null;
         if (!principalUserId) {
           logger.info(
             {

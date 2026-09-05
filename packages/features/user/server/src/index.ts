@@ -19,9 +19,9 @@ export { UserService } from "./services/user.service";
 export {
   runGdprUserDataErase,
   UserDataEraseTask,
-  type GdprUserDataEraseDatabase,
   type GdprUserDataEraseOutcome,
 } from "./tasks/user-data-erase.task";
+export type { GdprUserDataEraseDatabase } from "./repositories/prisma/prisma.user-data-erase.repository";
 export {
   IdentityTrpcApi,
   type IdentityTrpcContext,

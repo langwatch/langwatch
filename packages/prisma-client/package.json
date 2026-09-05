@@ -19,6 +19,10 @@
     "./generated": {
       "types": "./src/generated/client.ts",
       "default": "./src/generated/client.ts"
+    },
+    "./errors": {
+      "types": "./src/prisma-error-codes.ts",
+      "default": "./src/prisma-error-codes.ts"
     }
   },
   "scripts": {

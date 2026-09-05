@@ -16,7 +16,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 
 import { PrismaGatewayAdapter } from "../../../adapters/prisma.gateway.adapter";
-import { PrismaGatewayInternalStoreAdapter } from "../../../adapters/prisma.gateway-internal-store.adapter";
+import { PrismaGatewayInternalStoreAdapter } from "../../../adapters/postgres.gateway-internal-store.adapter";
 import type { GatewayModelProviderCredentialsPort } from "../../../ports/gateway-model-provider-credentials.port";
 import { GatewayConfigMaterialiserService } from "../../../services/gateway-config-materialisation.service";
 import { TestProjectService } from "../../../__tests__/support/test-project-service";
@@ -30,7 +30,7 @@ import {
 import { testRestSecurity } from "./support/rest-security.support";
 
 import { createVirtualKeyServiceForTest } from "../../../testing";
-import { GatewayConfigAssemblyAdapter } from "../../../adapters/gateway-config-assembly.adapter";
+import { GatewayConfigAssemblyAdapter } from "../../../adapters/postgres.gateway-config-assembly.adapter";
 import { PrismaGatewayScopeResolutionRepository } from "../../../repositories/prisma/prisma.gateway-scope-resolution.repository";
 import { GatewayScopeResolutionService } from "../../../services/gateway-scope-resolution.service";
 class AllowTestQueries extends PrismaQueryGuard {

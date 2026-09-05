@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  purgeProcessManagerTables,
+  PrismaProcessManagerPurgeRepository,
   type ProcessManagerPurgeDatabase,
-} from "../process-manager-purge.task";
+} from "../../repositories/prisma/prisma.process-manager-purge.repository";
+import { purgeProcessManagerTables } from "../process-manager-purge.task";
 
 /**
  * A database double that answers the two counts and hands back one full batch
  * then an empty one, so a purge that applies runs its loop to exhaustion.
  */
-function fakeDatabase({
+function fakeRepository({
   eligible = 12n,
   batches = [7, 0],
 }: { eligible?: bigint; batches?: number[] } = {}) {
@@ -28,16 +29,19 @@ function fakeDatabase({
       return 0;
     }),
   };
-  return { database: database as unknown as ProcessManagerPurgeDatabase, statements };
+  const repository = PrismaProcessManagerPurgeRepository.create({
+    database: database as unknown as ProcessManagerPurgeDatabase,
+  });
+  return { repository, statements };
 }
 
 describe("purgeProcessManagerTables", () => {
   describe("given a backlog and no instruction to apply", () => {
     /** @scenario "The process-manager purge counts the backlog before deleting it" */
     it("reports what is eligible in each table and deletes nothing", async () => {
-      const { database, statements } = fakeDatabase();
+      const { repository, statements } = fakeRepository();
 
-      const report = await purgeProcessManagerTables({ database });
+      const report = await purgeProcessManagerTables({ repository });
 
       expect(report.mode).toBe("dry-run");
       expect(report.targets.map((target) => target.eligible)).toEqual([12, 12]);
@@ -49,9 +53,9 @@ describe("purgeProcessManagerTables", () => {
   describe("when the operator applies the purge", () => {
     /** @scenario "The process-manager purge never touches work still owed" */
     it("deletes only dispatched outbox rows and consumed inbox rows", async () => {
-      const { database, statements } = fakeDatabase();
+      const { repository, statements } = fakeRepository();
 
-      const report = await purgeProcessManagerTables({ database, apply: true, sleepMs: 0 });
+      const report = await purgeProcessManagerTables({ repository, apply: true, sleepMs: 0 });
 
       expect(report.targets.map((target) => target.deleted)).toEqual([7, 7]);
       const deletes = statements.filter((statement) => statement.includes("DELETE FROM"));
@@ -66,10 +70,10 @@ describe("purgeProcessManagerTables", () => {
   describe("when the retention window is zero days", () => {
     /** @scenario "An unusable retention window deletes nothing" */
     it("refuses before issuing any statement and says what is usable", async () => {
-      const { database, statements } = fakeDatabase();
+      const { repository, statements } = fakeRepository();
 
       await expect(
-        purgeProcessManagerTables({ database, retentionDays: 0, apply: true }),
+        purgeProcessManagerTables({ repository, retentionDays: 0, apply: true }),
       ).rejects.toThrow("retentionDays must be a whole number of at least 1");
       expect(statements).toEqual([]);
     });

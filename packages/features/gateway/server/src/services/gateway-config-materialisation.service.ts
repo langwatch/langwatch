@@ -1,7 +1,7 @@
 /**
  * Materialise GET /api/internal/gateway/config/:vk_id (bundle shape: contract §4.2). Source of truth post VK-binding-collapse: GatewayProviderCredential is gone, ModelProvider absorbed its gateway fields, and the VK's eligible-provider set computes from the VirtualKeyScope graph + optional RoutingPolicy.modelProviderIds ordering (scopeResolver.ts).
  */
-import type { GatewayBudget, ModelProvider, VirtualKey } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget, ModelProvider, VirtualKey } from "@langwatch/gateway-contract";
 
 import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port";
 import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
@@ -582,7 +582,7 @@ function routingWire({
   mp: ModelProvider;
   assembly: GatewayConfigAssemblyPort;
 }): Pick<ProviderSlot, "handle" | "models"> {
-  const models = assembly.declaredModelsForProvider(mp);
+  const models = assembly.tryDeclaredModelsForProvider(mp);
 
   return {
     ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),

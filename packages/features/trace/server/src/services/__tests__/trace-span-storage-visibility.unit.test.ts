@@ -69,9 +69,9 @@ describe("given a span storage read with a visibility gate", () => {
       );
     });
 
-    it("teases a single span on getSpanById", async () => {
+    it("teases a single span on tryGetSpanById", async () => {
       const service = makeService([makeSpan(15)]);
-      const span = await service.getSpanById({
+      const span = await service.tryGetSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",

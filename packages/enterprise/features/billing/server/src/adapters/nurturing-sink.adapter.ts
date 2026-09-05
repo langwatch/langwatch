@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository";
 import type { NurturingService } from "../services/nurturing.service";
 
 /**
@@ -20,7 +20,7 @@ import type { NurturingService } from "../services/nurturing.service";
 const nurturingLogger = createLogger("langwatch:billing:nurturing");
 
 let registeredSink: NurturingService | null = null;
-let registeredDatabase: PrismaClient | null = null;
+let registeredProfiles: NurturingProfileRepository | null = null;
 let registeredOrgAdminResolver: OrganizationAdminResolver | null = null;
 
 /** Resolves an organization admin for a project, when no actor is in hand. */
@@ -41,15 +41,15 @@ export function tryNurturingSink(): NurturingService | null {
 /**
  * Registers the reads two of these signals make on their own — the member list
  * behind a subscription sync, and the person behind a session. Both are plain
- * row reads; the process supplies its guarded client.
+ * row reads; the process supplies the repository they run on.
  */
-export function setNurturingDatabase(database: PrismaClient | null): void {
-  registeredDatabase = database;
+export function setNurturingProfiles(profiles: NurturingProfileRepository | null): void {
+  registeredProfiles = profiles;
 }
 
-/** The registered client, or null when this process composed none. */
-export function tryNurturingDatabase(): PrismaClient | null {
-  return registeredDatabase;
+/** The registered reader, or null when this process composed none. */
+export function tryNurturingProfiles(): NurturingProfileRepository | null {
+  return registeredProfiles;
 }
 
 /** Registers how an organization admin is resolved for a project. */

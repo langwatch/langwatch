@@ -30,12 +30,12 @@ function harness(options?: {
 
   const users: IdentityUsersRepository = {
     storeUserHashKeyIfMissing: vi.fn().mockResolvedValue(undefined),
-    findEmail: vi
+    tryFindEmail: vi
       .fn()
       .mockResolvedValue(options?.email === undefined ? "sam@acme.com" : options.email),
     // The ceremonies never ask it — the collision guard does, one layer
     // down — but the double is the whole port.
-    findUserIdByEmail: vi.fn().mockResolvedValue(null),
+    tryFindUserIdByEmail: vi.fn().mockResolvedValue(null),
   };
   const identity = {
     attachIdentifier: vi.fn(options?.attach ?? (async () => [])),
@@ -68,7 +68,7 @@ describe("the identity ceremonies", () => {
     it("emits nothing and leaves the row write untouched", async () => {
       const { ceremonies, identity } = harness({ latched: false });
 
-      expect(await ceremonies.beforeAccountCreate(accountRow())).toBeUndefined();
+      expect(await ceremonies.tryBeforeAccountCreate(accountRow())).toBeUndefined();
       await ceremonies.beforeAccountDelete(accountRow());
       await ceremonies.beforeUserDelete({ id: USER });
 
@@ -93,7 +93,7 @@ describe("the identity ceremonies", () => {
     it("attaches the identifier and pins the row id it derived from", async () => {
       const { ceremonies, identity } = harness();
 
-      const result = await ceremonies.beforeAccountCreate(accountRow());
+      const result = await ceremonies.tryBeforeAccountCreate(accountRow());
 
       // The row keeps the id the ceremony saw, so the identifier id the
       // backfill later derives from this row is the same id.
@@ -116,7 +116,7 @@ describe("the identity ceremonies", () => {
     it("carries better-auth's own provider id, unfolded, beside the folded one", async () => {
       const { ceremonies, identity } = harness();
 
-      await ceremonies.beforeAccountCreate(
+      await ceremonies.tryBeforeAccountCreate(
         accountRow({ providerId: "auth0", accountId: "auth0|42" }),
       );
 
@@ -132,7 +132,7 @@ describe("the identity ceremonies", () => {
     it("mints the row id when better-auth supplied none", async () => {
       const { ceremonies, identity } = harness();
 
-      const result = await ceremonies.beforeAccountCreate(accountRow({ id: undefined }));
+      const result = await ceremonies.tryBeforeAccountCreate(accountRow({ id: undefined }));
 
       const minted = (result as { data: { id: string } }).data.id;
       expect(minted).toBeTruthy();
@@ -144,7 +144,7 @@ describe("the identity ceremonies", () => {
     it("attaches nothing when the user carries no email value", async () => {
       const { ceremonies, identity } = harness({ email: null });
 
-      expect(await ceremonies.beforeAccountCreate(accountRow())).toBeUndefined();
+      expect(await ceremonies.tryBeforeAccountCreate(accountRow())).toBeUndefined();
       expect(identity.attachIdentifier).not.toHaveBeenCalled();
     });
 
@@ -156,7 +156,7 @@ describe("the identity ceremonies", () => {
         },
       });
 
-      await expect(ceremonies.beforeAccountCreate(accountRow())).rejects.toBeInstanceOf(
+      await expect(ceremonies.tryBeforeAccountCreate(accountRow())).rejects.toBeInstanceOf(
         IdentityPrimaryMustDemoteFirstError,
       );
     });

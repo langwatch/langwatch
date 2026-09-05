@@ -26,11 +26,11 @@ class FakeRequests implements JoinRequestReadRepository {
   held: JoinRequestAggregateState | null = null;
   pending: JoinRequestAggregateState | null = null;
 
-  async findRequest(): Promise<JoinRequestAggregateState | null> {
+  async tryFindRequest(): Promise<JoinRequestAggregateState | null> {
     return this.held;
   }
 
-  async findPendingRequest(): Promise<JoinRequestAggregateState | null> {
+  async tryFindPendingRequest(): Promise<JoinRequestAggregateState | null> {
     return this.pending;
   }
 }

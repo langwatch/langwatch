@@ -307,7 +307,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
       });
 
       const ref = { processName: ns, projectId: PROJECT, processKey: "stuck" };
-      const first = await service.tryRedriveDeadMessage({
+      const first = await service.redriveDeadMessage({
         ref,
         messageId: dead.id,
         actorUserId: ACTOR,
@@ -321,7 +321,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
       expect(after.attempts).toBe(0);
       expect(after.nextAttemptAt.getTime()).toBeLessThanOrEqual(Date.now());
 
-      const second = await service.tryRedriveDeadMessage({
+      const second = await service.redriveDeadMessage({
         ref,
         messageId: dead.id,
         actorUserId: ACTOR,
@@ -343,7 +343,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
       const lapsed = await prisma.processManagerOutbox.findFirstOrThrow({
         where: { processName: ns, projectId: PROJECT, messageKey: "lapsed" },
       });
-      const released = await service.tryReleaseLapsedLease({
+      const released = await service.releaseLapsedLease({
         ref,
         messageId: lapsed.id,
         actorUserId: ACTOR,
@@ -365,7 +365,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
         leasedUntil: new Date(Date.now() + 60 * 1000),
         leaseToken: `lease_${randomUUID().slice(0, 6)}`,
       });
-      const refused = await service.tryReleaseLapsedLease({
+      const refused = await service.releaseLapsedLease({
         ref,
         messageId: liveId,
         actorUserId: ACTOR,
@@ -497,7 +497,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
       expect(messages.map((m) => m.id)).toEqual([redriveId]);
       const target = messages[0]!;
 
-      const result = await service.tryRedriveDeadMessage({
+      const result = await service.redriveDeadMessage({
         ref: {
           processName: target.processName,
           projectId: target.projectId,
@@ -529,7 +529,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
         retiredAt: new Date(NOW - 30_000),
       });
 
-      const result = await service.tryDiscardDeadMessage({
+      const result = await service.discardDeadMessage({
         ref: {
           processName: nsDiscard,
           projectId: PROJECT,
@@ -583,7 +583,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
         },
       });
 
-      const result = await service.tryDiscardDeadMessage({
+      const result = await service.discardDeadMessage({
         ref: {
           processName: nsGuard,
           projectId: PROJECT,
@@ -616,7 +616,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
         retiredAt: new Date(NOW - 10_000),
       });
 
-      await service.tryDiscardDeadMessage({
+      await service.discardDeadMessage({
         ref: {
           processName: nsCount,
           projectId: PROJECT,
@@ -801,7 +801,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
         retiredAt: new Date(NOW - 60_000),
       });
       for (const id of [staleId, freshId]) {
-        const { discarded } = await service.tryDiscardDeadMessage({
+        const { discarded } = await service.discardDeadMessage({
           ref: {
             processName: nsSweep,
             projectId: PROJECT,

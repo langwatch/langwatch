@@ -1,8 +1,5 @@
-import {
-  type Prisma,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+import { RoleBindingScopeType, TeamUserRole } from "@langwatch/organization-contract";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 
 /**
  * Who effectively administers a team.

@@ -158,14 +158,19 @@ export {
   type SubscriptionWithOrg,
 } from "./ports/billing-webhook-subscription.port";
 export {
-  setNurturingDatabase,
+  setNurturingProfiles,
   setNurturingOrganizationAdminResolver,
   setNurturingSink,
-  tryNurturingDatabase,
+  tryNurturingProfiles,
   tryNurturingOrganizationAdminResolver,
   tryNurturingSink,
   type OrganizationAdminResolver,
 } from "./adapters/nurturing-sink.adapter";
+export { PostgresNurturingProfileAdapter } from "./adapters/postgres.nurturing-profile.adapter";
+export type {
+  NurturingProfile,
+  NurturingProfileRepository,
+} from "./repositories/nurturing-profile.repository";
 export { NurturingActivityTrackingService } from "./services/nurturing-activity-tracking.service";
 export { NurturingFeatureAdoptionService } from "./services/nurturing-feature-adoption.service";
 export {
@@ -195,7 +200,10 @@ export {
 export {
   DuplicateSubscriptionsReportTask,
   reportDuplicateSubscriptions,
-  type DuplicateSubscriptionsDatabase,
   type DuplicateSubscriptionsReport,
-  type SubscriptionReportRow,
 } from "./tasks/duplicate-subscriptions-report.task";
+export { PostgresDuplicateSubscriptionsReportAdapter } from "./adapters/postgres.duplicate-subscriptions-report.adapter";
+export type {
+  DuplicateSubscriptionsReportRepository,
+  SubscriptionReportRow,
+} from "./repositories/duplicate-subscriptions-report.repository";

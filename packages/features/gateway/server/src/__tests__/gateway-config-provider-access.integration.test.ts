@@ -22,7 +22,7 @@ import { GatewayConfigMaterialiserService } from "../services/gateway-config-mat
 import type { GatewayService } from "../services/gateway.service";
 import { TestProjectService } from "./support/test-project-service";
 
-import { GatewayConfigAssemblyAdapter } from "../adapters/gateway-config-assembly.adapter";
+import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository";
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service";
 class AllowTestQueries extends PrismaQueryGuard {

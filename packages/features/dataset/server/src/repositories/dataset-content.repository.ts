@@ -1,17 +1,50 @@
-import type { Prisma } from "@langwatch/prisma-client/generated";
 import type { DatasetRow } from "../ports/dataset.port";
 
-export type CreateDatasetInput = Omit<
-  Prisma.DatasetCreateInput,
-  "project" | "datasetRecords" | "batchEvaluations"
-> & {
+/** A Json column's value, mirroring the generated client's own shape. */
+export type DatasetJsonObject = { [Key in string]?: DatasetJsonValue };
+export interface DatasetJsonArray extends Array<DatasetJsonValue> {}
+export type DatasetJsonValue =
+  | string
+  | number
+  | boolean
+  | DatasetJsonObject
+  | DatasetJsonArray
+  | null;
+
+/** The columns a dataset row is written with, minus its relations. */
+export type DatasetWriteFields = {
+  id?: string;
+  name?: string;
+  slug?: string;
+  columnTypes?: DatasetJsonValue;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  archivedAt?: Date | string | null;
+  mapping?: DatasetJsonValue | null;
+  useS3?: boolean;
+  s3RecordCount?: number | null;
+  contentLayout?: string;
+  status?: string;
+  statusError?: string | null;
+  stagingKey?: string | null;
+  uploadFilename?: string | null;
+  rowCount?: number | null;
+  sizeBytes?: bigint | number | null;
+  chunkCount?: number | null;
+  chunkOffsets?: DatasetJsonValue | null;
+};
+
+export type CreateDatasetInput = DatasetWriteFields & {
+  name: string;
+  slug: string;
+  columnTypes: DatasetJsonValue;
   projectId: string;
 };
 
 export type UpdateDatasetInput = {
   id: string;
   projectId: string;
-  data: Prisma.DatasetUpdateInput;
+  data: DatasetWriteFields;
 };
 
 /**

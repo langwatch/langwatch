@@ -252,7 +252,7 @@ export class JoinRequestsService {
    * and the same audit trail — approved by policy the moment it is made instead of by a person
    * later.
    */
-  async joinAutomaticallyIfAdmitted({
+  async tryJoinAutomaticallyIfAdmitted({
     userId,
     verifiedEmail,
   }: {
@@ -383,7 +383,7 @@ export class JoinRequestsService {
     joinRequestId: string;
     userId: string;
   }): Promise<void> {
-    const request = await this.deps.reads.findRequest({ joinRequestId });
+    const request = await this.deps.reads.tryFindRequest({ joinRequestId });
     if (!request || request.userId !== userId) {
       throw new JoinRequestNotFoundError(
         `join request ${joinRequestId} is not ${userId}'s to withdraw`,
@@ -415,7 +415,7 @@ export class JoinRequestsService {
     organizationId: string;
     inviteId: string;
   }): Promise<void> {
-    const open = await this.deps.reads.findPendingRequest({
+    const open = await this.deps.reads.tryFindPendingRequest({
       userId,
       organizationId,
     });
@@ -453,7 +453,7 @@ export class JoinRequestsService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const open = await this.deps.reads.findPendingRequest({
+    const open = await this.deps.reads.tryFindPendingRequest({
       userId,
       organizationId,
     });
@@ -605,7 +605,7 @@ export class JoinRequestsService {
     joinRequestId: string;
     organizationId: string;
   }): Promise<JoinRequestAggregateState> {
-    const request = await this.deps.reads.findRequest({ joinRequestId });
+    const request = await this.deps.reads.tryFindRequest({ joinRequestId });
     if (!request || request.organizationId !== organizationId) {
       throw new JoinRequestNotFoundError(
         `join request ${joinRequestId} does not belong to ${organizationId}`,

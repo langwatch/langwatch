@@ -123,8 +123,8 @@ function harness(options?: {
       // The backfill never reads either of these - the plan takes the email
       // off the user row it already read, and the collision guard is the one
       // asking who holds an address - but the double is the whole port.
-      findEmail: async () => user?.email ?? null,
-      findUserIdByEmail: async () => null,
+      tryFindEmail: async () => user?.email ?? null,
+      tryFindUserIdByEmail: async () => null,
     },
     { attachIdentifier, verifyIdentifier, detachIdentifier },
     // The latch's secret carry (ADR-116 §4). Recorded rather than performed:

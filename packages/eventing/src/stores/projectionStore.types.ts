@@ -94,10 +94,10 @@ export interface ProjectionStore<ProjectionType extends Projection = Projection>
    * @returns The projection if it exists, null otherwise
    * @throws {Error} If tenantId is missing or invalid
    *
-   * **Security:** Implementations MUST call validateTenantId(context, 'getProjection')
+   * **Security:** Implementations MUST call validateTenantId(context, 'tryGetProjection')
    * before executing the query to ensure tenant isolation.
    */
-  getProjection(
+  tryGetProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null>;

@@ -94,7 +94,7 @@ function createRedisStateStore(redis: RedisConnection): AgentStateStorePort {
       const written = await redis.set(key, value, "EX", ttlSeconds, "NX");
       return written === "OK";
     },
-    async get(key) {
+    async tryGet(key) {
       return redis.get(key);
     },
     async del(key) {
@@ -118,7 +118,7 @@ function createRedisStateStore(redis: RedisConnection): AgentStateStorePort {
     async hset(key, fields, ttlSeconds) {
       await redis.multi().hset(key, fields).expire(key, ttlSeconds).exec();
     },
-    async hgetall(key) {
+    async tryHgetall(key) {
       const fields = await redis.hgetall(key);
       return Object.keys(fields).length > 0 ? fields : null;
     },
@@ -219,7 +219,7 @@ function memoryHashOps({
   hashes: Map<string, Expiring<Record<string, string>>>;
   counters: Map<string, Expiring<number>>;
   now: () => number;
-}): Pick<AgentStateStorePort, "hset" | "hgetall" | "incr" | "decr"> {
+}): Pick<AgentStateStorePort, "hset" | "tryHgetall" | "incr" | "decr"> {
   return {
     async hset(key, fields, ttlSeconds) {
       const current = live(hashes, key, now) ?? {};
@@ -228,7 +228,7 @@ function memoryHashOps({
         expiresAt: now() + ttlSeconds * 1000,
       });
     },
-    async hgetall(key) {
+    async tryHgetall(key) {
       return live(hashes, key, now);
     },
     async incr(key, ttlSeconds) {
@@ -277,7 +277,7 @@ function createMemoryStateStore({
       strings.set(key, { value, expiresAt: now() + ttlSeconds * 1000 });
       return true;
     },
-    async get(key) {
+    async tryGet(key) {
       // A counter is a string key in Redis; GET reads it the same way.
       const counter = live(counters, key, now);
       if (counter !== null) return String(counter);

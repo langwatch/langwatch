@@ -87,7 +87,7 @@ async function rewriteMessage(
   rawMessage: Record<string, unknown>,
   params: ExtractionParams,
 ): Promise<{ message: Record<string, unknown>; refs: ExtractedRef[] }> {
-  const contentArray = TraceContentArrayService.coerceContentToArray(rawMessage.content);
+  const contentArray = TraceContentArrayService.tryCoerceContentToArray(rawMessage.content);
   if (contentArray === null) {
     return { message: rawMessage, refs: [] };
   }

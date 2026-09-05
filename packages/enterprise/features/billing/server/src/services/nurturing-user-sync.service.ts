@@ -1,6 +1,6 @@
 import {
   reportNurturingFailure,
-  tryNurturingDatabase,
+  tryNurturingProfiles,
   tryNurturingSink,
 } from "../adapters/nurturing-sink.adapter";
 import type { CioOrgTraits, CioPersonTraits } from "@langwatch/enterprise-billing-contract";
@@ -20,54 +20,18 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
     return;
   }
 
-  const database = tryNurturingDatabase();
-  if (!database) {
+  const profiles = tryNurturingProfiles();
+  if (!profiles) {
     return;
   }
 
-  const [user, orgUser] = await Promise.all([
-    database.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, name: true, createdAt: true },
-    }),
-    database.organizationUser.findFirst({
-      where: { userId },
-      select: { organizationId: true, role: true },
-    }),
-  ]);
-
-  if (!user || !orgUser) {
+  const profile = await profiles.tryFindProfile(userId);
+  if (!profile) {
     return;
   }
 
-  const [org, projects, activeSubscription] = await Promise.all([
-    database.organization.findUnique({
-      where: { id: orgUser.organizationId },
-      select: { id: true, name: true, signupData: true },
-    }),
-    database.project.findMany({
-      where: {
-        team: {
-          organization: { id: orgUser.organizationId },
-        },
-      },
-      select: { firstMessage: true, integrated: true },
-    }),
-    database.subscription.findFirst({
-      where: {
-        organizationId: orgUser.organizationId,
-        status: "ACTIVE",
-      },
-      select: { id: true },
-    }),
-  ]);
-
-  if (!org) {
-    return;
-  }
-
-  const signupData = (org.signupData ?? {}) as Record<string, unknown>;
-  const hasTraces = projects.some((p) => p.firstMessage);
+  const { user, organization: org, hasTraces, hasSubscription } = profile;
+  const signupData = org.signupData;
 
   const traits: Partial<CioPersonTraits> = {
     ...(user.email ? { email: user.email } : {}),
@@ -75,7 +39,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
     ...(signupData.yourRole ? { role: signupData.yourRole as string } : {}),
     ...(signupData.companySize ? { company_size: signupData.companySize as string } : {}),
     has_traces: hasTraces,
-    has_subscription: !!activeSubscription,
+    has_subscription: hasSubscription,
     createdAt: user.createdAt.toISOString(),
     last_active_at: new Date().toISOString(),
   };

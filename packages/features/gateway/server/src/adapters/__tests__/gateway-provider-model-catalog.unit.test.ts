@@ -10,14 +10,14 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { GatewayConfigAssemblyAdapter } from "../gateway-config-assembly.adapter";
+import { GatewayConfigAssemblyAdapter } from "../postgres.gateway-config-assembly.adapter";
 
 const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
 
-describe("declaredModelsForProvider", () => {
+describe("tryDeclaredModelsForProvider", () => {
   describe("when a custom provider declares models", () => {
     it("declares the customer's own model ids", () => {
-      const declared = assembly.declaredModelsForProvider({
+      const declared = assembly.tryDeclaredModelsForProvider({
         provider: "custom",
         customModels: [{ modelId: "stealth/ox-alpha", displayName: "Ox", mode: "chat" }],
         customEmbeddingsModels: null,
@@ -27,7 +27,7 @@ describe("declaredModelsForProvider", () => {
     });
 
     it("keeps a model id that contains a slash whole", () => {
-      const declared = assembly.declaredModelsForProvider({
+      const declared = assembly.tryDeclaredModelsForProvider({
         provider: "custom",
         customModels: ["meta-llama/Llama-3-70B"],
         customEmbeddingsModels: null,
@@ -37,7 +37,7 @@ describe("declaredModelsForProvider", () => {
     });
 
     it("declares chat and embeddings models together", () => {
-      const declared = assembly.declaredModelsForProvider({
+      const declared = assembly.tryDeclaredModelsForProvider({
         provider: "custom",
         customModels: ["chat-one"],
         customEmbeddingsModels: ["embed-one"],
@@ -49,7 +49,7 @@ describe("declaredModelsForProvider", () => {
 
   describe("when the provider is a hosted family", () => {
     it("declares the shipped catalog with the family prefix removed", () => {
-      const declared = assembly.declaredModelsForProvider({
+      const declared = assembly.tryDeclaredModelsForProvider({
         provider: "openai",
         customModels: null,
         customEmbeddingsModels: null,
@@ -60,7 +60,7 @@ describe("declaredModelsForProvider", () => {
     });
 
     it("declares the customer's own models alongside the shipped ones", () => {
-      const declared = assembly.declaredModelsForProvider({
+      const declared = assembly.tryDeclaredModelsForProvider({
         provider: "openai",
         customModels: ["ft:gpt-5-mini:acme:1"],
         customEmbeddingsModels: null,
@@ -72,7 +72,7 @@ describe("declaredModelsForProvider", () => {
 
     it("reads Anthropic and Gemini from the same catalog", () => {
       expect(
-        assembly.declaredModelsForProvider({
+        assembly.tryDeclaredModelsForProvider({
           provider: "anthropic",
           customModels: null,
           customEmbeddingsModels: null,
@@ -80,7 +80,7 @@ describe("declaredModelsForProvider", () => {
       ).toContain("claude-sonnet-5");
       expect(
         assembly
-          .declaredModelsForProvider({
+          .tryDeclaredModelsForProvider({
             provider: "gemini",
             customModels: null,
             customEmbeddingsModels: null,
@@ -96,14 +96,14 @@ describe("declaredModelsForProvider", () => {
       // provider said nothing" and keeps it a candidate for a model no other
       // provider claims. An empty list would read as "serves no models".
       expect(
-        assembly.declaredModelsForProvider({
+        assembly.tryDeclaredModelsForProvider({
           provider: "bedrock",
           customModels: null,
           customEmbeddingsModels: null,
         }),
       ).toBeUndefined();
       expect(
-        assembly.declaredModelsForProvider({
+        assembly.tryDeclaredModelsForProvider({
           provider: "groq",
           customModels: [],
           customEmbeddingsModels: [],
@@ -113,10 +113,10 @@ describe("declaredModelsForProvider", () => {
   });
 
   describe("when a stored custom model entry fails the strict parse", () => {
-    /** @scenario A malformed custom model entry is dropped loudly, not silently */
+    /** @scenario A stored custom model entry that fails the strict parse is dropped loudly */
     it("drops it from the declared list and logs it at warn by name", () => {
       warned.mockClear();
-      const declared = assembly.declaredModelsForProvider({
+      const declared = assembly.tryDeclaredModelsForProvider({
         provider: "custom",
         customModels: [
           { modelId: "good-model", displayName: "Good", mode: "chat" },
@@ -134,7 +134,7 @@ describe("declaredModelsForProvider", () => {
 
   describe("when the same model is declared twice", () => {
     it("declares it once, sorted, so the payload does not move on its own", () => {
-      const declared = assembly.declaredModelsForProvider({
+      const declared = assembly.tryDeclaredModelsForProvider({
         provider: "custom",
         customModels: ["b-model", "a-model"],
         customEmbeddingsModels: ["a-model"],

@@ -83,7 +83,7 @@ export {
 
 /** The Postgres cost ledger an evaluation run writes into. Was
  * `platform/app/src/server/app-layer/evaluations/evaluation-cost.recorder.ts`. */
-export { PrismaEvaluationCostRecorderAdapter } from "./adapters/prisma.evaluation-cost-recorder.adapter";
+export { PrismaEvaluationCostRecorderAdapter } from "./adapters/postgres.evaluation-cost-recorder.adapter";
 
 /**
  * The ONLINE execution path: rendering a stored trace through its evaluator
