@@ -86,6 +86,26 @@ export class GuidedOnboardingService {
     return new GuidedOnboardingService(prisma);
   }
 
+  /**
+   * The organization a project credential speaks for. The REST route and the
+   * CLI reach the state through a project key, and the state is the
+   * organization's.
+   */
+  async organizationIdOfProject({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<string> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    if (!project) {
+      throw new NotFoundError("project_not_found", "Project", projectId);
+    }
+    return project.team.organizationId;
+  }
+
   async getState({
     organizationId,
   }: {

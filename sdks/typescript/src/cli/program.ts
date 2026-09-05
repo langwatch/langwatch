@@ -3652,6 +3652,39 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       await impl(resourceId);
     });
 
+  // The guided onboarding state of the organization this project belongs to.
+  // Agent plumbing like `navigate`: Langy reads it to know which path it is
+  // guiding and marks a path done at the end of a guided setup, so the Home
+  // offer and the campaigns see it finish.
+  // See specs/features/onboarding/guided-onboarding-variant.feature.
+  const onboardingCmd = program
+    .command("onboarding")
+    .description("Read and update the guided onboarding of this organization");
+
+  emitsResult(
+    onboardingCmd
+      .command("state")
+      .description("Show the guided onboarding state: paths picked, current, done, provider, tour")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { onboardingStateCommand: impl } = await import("./commands/onboarding/state.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    onboardingCmd
+      .command("complete-path <path>")
+      .description("Mark a guided onboarding path as done: llmops, coding, gateway or governance")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (path: string) => {
+      const { onboardingCompletePathCommand: impl } = await import(
+        "./commands/onboarding/complete-path.js"
+      );
+      return impl(path);
+    },
+  );
+
   // Drive the page the user has open with typed UI actions. Agent plumbing
   // like `navigate`: only works mid-turn, when the platform can reach the
   // page over the turn's live stream. See specs/langy/langy-ui-actions.feature.

@@ -168,6 +168,7 @@ describe("the CLI boot module graph", () => {
     "If the new module genuinely belongs at boot, update this list deliberately.";
 
   describe("given the entrypoint's transitive static imports", () => {
+    /** @scenario "the CLI boot graph does not change for the onboarding commands" */
     it("pins the exact set of first-party modules loaded at boot", () => {
       const { local } = collectBootGraph();
 

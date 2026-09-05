@@ -51,6 +51,10 @@ const EXCLUDED_COMMANDS = new Set([
   // frame and deliberately renders NO card (see
   // specs/langy/langy-agent-driven-navigation.feature).
   "navigate",
+  // Agent-only onboarding signal: `onboarding complete-path` and
+  // `onboarding state` write and read the organization's guided onboarding
+  // state at the end of a guided setup. Not a resource a card could show.
+  "onboarding",
   // Local telemetry-wiring setup: writes agent config files on the user's
   // machine (settings.json, config.toml, shell rc), not a platform resource.
   "instrument",
