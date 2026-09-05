@@ -223,6 +223,11 @@ export class PrismaTeamRepository extends TeamRepository {
     removeLegacyUserId?: string;
   }): Promise<OrganizationTeam> {
     return this.database.$transaction(async (transaction) => {
+      // Take the team row before comparing against it. Without the lock two
+      // concurrent membership changes can both read the same `updatedAt` and
+      // both pass the compare-and-swap, which is how a team with two admins
+      // lost both of them at once.
+      await transaction.$queryRaw`SELECT id FROM "Team" WHERE id = ${input.teamId} AND "organizationId" = ${input.organizationId} FOR UPDATE`;
       const result = await transaction.team.updateMany({
         where: {
           id: input.teamId,

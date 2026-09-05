@@ -14,6 +14,7 @@ import {
   type SimulationQueueRun,
   type SimulationRunData,
   type SimulationSetData,
+  type SimulationRecordAgentInstance,
   type SimulationStartRun,
   type SimulationTextMessageEnd,
   type SimulationTextMessageStart,
@@ -25,6 +26,7 @@ export type { SimulationRunState } from "./projections/simulation-run-state.proj
 export type TestSimulationServiceOptions = {
   run?: SimulationRunData;
   finishRun?: (input: SimulationFinishRun) => Promise<void>;
+  recordAgentInstance?: (input: SimulationRecordAgentInstance) => Promise<void>;
 };
 
 /** Deterministic Scenario run capability for transport and process tests. */
@@ -143,4 +145,8 @@ export class TestSimulationService extends SimulationService {
   async cancelRun(_input: SimulationCancelRun): Promise<void> {}
 
   async deleteRun(_input: SimulationDeleteRun): Promise<void> {}
+
+  async recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void> {
+    await this.options.recordAgentInstance?.(input);
+  }
 }

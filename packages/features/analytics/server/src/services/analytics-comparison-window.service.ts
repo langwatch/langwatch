@@ -1,12 +1,7 @@
 /**
- * The comparison window a period-over-period read is measured against.
- *
- * Arithmetic over a request's own dates and nothing else: it takes a start and
- * an end, and answers where the window immediately before them begins. It lives
- * with Analytics because it is what "compared to the previous period" means on
- * every analytics surface — the monitors page's performance strip reads the
- * same trend a person sees when they open analytics for that evaluation, and it
- * reads it by asking this.
+ * The comparison window a period-over-period read is measured against. Arithmetic over a
+ * request's own dates and nothing else: it takes a start and an end, and answers where the
+ * window immediately before them begins.
  */
 import { addDays, differenceInCalendarDays } from "date-fns";
 
@@ -23,9 +18,7 @@ export class AnalyticsComparisonWindowService {
 
   /**
    * Where the window immediately before `startDate` begins.
-   *
    * @param period Minutes, when the surface has a datapoint step; one day
-   *   otherwise.
    */
   currentVsPrevious(
     input: Readonly<{ startDate: number | string | Date; endDate: number | string | Date }>,

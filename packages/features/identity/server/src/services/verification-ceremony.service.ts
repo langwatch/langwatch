@@ -43,22 +43,9 @@ export interface VerificationCeremonyDeps {
 }
 
 /**
- * The email verification ceremony (D01 — magic link + proof binding).
- *
- * Two distinct proofs, checked at completion and never separable:
- *
- *   1. Mailbox control — the single-use token from the emailed link, HASHED
- *      at rest with a 15-minute TTL.
- *   2. Ceremony ownership (PKCE) — the initiating context mints a
- *      `code_verifier` and sends only its S256 challenge at mint time;
- *      completion requires the verifier. A forwarded link, a mail-scanner
- *      prefetch, or a token replayed from another context cannot complete
- *      the ceremony, because possession of the link alone is insufficient.
- *
- * Identity binding on top: the record pins `verificationId → (identifierId,
- * userId)` at mint, and completion verifies the consumed record targets
- * exactly the identifier being verified — a token can never verify a
- * different identifier, user, or a re-attached successor.
+ * The email verification ceremony (D01 — magic link + proof binding). Two distinct proofs,
+ * checked at completion and never separable: 1. Mailbox control — the single-use token from the
+ * emailed link, HASHED at rest with a 15-minute TTL. 2.
  */
 export class VerificationCeremonyService {
   private readonly now: () => number;
@@ -119,17 +106,6 @@ export class VerificationCeremonyService {
 
   /**
    * Complete the ceremony — the POST half of GET-renders/POST-completes.
-   * Every check must pass against the ONE record the identifier pins; only
-   * then does the verify command dispatch, and consumption follows it — a
-   * persistence failure must leave the proof intact so a retry of the same
-   * valid link can still complete. Concurrent duplicates are absorbed by the
-   * command's own idempotency (an already-VERIFIED identifier emits nothing),
-   * so a consume that reports the record already gone is success, not a
-   * refusal; a later replay of the completion then finds no record at all.
-   *
-   * The one emission that is NOT success is the uniqueness race's dead-end:
-   * the identifier ends DEAD_END rather than VERIFIED, so the ceremony reports
-   * `identity_email_in_use` instead of returning as though it had worked.
    */
   async completeEmailVerification(args: {
     userId: string;
@@ -217,14 +193,8 @@ export class VerificationCeremonyService {
   }
 
   /**
-   * The guard resolved a cross-user race by DEAD-ENDING this identifier rather
-   * than refusing (D01: on the losing side of a concurrent verify there is no
-   * caller to refuse). There is a caller here, so the caller is told:
-   * reporting this as a completed verification would leave a customer
-   * believing an address is theirs while it belongs to somebody else. The
-   * record is left unconsumed — the identifier is DEAD_END, so the token can
-   * no longer verify anything, and burning it would be the ceremony charging
-   * for a proof it rejected.
+   * The guard resolved a cross-user race by DEAD-ENDING this identifier rather than refusing
+   * (D01: on the losing side of a concurrent verify there is no caller to refuse).
    */
   private deadEnd(context: {
     userId: string;

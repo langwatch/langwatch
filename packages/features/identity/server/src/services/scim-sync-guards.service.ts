@@ -17,46 +17,13 @@ import {
 import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository";
 
 /**
- * The directory-sync guards (D08): what runs BEFORE any sync fact exists.
- * Each verb reads the sync's FOLDED STATE and states only what the state does
- * not already carry.
- *
- * One implementation, two callers — the SCIM boundary on the calling path and
- * the pipeline's command handlers on the staged re-run — so a retried command
- * re-derives the same facts rather than a second set.
- *
- * Two decisions live here and nowhere else:
- *
- *   RECOVERY   a push that lands while the sync is in ERROR states the
- *              recovery as its own fact, so "it started working again"
- *              appears in the same history the failure did rather than being
- *              inferred from an absence.
- *
- *   RETIREMENT a failure is retired — becomes a dead letter — when it can
- *              never succeed, or when the identity provider has retried the
- *              identical failure {@link SCIM_APPLY_MAX_ATTEMPTS} times. It is
- *              retired VISIBLY: the fact stays, the sync stays in ERROR, and
- *              the directory's requested state is never reported as reached.
- *
- * A sync that is REVOKED states nothing at all. Its token has stopped
- * verifying, so a command reaching here is a straggler from before the
- * teardown, and folding it would report a torn-down connection as healthy.
- *
- * Facts come back without their envelope; the ledger stamps business time,
- * tenancy and idempotency from the command that produced them.
+ * The directory-sync guards (D08): what runs BEFORE any sync fact exists. Each verb reads the
+ * sync's FOLDED STATE and states only what the state does not already carry.
  */
 
 /**
- * How many identical failed applies an identity provider may make before the
- * failure is retired as a dead letter.
- *
- * Five, because a directory retries on its own schedule — hourly for most,
- * nightly for some — and the number has to be large enough that a transient
- * outage recovers on its own and small enough that a genuinely stuck
- * deprovision reaches an administrator the same working day. It is a count of
- * IDENTICAL failures (same operation, same reason, same person), so a
- * connection failing at several different things does not retire any of them
- * early.
+ * How many identical failed applies an identity provider may make before the failure is retired
+ * as a dead letter.
  */
 export const SCIM_APPLY_MAX_ATTEMPTS = 5;
 
@@ -138,10 +105,9 @@ export class ScimSyncGuardsService {
   }
 
   /**
-   * An apply failed. Always states the failure; states the retirement WITH
-   * it when this attempt is the last one, so the dead letter and the failure
-   * that produced it land in one append rather than needing a second command
-   * that a crash could lose.
+   * An apply failed. Always states the failure; states the retirement WITH it when this attempt
+   * is the last one, so the dead letter and the failure that produced it land in one append
+   * rather than needing a second command that a crash could lose.
    */
   async recordScimApplyFailure(
     data: RecordScimApplyFailureCommandData,
@@ -236,10 +202,9 @@ export class ScimSyncGuardsService {
   }
 
   /**
-   * What the attempt count becomes once this failure lands. Mirrors the
-   * reducer's own continuation rule — same operation, same reason, same
-   * person, not already retired — so the number the retirement fact carries
-   * is the number the projection will hold.
+   * What the attempt count becomes once this failure lands. Mirrors the reducer's own
+   * continuation rule — same operation, same reason, same person, not already retired — so the
+   * number the retirement fact carries is the number the projection will hold.
    */
   private attemptsAfter({
     state,

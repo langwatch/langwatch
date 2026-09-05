@@ -1,17 +1,5 @@
 /**
  * ADR-032: S3 (S3-compatible) implementation of `DatasetStorage`.
- *
- * Folds two previously-separate free-function modules into one provider:
- *   - chunked-JSONL I/O (PutObject per chunk; GetObject + parse), keeping the
- *     throw-on-missing-chunk behavior (a missing chunk that PG's `chunkCount`
- *     claims is corruption, not emptiness — never silently truncate).
- *   - the presigned direct-upload wrappers (presigned PUT via
- *     `s3-request-presigner`, HeadObject for the finalize size check, and a
- *     best-effort DeleteObject for staged objects).
- *
- * Each operation resolves its project's current S3 destination and credentials
- * through the injected resolver. A process may keep one adapter, but it must
- * not pin a tenant's BYOC configuration without an invalidation contract.
  */
 
 import type { Readable } from "node:stream";

@@ -12,13 +12,9 @@ import type {
 const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
 
 /**
- * Factory for evaluator_id EXISTS condition builders.
- * All 5 variants share the same EXISTS subquery template, differing only in the additional WHERE clause.
- *
- * NOTE: evaluation_runs.TraceId is Nullable(String) while trace_summaries.TraceId is String.
- * ClickHouse correlated EXISTS silently fails to filter on Nullable = NonNullable comparisons,
- * returning TRUE for every outer row. We use assumeNotNull() + IS NOT NULL to work around this.
- * See: https://github.com/langwatch/langwatch/issues/3000
+ * Factory for evaluator_id EXISTS condition builders. All 5 variants share the same EXISTS
+ * subquery template, differing only in the additional WHERE clause. NOTE:
+ * evaluation_runs.TraceId is Nullable(String) while trace_summaries.TraceId is String.
  */
 function buildEvaluatorExistsCondition(additionalWhere: string): FilterConditionBuilder {
   return (values, paramId) => ({
@@ -355,13 +351,8 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
 };
 
 /**
- * Recursively collects ClickHouse WHERE conditions from nested filter parameters.
- *
- * @param field - The filter field being processed
- * @param params - Filter params: string[] | Record<string, ...> | Record<string, Record<string, ...>>
- * @param keys - Accumulated keys from parent levels [key, subkey, ...]
- * @param paramCounter - Mutable counter for unique parameter IDs
- * @param allParams - Accumulated query parameters
+ * Recursively collects ClickHouse WHERE conditions from nested filter
+ * parameters, given the field, params, accumulated keys, and counters.
  * @returns Object with conditions array and unsupported filter flag
  */
 function collectClickHouseConditions(
@@ -431,12 +422,9 @@ function collectClickHouseConditions(
 }
 
 /**
- * Spans of a trace start around the trace's `OccurredAt`, but a long-running
- * trace can have spans a little outside the dashboard window. Widen the
- * `stored_spans` partition window by this buffer so a matching span near a
- * window edge is never pruned away. Matches the +/- 2 day margin used by the
- * trace-fetch `withPartitionHint` helper. Partitions are weekly, so the buffer
- * costs at most one extra week of partitions while still pruning the cold tail.
+ * Spans of a trace start around the trace's `OccurredAt`, but a long-running trace can have
+ * spans a little outside the dashboard window. Widen the `stored_spans` partition window by
+ * this buffer so a matching span near a window edge is never pruned away.
  */
 const SPAN_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -466,14 +454,8 @@ function buildSpanTimeBound(timeWindow?: { startDate?: number; endDate?: number 
 }
 
 /**
- * Generate ClickHouse WHERE conditions from filter parameters.
- * Returns SQL condition strings and aggregated parameters for parameterized queries.
- *
  * @param filters - The filter parameters from the request
  * @param timeWindow - Optional dashboard time window. When provided, span/event
- *   filters that probe `stored_spans` via an EXISTS subquery are bounded to this
- *   window so they prune partitions instead of cold-scanning every weekly
- *   partition (including S3-tiered ones).
  * @returns Object with conditions array, aggregated params, and unsupported filter flag
  */
 export function generateClickHouseFilterConditions(

@@ -11,11 +11,6 @@ export type DeriveIdentifierIdInput = {
 
 /**
  * Where an identifier fact's identity comes from.
- *
- * A seam rather than a call because the derivation reaches for KSUID
- * construction, which the guards and the backfill plan have no business
- * naming: they state what the fact is, and the composed adapter says what it
- * is called.
  */
 export abstract class IdentifierIdentityPort {
   /** The deterministic id this fact always derives, on any pass. */

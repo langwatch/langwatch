@@ -31,6 +31,8 @@ class TestScenarioExecutionService extends ScenarioExecutionService {
     Promise.resolve(),
   );
 
+  readonly recordAgentInstance = vi.fn(() => Promise.resolve());
+
   submit(_input: ScenarioExecutionJob): Promise<void> {
     throw new Error("submit unexpectedly called in backfill tests");
   }

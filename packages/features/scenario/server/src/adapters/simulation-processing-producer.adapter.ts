@@ -83,6 +83,12 @@ class ProducerOnlyScenarioExecution extends ScenarioExecutionService {
   finishUnsuccessfulRun(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "finish an unsuccessful scenario run"));
   }
+
+  recordAgentInstance(): Promise<never> {
+    return Promise.reject(
+      producerOnly(this.processName, "record the agent instance that served a scenario run"),
+    );
+  }
 }
 
 /**
@@ -117,6 +123,9 @@ class ProducerOnlySimulationExecution extends SimulationExecutionPort {
   }
   deleteRun(): Promise<never> {
     return this.refuse("delete a simulation run");
+  }
+  recordAgentInstance(): Promise<never> {
+    return this.refuse("record the agent instance that served a simulation run");
   }
 
   private refuse(capability: string): Promise<never> {

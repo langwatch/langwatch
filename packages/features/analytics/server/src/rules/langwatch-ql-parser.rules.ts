@@ -1,34 +1,14 @@
 /**
- * LangWatchQL analytics SQL — the parser seam.
- *
- * The validator walks a tree of `{ type, ...fields }` nodes and knows nothing
- * about how that tree was produced. This module is the only place that knows,
- * which is what makes the parser replaceable: swapping `@clickhouse/parser` for
- * another front end means writing another {@link LangWatchQLParser} that emits
- * the same node vocabulary, and changing nothing in the walker.
- *
- * Two properties are load-bearing and belong here rather than at the call site:
- *
- *  - **Nothing escapes.** A parser is a large piece of generated code fed
- *    attacker-controlled text; it can throw anything, including a `RangeError`
- *    from its own recursion. Every throw becomes `{ ok: false }`, so a parser
- *    that breaks refuses the query instead of letting it past unvalidated.
- *  - **The failure reason is not the parser's message.** A parse diagnostic
- *    quotes the input and names grammar internals; the caller gets a fixed
- *    sentence and the position, and the detail stays in the log.
- *
+ * LangWatchQL analytics SQL — the parser seam. The validator walks a tree of `{ type, ...fields
+ * }` nodes and knows nothing about how that tree was produced.
  * @see specs/analytics/lwql-api.feature
  */
 import { parse } from "@clickhouse/parser";
 
 /**
- * A node of a parsed SQL statement.
- *
- * Deliberately structural: `type` is the discriminant the validator's allowlist
- * is keyed on, and every other field is `unknown` so the walker must decide,
- * field by field, what it recognises. A typed AST union would let a field the
- * walker has never heard of ride along silently — the exact failure the
- * default-deny walk exists to prevent.
+ * A node of a parsed SQL statement. Deliberately structural: `type` is the discriminant the
+ * validator's allowlist is keyed on, and every other field is `unknown` so the walker must
+ * decide, field by field, what it recognises.
  */
 export interface SqlAstNode {
   readonly type: string;
@@ -54,11 +34,6 @@ export interface LangWatchQLParser {
 
 /**
  * Reads a `location` off a thrown parser error without trusting its shape.
- *
- * `@clickhouse/parser` raises a peggy `SyntaxError` carrying
- * `location.start.{line,column}`, but this runs on the catch path of a
- * dependency parsing hostile input — a second failure while reporting the first
- * would turn a rejection into a 500.
  */
 function positionOfThrown(error: unknown): SqlSourcePosition | undefined {
   if (typeof error !== "object" || error === null) return undefined;
@@ -70,14 +45,8 @@ function positionOfThrown(error: unknown): SqlSourcePosition | undefined {
 }
 
 /**
- * The shipped parser: ClickHouse's own TypeScript grammar.
- *
- * Pinned to an exact version in `package.json` rather than a caret range. The
- * package is young and its AST *is* this module's security-relevant contract —
- * a minor release that renames a node type or adds a field would silently
- * change what the validator recognises, and the walk fails closed on anything
- * it does not recognise, so the failure mode of an unreviewed bump is refusing
- * valid customer SQL. Bump it deliberately, with the walk's rule table re-read.
+ * The shipped parser: ClickHouse's own TypeScript grammar. Pinned to an exact version in
+ * `package.json` rather than a caret range.
  */
 export const clickHouseSqlParser: LangWatchQLParser = {
   parse(sql: string): SqlParseOutcome {

@@ -1,4 +1,8 @@
-import { type Scenario, type ScenarioService, SimulationService } from "@langwatch/scenario-contract";
+import {
+  type Scenario,
+  type ScenarioService,
+  SimulationService,
+} from "@langwatch/scenario-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -114,6 +118,7 @@ describe.skipIf(!databaseUrl)("Scenario parameter definition persistence", () =>
         await cleanupTestRows(database(), [
           ["scenarioVersion", { projectId }],
           ["scenario", { projectId }],
+          ["simulationSuite", { projectId }],
           ["project", { id: projectId }],
           ["team", { id: teamId }],
           ["organization", { id: organizationId }],

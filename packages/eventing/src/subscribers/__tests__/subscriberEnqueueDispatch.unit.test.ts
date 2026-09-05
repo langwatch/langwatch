@@ -1,21 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The enqueue-time subscriber contract (payload-cost doctrine invariant 4 —
  * ADR-069), proven at the fan-out seam. These drive the real ProjectionRouter,
- * so what a subscriber's handler receives is exactly what the seam would have
- * staged.
- *
- * Guarantees under test:
- *   - a `filter` returning false never mints a job;
- *   - a `filter` that raises is reported as a failure rather than read as a
- *     decline, loses only its own subscriber's job, and — because the routing
- *     path has no retry — is never re-dispatched (which is why the contract
- *     requires enqueue hooks to be total);
- *   - without a filter, the full event is staged unchanged; and
- *   - each outcome is counted on `es_subscriber_enqueue_total`, `staged` only
- *     once the handoff to the subscriber's lane actually succeeded.
- *
  * @see packages/group-queue/specs/payload-cost.feature
  */
 import { register } from "prom-client";

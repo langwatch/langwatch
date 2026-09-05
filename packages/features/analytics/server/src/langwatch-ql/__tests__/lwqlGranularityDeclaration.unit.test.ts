@@ -1,13 +1,6 @@
 /**
- * The save-time granularity rules, and the A5 premise they rest on: that the
- * validator accepts a bound parameter *inside* an `INTERVAL` expression —
- * `INTERVAL {period_granularity_seconds:UInt32} SECOND` — which is the whole
- * mechanism. ClickHouse compiles `INTERVAL 1 HOUR` to a function call
- * (`toIntervalHour`), so the unit of an offered step cannot itself be a
- * bound value; the seconds-multiplier form is the seam that leaves the
- * surface one value to inject. If the parser or policy refuses that shape,
- * the contract collapses and this test is the first thing to say so.
- *
+ * The save-time granularity rules rest on a bound parameter working *inside*
+ * an `INTERVAL` expression, since ClickHouse compiles it to a function call.
  * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 

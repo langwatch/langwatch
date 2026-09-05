@@ -32,24 +32,7 @@ import type { IdentityUsersRepository } from "../repositories/identity-users.rep
 
 /**
  * The identity guards (ADR-101 §2): what runs BEFORE any fact exists — the
- * veto-before-write half of the adapter contract. Each verb reads the heads,
- * refuses what the state machine forbids, and states only what the heads do
- * not already carry (PR #7429: the store's dedupe is read-side, so a
- * restated fact is still a row written).
- *
- * One implementation, two callers: `IdentityService` on the calling path
- * and the app's pipeline command handlers on the staged re-run, so the
- * guard that vetoes a live ceremony is the one the queue's re-run applies.
- * Facts come back without their envelope; the ledger stamps business time,
- * tenancy and idempotency from the command that produced them.
- *
- * THREE repositories, because uniqueness spans two populations and a race
  * (ADR-116 §6). The heads answer for latched users; `User.email` answers for
- * everyone the identity branch has not adopted yet — a guard that consulted
- * only the projection would call an address free while a legacy user held it.
- * Neither read can decide two concurrent claims, though, so the third is the
- * address LOCK: claimed atomically before any fact is stated, which is what
- * keeps a losing verification out of the log and its proof unburned.
  */
 export class IdentityGuardsService {
   static create(
@@ -70,16 +53,6 @@ export class IdentityGuardsService {
 
   /**
    * Take the address lock, or refuse (ADR-116 §6).
-   *
-   * The two reads above it name the ordinary case — somebody was already
-   * sitting there — and this decides the race, which no read can. It runs
-   * BEFORE any fact is stated, so a loser's verification never reaches the
-   * log and the ceremony's single-use proof is still unburned when the
-   * refusal surfaces.
-   *
-   * A claim already held by this user, or by this same command, is this
-   * caller's own: every ceremony's staged re-run arrives here a second time
-   * with the same command id, and that must cost nothing.
    */
   private async holdsAddressLock({
     userId,
@@ -134,19 +107,6 @@ export class IdentityGuardsService {
 
   /**
    * The cross-population uniqueness check (ADR-116 §6), asked at the two
-   * moments a value becomes a CLAIM on a mailbox: verify, and primary.
-   *
-   * Two reads because there are two populations and one address space. The
-   * projection answers for latched users; `User.email` answers for everyone
-   * else. Attach never asks — an `ATTACHED` identifier blocks nobody, which
-   * is what stops the guard from becoming a squatting mechanism.
-   *
-   * The identity half stays a DEAD-END rather than a refusal, and that is
-   * deliberate: it resolves a concurrent race between two users who both
-   * reached verify, where there is no caller to hand a refusal to on the
-   * losing side (D01, `uniqueness_race_lost`). The legacy half is a genuine
-   * refusal, because the holder was already sitting there before this
-   * ceremony began and the customer can act on being told so.
    */
   private async refuseIfLegacyHolderExists({
     userId,
@@ -201,16 +161,11 @@ export class IdentityGuardsService {
     }
 
     const userHashKey = await this.heads.tryFindUserHashKey({ userId });
-    // Non-email providers arrive VERIFIED with no verify ceremony to
-    // re-check them, so the attach itself is where a cross-user race
-    // resolves — and the address lock is what resolves it, atomically. The
-    // loser arrives ATTACHED and dead-ends in the same emission, which is
-    // D01's answer for a side with no caller to refuse: an IdP callback that
-    // failed would tell the customer nothing they could act on.
-    //
-    // An `email` attach takes no lock. It arrives ATTACHED, blocks nobody,
-    // and locking there is exactly the squatting mechanism the state machine
-    // exists to prevent.
+    // Non-email providers arrive VERIFIED with no verify ceremony to re-check them, so the
+    // attach itself is where a cross-user race resolves — and the address lock is what resolves
+    // it, atomically. The loser arrives ATTACHED and dead-ends in the same emission, which is
+    // D01's answer for a side with no caller to refuse: an IdP callback that failed would tell
+    // the customer nothing they could act on. An `email` attach takes no lock.
     const arrivalState = arrivalStateForProvider(provider);
     const isRaceLoser =
       arrivalState === "VERIFIED" &&
@@ -346,11 +301,6 @@ export class IdentityGuardsService {
     });
 
     // One fact per stream that has to move (ADR-127): the promotion, and a
-    // demotion naming each identifier standing PRIMARY. The fold sweeps for
-    // those itself today and a per-identifier fold cannot, so the command
-    // names them here, while it can still read the whole person. For the one
-    // standing PRIMARY a person actually has, this states exactly what it
-    // stated before.
     return primaryChangeFacts({ heads, identifierId, actor });
   }
 
@@ -408,28 +358,15 @@ export class IdentityGuardsService {
     const { userId, actor } = data;
     const heads = await this.heads.findHeads({ userId });
 
-    // The ids are read from the WHOLE person rather than taken from a caller.
-    // Today the fold sweeps every head and the list is the writer's audit
+    // The ids are read from the WHOLE person rather than taken from a caller. Today the fold
+    // sweeps every head and the list is the writer's audit
     // record; once the fold keys per identifier (ADR-127 slice 3) the list
-    // BECOMES the sweep's bound, and a list built from anything narrower than
     // the whole person would leave an address behind — ADR-110's
-    // principal-filter rule in identity's terms. The event-log mutation that
-    // wipes the user's PRIOR events, the protocol-row deletions, and the
-    // userHashKey shred are the erasure service's side-effects — sequenced
-    // around this command, not inside it.
     return userErasureFacts({ heads, userId, actor });
   }
 
   /**
    * A callback's link was refused and handed to a human (ADR-117 §3). There is
-   * nothing for a guard to veto: a proposal states that no identifier was
-   * attached, so it can never violate an invariant the heads hold. What it
-   * does do is what every other verb does — normalize the value once, here,
-   * so only the normalized form ever reaches a fact.
-   *
-   * A retried callback dedupes on the command's idempotency key, the same way
-   * every other repeated command does, so this states its fact unconditionally
-   * rather than reading heads it would not use.
    */
   async proposeLink(data: ProposeLinkCommandData): Promise<IdentityFactInput[]> {
     const { proposalId, userId, connectionId, provider, providerAccountId, value, reason, actor } =

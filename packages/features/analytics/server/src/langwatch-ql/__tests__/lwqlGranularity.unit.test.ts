@@ -1,13 +1,6 @@
 /**
- * The granularity contract on its own: what declaring
- * `{period_granularity_seconds:UInt32}` means for one run, and the three ways
- * a surface can get it wrong.
- *
- * Driven directly rather than through the service, because these are the
- * rules every surface inherits — the workbench refuses where this refuses,
- * the dashboard coarsens where `coarsen` is passed, and neither can restate
- * the budget arithmetic.
- *
+ * The granularity contract on its own: what declaring `{period_granularity_seconds:UInt32}`
+ * means for one run, and the three ways a surface can get it wrong.
  * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -321,15 +314,11 @@ describe("resolveLangWatchQLGranularity", () => {
     });
 
     it("never reports coarsening to a step finer than the one requested", () => {
-      // The invariant the label promises: wherever coarsenedFromSeconds is
-      // set, the effective step is strictly wider than the requested one.
-      //
-      // The refusal above is what makes the finer-than-requested case
-      // unreachable through this entry point, so this sweep holds on the old
-      // `effective !== requested` code too -- it pins the property rather
-      // than falsifying the bug. The test that fails on the pre-fix code is
-      // "refuses a positive whole step the surface does not offer": 7,200
-      // used to reach coarsening and come back labelled as widened to 3,600.
+      // The invariant the label promises: wherever coarsenedFromSeconds is set, the effective
+      // step is strictly wider than the requested one. The refusal above is what makes the
+      // finer-than-requested case unreachable through this entry point, so this sweep holds on
+      // the old `effective !== requested` code too -- it pins the property rather than
+      // falsifying the bug.
       const windows = [
         WINDOW,
         {

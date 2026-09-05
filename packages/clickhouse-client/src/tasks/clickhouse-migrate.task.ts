@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
+import { acquireClickHouseSchemaLock } from "../schema-lock";
 import { parseRoutingTable } from "../tenancy";
 import { runMigrations } from "./goose.migration-runner";
 import { reconcileTTL } from "./ttl.reconciler";
@@ -86,12 +87,22 @@ export class ClickHouseMigrateTask extends Task {
     }
     if (this.config.buildTime) return;
 
-    const migratedUrls = new Set<string>();
-    if (this.config.sharedUrl !== undefined) {
-      await this.migrateEndpoint({ url: this.config.sharedUrl }, migratedUrls);
-    }
-    for (const endpoint of this.config.privateEndpoints) {
-      await this.migrateEndpoint(endpoint, migratedUrls);
+    // One process at a time owns the schema. Migration is not tenant-scoped —
+    // it drops views and re-derives tables for every tenant at once — so a
+    // second migrator overlapping this one reads and writes a schema partway
+    // through being rebuilt, which surfaces as a wrong number rather than an
+    // error and repairs itself moments later.
+    const release = await acquireClickHouseSchemaLock();
+    try {
+      const migratedUrls = new Set<string>();
+      if (this.config.sharedUrl !== undefined) {
+        await this.migrateEndpoint({ url: this.config.sharedUrl }, migratedUrls);
+      }
+      for (const endpoint of this.config.privateEndpoints) {
+        await this.migrateEndpoint(endpoint, migratedUrls);
+      }
+    } finally {
+      release();
     }
   }
 

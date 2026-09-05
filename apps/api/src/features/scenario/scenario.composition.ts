@@ -566,6 +566,7 @@ function composeScenarioExecution(
       agents: options.agents,
       simulations: composed.simulations,
     }),
+    simulations: composed.simulations,
   });
 }
 

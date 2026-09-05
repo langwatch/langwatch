@@ -1,3 +1,4 @@
+export { resolvePlatformDefaultRetentionDays } from "./rules/platform-default-retention.rules";
 export { PrismaDataRetentionAdapter } from "./adapters/prisma.data-retention.adapter";
 export { ScopeTargetNotFoundError } from "@langwatch/data-retention-contract";
 export {

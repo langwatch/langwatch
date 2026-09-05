@@ -1,19 +1,5 @@
 /**
  * The naming contract between the approved views and the grants that reach them.
- *
- * The reader role's `SELECT` grants are not provisioned from this catalog. The
- * infrastructure bootstrap selects the relations to grant by matching their
- * names against a prefix, so an approved view named outside it is created and
- * then granted to nobody. That failure is silent in the shape that matters: the
- * view exists, the ClickHouse PostgreSQL-engine table over it resolves, and the
- * query returns no rows rather than an error a caller could act on.
- *
- * Nothing else in this repository can catch it. Every other suite reads the
- * approved-view names out of this same catalog, so a renamed view moves the
- * expectation with it and stays green. The prefix is written out literally here
- * for that reason: this guard has to be able to disagree with the catalog, and
- * one that read the name from the catalog never could.
- *
  * @see ../views.ts — the statements under test
  * @see specs/analytics/lwql-api.feature
  */

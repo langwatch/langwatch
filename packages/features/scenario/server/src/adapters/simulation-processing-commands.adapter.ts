@@ -183,6 +183,7 @@ export class SimulationProcessingCommandsAdapter {
   readonly textMessageEnd = TextMessageEndCommand;
   readonly cancelRun = CancelRunCommand;
   readonly deleteRun = DeleteRunCommand;
+  readonly recordAgentInstance = RecordAgentInstanceCommand;
   readonly archiveSet = ArchiveSetCommand;
 
   private constructor() {}

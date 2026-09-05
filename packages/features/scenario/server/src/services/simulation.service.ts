@@ -5,6 +5,7 @@ import {
   simulationBatchSummarySchema,
   simulationCancelRunSchema,
   simulationDeleteRunSchema,
+  simulationRecordAgentInstanceSchema,
   simulationExportRunSchema,
   simulationFinishRunSchema,
   simulationMessageSnapshotSchema,
@@ -28,6 +29,7 @@ import type {
   SimulationBatchSummaryInput,
   SimulationCancelRun,
   SimulationDeleteRun,
+  SimulationRecordAgentInstance,
   SimulationExportFilterInput,
   SimulationExportRunsInput,
   SimulationExternalSetCountInput,
@@ -216,5 +218,9 @@ export class SimulationService extends SimulationServiceContract {
 
   deleteRun(input: SimulationDeleteRun): Promise<void> {
     return this.execution.deleteRun(simulationDeleteRunSchema.parse(input));
+  }
+
+  recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void> {
+    return this.execution.recordAgentInstance(simulationRecordAgentInstanceSchema.parse(input));
   }
 }

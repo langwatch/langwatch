@@ -16,15 +16,8 @@ import {
 } from "./support/in-memory-connections";
 
 /**
- * Operator attestation (D04's D05 amendment): a LangWatch operator states out
- * of band that a domain is an organization's, which replaces the PROOF and
- * never the approval.
- *
- * The distinction is the whole security argument, so it is what most of these
- * tests are about: the claim is still claimed, still approved by an operator,
- * and an attested domain is exactly as trustworthy as that approval — no
- * more. What is removed is the round-trip to a customer the same operator
- * just decided about, which buys latency and no security.
+ * Operator attestation (D04's D05 amendment): a LangWatch operator states out of band that a
+ * domain is an organization's, which replaces the PROOF and never the approval.
  */
 
 const ORG = "org_acme";

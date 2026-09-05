@@ -1,12 +1,5 @@
 /**
  * LangWatchQL analytics SQL — the vocabulary the default-deny walk is written in.
- *
- * What an accepted query reports, what a refused one reports, and the frame and
- * accumulator types the walk carries down the tree. Types and constants only:
- * the walk itself is `./langwatch-ql-query-walk.rules`, and the entry point
- * that composes a parser with it is
- * `../services/langwatch-ql-validation.service.ts`.
- *
  * @see specs/analytics/lwql-api.feature
  */
 import type { SqlAstNode } from "./langwatch-ql-parser.rules";
@@ -33,15 +26,8 @@ export interface LangWatchQLTableReference {
 }
 
 /**
- * One equality a `JOIN` was written on, with each side exactly as the caller
- * wrote it — `t.TraceId`, not a resolved column.
- *
- * Resolving a side to a dataset is the reader's job, and
- * {@link LangWatchQLQueryBlock.tables} is what it takes to do it: the qualifier
- * is either an alias or a table name from that same list. The walk deliberately
- * does not do it here, because doing so would mean deciding what an ambiguous
- * or shadowed qualifier means — a judgement that belongs to whoever is asking,
- * not to the gate.
+ * One equality a `JOIN` was written on, with each side exactly as the caller wrote it —
+ * `t.TraceId`, not a resolved column.
  */
 export interface LangWatchQLJoinEdge {
   readonly left: string;
@@ -49,13 +35,9 @@ export interface LangWatchQLJoinEdge {
 }
 
 /**
- * One `SELECT` block, and the structure the walk saw in it.
- *
- * Recorded because a diagnostic like `POSSIBLE_FANOUT` — aggregating at a
- * parent's grain after a one-to-many join — is a question about the shape of
- * the query, and the walk is the only pass that ever looks at the tree. Reading
- * it back out later would mean parsing the statement a second time, and a
- * second parse is a second answer waiting to disagree with the first.
+ * One `SELECT` block, and the structure the walk saw in it. Recorded because a diagnostic like
+ * `POSSIBLE_FANOUT` — aggregating at a parent's grain after a one-to-many join — is a question
+ * about the shape of the query, and the walk is the only pass that ever looks at the tree.
  */
 export interface LangWatchQLQueryBlock {
   /**
@@ -65,50 +47,27 @@ export interface LangWatchQLQueryBlock {
    */
   readonly tables: readonly LangWatchQLTableReference[];
   /**
-   * The equalities this block's joins were written on.
-   *
-   * Only the conjunctive ones whose two sides are both plain column
-   * references: `ON a = b AND c = d` contributes two edges, while a side that
-   * is a function call, a literal, or one arm of an `OR` contributes none. The
-   * question these answer is which key columns were matched, and an equality
-   * that may or may not hold is not one of them.
+   * The equalities this block's joins were written on. Only the conjunctive ones whose two
+   * sides are both plain column references: `ON a = b AND c = d` contributes two edges, while a
+   * side that is a function call, a literal, or one arm of an `OR` contributes none.
    */
   readonly joins: readonly LangWatchQLJoinEdge[];
   /**
-   * Column names this block filters on, lowercased and stripped of any
-   * qualifier — `WHERE t.OccurredAt >= …` contributes `occurredat`.
-   *
-   * Only `WHERE`, `PREWHERE` and `QUALIFY`, which are the positions that bound
-   * what a read touches. A join condition is deliberately absent: it says which
-   * rows line up, not which rows are read.
-   *
-   * Recorded because "this query has no predicate on the dataset's partitioning
-   * column" is a question about the query's shape, and the walk is the only
-   * pass that ever looks at the tree. It reads the name as written, so a filter
-   * written against a *projection alias* (`SELECT toStartOfHour(t) AS b … WHERE
-   * b > x`) contributes the alias rather than the column — a diagnostic reading
-   * this can therefore under-count real predicates, never invent one.
+   * Column names this block filters on, lowercased and stripped of any qualifier — `WHERE
+   * t.OccurredAt >= …` contributes `occurredat`. Only `WHERE`, `PREWHERE` and `QUALIFY`, which
+   * are the positions that bound what a read touches.
    */
   readonly filteredColumns: readonly string[];
   /** Whether the block carries `GROUP BY`, in any of its spellings. */
   readonly hasGroupBy: boolean;
   /**
    * Names the block groups by, lowercased and stripped of any qualifier.
-   *
-   * Names, not expressions: `GROUP BY toStartOfHour(t)` groups by something the
-   * result has no name for, and is absent here, while the ordinary
-   * `SELECT toStartOfHour(t) AS bucket … GROUP BY bucket` contributes `bucket`
-   * — which is also the result column's name, and is what lets a reader tell a
-   * grouping key apart from an aggregate that happens to return a timestamp.
    */
   readonly groupByColumns: readonly string[];
   /**
-   * Whether the block collapses rows with an aggregate.
-   *
-   * `false` for an aggregate used with `OVER`: a window function reads a frame
-   * and returns one value per row, which is the opposite of collapsing. A block
-   * with a join, no `hasGroupBy` and no `isAggregated` is the bare `SELECT` over a
-   * fanout that a diagnostic wants to warn about.
+   * Whether the block collapses rows with an aggregate. `false` for an aggregate used with
+   * `OVER`: a window function reads a frame and returns one value per row, which is the
+   * opposite of collapsing.
    */
   readonly isAggregated: boolean;
 }
@@ -137,12 +96,8 @@ export interface RejectedLangWatchQL {
 export type LangWatchQLValidation = AcceptedLangWatchQL | RejectedLangWatchQL;
 
 /**
- * How many reasons a single rejection reports.
- *
- * All of them, up to a cap: an agent fixing a query wants every problem at
- * once, not one per round trip. The cap is there because a pathological query
- * can violate the policy thousands of times and the list rides in a response
- * body.
+ * How many reasons a single rejection reports. All of them, up to a cap: an agent fixing a
+ * query wants every problem at once, not one per round trip.
  */
 export const MAX_VIOLATIONS = 20;
 
@@ -156,12 +111,9 @@ export const METADATA_FIELDS: readonly string[] = [
 ];
 
 /**
- * Column-set constructs whose members the walk cannot enumerate.
- *
- * Refused in a projection when the caller has restricted fields, because there
- * is no way to prove the expansion excludes them without the table's columns —
- * which this layer deliberately does not have. `COLUMNS(a, b)` is absent on
- * purpose: it names its columns, so they are checked like any other reference.
+ * Column-set constructs whose members the walk cannot enumerate. Refused in a projection when
+ * the caller has restricted fields, because there is no way to prove the expansion excludes
+ * them without the table's columns — which this layer deliberately does not have.
  */
 export const UNRESOLVABLE_COLUMN_SETS: readonly string[] = [
   "Asterisk",
@@ -172,10 +124,6 @@ export const UNRESOLVABLE_COLUMN_SETS: readonly string[] = [
 
 /**
  * A {@link LangWatchQLQueryBlock} while the walk is still filling it in.
- *
- * Mutable, and carried on the frame rather than looked up, so that whichever
- * node learns a fact writes it to the block it is lexically inside — which is
- * the only interpretation that stays right when blocks nest.
  */
 export interface BlockAccumulator {
   readonly tables: LangWatchQLTableReference[];
@@ -220,11 +168,6 @@ export interface FieldArgs extends NodeArgs {
 
 /**
  * What the walk does with one field of one node kind.
- *
- * The four non-walking kinds are the whole point: a field cannot be listed
- * without saying whether its contents are inspected (`node` / `nodes` /
- * `custom`), inert (`scalar`), constrained to known values (`enum`), or fatal
- * (`refuse`). Anything not listed at all is refused by {@link walkNode}.
  */
 export type FieldRule =
   | { readonly kind: "node"; readonly clause?: LangWatchQLClause }

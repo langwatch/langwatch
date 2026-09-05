@@ -49,11 +49,9 @@ function googleAccount(): BackfillAccountRow {
 }
 
 /**
- * The harness's identity service mirrors the real calling-path dispatch
- * faithfully where it matters to this pass: attach folds an Identifier row
- * with the same deterministic id derivation and arrival state, verify
- * promotes ATTACHED and refuses the states the real guard refuses — so the
- * parity proof runs against rows shaped exactly like the fold's.
+ * The harness's identity service mirrors the real calling-path dispatch: attach
+ * folds an Identifier row with the same id derivation and arrival state, and
+ * verify promotes/refuses exactly like the real guard.
  */
 function harness(options?: {
   user?: BackfillUserRow | null;

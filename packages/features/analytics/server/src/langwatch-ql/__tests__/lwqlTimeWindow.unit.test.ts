@@ -1,11 +1,6 @@
 /**
- * The time-window contract on its own: how an instant is spelled for the
- * database, and what a surface may and may not do with the two reserved names.
- *
- * Driven directly rather than through the service, because these are the rules
- * every surface inherits — a refusal proven here is a refusal REST, tRPC and
- * the saved-chart write path all get for free, and none of them can restate it.
- *
+ * The time-window contract on its own: how an instant is spelled for the database, and what a
+ * surface may and may not do with the two reserved names.
  * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -52,12 +47,9 @@ function metaOf(run: () => unknown): Record<string, unknown> {
 }
 
 /**
- * A zone the process is pinned to while the format is under test.
- *
- * Without it the whole group is vacuous wherever `TZ` is UTC — which is most
- * CI runners — because an implementation reading the *local* getters would
- * agree with a correct one on every instant. At UTC-3 it disagrees, and the
- * instant below is chosen so it disagrees about the calendar day too.
+ * A zone the process is pinned to while the format is under test. Without it the whole group is
+ * vacuous wherever `TZ` is UTC — which is most CI runners — because an implementation reading
+ * the *local* getters would agree with a correct one on every instant.
  */
 const NON_UTC_ZONE = "America/Sao_Paulo";
 
@@ -198,16 +190,9 @@ describe("given a statement and the window a surface is showing", () => {
   });
 
   /**
-   * Pinned, not endorsed.
-   *
-   * A window whose end precedes its start, or whose ends coincide, is bound
-   * exactly as it arrives; the half-open comparison then matches no row and the
-   * member gets an empty answer rather than a refusal. Nothing in the resolver
-   * inspects the order, and these two cases exist so that giving it an opinion
-   * later is a deliberate edit to this file rather than a behavior change
-   * nobody notices — the surfaces above are what own the period, and a resolver
-   * that second-guesses one of them would be a second place the window can be
-   * decided.
+   * Pinned, not endorsed. A window whose end precedes its start, or whose ends coincide, is
+   * bound exactly as it arrives; the half-open comparison then matches no row and the member
+   * gets an empty answer rather than a refusal.
    */
   describe("when the window is inverted or has no width", () => {
     it("binds an inverted window exactly as given, refusing nothing", () => {

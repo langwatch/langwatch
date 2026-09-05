@@ -7,8 +7,14 @@ import {
   type ProcessObservability,
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import {
+  ResourceScope,
+  runShutdownPhases,
+  type ShutdownPhase,
+} from "@langwatch/runtime-composition";
 import { resolveWorkerConfig, type WorkerConfig } from "./platform/config/worker.config";
+
+const DRAIN_PHASE_TIMEOUT_MS = 60_000;
 
 export type WorkerProcessComposition = {
   readonly application: WorkerApplicationPort;
@@ -137,32 +143,34 @@ export class WorkerProcess {
   }
 
   private async closeProcess(): Promise<void> {
-    let firstError: unknown;
+    // Named phases on one runner, so a teardown that hangs is abandoned with
+    // its name in the log rather than holding the whole shutdown open. The
+    // backstop sits above any pod grace period: it is a last resort, not the
+    // drain budget itself.
+    const phases: ShutdownPhase[] = [
+      {
+        name: "application-drain",
+        timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
+        run: () => this.application.drain(),
+      },
+      {
+        name: "telemetry",
+        timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
+        run: () => this.observability.shutdown(),
+      },
+      {
+        name: "application-resources",
+        timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
+        run: () => this.application.closeResources(),
+      },
+      {
+        name: "process-resources",
+        timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
+        run: () => this.resources.close(),
+      },
+    ];
 
-    try {
-      await this.application.drain();
-    } catch (error) {
-      firstError = error;
-    }
-
-    try {
-      await this.observability.shutdown();
-    } catch (error) {
-      firstError ??= error;
-    }
-
-    try {
-      await this.application.closeResources();
-    } catch (error) {
-      firstError ??= error;
-    }
-
-    try {
-      await this.resources.close();
-    } catch (error) {
-      firstError ??= error;
-    }
-
+    const firstError = await runShutdownPhases({ phases, logger: this.observability.logger });
     if (firstError) throw firstError;
   }
 }

@@ -1,11 +1,7 @@
 /**
- * The only LangWatchQL database seam.
- *
- * An executor runs an already-validated statement as the restricted identity —
- * never the application's administrative client, which has no tenant row
- * policy. The tenant capability is the sole query setting; the database profile
- * pins read-only and the resource ceilings, and this seam only bounds what the
- * finished result carries back.
+ * The only LangWatchQL database seam. An executor runs an already-validated statement as the
+ * restricted identity — never the application's administrative client, which has no tenant row
+ * policy.
  */
 import type { LangWatchQLColumn, LangWatchQLStatistics } from "@langwatch/analytics-contract";
 
@@ -22,13 +18,6 @@ export interface LangWatchQLExecutionRequest {
 
 /**
  * How much of a result reaches the caller.
- *
- * Distinct from the ceilings the settings profile pins, and the distinction is
- * the whole design: the database's ceilings decide whether the query is allowed
- * to *finish* and throw when it is not, while these decide how much of a
- * finished result is serialised into the response. Overflow here is never
- * silent — the result carries `truncated`, and the service turns that into a
- * diagnostic the caller can branch on.
  */
 export interface LangWatchQLResultLimits {
   /** Most rows a response may carry. */
@@ -65,12 +54,6 @@ export abstract class LangWatchQLExecutorPort {
 
   /**
    * Releases whatever transport this executor holds.
-   *
-   * The real one owns a connection pool, and a process that replaces its
-   * service — which the endpoint suites do several times per file — would
-   * otherwise leave the previous pool's sockets open against the same server
-   * for the lifetime of the process. A double that holds nothing overrides
-   * this with the no-op it inherits.
    */
   close(): Promise<void> {
     return Promise.resolve();

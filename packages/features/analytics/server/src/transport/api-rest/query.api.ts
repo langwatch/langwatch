@@ -1,54 +1,5 @@
 /**
  * The query domain — LangWatchQL over REST, on its own family.
- *
- * Two doors:
- *
- *  - `POST /api/v1/query` — run one statement
- *  - `GET  /api/v1/query/schema` — describe what may be queried
- *
- * This supersedes `/api/v1/projects/{projectId}/analytics/query/clickhouse`
- * and its sibling `.../analytics/schema` — both removed (issue #7565), so this
- * is now the only HTTP door for raw LangWatchQL. Three things moved:
- *
- *  1. **The engine leaves the URL.** `/clickhouse` named the storage engine on
- *     a public path while Postgres-backed views already routed through the same
- *     service. The name promised something the surface does not mean.
- *  2. **The decorative path parameter goes.** `projectId` never *selected*
- *     anything on the old routes — the tenant came from the credential and a
- *     path naming any other project answered not found. A URL segment that
- *     cannot change the answer is a segment that misleads.
- *  3. **The domain gets its own family.** LangWatchQL is not a sub-feature of
- *     charts; charts are a *consumer* of it. `analytics-sql` (directory),
- *     `analytics/query/clickhouse` (URL) and `lwql` (service) were three names
- *     for one thing.
- *
- * The transport is plain REST, like every other family here. A request body is
- * the query itself and a `200` is the result itself — nothing is wrapped, and
- * a refusal is the canonical error envelope this API publishes everywhere
- * else, so one parser reads the whole platform.
- *
- * The version leads: `/api/v1/query`. Issue #7565 originally specified
- * `/api/query/v1` with a deliberate "do not correct this" note, and that
- * decision was reversed on purpose — the reversal and its reasoning are
- * recorded on the issue, not re-litigated here.
- *
- * ## Scope, and why the policy is a route-level chain
- *
- * A project API key reaches exactly its own project, so this file's handlers
- * are the single-project slice: they read the project off the credential, the
- * same way every other API-key read path does.
- *
- * The policy is {@link apiKeyPermission} with `analytics:view` — a real
- * route-level chain, which authenticates the credential and applies the
- * API-key ceiling before any of this file's code runs. `handlerManagedAuth`
- * applies NO middleware: it is a declaration that the HANDLER authenticates,
- * and a handler that then reads the project off an unpopulated context leaves
- * the door open and answers 500 where it owed a 401.
- *
- * Unlike the routes it replaces, this family carries NO feature flag. The two
- * it supersedes were gated because they were experimental; this door is the
- * published one.
- *
  * @see ../../langwatch-ql — the service and everything under it
  * @see specs/analytics/lwql-api.feature
  */
@@ -85,21 +36,16 @@ const logger = createLogger("langwatch:api:query");
 const QUERY_TAGS = ["Query"];
 
 /**
- * The permission this family enforces for itself.
- *
- * Named once and shared by both routes so the policy and the audits cannot
- * drift apart, and so a future cross-project fan-out has a single place to
- * read it from.
+ * The permission this family enforces for itself. Named once and shared by both routes so the
+ * policy and the audits cannot drift apart, and so a future cross-project fan-out has a single
+ * place to read it from.
  */
 const QUERY_PERMISSION = "analytics:view" as const;
 
 /**
- * The gate: `analytics:view` through the API-key ceiling.
- *
- * `apiKeyPermission` rather than `requires`, because this is a public
- * API-key surface — the ceiling is what makes a scoped key answer
- * `effective = ApiKey ∩ user` instead of inheriting the whole of its owner's
- * access.
+ * The gate: `analytics:view` through the API-key ceiling. `apiKeyPermission` rather than
+ * `requires`, because this is a public API-key surface — the ceiling is what makes a scoped key
+ * answer `effective = ApiKey ∩ user` instead of inheriting the whole of its owner's access.
  */
 function queryAccess() {
   return apiKeyPermission(QUERY_PERMISSION);
@@ -116,12 +62,7 @@ const SCHEMA_DESCRIPTION =
   "Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.";
 
 /**
- * `POST /api/v1/query` — execute one statement.
- *
- * The body IS the query. Validation is `zValidator`, so a malformed one is
- * refused by the shared validator with the canonical `validation_error` and
- * its per-field `reasons` chain, exactly as on every other family — this
- * route neither builds nor classifies that failure itself.
+ * `POST /api/v1/query` — execute one statement. The body IS the query.
  */
 function registerRun(secured: QueryApp, ports: LangWatchQLRestPorts): void {
   secured.access(queryAccess()).post(
@@ -170,10 +111,8 @@ function registerRun(secured: QueryApp, ports: LangWatchQLRestPorts): void {
 }
 
 /**
- * `GET /api/v1/query/schema` — describe what may be queried.
- *
- * A GET, because it reads a catalog and takes no arguments: the credential is
- * the whole of its input.
+ * `GET /api/v1/query/schema` — describe what may be queried. A GET, because it reads a catalog
+ * and takes no arguments: the credential is the whole of its input.
  */
 function registerSchema(secured: QueryApp, ports: LangWatchQLRestPorts): void {
   secured.access(queryAccess()).get(
@@ -212,14 +151,8 @@ export function registerQueryRoutes(secured: QueryApp, ports: LangWatchQLRestPor
 }
 
 /**
- * `/api/v1/query`, bound to one process's graph.
- *
- * Version-first, unlike the families that predate it: a consumer holding a
- * base URL does not learn two rules for where `v1` lives.
- *
- * The canonical envelope, because this is a new family — `legacy` is the flat
- * `{ error }` shape older families published and whose consumers parse it, and
- * nothing consumes this door yet.
+ * `/api/v1/query`, bound to one process's graph. Version-first, unlike the families that
+ * predate it: a consumer holding a base URL does not learn two rules for where `v1` lives.
  */
 export function createQueryRestApp(options: {
   security: AppRestSecurity;
@@ -236,23 +169,13 @@ export function createQueryRestApp(options: {
 }
 
 /**
- * The wire shapes of the query domain: what a caller sends, and what the two
- * doors answer with.
- *
- * A file of their own because the request schema is what `zValidator` refuses
- * a malformed body against, and the two response schemas exist for the
- * published OpenAPI document — the service owns the types, these describe them
- * to a consumer reading the spec, and stay loose where the payload genuinely
- * is (a result row's columns are the caller's).
- *
+ * The wire shapes of the query domain: what a caller sends, and what the two doors answer with.
  * @see ./query.api.ts — the routes these describe
  */
 
 /**
- * A bound parameter's value.
- *
- * Scalars only: a parameter is a *value*, and anything structured would be a
- * value whose shape the declared ClickHouse type cannot describe.
+ * A bound parameter's value. Scalars only: a parameter is a *value*, and anything structured
+ * would be a value whose shape the declared ClickHouse type cannot describe.
  */
 const parameterValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
@@ -263,23 +186,15 @@ export const lwqlQuerySchema = z.object({
   sql: z.string().min(1).max(MAX_LWQL_LENGTH),
   parameters: z.record(z.string(), parameterValueSchema).optional(),
   /**
-   * The period this caller is reporting over.
-   *
-   * Honoured here and not only on the dashboard, because the same saved chart
-   * is readable from both and a statement that follows the period must not have
-   * two different meanings depending on which surface asked. Its values fill the
-   * reserved `period_start` / `period_end` parameters the statement declares —
-   * which is also why sending either of those under `parameters` is refused.
+   * The period this caller is reporting over. Honoured here and not only on the dashboard,
+   * because the same saved chart is readable from both and a statement that follows the period
+   * must not have two different meanings depending on which surface asked.
    */
   timeWindow: lwqlTimeWindowSchema.optional(),
   /**
-   * The datapoint step for a statement that declares
-   * `{period_granularity_seconds:UInt32}`, in seconds — the REST twin of the
-   * workbench's step control, so a statement's bucketing means the same thing
-   * at both doors. Restricted to the steps the surface actually offers
-   * ({@link lwqlGranularityStepSchema}) rather than any positive integer, so
-   * an off-list value is a clean schema rejection instead of reaching the
-   * service's backstop. The bucket-budget refusal is still the service's.
+   * The datapoint step for a statement that declares `{period_granularity_seconds:UInt32}`, in
+   * seconds — the REST twin of the workbench's step control, so a statement's bucketing means
+   * the same thing at both doors.
    */
   granularitySeconds: lwqlGranularityStepSchema.optional(),
 });
@@ -297,12 +212,11 @@ export const lwqlResultSchema = z.object({
     rowsReturned: z.number(),
   }),
   truncated: z.boolean(),
-  // Whether the statement DECLARED the reserved time-window parameters and was
-  // therefore given the surface's window. It is not a claim about the rows: the
-  // author writes the comparison, so a statement that declares the names and
-  // never compares against them reports `true` and still reads all of time.
-  // What a consumer can say from it is that this result was offered the period
-  // beside it, not that the period bounded it.
+  // Whether the statement DECLARED the reserved time-window parameters and was therefore given
+  // the surface's window. It is not a claim about the rows: the author writes the comparison,
+  // so a statement that declares the names and never compares against them reports `true` and
+  // still reads all of time. What a consumer can say from it is that this result was offered
+  // the period beside it, not that the period bounded it.
   followsTimeWindow: z.boolean(),
   // The granularity facts, mirroring the service's result: whether the
   // statement declares the reserved parameter at all, the step this run was

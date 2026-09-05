@@ -14,18 +14,6 @@ import { adoptAccountCommandId, adoptUserEmailCommandId } from "../rules/identit
 /**
  * What the legacy rows IMPLY — the plan a backfill pass states, and the
  * same plan the parity check proves the projection against (ADR-101 §6).
- *
- * Its own module for the reason `offboard.ts` is its own module in authz:
- * this is a different shape of work from the service's steps. The service
- * sequences effects (adopt, establish, compensate, prove); this is a pure
- * function of two row sets, and keeping it here is what lets the parity
- * check and the adoption loop read the same plan rather than two
- * derivations that must be kept in agreement by hand.
- *
- * Every id in the plan is derived, none minted: the identifier ids come
- * from `deriveIdentifierId` over the row's own content, and the command
- * ids from `identity-command-id.ts`. That is what makes the pass restatable
- * — a second pass over unchanged rows produces a byte-identical plan.
  */
 
 /** One identifier the legacy rows imply, with the command that adopts it. */
@@ -44,10 +32,9 @@ export type PlannedIdentifier = ExpectedIdentifier & {
 };
 
 /**
- * The email identifier from `User.email` (VERIFIED when `emailVerified`),
- * plus one identifier per `Account` row in the state its provider arrives
- * in (R8). Business time is each row's own `createdAt`, so live emission of
- * the same fact derives the same identifier id.
+ * The email identifier from `User.email` (VERIFIED when `emailVerified`), plus one identifier
+ * per `Account` row in the state its provider arrives in (R8). Business time is each row's own
+ * `createdAt`, so live emission of the same fact derives the same identifier id.
  */
 export class IdentityBackfillPlanService {
   static create(identifiers: IdentifierIdentityPort): IdentityBackfillPlanService {

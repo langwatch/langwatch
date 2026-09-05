@@ -1,3 +1,4 @@
+import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-server";
 import type { Protections } from "@langwatch/trace-contract";
 /**
  * The ClickHouse trace READ stack, composed from this process's own graph.
@@ -746,8 +747,14 @@ class UnrecomputedTraceFullIo extends TraceFullIoPort {
   }
 }
 
-/** The platform application's retention floor, stated rather than imported. */
-const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
+/**
+ * The retention a tenant's data is stamped with when no override exists in its
+ * scope cascade. Resolved rather than written down, so a local stack can lower
+ * it through `LANGWATCH_DEFAULT_RETENTION_DAYS`; the resolver refuses that
+ * variable outside development and test, where lowering it would silently
+ * expire customer data.
+ */
+const PLATFORM_DEFAULT_RETENTION_DAYS = resolvePlatformDefaultRetentionDays(process.env);
 
 const PROMPT_ATTR_KEYS = [
   "langwatch.prompt.id",

@@ -28,6 +28,7 @@ import type {
   ScenarioExecutionJob,
   SimulationCancelRun,
   SimulationDeleteRun,
+  SimulationRecordAgentInstance,
   SimulationFinishRun,
   SimulationMessageSnapshot,
   SimulationProcessingEvent,
@@ -234,6 +235,12 @@ class WorkerScenarioExecutionAdapter extends ScenarioExecutionService {
   finishUnsuccessfulRun(): Promise<never> {
     return Promise.reject(new Error("Scenario failure handling is not composed in this process."));
   }
+
+  recordAgentInstance(): Promise<never> {
+    return Promise.reject(
+      new Error("Recording the serving agent instance is not composed in this process."),
+    );
+  }
 }
 
 /**
@@ -269,6 +276,9 @@ class WorkerSimulationExecutionAdapter extends SimulationExecutionPort {
   }
   deleteRun(input: SimulationDeleteRun): Promise<void> {
     return this.dispatch("deleteRun", input);
+  }
+  recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void> {
+    return this.dispatch("recordAgentInstance", input);
   }
 
   private async dispatch(name: string, input: unknown): Promise<void> {

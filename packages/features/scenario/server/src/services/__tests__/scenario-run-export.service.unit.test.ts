@@ -52,6 +52,7 @@ class NoopSimulationExecutionPort extends SimulationExecutionPort {
   finishRun = noop;
   cancelRun = noop;
   deleteRun = noop;
+  recordAgentInstance = noop;
 }
 
 function createSimulationService(): SimulationService {

@@ -1,78 +1,13 @@
 /**
  * LangWatchQL analytics SQL — which functions a LangWatchQL query may call.
- *
- * The walk in `./validate.ts` allowlists node *kinds* and their *fields*. That
- * is not enough on its own, because every function call in ClickHouse — and
- * every operator, which the grammar desugars into one — arrives as the same
- * `Function` node carrying a name. A kind allowlist says "a function call is
- * fine here" and says nothing about `getSetting`, `currentUser`, `hostName` or
- * `version`. This module is the third allowlist: over the name.
- *
- * ## The admission rule
- *
- * **A function is listed because a question the LangWatchQL schema exists to
- * answer needs it, never because it looks harmless.** Harmlessness is not the
- * test and never was: `version()` leaks nothing of another tenant's and is
- * still not something this API publishes, and the set of functions that "look
- * fine" grows without limit while the set a caller actually needs does not.
- * Every family below traces to the feature file's answerable questions, to the
- * example SQL the schema endpoint publishes, or to the column types the
- * LangWatchQL views expose — and the comment on each says which.
- *
- * The corollary is the important half: **there is no denylist**. Nothing here
- * enumerates the introspection, system, filesystem, URL, dictionary or
- * randomness families, and nothing needs to. They are refused because they are
- * absent, which is also how a function ClickHouse ships next year is refused
- * before anyone has heard of it.
- *
- * ## Matching is case-insensitive, because the parser preserves case
- *
- * `@clickhouse/parser` reports the name as the caller wrote it: `COUNT(*)`
- * arrives as `COUNT`, `Avg(x)` as `Avg`. ClickHouse itself accepts either for a
- * documented subset, so a case-sensitive comparison would refuse the upper-case
- * SQL half the world writes. Folding case can only widen matching *within* this
- * list — a name that is absent stays absent in every spelling — and no entry
- * here is the case-variant of some other ClickHouse function.
- *
- * ## Aggregate combinators are a suffix rule, not 400 more entries
- *
- * ClickHouse spells conditional aggregation by suffixing the aggregate:
- * `countIf`, `sumIf`, `argMaxIf`. The grammar does the same for the standard
- * spelling — `COUNT(DISTINCT x)` arrives as `COUNTDistinct`, `sum(DISTINCT x)`
- * as `sumDistinct` — so refusing the suffix forms would refuse ordinary SQL.
- * {@link AGGREGATE_COMBINATORS} enumerates the two suffixes those needs
- * require, and they compose only onto {@link AGGREGATE_FUNCTIONS}. `-Merge`,
- * `-State`, `-Resample`, `-ForEach`, `-Array` and `-Map` are deliberately
- * absent: no LangWatchQL view exposes an `AggregateFunction` column, so no
- * LangWatchQL question can need them.
- *
- * ## What stays out on purpose, and why it is not an oversight
- *
- * `arrayReduce`, `arrayReduceInRanges`, `initializeAggregation` and
- * `finalizeAggregation` take an aggregate's name as a *string*, which no name
- * allowlist can inspect. They are absent rather than special-cased.
- * `rand`/`randCanonical` are absent because this API promises a parameterized
- * query re-runs deterministically. `dictGet*` is absent because dictionaries
- * are not subject to row policies at all — the feature file's own reason for
- * keeping the LangWatchQL schema free of them. `now()` is the one deliberate
- * exception to determinism: a relative time window has no other spelling, and
- * the schema endpoint's published example SQL uses it.
- *
  * @see ./validate.ts — the walk that applies this
  * @see specs/analytics/lwql-api.feature
  */
 
 /**
- * Operators, under the names the grammar desugars them to.
- *
- * Not a widening: `a + b` is a `Function` named `plus`, `a IN (…)` one named
- * `in`, `CASE WHEN` one named `multiIf`, and `x::T` one named `CAST`. A caller
- * who writes no function call at all still lands here, so an operator missing
- * from this list refuses ordinary arithmetic.
- *
- * Two operators are listed with their families instead, because that is where a
- * reader looks for them: `||` desugars to `concat` and `CASE WHEN` without a
- * subject desugars to `multiIf`.
+ * Operators, under the names the grammar desugars them to. Not a widening: `a + b` is a
+ * `Function` named `plus`, `a IN (…)` one named `in`, `CASE WHEN` one named `multiIf`, and
+ * `x::T` one named `CAST`.
  */
 const OPERATORS = [
   "plus",
@@ -117,13 +52,9 @@ const OPERATORS = [
 ] as const;
 
 /**
- * Aggregates, and the only names {@link AGGREGATE_COMBINATORS} may extend.
- *
- * Every answerable question in the feature file is an aggregation: percentiles
- * by model, error rate against the previous period, pass rates, cost rollups,
- * first failure per trace. `argMin` / `argMax` are what "first failure and
- * first retry per trace" is written with, and `groupArray` is what an ordered
- * "operation A then operation B" reconstruction needs.
+ * Aggregates, and the only names {@link AGGREGATE_COMBINATORS} may extend. Every answerable
+ * question in the feature file is an aggregation: percentiles by model, error rate against the
+ * previous period, pass rates, cost rollups, first failure per trace.
  */
 const AGGREGATE_FUNCTIONS = [
   "count",
@@ -158,20 +89,16 @@ const AGGREGATE_FUNCTIONS = [
 ] as const;
 
 /**
- * Aggregate suffixes.
- *
- * `If` because every rate question in the feature file is a conditional
- * aggregate; `Distinct` because it is where the grammar puts the `DISTINCT`
- * a caller wrote inside an ordinary aggregate call.
+ * Aggregate suffixes. `If` because every rate question in the feature file is a conditional
+ * aggregate; `Distinct` because it is where the grammar puts the `DISTINCT` a caller wrote
+ * inside an ordinary aggregate call.
  */
 const AGGREGATE_COMBINATORS = ["if", "distinct"] as const;
 
 /**
- * Window functions, for the rolling-window and ordering questions.
- *
- * An aggregate used with `OVER` keeps its own name and is admitted by
- * {@link AGGREGATE_FUNCTIONS}; these are the ones that exist only as window
- * functions.
+ * Window functions, for the rolling-window and ordering questions. An aggregate used with
+ * `OVER` keeps its own name and is admitted by {@link AGGREGATE_FUNCTIONS}; these are the ones
+ * that exist only as window functions.
  */
 const WINDOW_FUNCTIONS = [
   "row_number",
@@ -186,11 +113,9 @@ const WINDOW_FUNCTIONS = [
 ] as const;
 
 /**
- * Date and time, for time buckets, relative windows and period comparisons.
- *
- * `toInterval*` is not optional decoration: `INTERVAL 1 HOUR` *is* a call to
- * `toIntervalHour`, so `toStartOfInterval(t, INTERVAL 1 HOUR)` needs both.
- * `now()` is here for relative windows — see the module header on determinism.
+ * Date and time, for time buckets, relative windows and period comparisons. `toInterval*` is
+ * not optional decoration: `INTERVAL 1 HOUR` *is* a call to `toIntervalHour`, so
+ * `toStartOfInterval(t, INTERVAL 1 HOUR)` needs both.
  */
 const DATE_TIME_FUNCTIONS = [
   "now",
@@ -281,10 +206,9 @@ const ARITHMETIC_FUNCTIONS = [
 ] as const;
 
 /**
- * Strings, for grouping and filtering on names, models and attribute values.
- *
- * The regular-expression members are RE2 through ClickHouse, and the cost of
- * one is bounded by the same server-side execution ceilings as everything else.
+ * Strings, for grouping and filtering on names, models and attribute values. The
+ * regular-expression members are RE2 through ClickHouse, and the cost of one is bounded by the
+ * same server-side execution ceilings as everything else.
  */
 const STRING_FUNCTIONS = [
   "lower",
@@ -325,11 +249,6 @@ const CONDITIONAL_FUNCTIONS = ["multiIf", "coalesce", "nullIf", "ifNull", "assum
 
 /**
  * Arrays, maps and tuples, because the LangWatchQL views expose those types.
- *
- * `traces.Models` and `simulations.MessageContents` are `Array(String)` and
- * `spans.SpanAttributes` is a `Map(String, String)`, so "latency by model" is
- * literally an `arrayJoin` and reading an attribute is a `mapKeys` / `mapValues`
- * / element access away. A caller cannot use these datasets without them.
  */
 const COLLECTION_FUNCTIONS = [
   "arrayJoin",
@@ -365,10 +284,9 @@ const COLLECTION_FUNCTIONS = [
 ] as const;
 
 /**
- * JSON, because attribute maps carry serialised payloads.
- *
- * The feature file's example SQL reads a JSON field out of a string column, and
- * an evaluation's `Details` is routinely a JSON document.
+ * JSON, because attribute maps carry serialised payloads. The feature file's example SQL reads
+ * a JSON field out of a string column, and an evaluation's `Details` is routinely a JSON
+ * document.
  */
 const JSON_FUNCTIONS = [
   "JSONExtract",
@@ -394,12 +312,9 @@ const JSON_FUNCTIONS = [
 ] as const;
 
 /**
- * Types a caller may convert to.
- *
- * Written as targets crossed with {@link CONVERSION_FALLBACKS} rather than as
- * ninety-odd literals, because the list is exactly that product and typing it
- * out would hide a missing member rather than reveal one. The result is still a
- * closed, enumerable set — {@link ALLOWED_FUNCTION_NAMES} is the whole of it.
+ * Types a caller may convert to. Written as targets crossed with {@link CONVERSION_FALLBACKS}
+ * rather than as ninety-odd literals, because the list is exactly that product and typing it
+ * out would hide a missing member rather than reveal one.
  */
 const CONVERSION_TARGETS = [
   "Int8",
@@ -429,10 +344,6 @@ const CONVERSION_TARGETS = [
 
 /**
  * What a conversion does with a value it cannot read.
- *
- * The `Or*` forms are what makes an attribute map usable: a token count stored
- * as a `String` is `toUInt64OrNull(SpanAttributes['…'])`, and the plain form
- * would fail the whole query on one malformed row.
  */
 const CONVERSION_FALLBACKS = ["", "OrNull", "OrZero", "OrDefault"] as const;
 
@@ -448,11 +359,6 @@ const CONVERSION_FUNCTIONS: readonly string[] = [
 
 /**
  * A membership table for names, keyed on a null prototype.
- *
- * A record rather than a set because a rules module holds data and functions
- * and constructs nothing; a null prototype because the keys are function names
- * a caller wrote, and an inherited `constructor` would otherwise read as a
- * listed name.
  */
 type NameLookup = Readonly<Record<string, true>>;
 
@@ -488,11 +394,9 @@ const AGGREGATE_BASE_NAMES: NameLookup = nameLookup(
 );
 
 /**
- * How many combinator suffixes may be stripped off one name.
- *
- * ClickHouse allows them to compose (`sumIfDistinct`), and each pass shortens
- * the name so the loop terminates on its own — the bound is here so that
- * reasoning about this function never has to depend on that.
+ * How many combinator suffixes may be stripped off one name. ClickHouse allows them to compose
+ * (`sumIfDistinct`), and each pass shortens the name so the loop terminates on its own — the
+ * bound is here so that reasoning about this function never has to depend on that.
  */
 const MAX_COMBINATORS = 4;
 
@@ -515,9 +419,7 @@ function aggregateBaseOf(lowercased: string): string | null {
 
 /**
  * Whether a LangWatchQL query may call this function.
- *
  * @param name The name exactly as the parser reported it, in the caller's own
- *   spelling and case.
  */
 export function isAllowedLangWatchQLFunction(name: string): boolean {
   const lowercased = name.trim().toLowerCase();
@@ -526,12 +428,8 @@ export function isAllowedLangWatchQLFunction(name: string): boolean {
 }
 
 /**
- * Whether this function collapses rows — the fact a fanout diagnostic reads.
- *
- * True for a combinator form as well, because `countIf` aggregates exactly as
- * `count` does. Says nothing about *where* the call appears: the same name used
- * with `OVER` does not collapse anything, and that distinction belongs to the
- * walk, which is what knows the call is a window function.
+ * Whether this function collapses rows — the fact a fanout diagnostic reads. True for a
+ * combinator form as well, because `countIf` aggregates exactly as `count` does.
  */
 export function isLangWatchQLAggregateFunction(name: string): boolean {
   return aggregateBaseOf(name.trim().toLowerCase()) !== null;

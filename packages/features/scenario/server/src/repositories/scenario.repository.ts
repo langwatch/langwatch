@@ -106,4 +106,24 @@ export abstract class ScenarioRepository {
   abstract archiveTestSuite(
     input: ScenarioTestSuiteIdInput & { archivedAt: Date },
   ): Promise<ScenarioTestSuite>;
+
+  /**
+   * The project's active Default test suite, or null.
+   *
+   * Matched by name rather than by a reserved label, so a suite a person named
+   * "Default" themselves IS the project's Default rather than a second one
+   * beside it. The oldest wins when a project holds two.
+   */
+  abstract tryFindDefaultTestSuite(input: { projectId: string }): Promise<{ id: string } | null>;
+
+  /**
+   * Creates the project's Default test suite and answers its id, or answers the
+   * id of the one a concurrent write created first. The `default` slug may
+   * already belong to another suite of the project, so the slug takes a numeric
+   * suffix rather than the write being refused.
+   */
+  abstract createDefaultTestSuite(input: {
+    projectId: string;
+    id: string;
+  }): Promise<{ id: string }>;
 }

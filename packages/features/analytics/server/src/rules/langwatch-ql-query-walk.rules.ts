@@ -1,60 +1,5 @@
 /**
  * LangWatchQL analytics SQL — the default-deny walk, and the rule table it reads.
- *
- * ## The rule that makes it a gate rather than a filter
- *
- * The walk is an **allowlist over node kinds, and over each kind's fields**.
- * A node type {@link NODE_RULES} does not name is refused; so is a *field* the
- * rule for that node type does not name. Both matter. A kind-only allowlist
- * would let unrecognised syntax ride into an existing node — `INTO OUTFILE` is
- * a plain string literal hanging off a field of an otherwise ordinary SELECT —
- * and the walk would never look at it. So every field is either walked,
- * explicitly accepted as an inert scalar, restricted to an enumerated set of
- * values, or refused outright.
- *
- * The consequence is deliberate: when `@clickhouse/parser` learns syntax that
- * ClickHouse already supports, that syntax arrives here **refused**, and stays
- * refused until someone adds a rule for it. Capability is a review, never a
- * silent widening. The version is pinned exactly for the same reason
- * (`./langwatch-ql-parser.rules.ts`).
- *
- * ## What is allowed
- *
- * A single `SELECT`, optionally with `WITH`; aggregates and window functions;
- * CTEs, subqueries and `UNION` within the depth ceilings; joins; array, map and
- * JSON access; and bound parameters. Everything else — every write and every
- * DDL form, `SETTINGS` in any position, role changes, reserved schemas, output
- * redirection, and every table function — is refused.
- *
- * ## Functions are allowlisted by name, in a third list
- *
- * Kinds and fields are not enough on their own. Every function call *and every
- * operator* arrives as one `Function` node, so a walk that stops at the kind
- * admits `getSetting()`, `currentUser()`, `hostName()` and `version()` — none
- * of which reaches another tenant, and all of which publish more of the server
- * than this API means to. `./langwatch-ql-functions.rules.ts` is the name
- * allowlist and carries the rule that governs it: a function is listed because
- * a LangWatchQL question needs it, never because it looks harmless. It is
- * applied in two places, because a name reaches the walk in two shapes — a
- * `Function` node, and the bare `func_name` string of an `APPLY` transformer.
- *
- * ## Table functions
- *
- * Refused **positionally**: a `TableExpression` carrying a `table_function` is
- * a violation whatever the function is named. That is stronger than any
- * name-list pre-check, so this file deliberately keeps no list of its own — a
- * second list is a second thing to keep in sync, and this one would always be a
- * subset of "all of them".
- *
- * Be accurate about why, because the database layer's measured behaviour is not
- * uniform. `url`, `s3`, `remote`, `file` and `postgresql` are already refused
- * for the restricted identity by grants (error 497), and `merge()` is *not* a
- * bypass — it respects row policies. `numbers`, `values`, `view` and
- * `generateRandom` reach no stored data at all and the database permits them.
- * So this rule is not standing between a caller and a leak: it is here to keep
- * the reachable surface uniform and small, so that "which table functions are
- * safe today" never becomes a question anyone has to re-answer.
- *
  * @see specs/analytics/lwql-api.feature
  * @see dev/docs/adr/081-lwql-table-function-and-ssrf-policy.md
  */
@@ -145,12 +90,9 @@ const UNSUPPORTED_SYNTAX_MESSAGE =
   "This query uses SQL this API does not support. Rewrite it as a plain read query over the analytics datasets.";
 
 /**
- * The default-deny fallthrough.
- *
- * Names neither the node kind nor the field: those are the parser's vocabulary,
- * not the customer's, and a message that recites them tells an attacker which
- * internal representation the gate is built on while telling a customer
- * nothing. The source position is what makes it actionable.
+ * The default-deny fallthrough. Names neither the node kind nor the field: those are the
+ * parser's vocabulary, not the customer's, and a message that recites them tells an attacker
+ * which internal representation the gate is built on while telling a customer nothing.
  */
 function refuseUnrecognised({ ctx, frame, node }: NodeArgs): void {
   report({
@@ -314,12 +256,8 @@ function gateColumnReference({
 }
 
 /**
- * A projection list. Each direct element is checked for an unresolvable column
- * set before it is walked.
- *
- * The check is on the *direct* elements on purpose: `count(*)` puts an
- * `Asterisk` inside a function's arguments, where it names a row count rather
- * than a column set and reveals nothing.
+ * A projection list. Each direct element is checked for an unresolvable column set before it is
+ * walked.
  */
 function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
   if (!Array.isArray(value)) {
@@ -441,12 +379,7 @@ interface LiteralTableReference {
 }
 
 /**
- * Reads a table reference, or reports `null` for one whose parts are not
- * literal names.
- *
- * Any part may be a bound parameter in identifier position (`{db:Identifier}.t`,
- * `FROM {which:Identifier}`), and a table chosen at bind time is a table the
- * allowlist cannot see — which would mean the allowlist was not one.
+ * Reads a table reference, or reports `null` for one whose parts are not literal names.
  */
 function readTableReference(node: SqlAstNode): LiteralTableReference | null {
   const { name, database, alias } = node;
@@ -518,13 +451,9 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
 }
 
 /**
- * How many nodes the join-key scan will look at before giving up.
- *
- * The scan runs inside {@link enterTableJoin}, which is *before* the walk's own
- * depth ceiling has descended into the `ON` expression, so it cannot borrow
- * that ceiling. A join condition big enough to reach this bound is one no
- * diagnostic would say anything useful about anyway, and the query itself is
- * still validated by the walk that follows.
+ * How many nodes the join-key scan will look at before giving up. The scan runs inside {@link
+ * enterTableJoin}, which is *before* the walk's own depth ceiling has descended into the `ON`
+ * expression, so it cannot borrow that ceiling.
  */
 const MAX_JOIN_KEY_SCAN_NODES = 200;
 
@@ -535,12 +464,7 @@ function joinSideName(value: unknown): string | null {
 }
 
 /**
- * The equality pairs a `JOIN` was written on.
- *
- * Descends `AND` only. An equality reached through an `OR`, a `NOT`, or any
- * other function is not a key the join is guaranteed to have matched on, and
- * recording it would tell a diagnostic that two datasets line up on a column
- * when they may not.
+ * The equality pairs a `JOIN` was written on. Descends `AND` only.
  */
 function collectJoinEdges({ node, block }: { node: SqlAstNode; block: BlockAccumulator }): void {
   collectUsingEdges({ using: node.using, block });
@@ -548,10 +472,8 @@ function collectJoinEdges({ node, block }: { node: SqlAstNode; block: BlockAccum
 }
 
 /**
- * Records the pairs a `USING (col)` clause implies.
- *
- * `USING` matches the same name on both sides, which is exactly the pair an
- * `ON` would have spelled out.
+ * Records the pairs a `USING (col)` clause implies. `USING` matches the same name on both
+ * sides, which is exactly the pair an `ON` would have spelled out.
  */
 function collectUsingEdges({ using, block }: { using: unknown; block: BlockAccumulator }): void {
   if (!Array.isArray(using)) return;
@@ -562,10 +484,9 @@ function collectUsingEdges({ using, block }: { using: unknown; block: BlockAccum
 }
 
 /**
- * Records the equality pairs reachable from an `ON` condition through `AND`.
- *
- * Bounded by {@link MAX_JOIN_KEY_SCAN_NODES}: the condition is caller-written,
- * so the descent needs a ceiling that does not depend on it being reasonable.
+ * Records the equality pairs reachable from an `ON` condition through `AND`. Bounded by {@link
+ * MAX_JOIN_KEY_SCAN_NODES}: the condition is caller-written, so the descent needs a ceiling
+ * that does not depend on it being reasonable.
  */
 function collectOnEdges({ on, block }: { on: unknown; block: BlockAccumulator }): void {
   const pending: unknown[] = [on];
@@ -593,11 +514,9 @@ function conjunctArguments(node: unknown): unknown[] | null {
 }
 
 /**
- * The join edge an `a = b` node names, or `null` for anything else.
- *
- * Both sides have to resolve to a name: an equality against an expression is
- * not a key two datasets line up on, and recording half of one would claim a
- * match that was never written.
+ * The join edge an `a = b` node names, or `null` for anything else. Both sides have to resolve
+ * to a name: an equality against an expression is not a key two datasets line up on, and
+ * recording half of one would claim a match that was never written.
  */
 function readEqualityEdge(node: unknown): { left: string; right: string } | null {
   if (!isNode(node) || node.type !== "Function") return null;
@@ -615,11 +534,9 @@ function enterTableJoin({ node, frame }: NodeArgs): Frame {
 }
 
 /**
- * Applies the function allowlist, and notes an aggregate for the block.
- *
- * Reports and keeps descending rather than cutting the subtree off, so that a
- * caller who used a refused function *and* a restricted field hears about both
- * in one round trip.
+ * Applies the function allowlist, and notes an aggregate for the block. Reports and keeps
+ * descending rather than cutting the subtree off, so that a caller who used a refused function
+ * *and* a restricted field hears about both in one round trip.
  */
 function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
   const { name } = node;
@@ -710,12 +627,9 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
 }
 
 /**
- * Records a column named in a filter or grouping position on the block it sits
- * in.
- *
- * The leaf segment only: what a diagnostic asks is "was this dataset's time
- * column filtered", and `t.OccurredAt`, `OccurredAt` and
- * `analytics.traces.OccurredAt` are all the same answer to it.
+ * Records a column named in a filter or grouping position on the block it sits in. The leaf
+ * segment only: what a diagnostic asks is "was this dataset's time column filtered", and
+ * `t.OccurredAt`, `OccurredAt` and `analytics.traces.OccurredAt` are all the same answer to it.
  */
 function noteColumnPosition({ name, frame }: { name: string; frame: Frame }): void {
   const { block, clause } = frame;
@@ -728,27 +642,8 @@ function noteColumnPosition({ name, frame }: { name: string; frame: Frame }): vo
 }
 
 /**
- * Records a bound parameter. Parameters are *values*, and values are permitted
- * — but an `Identifier`-typed one is not a value, and is refused.
- *
- * The rest of this file decides what a query may name by reading names out of
- * the parse: {@link gateColumnReference} matches a column reference against the
- * caller's withheld set, and {@link readTableReference} refuses a table whose
- * name is not literal, "because a table chosen at bind time is a table the
- * allowlist cannot see — which would mean the allowlist was not one."
- *
- * That argument is not specific to tables. A column chosen at bind time is a
- * column the *gate* cannot see: `SELECT {c:Identifier}` carries no column
- * reference through the walk at all, so ClickHouse substitutes the name after
- * every check has already passed. Measured against a caller whose data-privacy
- * policy withholds captured content, that returned the withheld value — the
- * literal spelling of the same query is refused with `GATED_COLUMN`.
- *
- * So the refusal is total rather than a gate-check on the bound value: the
- * substitution happens in the database, after this validator has finished, and
- * a check here would be reasoning about a string that the parse does not
- * commit to. Callers write column names literally; the schema endpoint is what
- * tells them which names exist.
+ * Records a bound parameter. Parameters are *values*, and values are permitted — but an
+ * `Identifier`-typed one is not a value, and is refused.
  */
 function enterQueryParameter({ node, frame, ctx }: NodeArgs): Frame | null {
   const { name, param_type: paramType } = node;
@@ -795,10 +690,9 @@ const REFUSE_OUTPUT: FieldRule = {
 };
 
 /**
- * Every node kind the walk recognises, and every field each of them may carry.
- *
- * Read this table as the policy: it is the complete statement of what a
- * LangWatchQL query may contain. Nothing outside it is reachable.
+ * Every node kind the walk recognises, and every field each of them may carry. Read this table
+ * as the policy: it is the complete statement of what a LangWatchQL query may contain. Nothing
+ * outside it is reachable.
  */
 const NODE_RULES: Readonly<Record<string, NodeRule>> = {
   // ---- query structure ----

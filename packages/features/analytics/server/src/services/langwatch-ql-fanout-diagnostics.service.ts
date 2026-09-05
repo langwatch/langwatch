@@ -18,13 +18,9 @@ import {
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 /**
- * Key columns a join never has to spell out.
- *
- * The row policy resolves one tenant for the whole query, so both sides of
- * every join are already the same tenant's rows whether or not the caller
- * wrote the equality. Treating it as matched is what keeps an ordinary
- * `ON child.TraceId = parent.TraceId` from reporting the parent as fanning out
- * the child, which it does not.
+ * Key columns a join never has to spell out. The row policy resolves one tenant for the whole
+ * query, so both sides of every join are already the same tenant's rows whether or not the
+ * caller wrote the equality.
  */
 const IMPLICITLY_MATCHED_KEY_COLUMNS: ReadonlySet<string> = new Set(["tenantid"]);
 
@@ -56,12 +52,9 @@ function fanoutDiagnostics({
 }
 
 /**
- * The fan-out diagnostics one joined pair earns, in both directions.
- *
- * Both, because a join under-matched on either side multiplies the *other*
- * side's rows, and which side a reader cares about is not knowable here. The
- * `seen` set is shared across the whole query so the same dataset pairing is
- * reported once however many blocks join it.
+ * The fan-out diagnostics one joined pair earns, in both directions. Both, because a join
+ * under-matched on either side multiplies the *other* side's rows, and which side a reader
+ * cares about is not knowable here.
  */
 function fanoutForPair({
   pair,
@@ -96,19 +89,9 @@ function fanoutForPair({
 }
 
 /**
- * The grain columns a join left unmatched — the reason one row can meet many.
- *
- * A dataset's grain is the identity of one of its rows: match every column of
- * it and one row answers, match fewer and the rest of them multiply.
- *
- * Read from {@link LangWatchQLCatalogShapesService.grainColumns} rather than from the source's sort
- * key, because the two are not always the same list and the difference is a
- * false alarm rather than a finding. `evaluation_metrics` is sorted
- * `(TenantId, OccurredAt, EvaluationId)` for range scans and declares a grain
- * of `(TenantId, EvaluationId)`, which its `in-tuple` dedup delivers, so a join
- * on that grain would otherwise be reported as fanning out on `OccurredAt` —
- * the diagnostic contradicting the schema, on the join it told the caller to
- * write.
+ * The grain columns a join left unmatched — the reason one row can meet many. A dataset's grain
+ * is the identity of one of its rows: match every column of it and one row answers, match fewer
+ * and the rest of them multiply.
  */
 function unmatchedGrainColumns(
   view: LangWatchQLViewDefinition,
@@ -169,24 +152,17 @@ function fanoutDiagnostic({
 }
 
 /**
- * The columns whose values are measured in something.
- *
- * These are the ones a fanout silently changes: repeating a row doubles a
- * duration or a cost that is then summed, while repeating an identifier only
- * repeats it. The catalog's `unit` is what says which is which.
+ * The columns whose values are measured in something. These are the ones a fanout silently
+ * changes: repeating a row doubles a duration or a cost that is then summed, while repeating an
+ * identifier only repeats it. The catalog's `unit` is what says which is which.
  */
 function measureColumns(view: LangWatchQLViewDefinition): readonly string[] {
   return view.columns.filter((column) => column.unit !== undefined).map((column) => column.name);
 }
 
 /**
- * Every pair of a block's datasets that a join condition tied together, with
- * the columns it tied them on.
- *
- * Pairs with no recorded equality are absent rather than reported as an
- * unbounded join: the walk records only the equalities written in `ON` or
- * `USING`, so a join expressed in `WHERE` would otherwise look like a cross
- * product it is not.
+ * Every pair of a block's datasets that a join condition tied together, with the columns it
+ * tied them on.
  */
 function joinedPairs({
   block,
@@ -255,12 +231,9 @@ type JoinSide = ReturnType<typeof readJoinSide>;
 type PairLookup = (leftIndex: number, rightIndex: number) => JoinedPair;
 
 /**
- * Records an equality neither side qualified — `USING (col)`, or a bare
- * `ON a = a`.
- *
- * With no qualifier there is nothing to say which two datasets the equality
- * belongs to, so it matches the column for *every* pair the block reads. A
- * differing column on each side names nothing at all and is dropped.
+ * Records an equality neither side qualified — `USING (col)`, or a bare `ON a = a`. With no
+ * qualifier there is nothing to say which two datasets the equality belongs to, so it matches
+ * the column for *every* pair the block reads.
  */
 function applyUnqualifiedEquality({
   left,
@@ -287,11 +260,9 @@ function applyUnqualifiedEquality({
 }
 
 /**
- * Records an equality that named at least one side's table.
- *
- * A qualifier the block never introduced, or both sides resolving to the same
- * reference, matches no pair of datasets and is dropped — a self-equality is
- * not a join key.
+ * Records an equality that named at least one side's table. A qualifier the block never
+ * introduced, or both sides resolving to the same reference, matches no pair of datasets and is
+ * dropped — a self-equality is not a join key.
  */
 function applyQualifiedEquality({
   left,

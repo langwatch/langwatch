@@ -1,16 +1,6 @@
 /**
- * The function-name allowlist, driven through the real ClickHouse parser.
- *
- * Two claims, and the second is the one that is easy to fake. The first is that
- * the functions a LangWatchQL question needs are admitted — asserted by submitting
- * the SQL those questions are actually written in. The second is that
- * everything else is refused *because it is absent from the list*, not because
- * some other rule happened to catch it: every refusal case below is paired with
- * a control that runs the same query with an allowlisted function in the same
- * position and asserts it passes. Without that pair, a case would still be
- * green if the whole expression had been unparseable, or the table wrong, or
- * the column gated.
- *
+ * The function-name allowlist, driven through the real ClickHouse parser. Two claims, and the
+ * second is the one that is easy to fake.
  * @see ../functions.ts — the list, and the rule that governs what is on it
  */
 import { describe, expect, it } from "vitest";
@@ -249,10 +239,9 @@ describe("the LangWatchQL function allowlist", () => {
     });
 
     /**
-     * The suffixes that are absent. No LangWatchQL view exposes an
-     * `AggregateFunction` column, so nothing a caller can write needs a state
-     * or a merge — and a suffix admitted "because it is an aggregate too" is
-     * exactly the reasoning the admission rule forbids.
+     * The suffixes that are absent. No LangWatchQL view exposes an `AggregateFunction` column,
+     * so nothing a caller can write needs a state or a merge — and a suffix admitted "because
+     * it is an aggregate too" is exactly the reasoning the admission rule forbids.
      */
     it.each([
       ["a state", "sumState(TotalCost)"],

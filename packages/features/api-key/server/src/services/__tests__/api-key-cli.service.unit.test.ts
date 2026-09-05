@@ -52,6 +52,29 @@ function serviceWith(options: {
 }
 
 describe("given a CLI login key mint", () => {
+  describe("when the exchange reports what it minted", () => {
+    /** @scenario "the exchange reports the permissions the key was minted with" */
+    it("answers the selected permissions on the scope summary, deduplicated and sorted", async () => {
+      const { service } = serviceWith({});
+
+      const minted = await service.mintCliLoginKey({
+        userId: "user-1",
+        organizationId: "org-1",
+        deviceLabel: "laptop",
+        selection: {
+          bindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+          permissions: ["traces:view", "project:manage", "traces:view"],
+        },
+      });
+
+      expect(minted.scope).toEqual({
+        kind: "organization",
+        projectIds: [],
+        permissions: ["project:manage", "traces:view"],
+      });
+    });
+  });
+
   describe("when the user logs in again from the same device", () => {
     /** @scenario "re-login from the same device replaces the previous CLI key" */
     it("revokes the previous key for that device label and keeps the new one", async () => {

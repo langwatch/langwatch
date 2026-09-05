@@ -12,23 +12,6 @@ const logger = createLogger("langwatch:identity:email");
 
 /**
  * The READ fork for `User.email` (ADR-101 §5; D03 generalizes it to the
- * whole router).
- *
- * `User.email` is a legacy column that answers a question identity now owns:
- * which address is this person's. For a user whose backfill is `finalized`
- * the identifiers are the truth and the column is a stale copy, so this
- * service answers from the projection. For everyone else the column still
- * IS the truth, so the caller keeps whatever it already read.
- *
- * Every answer is a fallback, never a failure: an ungated user, a user with
- * no live email identifier, an unreadable projection — all return null, and
- * `null` means "use the legacy column". The one thing this must never do is
- * make a request fail, because `getServerAuthSession` runs on every request
- * that touches a session.
- *
- * Same gate as the writes, deliberately (`IdentityUserGate`): a user whose
- * ceremonies emit events is exactly the user whose identifiers are proven
- * against their legacy rows, so reads and writes flip together.
  */
 export class IdentityEmailService extends IdentityEmailCapability {
   static create(heads: IdentityHeadsReader, isOnIdentity: IdentityUserGate): IdentityEmailService {
@@ -67,15 +50,9 @@ export class IdentityEmailService extends IdentityEmailCapability {
   }
 
   /**
-   * Every address the user has PROVEN, through any method — invitation
-   * acceptance's question (D11): an invite targets an address, and any
-   * VERIFIED identifier holding it vouches for the person.
-   *
-   * `null` means "answer from the legacy columns instead" — the user is not
-   * on identifiers, or the projection could not be read. The same
-   * never-fail-a-request rule as `tryResolveEmail`, for the same reason: this
-   * runs on the invite-acceptance path a brand-new member's first session
-   * walks through.
+   * Every address the user has PROVEN, through any method — invitation acceptance's question
+   * (D11): an invite targets an address, and any VERIFIED identifier holding it vouches for the
+   * person.
    */
   async tryVerifiedEmailsOf({ userId }: { userId: string }): Promise<MatchableEmail[] | null> {
     try {

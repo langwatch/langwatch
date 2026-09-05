@@ -1,47 +1,4 @@
 /**
- * LangWatchQL analytics SQL — the PostgreSQL-resident half of the catalog.
- *
- * Same shape as the ClickHouse-resident entries and read by the same consumers;
- * what differs is where the rows live and how they arrive. Each entry declares
- * a {@link LangWatchQLPostgresMapping}, and that declaration generates the whole
- * chain: the approved PostgreSQL view, the reader role's grant on it, the
- * PostgreSQL-engine table in the LangWatchQL database, its row policy, and the
- * LangWatchQL view a caller names.
- *
- * ## Why these five datasets and no others
- *
- * They are what the three question classes the catalog could not answer need,
- * and nothing else. Cost by *name* needs `projects`, `prompts` and
- * `prompt_versions`, because the fact tables carry only the identifiers.
- * Annotation-versus-evaluation agreement needs `annotations`. Naming an
- * experiment needs `experiments`. Models are already
- * names on the fact tables (`traces.Models` carries `openai/gpt-5-mini`, not an
- * id), so no dimension is mapped for them — mapping one would put load on the
- * primary to resolve a name ClickHouse already has.
- *
- * ## What is deliberately absent, and why per column rather than per table
- *
- * The approved view is the boundary: a column left out of it is unreachable,
- * because the reader role has no grant on the base table. Three kinds are left
- * out, on the same reasoning the ClickHouse half applies:
- *
- *  - **Free-text carriers with no gate in the canonical visibility policy** —
- *    `Annotation.comment` and `expectedOutput`, `LlmPromptConfigVersion.commitMessage`.
- *    Each routinely quotes the payload it describes,
- *    and no rule in the visibility policy gates them, so exposing them would
- *    mean inventing a gate rather than deriving one.
- *  - **JSON blobs carrying captured content** — `Annotation.scoreOptions`,
- *    `LlmPromptConfigVersion.configData` (the prompt text itself),
- *    `Experiment.workbenchState`.
- *  - **Person-identifying columns** — `Annotation.userId` and `email`,
- *    `LlmPromptConfigVersion.authorId`. Analytics answers questions about
- *    traffic, not about named colleagues, and the API has no permission that
- *    would gate them.
- *
- * `Project.apiKey` is absent for a fourth reason that is worth stating on its
- * own: it is a credential, and the whole model rests on the caller never
- * reaching one.
- *
  * @see ./types.ts — the shapes
  * @see ../provisioning.ts — the approved views, the engine tables and the role
  * @see specs/analytics/lwql-api.feature
@@ -50,23 +7,15 @@
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service";
 
 /**
- * How far behind the application's writes these datasets can be.
- *
- * They are read live off the primary through the named collection, so there is
- * no pipeline to lag: a row committed in PostgreSQL is visible to the next
- * LangWatchQL query. Published so a caller comparing a dimension against a fact
- * knows which side can be stale, and it is the fact side.
+ * How far behind the application's writes these datasets can be. They are read live off the
+ * primary through the named collection, so there is no pipeline to lag: a row committed in
+ * PostgreSQL is visible to the next LangWatchQL query.
  */
 const LIVE_FRESHNESS = "live — read from PostgreSQL at query time";
 
 /**
- * The name every approved view exposes the owning project under.
- *
- * The application's schema calls it `projectId` on most tables and `id` on
- * `Project` itself. Reconciling both to `TenantId` in the approved view is what
- * lets a caller join a PostgreSQL-resident dataset to a ClickHouse-resident one
- * without knowing which is which, and it is what lets one row policy shape
- * serve every LangWatchQL object.
+ * The name every approved view exposes the owning project under. The application's schema calls
+ * it `projectId` on most tables and `id` on `Project` itself.
  */
 const TENANT_COLUMN = "TenantId";
 
@@ -134,12 +83,8 @@ const ANNOTATIONS: LangWatchQLViewDefinition = {
 };
 
 /**
- * Projects: the caller's own project, one row.
- *
- * The row policy resolves the tenant to exactly one project, so this dataset is
- * a single row by construction. It is here because a caller reporting cost "by
- * project" wants the name in the output, and because a multi-project report
- * assembled by a client needs somewhere to read that name from.
+ * Projects: the caller's own project, one row. The row policy resolves the tenant to exactly
+ * one project, so this dataset is a single row by construction.
  */
 const PROJECTS: LangWatchQLViewDefinition = {
   name: "projects",
@@ -241,12 +186,11 @@ const PROMPTS: LangWatchQLViewDefinition = {
       gates: [],
       sourceColumns: ["createdAt"],
     },
-    // `DeletedAt` and not `ArchivedAt`, which is the spelling the rest of this
-    // file uses: `LlmPromptConfig` really does soft-delete through `deletedAt`
-    // and declares no `archivedAt` at all, so the house spelling here would
-    // publish a column name for a field that does not exist. An exposed name
-    // tracks the field behind it; where the two agree — `Experiment.archivedAt`
-    // — the exposed name is `ArchivedAt`.
+    // `DeletedAt` and not `ArchivedAt`, which is the spelling the rest of this file uses:
+    // `LlmPromptConfig` really does soft-delete through `deletedAt` and declares no
+    // `archivedAt` at all, so the house spelling here would publish a column name for a field
+    // that does not exist. An exposed name tracks the field behind it; where the two agree —
+    // `Experiment.archivedAt` — the exposed name is `ArchivedAt`.
     {
       name: "DeletedAt",
       type: "Nullable(DateTime64(3))",

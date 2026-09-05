@@ -1,20 +1,5 @@
 /**
- * The API process's four Langy REST doors, and what it can and cannot put
- * behind each of them.
- *
- * Behaviour is package-owned (`@langwatch/langy-server`); this supplies the
- * capabilities that are the PROCESS's — how a project credential is read off a
- * request and checked against its ceiling, which flag store answers the
- * rollout, which Redis the live edge lives in, which counters the internal
- * callbacks publish, and which user directory a key's owner is read from.
- *
- * Two of the four are conditional on Redis, and the condition is not
- * squeamishness. The UI-action channel IS a Redis claim key, a result list and
- * a blocking pop; the relay IS a Redis stream plus a dedup set. A process with
- * no Redis mounting either would accept a dispatch nothing can deliver and a
- * frame nothing can read back, which the caller cannot detect. The turn surface
- * has no such dependency — `Prefer: wait` degrades to fold reads — so it mounts
- * either way.
+ * The API process's four Langy REST doors, and what it can and cannot put behind each of them.
  */
 import { LangyTokenBufferAdapter } from "@langwatch/langy-server";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
@@ -68,14 +53,9 @@ export type LangyRestMetricsPorts = Readonly<{
 }>;
 
 /**
- * The page-action catalogue, absent — and therefore every kind unknown.
- *
- * The only catalogue that exists is the experiments workbench's, and it is a
- * browser module: a server package may not reach it and neither may this
- * process. So `GET /api/langy/ui/actions` answers an EMPTY list rather than a
- * wrong one, and a dispatch refuses by name with `langy_ui_action_unknown`.
- * Both are honest: an agent reading the list learns there is nothing to call
- * here, which is exactly true of this process.
+ * The page-action catalogue, absent — and therefore every kind unknown. The only catalogue that
+ * exists is the experiments workbench's, and it is a browser module: a server package may not
+ * reach it and neither may this process.
  */
 class UnavailableApiLangyUiActionCatalog extends LangyUiActionRestCatalogPort {
   tryFind(): null {
@@ -88,13 +68,9 @@ class UnavailableApiLangyUiActionCatalog extends LangyUiActionRestCatalogPort {
 }
 
 /**
- * Composes the Langy REST ports, or none.
- *
- * `undefined` when any of the four collaborators every door shares is missing —
- * the application, the credential directory, the flag store or the user
- * directory. Absent beats mounted: a turn door with no flag store cannot tell
- * an open surface from a dark one, and a door that cannot tell answers the
- * wrong 404 to somebody who should have been served.
+ * Composes the Langy REST ports, or none. `undefined` when any of the four collaborators every
+ * door shares is missing — the application, the credential directory, the flag store or the
+ * user directory.
  */
 export function composeApiLangyRest(
   options: ApiLangyRestOptions,
@@ -152,16 +128,6 @@ export function composeApiLangyRest(
 
 /**
  * The Langy counters, on the process-global Prometheus registry.
- *
- * Global rather than a registry of this composition's own, for the reason
- * {@link ApiMetricsInfrastructure} states: the scrape surface serves
- * `prom-client`'s process registry, and a counter registered anywhere else
- * would increment forever without ever reaching a scrape.
- *
- * `getSingleMetric` guards re-registration rather than `removeSingleMetric`
- * clearing it: a second composition in one process (a test, a second listener)
- * must share the counter, and removing it would silently reset every series
- * the first one had already published.
  */
 export function apiLangyRestMetrics(): LangyRestMetricsPorts {
   const turnResults = counter({

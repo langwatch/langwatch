@@ -1,33 +1,5 @@
 /**
  * Saved workbench charts — the REST routes.
- *
- * Seven endpoints under the LangWatchQL analytics SQL family:
- *
- *  - `GET    /api/v1/projects/{projectId}/analytics/charts`
- *  - `POST   /api/v1/projects/{projectId}/analytics/charts`
- *  - `GET    /api/v1/projects/{projectId}/analytics/charts/{chartId}`
- *  - `PATCH  /api/v1/projects/{projectId}/analytics/charts/{chartId}`
- *  - `DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}`
- *  - `PUT    /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement`
- *  - `DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement`
- *
- * They sit here rather than under `/api/dashboards` because a saved chart is a
- * LangWatchQL artifact before it is a dashboard one: it is behind the same
- * experimental switch, resolved for the project's organization by the same
- * guard, and its refusals are `HandledError`s the family already serialises
- * with their `meta` intact. Placement, too, is an operation on the chart — the
- * dashboard is the value it is given, not the resource being edited.
- *
- * ## Nothing is validated here
- *
- * The handlers check the request's *envelope* — a name, and a definition that
- * was supplied — and nothing about what a definition means. The versioned
- * definition schema, the LangWatchQL validator and the Vega-Lite policy all
- * live behind the composed Dashboard service, which is the single write path.
- * Re-declaring any of them here would fork the contract and hand this surface
- * the power to admit a chart the workbench would refuse, which is the one thing
- * slice 1 exists to prevent.
- *
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
@@ -56,27 +28,16 @@ const routeGuards = LangWatchQLRouteGuardsService.create();
 type LangWatchQLApp = SecuredApp<{ Variables: AppRestProjectVariables }>;
 
 /**
- * The Vega-Lite specification ceiling this route derives its own from.
- *
- * STATED here rather than imported. The policy that names it — every ceiling,
- * allowlist and rule in the LangWatch QL visualization envelope — lives in
- * `@langwatch/analytics-web`, a browser package, and no server module may
- * value-import one. What crosses is one number, and the number is a wire fact:
- * it is the largest specification the policy admits, so a definition this
- * route accepts is one the policy can still judge.
- *
+ * The Vega-Lite specification ceiling this route derives its own from. STATED here rather than
+ * imported.
  * @see packages/features/analytics/contract/src/visualization/vega-lite-policy.ts
  */
 const MAX_VEGA_SPEC_BYTES = 262_144;
 
 /**
- * The serialized size of a definition in UTF-8 bytes, or `null` when it cannot
- * be serialized at all.
- *
- * The same measurement the visualization policy makes of its own ceiling, so
- * this route and that one are in the same unit. `null` is a refusal rather
- * than "small enough": a definition that will not serialize is one nothing
- * downstream can store or draw.
+ * The serialized size of a definition in UTF-8 bytes, or `null` when it cannot be serialized at
+ * all. The same measurement the visualization policy makes of its own ceiling, so this route
+ * and that one are in the same unit.
  */
 function measureSpecBytes(spec: unknown): number | null {
   try {
@@ -93,28 +54,13 @@ const nameSchema = z.string().min(1).max(200);
 
 /**
  * Longest definition this endpoint accepts, in UTF-8 bytes of its JSON.
- *
- * The definition's *meaning* is the service's to judge, but its size is this
- * route's: nothing below here bounds it — the versioned schema puts no ceiling
- * on the statement it holds — so without this a key-holder could store a body
- * of any size on a surface that is metered everywhere else.
- *
- * Derived from the specification's own ceiling rather than picked, plus room
- * for the statement and parameter values that travel beside it, so this can
- * never refuse a definition the Vega-Lite policy would have admitted. The
- * headroom sits above the query endpoint's statement ceiling too: SQL short
- * enough to run is always short enough to save.
  */
 const MAX_CHART_DEFINITION_BYTES = MAX_VEGA_SPEC_BYTES + 65_536;
 
 /**
- * The definition: bounded, and otherwise untouched.
- *
- * `unknown` is the honest declaration of its shape — that belongs to the
- * service's versioned schema, and a definition this route rejected on shape
- * would be rejected by a second, drifting copy of that decision. A byte ceiling
- * forks nothing, because it is a fact about the request rather than about what
- * a chart means.
+ * The definition: bounded, and otherwise untouched. `unknown` is the honest declaration of its
+ * shape — that belongs to the service's versioned schema, and a definition this route rejected
+ * on shape would be rejected by a second, drifting copy of that decision.
  */
 const definitionSchema = z.unknown().superRefine((definition, ctx) => {
   // `z.unknown()` is satisfied by an absent key. A create that omits the
@@ -134,12 +80,7 @@ const definitionSchema = z.unknown().superRefine((definition, ctx) => {
 });
 
 /**
- * A placement request's envelope: a dashboard id, and an optional grid
- * position. What a valid position *is* — the column and span ceilings, and
- * which dashboard this project may name — is the service's placement schema
- * and its tenancy check, not this route's. Re-declaring the bounds here would
- * fork them, and a placement this route admitted that the service refuses is
- * answered with the service's own refusal.
+ * A placement request's envelope: a dashboard id, and an optional grid position.
  */
 const placeChartSchema = z.object({
   dashboardId: z.string().min(1),
@@ -203,12 +144,8 @@ const chartListSchema = z.object({ data: z.array(chartSchema) });
 const CHART_TAGS = ["Analytics / LangWatchQL"];
 
 /**
- * The not-found answer every resource operation can give — a missing id and
- * another project's chart alike, deliberately indistinguishable.
- *
- * The canonical envelope, like every other refusal this family publishes:
- * {@link canonicalBaseResponses} covers 400/401/403/500, and a 404 is the one
- * status only these operations can answer.
+ * The not-found answer every resource operation can give — a missing id and another project's
+ * chart alike, deliberately indistinguishable.
  */
 const chartNotFoundResponse: Record<404, RouteResponse> = {
   404: {
@@ -218,16 +155,9 @@ const chartNotFoundResponse: Record<404, RouteResponse> = {
 };
 
 /**
- * The chart as the API publishes it.
- *
- * Built field by field rather than spread: the service's chart also carries
- * `projectId`, which is the credential's and tells a caller nothing it did not
- * already send.
- *
- * `platformUrl` names the workbench rather than this chart, because the
- * workbench has no per-chart URL yet — a link carrying an id nothing reads
- * would land an integrator on an empty editor. It gains one with the dashboard
- * placement slice.
+ * The chart as the API publishes it. Built field by field rather than spread: the service's
+ * chart also carries `projectId`, which is the credential's and tells a caller nothing it did
+ * not already send.
  */
 function chartResource({
   chart,
@@ -259,12 +189,7 @@ function chartResource({
 }
 
 /**
- * The chart id the path matched.
- *
- * @throws {Error} when a chart route matched without one. That is a routing
- *   fault rather than a caller's mistake, and the plain error is deliberate:
- *   substituting `""` would turn it into a lookup that answers "not found",
- *   reporting the bug as a normal, expected outcome.
+ * The chart id the path matched. @throws {Error} when a chart route matched without one.
  */
 function chartIdOf(chartId: string | undefined): string {
   if (!chartId) {
@@ -542,10 +467,6 @@ function registerUnplace(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): 
 
 /**
  * Registers the saved workbench chart routes on the LangWatchQL analytics SQL app.
- *
- * One function per verb because the house line ceiling is per function and a
- * described route is a dozen lines of prose before it is a handler; the split
- * is mechanical and the registration order is the document's.
  */
 export function registerSavedWorkbenchChartRoutes(
   secured: LangWatchQLApp,

@@ -95,6 +95,32 @@ describe("ApiRestSecurity", () => {
     });
   });
 
+  describe("when the permission gate is mounted with no authentication before it", () => {
+    /**
+     * A permission gate running with nobody authenticated is a mis-wired
+     * route. It refuses rather than waving the request through: the old
+     * pass-through meant a route that forgot its authentication silently lost
+     * its permission check too. The plain Error degrades to the generic
+     * unknown response at the boundary (ADR-045).
+     */
+    /** @scenario "The permission gate refuses a request nobody authenticated" */
+    it("refuses the request instead of passing it through", async () => {
+      const apiKeys = apiKeyService();
+      const authz = authzService();
+      const policy = policyOver({ apiKeys, authz });
+      const app = new Hono();
+      app.use("*", policy.permissionMiddleware("secrets:manage"));
+      const handler = vi.fn((context: Context) => context.json({ reached: true }));
+      app.all("*", handler);
+
+      const response = await app.request("/api/secret");
+
+      expect(response.status).toBe(500);
+      expect(handler).not.toHaveBeenCalled();
+      expect(authz.hasApiKeyPermission).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a project route authorizes", () => {
     it("keeps legacy project keys actorless and outside the permission ceiling", async () => {
       const apiKeys = apiKeyService();

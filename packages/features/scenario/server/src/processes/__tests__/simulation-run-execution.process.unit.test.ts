@@ -54,6 +54,10 @@ class UnusedScenarioExecutionService extends ScenarioExecutionService {
   finishUnsuccessfulRun(_input: ScenarioUnsuccessfulExecutionInput): Promise<void> {
     throw new Error("finishUnsuccessfulRun unexpectedly called in evolve tests");
   }
+
+  recordAgentInstance(): Promise<void> {
+    throw new Error("recordAgentInstance unexpectedly called in evolve tests");
+  }
 }
 
 /**

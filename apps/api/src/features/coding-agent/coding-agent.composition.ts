@@ -1,3 +1,4 @@
+import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-server";
 /**
  * `codingAgents.*` — what the coding agents did inside a tenant's projects — composed as
  * its own feature.
@@ -29,9 +30,13 @@ import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections
 import { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount";
 
 /**
- * The platform application's `PLATFORM_DEFAULT_RETENTION_DAYS`.
+ * The retention a tenant's data is stamped with when no override exists in its
+ * scope cascade. Resolved rather than written down, so a local stack can lower
+ * it through `LANGWATCH_DEFAULT_RETENTION_DAYS`; the resolver refuses that
+ * variable outside development and test, where lowering it would silently
+ * expire customer data.
  */
-const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
+const PLATFORM_DEFAULT_RETENTION_DAYS = resolvePlatformDefaultRetentionDays(process.env);
 
 /** The other services and stores one project's coding agents are read over. */
 export type CodingAgentPeers = Readonly<{

@@ -221,7 +221,10 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
   /** @scenario "Renaming a test suite in another project is refused with suite_not_found" */
   it("refuses to rename a test suite that belongs to another project", async () => {
     const testSuites = service();
-    const foreign = await testSuites.createTestSuite({ projectId: otherProjectId, name: "Foreign" });
+    const foreign = await testSuites.createTestSuite({
+      projectId: otherProjectId,
+      name: "Foreign",
+    });
 
     await expect(
       testSuites.renameTestSuite({ projectId, testSuiteId: foreign.id, name: "Taken over" }),
@@ -291,7 +294,10 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     const unfiled = await createScenario({ name: "Unfiled" });
 
     expect(first.testSuiteId).toBe(refunds.id);
-    expect(unfiled.testSuiteId).toBeNull();
+    // No scenario is loose: the one created naming no suite is filed into the
+    // project's Default, which that write created.
+    expect(unfiled.testSuiteId).not.toBe(refunds.id);
+    expect(unfiled.testSuiteId).not.toBeNull();
     expect(await testSuiteScenarioIds(refunds.id)).toEqual([first.id]);
     expect(await invariantBreaks()).toEqual([]);
   });
@@ -309,14 +315,13 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     expect(await testSuiteScenarioIds(refunds.id)).toEqual([]);
     expect(await testSuiteScenarioIds(checkout.id)).toEqual([scenario.id]);
 
-    await expect(
-      testSuites.update({ id: scenario.id, projectId, testSuiteId: null }),
-    ).resolves.toMatchObject({
-      testSuiteId: null,
-    });
+    // Clearing the suite files the scenario into Default rather than leaving it loose.
+    const unfiled = await testSuites.update({ id: scenario.id, projectId, testSuiteId: null });
+    expect(unfiled.testSuiteId).not.toBeNull();
+    expect(unfiled.testSuiteId).not.toBe(checkout.id);
     expect(await testSuiteScenarioIds(checkout.id)).toEqual([]);
     await expect(testSuites.list({ projectId })).resolves.toMatchObject([
-      { id: scenario.id, testSuiteId: null },
+      { id: scenario.id, testSuiteId: unfiled.testSuiteId },
     ]);
     expect(await invariantBreaks()).toEqual([]);
   });

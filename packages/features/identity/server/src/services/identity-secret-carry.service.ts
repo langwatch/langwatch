@@ -4,14 +4,8 @@ import type { IdentityAccountSecrets } from "../rules/identity-storage-ports.rul
 const logger = createLogger("langwatch:identity:secret-carry");
 
 /**
- * One `Account` row's secrets beside the `AccountCredential` row that
- * mirrors it, if there is one.
- *
- * `credentialUpdatedAtMs` is `null` when no credential row exists yet —
- * which is the difference between the two jobs this service does, and the
- * reason they are one service: a missing row is a user LATCHING and needs
- * their secrets carried across; an older row is a secret that landed on the
- * legacy branch AFTER they latched and needs healing back.
+ * One `Account` row's secrets beside the `AccountCredential` row that mirrors it, if there is
+ * one.
  */
 export interface AccountSecretPair {
   /** The pinned account id: the `Account` row's id and the credential's. */
@@ -31,12 +25,8 @@ export interface IdentitySecretCarryRepository {
   findAccountSecretPairs(args: { userId: string }): Promise<AccountSecretPair[]>;
   /**
    * Create the credential row for an account that has none, PRESERVING the
-   * `Account` row's own timestamps — the credential is a copy of a fact that
-   * already happened, not a new one, and stamping it `now()` would make
-   * every later `updatedAt` comparison lie about which branch wrote last.
-   *
-   * Idempotent: a row that already exists is left exactly as it is, so
-   * running the carry again inserts nothing.
+   * `Account` row's own timestamps rather than stamping `now()`. Idempotent:
+   * a row that already exists is left exactly as it is.
    */
   insertCredentialIfMissing(args: {
     accountId: string;
@@ -65,28 +55,6 @@ export interface IdentitySecretCarryOutcome {
 
 /**
  * Both directions of the bridge mirror's row half (ADR-116 §4).
- *
- * The forward direction — an identity-branch write mirrored onto the
- * `Account` row — is the adapter's, because it happens at write time. This
- * is everything that happens at PASS time, and there are two of those,
- * different only in whether the credential row exists yet:
- *
- * **Carry (the latch).** When a user finalizes, the secrets they already
- * hold live only in `Account`. Copy each row's secret columns into an
- * `AccountCredential` row once, preserving the `Account` row's own
- * timestamps. Without it, a user's first sign-in after latching verifies
- * against an empty credential row and fails.
- *
- * **Heal (the reverse mirror).** A finalized user's secret write can still
- * land on the legacy branch — deterministically for up to the write gate's
- * TTL per pod right after their latch, and during any gate-cache failure.
- * Where the `Account` row is NEWER than its credential row, copy it back.
- * Without this leg, a password changed in that window is rejected forever.
- *
- * The rule is one `updatedAt` comparison, and it lives here rather than in
- * SQL so it can be read and tested: strictly newer wins, equal does nothing.
- * Equal-does-nothing is what keeps a pass that changes nothing from
- * rewriting every credential row it looks at.
  */
 export class IdentitySecretCarryService {
   static create(reads: IdentitySecretCarryRepository): IdentitySecretCarryService {

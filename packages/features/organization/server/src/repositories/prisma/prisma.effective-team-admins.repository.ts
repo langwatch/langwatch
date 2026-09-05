@@ -2,25 +2,17 @@ import { RoleBindingScopeType, TeamUserRole } from "@langwatch/organization-cont
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
 /**
- * Who effectively administers a team.
- *
- * "Has an admin" counts people, not binding rows: every user holding a direct
- * TEAM-scoped ADMIN binding, plus every member of a group holding one, the way
- * SCIM-provisioned organizations grant access. A guard that counts only direct
- * bindings refuses changes the team can absorb, and reads a team administered
- * entirely through a group as having no admin at all. Every last-admin guard
- * resolves the set through here so the policy cannot drift between the team
- * form, the member dialog, and the REST surface.
+ * Who effectively administers a team. "Has an admin" counts people, not binding rows: every
+ * user holding a direct TEAM-scoped ADMIN binding, plus every member of a group holding one,
+ * the way SCIM-provisioned organizations grant access.
  */
 
 type TxClient = Prisma.TransactionClient;
 
 /**
- * The principals holding a team's ADMIN bindings, split by kind.
- *
- * The one read every admin question in this module asks — a single
- * definition of "administers this team" that the last-admin invariant rests
- * on every caller agreeing with.
+ * The principals holding a team's ADMIN bindings, split by kind. The one read every admin
+ * question in this module asks — a single definition of "administers this team" that the
+ * last-admin invariant rests on every caller agreeing with.
  */
 
 export class PrismaEffectiveTeamAdminsRepository {
@@ -109,14 +101,8 @@ export class PrismaEffectiveTeamAdminsRepository {
   }
 
   /**
-   * The effective admin set a planned edit to a team's DIRECT user bindings
-   * would leave behind.
-   *
+   * The effective admin set a planned edit to a team's DIRECT user bindings would leave behind.
    * Bindings are ledger facts (ADR-092 §13), so the plan is decided before
-   * anything is emitted rather than read back post-write inside a
-   * transaction: the caller supplies the direct-admin users its plan leaves,
-   * and the group-derived admins — which this form cannot edit — still come
-   * from the projection.
    */
   async projectAdminUserIdsAfterDirectEdit({
     tx,
@@ -171,10 +157,8 @@ export class PrismaEffectiveTeamAdminsRepository {
   }
 
   /**
-   * The effective admin set once `userId` no longer holds a direct ADMIN binding
-   * on the team, whether it is being demoted, converted to a custom role, or
-   * removed. Their group-derived administration survives the change, so they
-   * only leave the set when no group grants it back.
+   * The effective admin set once `userId` no longer holds a direct ADMIN binding on the team,
+   * whether it is being demoted, converted to a custom role, or removed.
    */
   async projectAdminUserIdsWithoutDirectRole({
     tx,

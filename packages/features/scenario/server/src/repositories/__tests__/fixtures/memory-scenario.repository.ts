@@ -23,6 +23,7 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
+import { DEFAULT_SUITE_NAME } from "../../../rules/default-suite.rules";
 import { ScenarioRepository, type ScenarioPlanRecord } from "../../scenario.repository";
 
 export class MemoryScenarioRepository extends ScenarioRepository {
@@ -301,5 +302,32 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     const archived = { ...testSuite, archivedAt: testSuite.archivedAt ?? input.archivedAt };
     this.testSuites.set(archived.id, archived);
     return archived;
+  }
+
+  async tryFindDefaultTestSuite(input: { projectId: string }): Promise<{ id: string } | null> {
+    for (const suite of this.testSuites.values()) {
+      if (
+        suite.projectId === input.projectId &&
+        suite.archivedAt === null &&
+        suite.name.toLowerCase() === DEFAULT_SUITE_NAME.toLowerCase()
+      ) {
+        return { id: suite.id };
+      }
+    }
+    return null;
+  }
+
+  async createDefaultTestSuite(input: {
+    projectId: string;
+    id: string;
+  }): Promise<{ id: string }> {
+    const existing = await this.tryFindDefaultTestSuite(input);
+    if (existing) return existing;
+    const created = await this.createTestSuite({
+      id: input.id,
+      projectId: input.projectId,
+      name: DEFAULT_SUITE_NAME,
+    });
+    return { id: created.id };
   }
 }

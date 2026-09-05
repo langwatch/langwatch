@@ -10,24 +10,6 @@ import { IdentityJitDisabledError, IdentityLinkProposedError } from "@langwatch/
 
 /**
  * What happens when an SSO callback comes back (ADR-117 §3), in one place and
- * in one order:
- *
- *   1. the (connection, subject) pair already resolves someone   → sign in
- *   2. the evidence is TWO-SIDED and unambiguous                 → auto-link
- *   3. it matched somebody, but not well enough                  → propose
- *   4. it matched nobody                                         → JIT, or deny
- *
- * "Two-sided" is the load-bearing word. Trusting the IdP's `email_verified`
- * alone would let any connection claim any row on its domain — the hijack
- * `sso-orphan-user-linking.feature` exists to prevent. So the matched user has
- * to hold the address themselves, verified, and hold nothing the organization
- * cannot vouch for. Everything short of that is a proposal a human resolves,
- * which is where a human belongs anyway.
- *
- * The service links by asking the directory to create the provider account —
- * better-auth's own write, which fires the account ceremony that attaches the
- * identifier through the pipeline. It never writes an `Account` row and never
- * attaches an identifier itself.
  */
 
 /** What an IdP handed back. */
@@ -61,9 +43,6 @@ export interface CallbackUserMatch {
 
 /**
  * The user-level reads and writes a callback needs BEFORE the ADR-116 storage
- * adapter serves them. Its own port precisely so the adapter can absorb it
- * later without this service changing: the router deliberately has no per-user
- * fork, and this is the one flow that genuinely needs one.
  */
 export interface SignInCallbackDirectoryPort {
   findUserByProviderSubject(input: {
@@ -98,13 +77,6 @@ export interface SignInCallbackDirectoryPort {
 
 /**
  * The before/after audit pair around a link (ADR-117 §3). Two records rather
- * than one because they answer different questions: the first says a link was
- * ATTEMPTED and on what evidence, the second says it landed. A link that fails
- * between them leaves the attempt standing, which is exactly what an operator
- * needs to see.
- *
- * Records carry the domain and never the local part, for the same reason the
- * router's do.
  */
 export interface SignInCallbackAudit {
   linkAttempted(record: CallbackAuditRecord): void;

@@ -19,7 +19,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run integration.test"
   },
   "dependencies": {
     "@clickhouse/client": "^1.23.0",
@@ -28,6 +29,7 @@
     "@langwatch/task": "workspace:*"
   },
   "devDependencies": {
+    "tsx": "^4.22.4",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

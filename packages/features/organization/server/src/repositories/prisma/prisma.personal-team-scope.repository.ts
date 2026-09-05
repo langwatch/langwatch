@@ -17,13 +17,8 @@ export class PrismaPersonalTeamScopeRepository {
   private constructor() {}
 
   /**
-   * The teams an organization actually shares, which is every team except the
-   * personal workspace each member gets to themselves.
-   *
-   * Anything deciding what an organization-wide change applies to asks for this
-   * rather than for `team.findMany` by organization: a personal workspace has
-   * exactly one admin, its owner, so sweeping it into such a change asks the
-   * organization to demote a team's last admin, which is refused.
+   * The teams an organization actually shares, which is every team except the personal
+   * workspace each member gets to themselves.
    */
   async findSharedTeamIds({
     client,
@@ -41,10 +36,9 @@ export class PrismaPersonalTeamScopeRepository {
   }
 
   /**
-   * The personal team a set of scopes reaches, by the name its owner sees, or
-   * null when they reach only shared ground. Both TEAM and PROJECT scopes are
-   * resolved, so naming the project rather than the team cannot be the way
-   * around the refusal.
+   * The personal team a set of scopes reaches, by the name its owner sees, or null when they
+   * reach only shared ground. Both TEAM and PROJECT scopes are resolved, so naming the project
+   * rather than the team cannot be the way around the refusal.
    */
   async tryFindPersonalTeamInScopes({
     client,
@@ -126,9 +120,6 @@ export class PrismaPersonalTeamScopeRepository {
 
   /**
    * A team filter matching personal teams that do NOT belong to the given user.
-   * A personal team with no recorded owner also matches, so the check fails
-   * closed on incomplete provisioning: the explicit `ownerUserId: null` arm
-   * matters because Prisma's `not` comparison would otherwise skip NULL rows.
    */
   private foreignOwnerFilter(ownerUserId: string | null): Prisma.TeamWhereInput {
     return ownerUserId

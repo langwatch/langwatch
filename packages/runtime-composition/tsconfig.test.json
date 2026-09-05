@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": [],
+    "types": ["node"],
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/runtime-composition-tests.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],

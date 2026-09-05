@@ -1,17 +1,5 @@
 /**
  * ADR-032: pure (no-I/O) helpers for the chunked-JSONL dataset layout.
- *
- * Layout: `datasets/{projectId}/{datasetId}/chunk-NNNNN.jsonl`, ordered
- * zero-padded keys, each capped at ~`CHUNK_MAX_BYTES`. Postgres stays
- * authoritative for the counters (rowCount / sizeBytes / chunkCount /
- * chunkOffsets); S3 LIST is repair-only and never the read path.
- *
- * This module is deliberately provider-agnostic: it owns the chunk
- * boundaries, counts, offsets, key scheme, null-byte scrubbing and JSONL
- * (de)serialization, with zero coupling to S3 or the filesystem. The
- * `DatasetStorage` implementations import these helpers; they never
- * reimplement them. Keeping the math pure lets the ADR invariants (I-NULL,
- * I-COUNT) be unit-tested in isolation.
  */
 import { stripNullBytes } from "./dataset-sanitize.rules";
 
@@ -19,10 +7,6 @@ export { assertKeyWithinProject, assertNoTraversal, chunkKey } from "@langwatch/
 
 /**
  * ADR-032 CHUNK_MAX_BYTES — byte cap per JSONL chunk object (~16 MB, v5).
- * The only hard chunk bound in v1: small enough to bound normalize memory
- * and the future paginated read's per-chunk I/O, large enough to avoid an
- * object explosion (~128 objects per 2 GB). A row-count ceiling is deferred
- * to the reads epic (a low row cap explodes object count on light rows).
  */
 export const CHUNK_MAX_BYTES = 16 * 1024 * 1024;
 
@@ -45,11 +29,8 @@ export type ChunkOffset = {
 };
 
 /**
- * Lightweight per-chunk metadata — everything `chunkedMeta` needs to build the
- * PG-authoritative addressing WITHOUT the chunk's `jsonl` payload (I-MEM). The
- * streaming normalize writer maps each freshly-written `DatasetChunk` to this
- * immediately and drops the payload, so a multi-GB upload never accumulates the
- * serialized file in heap by the time `finalize()` runs.
+ * Lightweight per-chunk metadata — everything `chunkedMeta` needs to build the PG-authoritative
+ * addressing WITHOUT the chunk's `jsonl` payload (I-MEM).
  */
 export type ChunkMeta = {
   index: number;
@@ -76,10 +57,9 @@ export type ChunkedDatasetMeta = {
 };
 
 /**
- * Split records into JSONL chunks, each at most `maxBytes` (a single row
- * larger than the cap still gets its own chunk — never dropped). Null
- * bytes are scrubbed per row (Postgres-parity, I-NULL) before serializing.
- * Pure: no I/O, deterministic.
+ * Split records into JSONL chunks, each at most `maxBytes` (a single row larger than the cap
+ * still gets its own chunk — never dropped). Null bytes are scrubbed per row (Postgres-parity,
+ * I-NULL) before serializing. Pure: no I/O, deterministic.
  */
 export const toJsonlChunks = (
   records: unknown[],
@@ -131,11 +111,8 @@ export const toJsonlChunks = (
 };
 
 /**
- * Serialize exactly these records into ONE JSONL blob (no byte-cap roll-over),
- * scrubbing null bytes per row (I-NULL) like `toJsonlChunks`. The single-chunk
- * rewrite path (`rewriteChunk`) uses this so an edit/delete writes the affected
- * chunk back as one object with the same on-disk shape the append path produces.
- * Returns the blob and its UTF-8 byte size for the PG `chunkOffsets` patch.
+ * Serialize exactly these records into ONE JSONL blob (no byte-cap roll-over), scrubbing null
+ * bytes per row (I-NULL) like `toJsonlChunks`.
  */
 export const toSingleJsonl = (records: unknown[]): { jsonl: string; byteSize: number } => {
   const jsonl =
@@ -146,10 +123,9 @@ export const toSingleJsonl = (records: unknown[]): { jsonl: string; byteSize: nu
 };
 
 /**
- * Aggregate per-dataset metadata from a chunk list (PG-authoritative). Accepts
- * the lightweight `ChunkMeta` (a `DatasetChunk` is structurally assignable), so
- * the streaming writer can build the final meta from metadata alone — never
- * holding the `jsonl` payloads (I-MEM).
+ * Aggregate per-dataset metadata from a chunk list (PG-authoritative). Accepts the lightweight
+ * `ChunkMeta` (a `DatasetChunk` is structurally assignable), so the streaming writer can build
+ * the final meta from metadata alone — never holding the `jsonl` payloads (I-MEM).
  */
 export const chunkedMeta = (chunks: ChunkMeta[]): ChunkedDatasetMeta => ({
   rowCount: chunks.reduce((n, c) => n + c.rowCount, 0),
@@ -171,10 +147,9 @@ export const parseJsonl = (jsonl: string): unknown[] =>
     .map((line) => JSON.parse(line));
 
 /**
- * Narrow an `unknown` caught value to one carrying a given property with a
- * given string value. Shared by every storage impl so the "is this a
- * NoSuchKey / ENOENT?" check lives in exactly one place. The prop name is a
- * param because the SDKs disagree (`name` for S3 errors, `code` for Node FS).
+ * Narrow an `unknown` caught value to one carrying a given property with a given string value.
+ * Shared by every storage impl so the "is this a NoSuchKey / ENOENT?" check lives in exactly
+ * one place.
  */
 export const errorHasProp = (error: unknown, prop: "code" | "name", value: string): boolean =>
   typeof error === "object" &&
@@ -183,13 +158,8 @@ export const errorHasProp = (error: unknown, prop: "code" | "name", value: strin
   (error as Record<string, unknown>)[prop] === value;
 
 /**
- * True when a caught error is a "missing object" from any storage backend —
- * the 4-way `name`/`code` × `NoSuchKey`/`NotFound` check. AWS S3 raises
- * `NoSuchKey`, but S3-compatible backends (MinIO, etc.) raise `NotFound`, and
- * the SDKs disagree on whether it lands on `name` or `code`. Shared so the
- * chunk-read path and the staged-object path classify a miss identically — a
- * single-key check would let a MinIO `NotFound` escape as a raw SDK error
- * instead of the typed `MissingChunkError` callers expect.
+ * True when a caught error is a "missing object" from any storage backend — the 4-way
+ * `name`/`code` × `NoSuchKey`/`NotFound` check.
  */
 export const isMissingObjectError = (error: unknown): boolean =>
   errorHasProp(error, "name", "NoSuchKey") ||

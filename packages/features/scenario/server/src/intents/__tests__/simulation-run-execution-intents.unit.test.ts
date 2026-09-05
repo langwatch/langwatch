@@ -79,6 +79,10 @@ class TestScenarioExecutionService extends ScenarioExecutionService {
   finishUnsuccessfulRun(_input: ScenarioUnsuccessfulExecutionInput): Promise<void> {
     throw new Error("finishUnsuccessfulRun unexpectedly called in simulation intent tests");
   }
+
+  recordAgentInstance(): Promise<void> {
+    throw new Error("recordAgentInstance unexpectedly called in simulation intent tests");
+  }
 }
 
 function executionService(submit: (job: ScenarioExecutionJob) => void): ScenarioExecutionService {

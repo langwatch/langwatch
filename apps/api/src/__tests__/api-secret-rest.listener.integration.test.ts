@@ -58,6 +58,8 @@ afterEach(async () => {
 });
 
 describe("standalone Secret REST listener", () => {
+  /** @scenario "Every transport uses one service" */
+  /** @scenario "Legacy REST remains a thin compatibility transport" */
   it("serves every deployed collection and item operation through each Secret base path", async () => {
     const api = await startApi();
     const bases = ["/api/v1/secret", "/api/v1/secrets", "/api/secret", "/api/secrets"];
@@ -156,6 +158,8 @@ describe("standalone Secret REST listener", () => {
     expect(body).not.toContain("not found");
   });
 
+  /** @scenario "An authorised credential chooses a project" */
+  /** @scenario "Writes use the authenticated user actor" */
   it("resolves the credential, checks the declared permission and attributes the write", async () => {
     const api = await startApi();
     const response = await api.fetch("/api/v1/secret", {
@@ -189,6 +193,24 @@ describe("standalone Secret REST listener", () => {
     expect(api.apiKeys.markUsed).toHaveBeenCalledExactlyOnceWith({ id: "key-1" });
   });
 
+  it("refuses a write from a credential that names no person", async () => {
+    const api = await startApi({ userId: null });
+
+    const response = await api.fetch("/api/v1/secret", {
+      method: "POST",
+      headers: { ...credentials, "content-type": "application/json" },
+      body: JSON.stringify({
+        projectId: "project-1",
+        name: "OPENAI_API_KEY",
+        value: "secret-value",
+      }),
+    });
+
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    await expect(response.json()).resolves.toMatchObject({ code: expect.any(String) });
+    expect(api.secrets.create).not.toHaveBeenCalled();
+  });
+
   it("does not move the key's last-used clock for a failed REST response", async () => {
     const api = await startApi();
 
@@ -209,10 +231,12 @@ const publicSecret = {
   updatedAt: secret.updatedAt.toISOString(),
 };
 
-async function startApi() {
+async function startApi(caller: { userId?: string | null } = {}) {
   const secrets = new TestSecretService();
   const apiKeys = apiKeyService();
-  apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+  const withCallerUser = { ...currentKey, userId: caller.userId ?? null };
+  const resolved: ResolvedApiKeyToken = caller.userId === undefined ? currentKey : withCallerUser;
+  apiKeys.tryResolveToken.mockResolvedValue(resolved);
   const authz = authzService();
   const security = ApiRestSecurity.projectPolicy({
     apiKeys: apiKeys.service,

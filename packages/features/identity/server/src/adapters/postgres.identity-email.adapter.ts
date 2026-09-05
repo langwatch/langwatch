@@ -9,32 +9,19 @@ const logger = createLogger("langwatch:identity:latch");
 
 /**
  * How long one latch answer is held, in both directions.
- *
- * The same bound the platform application documents for its own gate, and it
- * has to be the same for the same reason the migration name does: an operator
- * enrolling a user, or pulling one back off the ledger, should not have to
- * learn a different lag per tier. There is no cross-process invalidation, so
- * this is the delay an enrolment or a rollback takes to be seen everywhere.
  */
 export const IDENTITY_LATCH_CACHE_TTL_MS = 60_000;
 
 /**
  * Hard cap on the users one process holds a cached latch answer for.
- *
- * Cardinality here is the fleet's ACTIVE users rather than its tenants, and an
- * entry nothing revisits would otherwise sit in the map for the life of the
- * process, so a write amortized-sweeps expired entries once the map reaches
- * the cap and evicts oldest-first if it is still over.
  */
 export const IDENTITY_LATCH_CACHE_MAX_USERS = 50_000;
 
 export type PostgresIdentityEmailAdapterOptions = {
   /**
-   * The composition root's own guarded client, typed.
-   *
-   * Both reads behind the fork live on it: the `Identifier` projection that
-   * answers which address is this person's, and the migration-state row that
-   * says whether that projection is allowed to answer at all.
+   * The composition root's own guarded client, typed. Both reads behind the fork live on it:
+   * the `Identifier` projection that answers which address is this person's, and the
+   * migration-state row that says whether that projection is allowed to answer at all.
    */
   database: PrismaClient;
   /** Overridden only by tests that need the latch to expire inside one run. */
@@ -47,29 +34,6 @@ export type PostgresIdentityEmailAdapterOptions = {
 
 /**
  * The READ fork for `User.email`, composed from a guarded Prisma client alone.
- *
- * `User.email` is a legacy column that answers a question identity owns: which
- * address is this person's. For a user whose backfill has finalized the
- * identifiers are the truth and the column is a stale copy; for everyone else
- * the column still IS the truth. Which of those a user is, is one row in the
- * migration-state table, and both reads are plain Postgres — which is what
- * lets a process holding only a client compose this service rather than
- * receive it from a tier that already had one.
- *
- * The latch is CACHED, and that is not an optimization detail to leave out.
- * The fork is asked on every request that resolves a browser session, so an
- * uncached composition would put one indexed lookup per request per active
- * user on the session path — and, before any operator has enrolled anybody, it
- * would spend all of them learning something a single row already settles.
- * So the fleet-wide question is asked first and cached once per process, and
- * it self-disables the moment the first user finalizes.
- *
- * Every failure answers `false`, which means "keep the legacy column". That is
- * the only safe direction: this runs on the path a customer's session is
- * resolved on, and a read fork that can break sign-in is worse than a stale
- * email. Failures are logged rather than swallowed, because a latch that is
- * closed because the table is unreadable and a latch that is closed because
- * nobody is enrolled look identical from the outside.
  */
 export class PostgresIdentityEmailAdapter {
   static create(options: PostgresIdentityEmailAdapterOptions): PostgresIdentityEmailAdapter {
@@ -97,18 +61,7 @@ export class PostgresIdentityEmailAdapter {
 type CachedAnswer = { value: boolean; expiresAt: number };
 
 /**
- * The two latch reads, cached per process with one TTL and coalesced per
- * subject.
- *
- * Coalescing matters as much as the TTL: without it, a burst of requests
- * against a user nothing has cached yet each starts its own lookup — the same
- * stampede a cache exists to prevent, deferred to the first request after
- * every expiry rather than avoided.
- *
- * There is deliberately no invalidation. The platform application needs one
- * because it can create a user who is finalized in the same request; this
- * process creates no users, so the only way an answer changes is an operator
- * moving a migration record, and the TTL is the bound on that.
+ * The two latch reads, cached per process with one TTL and coalesced per subject.
  */
 class CachedIdentityLatch {
   static create(options: {

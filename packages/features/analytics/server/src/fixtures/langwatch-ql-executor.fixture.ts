@@ -1,11 +1,6 @@
 /**
- * The shared LangWatchQL executor fake for every suite that only needs to
- * observe what reached this seam, not what a real database does with it.
- *
- * Records what it was asked to run and answers a fixed small result — the
- * claim worth making about a run is "what reached the database", which is an
- * artifact to inspect rather than a call sequence to verify (never mock what
- * you own).
+ * The shared LangWatchQL executor fake for every suite that only needs to observe what reached
+ * this seam, not what a real database does with it.
  */
 import {
   type LangWatchQLExecutionRequest,

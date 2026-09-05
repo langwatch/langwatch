@@ -11,14 +11,8 @@ import {
 } from "./support/in-memory-connections";
 
 /**
- * D05 tier 1 end to end at the write surface: an operator takes a customer
- * from nothing to a connection ready to go live, in one sitting, through the
- * real service and the real guards.
- *
- * Integration rather than unit because it is the composition under test —
- * service, guards and the fold together — not any one of them. The ledger is
- * the seam a datastore would sit behind; everything above it is production
- * code.
+ * D05 tier 1 end to end at the write surface: an operator takes a customer from nothing to a
+ * connection ready to go live, in one sitting, through the real service and the real guards.
  */
 
 const ORG = "org_acme";

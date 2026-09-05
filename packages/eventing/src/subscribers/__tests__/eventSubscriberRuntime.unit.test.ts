@@ -1,20 +1,6 @@
 /**
  * @vitest-environment node
- *
  * Runtime-boundary proofs for the event-subscriber seam (ADR-049 §3). These
- * drive the real EventSourcingService over a real in-memory global queue
- * (the same EventSourcedQueueProcessorMemory + JobRegistry dispatch shape
- * eventSourcing.ts wires in production) and a real OTel in-memory exporter,
- * asserting the four operational guarantees:
- *
- *   1. a subscriber receives the full queued event directly, without reading
- *      event_log or any projection;
- *   2. projection execution and subscriber execution are independent jobs, so
- *      a subscriber redelivery never reapplies a committed projection;
- *   3. projection replay never invokes live subscribers; and
- *   4. the publication / queue-processing OTel context is active inside the
- *      subscriber handler, which opens its own span carrying
- *      tenant / pipeline / subscriber attributes.
  */
 import { context, SpanKind, trace } from "@opentelemetry/api";
 import {
@@ -42,11 +28,8 @@ import type { JobRegistryEntry } from "../../services/queues/queueManager";
 import type { EventSubscriberDefinition } from "../eventSubscriber.types";
 
 /**
- * Builds a real in-memory global queue whose process/spanAttributes callbacks
- * dispatch through the shared JobRegistry — mirroring eventSourcing.ts's
- * `lookupEntry` routing. This is test wiring for the production queue, not a
- * new abstraction: the registry entries under test are the ones the router
- * registers.
+ * Builds a real in-memory global queue whose process/spanAttributes callbacks dispatch through
+ * the shared JobRegistry — mirroring eventSourcing.ts's `lookupEntry` routing.
  */
 function createMemoryGlobalQueue(registry: Map<string, JobRegistryEntry>) {
   const lookup = (

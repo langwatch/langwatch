@@ -12,6 +12,7 @@ import type {
   ScenarioChildBootstrapPort,
   ScenarioChildExecutionSession,
 } from "../ports/scenario-child-bootstrap.port";
+import { isCustomerActionablePrefetchFailure } from "../rules/scenario-prefetch-failure.rules";
 import type {
   ExecutionJobData,
   ScenarioExecutionPoolService,
@@ -40,6 +41,27 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
     },
   ) {
     super();
+  }
+
+  /**
+   * A prefetch refusal the customer's own configuration caused is logged below
+   * error, naming the reason; anything else stays at error, where a real fault
+   * belongs. Static so the classification can be exercised on its own.
+   */
+  static logPrefetchFailure({
+    jobLogger,
+    prefetchResult,
+  }: {
+    jobLogger: Pick<Logger, "warn" | "error">;
+    prefetchResult: Extract<ScenarioExecutionPrefetchResult, { success: false }>;
+  }): void {
+    const customerActionable = isCustomerActionablePrefetchFailure(prefetchResult.reason);
+    jobLogger[customerActionable ? "warn" : "error"](
+      { error: prefetchResult.error, reason: prefetchResult.reason, phase: "prefetch" },
+      customerActionable
+        ? "Scenario prefetch blocked by project configuration; failing the run with its remediation message"
+        : "Failed to prefetch scenario data",
+    );
   }
 
   async start(): Promise<{ close: () => Promise<void> }> {
@@ -190,10 +212,7 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
 
     if (!prefetch.success) {
       await this.releaseChild({ childSession, scenarioRunId: jobData.scenarioRunId });
-      jobLogger.error(
-        { error: prefetch.error, phase: "prefetch" },
-        "Failed to prefetch scenario data",
-      );
+      ScenarioProcessorService.logPrefetchFailure({ jobLogger, prefetchResult: prefetch });
       await this.handleFailed(jobData, prefetch.error);
 
       return;
@@ -256,6 +275,7 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
 
     if (result.success) {
       this.options.metrics.completed(durationMs);
+      await this.handleSucceeded({ jobData, result, jobLogger });
       jobLogger.info({ success: true, durationMs, childDurationMs }, "Scenario job completed");
 
       return;
@@ -273,6 +293,33 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
       "Scenario job completed with failure",
     );
     await this.handleFailed(jobData, result.error);
+  }
+
+  /**
+   * What a job that ran to the end records: the connected agent instance the
+   * child named, when one did. A run served by no connected agent names none
+   * and records nothing, and a record that cannot be written never fails the
+   * job that already succeeded.
+   */
+  async handleSucceeded(input: {
+    jobData: ExecutionJobData;
+    result: ScenarioExecutionResult;
+    jobLogger?: Logger;
+  }): Promise<void> {
+    const agentInstance = input.result.agentInstance;
+    if (!agentInstance) return;
+    try {
+      await this.options.execution.recordAgentInstance({
+        projectId: input.jobData.projectId,
+        scenarioRunId: input.jobData.scenarioRunId,
+        agentInstance,
+      });
+    } catch (error) {
+      (input.jobLogger ?? logger).warn(
+        { err: error, scenarioRunId: input.jobData.scenarioRunId },
+        "Could not record the agent instance that served the run",
+      );
+    }
   }
 
   private async handleCancelled(

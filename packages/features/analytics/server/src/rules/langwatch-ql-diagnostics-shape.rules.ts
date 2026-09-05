@@ -12,14 +12,8 @@ import type {
 } from "./langwatch-ql-validation-shape.rules";
 
 /**
- * Every note this API can attach to a result.
- *
- * A code is here because a caller would *do something different* on seeing it,
- * which is the same bar the violation codes are held to. The set is the four
- * rules issue #6480 scopes — fanout, truncation, comparison period, missing
- * buckets — plus the unfiltered-time-range rule, which is here because the
- * partition-pruning measurement recorded in `./views.ts` puts an eight-fold
- * read cost on exactly that shape.
+ * Every note this API can attach to a result. A code is here because a caller would *do
+ * something different* on seeing it, which is the same bar the violation codes are held to.
  */
 export const LWQL_DIAGNOSTIC_CODES = [
   /** A response ceiling cut the answer short. */
@@ -41,11 +35,6 @@ export type {
 
 /**
  * What an empty diagnostics list means, in the words the API publishes.
- *
- * Stated once, here, and reused by the endpoint's own documentation, because
- * the distinction it draws is the entire point of the feature: "we found
- * nothing" and "this is right" are different claims and only the first one is
- * ours to make.
  */
 export const LWQL_CLEAN_DIAGNOSTICS_MEANING =
   "An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.";
@@ -66,11 +55,9 @@ export interface LangWatchQLDiagnosticsInput {
   /** Rows actually handed back, after the ceilings. */
   readonly rowsReturned: number;
   /**
-   * The instant "has this bucket finished yet" is asked against.
-   *
-   * Injected rather than read from the clock so that the answer is a function
-   * of its inputs — the same result at the same instant always produces the
-   * same diagnostics.
+   * The instant "has this bucket finished yet" is asked against. Injected rather than read from
+   * the clock so that the answer is a function of its inputs — the same result at the same
+   * instant always produces the same diagnostics.
    */
   readonly now: Date;
 }
@@ -89,11 +76,9 @@ export interface ResolvedTableReference {
 }
 
 /**
- * The block's table references, resolved against the catalog.
- *
- * A reference the catalog does not know is dropped: it can only be a dataset
- * this service was not given, and a rule that guessed at its grain would be
- * inventing the fact it reports.
+ * The block's table references, resolved against the catalog. A reference the catalog does not
+ * know is dropped: it can only be a dataset this service was not given, and a rule that guessed
+ * at its grain would be inventing the fact it reports.
  */
 export function resolveTableReferences({
   block,

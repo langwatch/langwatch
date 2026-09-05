@@ -1,9 +1,7 @@
 /**
- * Advisory result diagnostics. The validator alone refuses SQL; these describe
- * facts that can make an accepted result easy to misread. Query-shape rules use
- * its one recorded walk, never a second parse; other rules use returned rows or
- * the executor's truncation report. Under-report rather than warn on a fact
- * this module cannot point at.
+ * Advisory result diagnostics. The validator alone refuses SQL; these describe facts that can
+ * make an accepted result easy to misread. Query-shape rules use its one recorded walk, never a
+ * second parse; other rules use returned rows or the executor's truncation report.
  */
 import type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
 
@@ -93,10 +91,9 @@ export class LangWatchQLDiagnosticsService {
   ) {}
 
   /**
-   * Every diagnostic a finished query earns, in a stable order.
-   *
-   * Pure. Truncation first because it changes what the other rules are looking
-   * at: a cut-off result can be missing the buckets they would have read.
+   * Every diagnostic a finished query earns, in a stable order. Pure. Truncation first because
+   * it changes what the other rules are looking at: a cut-off result can be missing the buckets
+   * they would have read.
    */
   diagnose(input: LangWatchQLDiagnosticsInput): readonly LangWatchQLDiagnostic[] {
     return [

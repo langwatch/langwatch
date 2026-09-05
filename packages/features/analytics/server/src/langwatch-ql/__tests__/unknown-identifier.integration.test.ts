@@ -1,25 +1,5 @@
 /**
  * A column that does not exist, as the member who wrote the SQL experiences it.
- *
- * Naming a nonexistent column is the one refusal on this path the caller fixes
- * themselves, and it cannot be caught earlier: the validator approves table
- * names, not columns, and whether a column exists is not knowable when a chart
- * is saved. Before this mapping it reached the caller as an unknown 500: the
- * dashboard widget rendered "Something went wrong" and `langwatch chart run`
- * said "An unknown error occurred", for a typo (#7447).
- *
- * **Why this suite has to touch a real server.** The classification is unit
- * tested against synthesised driver errors
- * (`app-layer/clients/clickhouse/__tests__/translate-query-error.unit.test.ts`),
- * but those fixtures carry the sentences *I* believe ClickHouse writes. The
- * identifier is lifted out of that sentence by a regex, so a fixture-only test
- * proves the regex matches my own fixture and nothing about the engine. Only a
- * real server can say the wording is what the extractor reads, and only a real
- * server catches it changing under an upgrade.
- *
- * Habit carried from the sibling suites: the rejection is paired with the
- * same-shaped query succeeding on a real column. A typo in the test throws
- * too, and would otherwise read as the mapping working.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

@@ -1,3 +1,4 @@
+import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-server";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
@@ -164,10 +165,13 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { UsageService } from "@langwatch/entitlement-server";
 
 /**
- * The retention floor a project with no policy of its own is bounded by. The platform
- * application's `PLATFORM_DEFAULT_RETENTION_DAYS`.
+ * The retention a tenant's data is stamped with when no override exists in its
+ * scope cascade. Resolved rather than written down, so a local stack can lower
+ * it through `LANGWATCH_DEFAULT_RETENTION_DAYS`; the resolver refuses that
+ * variable outside development and test, where lowering it would silently
+ * expire customer data.
  */
-const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
+const PLATFORM_DEFAULT_RETENTION_DAYS = resolvePlatformDefaultRetentionDays(process.env);
 import {
   composeApiModelProviders,
   LoggedApiModelProviderAbsence,

@@ -318,4 +318,26 @@ describe("AutomationSettlementMatchConfirmationService", () => {
     expect(filterEvaluator.traceFilterCalls).toHaveLength(1);
     expect(filterEvaluator.evaluationFilterCalls).toHaveLength(1);
   });
+  describe("given a grandfathered condition-less automation", () => {
+    /** @scenario "Automations that predate the rule keep firing" */
+    it("still confirms its matches at dispatch time", async () => {
+      // The write paths refuse this shape now. Rows saved before that rule keep
+      // running unchanged: refusing them at dispatch would silently break
+      // automations a customer is relying on, on a deploy they did not ask for.
+      const { service, evaluations, traces, filterEvaluator } = createService();
+
+      const confirmed = await service.confirms({
+        trigger: trigger({ filters: {}, filterQuery: null }),
+        projectId: "project-1",
+        traceId: "trace-1",
+        foldState: traceSummary(),
+      });
+
+      expect(confirmed).toBe(true);
+      expect(evaluations.lookups).toEqual([]);
+      expect(traces.eventRequests).toEqual([]);
+      expect(filterEvaluator.traceFilterCalls).toEqual([]);
+      expect(filterEvaluator.evaluationFilterCalls).toEqual([]);
+    });
+  });
 });

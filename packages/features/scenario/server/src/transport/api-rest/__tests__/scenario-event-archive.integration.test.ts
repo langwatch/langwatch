@@ -77,6 +77,18 @@ describe("given DELETE /api/scenario-events", () => {
     });
   });
 
+  describe("when the request carries both a scenarioSetId and a scenarioRunId", () => {
+    /** @scenario "DELETE with both scenarioSetId and scenarioRunId is refused" */
+    it("refuses as not matching the expected shape, archiving nothing", async () => {
+      const api = mount();
+
+      const response = await api.delete("?scenarioSetId=set-a&scenarioRunId=run-1");
+
+      expect(response.status).toBe(422);
+      expect(api.getRunIdsForSet).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the request carries an empty scenarioSetId", () => {
     /** @scenario "DELETE with empty scenarioSetId is refused" */
     it("refuses as not matching the expected shape, archiving nothing", async () => {

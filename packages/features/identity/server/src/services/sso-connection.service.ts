@@ -50,16 +50,6 @@ import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
 
 /**
  * The SSO connection write surface (D04, ADR-117 §5): fourteen verbs, each
- * the same move — parse the input, run the guard, hand the command and its
- * facts to the ledger.
- *
- * There is no other way to change a connection. The backoffice's ops
- * actions, the grandfather migration and D05's self-service all call these
- * methods; nothing anywhere writes an `SsoConnection` row directly, because
- * the row is a projection of this log and a hand-written one would be
- * overwritten by the next fold or the next replay. That is what "backoffice
- * edits go through commands like everyone else's" means mechanically: the
- * actor rides on every command, so the history says who did it.
  */
 export class SsoConnectionService {
   static create(

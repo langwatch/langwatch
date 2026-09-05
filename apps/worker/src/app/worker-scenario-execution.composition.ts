@@ -234,6 +234,7 @@ export function createWorkerScenarioExecution(input: {
       traces: composeTraceReads(deps),
     }),
     failures: ScenarioFailureHandlerService.create({ agents, simulations }),
+    simulations,
   });
 
   return ScenarioProcessorService.create({

@@ -1,28 +1,6 @@
 /**
- * The LangWatchQL `analytics.*` views, proven over the real fact tables.
- *
- * Everything here runs against a ClickHouse 25.10 server carrying the *shipped*
- * migrations — not a fixture schema — with the shipped provisioning applied and
- * every read executed as the actual restricted database identity. That is the
- * bar the feature file sets: a view that deduplicates correctly against two toy
- * `MergeTree` tables has proven nothing about a `ReplacingMergeTree` holding
- * eight weekly partitions.
- *
- * Three habits, each answering a way this kind of suite goes quietly vacuous:
- *
- *  - Every absence claim is paired with an administrator-side control proving
- *    the thing it failed to find exists.
- *  - Every rejection is asserted by specific ClickHouse error code. "It threw"
- *    is not containment when a typo throws too.
- *  - The catalog's declared types are checked against `system.columns` rather
- *    than trusted, so a migration that changes a column turns this red instead
- *    of turning the schema endpoint into a liar.
- *
  * @see specs/analytics/lwql-api.feature
  * @see ../../repositories/clickhouse/clickhouse.lwql-views.mapper.ts — the
- *   statements under proof
- *
- * @integration
  * @vitest-environment node
  */
 
@@ -603,10 +581,9 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
   });
 
   /**
-   * The rollups (issue #6856). An `AggregatingMergeTree` holds a bucket as
-   * however many partial rows the writers produced, and no one of them is the
-   * answer — which makes it the one shape where "returned a single row" and
-   * "returned the right number" can come apart.
+   * The rollups (issue #6856). An `AggregatingMergeTree` holds a bucket as however many partial
+   * rows the writers produced, and no one of them is the answer — which makes it the one shape
+   * where "returned a single row" and "returned the right number" can come apart.
    */
   describe("when a rollup table holds two partial rows for one bucket", () => {
     /**

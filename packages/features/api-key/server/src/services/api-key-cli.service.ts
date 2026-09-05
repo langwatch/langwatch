@@ -147,6 +147,7 @@ export class ApiKeyCliService {
     const scope = await this.resolveCliScopeSummary({
       organizationId: input.organizationId,
       bindings: input.selection.bindings,
+      permissions: input.selection.permissions,
     });
     const created = await this.lifecycle.create({
       name: `CLI login - ${input.deviceLabel}`,
@@ -239,9 +240,11 @@ export class ApiKeyCliService {
   private async resolveCliScopeSummary(input: {
     organizationId: string;
     bindings: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+    permissions: readonly string[];
   }): Promise<CliKeyScopeSummary> {
+    const permissions = [...new Set(input.permissions)].sort();
     if (input.bindings.some((binding) => binding.scopeType === "ORGANIZATION")) {
-      return { kind: "organization", projectIds: [] };
+      return { kind: "organization", projectIds: [], permissions };
     }
 
     const teamIds = input.bindings
@@ -258,6 +261,10 @@ export class ApiKeyCliService {
       })
     ).data.filter((project) => projectIds.includes(project.id) || teamIds.includes(project.teamId));
 
-    return { kind: "projects", projectIds: projects.map((project) => project.id).sort() };
+    return {
+      kind: "projects",
+      projectIds: projects.map((project) => project.id).sort(),
+      permissions,
+    };
   }
 }

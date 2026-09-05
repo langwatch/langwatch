@@ -31,11 +31,6 @@ import type {
 
 /**
  * The identity write surface (ADR-101 §2, ADR-115 §3): six verbs, each
- * the same move — parse the input, run the guard, hand the command and its
- * facts to the ledger. The guard vetoes before any fact exists; the ledger
- * (the app's) appends waited, folds on the calling path and stages last.
- * A verb whose guard states nothing (the heads already carry the fact)
- * returns without touching the ledger at all.
  */
 export class IdentityService
   implements

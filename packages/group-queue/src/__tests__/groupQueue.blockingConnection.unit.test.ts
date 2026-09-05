@@ -1,13 +1,6 @@
 /**
- * Regression test: GroupQueueProcessor must duplicate the source connection
- * for its BRPOP loop in BOTH standalone (IORedis) and cluster (Cluster) topologies.
- *
- * Bug: after the PR changed the topology check from duck-type
- * ("duplicate" in effectiveConnection) to instanceof IORedis, a Cluster
- * connection would fall through to the else branch and share the single
- * connection — re-introducing the "BRPOP blocks the shared connection" problem.
- *
- * Fix: add an `instanceof Cluster` branch that calls `.duplicate()` with no args.
+ * Regression test: GroupQueueProcessor must duplicate the source connection for its BRPOP loop
+ * in BOTH standalone (IORedis) and cluster (Cluster) topologies.
  */
 
 import { Cluster, Redis as IORedis } from "ioredis";
@@ -15,16 +8,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GroupQueueRuntimeDefinition } from "../contracts";
 import { GroupQueueProcessor } from "../groupQueue";
 
-// The processor instantiates these collaborators with `new` in consumer mode.
-// The mock implementations MUST therefore be constructible — a
-// `vi.fn(() => ({ ... }))` arrow-returning factory is NOT a constructor under
-// Vitest 4.x and throws `TypeError: ... is not a constructor`, which previously
-// made both consumer-mode cases fail before reaching their assertions. Using a
-// class keeps the mock constructible.
-//
-// Mocking them also prevents the real BRPOP dispatcher loop and the metrics
-// `setInterval` from starting — both would attempt network I/O and open handles
-// that outlive the test.
+// The processor instantiates these collaborators with `new` in consumer mode. The mock
+// implementations MUST therefore be constructible — a `vi.fn(() => ({ ... }))` arrow-returning
+// factory is NOT a constructor under Vitest 4.x and throws `TypeError: ... is not a
+// constructor`, which previously made both consumer-mode cases fail before reaching their
+// assertions. Using a class keeps the mock constructible.
 vi.mock("../dispatcher", () => ({
   GroupQueueDispatcher: class {
     start(): void {}

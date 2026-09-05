@@ -11,15 +11,6 @@ const logger = createLogger("langwatch:identity:signin-router");
 
 /**
  * The composition layer over `@langwatch/identity-contract`'s pure router (ADR-117 §1):
- * it assembles the engine's inputs from injected ports, calls the engine, and
- * records the decision. It holds no routing policy of its own — every branch a
- * reviewer might look for is in the engine, where a test enumerates it without
- * a stub in sight.
- *
- * The ports are what make D04 a composition change rather than a router
- * change: today the domain lookup reads `Organization.ssoDomain` strings, and
- * behind `SSOCONN_ROUTING` it reads the `SsoConnection` projection instead.
- * Neither this file nor the engine learns which.
  */
 
 /** Org-level routing data. Never per-user: see the engine's docblock. */
@@ -39,13 +30,6 @@ export interface SignInMethodPolicyPort {
 
 /**
  * The budget on the break-glass bypass (ADR-117 §2: "it is rate-limited,
- * audited").
- *
- * Spending the budget never locks anyone out — it only stops `?local=1` from
- * BYPASSING the auto-redirect, so the request routes the way an ordinary one
- * would. That asymmetry is the point: an operator who needs the local door
- * once gets it, and someone spraying the parameter to farm a password form off
- * an SSO-only deployment gets handed to the IdP like everybody else.
  */
 export interface SignInBreakGlassLimiter {
   /** True while the break-glass budget for this window is unspent. */
@@ -66,10 +50,7 @@ export interface SignInRoutingRecord {
   reasonCode: RoutingDecision["reasonCode"];
   connectionId: string | null;
   /**
-   * The DOMAIN of the submitted address, never the local part. A domain is an
-   * org-level fact routing is decided on and support has to be able to search
-   * by; `sam@` is the person, and putting the person in a line that every
-   * sign-in attempt writes is how a log becomes a mailing list.
+   * The DOMAIN of the submitted address, never the local part.
    */
   domain: string | null;
   /** The break-glass audit trail: asked for, and whether it was granted. */

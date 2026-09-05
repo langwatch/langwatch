@@ -6,6 +6,11 @@ import type { Hono } from "hono";
 
 export type ApiListenerAddress = Readonly<{ host: string; port: number }>;
 
+const DEFAULT_DRAIN_GRACE_MS = 5_000;
+
+/** Room inside the phase for the teardown either side of the grace. */
+const CLOSE_PHASE_SLACK_MS = 2_000;
+
 /**
  * A surface served straight off the Node server, ahead of the Hono
  * application.
@@ -39,6 +44,12 @@ export type ApiHttpListenerOptions = Readonly<{
   port: number;
   drainGraceMs?: number;
   logger?: Pick<Logger, "error" | "info">;
+  /**
+   * Teardown that must run once the listener stops accepting, and that must
+   * not be paid for out of the grace in-flight requests were given. The hosted
+   * Model Context Protocol sessions are the live registrant.
+   */
+  closeSessions?: (() => Promise<void>) | undefined;
   /** Served before the Hono application; see {@link ApiRawRequestSurfacePort}. */
   rawSurface?: ApiRawRequestSurfacePort | undefined;
   /** Attached to the server's own `upgrade` event; see {@link ApiUpgradeSurfacePort}. */
@@ -101,6 +112,15 @@ export class ApiHttpListener {
     return this.closing;
   }
 
+  /**
+   * The ceiling a shutdown runner may put on this phase. Strictly above the
+   * grace, or the runner abandons the phase before the destroy the grace leads
+   * into, and the sockets survive to the process deadline instead.
+   */
+  get closePhaseTimeoutMs(): number {
+    return (this.options.drainGraceMs ?? DEFAULT_DRAIN_GRACE_MS) + CLOSE_PHASE_SLACK_MS;
+  }
+
   private async listen(): Promise<ApiListenerAddress> {
     await new Promise<void>((resolve, reject) => {
       const onError = (error: Error) => {
@@ -144,11 +164,23 @@ export class ApiHttpListener {
     });
     this.server.closeIdleConnections();
 
-    const drainGraceMs = this.options.drainGraceMs ?? 5_000;
-    const drained = await Promise.race([
-      closed.then(() => true),
-      delay(drainGraceMs, false as const, { ref: false }),
-    ]);
+    const drainGraceMs = this.options.drainGraceMs ?? DEFAULT_DRAIN_GRACE_MS;
+    // The grace starts here, not after the session teardown below: it measures
+    // how long in-flight requests have been given, and anything awaited before
+    // it silently eats into that budget.
+    const graceExpired = delay(drainGraceMs, false as const, { ref: false });
+    // Session teardown must not decide whether sockets get reaped. A failure is
+    // reported and stepped over: the listener is already closed, and leaving
+    // the sockets alive until the process deadline is the worse outcome.
+    try {
+      await this.options.closeSessions?.();
+    } catch (error) {
+      this.options.logger?.error(
+        { error },
+        "API session teardown failed during shutdown, draining connections anyway",
+      );
+    }
+    const drained = await Promise.race([closed.then(() => true), graceExpired]);
     if (!drained) {
       this.options.logger?.info(
         { drainGraceMs },

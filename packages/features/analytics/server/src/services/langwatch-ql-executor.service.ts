@@ -1,10 +1,7 @@
 /**
- * What the LangWatchQL executor seam needs decided outside a transport: how
- * much of a finished result reaches the caller, and whether this deployment
- * provisioned a restricted identity at all.
- *
- * The transport itself is `../adapters/clickhouse.langwatch-ql-executor.adapter.ts`,
- * behind `../ports/langwatch-ql-executor.port.ts`.
+ * What the LangWatchQL executor seam needs decided outside a transport: how much of a finished
+ * result reaches the caller, and whether this deployment provisioned a restricted identity at
+ * all.
  */
 import { createLogger } from "@langwatch/observability";
 
@@ -19,11 +16,6 @@ export type { LangWatchQLColumn, LangWatchQLStatistics } from "@langwatch/analyt
 
 /**
  * The shipped result ceilings.
- *
- * Sized so a full page of an analytical answer fits comfortably — the shapes
- * the issue enumerates aggregate to tens or hundreds of rows — while a query
- * that forgot to aggregate is cut off long before the response becomes
- * something a caller has to stream.
  */
 export const DEFAULT_LWQL_RESULT_LIMITS: LangWatchQLResultLimits = {
   maxRows: 10_000,
@@ -38,14 +30,9 @@ export class LangWatchQLExecutorService {
   private constructor() {}
 
   /**
-   * Applies the row ceiling, then the byte ceiling, reporting whether either bit.
-   *
-   * Byte cost is measured on the JSON encoding of each retained row, which is
-   * what the response body actually carries. It is an accounting of the
-   * *result*, not of the query: the rows were already materialised by the time
-   * this runs, so this bounds what a caller receives rather than what the
-   * gateway holds. Bounding the latter is the database's job and it already
-   * does it, with `max_memory_usage` pinned `CONST` by the profile.
+   * Applies the row ceiling, then the byte ceiling, reporting whether either bit. Byte cost is
+   * measured on the JSON encoding of each retained row, which is what the response body
+   * actually carries.
    */
   applyResultLimits({
     rows,
@@ -73,21 +60,8 @@ export class LangWatchQLExecutorService {
   }
 
   /**
-   * Reads the restricted identity's connection out of the environment a process
-   * handed over, or reports that this deployment has none.
-   *
-   * `null` rather than a throw, and rather than a default pointing at the
-   * application's own ClickHouse: an unconfigured deployment must refuse
-   * LangWatchQL queries, and a partially-configured one must refuse them too.
-   * Every field is required for exactly that reason.
-   *
-   * The two cases are indistinguishable to a caller and must not be to an
-   * operator, so a partial configuration is logged with the names it is
-   * missing. They are not read through the validated env module: the variables
-   * are optional by design — most deployments provision no LangWatchQL identity
-   * — and an optional entry there would not reject a misspelling either, while
-   * making them required would refuse to boot every deployment that does not
-   * run this API.
+   * Reads the restricted identity's connection out of the environment a process handed over, or
+   * reports that this deployment has none.
    */
   tryConnectionFromEnvironment(
     environment: Record<string, string | undefined>,

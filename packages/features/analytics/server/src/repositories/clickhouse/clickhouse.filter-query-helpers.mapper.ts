@@ -3,10 +3,9 @@ import type { ClickHouseFilterQueryParams } from "./clickhouse.filter-shapes.map
 import type { FilterOption } from "../../ports/filter-options.port";
 
 /**
- * Attribute keys as stored in ClickHouse trace_summaries.Attributes map.
- *
- * These must match the canonical keys used by the event-sourcing fold projection.
- * See: src/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection.ts
+ * Attribute keys as stored in ClickHouse trace_summaries.Attributes map. These must match the
+ * canonical keys used by the event-sourcing fold projection. See:
+ * src/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection.ts
  */
 export const ATTRIBUTE_KEYS = {
   thread_id: "Attributes['gen_ai.conversation.id']",
@@ -72,9 +71,6 @@ export function extractStandardResults(rows: unknown[]): FilterOption[] {
 }
 
 /**
- * Build scope conditions from filter parameters for scoping query results.
- * Returns SQL fragment and prefixed parameters to avoid collisions.
- *
  * @param params - Query parameters including optional scopeFilters
  * @param scopeParamPrefix - Prefix for parameter names (default: "scope")
  * @returns Object with sql fragment and prefixed params

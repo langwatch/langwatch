@@ -1,21 +1,6 @@
 /**
  * ADR-032: local-filesystem implementation of `DatasetStorage`.
- *
- * The single-replica self-host fallback (formerly the
- * `env.DATASET_STORAGE_LOCAL` branch). Chunk objects become files under
- * `<root>/<chunk key>`; a missing chunk that PG's `chunkCount` claims throws
- * (never silently truncate). There is no browser-reachable presign for local
- * FS, so `createPresignedUpload` mints a SAME-ORIGIN upload URL instead — the
- * browser PUTs the raw file to the `/direct-upload/staging/:uploadId` route,
  * which streams it back here via `putStaged` (ADR-032 D4, local-FS extension).
- * Heavy uploads work without S3; the bytes just transit the app.
- *
- * The `root` is supplied by `getDatasetStorage` from the shared storage
- * destination resolver (`resolveProjectStorageDestination`), which is the single
- * source of truth for where a project's bytes live (it already honors
- * `LANGWATCH_LOCAL_STORAGE_PATH` + the canonical default). This impl never reads
- * `process.env` directly — that would bypass the resolver and risk drifting from
- * the canonical root.
  */
 
 import { type Readable, Transform } from "node:stream";
@@ -65,15 +50,7 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
   }
 
   /**
-   * Write a chunk file atomically: write a unique temp sibling, then `rename`
-   * it into place. A bare `fs.writeFile` truncates-then-writes, so a reader —
-   * `readChunks`/`readChunk` take NO advisory lock (only writers do) — can
-   * observe a half-written chunk and crash in `JSON.parse`. POSIX `rename` is
-   * atomic on the same filesystem, so a concurrent read sees either the old
-   * object or the fully-written new one, never a torn one. This brings the
-   * local backend to parity with S3 (PutObject is already atomic). The temp
-   * sibling shares the chunk's directory so the rename stays intra-filesystem;
-   * a failed write removes it so a crash never leaves `.tmp-*` litter.
+   * Write a chunk file atomically: write a unique temp sibling, then `rename` it into place.
    */
   private async atomicWriteFile(filePath: string, data: string): Promise<void> {
     const tmpPath = `${filePath}.tmp-${nanoid()}`;
@@ -90,16 +67,7 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
 
   /**
    * Turn a raw FS permission failure (EACCES/EROFS/EPERM) into the handled
-   * `storage_not_writable` refusal; rethrow anything else. Born-on-storage made
-   * a writable backend mandatory, so an unwritable root (e.g. the default
-   * `/var/lib/langwatch/objects` on an install that never provisioned it) is a
-   * deployment-config error, not a transient failure. Shared by `writeChunks`
-   * and `putStaged`.
-   *
-   * The root and the two environment variables that set it go in this log line
-   * and in the error's tips, where an operator reads them. They must not ride
-   * the error message: the REST boundary ships that message in the response
-   * body.
+   * `storage_not_writable` refusal; rethrow anything else.
    */
   private rethrowWritable(error: unknown): never {
     if (
@@ -251,11 +219,9 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
   }
 
   /**
-   * Local FS has no browser-reachable bucket, so instead of a cross-origin
-   * presigned PUT we mint a SAME-ORIGIN upload URL: the browser PUTs the raw
-   * file to `/direct-upload/staging/:uploadId`, which streams it back here via
-   * `putStaged`. The `key` is the same server-owned, tenant-scoped staging key
-   * the S3 path uses, so finalize/normalize are backend-agnostic from here on.
+   * Local FS has no browser-reachable bucket, so instead of a cross-origin presigned PUT we
+   * mint a SAME-ORIGIN upload URL: the browser PUTs the raw file to
+   * `/direct-upload/staging/:uploadId`, which streams it back here via `putStaged`.
    */
   createPresignedUpload({ projectId }: { projectId: string }): Promise<PresignedUpload> {
     const uploadId = nanoid();
@@ -267,12 +233,8 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
   }
 
   /**
-   * Stream a staged upload to disk (the server-side deposit for the local-FS
-   * direct-upload route). Streamed via `pipeline`, never buffered, so a multi-GB
-   * file never sits in heap. `maxBytes` is enforced inline by a counting
-   * transform that aborts the stream the moment the cap is crossed and deletes
-   * the partial object — an authed client can't fill the disk ahead of the
-   * finalize HEAD that would reject it.
+   * Stream a staged upload to disk (the server-side deposit for the local-FS direct-upload
+   * route). Streamed via `pipeline`, never buffered, so a multi-GB file never sits in heap.
    */
   async putStaged({
     projectId,

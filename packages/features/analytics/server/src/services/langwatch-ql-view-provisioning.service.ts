@@ -1,9 +1,5 @@
 /**
- * LangWatchQL analytics SQL — what provisioning the views involves beyond the
- * view statements themselves: the column grants that bound what a view may
- * read, the source tables its row policies go on, and the order the whole set
- * has to run in.
- *
+ * What provisioning LangWatchQL views involves beyond the view statements: grants, row policies, and run order.
  * @see ./langwatch-ql-view-statements.service.ts — the views
  * @see ./langwatch-ql-access-model.service.ts — the access model applied over them
  */
@@ -33,13 +29,9 @@ export class LangWatchQLViewProvisioningService {
   private constructor() {}
 
   /**
-   * The source tables the catalog reads, each with its tenant column, ready for
-   * a row policy.
-   *
-   * Deduplicated by qualified name: two views over one table in one database
-   * share its policy, and creating the same policy twice is not idempotent in a
-   * way worth relying on. Two tables that share a name across databases are
-   * distinct sources and each keeps its own policy.
+   * The source tables the catalog reads, each with its tenant column, ready for a row policy.
+   * Deduplicated by qualified name: two views over one table in one database share its policy,
+   * and creating the same policy twice is not idempotent in a way worth relying on.
    */
   sourceTables({
     names,
@@ -55,12 +47,11 @@ export class LangWatchQLViewProvisioningService {
       // A PostgreSQL-engine table lives in the LangWatchQL database, beside the
       // view over it, rather than in the application's.
       const database = catalogShapes.isPostgresResident(view) ? names.database : sourceDatabase;
-      // Keyed on the qualified name, not the bare table. Two catalog entries can
-      // share a `sourceTable` while resolving to different databases — one
-      // PostgreSQL-resident, one a fact table — and keying on the bare name
-      // collapses them to a single entry. The one that loses gets no row policy,
-      // and the row policy is the tenant boundary, so the physical table becomes
-      // readable across tenants by the restricted identity.
+      // Keyed on the qualified name, not the bare table. Two catalog entries can share a
+      // `sourceTable` while resolving to different databases — one PostgreSQL-resident, one a
+      // fact table — and keying on the bare name collapses them to a single entry. The one that
+      // loses gets no row policy, and the row policy is the tenant boundary, so the physical
+      // table becomes readable across tenants by the restricted identity.
       byTable.set(`${database}.${view.sourceTable}`, {
         table: view.sourceTable,
         // Every source names the owning project the same way — the fact tables
@@ -78,21 +69,6 @@ export class LangWatchQLViewProvisioningService {
 
   /**
    * Every statement that provisions the LangWatchQL views, in dependency order.
-   *
-   * Runs *after* `lwqlClickHouseSetupStatements`, which mints the restricted
-   * user: a grant created before the user still points at the replaced access
-   * entity, so the ordering between the two is load-bearing in exactly the way
-   * the setup list documents.
-   *
-   * The source tables themselves are not created here — the ClickHouse ones come
-   * from migrations, and the PostgreSQL-engine ones from
-   * {@link lwqlPostgresEngineTableStatements}, which must have run first.
-   * This function only exposes them.
-   *
-   * Not called from any production path in this repo: the real views' grants and
-   * access model are owned by infra (langwatch-saas#1126). This is the reference
-   * implementation that terraform must match — keep it and its tests in sync, do
-   * not delete as dead code.
    */
   setupStatements({
     names,
@@ -107,12 +83,11 @@ export class LangWatchQLViewProvisioningService {
   }): string[] {
     return [
       ...views.map((view) => viewStatements.viewStatement({ names, sourceDatabase, view, dedup })),
-      // A fact table carries far more than the catalog exposes, so its grant is
-      // column-scoped. A PostgreSQL-engine table was *created from* the catalog
-      // and its whole column list is the exposed surface, so it takes the
-      // whole-object grant the key map and the views take — which is also what
-      // keeps `SHOW CREATE TABLE` answerable, the surface the credential-leak
-      // assertion inspects.
+      // A fact table carries far more than the catalog exposes, so its grant is column-scoped.
+      // A PostgreSQL-engine table was *created from* the catalog and its whole column list is
+      // the exposed surface, so it takes the whole-object grant the key map and the views take
+      // — which is also what keeps `SHOW CREATE TABLE` answerable, the surface the
+      // credential-leak assertion inspects.
       ...views.map((view) =>
         catalogShapes.isPostgresResident(view)
           ? accessModel.grantStatement({ names, table: view.sourceTable })

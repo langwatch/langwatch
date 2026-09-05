@@ -1,14 +1,5 @@
 /**
  * The settings profile, as SQL text.
- *
- * The integration suites prove the shipped profile is *accepted* by ClickHouse
- * and that a caller cannot override it. What they cannot show cheaply is which
- * ceilings the statement carries at all: a limit dropped from the emitted text
- * leaves every one of those suites green, because nothing they run comes near
- * the bound that went missing. This file is the inventory check — it fails when
- * a ceiling stops being pinned, which is the change that would otherwise ship
- * silently.
- *
  * @see ../provisioning.ts — the statements under test
  * @see specs/analytics/lwql-api.feature
  */
@@ -62,11 +53,8 @@ describe("given the LangWatchQL settings profile statement", () => {
     });
 
     /**
-     * The tenant capability is the one setting a caller may change, and its
-     * empty default is what makes an absent context read zero rows rather than
-     * every row. Pinning it `CONST` alongside the rest would break every
-     * LangWatchQL query; leaving it changeable *without* the empty default would
-     * fail open.
+     * The tenant capability is the one setting a caller may change, and its empty default is
+     * what makes an absent context read zero rows rather than every row.
      */
     it("leaves only the tenant capability changeable, defaulted to empty", () => {
       const statement = accessModel.settingsProfileStatement({
@@ -95,13 +83,9 @@ describe("given the LangWatchQL settings profile statement", () => {
 });
 
 /**
- * The row policy is the tenant boundary, and its `USING` clause reads a table
- * this application never writes and cannot constrain: `MergeTree ORDER BY
- * KeyHash` sorts on the hash without making it unique. A key mapped to two
- * tenants is therefore representable, and the only place that can refuse it is
- * the predicate. These assertions pin the refusal, because a predicate that
- * quietly went back to a bare `IN` would leave every integration suite green —
- * none of them writes a conflicting row.
+ * The row policy is the tenant boundary, and its `USING` clause reads a table this application
+ * never writes and cannot constrain: `MergeTree ORDER BY KeyHash` sorts on the hash without
+ * making it unique.
  */
 describe("given the LangWatchQL row policy", () => {
   const LWQL_TABLE = {

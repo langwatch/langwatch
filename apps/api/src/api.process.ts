@@ -24,6 +24,11 @@ import {
   ObservabilityApiRequestFailureCaptureAdapter,
 } from "./api-process.lifecycle";
 import { ApiRequestPolicy } from "./api-request.policy";
+import {
+  runShutdownPhases,
+  type ShutdownLogger,
+  type ShutdownPhase,
+} from "@langwatch/runtime-composition";
 import type { Hono } from "hono";
 import { trace } from "@opentelemetry/api";
 
@@ -153,6 +158,7 @@ export class ApiProcess {
       featureDrain: this.featureDrain,
       graph: this.graph,
       observability: this.observability,
+      logger: this.observability.logger,
     });
   }
 }
@@ -163,29 +169,61 @@ export class ApiProcess {
  * only then are infrastructure resources released.
  */
 export async function closeApiProcessResources(options: {
-  listener?: Pick<ApiHttpListener, "close"> | undefined;
+  listener?: (Pick<ApiHttpListener, "close"> & { closePhaseTimeoutMs?: number }) | undefined;
   featureDrain?: ApiFeatureDrainPort | undefined;
   graph?: ApiProcessGraphPort | undefined;
   observability: Pick<ProcessObservability, "shutdown">;
+  logger?: ShutdownLogger;
 }): Promise<void> {
-  let firstError: unknown;
-  const phases: Array<() => Promise<void> | undefined> = [
-    () => options.listener?.close(),
-    () => options.featureDrain?.drain(),
-    () => options.graph?.drain(),
-    () => options.observability.shutdown(),
-    () => options.graph?.close(),
+  // The drain phases legitimately outlast the runner's default ceiling — a
+  // queue drain is entitled to the whole budget — so they carry a backstop
+  // above any pod grace period rather than the ten seconds a teardown gets.
+  const drain = DRAIN_PHASE_TIMEOUT_MS;
+  const phases: ShutdownPhase[] = [
+    {
+      name: "http-listener",
+      // The listener's own ceiling, which sits above the grace it hands out,
+      // so the runner never abandons the phase before the reap it leads into.
+      ...(options.listener?.closePhaseTimeoutMs
+        ? { timeoutMs: options.listener.closePhaseTimeoutMs }
+        : {}),
+      run: async () => void (await options.listener?.close()),
+    },
+    {
+      name: "feature-drain",
+      timeoutMs: drain,
+      run: async () => void (await options.featureDrain?.drain()),
+    },
+    {
+      name: "graph-drain",
+      timeoutMs: drain,
+      run: async () => void (await options.graph?.drain()),
+    },
+    {
+      name: "telemetry",
+      timeoutMs: drain,
+      run: async () => void (await options.observability.shutdown()),
+    },
+    { name: "graph-close", timeoutMs: drain, run: async () => void (await options.graph?.close()) },
   ];
 
-  for (const phase of phases) {
-    try {
-      await phase();
-    } catch (error) {
-      firstError ??= error;
-    }
-  }
+  const firstError = await runShutdownPhases({
+    phases,
+    logger: options.logger ?? SILENT_SHUTDOWN_LOGGER,
+  });
   if (firstError) throw firstError;
 }
+
+/**
+ * A process that composed no logger still runs the phases; it just cannot say
+ * which one failed. The error it throws carries that anyway.
+ */
+const DRAIN_PHASE_TIMEOUT_MS = 60_000;
+
+const SILENT_SHUTDOWN_LOGGER: ShutdownLogger = {
+  info: () => void 0,
+  error: () => void 0,
+};
 
 /** Feature-owned shutdown work that must finish before telemetry and infrastructure close. */
 export abstract class ApiFeatureDrainPort {

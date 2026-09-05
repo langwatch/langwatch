@@ -70,6 +70,11 @@ export {
   shardModuleTally,
   shardSawFailure,
 } from "./shard-failure-reporter";
+export {
+  hardFloorReport,
+  resolveHardFloorMs,
+  setup as armUnitShardHardFloor,
+} from "./unit-shard-hard-floor";
 export { createWeigher, loadDurationManifest, type DurationManifest } from "./shard-weights";
 export { scanTestSourceForUnsafeDeleteMany, type TeardownViolation } from "./teardown-scan";
 export { closeTsAstSession, parseSourceText, parseSourceTexts } from "./ts-ast";

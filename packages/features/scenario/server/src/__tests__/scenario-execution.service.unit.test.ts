@@ -3,6 +3,7 @@ import type {
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
 } from "@langwatch/scenario-contract";
+import { SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -51,6 +52,10 @@ function failures(): ScenarioFailureHandlerService {
   return Object.create(ScenarioFailureHandlerService.prototype) as ScenarioFailureHandlerService;
 }
 
+function simulations(): SimulationService {
+  return Object.create(SimulationService.prototype) as SimulationService;
+}
+
 describe("ScenarioExecutionService", () => {
   it("throws when this process has no execution pool", async () => {
     const service = ScenarioExecutionService.create({
@@ -58,6 +63,7 @@ describe("ScenarioExecutionService", () => {
       cancellations: new TestCancellationPublisher(),
       prefetcher: prefetcher(),
       failures: failures(),
+      simulations: simulations(),
     });
 
     await expect(service.submit(job)).rejects.toThrow(/No execution pool on this pod.*run-1/);
@@ -72,6 +78,7 @@ describe("ScenarioExecutionService", () => {
       cancellations: new TestCancellationPublisher(),
       prefetcher: prefetcher(),
       failures: failures(),
+      simulations: simulations(),
     });
 
     await service.submit(job);
@@ -86,6 +93,7 @@ describe("ScenarioExecutionService", () => {
       cancellations,
       prefetcher: prefetcher(),
       failures: failures(),
+      simulations: simulations(),
     });
 
     await service.cancel({ projectId: "project-1", scenarioRunId: "run-1" });
@@ -122,6 +130,7 @@ describe("ScenarioExecutionService", () => {
       cancellations: new TestCancellationPublisher(),
       prefetcher: preparationService,
       failures: failures(),
+      simulations: simulations(),
     });
 
     await expect(service.prefetch(input)).resolves.toEqual(result);
@@ -138,6 +147,7 @@ describe("ScenarioExecutionService", () => {
       cancellations: new TestCancellationPublisher(),
       prefetcher: prefetcher(),
       failures: failureHandler,
+      simulations: simulations(),
     });
     const input = {
       projectId: "project-1",

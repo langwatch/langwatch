@@ -156,6 +156,7 @@ export * from "./privateRouteKey";
 
 /** The ClickHouse schema migration task — goose runner, TTL reconciliation,
  * and the `@langwatch/task` catalogue entry that runs both. */
+export { acquireClickHouseSchemaLock, createSchemaLock, type SchemaLock } from "./schema-lock";
 export { ClickHouseMigrateTask } from "./tasks/clickhouse-migrate.task";
 export { parseConnectionUrl } from "./tasks/goose.migration-runner";
 export type { ClickHouseConfig } from "./tasks/goose.migration-runner";

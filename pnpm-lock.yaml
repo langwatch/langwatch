@@ -738,6 +738,9 @@ importers:
       '@langwatch/enterprise-licensing-web':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/licensing/web
+      '@langwatch/enterprise-managed-provider-web':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/managed-provider/web
       '@langwatch/enterprise-scim-web':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/scim/web
@@ -1493,6 +1496,9 @@ importers:
         specifier: workspace:*
         version: link:../task
     devDependencies:
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -3789,15 +3795,15 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
-      '@langwatch/enterprise-billing-web':
-        specifier: workspace:*
-        version: link:../../../enterprise/features/billing/web
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../role/contract
+      '@langwatch/ui-host':
+        specifier: workspace:*
+        version: link:../../../ui-host
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
@@ -5646,9 +5652,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
-      '@langwatch/enterprise-billing-web':
-        specifier: workspace:*
-        version: link:../../../enterprise/features/billing/web
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../contract
@@ -6427,9 +6430,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
-      '@langwatch/enterprise-managed-provider-web':
-        specifier: workspace:*
-        version: link:../../../enterprise/features/managed-provider/web
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -7203,12 +7203,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
-      '@langwatch/enterprise-billing-web':
-        specifier: workspace:*
-        version: link:../../../enterprise/features/billing/web
-      '@langwatch/enterprise-licensing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/features/licensing/contract
       '@langwatch/enterprise-licensing-web':
         specifier: workspace:*
         version: link:../../../enterprise/features/licensing/web
@@ -9028,9 +9022,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
-      '@langwatch/enterprise-licensing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/features/licensing/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -9355,9 +9346,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
-      '@langwatch/enterprise-governance-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/features/governance/contract
       '@langwatch/gateway-web':
         specifier: workspace:*
         version: link:../../gateway/web
@@ -9550,9 +9538,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
-      '@langwatch/enterprise-licensing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/features/licensing/contract
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -10122,6 +10107,9 @@ importers:
 
   packages/runtime-composition:
     devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

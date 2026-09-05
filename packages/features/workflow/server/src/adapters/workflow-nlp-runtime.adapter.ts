@@ -7,6 +7,8 @@ import {
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
 } from "../ports/workflow.port";
+import type { NlpLambdaInvokePort, NlpPayloadStagingPort } from "../ports/workflow-nlp-lambda.port";
+import { NlpInvokeTransport, type NlpInvokeStagingConfig } from "./workflow-nlp-lambda.adapter";
 
 /**
  * Origin tag for the `X-LangWatch-Origin` header. Set at the request boundary
@@ -14,6 +16,12 @@ import {
  * consistent attribution. See specs/nlp-go/telemetry.feature.
  */
 export type NlpOrigin = "workflow" | "playground" | "evaluation" | "scenario" | "topic_clustering";
+
+/** The staging policy an ARN target falls back to when composition named none. */
+const DEFAULT_INVOKE_STAGING_CONFIG: NlpInvokeStagingConfig = {
+  stagingTtlSeconds: 600,
+  maxPayloadBytes: 16_000_000,
+};
 
 const TRACE_ID_HEX_RE = /^[0-9a-fA-F]{32}$/;
 const SPAN_ID_HEX_RE = /^[0-9a-fA-F]{16}$/;
@@ -52,6 +60,8 @@ export type NlpDispatchRequest = Readonly<{
   path: string;
   body: unknown;
   origin: NlpOrigin;
+  /** Scopes S3 staging on the ARN path; absent means never stage. */
+  projectId?: string;
   causalityDepth?: number;
   parentTrace?: { traceId: string; parentSpanId: string };
 }>;
@@ -76,16 +86,42 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
   }
 
   static create(options: {
-    /** Where the engine answers, for example `http://127.0.0.1:5561`. */
+    /**
+     * Where the engine answers: `http://127.0.0.1:5561`, or the ARN of a
+     * per-project Lambda when the deployment fronts the engine with one.
+     */
     serviceUrl: string;
     /** Injected so a test drives the wire without a listener. */
     fetch?: typeof fetch;
+    /** Composed only where the engine is reached by ARN; see the transport. */
+    lambda?: NlpLambdaInvokePort | undefined;
+    staging?: NlpPayloadStagingPort | undefined;
+    stagingConfig?: NlpInvokeStagingConfig | undefined;
   }): HttpWorkflowNlpRuntimeAdapter {
     return new HttpWorkflowNlpRuntimeAdapter(options);
   }
 
-  private constructor(private readonly options: { serviceUrl: string; fetch?: typeof fetch }) {
+  private readonly transport: NlpInvokeTransport;
+
+  private constructor(
+    private readonly options: {
+      serviceUrl: string;
+      fetch?: typeof fetch;
+      lambda?: NlpLambdaInvokePort | undefined;
+      staging?: NlpPayloadStagingPort | undefined;
+      stagingConfig?: NlpInvokeStagingConfig | undefined;
+    },
+  ) {
     super();
+    this.transport = NlpInvokeTransport.create({
+      target: options.serviceUrl,
+      // A deployment that named no staging policy still gets the built-in
+      // threshold, so an ARN target cannot silently re-expose the 6 MiB cap.
+      config: options.stagingConfig ?? DEFAULT_INVOKE_STAGING_CONFIG,
+      ...(options.lambda ? { lambda: options.lambda } : {}),
+      ...(options.staging ? { staging: options.staging } : {}),
+      ...(options.fetch ? { fetch: options.fetch } : {}),
+    });
   }
 
   dispatch(input: WorkflowNlpDispatchInput): Promise<WorkflowNlpDispatchResponse> {
@@ -93,6 +129,7 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
       path: "/studio/execute_sync",
       body: input.body,
       origin: input.origin as NlpOrigin,
+      ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
       ...(input.causalityDepth === undefined ? {} : { causalityDepth: input.causalityDepth }),
       ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
     });
@@ -132,11 +169,12 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
       headers.traceparent = formatTraceparent(request.parentTrace);
     }
 
-    const call = this.options.fetch ?? fetch;
-    const response = await call(`${this.options.serviceUrl.replace(/\/$/, "")}/go${request.path}`, {
+    const response = await this.transport.send({
+      path: `/go${request.path}`,
       method: "POST",
       headers,
       body: JSON.stringify(request.body),
+      ...(request.projectId === undefined ? {} : { projectId: request.projectId }),
     });
 
     return {

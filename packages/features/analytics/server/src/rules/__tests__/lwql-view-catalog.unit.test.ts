@@ -1,15 +1,5 @@
 /**
  * Shape invariants of the LangWatchQL schema catalog.
- *
- * The catalog is data three things read — the schema endpoint, the AST
- * validator, and the view generator — so a malformed entry is not a crash, it
- * is a wrong answer published as documentation. These are the properties no
- * consumer can check for itself.
- *
- * The content-gating checks deliberately derive their expectation from the
- * data-privacy modules rather than from the catalog, so they can *disagree*
- * with it. A guard that reads the value it guards can only ever agree.
- *
  * @see specs/analytics/lwql-api.feature
  */
 
@@ -75,11 +65,10 @@ describe("given the LangWatchQL view catalog", () => {
         }
         expect(view.dedup.keyColumns.length, `${view.name} has no dedup key`).toBeGreaterThan(0);
 
-        // Both key sets are read against the columns a caller can actually
-        // name — the grain by the fanout diagnostic, the engine key by the view
-        // body — so both have to be exposed, whichever residence the dataset
-        // has. The exception is a grouped render: an engine-key column outside
-        // the published grain is grouped away there, and exposing it would
+        // Both key sets are read against the columns a caller can actually name — the grain by
+        // the fanout diagnostic, the engine key by the view body — so both have to be exposed,
+        // whichever residence the dataset has. The exception is a grouped render: an engine-key
+        // column outside the published grain is grouped away there, and exposing it would
         // reintroduce the breakdown the view exists to sum over.
         const grouped =
           view.dedup.aggregating === true &&
@@ -123,15 +112,11 @@ describe("given the LangWatchQL view catalog", () => {
           continue;
         }
 
-        // Asserted before the grant loop, not inside it: `versionColumn` is
-        // optional, and an entry that forgot it would otherwise fail as
-        // "deduplicates on undefined without granting it" — which reads as a
-        // broken guard rather than as the missing declaration it is.
-        //
-        // An aggregating source is the one ClickHouse-resident shape with no
-        // version, because its rows for a key are summed rather than
-        // superseded. It has to say so, or "no version column" is
-        // indistinguishable from a `ReplacingMergeTree` entry that forgot one.
+        // Asserted before the grant loop, not inside it: `versionColumn` is optional, and an
+        // entry that forgot it would otherwise fail as "deduplicates on undefined without
+        // granting it" — which reads as a broken guard rather than as the missing declaration
+        // it is. An aggregating source is the one ClickHouse-resident shape with no version,
+        // because its rows for a key are summed rather than superseded.
         if (view.dedup.aggregating) {
           expect(
             view.dedup.versionColumn,
@@ -211,10 +196,9 @@ describe("given the LangWatchQL view catalog", () => {
     });
 
     /**
-     * The expectation is derived from what the column *is* — its name and the
-     * sentence the endpoint publishes about it — rather than read back off the
-     * `unit` field, so a millisecond column added without a unit turns this red
-     * instead of agreeing with itself.
+     * The expectation is derived from what the column *is* — its name and the sentence the
+     * endpoint publishes about it — rather than read back off the `unit` field, so a
+     * millisecond column added without a unit turns this red instead of agreeing with itself.
      */
     it("declares a unit on every column that measures something", () => {
       let checked = 0;
@@ -395,10 +379,7 @@ describe("given the LangWatchQL view catalog", () => {
   });
 
   /**
-   * The analytics projections and their rollups (issue #6856). The fold never
-   * writes captured content onto them, so nothing on them is content-gated —
-   * pinned here so that adding a captured-content column to one is a decision
-   * someone made rather than a line that arrived with a copy-pasted entry.
+   * The analytics projections and their rollups (issue #6856).
    */
   describe("when the analytics projections are inspected", () => {
     // The property, not a name list: an analytics dataset is one that reads a
@@ -455,19 +436,11 @@ describe("given the LangWatchQL view catalog", () => {
       ).toBeGreaterThan(0);
 
       for (const view of aggregating) {
-        // Every column is one of two things: a dimension of the published
-        // grain, or a measure that merges. A dimension missing from the grain
-        // is the silent failure — the view would sum across it and add two
-        // models' costs together under one row that never says so. Read
-        // against the grain rather than the engine key, because a grouped
-        // render deliberately keeps engine-key breakdowns out of its columns.
-        //
-        // Which is which is read from the column's own `summed` declaration
-        // rather than from "it has an expression": an expression is how a
-        // measure used to be written, and any column can have one — the
-        // filtered attribute maps do — so classifying by its presence would
-        // have called a filtered map a measure and a hand-written measure a
-        // dimension.
+        // Every column is one of two things: a dimension of the published grain, or a measure
+        // that merges. A dimension missing from the grain is the silent failure — the view
+        // would sum across it and add two models' costs together under one row that never says
+        // so. Read against the grain rather than the engine key, because a grouped render
+        // deliberately keeps engine-key breakdowns out of its columns.
         const measures = view.columns
           .filter((column) => column.summed)
           .map((column) => column.name);
@@ -530,11 +503,7 @@ describe("given the LangWatchQL view catalog", () => {
   });
 
   /**
-   * The dataset whose engine key and grain come apart. `evaluation_analytics`
-   * sorts by `(TenantId, OccurredAt, EvaluationId)` and its fold writes a moving
-   * watermark into `OccurredAt`, so the engine sees one evaluation's versions as
-   * different keys — `FINAL` keeps all of them and every aggregate counts the
-   * evaluation once per version, with nothing in the result that looks wrong.
+   * The dataset whose engine key and grain come apart.
    */
   describe("when a dataset's source sorts by a column its write path moves", () => {
     const evaluationMetrics = lwqlViewByName("evaluation_metrics")!;
@@ -614,12 +583,9 @@ describe("given the LangWatchQL view catalog", () => {
   });
 
   /**
-   * A measure's SQL, which is the one thing about a rollup column that can be
-   * wrong without anything noticing: a cast returns a number whatever column it
-   * reads, and a fixture whose measures share a value agrees with either
-   * reading. So the column states what it is once — its name, its published
-   * type, and `summed` — and the SQL is derived from those rather than written
-   * a second time beside them.
+   * A measure's SQL, which is the one thing about a rollup column that can be wrong without
+   * anything noticing: a cast returns a number whatever column it reads, and a fixture whose
+   * measures share a value agrees with either reading.
    */
   describe("when a summed measure is declared", () => {
     const summed = LWQL_VIEW_CATALOG.flatMap((view) =>
@@ -792,10 +758,9 @@ describe("given the LangWatchQL view catalog", () => {
     });
 
     /**
-     * A column requiring two permissions is withheld unless both are held.
-     * Written as its own case because "some gate is missing" and "every gate is
-     * missing" are easy to swap, and the swap only shows up on a column with
-     * more than one.
+     * A column requiring two permissions is withheld unless both are held. Written as its own
+     * case because "some gate is missing" and "every gate is missing" are easy to swap, and the
+     * swap only shows up on a column with more than one.
      */
     it("withholds a column needing two permissions when only one is held", () => {
       const outputOnly = catalogShapes.gatedColumns({
@@ -822,10 +787,8 @@ describe("given the LangWatchQL view catalog", () => {
   });
 
   /**
-   * Dataset-level gating, exercised on a fixture rather than on the shipped
-   * catalog — which gates no dataset, so a case written against it would assert
-   * that nothing happens. The mechanism is the same code either way, and the
-   * case above pins the shipped catalog's own answer.
+   * Dataset-level gating, exercised on a fixture rather than on the shipped catalog — which
+   * gates no dataset, so a case written against it would assert that nothing happens.
    */
   describe("when a dataset is gated as a whole", () => {
     const views = [...LWQL_VIEW_CATALOG, GATED_DATASET];

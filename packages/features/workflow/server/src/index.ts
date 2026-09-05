@@ -24,6 +24,20 @@ export {
   type NlpDispatchRequest,
   type NlpOrigin,
 } from "./adapters/workflow-nlp-runtime.adapter";
+export {
+  InvokePayloadTooLargeError,
+  NlpInvokeTransport,
+  type NlpInvokeRequest,
+  type NlpInvokeResponse,
+  type NlpInvokeStagingConfig,
+} from "./adapters/workflow-nlp-lambda.adapter";
+export {
+  NlpLambdaInvokePort,
+  NlpPayloadStagingPort,
+  STAGED_PAYLOAD_HEADER,
+  type NlpLambdaInvokeResult,
+  type StagedNlpPayload,
+} from "./ports/workflow-nlp-lambda.port";
 export { ModelProviderWorkflowStudioDslAdapter } from "./adapters/workflow-studio-dsl.adapter";
 export {
   HttpWorkflowStudioStreamAdapter,

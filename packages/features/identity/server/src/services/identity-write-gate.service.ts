@@ -15,10 +15,9 @@ const logger = createLogger("langwatch:identity:write-gate");
 register.removeSingleMetric("identity_write_gate_read_failures_total");
 
 /**
- * This gate's migration-state read failed: for up to the negative-cache TTL
- * the user's ceremonies emit no events regardless of their true backfill
- * status. Protocol behaviour is unaffected - the gap is event history, which
- * the backfill's next pass adopts.
+ * This gate's migration-state read failed: for up to the negative-cache TTL the user's
+ * ceremonies emit no events regardless of their true backfill status. Protocol behaviour is
+ * unaffected - the gap is event history, which the backfill's next pass adopts.
  */
 const readFailuresTotal = new Counter({
   name: "identity_write_gate_read_failures_total",

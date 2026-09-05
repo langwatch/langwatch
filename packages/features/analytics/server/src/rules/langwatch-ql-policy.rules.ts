@@ -1,30 +1,10 @@
 /**
  * LangWatchQL analytics SQL — what a caller is allowed to name.
- *
- * The data half of the gate: which tables exist for this caller, which fields
- * their permissions withhold, and how deep a query may nest. The behaviour half
- * is `validate.ts`.
- *
- * These values come from the schema catalog and the caller's permissions, both
- * resolved server-side from the authenticated context — never from the request
- * body, and never from the SQL text. This module only says what the shape is.
- *
  * @see specs/analytics/lwql-api.feature
  */
 
 /**
  * Databases no LangWatchQL query may name, whatever the catalog says.
- *
- * The restricted database identity is granted `SELECT` on the LangWatchQL objects
- * and nothing else, so these are already unreachable at the database layer —
- * `system.*` exposes users, settings and other tenants' query history, and
- * ClickHouse's `information_schema` is a view over the same metadata. They are
- * listed here so the refusal happens at the gateway with a message the caller
- * can act on, rather than as a permission error from a layer whose vocabulary
- * we do not want to relay.
- *
- * Matched case-insensitively: ClickHouse exposes `information_schema` under
- * both that spelling and `INFORMATION_SCHEMA`, and they are the same database.
  */
 export const RESERVED_DATABASES: readonly string[] = ["system", "information_schema"];
 
@@ -36,25 +16,16 @@ export interface LangWatchQLLimits {
    */
   readonly maxSubqueryDepth: number;
   /**
-   * Deepest the walk will descend into the parsed tree, counting every node
-   * rather than only queries.
-   *
-   * Bounds the walker's own recursion rather than the query's cost — a tree
-   * nested past this refuses instead of risking a stack overflow in the
-   * gateway, which would surface as an unknown 500 for what is really a
-   * rejected query.
+   * Deepest the walk will descend into the parsed tree, counting every node rather than only
+   * queries.
    */
   readonly maxNodeDepth: number;
 }
 
 /**
- * Ceilings for the shipped API.
- *
- * Eight levels of subquery nesting covers every analytical shape the issue
- * enumerates (period-over-period comparisons, rolling windows, first-event-per-
- * trace) with headroom. The node ceiling sits far above what those shapes reach
- * — a query at the subquery ceiling costs roughly 150 levels of tree — and far
- * below the JavaScript stack, so it only ever fires on pathological input.
+ * Ceilings for the shipped API. Eight levels of subquery nesting covers every analytical shape
+ * the issue enumerates (period-over-period comparisons, rolling windows, first-event-per-
+ * trace) with headroom.
  */
 export const DEFAULT_LWQL_LIMITS: LangWatchQLLimits = {
   maxSubqueryDepth: 8,
@@ -64,20 +35,14 @@ export const DEFAULT_LWQL_LIMITS: LangWatchQLLimits = {
 /** What this caller may reference. */
 export interface LangWatchQLPolicy {
   /**
-   * Table references the caller may name, each `table` or `database.table`.
-   *
-   * A reference must match an entry exactly, case-insensitively, after both
-   * sides are qualified with {@link LangWatchQLPolicy.defaultDatabase}. CTE
-   * names are not checked against this list — a `WITH` name resolves to its own
-   * subquery, which the walk validates on its own terms.
+   * Table references the caller may name, each `table` or `database.table`. A reference must
+   * match an entry exactly, case-insensitively, after both sides are qualified with {@link
+   * LangWatchQLPolicy.defaultDatabase}.
    */
   readonly allowedTables: readonly string[];
   /**
-   * Fields the caller's permissions withhold, matched case-insensitively
-   * against the last segment of a column reference (`t.body` matches `body`).
-   *
-   * When this is non-empty the walk also refuses wildcard column sets, because
-   * it cannot prove `*` excludes a withheld field without the table's columns.
+   * Fields the caller's permissions withhold, matched case-insensitively against the last
+   * segment of a column reference (`t.body` matches `body`).
    */
   readonly gatedColumns: readonly string[];
   /**
@@ -99,12 +64,8 @@ export interface ResolvedLangWatchQLPolicy {
 }
 
 /**
- * `database.table`, lowercased, with `defaultDatabase` filled in when the
- * reference or the catalog entry omitted one.
- *
- * Both sides of every comparison go through here, so a catalog listing
- * `analytics.traces` matches a caller writing `traces` exactly when the
- * executor's default database is `analytics` — and never otherwise.
+ * `database.table`, lowercased, with `defaultDatabase` filled in when the reference or the
+ * catalog entry omitted one.
  */
 export function qualifyTableName({
   table,

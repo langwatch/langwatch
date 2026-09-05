@@ -7,26 +7,15 @@ import type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
 import type { LangWatchQLDiagnosticsInput } from "../rules/langwatch-ql-diagnostics-shape.rules";
 
 /**
- * Buckets needed before a gap can be told from the spacing.
- *
- * Two buckets one hour apart are indistinguishable from two hourly buckets
- * with an hour missing between them, so the gap rule needs a third.
+ * Buckets needed before a gap can be told from the spacing. Two buckets one hour apart are
+ * indistinguishable from two hourly buckets with an hour missing between them, so the gap rule
+ * needs a third.
  */
 const MIN_BUCKETS_FOR_GAP_DETECTION = 3;
 
 /**
- * How far a spacing may drift from a whole multiple of the bucket width, per
- * bucket the spacing covers, and still count as aligned.
- *
- * A calendar bucket is not a fixed number of milliseconds — months differ by
- * up to three days and a daylight-saving day by an hour — so a tolerance
- * proportional to the width is what keeps `toStartOfMonth` from reporting
- * itself as misaligned.
- *
- * Per bucket, because the drift accumulates with the gap: `width` is the
- * *shortest* spacing observed, so every longer bucket the gap spans adds its
- * own difference. A budget fixed at one bucket's worth would hold for a gap of
- * one and fail for a gap of three.
+ * How far a spacing may drift from a whole multiple of the bucket width, per bucket the spacing
+ * covers, and still count as aligned.
  */
 const BUCKET_ALIGNMENT_TOLERANCE = 0.15;
 
@@ -50,17 +39,6 @@ function timeBucketDiagnostics(input: LangWatchQLDiagnosticsInput): LangWatchQLD
 
 /**
  * The result's time axis, or nothing when the query has none.
- *
- * Three conditions, all required, and each of them is what keeps the rules off
- * a query they have nothing to say about:
- *
- *  - exactly one temporal column came back, so "the time axis" is unambiguous;
- *  - the query *grouped by that column's name*, so its values really are one
- *    bucket per row. Without this the rules would read an aggregate that
- *    happens to return a timestamp — `argMin(SpanName, StartTime)` beside
- *    `min(StartTime)`, grouped by trace — as a series, and report the ordinary
- *    spacing between unrelated traces as missing buckets;
- *  - at least two buckets came back, so there is a spacing to reason about.
  */
 function timeBucketAxis({
   validation,
@@ -195,12 +173,11 @@ function isWholeMultiple(value: number, unit: number): boolean {
   const multiple = value / unit;
   const nearest = Math.round(multiple);
 
-  // Scaled by the buckets the gap covers, not fixed: a three-month hole drifts
-  // roughly three times as far from a whole multiple of the shortest month as
-  // a one-month step does. Judged against a fixed budget it reads as "these
-  // periods are unequal lengths" while the truth is "two months are missing" —
-  // and `missingBucketDiagnostics` skips the same gap, so the count of absent
-  // buckets comes back zero.
+  // Scaled by the buckets the gap covers, not fixed: a three-month hole drifts roughly three
+  // times as far from a whole multiple of the shortest month as a one-month step does. Judged
+  // against a fixed budget it reads as "these periods are unequal lengths" while the truth is
+  // "two months are missing" — and `missingBucketDiagnostics` skips the same gap, so the count
+  // of absent buckets comes back zero.
   return Math.abs(multiple - nearest) <= BUCKET_ALIGNMENT_TOLERANCE * Math.max(1, nearest);
 }
 
@@ -233,11 +210,9 @@ function isTemporalType(type: string): boolean {
 const CLICKHOUSE_TIMESTAMP = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?))?$/;
 
 /**
- * A temporal value as milliseconds, or `null` for anything else.
- *
- * Read as UTC rather than through `new Date(string)`, which interprets a
- * space-separated timestamp in the *server process's* zone — so the same
- * result would produce different diagnostics on two deployments.
+ * A temporal value as milliseconds, or `null` for anything else. Read as UTC rather than
+ * through `new Date(string)`, which interprets a space-separated timestamp in the *server
+ * process's* zone — so the same result would produce different diagnostics on two deployments.
  */
 function parseClickHouseTimestamp(value: unknown): number | null {
   if (typeof value !== "string") {

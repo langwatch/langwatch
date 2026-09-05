@@ -4,6 +4,7 @@ import type {
   SimulationFinishRun,
   SimulationMessageSnapshot,
   SimulationQueueRun,
+  SimulationRecordAgentInstance,
   SimulationStartRun,
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
@@ -19,4 +20,5 @@ export abstract class SimulationExecutionPort {
   abstract finishRun(input: SimulationFinishRun): Promise<void>;
   abstract cancelRun(input: SimulationCancelRun): Promise<void>;
   abstract deleteRun(input: SimulationDeleteRun): Promise<void>;
+  abstract recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void>;
 }

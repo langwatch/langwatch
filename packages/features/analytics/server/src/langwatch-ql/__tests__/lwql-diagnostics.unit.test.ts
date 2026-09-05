@@ -1,16 +1,6 @@
 /**
- * The advisory diagnostics: which shapes earn one, and which do not.
- *
- * Driven through the real validator rather than through hand-built blocks. The
- * whole design of the shape rules is that they read what the *single* parser
- * pass recorded, so a suite that fabricated its own blocks would be testing an
- * agreement between two pieces of this test file and would stay green if the
- * walk stopped recording the fact.
- *
- * Every "fires" case is paired with a "does not fire" control that differs by
- * exactly the fact under test — a diagnostic that fired on everything would
- * pass every positive case here and be worthless in a response.
- *
+ * The advisory diagnostics: which shapes earn one, and which do not. Driven through the real
+ * validator rather than through hand-built blocks.
  * @see specs/analytics/lwql-api.feature
  */
 
@@ -42,10 +32,8 @@ const LONG_AFTER = new Date("2026-06-01T00:00:00Z");
 const HOUR_MS = 60 * 60 * 1000;
 
 /**
- * Runs the shipped validator, then the diagnostics, over a submitted statement
- * and a result the caller describes.
- *
- * Fails loudly on a statement the validator refuses: a typo would otherwise
+ * Runs the shipped validator, then the diagnostics, over a submitted statement and a result the
+ * caller describes. Fails loudly on a statement the validator refuses: a typo would otherwise
  * produce an empty block list and every "no diagnostic" assertion would pass.
  */
 function diagnose({
@@ -223,10 +211,9 @@ describe("given a LangWatchQL query that ran", () => {
     });
 
     /**
-     * The tenant column is equal on both sides whether or not the caller wrote
-     * it, because the row policy resolves one tenant for the query. Without
-     * that, every ordinary child-to-parent join would report the parent as
-     * fanning out the child.
+     * The tenant column is equal on both sides whether or not the caller wrote it, because the
+     * row policy resolves one tenant for the query. Without that, every ordinary
+     * child-to-parent join would report the parent as fanning out the child.
      */
     it("treats a join that matches everything but the tenant as covered", () => {
       const diagnostics = diagnose({
@@ -357,10 +344,9 @@ describe("given a LangWatchQL query that ran", () => {
     });
 
     /**
-     * The shape that made the grouping-key condition necessary: "first failure
-     * per trace" groups by trace and returns a timestamp *aggregate*, and the
-     * ordinary spacing between two unrelated traces is not a series with holes
-     * in it.
+     * The shape that made the grouping-key condition necessary: "first failure per trace"
+     * groups by trace and returns a timestamp *aggregate*, and the ordinary spacing between two
+     * unrelated traces is not a series with holes in it.
      */
     it("says nothing about a timestamp the query aggregated rather than bucketed", () => {
       expect(
@@ -497,12 +483,8 @@ describe("given a LangWatchQL query that ran", () => {
       ).toEqual([]);
     });
     /**
-     * The drift from a whole multiple grows with the gap, so a budget fixed at
-     * one bucket's worth misreads a hole as a change of period length. Here
-     * `width` is February — the shortest spacing — and the March-to-June gap is
-     * 3.29 of those, which a fixed 0.15 rejects. The series is told it has
-     * unequal periods, and the two absent months are never counted, because
-     * the gap rule skips exactly the gaps the alignment rule rejects.
+     * The drift from a whole multiple grows with the gap, so a budget fixed at one bucket's
+     * worth misreads a hole as a change of period length.
      */
     it("reads a hole in a monthly series as missing months, not unequal periods", () => {
       const diagnostics = diagnose({

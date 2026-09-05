@@ -1,10 +1,7 @@
 /**
- * The LangWatchQL gate, driven through the real ClickHouse parser.
- *
- * Every case here submits SQL text rather than a hand-built tree, so a rule
- * that stops matching what the grammar actually produces turns this red. The
- * synthetic-tree cases — the default-deny fallthrough — live in
- * `failClosed.unit.test.ts`, which is the only place a fake parser appears.
+ * The LangWatchQL gate, driven through the real ClickHouse parser. Every case here submits SQL
+ * text rather than a hand-built tree, so a rule that stops matching what the grammar actually
+ * produces turns this red.
  */
 import { describe, expect, it } from "vitest";
 
@@ -35,10 +32,9 @@ function validate(
 }
 
 /**
- * The violation codes, or an empty list when the query passed.
- *
- * Asserting `toEqual([])` on this rather than `result.ok` on a rejection is
- * what makes a failure legible: the report names the rule that fired.
+ * The violation codes, or an empty list when the query passed. Asserting `toEqual([])` on this
+ * rather than `result.ok` on a rejection is what makes a failure legible: the report names the
+ * rule that fired.
  */
 function codesOf(result: LangWatchQLValidation): LangWatchQLViolationCode[] {
   return result.ok ? [] : result.violations.map((violation) => violation.code);
@@ -229,9 +225,8 @@ describe("validateLangWatchQL", () => {
     });
 
     /**
-     * The refusal echoes the identifier the caller wrote, and a backtick-quoted
-     * ClickHouse identifier can carry anything — so the echo must shed the
-     * characters that would ride an ANSI escape or a bidi override back into
+     * The refusal echoes the caller's identifier, so the echo must shed
+     * characters that would ride an ANSI escape or bidi override back into
      * terminals and agent logs through `message` and `meta.violations`.
      */
     it("strips control characters and bidi overrides from the echoed name", () => {
@@ -272,9 +267,6 @@ describe("validateLangWatchQL", () => {
   describe("given a restricted field", () => {
     /**
      * One case per expression position the content-gating policy enumerates.
-     * The `clause` assertion is what stops this collapsing into eight copies of
-     * "somewhere": a walk that reached the reference by the wrong route, or by
-     * no route at all, cannot report the right one.
      */
     it.each<[string, string, string]>([
       ["projection", "SELECT body FROM traces", "projection"],
@@ -311,10 +303,9 @@ describe("validateLangWatchQL", () => {
     });
 
     /**
-     * The field name is deliberately one the policy permits: a parameter in
-     * identifier position is refused because its value arrives after the gate
-     * has run, so the only thing that can produce a violation here is the
-     * parameter itself.
+     * The field name is deliberately one the policy permits: a parameter in identifier position
+     * is refused because its value arrives after the gate has run, so the only thing that can
+     * produce a violation here is the parameter itself.
      */
     it("refuses a field named by a bound parameter in identifier position", () => {
       expect(codesOf(validate("SELECT {which:Identifier}.TraceId FROM traces"))).toEqual([
@@ -323,19 +314,8 @@ describe("validateLangWatchQL", () => {
     });
 
     /**
-     * The case above binds the *qualifier* and left the one that mattered
-     * uncovered: a parameter standing in for the column itself. Measured
-     * against a live instance, `SELECT {c:Identifier}` returned a withheld
-     * value that `SELECT <that column>` refuses — the reference never reaches
-     * the walk, so the gate has nothing to match and ClickHouse substitutes
-     * the name after every check has passed.
-     *
-     * The bound-identifier SQL is the same on every iteration on purpose: the
-     * parameter shape is refused regardless of which column it would resolve
-     * to, since the reference never reaches the walk. What varies per gated
-     * column is the control — the literal spelling of that column staying
-     * refused is what keeps the refusal above about the shape rather than
-     * about a gate that quietly stopped working.
+     * The case above binds the *qualifier* and left the one that mattered uncovered: a
+     * parameter standing in for the column itself.
      */
     it.each(POLICY.gatedColumns)(
       "refuses a parameter standing in for the withheld column %s",

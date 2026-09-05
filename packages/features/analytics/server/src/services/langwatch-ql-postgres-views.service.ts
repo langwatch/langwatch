@@ -1,13 +1,5 @@
 /**
  * LangWatchQL analytics SQL — the PostgreSQL-resident half of the catalog.
- *
- * The approved views the reader role is granted (PostgreSQL statements), and
- * the PostgreSQL-engine tables that map them into the LangWatchQL database
- * (ClickHouse statements). They are here rather than in a Prisma migration
- * because their column lists are the catalog's: binding them to the migration
- * history would tie a catalog edit to a schema migration and leave the two able
- * to disagree.
- *
  * @see ./langwatch-ql-view-statements.service.ts — the ClickHouse views over them
  */
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules";
@@ -30,11 +22,6 @@ const TENANT_COLUMN = "TenantId";
 
 /**
  * The one column a mapped dataset's exposed column reads.
- *
- * A PostgreSQL-resident column is a projection of exactly one base column: the
- * approved view is a rename, never a computation, so that what the reader role
- * is granted and what the catalog exposes are the same list rather than two
- * lists that have to agree.
  */
 function singleSourceColumn(view: LangWatchQLViewDefinition, columnName: string): string {
   const column = view.columns.find((candidate) => candidate.name === columnName);
@@ -58,17 +45,9 @@ export class LangWatchQLPostgresViewsService {
   private constructor() {}
 
   /**
-   * The approved PostgreSQL views the catalog's PostgreSQL-resident datasets
-   * read, as statements to run *against PostgreSQL*.
-   *
-   * The only statements this module produces that are not ClickHouse SQL, and
-   * they are here rather than in a Prisma migration on purpose. These views are
-   * not part of the application's schema: their column lists are the LangWatchQL
-   * catalog's, they change when the catalog changes, and nothing the application
-   * itself does reads them. Binding them to the migration history would tie a
-   * catalog edit to a schema migration and leave the two able to disagree.
-   *
-   * Run before {@link postgresMapping.readerRoleStatements}, whose grants name them.
+   * The approved PostgreSQL views the catalog's PostgreSQL-resident datasets read, as
+   * statements to run *against PostgreSQL*. The only statements this module produces that are
+   * not ClickHouse SQL, and they are here rather than in a Prisma migration on purpose.
    */
   approvedViewStatements({
     schema,
@@ -97,30 +76,16 @@ export class LangWatchQLPostgresViewsService {
   }
 
   /**
-   * The approved views the reader role must be granted, in catalog order.
-   *
-   * No production caller in this repo — input to the infra-owned access model
-   * (langwatch-saas#1126); reference implementation, not dead code.
+   * The approved views the reader role must be granted, in catalog order. No production caller
+   * in this repo — input to the infra-owned access model (langwatch-saas#1126); reference
+   * implementation, not dead code.
    */
   approvedViewNames(views: readonly LangWatchQLViewDefinition[] = LWQL_VIEW_CATALOG): string[] {
     return catalogShapes.postgresViews(views).map((view) => view.postgres.approvedView);
   }
 
   /**
-   * Connections to allow the reader role, derived from the catalog rather than
-   * chosen.
-   *
-   * The two numbers have to agree or the tighter one fails first, and they are
-   * set in different files — which is exactly how a `CONNECTION LIMIT` sized for
-   * one mapped table survived until a catalog of six exhausted it with idle
-   * pooled connections and then refused the role's next login. Deriving it is
-   * what stops that recurring when a dataset is added.
-   *
-   * Headroom on top of the pools' total demand, for the connection a
-   * re-provisioning run or an operator's `psql` needs while the pools are full.
-   *
-   * No production caller in this repo — input to the infra-owned reader role
-   * (langwatch-saas#1126); reference implementation, not dead code.
+   * Connections to allow the reader role, derived from the catalog rather than chosen.
    */
   readerConnectionLimit({
     views = LWQL_VIEW_CATALOG,
@@ -131,13 +96,8 @@ export class LangWatchQLPostgresViewsService {
     views?: readonly LangWatchQLViewDefinition[];
     connectionPoolSize?: number;
     /**
-     * ClickHouse deployments mapping this PostgreSQL role at once.
-     *
-     * One in production — a LangWatchQL database per deployment. More wherever
-     * several LangWatchQL databases share a server and a role, which is the shape
-     * the test harness has and the reason this is a parameter: the cap is a
-     * property of how many pools point at the role, not of how many the catalog
-     * describes.
+     * ClickHouse deployments mapping this PostgreSQL role at once. One in production — a
+     * LangWatchQL database per deployment.
      */
     concurrentCatalogs?: number;
     headroom?: number;
@@ -148,16 +108,9 @@ export class LangWatchQLPostgresViewsService {
   }
 
   /**
-   * The PostgreSQL-engine tables mapping each approved view into the LangWatchQL
-   * database, as ClickHouse statements.
-   *
-   * Run before {@link lwqlViewSetupStatements}, which builds the LangWatchQL
-   * views over them, and after the named collection exists.
-   *
-   * Not called from any production path in this repo: the real tables are owned
-   * by infra (langwatch-saas#1126). This is the reference implementation that
-   * terraform must match — keep it and its tests in sync, do not delete as dead
-   * code.
+   * The PostgreSQL-engine tables mapping each approved view into the LangWatchQL database, as
+   * ClickHouse statements. Run before {@link lwqlViewSetupStatements}, which builds the
+   * LangWatchQL views over them, and after the named collection exists.
    */
   engineTableStatements({
     names,

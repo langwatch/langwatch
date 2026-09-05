@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import {
   Prisma,
   type PrismaClient,
@@ -39,6 +41,11 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
+import {
+  DEFAULT_SUITE_NAME,
+  DEFAULT_SUITE_SLUG,
+  pickFreeSuiteSlug,
+} from "../../rules/default-suite.rules";
 import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository";
 
 type ScenarioWriteInput = ScenarioUpdateInput & { actor: ScenarioActor };
@@ -759,6 +766,69 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     await transaction.simulationSuite.update({
       where: { id: testSuiteId, projectId },
       data: { scenarioIds: members.map((member) => member.id) },
+    });
+  }
+
+  async tryFindDefaultTestSuite(input: { projectId: string }): Promise<{ id: string } | null> {
+    return this.database.simulationSuite.findFirst({
+      where: {
+        projectId: input.projectId,
+        kind: "test_suite",
+        archivedAt: null,
+        name: { equals: DEFAULT_SUITE_NAME, mode: "insensitive" },
+      },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  async createDefaultTestSuite(input: { projectId: string; id: string }): Promise<{ id: string }> {
+    try {
+      return await this.insertDefaultTestSuite({ ...input, slug: DEFAULT_SUITE_SLUG });
+    } catch (error) {
+      if (!this.isSlugConflict(error)) throw error;
+      // Either a concurrent write created the Default suite, or another suite of
+      // this project already owns the "default" slug. Reading first tells the two
+      // apart, and costs one query on a path that runs once per project.
+      const raced = await this.tryFindDefaultTestSuite(input);
+      if (raced) return raced;
+      return await this.insertDefaultTestSuite({
+        ...input,
+        slug: await this.pickFreeDefaultSlug(input.projectId),
+      });
+    }
+  }
+
+  private async pickFreeDefaultSlug(projectId: string): Promise<string> {
+    const rows = await this.database.simulationSuite.findMany({
+      where: { projectId, slug: { startsWith: DEFAULT_SUITE_SLUG }, archivedAt: null },
+      select: { slug: true },
+    });
+    return pickFreeSuiteSlug({
+      baseSlug: DEFAULT_SUITE_SLUG,
+      takenSlugs: rows.map((row) => row.slug),
+      randomSuffix: () => randomBytes(4).toString("hex"),
+    });
+  }
+
+  private async insertDefaultTestSuite(input: {
+    projectId: string;
+    id: string;
+    slug: string;
+  }): Promise<{ id: string }> {
+    return this.database.simulationSuite.create({
+      data: {
+        id: input.id,
+        projectId: input.projectId,
+        name: DEFAULT_SUITE_NAME,
+        slug: input.slug,
+        kind: "test_suite",
+        scenarioIds: [],
+        targets: [],
+        repeatCount: 1,
+        labels: [],
+      },
+      select: { id: true },
     });
   }
 

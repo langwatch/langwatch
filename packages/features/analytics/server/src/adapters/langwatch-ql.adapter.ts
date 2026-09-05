@@ -1,12 +1,5 @@
 /**
  * Process composition binds the restricted LangWatchQL identity to its service.
- *
- * The connection arrives from the process rather than being read here: the
- * identity a statement runs as is a deployment credential, and the one place
- * this repository reads the environment is a process's own configuration
- * module. A process that has no such identity composes the service anyway and
- * `available` answers false — which is what the workbench's navigation gate
- * reads, so an unprovisioned deployment never offers a surface it would refuse.
  */
 import type { LangWatchQLConnection } from "../ports/langwatch-ql-executor.port";
 import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service";

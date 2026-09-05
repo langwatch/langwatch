@@ -28,21 +28,6 @@ import type { JoinRequestReadRepository } from "../repositories/join-request.rep
 
 /**
  * The join-request guards (ADR-117, D12): what runs BEFORE any fact exists.
- * Each verb reads the request's FOLDED STATE, refuses what the lifecycle
- * forbids, and states only what the state does not already carry.
- *
- * One implementation, two callers — `JoinRequestService` on the calling path
- * and the pipeline's command handlers on the staged re-run — so the guard
- * that vetoes a live command is the one the queue's re-run applies. That is
- * what makes a replayed approval cost one membership: the re-run reads a
- * request that is already APPROVED and states nothing.
- *
- * What this file does NOT decide is who is allowed to click. Authority is the
- * boundary's job (`organization:manage`, the same permission that gates
- * inviting); the guard's job is the state machine and the domain rules.
- *
- * Facts come back without their envelope; the ledger stamps business time,
- * tenancy and idempotency from the command that produced them.
  */
 
 /** Which states each verb may be commanded from. The one place the diagram
@@ -73,13 +58,9 @@ export class JoinRequestGuardsService {
   }
 
   /**
-   * Ask to join.
-   *
-   * Two refusals and one silence. A second ask for a request that already
-   * exists states nothing at all — the caller minted the same id, so this is
-   * a retry rather than a duplicate. A DIFFERENT request while one is open is
-   * `join_request_already_pending`; a public email domain is
-   * `join_not_available`, the same nothing every other closed door gives.
+   * Ask to join. Two refusals and one silence. A second ask for a request that already exists
+   * states nothing at all — the caller minted the same id, so this is a retry rather than a
+   * duplicate.
    */
   async requestJoin(data: RequestJoinCommandData): Promise<JoinRequestFactInput[]> {
     const existing = await this.requests.tryFindRequest({
@@ -126,10 +107,8 @@ export class JoinRequestGuardsService {
   }
 
   /**
-   * Approve — by an admin, by the auto-join policy, or by an invitation that
-   * answered the request. There is no role on this command and never will be:
-   * an approval grants the organization's default role, and an admin who
-   * wants to hand over more sends a formal invitation instead.
+   * Approve — by an admin, by the auto-join policy, or by an invitation that answered the
+   * request.
    */
   async approveJoin(data: ApproveJoinCommandData): Promise<JoinRequestFactInput[]> {
     const held = await this.requests.tryFindRequest({
@@ -216,10 +195,8 @@ export class JoinRequestGuardsService {
   }
 
   /**
-   * Expire, dispatched by the day-14 wake.
-   *
-   * The guard re-reads the folded deadline, so a wake that fires early — a
-   * lagged queue, a replayed job — expires nothing. The process manager
+   * Expire, dispatched by the day-14 wake. The guard re-reads the folded deadline, so a wake
+   * that fires early — a lagged queue, a replayed job — expires nothing. The process manager
    * decides WHEN; this still decides whether.
    */
   async expireJoin(data: ExpireJoinCommandData): Promise<JoinRequestFactInput[]> {
@@ -246,12 +223,8 @@ export class JoinRequestGuardsService {
   }
 
   /**
-   * The shared read: the request as it stands, refused unless PENDING.
-   *
-   * A request that does not exist is NOT refused here — it is answered with
-   * `null`, meaning "state nothing". Whether that is a 404 the caller sees is
-   * the boundary's decision, and the boundary is the only place that knows
-   * whether the asker was allowed to know the request exists at all.
+   * The shared read: the request as it stands, refused unless PENDING. A request that does not
+   * exist is NOT refused here — it is answered with `null`, meaning "state nothing".
    */
   private async pendingOrRefuse({
     joinRequestId,

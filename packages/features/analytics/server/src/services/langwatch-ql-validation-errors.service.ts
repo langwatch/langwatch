@@ -1,16 +1,5 @@
 /**
- * LangWatchQL analytics SQL — how a refusal crosses the API boundary.
- *
- * The validator returns a result; it never throws for a rejection. These are
- * what a caller of the validator throws once it has decided the rejection is
- * fatal to the request, so the REST boundary can serialise it.
- *
  * Both codes clear the handled-error bar of ADR-045: we know the cause (the
- * query is malformed, or it names something the policy withholds) and the
- * caller can act on it (rewrite the query). Neither message names an internal
- * table, a server setting, a host, a database identity, or another tenant —
- * `message` rides in the REST response body, so that is a rule, not a habit.
- *
  * @see dev/docs/best_practices/error-handling.md
  * @see dev/docs/adr/045-domain-errors-handled-boundary.md
  */
@@ -20,12 +9,9 @@ import type { RejectedLangWatchQL } from "../rules/langwatch-ql-validation-shape
 import type { LangWatchQLViolation } from "../rules/langwatch-ql-violations.rules";
 
 /**
- * `meta` for both codes: the violations, verbatim.
- *
- * Named consumer, as the contract requires — this API's client is usually an
- * agent writing SQL with no UI at all, and the violation list is the only thing
- * that tells it *which* of five joins to change. Nothing else goes in here; the
- * SQL, the resolved policy and the trace ids belong in the log line.
+ * `meta` for both codes: the violations, verbatim. Named consumer, as the contract requires —
+ * this API's client is usually an agent writing SQL with no UI at all, and the violation list
+ * is the only thing that tells it *which* of five joins to change.
  */
 function violationMeta(violations: readonly LangWatchQLViolation[]): Record<string, unknown> {
   return { violations };
@@ -83,12 +69,6 @@ export class LangWatchQLValidationErrorService {
 
   /**
    * Turns a rejection into the handled error for it.
-   *
-   * A rejection whose only reason is that the text would not parse is a different
-   * failure from one where the policy refused a construct: the first is a typo,
-   * the second is a query doing something this API does not do, and telling a
-   * caller to "check the syntax" of syntactically perfect SQL sends them looking
-   * in the wrong place.
    */
   forRejection(rejection: RejectedLangWatchQL): HandledError {
     const unparseable = rejection.violations.every(

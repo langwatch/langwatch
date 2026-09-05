@@ -14,23 +14,6 @@ import type { SsoConnectionService } from "./sso-connection.service";
 
 /**
  * Grandfathering (ADR-117 §5, D04): the organizations that already have
- * enterprise SSO get it as connection data, without noticing.
- *
- * Two halves, and the second is the one that matters:
- *
- *  1. State the history the two string columns imply — registered, claimed,
- *     approved, verified, activated — as one command whose id is derived from
- *     the organization, so a second pass costs no event.
- *  2. PROVE it, by routing. For every domain the organization carries, the
- *     connection-based lookup must answer what the string-based one answers.
- *     That is the same comparison `SSOCONN_ROUTING` shadow mode runs on every
- *     live login, evaluated per tenant — one function, so a fleet-wide silent
- *     bake and a per-organization finalization cannot mean different things.
- *
- * Agreement finalizes the organization. Disagreement HOLDS it, with the
- * domains named: the work is done and idempotent to redo, the organization
- * stays on the string path, and a later pass re-proves it once whatever the
- * report names is fixed. Held is not failed.
  */
 
 /** Where the legacy strings are read from. */
@@ -129,10 +112,9 @@ export class SsoConnectionGrandfatherService {
   }
 
   /**
-   * The routing proof. Run after the append rather than before, and read
-   * through the same ports the router uses rather than the projection
-   * directly — a proof that asked the store instead of the port would pass
-   * while the port that actually decides sign-in was miswired.
+   * The routing proof. Run after the append rather than before, and read through the same ports
+   * the router uses rather than the projection directly — a proof that asked the store instead
+   * of the port would pass while the port that actually decides sign-in was miswired.
    */
   private async prove({
     connectionId,

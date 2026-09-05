@@ -32,19 +32,9 @@ import type {
 const logger = createLogger("langwatch:identity:storage-adapter");
 
 /**
- * A refusal, logged on its way out.
- *
- * better-auth catches an adapter throw and turns it into a redirect carrying
- * the error CODE and nothing else, so an unlogged refusal reaches the
- * customer as a sign-in error page and leaves NOTHING behind to diagnose it
- * with. That is not hypothetical: `identity_unsupported_storage_query` broke
- * production sign-in and appeared zero times in the logs for the whole
- * outage, while the detail naming the exact shape sat unread on the error's
- * own `reasons`. It is logged at error because it is `fault: "platform"` —
- * nothing the customer did caused it and nothing they can do fixes it.
- *
- * Returns the error so a caller can `throw refused(...)` and keep the throw
- * visible at the site it happens.
+ * A refusal, logged on its way out. better-auth catches an adapter throw and turns it into a
+ * redirect carrying the error CODE and nothing else, so an unlogged refusal reaches the
+ * customer as a sign-in error page and leaves NOTHING behind to diagnose it with.
  */
 const refused = <T>(error: T): T => {
   if (error instanceof IdentityUnsupportedStorageQueryError) {
@@ -73,17 +63,9 @@ const SECRET_FIELDS = [
 const UPDATE_PASSTHROUGH_FIELDS = ["createdAt", "updatedAt"] as const;
 
 /**
- * Linkage columns better-auth RESTATES on an update it means as a secret
- * write — accepted when the value it carries already matches the row, and
- * refused when it differs.
- *
- * A restatement is not a rewrite. better-auth 1.7 rebuilt the sign-in token
- * refresh (`oauth2/link-account`) to send `providerId` alongside the tokens,
- * echoing back the value it just read; 1.6 sent `scope` and no linkage at
- * all. Refusing the echo failed EVERY OAuth sign-in for a latched user, so
- * the field alone cannot decide this — only the field and its value together
- * can. Equality is what makes accepting it safe: a matching value writes
- * nothing, and a differing one is a real rewrite and still refuses.
+ * Linkage columns better-auth RESTATES on an update it means as a secret write — accepted when
+ * the value it carries already matches the row, and refused when it differs. A restatement is
+ * not a rewrite.
  */
 const LINKAGE_RESTATEMENT_FIELDS = ["providerId", "issuer", "accountId", "userId"] as const;
 
@@ -93,10 +75,9 @@ const isLinkageRestatementField = (field: string): field is LinkageRestatementFi
   LINKAGE_RESTATEMENT_FIELDS.some((known) => known === field);
 
 /**
- * The value a row states for a linkage field, with `issuer` resolved the
- * same way the served row resolves it — a row attached before the fact
- * carried an issuer answers with the synthetic form better-auth minted, and
- * that is the value better-auth is echoing back.
+ * The value a row states for a linkage field, with `issuer` resolved the same way the served
+ * row resolves it — a row attached before the fact carried an issuer answers with the synthetic
+ * form better-auth minted, and that is the value better-auth is echoing back.
  */
 const linkageValueOf = (row: IdentityAccountRow, field: LinkageRestatementField): string =>
   field === "issuer"
@@ -106,9 +87,8 @@ const linkageValueOf = (row: IdentityAccountRow, field: LinkageRestatementField)
 export interface IdentityStorageAdapterDeps {
   /**
    * better-auth's own published storage engine, built (`prismaAdapter(...)`,
-   * `memoryAdapter(...)`) but not yet bound to options. The legacy branch
-   * delegates to it verbatim, so an unlatched user's behavior is
-   * byte-for-byte what the stock adapter did.
+   * `memoryAdapter(...)`) but not yet bound to options. The legacy branch delegates to it
+   * verbatim, so an unlatched user's behavior is byte-for-byte what the stock adapter did.
    */
   legacyEngine: (options: BetterAuthOptions) => DBAdapter;
   accounts: IdentityAccountsPort;
@@ -117,15 +97,8 @@ export interface IdentityStorageAdapterDeps {
   /** ADR-116 §2: `finalized` and nothing else, cached, fail-closed. */
   isUserOnIdentityWrites: IdentityUserGate;
   /**
-   * Whether ANY user has finalized, fleet-wide — the same pre-rollout
-   * short-circuit the write gate already reads.
-   *
-   * The per-user gate cannot be asked about a query that names no user, and
-   * §7's loud failure must not catch a population it can never serve: on a
-   * fleet where nobody has latched, an `account` shape the branch has not
-   * enumerated belongs to a legacy user by construction and has to run
-   * untouched. Fail-closed here means "legacy", exactly as the per-user gate's
-   * does.
+   * Whether ANY user has finalized, fleet-wide — the same pre-rollout short-circuit the write
+   * gate already reads.
    */
   isAnyoneOnIdentityWrites: () => Promise<boolean>;
   /**
@@ -138,45 +111,6 @@ export interface IdentityStorageAdapterDeps {
 
 /**
  * better-auth's one `database:` entry (ADR-116 §1): an identity-owned
- * adapter built with `createAdapterFactory`, in which a per-user gate routes
- * between the stock behavior and event-sourced storage.
- *
- * **We are the implementation the factory is built AROUND, never a wrapper
- * over a finished one.** That is not a preference. `findUserByEmail(email, {
- * includeAccounts: true })` asks for the user with `join: { account: true }`,
- * and with joins off — the default — the factory satisfies that join itself
- * by issuing a second query through the instance it was built around. Sign-up
- * runs inside `adapter.transaction`, which for that request is the only method
- * better-auth calls on the adapter at all. Both of those land BELOW a wrapper
- * and ON us at this level.
- *
- * ## The transform constraint
- *
- * The factory's own transforms stay ON here, and that is forced rather than
- * chosen. `handleFallbackJoin` runs INSIDE `transformOutput`, so a factory
- * configured with `disableTransformOutput` never emulates the join at all —
- * it is not passed down either (`passJoinToAdapter` is false whenever the
- * factory computed one), so the joined read would silently come back without
- * its accounts. Keeping the transforms on is what makes the fallback join
- * ours.
- *
- * The consequence is that everything below this line speaks the STORAGE
- * level: mapped model names (`Account`), mapped column names (`provider`,
- * `access_token`), and rows to match. The legacy engine is a FINISHED
- * adapter whose own factory transforms again, so delegating to it has to
- * cross back to better-auth's canonical field names and back out — which is
- * what `toCanonicalKeys` / `toStorageKeys` do, using the factory's own name
- * helpers rather than a table of our own. `where` clauses need no crossing:
- * `getDefaultFieldName` resolves a mapped name back to its canonical field,
- * so re-transforming an already-mapped clause is a no-op.
- *
- * ## Transaction
- *
- * `transaction` is left unset, which makes the factory hand better-auth the
- * as-is passthrough — no real transaction, the same thing the application
- * ran with the stock `prismaAdapter`. The identity branch invents no
- * cross-branch transactional promise, and preserving the existing behavior
- * exactly is the point.
  */
 export class BetterAuthIdentityStorageAdapter {
   static create(deps: IdentityStorageAdapterDeps): BetterAuthIdentityStorageAdapter {
@@ -199,11 +133,8 @@ export class BetterAuthIdentityStorageAdapter {
 }
 
 /**
- * Value coercion is deliberately absent: every `supports*` flag is on, so
- * this factory maps NAMES and leaves shapes alone. The legacy engine's own
- * factory knows what its store accepts and coerces there, and the identity
- * ports take Postgres shapes directly — a second coercion here could only
- * disagree with one of them.
+ * Value coercion is deliberately absent: every `supports*` flag is on, so this factory maps
+ * NAMES and leaves shapes alone.
  */
 const identityAdapterConfig: AdapterFactoryConfig = {
   adapterId: "langwatch-identity",
@@ -234,13 +165,6 @@ function identityCustomAdapter({
 
     /**
      * The write fork, as every routed write asks it (ADR-116 §2, §3).
-     *
-     * The gate, plus the answer it cannot give for a user this request just
-     * bore: their state row says `finalized`, but the gate reads it on
-     * another connection behind a TTL cache that answered before they
-     * existed. Wrapped HERE as well as at the composition root, so an
-     * application that composes the adapter without wrapping still cannot
-     * route a newborn's account write to the legacy table.
      */
     const routesToIdentity = BetterAuthIdentityBirthAdapter.birthAwareGate(isUserOnIdentityWrites);
 
@@ -272,15 +196,6 @@ function identityCustomAdapter({
 
     /**
      * The user a query names outright, when it names one.
-     *
-     * This is what keeps §7's loud failure from catching the wrong
-     * population: a shape the branch does not serve must fail for a
-     * finalized user and run untouched for everyone else, and the gate can
-     * only be asked once a user is known. A clause that is not a plain
-     * `AND`-connected equality is not a user this query is scoped to.
-     *
-     * A query that names nobody — a row id, a provider subject — is decided by
-     * the FLEET-level question instead, never by parsing it first.
      */
     const namedUserId = (where: readonly AccountWhere[]): string | null => {
       const clause = where.find(
@@ -293,13 +208,9 @@ function identityCustomAdapter({
     };
 
     /**
-     * Whether an `account` write is scoped to one user and NOTHING else —
-     * every row they hold, named by no provider, subject or row id.
-     *
-     * That shape reaches `deleteMany` from exactly one place: better-auth
-     * erasing the user. A delete that names anything further is somebody
-     * unlinking a method, and must keep meeting the guards that decide
-     * whether removing it would strand them.
+     * Whether an `account` write is scoped to one user and NOTHING else — every row they hold,
+     * named by no provider, subject or row id. That shape reaches `deleteMany` from exactly one
+     * place: better-auth erasing the user.
      */
     const isWholeUserScope = (
       model: string,
@@ -335,10 +246,9 @@ function identityCustomAdapter({
       );
 
     /**
-     * A better-auth `account` update is a token refresh or a password
-     * change — secrets, and nothing else. A payload that names a linkage
-     * column is asking the branch to rewrite what only a command may state,
-     * so it refuses rather than dropping the field silently.
+     * A better-auth `account` update is a token refresh or a password change — secrets, and
+     * nothing else. A payload that names a linkage column is asking the branch to rewrite what
+     * only a command may state, so it refuses rather than dropping the field silently.
      */
     const secretsOfUpdate = (
       operation: string,
@@ -370,23 +280,9 @@ function identityCustomAdapter({
     };
 
     /**
-     * The rows the identity branch serves for a query, or `null` when it
-     * does not answer for this record at all and the legacy branch does.
-     * An empty array is an ANSWER — this user holds no such account — and
-     * is never a reason to read the legacy table as well.
-     */
-    /**
-     * The row as better-auth 1.7 expects it, carrying the issuer half of its
-     * account key.
-     *
-     * The identifier STORES the issuer — stated on the attach, exactly as
-     * better-auth decided it — so the stored value is served verbatim. The
-     * derivation is a floor for a row attached before the fact carried one,
-     * and never a preference: a real OIDC connection's issuer is its own URL,
-     * and no rule of ours would arrive at it. Deriving over a stored value
-     * would hand back `local:oauth:google` for an account better-auth keyed
-     * by `https://accounts.google.com`, and it would look like a missing
-     * sign-in method rather than a wrong column.
+     * The row as better-auth 1.7 expects it, carrying the issuer half of its account key. The
+     * identifier STORES the issuer — stated on the attach, exactly as better-auth decided it —
+     * so the stored value is served verbatim.
      */
     const withIssuer = (row: IdentityAccountRow): IdentityAccountRow => ({
       ...row,
@@ -433,19 +329,9 @@ function identityCustomAdapter({
           return served.length > 0 ? served : null;
         }
         case "byProviderSubject": {
-          // The IdP callback's resolution read: no user is named, so the
-          // identity tables are consulted FIRST and answer only when the
+          // The IdP callback's resolution read: no user is named, so the identity tables are
+          // consulted FIRST and answer only when the
           // resolved user is finalized (ADR-116 §2). A miss, or a held
-          // user, falls through to the legacy row that is still their
-          // truth.
-          //
-          // Keyed on better-auth's own `providerId`, verbatim - NOT on the
-          // folded identifier vocabulary. `identifierProviderFor` collapses
-          // auth0, okta and every custom OIDC connection into `oidc`, and a
-          // provider subject is unique only WITHIN an issuer, so matching on
-          // the fold lets one enterprise IdP's subject resolve another IdP's
-          // user. `Account` is unique on this same pair; the identity branch
-          // namespaces identically.
           const resolved = await resolution.tryResolveByProviderSubject({
             providerId: query.providerId,
             providerAccountId: query.accountId,
@@ -507,17 +393,6 @@ function identityCustomAdapter({
     /**
      * An account create on the identity branch: the linkage is a fact, the
      * secrets are a row (ADR-116 §6).
-     *
-     * The ceremony states the attach and its ledger waits for the fold, so
-     * the identifier is in the projection by the time the credential row is
-     * written and the assembled row can be read back. When it is not —
-     * the ceremony declined, or the fold lagged past its window — this
-     * answers null and the caller writes the legacy row instead. That is
-     * the fail-closed direction the gate uses everywhere else: a row
-     * better-auth can read beats a sign-up that fails. It can leave a
-     * credential row nothing reaches, which is inert (no identifier names
-     * it) and adopted rather than duplicated by the next attempt, because
-     * the write is keyed by the id the ceremony pinned.
      */
     const createOnIdentityBranch = async (canonical: Row): Promise<IdentityAccountRow | null> => {
       const { userId, providerId } = canonical;
@@ -565,15 +440,6 @@ function identityCustomAdapter({
 
     /**
      * The identifier-first half of `findUserByEmail` (ADR-116 §6): the
-     * incoming value is D01-normalized and resolved against the identifiers,
-     * and a finalized user's read becomes a read BY ID. The `User` row still
-     * answers it — user-model reads are never routed, because the table is
-     * complete for both populations — so only WHICH row changes, and sign-in
-     * by any verified email is what that buys.
-     *
-     * Everything else is left exactly as it arrived, which is what keeps the
-     * admin plugin's `contains` searches, counts and `OR` connectors serving
-     * from the `User` table unchanged.
      */
     const resolveUserWhere = async (
       model: string,
@@ -607,11 +473,6 @@ function identityCustomAdapter({
     /**
      * A `user` create inside a marked request: the born-finalized entrance
      * (ADR-116 §3), or nothing at all.
-     *
-     * Only a create that carries an email is a birth. better-auth's own
-     * sign-up always does; anything else — a plugin minting a placeholder
-     * user, an anonymous session — has no address to derive an identifier
-     * from and takes the legacy branch, marker or not.
      */
     const bearOnIdentityBranch = async (canonical: Row): Promise<Row | null> => {
       if (BetterAuthIdentityBirthAdapter.currentIdentityBirth() === undefined) return null;
@@ -640,17 +501,6 @@ function identityCustomAdapter({
     /**
      * A `user` update on the identity branch, with `email` taken out of it
      * (ADR-116 §6) — or the update exactly as it arrived.
-     *
-     * `User.email` has ONE writer for a latched user: the fold, from their
-     * PRIMARY identifier. So the column write is REMOVED here and the
-     * address is stated as a command instead. Everything else in the same
-     * update — name, image, `lastLoginAt` — passes through untouched, which
-     * matters because most user updates carry no email at all and must not
-     * become a different kind of write just because this branch exists.
-     *
-     * A user the query does not NAME cannot be routed, and a population-wide
-     * update that set `email` would be a shape nothing issues; those fall
-     * through to the legacy branch, where they always were.
      */
     const withoutRoutedEmail = async ({
       model,
@@ -871,13 +721,8 @@ function identityCustomAdapter({
           });
           if (rows !== null) {
             return detachOnIdentityBranch(rows, {
-              // Every account row of one user, named by nothing else, is
-              // better-auth erasing that user: `deleteUser` fans this out
-              // before `user.delete.before` runs. The erase is stated ONCE by
-              // `beforeUserDelete`, so the rows go without a detach apiece —
-              // which is also what keeps the strands guard, written for
-              // unlinking a method from a LIVING user, from refusing to let a
-              // user holding one way in be deleted at all.
+              // Every account row of one user, named by nothing else, is better-auth erasing
+              // that user: `deleteUser` fans this out before `user.delete.before` runs.
               erasingUser: isWholeUserScope(model, where),
             });
           }
@@ -905,16 +750,6 @@ function identityCustomAdapter({
 
     /**
      * Unlink, and the fan-out a user delete performs (ADR-116 §8): a detach
-     * fact per identifier, and both secret-bearing rows removed with them.
-     *
-     * The bridge `Account` row is deleted HERE rather than left to the fold.
-     * The fold does remove it — a tombstoned identifier projects to no row —
-     * but only once it runs, and the mirror (§4) has been writing this user's
-     * newest password onto that row all along. A window in which the row
-     * outlives the unlink is a window in which the fail-closed fallback to the
-     * legacy branch still authenticates the method the customer just removed.
-     * The fold's own delete stays as the replay-time answer; this one is what
-     * makes the unlink true when it returns.
      */
     async function detachOnIdentityBranch(
       rows: readonly IdentityAccountRow[],
@@ -954,17 +789,6 @@ function identityCustomAdapter({
 
 /**
  * The adapter boundary's translation (ADR-116 §6): a `HandledError` becomes
- * a better-auth `APIError` carrying the stable `code`.
- *
- * Without it the code dies here. better-auth wraps a storage failure in its
- * own generic error — sign-up answers `FAILED_TO_CREATE_USER` and nothing
- * else — unless what it caught is already an `APIError`, which it re-throws
- * verbatim. So being an `APIError` is precisely what carries `code` out to
- * the auth error surface, where the client presentation registry turns it
- * into the words a customer reads. The original rides on `cause` for the log.
- *
- * Plain errors pass through untouched: they are the ones that SHOULD degrade
- * to a generic failure plus a trace id.
  */
 async function surfaceHandledRefusals<T>(run: () => Promise<T>): Promise<T> {
   try {

@@ -29,10 +29,9 @@ import type {
 } from "../repositories/sso-connection.repository";
 
 /**
- * The checks every SSO connection verb runs before it states a fact, and the
- * reads those checks are made of. Its own module so the verb list in
- * `sso-connection-guards.service.ts` reads as the lifecycle it enforces
- * rather than as a lifecycle interleaved with its own plumbing.
+ * The checks every SSO connection verb runs before it states a fact, and the reads those checks
+ * are made of. Its own module so the verb list in `sso-connection-guards.service.ts` reads as
+ * the lifecycle it enforces rather than as a lifecycle interleaved with its own plumbing.
  */
 
 /** Which states each verb may be commanded from. The one place the diagram
@@ -119,11 +118,7 @@ export class SsoConnectionGuardChecksService {
   }
 
   /**
-   * The operator gate, asked of the port rather than of the command. The
-   * refusal is the same whoever the actor is and whatever the deployment: an
-   * organization administrator holding every permission their organization
-   * can grant is still not a LangWatch operator, and a self-hosted
-   * installation's platform operator still is one.
+   * The operator gate, asked of the port rather than of the command.
    */
   async assertPlatformOperator({
     actor,

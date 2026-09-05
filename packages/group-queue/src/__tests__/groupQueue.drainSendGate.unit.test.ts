@@ -1,20 +1,5 @@
 /**
- * The producer gate must close when the DRAIN ends, not when shutdown is
- * requested.
- *
- * Prod, 2026-08-24: every worker rollout shed a burst of "Failed to dispatch
- * event to subscriber queue" carrying "Cannot send to queue after shutdown has
- * been requested" — 1,185 across two deploys in one morning, none outside a
- * rollout. There is one global group queue and the projection, subscriber, map
- * and fold queues are facades over it, so close() barred sends on the very
- * queue it was draining and jobs still in flight had their projection
- * dispatches rejected. Nothing above retried: the router collects the failure,
- * the event-sourcing service catches the AggregateError and carries on, so the
- * job succeeded while its projections never saw the events.
- *
- * These tests drive close() while holding the drain open, which is the only
- * window the defect lives in.
- *
+ * The producer gate must close when the DRAIN ends, not when shutdown is requested.
  * @see specs/background/queue-drain-send-gate.feature
  */
 
@@ -72,11 +57,9 @@ function makeDefinition(): EventSourcedQueueDefinition<TestPayload> {
 }
 
 /**
- * Waits until the drain is genuinely open.
- *
- * NOT `requestShutdown` — close() calls that before it starts draining, so a
- * test keying off it races ahead of the window it means to observe and the
- * drain then runs to its full budget.
+ * Waits until the drain is genuinely open. NOT `requestShutdown` — close() calls that before it
+ * starts draining, so a test keying off it races ahead of the window it means to observe and
+ * the drain then runs to its full budget.
  */
 async function drainIsOpen(): Promise<void> {
   await vi.waitUntil(() => releaseDrain !== undefined);

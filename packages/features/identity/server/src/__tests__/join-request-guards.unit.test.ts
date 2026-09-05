@@ -12,11 +12,6 @@ import type { JoinRequestReadRepository } from "../repositories/join-request.rep
 
 /**
  * What a guard refuses before any fact exists.
- *
- * Assertions are on `code`, never on message prose: every refusal here
- * crosses a serialisation boundary on its way to a customer, and the words
- * are copy that will change.
- *
  * Spec: specs/identity/join-requests.feature
  */
 

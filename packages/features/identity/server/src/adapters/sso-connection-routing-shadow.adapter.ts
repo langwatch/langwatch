@@ -10,18 +10,6 @@ const logger = createLogger("langwatch:identity:ssoconn-routing-shadow");
 
 /**
  * `SSOCONN_ROUTING=shadow` (ADR-117 §5), as one port wrapping two.
- *
- * The strings keep deciding: every method returns the DECIDING port's answer,
- * unchanged, and the shadow port's answer is only ever compared and logged.
- * That is why this is a wrapper around `SignInDomainRoutingPort` rather than
- * anything inside the router — the engine, `SignInRouterService` and
- * `signInRouterShadow.ts` are untouched, and never learn that two lookups
- * ran. Flipping to `enforce` is composing the projection port on its own.
- *
- * The shadow leg cannot break a sign-in: its read runs in parallel, its
- * failures are caught here, and a comparison that could not be computed is
- * logged as such rather than counted as agreement. Silently counting an
- * unreadable projection as a match is how a bake gate lies.
  */
 
 export interface SsoConnectionRoutingShadowRecorder {
@@ -101,11 +89,7 @@ export class ShadowComparingDomainRoutingAdapter implements SignInDomainRoutingP
   }
 
   /**
-   * The no-address lookup. Only a self-hosted instance with exactly one
-   * connection ever auto-redirects on it, so the comparison is over the sole
-   * entry — a list of any other length routes nowhere either way, and
-   * comparing element by element would report differences that decide
-   * nothing.
+   * The no-address lookup.
    */
   async listActiveConnections(): Promise<readonly RoutableConnection[]> {
     const decided = await this.deciding.listActiveConnections();

@@ -25,6 +25,8 @@ class RecordingExecutionPort extends SimulationExecutionPort {
   async finishRun(_input: SimulationFinishRun): Promise<void> {}
   async cancelRun(_input: SimulationCancelRun): Promise<void> {}
   async deleteRun(_input: SimulationDeleteRun): Promise<void> {}
+
+  async recordAgentInstance(): Promise<void> {}
 }
 
 describe("SimulationService", () => {

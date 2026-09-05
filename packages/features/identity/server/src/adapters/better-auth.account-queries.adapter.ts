@@ -2,21 +2,6 @@ import { HandledError } from "@langwatch/handled-error";
 
 /**
  * The `account` queries better-auth issues, enumerated (ADR-116 §7).
- *
- * A storage-replacing branch cannot answer "any query at all" — it answers
- * the ones its caller actually asks. better-auth's internal adapter issues a
- * small, fixed set against `account`, and every one of them is named here —
- * fields, connectors AND operators. All three are part of a shape: a clause
- * recognized by its field alone answers a question nobody asked, and answering
- * `id ne X` as `id eq X` inverts a delete.
- *
- * An unrecognized shape THROWS, and that is the load-bearing part: a missed
- * shape would be a silent wrong answer on the sign-in path, where `findOne`
- * returning null reads exactly like "no such account" — which is how a user
- * gets told their sign-in method does not exist. Failing loudly turns a
- * better-auth upgrade that adds a shape into a red test instead of a support
- * ticket. Scoped to `account` on purpose: it is the only model where per-record
- * routing has to be decidable, so no `user` query can raise it.
  */
 
 /** better-auth's own `Where` clause, narrowed to what these shapes use.
@@ -51,14 +36,9 @@ export type AccountQuery =
   | { kind: "byUserAndProvider"; userId: string; providerId: string };
 
 /**
- * An `account` storage operation the identity branch does not serve.
- *
- * `fault: "platform"` because nothing the customer did caused it and nothing
- * they can do fixes it: the library asked for a shape we never taught the
- * branch. The model and the operator name the failure in the LOG, through
- * `reasons`, and never in the message — the message is customer-safe copy,
- * and the words a customer reads come from the presentation registry keyed
- * by `code`.
+ * An `account` storage operation the identity branch does not serve. `fault: "platform"`
+ * because nothing the customer did caused it and nothing they can do fixes it: the library
+ * asked for a shape we never taught the branch.
  */
 export class IdentityUnsupportedStorageQueryError extends HandledError {
   constructor(detail: string) {
@@ -78,13 +58,8 @@ const shapeOf = (where: readonly AccountWhere[]): string =>
     .join(", ") || "no predicate";
 
 /**
- * The operators a field may carry, by field.
- *
- * Every shape below is an equality; `id` additionally arrives as an `in` list
- * when a user delete fans out. Validating the operator is load-bearing rather
- * than defensive: without it `where id ne X` matches the `byId` shape and is
- * answered as `byId(X)`, so a delete that meant "every row except X" removes
- * exactly the row it was told to spare.
+ * The operators a field may carry, by field. Every shape below is an equality; `id`
+ * additionally arrives as an `in` list when a user delete fans out.
  */
 const OPERATORS_BY_FIELD: Record<string, readonly string[]> = { id: ["eq"] };
 const EQUALITY_ONLY: readonly string[] = ["eq"];
@@ -95,22 +70,8 @@ const operatorIsEnumerated = (clause: AccountWhere): boolean =>
   );
 
 /**
- * better-auth's `issuer`, inverted back to the `providerId` this branch keys
- * on — or null when it cannot be.
- *
- * 1.7 re-keyed an account from `(providerId, accountId)` to
- * `(issuer, accountId)`, and synthesises the issuer from the provider id for
- * every provider that declares none of its own: `local:<id>` for local
- * credentials, `local:oauth:<id>` for a social provider. `Identifier` stores
- * the provider id verbatim and no issuer at all, so a query that names only
- * the issuer is answerable exactly when the issuer is one of those two
- * synthetic forms.
- *
- * A provider that brings its OWN issuer — a real enterprise OIDC issuer URL —
- * is deliberately NOT derivable here, and must keep reaching the refusal
- * below. Guessing a provider id from an issuer we never minted is the silent
- * wrong answer this whole module exists to prevent: it would resolve one
- * IdP's subject onto another IdP's user.
+ * better-auth's `issuer`, inverted back to the `providerId` this branch keys on — or null when
+ * it cannot be.
  */
 const OAUTH_ISSUER_PREFIX = "local:oauth:";
 const LOCAL_ISSUER_PREFIX = "local:";
@@ -124,13 +85,9 @@ export class BetterAuthAccountQueriesAdapter {
   private constructor() {}
 
   /**
-   * The issuer better-auth 1.7 expects to see ON a row it is given back.
-   *
-   * `Identifier` stores no issuer — the provider id is its truth — so the
-   * branch mints the synthetic one 1.7 would have minted itself. Without it a
-   * credential row comes back failing 1.7's own `issuer = local:credential`
-   * filter, which reads to the customer as a wrong password rather than as a
-   * missing column.
+   * The issuer better-auth 1.7 expects to see ON a row it is given back. `Identifier` stores no
+   * issuer — the provider id is its truth — so the branch mints the synthetic one 1.7 would
+   * have minted itself.
    */
   static issuerForProviderId = (providerId: string): string =>
     providerId === "credential"

@@ -1,16 +1,7 @@
 /**
- * The default-deny fallthrough, exercised rather than asserted about.
- *
- * The rule under test is the one the whole design rests on: a node kind, a
- * field, or an enumerated value the walk does not recognise is a **refusal**,
- * never a pass. It cannot be reached through the real grammar — by
- * construction, `@clickhouse/parser` only emits shapes that exist today — so
- * every case here parses real SQL first, mutates one thing in the resulting
- * tree, and feeds it back through an injected parser.
- *
- * Each case ships with its control: the *unmutated* tree is asserted to pass.
- * Without that, a mutation that merely broke the tree would look like the
- * fallthrough working.
+ * The default-deny fallthrough, exercised rather than asserted about. The rule under test is
+ * the one the whole design rests on: a node kind, a field, or an enumerated value the walk does
+ * not recognise is a **refusal**, never a pass.
  */
 import { describe, expect, it } from "vitest";
 
@@ -98,10 +89,8 @@ describe("the default-deny walk", () => {
     });
 
     /**
-     * Not a fictional kind: `InsertQuery` is a real node the parser emits, and
-     * it is refused here for the only reason that matters — the walk's rule
-     * table does not list it. A denylist of "bad" kinds would have to have
-     * predicted this position; the allowlist did not have to.
+     * Not a fictional kind: `InsertQuery` is a real node the parser emits, and it is refused
+     * here for the only reason that matters — the walk's rule table does not list it.
      */
     it("refuses a real node kind that is simply not in the allowlist", () => {
       const tree = baseTree();
@@ -123,10 +112,9 @@ describe("the default-deny walk", () => {
 
   describe("given a field the walk has never heard of", () => {
     /**
-     * The case a node-kind allowlist alone would miss. `INTO OUTFILE` is
-     * exactly this shape in real ClickHouse — an ordinary literal hanging off
-     * a field of an ordinary SELECT — so a walk that only checked kinds would
-     * step straight over it.
+     * The case a node-kind allowlist alone would miss. `INTO OUTFILE` is exactly this shape in
+     * real ClickHouse — an ordinary literal hanging off a field of an ordinary SELECT — so a
+     * walk that only checked kinds would step straight over it.
      */
     it("refuses one on a recognised statement node", () => {
       const tree = baseTree();

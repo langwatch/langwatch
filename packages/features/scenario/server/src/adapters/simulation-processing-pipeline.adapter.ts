@@ -88,6 +88,7 @@ export class SimulationProcessingPipelineAdapter {
       .withCommandInstance("finishRun", FinishRunCommand, deps.finishRunCommand)
       .withCommand("cancelRun", commands.cancelRun)
       .withCommand("deleteRun", commands.deleteRun)
+      .withCommand("recordAgentInstance", commands.recordAgentInstance)
       .withCommandInstance(
         "computeRunMetrics",
         ComputeRunMetricsCommand,

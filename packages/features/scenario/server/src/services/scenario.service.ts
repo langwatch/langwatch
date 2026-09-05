@@ -82,14 +82,50 @@ export class ScenarioService extends ScenarioServiceContract {
     this.runSecrets = ScenarioRunSecretsService.create(options.secretCipher);
   }
 
-  create(input: ScenarioCreateInput): Promise<Scenario> {
+  async create(input: ScenarioCreateInput): Promise<Scenario> {
     const parsed = scenarioCreateInputSchema.parse(input);
+    // No scenario is loose: a create that names no suite files into the
+    // project's Default, which is created here on the first such write.
+    const testSuiteId =
+      parsed.testSuiteId ?? (await this.ensureDefaultTestSuiteId(parsed.projectId));
 
     return this.options.repository.create({
       ...parsed,
+      testSuiteId,
       id: this.options.ids.next(),
       actor: parsed.actor ?? actorFor(parsed.lastUpdatedById),
     });
+  }
+
+  /**
+   * The id of the project's Default test suite, creating it when the project has
+   * none. Resolved before the caller's transaction opens: the create can lose a
+   * race with a concurrent one, and Postgres aborts a transaction on the unique
+   * violation that reports it, so the retry cannot happen inside that transaction.
+   */
+  private async ensureDefaultTestSuiteId(projectId: string): Promise<string> {
+    const existing = await this.options.repository.tryFindDefaultTestSuite({ projectId });
+    if (existing) return existing.id;
+    const created = await this.options.repository.createDefaultTestSuite({
+      projectId,
+      id: this.options.testSuiteIds.next(),
+    });
+    return created.id;
+  }
+
+  /**
+   * Turns "no suite" into the project's Default suite.
+   *
+   * A caller that clears `testSuiteId` is asking to take the scenario out of the
+   * suite it is in, not to make it loose. An update that names no `testSuiteId`
+   * at all is left alone, since it is not a move.
+   */
+  private async withResolvedTestSuite(parsed: ScenarioUpdateInput): Promise<ScenarioUpdateInput> {
+    if (parsed.testSuiteId !== null) return parsed;
+    return {
+      ...parsed,
+      testSuiteId: await this.ensureDefaultTestSuiteId(parsed.projectId),
+    };
   }
 
   getById(input: ScenarioIdInput): Promise<Scenario> {
@@ -116,8 +152,8 @@ export class ScenarioService extends ScenarioServiceContract {
     );
   }
 
-  update(input: ScenarioUpdateInput): Promise<Scenario> {
-    const parsed = scenarioUpdateInputSchema.parse(input);
+  async update(input: ScenarioUpdateInput): Promise<Scenario> {
+    const parsed = await this.withResolvedTestSuite(scenarioUpdateInputSchema.parse(input));
 
     return this.options.repository.update({
       ...parsed,

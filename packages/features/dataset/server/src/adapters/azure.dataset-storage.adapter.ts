@@ -1,20 +1,5 @@
 /**
  * ADR-032 / AC37 (issue #4133): Azure Blob implementation of `DatasetStorage`.
- *
- * Mirrors `S3DatasetStorage`'s shape (chunked-JSONL I/O + a staged-upload
- * flow for the finalize/normalize pipeline) but reuses the existing
- * `AzureBlobDriver` (get/put/delete/exists) as the byte-level transport
- * instead of the AWS SDK — the driver already speaks the Azure Blob REST API
- * and handles SharedKey signing, including Azurite's path-style addressing.
- *
- * Azure Blob has no cross-origin presigned-PUT primitive wired up here (a SAS
- * URL needs signing surface this driver doesn't implement — out of scope for
- * this rung). Like `LocalDatasetStorage`, this backend mints a SAME-ORIGIN
- * staging URL: the browser PUTs through the app, which streams the bytes to
- * Azure via `putStaged`.
- *
- * The pure chunk math lives in `dataset-chunking.ts`; this class composes it,
- * it never reimplements it (same discipline as the S3 / local impls).
  */
 import type { Readable } from "node:stream";
 import { nanoid } from "nanoid";
@@ -43,10 +28,9 @@ import {
 import { localStagingUploadPath, stagingUploadKey } from "../rules/presigned-upload.rules";
 
 /**
- * Reads a Readable fully as a utf-8 string (chunk objects are JSONL text).
- * Capped at CHUNK_MAX_BYTES — chunks are written under that bound by
- * `toJsonlChunks`, so anything larger is a tampered or corrupted object and
- * must not be allowed to exhaust the heap.
+ * Reads a Readable fully as a utf-8 string (chunk objects are JSONL text). Capped at
+ * CHUNK_MAX_BYTES — chunks are written under that bound by `toJsonlChunks`, so anything larger
+ * is a tampered or corrupted object and must not be allowed to exhaust the heap.
  */
 async function streamToString(stream: Readable): Promise<string> {
   const chunks: Buffer[] = [];
@@ -222,10 +206,8 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
   }
 
   /**
-   * No cross-origin presign wired up for Azure yet (a SAS URL needs signing
-   * surface this driver doesn't implement — out of scope here). Like
-   * `LocalDatasetStorage`, mint a SAME-ORIGIN staging URL: the browser PUTs
-   * through the app, which streams the bytes to Azure via `putStaged`.
+   * No cross-origin presign wired up for Azure yet (a SAS URL needs signing surface this driver
+   * doesn't implement — out of scope here).
    */
   createPresignedUpload({ projectId }: { projectId: string }): Promise<PresignedUpload> {
     const uploadId = nanoid();
@@ -239,9 +221,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
   /**
    * Deposits a staged upload from a byte stream, server-side — the same-origin
    * `/direct-upload/staging/:uploadId` route calls this (parity with
-   * `LocalDatasetStorage.putStaged`). `maxBytes` is enforced mid-stream: the
-   * shared `streamToBuffer` destroys the stream the moment the cap is
-   * exceeded, so an authed client can't fill the heap before the check runs.
+   * `LocalDatasetStorage.putStaged`).
    */
   async putStaged({
     projectId,

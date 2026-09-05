@@ -1,10 +1,5 @@
 /**
  * A sliding-window request counter, one per caller address.
- *
- * Checking and recording are separate calls because the endpoint decides
- * whether a request counts against the window only after it knows what the
- * request was: a well-formed call that simply failed authentication is
- * tracked, a malformed one is not.
  */
 
 interface RateLimitEntry {

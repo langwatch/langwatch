@@ -14,9 +14,8 @@ import {
 
 /**
  * Duck-typed by the adapter (`error.name === "ObjectNotFoundError"`, see
- * `isMissingObjectError`), mirroring `@langwatch/stored-object-server`'s
- * `ObjectNotFoundError` without taking a cross-package dependency for a test
- * double.
+ * `isMissingObjectError`), mirroring `@langwatch/stored-object-server`'s `ObjectNotFoundError`
+ * without taking a cross-package dependency for a test double.
  */
 class FakeObjectNotFoundError extends Error {
   constructor(uri: string) {
@@ -66,12 +65,7 @@ beforeEach(() => {
 });
 
 /**
- * An in-memory stand-in for the Azure Blob byte-level transport. The
- * write→read round trip below originally ran against a real Azurite emulator
- * (`azure-dataset-storage.integration.test.ts`); that test-support helper was
- * retired with `platform/app`, so this exercises the same adapter contract
- * (`writeChunks` really produces the objects `readChunks` really parses) at
- * unit level instead of losing the coverage outright.
+ * An in-memory stand-in for the Azure Blob byte-level transport.
  */
 function inMemoryDriver(): DatasetBlobDriver {
   const objects = new Map<string, Buffer>();

@@ -3,19 +3,9 @@ import type { NurturingProfileRepository } from "../repositories/nurturing-profi
 import type { NurturingService } from "./nurturing.service";
 
 /**
- * What the lifecycle-signal services reach for, and why it is registered
- * rather than passed.
- *
- * Every one of these signals is FIRE-AND-FORGET: a prompt written, a member
- * invited, a session seen. They are called from deep inside transports and
- * hooks that own no billing graph, and a deployment with no Customer.io
- * credentials composes no sink at all — in which case each of them is a no-op
- * by construction rather than a refusal, because nobody should lose the
- * organization they just created over a marketing e-mail.
- *
- * So the process registers its sink once at composition, exactly as the trace
- * cache registers its Redis. A process that registers nothing fires nothing,
- * which is the documented behaviour, not a failure.
+ * What the lifecycle-signal services reach for, and why it is registered rather than passed.
+ * Every one of these signals is FIRE-AND-FORGET: a prompt written, a member invited, a session
+ * seen.
  */
 const nurturingLogger = createLogger("langwatch:billing:nurturing");
 
@@ -70,11 +60,9 @@ export class NurturingSinkRegistryService {
   }
 
   /**
-   * Where a fire-and-forget lifecycle signal's failure goes.
-   *
-   * Warn rather than error, and swallowed rather than rethrown: the caller has
-   * already done the thing the customer asked for, and a Customer.io outage is
-   * not the customer's problem.
+   * Where a fire-and-forget lifecycle signal's failure goes. Warn rather than error, and
+   * swallowed rather than rethrown: the caller has already done the thing the customer asked
+   * for, and a Customer.io outage is not the customer's problem.
    */
   static reportFailure(error: unknown): void {
     nurturingLogger.warn({ error }, "a lifecycle signal could not be delivered");

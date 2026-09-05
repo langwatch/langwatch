@@ -52,19 +52,6 @@ import { grandfatheredConnectionFacts } from "../rules/sso-connection-grandfathe
 
 /**
  * The SSO connection guards (ADR-117 §5, D04): what runs BEFORE any fact
- * exists. Each verb reads the connection's FOLDED STATE, refuses what the
- * lifecycle forbids, and states only what the state does not already carry.
- *
- * One implementation, two callers — `SsoConnectionService` on the calling
- * path and the pipeline's command handlers on the staged re-run — so the
- * guard that vetoes a live command is the one the queue's re-run applies.
- * That is also what makes grandfathering safe: a grandfathered connection
- * gets its STATE from backfilled history, and every subsequent state CHANGE
- * arrives here and passes the same checks a self-served one does. There is
- * no grandfathered branch in this file, and that absence is the guarantee.
- *
- * Facts come back without their envelope; the ledger stamps business time,
- * tenancy and idempotency from the command that produced them.
  */
 export class SsoConnectionGuardsService {
   static create(deps: SsoConnectionGuardsDeps): SsoConnectionGuardsService {
@@ -106,15 +93,6 @@ export class SsoConnectionGuardsService {
   /**
    * The legacy strings, stated as the history a connection would have had
    * (ADR-117 §5). It is the one verb that emits a whole lifecycle at once,
-   * and the one that runs no lifecycle check — because it is not moving a
-   * connection through the lifecycle, it is recording one that already
-   * happened outside it.
-   *
-   * What keeps that from being a hole: it can only CREATE. A connection that
-   * already exists gets nothing, so there is no reachable state in which this
-   * command changes an existing connection, and every change to a
-   * grandfathered connection afterwards goes through the guarded verbs above
-   * like anyone else's.
    */
   async grandfatherConnection(
     data: GrandfatherConnectionCommandData,
@@ -154,12 +132,7 @@ export class SsoConnectionGuardsService {
   }
 
   /**
-   * Deciding a domain claim is a LangWatch operator's act, on every tier and
-   * every deployment. It is the abuse boundary the whole design rests on:
-   * first-verifier-owns means an approved claim is what lets a connection
-   * take a domain, so an organization administrator approving their own would
-   * make the queue a formality. Checked here rather than only on the surface,
-   * so the rule holds for every caller the aggregate will ever have.
+   * Deciding a domain claim is a LangWatch operator's act, on every tier and every deployment.
    */
   async approveDomainClaim(data: ApproveDomainClaimCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, APPROVE_DOMAIN_CLAIM_COMMAND_TYPE);
@@ -229,9 +202,6 @@ export class SsoConnectionGuardsService {
 
   /**
    * The ceremony's opening move, and where first-verifier-owns is enforced.
-   * Checked here rather than at `verifyDomain` on purpose: refusing before
-   * the operator publishes a TXT record costs them nothing, and refusing
-   * after would mean telling them the record they just made is worthless.
    */
   async requestVerification(
     data: RequestVerificationCommandData,
@@ -265,24 +235,9 @@ export class SsoConnectionGuardsService {
   }
 
   /**
-   * A platform operator states out of band that the domain is that
-   * organization's (D05 tier 1 / D04 amendment). One step, APPROVED straight
-   * to VERIFIED, because nothing is published and so nothing is pending.
-   *
-   * Three things this deliberately does NOT do:
-   *
-   * - It does not replace the approval. `ALLOWED_FROM` admits it from
-   *   APPROVED alone, so an attestation against a claim nobody approved is
-   *   refused and states no fact. The trust decision stays where it has
-   *   always been, and an attested domain is exactly as trustworthy as that
-   *   approval — no more.
-   * - It does not relax first-verifier-owns. The identical ownership check
-   *   the DNS ceremony runs runs here, so an operator cannot attest a domain
-   *   another ACTIVE connection holds.
-   * - It does not expire. Nothing here writes a deadline, and nothing
-   *   elsewhere reads one: the answer to a disputed attestation is suspend,
-   *   which is immediate, reversible, and taken by a human at the moment it
-   *   matters.
+   * A platform operator states out of band that the domain is that organization's (D05 tier 1 /
+   * D04 amendment). One step, APPROVED straight to VERIFIED, because nothing is published and
+   * so nothing is pending.
    */
   async attestDomain(data: AttestDomainCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, ATTEST_DOMAIN_COMMAND_TYPE);
@@ -359,10 +314,6 @@ export class SsoConnectionGuardsService {
 
   /**
    * Activation's three preconditions, checked together (ADR-117 §5):
-   * a verified domain, a live break-glass binding, and a recorded test
-   * login. The break-glass one is the reason activation cannot lock an
-   * organization out of its own instance — if the IdP is misconfigured,
-   * somebody must still be able to get in and turn it off.
    */
   async activateConnection(data: ActivateConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, ACTIVATE_CONNECTION_COMMAND_TYPE);
@@ -439,11 +390,9 @@ export class SsoConnectionGuardsService {
   }
 
   /**
-   * Teardown never strands a user. The read is over the identity heads: a
-   * user whose only live identifiers belong to this connection has no other
-   * way in, and removing it would turn a configuration change into an
-   * account loss. The refusal names how many, and heals itself the moment
-   * those people hold another verified method.
+   * Teardown never strands a user. The read is over the identity heads: a user whose only live
+   * identifiers belong to this connection has no other way in, and removing it would turn a
+   * configuration change into an account loss.
    */
   async requestTeardown(data: RequestTeardownCommandData): Promise<SsoConnectionFactInput[]> {
     await this.checks.require(data, REQUEST_TEARDOWN_COMMAND_TYPE);
@@ -471,10 +420,9 @@ export class SsoConnectionGuardsService {
   }
 
   /**
-   * The process manager's wake dispatches this once the grace has elapsed.
-   * The deadline is re-read from the folded state rather than trusted from
-   * the wake: a lagged wake, a replayed job or a hand-run command must not
-   * be able to complete a teardown early.
+   * The process manager's wake dispatches this once the grace has elapsed. The deadline is
+   * re-read from the folded state rather than trusted from the wake: a lagged wake, a replayed
+   * job or a hand-run command must not be able to complete a teardown early.
    */
   async completeTeardown(data: CompleteTeardownCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, COMPLETE_TEARDOWN_COMMAND_TYPE);

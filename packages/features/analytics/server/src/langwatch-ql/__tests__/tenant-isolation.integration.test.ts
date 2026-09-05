@@ -1,21 +1,5 @@
 /**
  * Isolation proof, part 1: row-policy enforcement as the restricted identity.
- *
- * Every assertion here executes as the actual restricted database user against
- * a real ClickHouse 25.10 server carrying the shipped provisioning. Nothing is
- * satisfied by a validator, a mock, or a query builder — the feature file makes
- * that a hard bar, because a validator can only prove what the gateway refuses
- * to send, never what the database refuses to answer.
- *
- * Two habits run through the file, both answers to the way isolation tests
- * quietly go vacuous:
- *
- *  - Every "no foreign rows" and "zero rows" claim is paired with an
- *    administrator-side count proving the rows it failed to return exist. An
- *    absence check passes against an empty database.
- *  - Every rejection is asserted by specific error code. "It threw" is not a
- *    proof of containment when a typo throws too.
- *
  * @see specs/analytics/lwql-api.feature
  */
 

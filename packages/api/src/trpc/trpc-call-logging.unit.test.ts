@@ -275,11 +275,9 @@ describe("handleTrpcCallLogging", () => {
 });
 
 /**
- * specs/observability/slow-work-warnings.feature, the API-call half.
- *
- * This half covers the calls whose slow work is not a Postgres query: a
- * ClickHouse read, a provider call, serialization. The procedure record is
- * the one place that always carries the full duration.
+ * specs/observability/slow-work-warnings.feature, the API-call half. This half covers the calls
+ * whose slow work is not a Postgres query: a ClickHouse read, a provider call, serialization.
+ * The procedure record is the one place that always carries the full duration.
  */
 describe("a call that succeeds slowly", () => {
   const BUDGET_MS = 3000;

@@ -1,17 +1,5 @@
 /**
  * LangWatchQL analytics SQL — the default-deny AST validator.
- *
- * The gateway's half of the isolation model. The database's half is already
- * proven and shipped by the provisioning adapter: a readonly identity, per-object
- * row policies, and a tenant capability the caller cannot forge. This validator
- * does not carry tenant isolation — it is defense in depth, and the reason it
- * exists is that a query which never reaches the database cannot exercise a bug
- * in the layer that would otherwise contain it.
- *
- * This module is the entry point only. The allowlist walk it drives lives in
- * `../rules/langwatch-ql-query-walk.rules.ts`, which is where the policy of
- * what a query may contain is written down.
- *
  * @see specs/analytics/lwql-api.feature
  * @see dev/docs/adr/081-lwql-table-function-and-ssrf-policy.md
  */
@@ -45,23 +33,8 @@ export interface ValidateLangWatchQLInput extends LangWatchQLPolicy {
 type ScreenedSubmission = { statement: SqlAstNode } | RejectedLangWatchQL;
 
 /**
- * Decides whether a submitted query may be executed against the LangWatchQL
- * analytics schema.
- *
- * Never throws for a rejection — a refused query is an outcome, not an
- * exception, and the caller decides how to surface it. It also never rewrites
- * the SQL: the statement the executor sends is the statement that arrived.
- *
+ * Decides whether a submitted query may be executed against the LangWatchQL analytics schema.
  * @example
- * ```ts
- * const result = LangWatchQLValidationService.create().validate({
- *   sql: "SELECT count() FROM traces",
- *   allowedTables: ["analytics.traces"],
- *   gatedColumns: ["body"],
- *   defaultDatabase: "analytics",
- * });
- * if (!result.ok) throw lwqlValidationError(result);
- * ```
  */
 export class LangWatchQLValidationService {
   private constructor(private readonly parser: LangWatchQLParser) {}

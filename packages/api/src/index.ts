@@ -39,3 +39,5 @@ export {
   requiresOnProject,
   requiresOnTeam,
 } from "./access-policy.js";
+
+export { isInternalSecretValid } from "./rest/security/internal-secret";

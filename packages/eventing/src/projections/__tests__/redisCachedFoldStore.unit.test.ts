@@ -48,8 +48,6 @@ function createInnerStore(durable: TestState | null = { count: 1, UpdatedAt: 100
 /**
  * An inner store that persists the applied-event-id set next to its state —
  * the durable read-back shape (`getWithApplied`) a store gains under ADR-066.
- * Its `get()` still answers state-only, so the wrapper's cache-miss path is
- * exercised for both entry points.
  */
 function createDurableInnerStore({
   state = { count: 1, UpdatedAt: 100 },

@@ -1,29 +1,6 @@
 /**
- * LangWatchQL analytics SQL — the `analytics.*` schema catalog.
- *
- * One entry per LangWatchQL view. This is the whole public surface of the
- * analytics SQL API: a caller can name these views and these columns, and
- * nothing else, because the grants the entries generate expose nothing else.
- *
- * ## What is deliberately absent
- *
- * Free-text carriers with no gate in the canonical visibility policy are not
- * exposed at all — `trace_summaries.ErrorMessage`, `evaluation_runs.Error` and
- * `ErrorDetails`, `stored_spans.StatusMessage`, and the whole `Events.*` nested
- * group on spans. Each of them routinely quotes the payload that produced the
- * failure, and the data-privacy policy has no rule that would gate them, so
- * exposing them would mean inventing a gate rather than deriving one. They are
- * off-catalog, which under the column grants means unreachable rather than
- * merely unselected.
- *
- * Event-sourcing bookkeeping (`ProjectionId`, `Version`, `LastProcessedEventId`,
- * `LastEventOccurredAt`, `CreatedAt`, `EarliestSpanStartMs`, `_retention_days`)
- * is absent for the same structural reason and a different substantive one: it
- * describes how a row got written or how long it is kept, which is not
- * something the API promises to keep stable.
- *
+ * LangWatchQL analytics SQL — the `analytics.*` schema catalog. One entry per LangWatchQL view.
  * @see ./types.ts — the shapes, the grain contract each entry declares, and the
- *   derivations the validator reads
  * @see specs/analytics/lwql-api.feature
  */
 
@@ -32,50 +9,16 @@ import { LWQL_POSTGRES_CATALOG } from "./lwql-postgres-view-catalog.rules";
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service";
 
 /**
- * How long after a write a row can be missing from these views.
- *
- * The projections are folded by the event-sourcing pipeline, so the number the
- * schema endpoint publishes is about that pipeline, not about ClickHouse.
+ * How long after a write a row can be missing from these views. The projections are folded by
+ * the event-sourcing pipeline, so the number the schema endpoint publishes is about that
+ * pipeline, not about ClickHouse.
  */
 const PROJECTION_FRESHNESS = "seconds behind ingestion";
 
 /**
- * ## Two datasets over one trace, and why that is not two answers
- *
- * `traces` and `trace_metrics` are both one row per trace, and `evaluations`
- * and `evaluation_metrics` are both one row per evaluation, because the write
- * path maintains two projections of each. They are folded from the *same*
- * events by the *same* services, so the values they share agree; what differs
- * is which questions each is shaped for, and each carries columns the other
- * does not:
- *
- *  - `traces` / `evaluations` are the complete record — captured input and
- *    output, prompt lineage, the evaluator's explanation — sorted for point
- *    lookups by id.
- *  - `trace_metrics` / `evaluation_metrics` are the analytics projections:
- *    time-sorted for range scans, carrying the hoisted `UserId`,
- *    `ConversationId`, `CustomerId` and `Origin` dimensions, and carrying no
- *    captured content at all because the fold never writes any onto them.
- *  - `trace_metrics_by_minute` / `evaluation_metrics_by_minute` are
- *    pre-aggregated per minute, for a metric a caller wants without touching
- *    per-row data.
- *
- * Note the `_by_minute` rollups count only what was final when the row was
- * written: a trace contributes to `TraceCount` through its root span, so a
- * trace whose root span never arrived contributes sums and no count. A
- * distinct-trace count is a question for `trace_metrics`.
- *
- * The two analytics projections are both sorted by a leading business time, and
- * they answer grain differently: `trace_analytics` freezes its `OccurredAt` as a
- * storage anchor, so the engine's key and the trace are the same row, while
- * `evaluation_analytics` writes its progress watermark into `OccurredAt`, which
- * moves — so that entry pins the `in-tuple` strategy and is deduplicated by the
- * evaluation rather than by the engine's key. The `_by_minute` rollups are
- * `AggregatingMergeTree`s, whose rows for one key are summed rather than
- * superseded; their measures declare `summed` and `../views.ts` derives the cast
- * back to a plain type from it.
- *
- * Traces: one row per trace, the summary the fold maintains.
+ * ## Two datasets over one trace, and why that is not two answers `traces` and `trace_metrics`
+ * are both one row per trace, and `evaluations` and `evaluation_metrics` are both one row per
+ * evaluation, because the write path maintains two projections of each.
  */
 const TRACES: LangWatchQLViewDefinition = {
   name: "traces",
@@ -235,16 +178,10 @@ const TRACES: LangWatchQLViewDefinition = {
       gates: [],
       sourceColumns: ["SubTopicId"],
     },
-    // `HasAnnotation` is deliberately not exposed, and it is the one absence
-    // here that is about agreement rather than about sensitivity. It is folded
-    // from `trace_summaries.AnnotationIds`, a *best-effort* dual-write of the
-    // annotation ids, while the `annotations` dataset reads PostgreSQL
-    // directly. Publishing both would let one caller ask "how many traces were
-    // annotated" two ways and get two answers, with nothing in the schema
-    // saying which is authoritative. The authoritative one is `annotations`:
-    //   SELECT count(DISTINCT a.TraceId) FROM analytics.annotations AS a
-    // The column itself stays on the fact table — the product's has-annotation
-    // filter reads it — so this removes the second *source*, not the projection.
+    // `HasAnnotation` is deliberately not exposed, and it is the one absence here that is about
+    // agreement rather than about sensitivity. It is folded from
+    // `trace_summaries.AnnotationIds`, a *best-effort* dual-write of the annotation ids, while
+    // the `annotations` dataset reads PostgreSQL directly.
     {
       name: "ContainsPrompt",
       type: "Bool",
@@ -788,15 +725,7 @@ const SIMULATIONS: LangWatchQLViewDefinition = {
 
 /**
  * Trace metrics: one row per trace, the analytics projection of the same fold.
- *
- * One row per trace is the *grain*; the source's `ORDER BY` is wider, leading
- * with `OccurredAt` so that range scans are monotonic over a part. The two
- * agree for every row the current fold writes, because `OccurredAt` here is a
  * storage anchor written once and frozen (migration 00061, ADR-071). Where they
- * can still come apart is a row written before that freeze, or one whose anchor
- * a post-miss rebuild re-stamped: those carry two `OccurredAt`s, which the
- * engine reads as two keys and `FINAL` therefore keeps — so `uniqExact(TraceId)`
- * is the honest way to count traces here, as the description says.
  */
 const TRACE_METRICS: LangWatchQLViewDefinition = {
   name: "trace_metrics",
@@ -806,12 +735,11 @@ const TRACE_METRICS: LangWatchQLViewDefinition = {
   gates: [],
   grain:
     "one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still",
-  // No `grainColumns`: `FINAL` merges on the sort key and nothing narrower, so
-  // declaring `(TenantId, TraceId)` would publish a grain the engine cannot
-  // deliver — a pre-freeze row whose anchor moved carries two `OccurredAt`s and
-  // comes back as two rows (see the doc above). The join below is still the
-  // right one; the fanout diagnostic honestly reporting `OccurredAt` unmatched
-  // is the price of not overstating the grain.
+  // No `grainColumns`: `FINAL` merges on the sort key and nothing narrower, so declaring
+  // `(TenantId, TraceId)` would publish a grain the engine cannot deliver — a pre-freeze row
+  // whose anchor moved carries two `OccurredAt`s and comes back as two rows (see the doc
+  // above). The join below is still the right one; the fanout diagnostic honestly reporting
+  // `OccurredAt` unmatched is the price of not overstating the grain.
   joinKeys: ["TenantId", "TraceId"],
   timeColumn: "OccurredAt",
   freshness: PROJECTION_FRESHNESS,
@@ -869,14 +797,9 @@ const TRACE_METRICS: LangWatchQLViewDefinition = {
       gates: [],
       sourceColumns: ["SubTopicId"],
     },
-    // The three identifiers below name the *customer's* end user, thread and
-    // account, not a LangWatch colleague — they are the dimensions the product
-    // groups by, hoisted out of the attribute map onto typed columns. The
-    // data-privacy catalog classifies none of the attributes they come from as
-    // content ("metadata keys … are deliberately absent", `dropKeyCatalog.ts`),
-    // so they already survive a content drop and reach a caller through
-    // `Attributes` today. Withholding the typed column would gate one spelling
-    // of a value and not the other.
+    // The three identifiers below name the *customer's* end user, thread and account, not a
+    // LangWatch colleague — they are the dimensions the product groups by, hoisted out of the
+    // attribute map onto typed columns.
     {
       name: "UserId",
       type: "Nullable(String)",
@@ -1027,12 +950,9 @@ const TRACE_METRICS: LangWatchQLViewDefinition = {
 };
 
 /**
- * Trace metrics per minute: the pre-aggregated fast path.
- *
- * The source rollup breaks each minute down by (Model, SpanType); this view
- * groups that breakdown away, because half its measures are trace facts
- * (TraceCount, ErrorCount, DurationSum) that a per-model split would
- * misstate. The span-fact breakdown is `model_usage_by_minute`.
+ * Trace metrics per minute: the pre-aggregated fast path. The source rollup breaks each minute
+ * down by (Model, SpanType); this view groups that breakdown away, because half its measures
+ * are trace facts (TraceCount, ErrorCount, DurationSum) that a per-model split would misstate.
  */
 const TRACE_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
   name: "trace_metrics_by_minute",
@@ -1172,12 +1092,7 @@ const TRACE_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
 };
 
 /**
- * Model usage per minute: the (Model, SpanType) breakdown of the trace rollup.
- *
- * Span facts only. The rollup also carries trace facts — TraceCount,
- * ErrorCount, DurationSum — which belong to a whole trace and would be
- * misleading broken out by the model of individual spans, so they are
- * published on `trace_metrics_by_minute` and withheld here.
+ * Model usage per minute: the (Model, SpanType) breakdown of the trace rollup. Span facts only.
  */
 const MODEL_USAGE_BY_MINUTE: LangWatchQLViewDefinition = {
   name: "model_usage_by_minute",
@@ -1303,18 +1218,8 @@ const MODEL_USAGE_BY_MINUTE: LangWatchQLViewDefinition = {
 };
 
 /**
- * Evaluation metrics: one row per evaluation, the analytics projection.
- *
- * The one entry in the catalog that does not take the shipped dedup strategy.
- * `evaluation_analytics` is sorted `(TenantId, OccurredAt, EvaluationId)`,
- * and the fold writes its progress watermark — `max(previous, event time)` —
- * straight into `OccurredAt`, so an evaluation that received a second lifecycle
- * event carries two sort keys. `FINAL` merges by the sort key and nothing else,
- * so it would keep both rows: not a visible duplicate, but every `count`, `sum`
- * and `avg` a caller writes over this dataset silently counting that evaluation
- * twice. The owning repository refuses `FINAL` on this table for the same
- * reason, and deduplicates the way this entry does — `max(UpdatedAt)` per
- * evaluation, whatever `OccurredAt` each version carries.
+ * Evaluation metrics: one row per evaluation, the analytics projection. The one entry in the
+ * catalog that does not take the shipped dedup strategy.
  */
 const EVALUATION_METRICS: LangWatchQLViewDefinition = {
   name: "evaluation_metrics",
@@ -1634,28 +1539,16 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
 };
 
 /**
- * The column every LangWatchQL dataset names its owning tenant with.
- *
- * The fact tables because that is their column, the PostgreSQL-engine tables
- * because the approved view renamed the application's `projectId` to match.
+ * The column every LangWatchQL dataset names its owning tenant with. The fact tables because
+ * that is their column, the PostgreSQL-engine tables because the approved view renamed the
+ * application's `projectId` to match.
  */
 export const TENANT_COLUMN = "TenantId";
 
 /**
- * The LangWatchQL schema, in the order the schema endpoint should publish it:
- * the ClickHouse-resident facts, then the PostgreSQL-resident entities and
- * dimensions that name them.
- *
- * One catalog rather than two, because residence is a property of a dataset and
- * not a property of the schema. Every consumer — the schema endpoint, the
- * validator, the diagnostics — reads this list and needs no idea which half an
- * entry came from; only the provisioning generators in `../views.ts` and
- * `../provisioning.ts` ask, and they ask the entry
- * ({@link isPostgresResident}) rather than being told.
- *
- * Generations and sessions remain unexposed: both are derivable from `spans`
- * and `traces` rather than resident anywhere of their own, so each needs a
- * derived view over tables already here, not a mapping.
+ * The LangWatchQL schema, in the order the schema endpoint should publish it: the
+ * ClickHouse-resident facts, then the PostgreSQL-resident entities and dimensions that name
+ * them.
  */
 export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   TRACES,

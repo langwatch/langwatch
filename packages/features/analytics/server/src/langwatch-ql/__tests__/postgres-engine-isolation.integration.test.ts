@@ -1,34 +1,6 @@
 /**
- * Isolation proof, part 2: PostgreSQL-resident data reached through
- * named-collection PostgreSQL-engine tables.
- *
- * There is no PostgreSQL endpoint and no PostgreSQL executor in this design.
- * PG-resident data is mapped into the LangWatchQL ClickHouse database as an engine
- * table over a server-side named collection, and policed by exactly the same
- * row policy as a native table. This file proves that the mapping does not
- * open a second door: not around the row policy, not around read-only, and not
- * around the credentials.
- *
- * The containment is layered on purpose, and each layer is asserted
- * independently: ClickHouse's row policy bounds which tenant's rows a caller
- * sees, while the dedicated PostgreSQL role bounds what the mapping could ever
- * reach even if ClickHouse were wrong about the first part. The PG role itself
- * is NOT tenant-scoped — it sees every tenant's rows in the approved view — so
- * asserting the ClickHouse-side policy is the only thing that proves tenant
- * isolation here.
- *
- * ## Two objects, and the difference between them is the point
- *
- * `<dataset>_pg` is the engine table: policed, and read by ClickHouse as a
- * whole-table scan on the primary. `<dataset>` is the LangWatchQL view over it,
- * which a caller names and which additionally carries the tenant predicate that
- * *does* push down. Reading both is what separates the security property from
- * the load property — the first holds on either object, the second only on the
- * view.
- *
+ * Isolation proof, part 2: PG-resident data reached via engine tables stays row-policed.
  * @see specs/analytics/lwql-api.feature
- *
- * @integration
  * @vitest-environment node
  */
 

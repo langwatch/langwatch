@@ -6,11 +6,8 @@ import type {
 } from "./serialized-handled-error";
 
 /**
- * The Go pkg/herr wire envelope — herr and HandledError are the SAME model
- * (type ⇄ code, meta, trace ids, recursive reasons), so a typed error crosses
- * any Go→TS wire losslessly. herr guarantees the envelope only ever carries
- * known handled codes with vetted copy; genuinely unknown causes arrive
- * pre-collapsed to type "unknown".
+ * The Go pkg/herr wire envelope — herr and HandledError are the SAME model (type ⇄ code, meta,
+ * trace ids, recursive reasons), so a typed error crosses any Go→TS wire losslessly.
  */
 export interface HerrEnvelope {
   /**
@@ -33,10 +30,9 @@ export interface HerrEnvelope {
 }
 
 /**
- * Pluggable trace-URL source for {@link HandledError.serialize}. The package
- * is env-agnostic so it can be shared by the app, MCP server and CLI; the app
- * wires its Grafana link builder in via {@link setTraceUrlProvider} at module
- * load. Defaults to no trace URLs.
+ * Pluggable trace-URL source for {@link HandledError.serialize}. The package is env-agnostic so
+ * it can be shared by the app, MCP server and CLI; the app wires its Grafana link builder in
+ * via {@link setTraceUrlProvider} at module load. Defaults to no trace URLs.
  */
 export type TraceUrlProvider = (traceId: string | undefined) => string | undefined;
 
@@ -48,14 +44,8 @@ export function setTraceUrlProvider(provider: TraceUrlProvider): void {
 const HANDLED_ERROR_RUNTIME = Symbol.for("@langwatch/handled-error/runtime/v1");
 
 /**
- * TypeScript counterpart of Go's `herr.E`. Use the serialisable `code`, not
- * `instanceof`, across process boundaries. Copies of this package loaded in
- * one realm share the same runtime constructor, so provenance survives a
- * duplicated bundle without trusting a forgeable structural brand.
- *
- * Trace IDs come from the active OTel span unless supplied from a wire error.
- * Nested handled causes retain their code; unknown causes are masked. `fault`,
- * `tips`, and `docsUrl` are client-safe remediation metadata.
+ * TypeScript counterpart of Go's `herr.E`. Use the serialisable `code`, not `instanceof`,
+ * across process boundaries.
  */
 abstract class HandledErrorRuntime extends Error {
   static #traceUrlProvider: TraceUrlProvider = () => undefined;
@@ -144,14 +134,9 @@ abstract class HandledErrorRuntime extends Error {
   }
 
   /**
-   * Narrows `error` to the concrete subclass this is called on:
-   *
-   *   EvaluationNotFoundError.is(err)   // error is EvaluationNotFoundError
-   *   NotFoundError.is(err)             // error is NotFoundError
-   *
-   * This is a subclass-specific `instanceof`. At a boundary, ask
-   * {@link HandledError.isHandled} instead ("is this handled at all?"), or
-   * compare `err.code` to pick out one subclass.
+   * Narrows `error` to the concrete subclass this is called on: EvaluationNotFoundError.is(err)
+   * // error is EvaluationNotFoundError NotFoundError.is(err) // error is NotFoundError This is
+   * a subclass-specific `instanceof`.
    */
   static is<T extends HandledErrorRuntime>(
     this: abstract new (...args: never) => T,
@@ -174,17 +159,9 @@ abstract class HandledErrorRuntime extends Error {
   }
 
   /**
-   * Returns a safe user-facing message for any error:
-   * - HandledErrors → their own message (safe to show users)
-   * - Everything else → a generic "unknown error" string, and the original
-   *   error is passed to the optional `log` callback for server-side logging.
-   *
-   * ```ts
-   * } catch (e) {
-   *   const msg = HandledError.toUserMessage(e, (err) => logger.error(err));
-   *   throw new TRPCError({ code: "NOT_FOUND", message: msg });
-   * }
-   * ```
+   * Returns a safe user-facing message for any error: - HandledErrors → their own message (safe
+   * to show users) - Everything else → a generic "unknown error" string, and the original error
+   * is passed to the optional `log` callback for server-side logging.
    */
   static toUserMessage(error: unknown, log?: (error: unknown) => void): string {
     if (HandledError.isHandled(error)) return error.message;
@@ -198,11 +175,9 @@ abstract class HandledErrorRuntime extends Error {
 }
 
 /**
- * Reuse the first runtime constructor installed in this JavaScript realm.
- * Turbopack may evaluate this module more than once, but every copy still
- * exports and subclasses this one constructor. Its private field is the
- * provenance check: copying public fields or changing an object's prototype
- * cannot manufacture it.
+ * Reuse the first runtime constructor installed in this JavaScript realm. Turbopack may
+ * evaluate this module more than once, but every copy still exports and subclasses this one
+ * constructor.
  */
 function handledErrorConstructor(): typeof HandledErrorRuntime {
   const scope = globalThis as typeof globalThis & {
@@ -224,17 +199,9 @@ export type HandledError = HandledErrorRuntime;
 export const HandledError: typeof HandledErrorRuntime = handledErrorConstructor();
 
 /**
- * Deserialize a herr wire envelope into a HandledError chain. A `tree_zebra`
- * herr from service A IS a `tree_zebra` HandledError here — same code, same
- * meta, same reasons; nothing marks it as having crossed a wire. Cross-process
- * identity is the `code` discriminant (see the class doc), exactly as if it
- * had been raised locally. Belongs in boundary middleware (wire schemas):
- * downstream code only ever receives the HandledError.
- *
- * SECURITY: call this only in an adapter that authenticated the backend source
- * before parsing its envelope. It deliberately preserves backend-authored
- * metadata, tips and documentation URLs; arbitrary public input must never be
- * promoted through this function.
+ * Deserialize a herr wire envelope into a HandledError chain. A `tree_zebra` herr from service
+ * A IS a `tree_zebra` HandledError here — same code, same meta, same reasons; nothing marks it
+ * as having crossed a wire.
  */
 export function handledErrorFromHerr(
   body: HerrEnvelope,
@@ -263,13 +230,11 @@ export function handledErrorFromHerr(
 
 function serializeReason(error: Error): SerializedReason {
   if (HandledError.isHandled(error)) {
-    // A HandledError's message is safe to show by the class contract, and for
-    // a reason it is often the only prose there is (a herr-deserialized cause
-    // carries its message on `.message`, not in meta — FromBody/toErrorBody
-    // promote between the two on the Go side). Fold it into `meta.message` —
+    // A HandledError's message is safe to show by the class contract, and for a reason it is
+    // often the only prose there is (a herr-deserialized cause carries its message on
+    // `.message`, not in meta — FromBody/toErrorBody promote between the two on the Go side).
+    // Fold it into `meta.message` —
     // the ADR-045 prose channel consumers already read — so the reason chain
-    // keeps naming the real failure across this serialization too. An explicit
-    // meta.message wins; a message that merely repeats the code adds nothing.
     const meta =
       error.message && error.message !== error.code && !error.meta.message
         ? { ...error.meta, message: error.message }
@@ -304,30 +269,13 @@ export interface HandledErrorOptions {
 }
 
 /**
- * Thrown when a requested resource does not exist (HTTP 404).
- *
- * Domain-specific subclasses narrow `code` via `declare` and populate `meta`
- * with identifying fields (e.g. `{ spanId }`).
+ * Thrown when a requested resource does not exist (HTTP 404). Domain-specific subclasses narrow
+ * `code` via `declare` and populate `meta` with identifying fields (e.g. `{ spanId }`).
  */
 export class NotFoundError extends HandledError {
   /**
-   * `code` is a bare `string` on purpose, and that is NOT the same as saying
-   * any string is acceptable.
-   *
-   * This package sits UPSTREAM of every tree that enumerates codes: the app
-   * (`platform/app/src/features/errors/logic/codes.ts`), the MCP server and
-   * `packages/api` all depend on it, and none of them can be
-   * depended on from here without inverting that edge into a cycle. There is
-   * also no single union to narrow to — each consumer owns its own code list,
-   * and a union of one of them would reject the others' perfectly valid codes.
-   *
-   * So the enumeration is enforced downstream instead, where the codes live:
-   * `platform/app/src/features/errors/logic/__tests__/codes.unit.test.ts` scans
-   * the app's trees for every code a handled error declares — including the
-   * `new NotFoundError("…", …)` shape specifically — and fails when a raised
-   * code is missing from `APP_ERROR_CODES`, which is the key set the client
-   * presentation registry must satisfy exhaustively. A code passed here
-   * without copy fails that guard, not the type checker.
+   * `code` is a bare `string` on purpose, and that is NOT the same as saying any string is
+   * acceptable.
    */
   constructor(code: string, resource: string, id: string, options: HandledErrorOptions = {}) {
     super(code, `${resource} not found: ${id}`, {
@@ -396,10 +344,9 @@ export class ValidationError extends HandledError {
 }
 
 /**
- * The active span's ids, for a failure shape that is not itself a
- * `HandledError` and so cannot pick them up from its own constructor. An
- * unclassified failure still has to be correlatable, and this is the one
- * place that reads the ambient span.
+ * The active span's ids, for a failure shape that is not itself a `HandledError` and so cannot
+ * pick them up from its own constructor. An unclassified failure still has to be correlatable,
+ * and this is the one place that reads the ambient span.
  */
 export function activeTraceContext(): { traceId?: string; spanId?: string } {
   const ctx = trace.getActiveSpan()?.spanContext();

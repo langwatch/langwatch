@@ -15,16 +15,9 @@ export interface CurrentTeamMembership {
 }
 
 /**
- * Who asked for this update: the caller, naming the team and the role outright,
- * or the seat change, correcting a role the new organization role no longer
- * allows.
- *
- * The difference decides what happens when the update would take away a team's
- * only admin. A caller who named the team is refused, because they asked for a
- * team-local change and a team needs an admin. A seat correction goes through
- * and is reported back: it is the organization deciding what one person's seat
- * is, an ORGANIZATION-scoped ADMIN binding still administers every shared team,
- * and refusing used to take the whole seat change down with it.
+ * Who asked for this update: the caller, naming the team and the role outright, or the seat
+ * change, correcting a role the new organization role no longer allows. The difference decides
+ * what happens when the update would take away a team's only admin.
  */
 export type TeamRoleUpdateOrigin = "requested" | "seat-correction";
 
@@ -41,18 +34,9 @@ export class EffectiveTeamRoleUpdatesService {
   private constructor() {}
 
   /**
-   * The effective set of team role updates to apply when changing a member's
-   * organization role.
-   *
-   * Cases:
-   * 1. Requested updates present + non-EXTERNAL org role: use requested updates as-is.
-   * 2. Requested updates present + EXTERNAL org role: use requested updates plus
-   *    fallback any uncovered existing memberships to VIEWER.
-   * 3. No requested updates + EXTERNAL org role: auto-correct all non-VIEWER
-   *    memberships to VIEWER.
-   * 4. No requested updates + MEMBER org role: auto-upgrade all VIEWER
-   *    memberships to MEMBER.
-   * 5. No requested updates + other org role (e.g. ADMIN): no changes needed.
+   * The effective set of team role updates to apply when changing a member's organization role.
+   * Cases: 1. Requested updates present + non-EXTERNAL org role: use requested updates as-is.
+   * 2.
    */
   computeEffectiveTeamRoleUpdates(params: {
     requestedTeamRoleUpdates: TeamRoleUpdate[];

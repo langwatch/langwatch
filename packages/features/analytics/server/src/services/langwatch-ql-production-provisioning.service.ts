@@ -1,25 +1,5 @@
 /**
  * Production LangWatchQL provisioning — pure composition only.
- *
- * `provisioning.ts`, `views.ts` and `postgres-mapping.ts` generate the SQL;
- * this module decides which of it a real deploy runs and in what order, from
- * the runtime `LWQL_*` connection. No I/O happens here — every function
- * takes its inputs as parameters and returns SQL statements, a name, or a
- * plan, so the composition itself is unit-testable without a database.
- * `src/tasks/provisionLwql.ts` is the only caller and the only place that
- * touches a client, an env var beyond what it hands in here, or Postgres.
- *
- * ## What this deploy provisions, and what it does not
- *
- * The ClickHouse access model — restricted user, settings profile, grants,
- * row policies — and the PostgreSQL-mapped views are infra's job: terraform
- * provisions both out of band, against a server-managed identity a
- * `CREATE USER`/`GRANT` issued here would be rejected against. This module
- * therefore composes only three things: the ClickHouse-native views
- * ({@link productionClickHouseObjectStatements}), the PostgreSQL-side
- * approved views ({@link productionPostgresApprovedViewStatements}), and the
- * key-map backfill plan ({@link planLwqlKeyMapBackfill}).
- *
  * @see specs/analytics/lwql-api.feature
  */
 
@@ -78,10 +58,9 @@ export interface LwqlKeyMapRow {
 export interface LwqlKeyMapBackfillPlan {
   rowsToInsert: LwqlKeyMapRow[];
   /**
-   * Project ids whose `lwqlKey` was empty/blank. Never silently dropped: an
-   * empty key means that project's LangWatchQL access is unreachable, which
-   * is the exact failure this backfill exists to prevent, so the caller must
-   * log these loudly rather than skip them quietly.
+   * Project ids whose `lwqlKey` was empty/blank. Never silently dropped: an empty key means
+   * that project's LangWatchQL access is unreachable, which is the exact failure this backfill
+   * exists to prevent, so the caller must log these loudly rather than skip them quietly.
    */
   blankKeyProjectIds: string[];
 }
@@ -95,20 +74,8 @@ export class LangWatchQLProductionProvisioningService {
   private constructor() {}
 
   /**
-   * The schema the application's tables actually live in, read from the
-   * connection URL's `schema` query parameter (the same one Prisma honours).
-   *
-   * Hardcoding `public` here broke on any deployment whose `DATABASE_URL`
-   * carries `?schema=...` — the SaaS cloud runs with `schema=langwatch_db` —
-   * because the approved views name their base relations schema-accessModel.qualified, and
-   * `public."Annotation"` does not exist there. The views must be created in,
-   * and read from, the schema the tables are in: it is also the schema the
-   * infra-owned reader-role bootstrap grants `lwql_%` views in and puts first
-   * on the role's `search_path`.
-   *
-   * Throws on a present-but-unparseable URL rather than defaulting: silently
-   * provisioning into `public` on a deployment that meant another schema is
-   * the exact failure this function exists to close.
+   * The schema the application's tables actually live in, read from the connection URL's
+   * `schema` query parameter (the same one Prisma honours).
    */
   postgresSchemaFromDatabaseUrl(databaseUrl: string | undefined): string {
     if (!databaseUrl) {
@@ -130,10 +97,8 @@ export class LangWatchQLProductionProvisioningService {
   }
 
   /**
-   * Builds the object names a production deploy provisions under, from the
-   * validated `LWQL_*` connection. `settingsProfile` is derived rather than
-   * configured, mirroring the test harness's `lwql_${slug}_profile` convention
-   * with the production database name standing in for the suite slug.
+   * Builds the object names a production deploy provisions under, from the validated `LWQL_*`
+   * connection.
    */
   names({ connection }: { connection: LangWatchQLConnection }): LangWatchQLNames {
     return {
@@ -146,13 +111,9 @@ export class LangWatchQLProductionProvisioningService {
   }
 
   /**
-   * The key-map table's accessModel.qualified name.
-   *
-   * Always migration 00084's table, created under the app's own ClickHouse
-   * database (`sourceDatabase`, matching goose's `${CLICKHOUSE_DATABASE}`) —
-   * the same database infra's row filters already reference. Never
-   * `names.database`: this deploy provisions no key-map table of its own (see
-   * {@link productionClickHouseObjectStatements}'s doc comment).
+   * The key-map table's accessModel.qualified name. Always migration 00084's table, created
+   * under the app's own ClickHouse database (`sourceDatabase`, matching goose's
+   * `${CLICKHOUSE_DATABASE}`) — the same database infra's row filters already reference.
    */
   keyMapTableQualifiedName({
     names,
@@ -165,10 +126,7 @@ export class LangWatchQLProductionProvisioningService {
   }
 
   /**
-   * ClickHouse-native views only. Never grants, policies, a user, a profile, or
-   * the key-map table (migration 00084 already created it) — the ClickHouse
-   * access model and the PostgreSQL-mapped views are infra's job, provisioned
-   * out of band (see the module doc comment).
+   * ClickHouse-native views only.
    */
   clickHouseObjectStatements({
     names,
@@ -213,22 +171,9 @@ export class LangWatchQLProductionProvisioningService {
   }
 
   /**
-   * Grants the reader role SELECT on every approved view, to be run straight
-   * after {@link productionPostgresApprovedViewStatements} creates them.
-   *
-   * This exists because the two halves are provisioned by different systems on
-   * different schedules. Out-of-band provisioning grants the role whatever
-   * views exist *at the moment it runs*, and re-runs only when its own inputs
-   * change — so a view this task adds later (a new catalog dataset, a first
-   * deploy that lands before the grant job) is created with no grant on it, and
-   * every query touching it fails `ACCESS_DENIED` until someone re-runs the
-   * grant job by hand. Re-granting here on every boot makes the app converge
-   * its own views and removes the ordering dependency entirely.
-   *
-   * Grants only — never `CREATE ROLE`, never a password. This code path holds
-   * no reader credential and must not invent one: if the role is absent the
-   * whole block is a no-op, so a deployment that has not provisioned the reader
-   * yet is unaffected rather than broken.
+   * Grants the reader role SELECT on every approved view, to be run straight after {@link
+   * productionPostgresApprovedViewStatements} creates them. This exists because the two halves
+   * are provisioned by different systems on different schedules.
    */
   postgresReaderGrantStatements({
     schema = LWQL_POSTGRES_SCHEMA,
@@ -266,14 +211,8 @@ export class LangWatchQLProductionProvisioningService {
   }
 
   /**
-   * Diffs every project's key hash against the key-map table's current rows and
-   * returns only what is missing. Pure: takes the already-read existing hash
-   * set, computes no I/O.
-   *
-   * Duplicate `(hash, tenant)` pairs are harmless at read time (row filters use
-   * `HAVING uniqExact(TenantId) = 1`), but this still de-duplicates within one
-   * run — inserting a row already covered by `existingHashes`, or repeated
-   * inside `projects` itself, buys nothing and only grows the table.
+   * Diffs every project's key hash against the key-map table's current rows and returns only
+   * what is missing.
    */
   planKeyMapBackfill({
     projects,
@@ -308,11 +247,8 @@ export class LangWatchQLProductionProvisioningService {
   }
 
   /**
-   * The sanctioned opt-out `guardProjectId` accepts on a raw PostgreSQL
-   * statement that intentionally has no tenancy predicate. Every LangWatchQL
-   * provisioning statement run through `prisma.$executeRawUnsafe` needs this:
-   * the objects it creates (the approved views) are catalog-wide, not scoped to
-   * one tenant.
+   * The sanctioned opt-out `guardProjectId` accepts on a raw PostgreSQL statement that
+   * intentionally has no tenancy predicate.
    */
   withTenancyOptOut(statement: string): string {
     return `-- @tenancy: provisions LangWatchQL catalog objects shared across every tenant, not scoped to one\n${statement}`;

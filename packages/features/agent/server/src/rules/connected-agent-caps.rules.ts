@@ -1,8 +1,6 @@
 /**
- * What a connected agent's reply is allowed to weigh.
- *
- * Server-side rather than contract: the measurement is `Buffer.byteLength`,
- * and the caps are only ever enforced on the way in.
+ * What a connected agent's reply is allowed to weigh. Server-side rather than contract: the
+ * measurement is `Buffer.byteLength`, and the caps are only ever enforced on the way in.
  */
 
 /** The size of a JSON value on the wire, in bytes. */

@@ -1,10 +1,5 @@
 /**
  * The LangWatchQL executor over a real ClickHouse endpoint.
- *
- * The client is built here rather than taken as an argument so that the two
- * properties that make it safe — the identity it authenticates as, and the fact
- * that the tenant capability is the only setting it ever sends — are decided in
- * one place instead of at every call site.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
@@ -32,27 +27,11 @@ const executorService = LangWatchQLExecutorService.create();
 
 /**
  * How long the driver waits on a LangWatchQL query, in milliseconds.
- *
- * Deliberately *above* the shipped profile's `max_execution_time`, and derived
- * from it rather than written twice: the server's ceiling is the one a caller
- * can act on, because it arrives as a coded `query_timeout`. A socket the
- * driver abandoned first arrives as an unknown transport failure for the same
- * underlying event, which tells the caller nothing and pages us instead of
- * them. The margin covers the round trip and the server's own cancellation.
- *
- * A deployment that provisions the profile with a *higher* execution ceiling
- * has to raise this with it, or it gets the transport failure back.
  */
 const LWQL_REQUEST_TIMEOUT_MS = (DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds + 5) * 1000;
 
 /**
  * Sockets this process may hold open against the LangWatchQL endpoint at once.
- *
- * Stated rather than defaulted so the LangWatchQL pool is a decision: it is a
- * second pool beside the application's own ClickHouse client, and the two
- * compete for the same server's connection budget. Pinned at the driver's own
- * default — there is no measurement saying otherwise yet — so that raising it
- * is a change someone makes on purpose.
  */
 const LWQL_MAX_OPEN_CONNECTIONS = 10;
 
@@ -63,27 +42,6 @@ function elapsedMs(elapsedSeconds: number | undefined): number {
 
 /**
  * What a failed governed run is reported as.
- *
- * Three answers, and which one applies is decided by what the server refused
- * rather than by anything the caller sent:
- *
- *  - **The deployment is incomplete.** An unknown table or database, or an
- *    access refusal, cannot be the caller's SQL: the validator only lets
- *    catalog-approved names reach here. So it is the same "not provisioned
- *    here" condition as having no executor at all, and gets the same answer.
- *  - **The caller named a column that is not there.** This one IS their SQL,
- *    and is the only refusal on this path they fix themselves. The validator
- *    approves table names, not columns, and column existence is not knowable
- *    when a chart is saved, so run time is the only place it can be named.
- *  - **Anything else** goes through the read path's own translation, so the
- *    resource ceilings a caller can act on arrive as the platform's existing
- *    codes rather than as a second vocabulary for the same failures. What that
- *    does not recognise stays unhandled and degrades to "unknown", which is
- *    correct: a driver diagnostic is not something a caller can act on, and is
- *    exactly the kind of text this API must not relay.
- *
- * In every case the raw error rides in `reasons` for the operator's logs and
- * never in the response.
  */
 function refusalFor({ error, durationMs }: { error: unknown; durationMs: number }): unknown {
   if (isClickHouseObjectUnavailableError(error)) {

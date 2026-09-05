@@ -1,11 +1,14 @@
 import { ScenarioExecutionService as ScenarioExecutionServiceContract } from "@langwatch/scenario-contract";
 import type {
+  ScenarioAgentInstance,
   ScenarioExecutionJob,
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
   ScenarioExecutionPreparation,
   ScenarioUnsuccessfulExecutionInput,
 } from "@langwatch/scenario-contract";
+
+import type { SimulationService } from "@langwatch/scenario-contract";
 
 import type { CancellationPublisherPort } from "../ports/cancellation-channel.port";
 import type { ScenarioExecutionPoolPort } from "../ports/scenario-execution-pool.port";
@@ -18,6 +21,7 @@ export class ScenarioExecutionService extends ScenarioExecutionServiceContract {
     cancellations: CancellationPublisherPort;
     prefetcher: ScenarioExecutionPrefetcherService;
     failures: ScenarioFailureHandlerService;
+    simulations: SimulationService;
   }): ScenarioExecutionService {
     return new ScenarioExecutionService(options);
   }
@@ -28,6 +32,7 @@ export class ScenarioExecutionService extends ScenarioExecutionServiceContract {
       cancellations: CancellationPublisherPort;
       prefetcher: ScenarioExecutionPrefetcherService;
       failures: ScenarioFailureHandlerService;
+      simulations: SimulationService;
     },
   ) {
     super();
@@ -51,5 +56,18 @@ export class ScenarioExecutionService extends ScenarioExecutionServiceContract {
 
   finishUnsuccessfulRun(input: ScenarioUnsuccessfulExecutionInput): Promise<void> {
     return this.options.failures.finishUnsuccessfulRun(input);
+  }
+
+  recordAgentInstance(input: {
+    projectId: string;
+    scenarioRunId: string;
+    agentInstance: ScenarioAgentInstance;
+  }): Promise<void> {
+    return this.options.simulations.recordAgentInstance({
+      tenantId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+      agentInstance: input.agentInstance,
+      occurredAt: Date.now(),
+    });
   }
 }

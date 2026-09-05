@@ -1,40 +1,6 @@
 /**
- * The questions the LangWatchQL analytics SQL API exists to answer, each asked
- * through the public `POST /api/v1/query` REST door against a seed whose
- * answer is known before the query runs.
- *
- * ## What makes a case here evidence
- *
- * **The number, not the status code.** Every case asserts the value the seed
- * implies — this percentile, this rate, this sum — because a 200 with rows in
- * it proves the plumbing and nothing about the answer. A case that could pass
- * against a differently-shaped seed is not testing the question.
- *
- * **Two tenants, and the other one is loud.** The second project holds rows in
- * every window this suite queries, with measures deliberately unlike the
- * asking tenant's: durations multiplied, every trace an error, costs an order
- * of magnitude out. So "only the authenticated tenant contributed" is proven by
- * the asserted number itself rather than by a separate check — a leak of even
- * one foreign row moves every assertion below.
- *
- * **One window per question.** Each question owns a day, and its query filters
- * to it. Without that, one question's fixture would silently become part of
- * another's answer, and the seed would have to be read end to end to know what
- * any single case means.
- *
- * ## The seeds are engineered, not sampled
- *
- * The latency tiers in particular are chosen so that the 50th, 95th and 99th
- * percentile each land strictly inside a tier of equal values. A seed whose
- * tier boundary sat on a percentile index would make the assertion depend on
- * which rounding convention ClickHouse picked, and the case would be pinning
- * the implementation rather than the answer.
- *
+ * The questions the LangWatchQL analytics SQL API answers, asked against an engineered seed across two tenants.
  * @see specs/analytics/lwql-api.feature
- * @see ../../../services/langwatch-ql.service.ts — the service under test
- * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
- *
- * @integration
  * @vitest-environment node
  */
 
@@ -97,11 +63,6 @@ function at(day: string, hour = 0, second = 0): string {
 
 /**
  * A quarter-hour inside the rolling-window day.
- *
- * Quarter-hours rather than hours because the question is a *one-hour* rolling
- * window: over hourly buckets that window is one bucket wide and the rolling
- * rate is the bucket's own rate, which would answer the question by not asking
- * it.
  */
 function quarterHour(minute: number): string {
   return `${DAY.rolling} 00:${String(minute).padStart(2, "0")}:00.000`;
@@ -121,11 +82,9 @@ function within(column: string, day: string, days = 1): string {
 }
 
 /**
- * Latency tiers for the percentile question.
- *
- * 31 / 17 / 2 over fifty traces: the 50th percentile lands inside the first
- * tier, the 95th inside the second and the 99th inside the third, whichever of
- * the two index conventions ClickHouse uses.
+ * Latency tiers for the percentile question. 31 / 17 / 2 over fifty traces: the 50th percentile
+ * lands inside the first tier, the 95th inside the second and the 99th inside the third,
+ * whichever of the two index conventions ClickHouse uses.
  */
 const LATENCY_TIERS = [
   { durationMs: 100, count: 31 },
@@ -141,22 +100,11 @@ const SEEDED_PROMPT_ID = "prompt-checkout";
 
 /**
  * The evaluated traces the seeded annotations are left on.
- *
- * Built from `evaluationSeeds()`' own ids through the same `${tenantId}-`
- * prefix `seedTenant` applies, rather than restated: written out by hand the
- * unprefixed form joins to nothing, and an annotation-to-evaluation join that
- * matches no rows reports an agreement rate over zero comparisons rather than
- * failing.
  */
 const annotatedTraceIds = (tenantId: string): string[] =>
   evaluationSeeds().map((seed) => `${tenantId}-${seed.traceId}`);
 /**
  * The human verdict on each of those traces, in order.
- *
- * Chosen against `evaluationSeeds()` so agreement is a distinctive fraction
- * rather than all-or-nothing: the evaluator passed the first two of the primary
- * model's three and the last of the second's, and the human agrees on four of
- * the six.
  */
 const ANNOTATION_THUMBS = [true, false, false, false, true, true] as const;
 /** Agreements over {@link annotatedTraceIds}: evaluator pass matches thumbs. */
@@ -171,10 +119,9 @@ const SECOND_MODEL_DURATION_MS = 300;
 const SECOND_MODEL_TRACES = 10;
 
 /**
- * What the second tenant's rows are multiplied by.
- *
- * Seven rather than two so that no leaked combination of its rows can land on
- * the asking tenant's expected number by arithmetic accident.
+ * What the second tenant's rows are multiplied by. Seven rather than two so that no leaked
+ * combination of its rows can land on the asking tenant's expected number by arithmetic
+ * accident.
  */
 const OTHER_TENANT_FACTOR = 7;
 
@@ -344,12 +291,9 @@ function simulationRow(
 // ---------------------------------------------------------------------------
 
 /**
- * Every fixture, for one tenant.
- *
- * `factor` is what makes the second tenant's rows unmistakable: it multiplies
- * every measure, so a leaked row cannot land on the asking tenant's expected
- * value. Its traces are also all errors, which no window of the asking
- * tenant's is.
+ * Every fixture, for one tenant. `factor` is what makes the second tenant's rows unmistakable:
+ * it multiplies every measure, so a leaked row cannot land on the asking tenant's expected
+ * value. Its traces are also all errors, which no window of the asking tenant's is.
  */
 function traceSeeds(factor: number): TraceSeed[] {
   const scale = (value: number) => value * factor;
@@ -696,10 +640,9 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
   let database: string;
   let facts: string;
   /**
-   * The service the mounted door dispatches through.
-   *
-   * Held in a variable rather than closed over so one case can swap in a
-   * service with an injected clock: the door reads the port on every request.
+   * The service the mounted door dispatches through. Held in a variable rather than closed over
+   * so one case can swap in a service with an injected clock: the door reads the port on every
+   * request.
    */
   let service: LangWatchQLService;
   let door: { fetch: (path: string, init?: RequestInit) => Promise<Response> };
@@ -743,11 +686,9 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
     result.diagnostics.find((entry: any) => entry.code === code);
 
   /**
-   * Row count the second tenant holds in a window, read as the administrator.
-   *
-   * Every "only this tenant contributed" claim leans on those rows existing;
-   * against an empty second tenant the asserted numbers would be right for the
-   * wrong reason.
+   * Row count the second tenant holds in a window, read as the administrator. Every "only this
+   * tenant contributed" claim leans on those rows existing; against an empty second tenant the
+   * asserted numbers would be right for the wrong reason.
    */
   const foreignRowCount = async (table: string, timeColumn: string, day: string) => {
     const result = await harness.admin.query({
@@ -870,11 +811,10 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
          ORDER BY model`,
       );
 
-      // Written out rather than derived from the seed constants: an expectation
-      // computed from the fixture it checks agrees with any fixture, and a
-      // changed seed would leave this case green while it answered something
-      // else. The percentiles are `Int64`, which this response format quotes,
-      // so the comparison reads them as numbers rather than pinning the
+      // Written out rather than derived from the seed constants: an expectation computed from
+      // the fixture it checks agrees with any fixture, and a changed seed would leave this case
+      // green while it answered something else. The percentiles are `Int64`, which this
+      // response format quotes, so the comparison reads them as numbers rather than pinning the
       // encoding.
       expect(
         result.rows.map((row: any) => [
@@ -1016,12 +956,11 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
         [`Project ${asking.id}`, PRIMARY_MODEL, `Prompt ${asking.id}`, 1, 0.2],
         [`Project ${asking.id}`, PRIMARY_MODEL, `Prompt ${asking.id}`, 2, 0.4],
       ]);
-      // Diagnostics are deliberately not pinned here. A star-shaped dimension
-      // join earns several advisory notes that are all true — each dimension is
-      // read without a range on its own time column, and each dimension row is
-      // repeated once per fact row — and none of them bears on whether the
-      // answer above is right. See the report accompanying this change for the
-      // noise this raises on healthy dimension joins.
+      // Diagnostics are deliberately not pinned here. A star-shaped dimension join earns
+      // several advisory notes that are all true — each dimension is read without a range on
+      // its own time column, and each dimension row is repeated once per fact row — and none of
+      // them bears on whether the answer above is right. See the report accompanying this
+      // change for the noise this raises on healthy dimension joins.
       expect(codes(result).every((code: string) => code !== "RESULT_TRUNCATED")).toBe(true);
     });
   });
@@ -1407,12 +1346,8 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
 });
 
 /**
- * The query family, mounted the way the API process mounts it, over a
- * credential resolution that authenticates one tenant.
- *
- * Only the credential chain is faked. The route's own access declaration, its
- * validator, the service, the executor and the restricted database identity
- * are the shipped ones.
+ * The query family, mounted the way the API process mounts it, over a credential resolution
+ * that authenticates one tenant. Only the credential chain is faked.
  */
 function mountQueryDoor({
   tenant,

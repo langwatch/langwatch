@@ -266,16 +266,17 @@ export function createScenarioEventsRestApp(options: {
     },
   );
 
-  // DELETE /api/scenario-events - Archive all simulation runs for a scenario
-  // set. A scenarioSetId is MANDATORY: an unqualified request is rejected so a
+  // DELETE /api/scenario-events - Archive simulation runs. Exactly ONE scope is
+  // MANDATORY: a scenarioSetId (archive every run in the set) or a
+  // scenarioRunId (archive one run). An unqualified request is rejected so a
   // single call can never archive every run in the project. Stays at `:manage`:
-  // it is bulk destruction, and only the administration grain should carry it.
+  // it is destruction, and only the administration grain should carry it.
   secured.access(requires("scenarios:manage")).delete(
     "/",
     traceUsageGuard,
     describeRoute({
       description:
-        "Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it.",
+        "Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run).",
       responses: {
         ...baseResponses,
         200: {
@@ -285,7 +286,13 @@ export function createScenarioEventsRestApp(options: {
           },
         },
         400: {
-          description: "Missing or invalid scenarioSetId",
+          description: "Missing or invalid scope parameter",
+          content: {
+            "application/json": { schema: resolver(responseSchemas.error) },
+          },
+        },
+        404: {
+          description: "Scenario run not found in this project",
           content: {
             "application/json": { schema: resolver(responseSchemas.error) },
           },
@@ -294,18 +301,37 @@ export function createScenarioEventsRestApp(options: {
     }),
     zValidator(
       "query",
-      z.object({
-        scenarioSetId: z.string().min(1, "scenarioSetId query parameter is required"),
-      }),
+      z
+        .object({
+          scenarioSetId: z.string().min(1).optional(),
+          scenarioRunId: z.string().min(1).optional(),
+        })
+        .refine(
+          (query) => (query.scenarioSetId === undefined) !== (query.scenarioRunId === undefined),
+          { message: "Pass exactly one of scenarioSetId or scenarioRunId as a query parameter" },
+        ),
     ),
     async (c) => {
       const { project } = c.var;
-      const { scenarioSetId } = c.req.valid("query");
+      const { scenarioSetId, scenarioRunId } = c.req.valid("query");
+
+      if (scenarioRunId !== undefined) {
+        const archivedRun = await archiveScenarioRun({
+          simulations: simulations(),
+          projectId: project.id,
+          scenarioRunId,
+        });
+        if (archivedRun === null) {
+          return c.json({ error: "Scenario run not found" }, 404);
+        }
+        return c.json(archivedRun, 200);
+      }
 
       const result = await archiveScenarioSetRuns({
         simulations: simulations(),
         projectId: project.id,
-        scenarioSetId,
+        // The refine above guarantees exactly one scope, so setId is present.
+        scenarioSetId: scenarioSetId!,
       });
 
       return c.json(result, 200);
@@ -390,6 +416,32 @@ function isStreamingEvent(type: string): boolean {
     type === ScenarioEventType.TOOL_CALL_ARGS ||
     type === ScenarioEventType.TOOL_CALL_END
   );
+}
+
+/**
+ * Archives ONE simulation run after checking it belongs to the project.
+ * Answers null when the project holds no such run, so a caller can never
+ * archive another tenant's run by guessing its id. Exported as a test seam.
+ */
+export async function archiveScenarioRun({
+  simulations,
+  projectId,
+  scenarioRunId,
+}: {
+  simulations: Pick<SimulationService, "tryGetScenarioRunData" | "deleteRun">;
+  projectId: string;
+  scenarioRunId: string;
+}): Promise<{ archived: number; failed: number; scenarioRunId: string } | null> {
+  const run = await simulations.tryGetScenarioRunData({ projectId, scenarioRunId });
+  if (!run) return null;
+
+  await simulations.deleteRun({
+    tenantId: projectId,
+    scenarioRunId,
+    occurredAt: Date.now(),
+  });
+
+  return { archived: 1, failed: 0, scenarioRunId };
 }
 
 /**

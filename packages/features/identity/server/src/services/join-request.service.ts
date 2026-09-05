@@ -22,21 +22,9 @@ import type { JoinRequestGuardsService } from "./join-request-guards.service";
 import type { JoinRequestLedger } from "../rules/join-request-ledger.rules";
 
 /**
- * The join-request write surface (D12): five verbs, each the same move —
- * parse the input, run the guard, hand the command and its facts to the
- * ledger.
- *
- * There is no other way to change a request. The sign-up interstitial, the
- * members area, the auto-join policy and the expiry wake all call these
- * methods; nothing anywhere writes a `JoinRequest` row directly, because the
- * row is a projection of this log and a hand-written one would be overwritten
- * by the next fold or the next replay.
- *
- * Membership is NOT written here, in any verb. An approval states that the
- * request was approved and nothing more; attaching the grant is the app's
- * job, on the ledger that already owns every other membership. That split is
- * what puts a join approval on the customer's audit page beside an invitation
- * acceptance rather than in a history of its own.
+ * The join-request write surface (D12): five verbs, each the same move — parse the input, run
+ * the guard, hand the command and its facts to the ledger. There is no other way to change a
+ * request.
  */
 export class JoinRequestService {
   static create(guards: JoinRequestGuardsService, ledger: JoinRequestLedger): JoinRequestService {

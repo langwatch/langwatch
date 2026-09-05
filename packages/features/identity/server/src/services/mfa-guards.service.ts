@@ -24,17 +24,6 @@ import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.rep
 
 /**
  * The two-step verification guards (D06): what runs BEFORE any fact exists.
- * Same contract as `IdentityGuardsService` — read the projection, refuse what the
- * state machine forbids, and state only what the projection does not
- * already carry, because the store's dedupe is read-side and a restated
- * fact is still a row written.
- *
- * What is NOT here is as deliberate as what is. Verifying a code, counting
- * failures and deciding when to lock out all belong to the two-factor
- * plugin, which does them correctly and at rest; rebuilding any of it here
- * would give us a second answer to the same question. These guards decide
- * the LIFECYCLE, and translate the plugin's refusals into codes a customer
- * can be shown.
  */
 export class MfaGuardsService {
   static create(enrollments: MfaEnrollmentRepository): MfaGuardsService {
@@ -124,15 +113,9 @@ export class MfaGuardsService {
   }
 
   /**
-   * Turn it off. Refused while an organization the person belongs to
-   * requires it — the requirement is a condition of membership, so the way
-   * out is to leave the organization or have an administrator lift it, not
-   * to turn the factor off and keep the access.
-   *
-   * An administrator's reset (`org-admin`) is NOT exempt: an administrator
-   * resetting somebody's lost authenticator inside an organization that
-   * requires one is turning it off for a person who must have one. The
-   * caller re-enrolls them; it does not get to leave them without.
+   * Turn it off. Refused while an organization the person belongs to requires it — the
+   * requirement is a condition of membership, so the way out is to leave the organization or
+   * have an administrator lift it, not to turn the factor off and keep the access.
    */
   async disableMfa(data: DisableMfaCommandData): Promise<MfaFactInput[]> {
     const { userId, via, actor } = data;
@@ -217,10 +200,9 @@ export class MfaGuardsService {
   }
 
   /**
-   * Record a failed attempt. Evidence only — the plugin already counted it
-   * and already decided whether to lock the account. States nothing when
-   * there is no enrollment to attach the failure to, so probing for
-   * somebody else's account writes no rows.
+   * Record a failed attempt. Evidence only — the plugin already counted it and already decided
+   * whether to lock the account. States nothing when there is no enrollment to attach the
+   * failure to, so probing for somebody else's account writes no rows.
    */
   async recordVerificationFailure(
     data: RecordMfaVerificationFailureCommandData,

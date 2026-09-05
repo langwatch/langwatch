@@ -1,51 +1,6 @@
 /**
- * Test harness for the LangWatchQL analytics SQL isolation proof.
- *
- * Starts a ClickHouse container and applies the *shipped* provisioning from
- * `../provisioning` to it. The harness deliberately holds no copy of the
- * LangWatchQL DDL: a proof that runs its own transcription of the security
- * objects proves the transcription, not the thing we deploy.
- *
- * ## Why this suite always uses containers
- *
- * Every other ClickHouse integration suite honours the docker-free native mode
- * (`LANGWATCH_TEST_CLICKHOUSE_URL`, see `@langwatch/test-harness`). This one
- * cannot: the model depends on *server-level* configuration that only exists
- * if it is present at process start — `custom_settings_prefixes` (without it
- * the settings profile is rejected with UNKNOWN_SETTING 115) and access
- * management for the administrative user (without it none of the users,
- * profiles, policies or named collections can be created). A developer's
- * always-on ClickHouse has neither, and pointing this suite at it would both
- * fail and write security objects into a dev server.
- *
- * `startTestClickHouseEndpoints` is likewise not used: it provisions
- * per-organization endpoints for a different isolation model and has no way to
- * inject server config.
- *
- * ## The reused container holds whatever was applied LAST
- *
- * Every statement here is `OR REPLACE`, so a normal run converges the reused
- * container onto the current source. Two consequences worth knowing:
- *
- *  - Inspecting the container out of band shows the last run's provisioning,
- *    not the source you are reading. A container left behind by a deliberately
- *    broken run keeps the broken policy until the suite runs again — which is
- *    a good way to convince yourself of the opposite of what the code says.
- *  - `OR REPLACE` converges statements that still exist. A statement DELETED
- *    from the setup list leaves its object behind in a reused container, so
- *    the suite could pass on a policy the source no longer creates. Drop the
- *    containers (`docker rm -f $(docker ps -q --filter "label=langwatch.test=true")`)
- *    when changing which objects are provisioned, not just how.
- *
- * ## Two fact-table modes
- *
- * `facts: "fixture"` creates two toy `MergeTree` tables, enough to prove row
- * policies, grants and settings behave and deliberately unlike the real schema.
- * `facts: "migrated"` instead runs the *shipped* ClickHouse migrations into a
- * second database on the same server, so a view is proven against the
- * `ReplacingMergeTree` and `AggregatingMergeTree` tables the product deploys —
- * a dedup that works on two toy tables has proven nothing about eight weekly
- * partitions.
+ * Test harness for the LangWatchQL analytics SQL isolation proof. Starts a ClickHouse container
+ * and applies the *shipped* provisioning from `../provisioning` to it.
  */
 import { createHash } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -99,10 +54,9 @@ const lwqlCapability = LangWatchQLCapabilityService.create();
 export const TEST_POSTGRES_IMAGE = "postgres:17";
 
 /**
- * The administrative identity `@testcontainers/clickhouse` configures.
- *
- * Not `default`: the container sets `CLICKHOUSE_USER`, and the official image's
- * entrypoint then *removes* `default` and creates this user instead.
+ * The administrative identity `@testcontainers/clickhouse` configures. Not `default`: the
+ * container sets `CLICKHOUSE_USER`, and the official image's entrypoint then *removes*
+ * `default` and creates this user instead.
  */
 const ADMIN_USER = "test";
 const ADMIN_PASSWORD = "test";
@@ -111,10 +65,9 @@ const ADMIN_PASSWORD = "test";
 const RESTRICTED_PASSWORD = "lwql-reader-test-password";
 
 /**
- * ClickHouse server error codes this proof discriminates between.
- *
- * Named because "it threw" is not an assertion: an UNKNOWN_TABLE from a typo in
- * the test would satisfy a bare rejection check and prove nothing.
+ * ClickHouse server error codes this proof discriminates between. Named because "it threw" is
+ * not an assertion: an UNKNOWN_TABLE from a typo in the test would satisfy a bare rejection
+ * check and prove nothing.
  */
 export const CLICKHOUSE_ERROR_CODE = {
   /** Correlated subquery shapes the engine has not implemented. */
@@ -139,12 +92,9 @@ export const POSTGRES_SQLSTATE = {
 } as const;
 
 /**
- * A tenant, its LangWatchQL secret, and the hash that is all ClickHouse ever
- * sees.
- *
- * The secret stands in for `Project.lwqlKey`, never for a credential a
- * caller authenticates with: the capability names a tenant, and the two values
- * rotate independently (see `../capability.ts`).
+ * A tenant, its LangWatchQL secret, and the hash that is all ClickHouse ever sees. The secret
+ * stands in for `Project.lwqlKey`, never for a credential a caller authenticates with: the
+ * capability names a tenant, and the two values rotate independently (see `../capability.ts`).
  */
 export interface LangWatchQLTenantFixture {
   tenantId: string;
@@ -192,13 +142,6 @@ export const LWQL_FACT_TABLES: LangWatchQLTable[] = [
 
 /**
  * Where the fact tables the proof reads come from.
- *
- * `fixture` is two toy `MergeTree` tables created by this harness — enough to
- * prove row policies, grants and settings behave, and deliberately unlike the
- * real schema so nothing about the real schema can be inferred from it passing.
- *
- * `migrated` is the real schema, from the shipped migrations, in its own
- * database on the same server.
  */
 export type LangWatchQLFactTableMode = "fixture" | "migrated";
 
@@ -212,21 +155,15 @@ export interface LangWatchQLClickHouseHarness {
   /** Database holding the fact tables the LangWatchQL views read. */
   factDatabase: string;
   /**
-   * A client authenticated as the restricted identity.
-   *
-   * Omitting `keyHash` sends NO tenant setting at all, which is the path that
-   * exercises the profile default. Passing `""` sends an explicit empty one.
-   * The two are different requests and the proof pins both.
-   *
-   * Asserts `currentUser()` before returning, so no isolation assertion can
-   * accidentally run as the administrator.
+   * A client authenticated as the restricted identity. Omitting `keyHash` sends NO tenant
+   * setting at all, which is the path that exercises the profile default. Passing `""` sends an
+   * explicit empty one. The two are different requests and the proof pins both.
    */
   restrictedClient(options?: { keyHash?: string }): Promise<ClickHouseClient>;
   /**
-   * The restricted identity's credentials, for a caller that must build its own
-   * client rather than borrow one — the REST endpoint suite, which drives the
-   * shipped executor and therefore needs a connection, not a connection object
-   * someone else opened.
+   * The restricted identity's credentials, for a caller that must build its own client rather
+   * than borrow one — the REST endpoint suite, which drives the shipped executor and therefore
+   * needs a connection, not a connection object someone else opened.
    */
   restrictedConnection(): {
     url: string;
@@ -240,11 +177,9 @@ export interface LangWatchQLClickHouseHarness {
 }
 
 /**
- * Names every object this suite creates, derived from the caller's suite name.
- *
- * Per-suite rather than shared: users, profiles and row policies are
- * server-global in ClickHouse, so two suites sharing a reused container would
- * otherwise mutate each other's security objects.
+ * Names every object this suite creates, derived from the caller's suite name. Per-suite rather
+ * than shared: users, profiles and row policies are server-global in ClickHouse, so two suites
+ * sharing a reused container would otherwise mutate each other's security objects.
  */
 export function lwqlNamesForSuite(suite: string): LangWatchQLNames {
   const slug = suite.replace(/[^a-zA-Z0-9_]/g, "_");
@@ -472,15 +407,9 @@ export const REAL_FACT_TABLES = [
 ] as const;
 
 /**
- * Runs the shipped ClickHouse migrations into their own database.
- *
- * Its own, not the LangWatchQL one: the migrations own every table in the database
- * they run against, and the LangWatchQL database holds the key map and the views.
- *
- * `CLICKHOUSE_CLUSTER` is unset for the duration. It is a *deployment* fact
- * that switches every engine to its `Replicated` form, and a developer whose
- * `.env` carries it would otherwise get migrations that need a Keeper the
- * container has not got — a failure that reads like a broken migration.
+ * Runs the shipped ClickHouse migrations into their own database. Its own, not the LangWatchQL
+ * one: the migrations own every table in the database they run against, and the LangWatchQL
+ * database holds the key map and the views. `CLICKHOUSE_CLUSTER` is unset for the duration.
  */
 async function runShippedMigrations({
   container,
@@ -510,12 +439,8 @@ async function runShippedMigrations({
 }
 
 /**
- * The seeded history: eight weekly partitions, the last of which is the window
- * a "recent" query asks for.
- *
- * Fixed dates rather than offsets from `now`, so a reused container seeded last
- * week and a fresh one seeded today hold the same partitions and the pruning
- * measurement compares like with like.
+ * The seeded history: eight weekly partitions, the last of which is the window a "recent" query
+ * asks for.
  */
 export const SEED_WEEK_COUNT = 8;
 const SEED_ANCHOR = Date.UTC(2026, 0, 5); // a Monday, so weeks line up
@@ -559,11 +484,9 @@ export const SEEDED_DIMENSION_ATTRIBUTE = {
 } as const;
 
 /**
- * The trace seeded twice, to prove the views collapse versions.
- *
- * Both versions carry the same partition-key time and differ only in
- * `UpdatedAt` and in the value a reader can see, so "the view returned one row"
- * and "it returned the newer one" are separate, checkable claims.
+ * The trace seeded twice, to prove the views collapse versions. Both versions carry the same
+ * partition-key time and differ only in `UpdatedAt` and in the value a reader can see, so "the
+ * view returned one row" and "it returned the newer one" are separate, checkable claims.
  */
 export const DEDUP_FIXTURE = {
   traceIdSuffix: "dedup-trace",
@@ -580,12 +503,6 @@ export function dedupTraceId(tenantId: string): string {
 
 /**
  * The trace whose newer version sits in a *different* weekly partition.
- *
- * The incident-backed case, and the one a dedup shape can get wrong without
- * ever returning a duplicate: the partition key is a business time that a later
- * fold can move, so a view that collapses versions per partition — or one whose
- * `max()` scope carries a time range — reports the older version as current and
- * looks entirely healthy doing it.
  */
 export const MOVED_PARTITION_FIXTURE = {
   traceIdSuffix: "moved-trace",
@@ -604,17 +521,6 @@ export function movedPartitionTraceId(tenantId: string): string {
 
 /**
  * The evaluation seeded twice, its two versions carrying two *sort keys*.
- *
- * `evaluation_analytics` sorts by `(TenantId, OccurredAt, EvaluationId)` and its
- * fold writes a moving progress watermark into `OccurredAt`, so a second
- * lifecycle event does not supersede the first row — it writes a row the engine
- * files under a different key. `FINAL` merges by that key and nothing else, so
- * it returns both, and every `count`, `sum` and `avg` over the dataset counts
- * this evaluation twice while looking entirely healthy.
- *
- * The two versions are a partition apart as well as a key apart, so the case
- * also covers a dedup shape that resolves the latest version only within one
- * partition.
  */
 export const EVALUATION_DEDUP_FIXTURE = {
   evaluationIdSuffix: "dedup-eval",
@@ -634,16 +540,9 @@ export function evaluationDedupId(tenantId: string): string {
 }
 
 /**
- * One bucket of a rollup, written as two partial rows in two parts.
- *
- * The shape an `AggregatingMergeTree` is for and the one a reader can get
- * wrong: neither part is the answer, and the answer is not the later of them
- * either — it is their sum. Written in two inserts with merges stopped, so a
- * view that forgot to merge returns two rows and a view that picked a winner
- * returns the wrong total, and neither can pass by accident.
- *
- * The bucket sits inside the last seeded week, so it is in the same partition
- * the "recent" queries read and shares their retention.
+ * One bucket of a rollup, written as two partial rows in two parts. The shape an
+ * `AggregatingMergeTree` is for and the one a reader can get wrong: neither part is the answer,
+ * and the answer is not the later of them either — it is their sum.
  */
 export const ROLLUP_MERGE_FIXTURE = {
   bucketStart: "2026-02-23 00:01:00.000",
@@ -652,14 +551,9 @@ export const ROLLUP_MERGE_FIXTURE = {
   evaluatorType: "rollup_merge_judge",
   status: "processed",
   /**
-   * The two parts of the trace bucket, keyed by the column each value is
-   * written to.
-   *
-   * Every measure carries a different number, in both parts and therefore in
-   * the total — which is the difference between proving the view merges and
-   * proving it merges *the right column*. Feeding the same number to two
-   * same-typed columns, as this fixture used to, means a view whose
-   * `TraceCount` reads `SpanCount` returns exactly what the assertion expects.
+   * The two parts of the trace bucket, keyed by the column each value is written to. Every
+   * measure carries a different number, in both parts and therefore in the total — which is the
+   * difference between proving the view merges and proving it merges *the right column*.
    */
   traceParts: [
     {
@@ -719,13 +613,9 @@ export const ROLLUP_MERGE_FIXTURE = {
 } as const;
 
 /**
- * What each merged bucket must add up to, stated rather than summed from the
- * parts — the arithmetic is the claim, and a test that derives it from the same
- * numbers it seeds only proves that addition works.
- *
- * Every measure of a rollup appears here, and the suite pins that: a measure
- * added to the catalog with no total to check against would otherwise be a
- * column nothing ever reads back.
+ * What each merged bucket must add up to, stated rather than summed from the parts — the
+ * arithmetic is the claim, and a test that derives it from the same numbers it seeds only
+ * proves that addition works.
  */
 export const ROLLUP_MERGE_TOTALS: {
   readonly trace: Readonly<Record<string, number>>;
@@ -819,12 +709,8 @@ function traceSummaryRow({
 }
 
 /**
- * Seeds both tenants into the real fact tables, across eight weekly partitions.
- *
- * Merges are stopped first. Without that, the two versions of the dedup fixture
- * can be collapsed by a background merge before the test looks, and a
- * deduplicating view would then be indistinguishable from one that does
- * nothing — the test would pass with the dedup removed.
+ * Seeds both tenants into the real fact tables, across eight weekly partitions. Merges are
+ * stopped first.
  */
 async function seedRealFactRows({
   admin,
@@ -1005,11 +891,6 @@ async function seedRealFactRows({
 
 /**
  * Seeds the analytics projections and their per-minute rollups.
- *
- * Same tenants, same weekly partitions and the same trace ids as the fold's
- * other projections, so a query that joins `trace_metrics` to `spans` on
- * `TraceId` finds rows on both sides rather than proving isolation against an
- * empty result.
  */
 async function seedAnalyticsProjections({
   admin,
@@ -1301,10 +1182,6 @@ export interface LangWatchQLQueryMeasurement {
 
 /**
  * Runs a query and reads its cost out of `system.query_log`.
- *
- * The server's own accounting rather than a wall-clock timer around the call:
- * an HTTP round trip on a laptop is noise next to the number under measurement,
- * and `read_rows` is the one that says whether a predicate reached the read.
  */
 export async function measureQuery({
   harness,
@@ -1368,11 +1245,9 @@ export async function selectScalar<T>(client: ClickHouseClient, query: string): 
 }
 
 /**
- * Asserts the client is the restricted identity.
- *
- * Every isolation claim in this suite is conditional on *who* ran the query, so
- * this runs before the claim rather than being assumed from the credentials
- * that were passed.
+ * Asserts the client is the restricted identity. Every isolation claim in this suite is
+ * conditional on *who* ran the query, so this runs before the claim rather than being assumed
+ * from the credentials that were passed.
  */
 export async function expectRestrictedIdentity({
   client,
@@ -1389,12 +1264,6 @@ export async function expectRestrictedIdentity({
 
 /**
  * Pulls ClickHouse's numeric error code out of a thrown error.
- *
- * `@clickhouse/client` throws a `ClickHouseError` carrying `code` (the number as
- * a string) and `type` (the symbolic name) as properties, having already
- * stripped the `Code: 497. DB::Exception:` prefix from the message — so reading
- * the property is the reliable path and the message regex is only a fallback for
- * errors that arrive as raw HTTP text.
  */
 function clickHouseErrorCode(error: unknown): number | null {
   const code = (error as { code?: unknown } | null)?.code;
@@ -1406,12 +1275,9 @@ function clickHouseErrorCode(error: unknown): number | null {
 }
 
 /**
- * Asserts a statement is rejected with one specific ClickHouse error code.
- *
- * Fails when the statement succeeds, when no code can be parsed (a connection
- * failure is not a rejection), and — the point of the helper — when the code is
- * any code other than the expected one. A typo yielding UNKNOWN_TABLE must turn
- * the test red rather than read as a successful denial.
+ * Asserts a statement is rejected with one specific ClickHouse error code. Fails when the
+ * statement succeeds, when no code can be parsed (a connection failure is not a rejection), and
+ * — the point of the helper — when the code is any code other than the expected one.
  */
 export async function expectClickHouseError(
   run: () => Promise<unknown>,
@@ -1446,12 +1312,9 @@ export interface SeedControl {
 }
 
 /**
- * Records how many rows each tenant actually has, and fails if either is zero.
- *
- * Every "no foreign rows were returned" assertion in this suite is an absence
- * check, and an absence check passes against an empty database. Pairing it with
- * this control is what makes it mean something: a control that is itself zero
- * fails the test instead of quietly certifying nothing.
+ * Records how many rows each tenant actually has, and fails if either is zero. Every "no
+ * foreign rows were returned" assertion in this suite is an absence check, and an absence check
+ * passes against an empty database.
  */
 export async function recordSeedControl({
   harness,
@@ -1489,10 +1352,9 @@ export async function recordSeedControl({
 }
 
 /**
- * Asserts a restricted read returned rows, all of them the caller's tenant's.
- *
- * Non-emptiness is part of the assertion: "every returned row belongs to
- * tenant-a" is trivially true of no rows at all.
+ * Asserts a restricted read returned rows, all of them the caller's tenant's. Non-emptiness is
+ * part of the assertion: "every returned row belongs to tenant-a" is trivially true of no rows
+ * at all.
  */
 export function expectOnlyTenantA<T extends Record<string, unknown>>({
   rows,
@@ -1513,11 +1375,9 @@ export function expectOnlyTenantA<T extends Record<string, unknown>>({
 }
 
 /**
- * The whole shape of a scoped read, in one call: control first, then the claim.
- *
- * Reads `query` as the restricted identity with tenant-a's key, having first
- * proved through the administrator that both tenants have rows in `table`, and
- * asserts the read saw exactly tenant-a's.
+ * The whole shape of a scoped read, in one call: control first, then the claim. Reads `query`
+ * as the restricted identity with tenant-a's key, having first proved through the administrator
+ * that both tenants have rows in `table`, and asserts the read saw exactly tenant-a's.
  */
 export async function expectTenantScopedRead({
   harness,
@@ -1592,28 +1452,18 @@ const PG_DATABASE = "lwtest";
 const PG_SCHEMA = "public";
 
 /**
- * The named collection this suite's engine tables read through.
- *
- * Per-suite for the same reason `lwqlNamesForSuite` exists: named
- * collections are server-global, and CI runs integration files two at a time
- * against one ClickHouse server. Under a shared name, each suite's
- * DROP + CREATE repoints the collection at its own PostgreSQL container —
- * the neighbour's engine tables silently read the wrong database, or lose
- * the collection entirely mid-run. (Shipped provisioning keeps one fixed
- * name; a deployment has one PostgreSQL, not one per suite.)
+ * The named collection this suite's engine tables read through. Per-suite for the same reason
+ * `lwqlNamesForSuite` exists: named collections are server-global, and CI runs integration
+ * files two at a time against one ClickHouse server.
  */
 export function lwqlTestNamedCollection(names: LangWatchQLNames): string {
   return `pg_${names.database}`;
 }
 
 /**
- * The dataset the PostgreSQL isolation proof is written against.
- *
- * Annotations rather than a dimension, because it is the one mapped dataset
- * that joins against a multi-million-row fact table and therefore the one the
- * issue names as most likely to need the projection fallback. Read from the
- * shipped catalog rather than restated, so a rename cannot leave the proof
- * pointing at something that no longer exists.
+ * The dataset the PostgreSQL isolation proof is written against. Annotations rather than a
+ * dimension, because it is the one mapped dataset that joins against a multi-million-row fact
+ * table and therefore the one the issue names as most likely to need the projection fallback.
  */
 export const PG_MAPPED_VIEW = "annotations";
 /** The PostgreSQL-engine table behind it, inside the LangWatchQL database. */
@@ -1621,11 +1471,8 @@ export const PG_MAPPED_TABLE = mappedCatalogEntry(PG_MAPPED_VIEW).sourceTable;
 /** The tenant column, which every approved view exposes under the same name. */
 export const PG_MAPPED_TENANT_COLUMN = "TenantId";
 /**
- * A column of the base relation the approved view leaves out.
- *
- * `Annotation.comment` is a free-text carrier the catalog deliberately does not
- * expose. Taken from the real model rather than a synthetic `secret_note`, so
- * the unreachability proof is about the shipped exclusion policy.
+ * A column of the base relation the approved view leaves out. `Annotation.comment` is a
+ * free-text carrier the catalog deliberately does not expose.
  */
 export const PG_EXCLUDED_COLUMN = "comment";
 
@@ -1670,45 +1517,22 @@ export interface LangWatchQLPostgresHarness {
   /** Clears the server's table statistics, so the next {@link rowsRead} is a delta. */
   resetStatistics(): Promise<void>;
   /**
-   * Makes every read done so far visible to {@link rowsRead}, by ending the
-   * backends that did it.
-   *
-   * PostgreSQL flushes a backend's pending statistics at transaction end, rate
-   * limited to once a second, and otherwise only when the backend has been idle
-   * for ten. ClickHouse *pools* its connections, so the backend that did the
-   * read is idle rather than gone and its numbers are not there yet — measured,
-   * a two-second wait reports the previous measurement's rows, which is worse
-   * than reporting none, and even twelve seconds raced.
-   *
-   * Terminating the backend runs its shutdown hook, which flushes, and this
-   * then waits for the backend to actually leave `pg_stat_activity` rather than
-   * for a duration. That turns the measurement from a wait long enough to
-   * probably work into one that is true when it returns, and it throws rather
-   * than returning a stale number if the backends outlast the timeout.
-   * ClickHouse reconnects on the next read.
+   * Makes every read done so far visible to {@link rowsRead}, by ending the backends that did
+   * it. PostgreSQL flushes a backend's pending statistics at transaction end, rate limited to
+   * once a second, and otherwise only when the backend has been idle for ten.
    */
   flushStatistics(): Promise<void>;
   /**
-   * Rows PostgreSQL actually read off a base relation since the last reset.
-   *
-   * The load number the projection-fallback decision turns on, taken from the
-   * server's own accounting rather than inferred from the statement text.
-   * Sequential and index reads summed, because which one the planner picks is
-   * its business and both are rows off the primary.
+   * Rows PostgreSQL actually read off a base relation since the last reset. The load number the
+   * projection-fallback decision turns on, taken from the server's own accounting rather than
+   * inferred from the statement text.
    */
   rowsRead(baseRelation: string): Promise<number>;
   stop(): Promise<void>;
 }
 
 /**
- * The application tables the mapped catalog reads, in the shape Prisma creates
- * them.
- *
- * Hand-written rather than migrated because the suite needs the *relations the
- * catalog names*, not the application's whole schema — every mapped base
- * relation, with every column the catalog reads plus at least one it
- * deliberately excludes. Quoted and mixed-case exactly as Prisma emits them, so
- * that a mapping which forgot to quote fails here rather than in production.
+ * The application tables the mapped catalog reads, in the shape Prisma creates them.
  */
 const PG_BASE_TABLE_DDL: Record<string, string> = {
   Annotation:
@@ -1743,16 +1567,6 @@ const PG_BASE_TABLE_DDL: Record<string, string> = {
 
 /**
  * LangWatchQL databases that map this one PostgreSQL role at the same time.
- *
- * Container reuse is what makes this more than one: every suite that maps the
- * PostgreSQL half gets its own LangWatchQL database inside the *same* reused
- * ClickHouse server, and each of those databases holds its own connection pool
- * per mapped table against the same role. Sized for one catalog, the role's cap
- * is exhausted by idle pooled connections from the suites that ran before, and
- * the failure is a refused login rather than a queue.
- *
- * Production maps one catalog from one deployment, which is the function's
- * default.
  */
 const LWQL_TEST_CONCURRENT_CATALOGS = 6;
 
@@ -1767,19 +1581,8 @@ const PG_LOAD_FIXTURE_TENANTS = 40;
 const PG_LOAD_FIXTURE_ROWS_PER_TENANT = 250;
 
 /**
- * A realistically-shaped annotation table, so the load measurement measures
- * something.
- *
- * Not padding. With only the two fixture tenants the table is four rows split
- * evenly, and at 50% selectivity a sequential scan is genuinely the cheaper
- * plan — so PostgreSQL reads every row whether or not the tenant predicate
- * reached it, and "the predicate bounds what PostgreSQL reads" is unmeasurable
- * rather than untrue. A real deployment has many tenants and one of them asking,
- * which is the shape that makes the index worth using; these filler tenants
- * restore it.
- *
- * The index is the one Prisma already declares (`@@index([projectId])`), and
- * `ANALYZE` is what gives the planner the statistics to choose it.
+ * A realistically-shaped annotation table, so the load measurement measures something. Not
+ * padding.
  */
 const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
   `INSERT INTO ${PG_SCHEMA}."Annotation" ` +
@@ -1792,21 +1595,9 @@ const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
 ];
 
 /**
- * One tenant's rows in every mapped base relation.
- *
- * Parameterized rather than fixed to the two harness fixtures because the
- * endpoint suites authenticate as *real project ids* and need PostgreSQL rows
- * under those, exactly as they already seed their own ClickHouse rows. Every
- * relation for every tenant, so that an isolation assertion always has
- * something it could have leaked.
- *
- * Excluded columns carry a recognisable `excluded-` marker, which is what lets
- * a test assert the *data* never reached the LangWatchQL schema rather than only
- * that the column name was refused.
- *
- * `traceIds` ties annotations to whatever traces the caller seeded on the
- * ClickHouse side, so an annotation-to-trace join has matching rows; the
- * default is the shape the isolation suite seeds.
+ * One tenant's rows in every mapped base relation. Parameterized rather than fixed to the two
+ * harness fixtures because the endpoint suites authenticate as *real project ids* and need
+ * PostgreSQL rows under those, exactly as they already seed their own ClickHouse rows.
  */
 export function postgresTenantSeedStatements({
   tenantId,
@@ -1825,11 +1616,6 @@ export function postgresTenantSeedStatements({
   scores?: readonly number[];
   /**
    * Identifier of the seeded prompt.
-   *
-   * Parameterized because a caller joining `traces.LastUsedPromptId` to
-   * `prompts.PromptId` needs the two sides to agree, and a prompt id is a
-   * primary key in PostgreSQL — so two tenants cannot both be given the same
-   * one, and which tenant gets which is the caller's to decide.
    */
   promptId?: string;
   stamp?: string;
@@ -1884,23 +1670,9 @@ export function postgresTenantSeedStatements({
 }
 
 /**
- * Starts PostgreSQL, seeds two tenants' annotations, and provisions the
- * dedicated reader role from the shipped statements.
- *
- * `log_statement='all'` is turned on *before* ClickHouse ever connects. That
- * ordering is the whole trick: ClickHouse pools its PostgreSQL connections, and
- * a connection opened before the setting was changed keeps the old value, so
- * enabling it later measures nothing until the pool is cycled.
- *
- * Deliberately NOT `.withReuse()`, unlike the ClickHouse container beside it.
- * Reuse hands every caller the same container, and this setup drops and
- * recreates a fixed set of relations in a fixed schema — so with
- * `VITEST_INTEGRATION_PARALLEL=1` (CI, `maxWorkers: 2`) two suites interleave
- * their drop/create and the second `CREATE TYPE "ExperimentType"` loses to the
- * first with `42710: type already exists`. The ClickHouse half is safe because
- * each suite gets its own LangWatchQL database; the PostgreSQL half has no such
- * per-suite name, so isolation comes from the container. A private container
- * per suite costs a few seconds and removes the race by construction.
+ * Starts PostgreSQL, seeds two tenants' annotations, and provisions the dedicated reader role
+ * from the shipped statements. `log_statement='all'` is turned on *before* ClickHouse ever
+ * connects.
  */
 export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHarness> {
   const container = await new PostgreSqlContainer(TEST_POSTGRES_IMAGE)
@@ -2014,12 +1786,11 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
         `SELECT pg_terminate_backend(pid) FROM pg_stat_activity ` +
           `WHERE usename = '${PG_READER_ROLE}' AND pid <> pg_backend_pid()`,
       ]);
-      // `pg_terminate_backend` only signals; it returns before the backend has
-      // run the shutdown hook that flushes its statistics. Waiting for the rows
-      // to leave `pg_stat_activity` waits for the thing that actually has to
-      // have happened — a fixed grace period here would be the hopeful wait
-      // this whole mechanism exists to avoid, and it is the shape that flakes
-      // first on a loaded CI worker.
+      // `pg_terminate_backend` only signals; it returns before the backend has run the shutdown
+      // hook that flushes its statistics. Waiting for the rows to leave `pg_stat_activity`
+      // waits for the thing that actually has to have happened — a fixed grace period here
+      // would be the hopeful wait this whole mechanism exists to avoid, and it is the shape
+      // that flakes first on a loaded CI worker.
       const deadline = Date.now() + PG_BACKEND_EXIT_TIMEOUT_MS;
       for (;;) {
         const remaining = await asAdmin(
@@ -2055,14 +1826,8 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
 }
 
 /**
- * Maps every PostgreSQL-resident catalog entry into the LangWatchQL ClickHouse
- * database as an engine table, and policies each exactly like a native table.
- *
- * Stops at the engine tables. The LangWatchQL views over them — the objects a
- * caller actually names, and the ones carrying the tenant pushdown predicate —
- * are `viewProvisioning.setupStatements`' job, so a suite that wants the whole
- * chain calls both, in that order. Keeping them apart is what lets the
- * isolation proof read the *unpredicated* engine table directly and compare.
+ * Maps every PostgreSQL-resident catalog entry into the LangWatchQL ClickHouse database as an
+ * engine table, and policies each exactly like a native table. Stops at the engine tables.
  */
 export async function mapPostgresIntoClickHouse({
   harness,
@@ -2110,10 +1875,9 @@ export async function mapPostgresIntoClickHouse({
 }
 
 /**
- * Drains a container log stream into a string.
- *
- * `logs()` follows the container, so it never ends on its own: collection stops
- * once the stream has been quiet for a moment, bounded by a hard cap.
+ * Drains a container log stream into a string. `logs()` follows the container, so it never ends
+ * on its own: collection stops once the stream has been quiet for a moment, bounded by a hard
+ * cap.
  */
 async function readContainerLog(
   streamPromise: Promise<Readable>,
@@ -2145,10 +1909,9 @@ async function readContainerLog(
 }
 
 /**
- * The statements PostgreSQL executed since `previousLog` was captured.
- *
- * Diffing rather than parsing timestamps: the suite runs serially, so
- * everything new in the log belongs to the statement under measurement.
+ * The statements PostgreSQL executed since `previousLog` was captured. Diffing rather than
+ * parsing timestamps: the suite runs serially, so everything new in the log belongs to the
+ * statement under measurement.
  */
 export function statementsLoggedSince(previousLog: string, currentLog: string): string[] {
   const delta = currentLog.startsWith(previousLog)
@@ -2164,11 +1927,9 @@ export function postgresSqlState(result: PostgresExecResult): string | null {
 }
 
 /**
- * Asserts a PostgreSQL statement was rejected with one specific SQLSTATE.
- *
- * Same discipline as {@link expectClickHouseError}: a rejection for the wrong
- * reason — a missing relation, a syntax error — must fail rather than count as
- * the containment being proved.
+ * Asserts a PostgreSQL statement was rejected with one specific SQLSTATE. Same discipline as
+ * {@link expectClickHouseError}: a rejection for the wrong reason — a missing relation, a
+ * syntax error — must fail rather than count as the containment being proved.
  */
 export function expectPostgresError(
   result: PostgresExecResult,

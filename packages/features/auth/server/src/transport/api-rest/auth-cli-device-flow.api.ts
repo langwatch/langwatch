@@ -535,7 +535,9 @@ export function createAuthCliDeviceFlowRestApp(options: {
     // rather than leaving a half-logged-in CLI holding tokens but no key.
     let cliApiKey: string | undefined;
     let cliApiKeyId: string | undefined;
-    let cliApiKeyScope: { kind: "organization" | "projects"; project_ids: string[] } | undefined;
+    let cliApiKeyScope:
+      | { kind: "organization" | "projects"; project_ids: string[]; permissions: string[] }
+      | undefined;
     if (record.key_selection) {
       // The same normalization every other label path uses, and the
       // user-chosen label wins over the machine hostname. The value names the
@@ -581,7 +583,11 @@ export function createAuthCliDeviceFlowRestApp(options: {
       }
       cliApiKey = minted.token;
       cliApiKeyId = minted.apiKeyId;
-      cliApiKeyScope = { kind: minted.scope.kind, project_ids: minted.scope.projectIds };
+      cliApiKeyScope = {
+        kind: minted.scope.kind,
+        project_ids: minted.scope.projectIds,
+        permissions: minted.scope.permissions,
+      };
     }
 
     // Stamp the device info so the devices inventory can show a recognisable

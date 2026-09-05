@@ -17,6 +17,7 @@ import {
 import type {
   SimulationCancelRun,
   SimulationDeleteRun,
+  SimulationRecordAgentInstance,
   SimulationFinishRun,
   SimulationMessageSnapshot,
   SimulationQueueRun,
@@ -204,6 +205,9 @@ class EventingApiSimulationExecution extends SimulationExecutionPort {
   deleteRun(input: SimulationDeleteRun): Promise<void> {
     return this.send("deleteRun", input);
   }
+  recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void> {
+    return this.send("recordAgentInstance", input);
+  }
 
   private send(name: string, input: unknown): Promise<void> {
     // Resolved at construction, so this cannot be absent; the lookup that
@@ -213,7 +217,7 @@ class EventingApiSimulationExecution extends SimulationExecutionPort {
 }
 
 /**
- * The eight names, listed once.
+ * The nine names, listed once.
  */
 const SIMULATION_COMMAND_NAMES = [
   "queueRun",
@@ -224,9 +228,10 @@ const SIMULATION_COMMAND_NAMES = [
   "finishRun",
   "cancelRun",
   "deleteRun",
+  "recordAgentInstance",
 ] as const;
 
-/** The eight simulation writes, refused by name where there is no queue. */
+/** The nine simulation writes, refused by name where there is no queue. */
 class UnqueuedApiSimulationExecution extends SimulationExecutionPort {
   queueRun(): Promise<void> {
     return this.refuse();
@@ -250,6 +255,9 @@ class UnqueuedApiSimulationExecution extends SimulationExecutionPort {
     return this.refuse();
   }
   deleteRun(): Promise<void> {
+    return this.refuse();
+  }
+  recordAgentInstance(): Promise<void> {
     return this.refuse();
   }
 

@@ -1,13 +1,5 @@
 /**
  * ADR-032: the streaming chunk writer — the I/O orchestrator that turns a
- * record stream into chunked-JSONL objects with bounded memory.
- *
- * Kept OUT of `dataset-chunking.ts` (which is deliberately pure / no-I/O): this
- * class calls `storage.writeChunks`, so it depends on a `DatasetStorage`. It is
- * shared by every born-on-storage producer:
- *   - the async normalize job (upload → chunks),
- *   - the PG→S3 backfill (DatasetRecord pages → chunks).
- * so the chunk-rollover + offset math lives in exactly one place.
  */
 import { nanoid } from "nanoid";
 import {
@@ -20,16 +12,9 @@ import {
 import type { DatasetStorage } from "../ports/dataset-storage.port";
 
 /**
- * A buffer that accumulates parsed records and flushes them to chunk objects as
- * soon as their serialized size reaches `CHUNK_MAX_BYTES`, keeping memory
- * bounded regardless of the source size. Each flush calls `writeChunks` with the
- * running `fromIndex`, so chunk keys stay contiguous across flushes.
- *
- * Each row is wrapped as `{ id, entry }` (mirroring the logical `DatasetRecord`
- * shape) so every row carries a stable id a later edit/delete can target — the
- * read adapter maps `{id, entry}` back to a `DatasetRecord`-shaped object. The
- * id is assigned per-record here so this stays streaming (never builds an
- * in-memory array of the whole source).
+ * A buffer that accumulates parsed records and flushes them to chunk objects as soon as their
+ * serialized size reaches `CHUNK_MAX_BYTES`, keeping memory bounded regardless of the source
+ * size.
  */
 export class StreamingChunkWriterService {
   static create(deps: {
@@ -44,19 +29,11 @@ export class StreamingChunkWriterService {
   private bufferBytes = 0;
   private nextIndex = 0;
   /**
-   * Running global row offset of the next chunk. `toJsonlChunks` (pure) emits
-   * `startRow`/`endRow` relative to each `writeChunks` batch — restarting at 0
-   * per flush — so the writer rebases them by this base to keep `chunkOffsets`
-   * globally contiguous across flushes. Without it, every flush's chunks would
-   * report `startRow: 0`, corrupting the paginated-read row addressing for any
-   * dataset larger than one chunk (normalize + backfill producers).
+   * Running global row offset of the next chunk.
    */
   private nextStartRow = 0;
   /**
    * I-MEM: accumulate only lightweight per-chunk metadata (no `jsonl` payload).
-   * Each flush maps its written `DatasetChunk[]` to `ChunkMeta[]` and drops the
-   * serialized bodies, so a multi-GB source never holds the whole normalized
-   * file in heap by the time `finalize()` runs.
    */
   private readonly chunkMetas: ChunkMeta[] = [];
 
@@ -69,11 +46,9 @@ export class StreamingChunkWriterService {
   ) {}
 
   /**
-   * Buffer one row. Mints a fresh `record_<nanoid>` id for new rows
-   * (normalize / upload); PRESERVES a caller-supplied `id` when given — the
-   * PG→S3 backfill passes the existing `DatasetRecord.id` so edit/delete keeps
-   * targeting the same row after cutover (I-MIG). The per-record assignment
-   * keeps this streaming.
+   * Buffer one row. Mints a fresh `record_<nanoid>` id for new rows (normalize / upload);
+   * PRESERVES a caller-supplied `id` when given — the PG→S3 backfill passes the existing
+   * `DatasetRecord.id` so edit/delete keeps targeting the same row after cutover (I-MIG).
    */
   async push(entry: unknown, opts?: { id?: string }): Promise<void> {
     const record = { id: opts?.id ?? `record_${nanoid()}`, entry };

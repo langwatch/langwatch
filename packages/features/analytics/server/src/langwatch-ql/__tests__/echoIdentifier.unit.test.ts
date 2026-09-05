@@ -1,12 +1,6 @@
 /**
- * The bound on quoted-back identifier text, read as output rather than length.
- *
- * `echoIdentifier` exists so a rejection can name what to change while still
- * bounding text the caller wrote. The bound therefore has to produce a string
- * that is safe to put in `message` and `meta.violations` — and a truncation
- * that counts UTF-16 units can end on half of an astral character, emitting a
- * lone surrogate into exactly that output. These assert on well-formedness,
- * not on a character count, because the count was never the point.
+ * The bound on quoted-back identifier text, read as output rather than length. `echoIdentifier`
+ * exists so a rejection can name what to change while still bounding text the caller wrote.
  */
 import { describe, expect, it } from "vitest";
 
