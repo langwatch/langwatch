@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InitiateToolCallCommand } from "@langwatch/langy-server/eventing/langy-conversation-processing";
+import { InitiateToolCallCommand } from "../../intents/langy-conversation.intent";
 import { langyRelayFrameSchema } from "../../streaming/langy-relay-frame";
 
 /**

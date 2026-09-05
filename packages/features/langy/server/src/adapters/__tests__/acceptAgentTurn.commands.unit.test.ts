@@ -4,7 +4,7 @@ import type { TenantId } from "@langwatch/eventing";
 import { orderEvents } from "@langwatch/eventing";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AcceptAgentTurnCommand } from "@langwatch/langy-server/eventing/langy-conversation-processing";
+import { AcceptAgentTurnCommand } from "../../intents/langy-conversation.intent";
 
 const TENANT = "project-1";
 const CONVERSATION = "conv-1";

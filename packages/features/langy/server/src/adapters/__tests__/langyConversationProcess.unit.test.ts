@@ -7,14 +7,14 @@ import {
   type ProcessRef,
 } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
+import type { LangyConversationProcessingEvent } from "../../services/langy-conversation.events";
 
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,
-  langyConversationProcess,
   type LangyConversationProcessState,
-} from "@langwatch/langy-server/eventing/langy-conversation-processing/process-manager";
+} from "../../ports/langy-conversation-process.port";
+import { langyConversationProcess } from "../../processes/langy-conversation.process";
 import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
 import {
   agentRespondedEvent,

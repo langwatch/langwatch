@@ -13,7 +13,7 @@ import {
   LangyTurnErrors,
   LangyWorkerRestartingError,
   LangyWorkerStoppedError,
-} from "@langwatch/langy-server/execution/langy-turn.errors";
+} from "../../services/langy-turn-errors.errors";
 
 /**
  * A turn fails in a handful of KNOWN ways. Each must reach the browser as its

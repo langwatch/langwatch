@@ -13,7 +13,7 @@
 
 import type { TenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { UpdatePlanCommand } from "@langwatch/langy-server/eventing/langy-conversation-processing";
+import { UpdatePlanCommand } from "../../intents/langy-conversation.intent";
 
 const TENANT = "project-1";
 const CONVERSATION = "conv-1";

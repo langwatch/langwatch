@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   FailAgentResponseCommand,
   RecordAgentResponseCommand,
-} from "@langwatch/langy-server/eventing/langy-conversation-processing";
+} from "../../intents/langy-conversation.intent";
 
 const TENANT = "project-1";
 const CONVERSATION = "conv-1";

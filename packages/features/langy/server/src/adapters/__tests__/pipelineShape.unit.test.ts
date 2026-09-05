@@ -9,15 +9,15 @@ import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "@langwatch/langy-server/eventing/langy-conversation-processing/process-manager";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../../ports/langy-conversation-process.port";
 import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
 import { agentRespondedEvent, CONVERSATION_ID, PROJECT_ID } from "./helpers/langyEventFixtures";
 import {
   LangyConversationPipelineAdapter,
-  type LangyAnalyticsEventProjectionRecord,
   type LangyConversationProcessingPipelineDeps,
-} from "@langwatch/langy-server/eventing/langy-conversation-processing";
-import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
+} from "../eventing.langy-conversation.adapter";
+import type { LangyAnalyticsEventProjectionRecord } from "../../projections/langy-analytics-event.projection";
+import type { LangyConversationProcessingEvent } from "../../services/langy-conversation.events";
 
 /**
  * Proves the FINAL Langy pipeline shape from the public static definition

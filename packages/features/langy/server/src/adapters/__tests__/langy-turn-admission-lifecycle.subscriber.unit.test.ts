@@ -1,7 +1,7 @@
 import type { EventSubscriberContext } from "@langwatch/eventing";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
+import type { LangyConversationProcessingEvent } from "../../services/langy-conversation.events";
 import { createLangyTurnAdmissionLifecycleSubscriber } from "@langwatch/langy-server";
 
 const context: EventSubscriberContext = {
