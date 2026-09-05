@@ -22,7 +22,7 @@ import {
   allLitellmModels,
   type ModelProviderEditorValue as MaybeStoredModelProvider,
 } from "@langwatch/model-provider-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import {
   MODEL_ICON_SIZE,

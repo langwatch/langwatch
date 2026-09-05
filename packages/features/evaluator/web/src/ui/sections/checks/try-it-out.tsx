@@ -34,7 +34,7 @@ import {
   evaluatePreconditions,
 } from "../../../model/evaluations/preconditions";
 import type { CheckPreconditions } from "../../../model/evaluations/types";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import type { Money } from "@langwatch/design-system/type-utils";
 import { FilterSidebar } from "@langwatch/analytics-web/components/filters/FilterSidebar";

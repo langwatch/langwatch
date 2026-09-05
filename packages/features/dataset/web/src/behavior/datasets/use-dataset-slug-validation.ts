@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 const DEBOUNCE_TIME = 500;
 const MAX_WAIT_TIME = 1000;

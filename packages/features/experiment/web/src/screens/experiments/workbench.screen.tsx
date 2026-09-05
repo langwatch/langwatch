@@ -36,7 +36,7 @@ import { useWorkbenchUpdateListener } from "../../behavior/experiments-v3/use-wo
 import { HandledErrorAlert } from "@langwatch/workflow-web/studio-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { assertCrispChatHidden } from "@langwatch/workflow-web/utils/crispBubblePolicy";
 import { useDrawer } from "@langwatch/ui-drawer";
 import {

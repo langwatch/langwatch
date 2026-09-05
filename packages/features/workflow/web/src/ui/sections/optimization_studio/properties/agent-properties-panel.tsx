@@ -44,7 +44,7 @@ import {
   useRegisterDrawerFooter,
 } from "@langwatch/workflow-web";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
-import { api } from "../../../../behavior/studio-host/api";
+import { api } from "../../../../model/workflow-api-client";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { AgentComponent, Field as DslField } from "@langwatch/workflow-contract";
 import {

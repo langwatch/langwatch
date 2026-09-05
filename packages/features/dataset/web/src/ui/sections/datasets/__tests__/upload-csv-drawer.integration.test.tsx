@@ -20,7 +20,7 @@ const putFileToPresignedUrl = vi.fn();
 const finalizeDirectUpload = vi.fn();
 const abortPendingUpload = vi.fn();
 
-vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   api: {
     useUtils: () => ({
       dataset: {

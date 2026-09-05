@@ -36,7 +36,7 @@ import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/components/FormatMoney";
 import { VersionBox } from "@langwatch/workflow-web/optimization_studio/components/History";
-import type { AppRouter } from "@langwatch/workflow-web/studio-host/api";
+import type { WorkflowApiRouter } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type {
   AppliedOptimization,
   AppliedOptimizationField,
@@ -46,7 +46,7 @@ import type {
   DSPyStepSummary,
   ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
@@ -56,11 +56,14 @@ import { getRunDisplayName } from "../../../index";
 /** The runs query, with the contract's row rather than the router's inference. */
 type DSPyRunsQuery = UseTRPCQueryResult<
   DSPyRunsSummary[] | undefined,
-  TRPCClientErrorLike<AppRouter>
+  TRPCClientErrorLike<WorkflowApiRouter>
 >;
 
 /** One optimizer step, likewise. */
-type DSPyStepQuery = UseTRPCQueryResult<DSPyStep | undefined, TRPCClientErrorLike<AppRouter>>;
+type DSPyStepQuery = UseTRPCQueryResult<
+  DSPyStep | undefined,
+  TRPCClientErrorLike<WorkflowApiRouter>
+>;
 import { ChartTooltip } from "../analytics/chart-tooltip";
 import { FeedbackLink } from "../feedback-link";
 import { LLMIcon } from "@langwatch/design-system/icons";

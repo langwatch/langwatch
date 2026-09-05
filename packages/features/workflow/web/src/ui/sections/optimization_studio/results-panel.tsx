@@ -14,7 +14,7 @@ import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPee
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useBatchEvaluationState } from "@langwatch/experiment-web/components/experiments/BatchEvaluationV2";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../behavior/studio-host/api";
+import { api } from "../../../model/workflow-api-client";
 import { slugify } from "@langwatch/design-system/slugify";
 import { useRunEvalution } from "./use-run-evalution";
 import {

@@ -10,7 +10,7 @@ import { extractPersistedState } from "../../model/experiments-v3/types/persiste
 import { HandledErrorAlert } from "@langwatch/workflow-web/studio-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**

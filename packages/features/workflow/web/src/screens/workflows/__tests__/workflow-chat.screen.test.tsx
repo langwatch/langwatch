@@ -29,7 +29,7 @@ const { state } = vi.hoisted(() => ({
 
 const calls = vi.hoisted(() => ({ chat: vi.fn() }));
 
-vi.mock("../../../behavior/workflow-api", () => ({
+vi.mock("../../../model/workflow-api", () => ({
   workflowApi: {
     useUtils: () => ({ workflow: { getAll: { invalidate: vi.fn() } } }),
     optimization: {

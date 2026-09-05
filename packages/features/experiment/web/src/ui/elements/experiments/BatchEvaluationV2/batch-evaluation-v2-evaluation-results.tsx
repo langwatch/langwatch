@@ -6,7 +6,7 @@ import { showErrorToast } from "@langwatch/ui-host/errors";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { BatchEvaluationV2EvaluationResult } from "./batch-evaluation-v2-evaluation-result";
 import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils";
 import { downloadCsv } from "@langwatch/csv/download";

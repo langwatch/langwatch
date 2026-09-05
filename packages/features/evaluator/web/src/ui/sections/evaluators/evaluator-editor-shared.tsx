@@ -38,7 +38,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/utils/constants";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 

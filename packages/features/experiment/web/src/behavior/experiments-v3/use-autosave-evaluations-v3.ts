@@ -5,7 +5,7 @@ import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { captureException, toError } from "../../model/posthog-error-capture";
 import { isNotFound as isTrpcNotFound } from "@langwatch/trace-web/utils/trpcError";
 import { AUTOSAVE_OUT_OF_DATE_REASON } from "../../model/experiments-v3/constants";

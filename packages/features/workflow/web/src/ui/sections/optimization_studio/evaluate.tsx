@@ -25,7 +25,7 @@ import { Select } from "@langwatch/design-system/select";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../behavior/studio-host/api";
+import { api } from "../../../model/workflow-api-client";
 import { useEvaluationExecution } from "./use-evaluation-execution";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys";

@@ -141,6 +141,13 @@ Feature: Feature package boundary lint
     Then architecture lint reports a sealed-export violation
 
   @unit @architecture
+  Scenario: A web feature collaborates only through another web feature's named surface
+    Given a web feature imports another web feature's surfaces entry
+    When architecture lint checks the importer
+    Then the dependency is allowed, because a surface is the web feature's public collaboration point
+    And the same importer is rejected for the bare package entry or any other subpath
+
+  @unit @architecture
   Scenario: Wildcard exports are forbidden for feature packages
     Given a feature package export map contains a wildcard subpath
     When architecture lint checks its manifest

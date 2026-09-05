@@ -2,7 +2,7 @@ import { Alert, Box, Button, Code, HStack, Link, Spacer, Text, VStack } from "@c
 import { useState } from "react";
 import { LuExternalLink, LuKeyRound, LuSettings } from "react-icons/lu";
 import { Popover } from "@langwatch/design-system/popover";
-import { api } from "../../../behavior/studio-host/api";
+import { api } from "../../../model/workflow-api-client";
 
 interface SecretsIndicatorProps {
   projectId: string;

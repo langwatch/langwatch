@@ -70,7 +70,7 @@ vi.mock("../../../../behavior/experiments-v3/use-evaluator-name", () => ({
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   api: {
     useUtils: () => ({
       agents: { getById: { fetch: vi.fn() } },

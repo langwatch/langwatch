@@ -98,10 +98,6 @@
       "types": "./src/screens/workflows/index.ts",
       "default": "./src/screens/workflows/index.ts"
     },
-    "./studio-host/api": {
-      "types": "./src/behavior/studio-host/api.ts",
-      "default": "./src/behavior/studio-host/api.ts"
-    },
     "./studio-host/errors": {
       "types": "./src/ui/elements/studio-host/errors.tsx",
       "default": "./src/ui/elements/studio-host/errors.tsx"
@@ -109,6 +105,10 @@
     "./studio-host/use-organization-team-project": {
       "types": "./src/behavior/studio-host/use-organization-team-project.ts",
       "default": "./src/behavior/studio-host/use-organization-team-project.ts"
+    },
+    "./surfaces/workflow-api": {
+      "types": "./src/model/workflow-api-client.ts",
+      "default": "./src/model/workflow-api-client.ts"
     },
     "./types": {
       "types": "./src/model/types.ts",
@@ -137,10 +137,6 @@
     "./utils/trpcError": {
       "types": "./src/behavior/trpc-error.ts",
       "default": "./src/behavior/trpc-error.ts"
-    },
-    "./utils/workflow-api": {
-      "types": "./src/behavior/workflow-api.ts",
-      "default": "./src/behavior/workflow-api.ts"
     }
   },
   "scripts": {

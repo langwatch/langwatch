@@ -29,7 +29,7 @@ const calls = vi.hoisted(() => ({
   invalidateAll: vi.fn(),
 }));
 
-vi.mock("../../../behavior/workflow-api", () => {
+vi.mock("../../../model/workflow-api", () => {
   const mutation = (spy: (input: unknown) => unknown) => ({
     useMutation: () => ({
       isPending: false,

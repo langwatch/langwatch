@@ -15,7 +15,7 @@ const AUTOSAVE_DEBOUNCE_MS = 1500;
 
 const mockMutateAsync = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   api: {
     useUtils: () => ({
       experiments: {

@@ -18,8 +18,8 @@ import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../behavior/studio-host/api";
-import { workflowApi } from "../../../behavior/workflow-api";
+import { api } from "../../../model/workflow-api-client";
+import { workflowApi } from "../../../model/workflow-api";
 import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";
 import {
   hasDSLChanged,

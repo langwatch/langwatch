@@ -6,7 +6,7 @@ import {
   type EvaluatorDefinition,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 
 export const useAvailableEvaluators = ():

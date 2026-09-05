@@ -1,5 +1,5 @@
 import { TRPCClientError, type TRPCClientErrorLike } from "@trpc/client";
-import type { AppRouter } from "./studio-host/api";
+import type { WorkflowApiRouter } from "../model/workflow-api";
 
 /**
  * The seat levers a licence caps, written out here rather than imported from
@@ -8,7 +8,7 @@ import type { AppRouter } from "./studio-host/api";
  */
 type LimitType = "members" | "membersLite";
 
-export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
+export const isNotFound = (error: TRPCClientErrorLike<WorkflowApiRouter> | null) => {
   if (error && error instanceof TRPCClientError && error.data?.httpStatus === 404) {
     return true;
   }
@@ -16,10 +16,8 @@ export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
 };
 
 /**
- * Every error any global interceptor in `utils/api.tsx` has already surfaced —
- * as a modal, or as its own bespoke toast. `isHandledByGlobalHandler` reads
- * ONLY this set, so a new `markAsHandledBy…` cannot forget to enrol itself in
- * a hand-maintained OR the way the first version did.
+ * Every error any global interceptor in `utils/api.tsx` has already surfaced — as a modal, or
+ * as its own bespoke toast.
  */
 const handledGlobally = new WeakSet<Error>();
 
@@ -37,18 +35,7 @@ export function markAsHandledByLicenseHandler(error: Error): void {
 
 /**
  * Check if an error was already handled by the global license limit handler.
- * Use this in component-level onError callbacks to avoid showing duplicate
- * error messages (toast + modal) for license limit errors.
- *
  * @example
- * ```tsx
- * const mutation = api.prompts.create.useMutation({
- *   onError: (error) => {
- *     if (isHandledByGlobalLicenseHandler(error)) return;
- *     showErrorToast({ error, fallbackTitle: "Couldn't save" });
- *   },
- * });
- * ```
  */
 export function isHandledByGlobalLicenseHandler(error: unknown): boolean {
   return error instanceof Error && handledLicenseErrors.has(error);
@@ -73,29 +60,9 @@ export function isHandledByLiteMemberHandler(error: unknown): boolean {
 }
 
 /**
- * Check if an error was already handled by any global error handler, which
- * surface it as a modal or a bespoke toast — so reporting it again would
- * duplicate it.
- *
- * Every interceptor in `utils/api.tsx` counts. This used to be a hand-written
- * OR over the individual sets, and the first version listed only two of them,
- * so a missing-model failure (which opens its own sticky toast naming the
- * feature and linking to model settings) also drew a second, vaguer toast next
- * to it — the exact duplication this guard exists to stop. It now reads the one
- * `handledGlobally` set that every `markAsHandledBy…` writes to, so adding an
- * interceptor cannot leave this stale.
- *
- * You rarely need to call this: `showErrorToast` and `<HandledErrorAlert>`
- * already do, which is why the ~137 copies of this guard in `onError`
- * callbacks are gone. Reach for it directly only when reporting an error some
- * other way.
- *
+ * Check if an error was already handled by any global error handler, which surface it as a
+ * modal or a bespoke toast — so reporting it again would duplicate it.
  * @example
- * ```tsx
- * const mutation = api.prompts.create.useMutation({
- *   onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save" }),
- * });
- * ```
  */
 export function isHandledByGlobalHandler(error: unknown): boolean {
   return error instanceof Error && handledGlobally.has(error);
@@ -163,9 +130,8 @@ export interface MissingModelExtracted {
 }
 
 /**
- * Extracts the typed payload from a tRPC error whose cause is
- * `MODEL_NOT_CONFIGURED`. The wire shape is set by the server-side
- * `ModelNotConfiguredError` (see
+ * Extracts the typed payload from a tRPC error whose cause is `MODEL_NOT_CONFIGURED`. The wire
+ * shape is set by the server-side `ModelNotConfiguredError` (see
  * `specs/model-providers/model-resolver-and-registry.feature`).
  */
 export function extractMissingModelInfo(error: unknown): MissingModelExtracted | null {
@@ -229,11 +195,8 @@ export interface ProviderDisabledExtracted {
 }
 
 /**
- * Extracts the typed payload from a tRPC error whose cause is
- * `MODEL_PROVIDER_DISABLED`. The wire shape is set by the server-side
- * `ModelProviderDisabledError`. The cascade still resolved a model,
- * but that model's provider is currently disabled — so the toast can
- * offer a one-click swap to the next cascade candidate (if any).
+ * Extracts the typed payload from a tRPC error whose cause is `MODEL_PROVIDER_DISABLED`. The
+ * wire shape is set by the server-side `ModelProviderDisabledError`.
  */
 export function extractProviderDisabledInfo(error: unknown): ProviderDisabledExtracted | null {
   if (!(error instanceof TRPCClientError)) return null;
@@ -285,13 +248,9 @@ export function extractProviderDisabledInfo(error: unknown): ProviderDisabledExt
 }
 
 /**
- * Wire-side discriminator a server route attaches when a downstream
- * AI call fails for a non-MODEL_NOT_CONFIGURED reason (provider 5xx,
- * 401 on a stale key, malformed custom model id, etc). The frontend
- * lifts it into a softer toast that nudges the user to double-check
- * their model provider configuration — most of these failures trace
- * back to a misset key or wrong model id at the provider layer, and
- * surfacing that hint up front saves a debug round-trip.
+ * Wire-side discriminator a server route attaches when a downstream AI call fails for a
+ * non-MODEL_NOT_CONFIGURED reason (provider 5xx, 401 on a stale key, malformed custom model id,
+ * etc).
  */
 export const AI_CALL_FAILED_CAUSE = "AI_CALL_FAILED" as const;
 

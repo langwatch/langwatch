@@ -31,7 +31,7 @@ import type { AgentWithFields } from "@langwatch/agent-contract";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { newTargetId } from "../../../model/experiments-v3/actions/transforms/add-target";
 import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants";
 import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name";

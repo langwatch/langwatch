@@ -31,7 +31,7 @@ import { Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { workflowApi } from "../../behavior/workflow-api";
+import { workflowApi } from "../../model/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host";
 
 /**

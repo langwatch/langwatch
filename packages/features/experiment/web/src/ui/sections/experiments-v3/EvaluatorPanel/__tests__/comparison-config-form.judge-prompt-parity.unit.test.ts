@@ -1,22 +1,7 @@
 /**
- * The four default Comparison judge prompts are written down twice: in the
- * langevals evaluator, which is the source of truth and the thing that
- * actually calls the model, and again in this config form. Both files say
- * they are kept byte-identical. Until this test, nothing checked.
- *
- * They have to match because both sides ask the same question by string
- * equality: "is this prompt still one of the shipped defaults?". The judge
- * asks it to decide whether it may swap in the template that matches what the
- * row really carries (select_best_compare.py), and the form asks it to decide
- * whether it may re-default the prompt when the golden toggle changes
- * (ComparisonConfigForm.tsx). One character of drift and an untouched prompt
- * stops being recognized on one side: the per-row adaptation quietly stops
- * applying, and a comparison with no reference answer goes out framed around
- * a reference it does not have, with an empty "Reference:" line. Nothing
- * throws and nothing logs, the judging just gets worse.
- *
- * So the Python file is read and parsed here at test time. Pasting the
- * prompts into the test would only add a third copy to drift.
+ * The four default Comparison judge prompts are written down twice: in the langevals evaluator,
+ * which is the source of truth and the thing that actually calls the model, and again in this
+ * config form. Both files say they are kept byte-identical. Until this test, nothing checked.
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -54,12 +39,9 @@ const CONFIG_FORM_SOURCE =
 const PYTHON_PROMPT_DECLARATION = /^(DEFAULT_SELECT_BEST_PROMPT[A-Z_]*)\s*=\s*"""([\s\S]*?)"""/gm;
 
 /**
- * The escapes a plain (non-raw) Python string literal can carry. The
- * backslash-newline is the line continuation in `"""\` that keeps the prompt
- * from starting with a blank line, and is the only one the file uses today.
- * Anything outside this table is rejected rather than guessed at: a parser
- * that quietly mis-decodes would compare a value the judge never sends, and
- * pass while the real prompts drift.
+ * The escapes a plain (non-raw) Python string literal can carry. The backslash-newline is the
+ * line continuation in `"""\` that keeps the prompt from starting with a blank line, and is the
+ * only one the file uses today.
  */
 const PYTHON_ESCAPES: Record<string, string> = {
   "\n": "",

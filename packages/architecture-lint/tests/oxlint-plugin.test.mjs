@@ -945,3 +945,38 @@ tester.run("package-boundaries: feature layer direction", plugin.rules["package-
     },
   ],
 });
+
+/** @scenario "A web feature collaborates only through another web feature's named surface" */
+tester.run("package-boundaries: web feature surfaces", plugin.rules["package-boundaries"], {
+  valid: [
+    {
+      filename: "packages/features/prompt/web/src/ui/elements/browser-panel.tsx",
+      code: 'import { BrowserPort } from "@langwatch/agent-web/surfaces/browser-port"; export { BrowserPort };',
+    },
+    {
+      filename: "packages/enterprise/features/billing/web/src/ui/elements/scope-row.tsx",
+      code: 'import { ScopePicker } from "@langwatch/authz-web/surfaces/scope-picker"; export { ScopePicker };',
+    },
+    {
+      filename: "apps/ui/src/routes/agents.tsx",
+      code: 'import { AgentManagementScreen } from "@langwatch/agent-web/screens/agent-management"; export { AgentManagementScreen };',
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/prompt/web/src/ui/elements/briefing.tsx",
+      code: 'import { Langy } from "@langwatch/langy-web"; export { Langy };',
+      errors: [{ messageId: "crossFeature" }],
+    },
+    {
+      filename: "packages/features/prompt/web/src/ui/elements/briefing.tsx",
+      code: 'import { asaplangy } from "@langwatch/langy-web/asaplangy"; export { asaplangy };',
+      errors: [{ messageId: "crossFeature" }],
+    },
+    {
+      filename: "packages/features/prompt/web/src/ui/elements/agents.tsx",
+      code: 'import { AgentManagementScreen } from "@langwatch/agent-web/screens/agent-management"; export { AgentManagementScreen };',
+      errors: [{ messageId: "crossFeature" }],
+    },
+  ],
+});

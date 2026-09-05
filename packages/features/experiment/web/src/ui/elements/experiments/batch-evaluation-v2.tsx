@@ -23,8 +23,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDejaViewLink } from "@langwatch/workflow-web/hooks/useDejaViewLink";
 import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/components/FormatMoney";
 import { VersionBox } from "@langwatch/workflow-web/optimization_studio/components/History";
-import type { AppRouter, RouterOutputs } from "@langwatch/workflow-web/studio-host/api";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import type {
+  WorkflowApiRouter,
+  RouterOutputs,
+} from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { getRunDisplayName } from "@langwatch/experiment-web";
@@ -278,13 +281,13 @@ export function BatchEvaluationV2RunList({
 }: {
   batchEvaluationRuns: UseTRPCQueryResult<
     RouterOutputs["experiments"]["getExperimentBatchEvaluationRuns"],
-    TRPCClientErrorLike<AppRouter>
+    TRPCClientErrorLike<WorkflowApiRouter>
   >;
   selectedRun:
     | NonNullable<
         UseTRPCQueryResult<
           RouterOutputs["experiments"]["getExperimentBatchEvaluationRuns"],
-          TRPCClientErrorLike<AppRouter>
+          TRPCClientErrorLike<WorkflowApiRouter>
         >["data"]
       >["runs"][number]
     | undefined;

@@ -12,7 +12,7 @@ import { useMemo } from "react";
 import { SecretsIndicator } from "../../secrets/secrets-indicator";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../../behavior/studio-host/api";
+import { api } from "../../../../model/workflow-api-client";
 
 type EditorProps = WorkflowCodeEditorContractProps & {
   code: string;

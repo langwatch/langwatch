@@ -4,7 +4,7 @@
 
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 
-import { workflowApi, type WorkflowListRow } from "../../behavior/workflow-api";
+import { workflowApi, type WorkflowListRow } from "../../model/workflow-api";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useWorkflowHost } from "../../model/workflow-host";
 import {

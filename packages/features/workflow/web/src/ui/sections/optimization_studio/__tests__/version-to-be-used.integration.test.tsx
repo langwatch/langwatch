@@ -35,7 +35,7 @@ vi.mock("@langwatch/model-provider-web/components/ModelSelector", () => ({
   useModelSelectionOptions: () => ({ modelOption: { isDisabled: false } }),
 }));
 
-vi.mock("../../../../behavior/studio-host/api", () => ({
+vi.mock("../../../../model/workflow-api-client", () => ({
   api: {
     modelProvider: {
       getResolvedDefault: {

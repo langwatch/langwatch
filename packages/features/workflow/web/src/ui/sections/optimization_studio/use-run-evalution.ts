@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../behavior/studio-host/api";
+import { api } from "../../../model/workflow-api-client";
 import { useVersionState } from "./history";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { hasDSLChanged } from "@langwatch/workflow-contract";

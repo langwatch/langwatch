@@ -11,7 +11,7 @@ import {
 import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { DRAWER_WIDTH } from "../../model/experiments-v3/constants";
 import type { FieldMapping, TargetConfig } from "../../model/experiments-v3/types";
 import {

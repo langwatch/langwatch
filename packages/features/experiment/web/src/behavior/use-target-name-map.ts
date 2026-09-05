@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 
 /**

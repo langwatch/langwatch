@@ -26,7 +26,7 @@ import {
   type DatasetRecordForm,
   datasetRecordFormSchema,
 } from "@langwatch/dataset-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { DatasetSlugDisplay } from "./dataset-slug-display";
 import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";

@@ -17,7 +17,7 @@ import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-
 import { AddModelProviderKey } from "@langwatch/workflow-web/optimization_studio/components/AddModelProviderKey";
 import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { camelCaseToTitleCase, titleCase } from "@langwatch/design-system/string-casing";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {

@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { AutosaveState, PendingSavedChanges } from "@langwatch/dataset-web";
 
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 export const DATASET_SYNC_DEBOUNCE_MS = 500;
 

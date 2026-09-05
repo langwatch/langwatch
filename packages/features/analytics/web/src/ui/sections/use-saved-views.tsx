@@ -18,7 +18,7 @@ import {
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { availableFilters } from "../../model/filters/registry";
 import type { FilterField } from "../../model/filters/types";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import {
   type DefaultView,
   findMatchingView,

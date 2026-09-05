@@ -11,7 +11,7 @@ import {
   newDatasetEntriesSchema,
 } from "@langwatch/dataset-contract";
 import { convertDatasetRecordsToColumnTypes } from "@langwatch/dataset-web";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { CSVReaderComponent } from "./upload-csv-drawer";
 
 export function AddRowsFromCSVModal({

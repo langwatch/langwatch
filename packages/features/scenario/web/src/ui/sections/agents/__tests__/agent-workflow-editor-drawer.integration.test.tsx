@@ -113,7 +113,7 @@ const MOCK_AGENT = {
   _count: undefined,
 };
 
-/** Mock workflow returned by workflowApi.workflow.getById. */
+/** Mock workflow returned by api.workflow.getById. */
 const MOCK_WORKFLOW = {
   id: "workflow-1",
   name: "Test Workflow",
@@ -155,8 +155,8 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("@langwatch/workflow-web/utils/workflow-api", () => ({
-  workflowApi: {
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+  api: {
     workflow: {
       getById: {
         useQuery: (_input: unknown, options?: { enabled?: boolean }) => {

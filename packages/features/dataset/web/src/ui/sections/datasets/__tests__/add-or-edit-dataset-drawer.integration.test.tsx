@@ -39,7 +39,7 @@ vi.mock("@langwatch/workflow-web", () => ({
  * `onSuccess` with the written row. That callback is where the crash lived, so
  * a double that never calls it would prove nothing.
  */
-vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   api: {
     dataset: {
       upsert: {

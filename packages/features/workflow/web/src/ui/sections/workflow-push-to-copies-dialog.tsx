@@ -30,7 +30,7 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { useEffect, useState } from "react";
 
-import { workflowApi } from "../../behavior/workflow-api";
+import { workflowApi } from "../../model/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host";
 
 export function WorkflowPushToCopiesDialog({

@@ -1,7 +1,7 @@
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "../../studio-host/use-organization-team-project";
-import { api } from "../../studio-host/api";
+import { api } from "../../../model/workflow-api-client";
 
 export {
   AuthConfigSection,

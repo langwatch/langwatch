@@ -1,4 +1,4 @@
-import { api } from "./studio-host/api";
+import { api } from "../model/workflow-api-client";
 import { useOrganizationTeamProject } from "./studio-host/use-organization-team-project";
 
 export const useFieldRedaction = (field: "input" | "output") => {

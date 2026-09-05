@@ -21,7 +21,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 const logger = createLogger("VersionHistoryListPopover");
 

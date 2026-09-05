@@ -39,7 +39,7 @@ import {
   checkPreconditionsSchema,
 } from "../../../model/evaluations/types";
 import { type MappingState, mappingStateSchema } from "@langwatch/trace-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { EvaluatorTracesMapping } from "../../elements/evaluations/evaluator-traces-mapping";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Tooltip } from "@langwatch/design-system/tooltip";

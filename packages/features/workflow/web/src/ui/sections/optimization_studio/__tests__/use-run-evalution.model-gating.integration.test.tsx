@@ -29,7 +29,7 @@ vi.mock("../../../../behavior/studio-host/use-organization-team-project", () => 
   }),
 }));
 
-vi.mock("../../../../behavior/studio-host/api", () => ({
+vi.mock("../../../../model/workflow-api-client", () => ({
   api: {
     useUtils: () => ({
       workflow: { getVersions: { invalidate: vi.fn() } },

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
 

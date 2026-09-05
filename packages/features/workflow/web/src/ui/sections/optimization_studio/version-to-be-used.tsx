@@ -12,7 +12,7 @@ import {
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../behavior/studio-host/api";
+import { api } from "../../../model/workflow-api-client";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { useVersionState } from "./history";

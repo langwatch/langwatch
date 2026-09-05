@@ -1,6 +1,6 @@
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project";
-import { workflowApi } from "../workflow-api";
+import { workflowApi } from "../../model/workflow-api";
 
 export const useLoadWorkflow = () => {
   const router = useRouter();

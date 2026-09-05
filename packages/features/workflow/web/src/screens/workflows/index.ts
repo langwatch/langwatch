@@ -45,8 +45,8 @@ export const workflowScreens = {
 export type WorkflowScreenName = keyof typeof workflowScreens;
 
 export { WORKFLOWS_PAGE_PERMISSION } from "./workflows.screen";
-export { workflowApi } from "../../behavior/workflow-api";
-export type { WorkflowApiMap, WorkflowOrganizationGraph } from "../../behavior/workflow-api";
+export { workflowApi } from "../../model/workflow-api";
+export type { WorkflowApiMap, WorkflowOrganizationGraph } from "../../model/workflow-api";
 export {
   WorkflowHostPort,
   WorkflowHostProvider,

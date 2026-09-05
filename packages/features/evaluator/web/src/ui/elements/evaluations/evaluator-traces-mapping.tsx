@@ -1,5 +1,5 @@
 import { useFilterParams } from "@langwatch/analytics-web/hooks/useFilterParams";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { TracesMapping } from "@langwatch/trace-web/components/traces/TracesMapping";
 
 /**

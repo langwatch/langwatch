@@ -53,7 +53,7 @@ vi.mock("@xyflow/react", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../../behavior/studio-host/api", () => ({
+vi.mock("../../../../model/workflow-api-client", () => ({
   api: {
     dataset: {
       getAll: {

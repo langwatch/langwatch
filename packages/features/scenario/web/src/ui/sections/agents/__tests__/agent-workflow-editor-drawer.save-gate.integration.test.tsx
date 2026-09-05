@@ -93,8 +93,8 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("@langwatch/workflow-web/utils/workflow-api", () => ({
-  workflowApi: {
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+  api: {
     workflow: {
       getById: {
         useQuery: (_input: unknown, options?: { enabled?: boolean }) => {

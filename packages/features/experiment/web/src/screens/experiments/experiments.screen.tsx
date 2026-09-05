@@ -39,7 +39,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { isHandledByGlobalHandler } from "@langwatch/trace-web/utils/trpcError";
 
 /** One row of the experiments list, as this table renders it. */

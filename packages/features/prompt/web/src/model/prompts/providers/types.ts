@@ -1,5 +1,5 @@
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { RouterInputs } from "@langwatch/workflow-web/studio-host/api";
+import type { RouterInputs } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 /**
  * Parameters for creating a new prompt configuration

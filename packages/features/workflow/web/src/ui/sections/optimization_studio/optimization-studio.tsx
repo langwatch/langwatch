@@ -86,7 +86,7 @@ import { EmojiPickerModal } from "./properties/modals/emoji-picker-modal";
 import { Publish } from "./publish";
 import { ResultsPanel } from "./results-panel";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { api } from "../../../behavior/studio-host/api";
+import { api } from "../../../model/workflow-api-client";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({

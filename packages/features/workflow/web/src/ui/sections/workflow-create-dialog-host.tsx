@@ -8,7 +8,7 @@ import { studioWorkflowWireSchema, type StudioWorkflow } from "@langwatch/workfl
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { workflowApi } from "../../behavior/workflow-api";
+import { workflowApi } from "../../model/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host";
 import { getRandomWorkflowIcon } from "../../model/random-workflow-icon";
 import {

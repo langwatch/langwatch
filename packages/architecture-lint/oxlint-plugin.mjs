@@ -279,6 +279,14 @@ const boundaryRule = {
           target.pkg.exports.has(subpath) &&
           (classification.role === "other" || classification.role === "server") &&
           isRecognizedTestSource(classification.workspacePath);
+        // A web feature's public surface is exactly `surfaces/<id>` for other web
+        // features and `screens/<owner>` for the browser application. A screen is
+        // therefore not collaboration between features, and the bare package entry
+        // and every other subpath stay private.
+        const webSurfaceImport =
+          target.pkg.role === "web" &&
+          classification.role === "web" &&
+          /^\.\/surfaces\/[^/]+$/.test(subpath);
         if (!target.pkg.exports.has(subpath)) {
           context.report({ node, messageId: "sealedExports" });
         }
@@ -286,7 +294,8 @@ const boundaryRule = {
           classification.feature &&
           target.pkg.feature !== classification.feature &&
           target.pkg.role !== "contract" &&
-          !testSupportImport
+          !testSupportImport &&
+          !webSurfaceImport
         ) {
           context.report({ node, messageId: "crossFeature" });
         }

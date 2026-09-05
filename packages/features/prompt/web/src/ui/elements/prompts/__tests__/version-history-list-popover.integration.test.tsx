@@ -18,7 +18,7 @@ vi.mock("@langwatch/ui-host/toaster", () => ({
 vi.mock("@langwatch/ui-host/errors", () => ({ showErrorToast: vi.fn() }));
 
 const mockUseQuery = vi.fn();
-vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   api: {
     prompts: {
       getAllVersionsForPrompt: { useQuery: (...args: unknown[]) => mockUseQuery(...args) },

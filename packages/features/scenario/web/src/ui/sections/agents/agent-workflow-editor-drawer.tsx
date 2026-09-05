@@ -37,7 +37,7 @@ import {
 } from "@langwatch/agent-contract";
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { api } from "../../../behavior/scenario-api";
-import { workflowApi } from "@langwatch/workflow-web/utils/workflow-api";
+import { api as workflowApi } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 export type AgentWorkflowEditorDrawerProps = {
   open?: boolean;

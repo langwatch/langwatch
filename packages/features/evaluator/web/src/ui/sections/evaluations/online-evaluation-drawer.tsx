@@ -47,7 +47,7 @@ import type {
 } from "../../../model/evaluations/types";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { MappingState, TRACE_MAPPINGS } from "@langwatch/trace-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { SmallLabel } from "@langwatch/design-system/small-label";

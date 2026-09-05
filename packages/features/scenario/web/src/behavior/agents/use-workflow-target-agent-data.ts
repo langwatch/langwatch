@@ -4,7 +4,7 @@ import { linkedWorkflowId } from "@langwatch/agent-contract";
 import type { Field as DSLField, StudioWorkflow } from "@langwatch/workflow-contract";
 import { getMappingSurfaceInputs, parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { api } from "../scenario-api";
-import { workflowApi } from "@langwatch/workflow-web/utils/workflow-api";
+import { api as workflowApi } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 /**
  * Derives the mapping-surface inputs (identifier + type) from a workflow's

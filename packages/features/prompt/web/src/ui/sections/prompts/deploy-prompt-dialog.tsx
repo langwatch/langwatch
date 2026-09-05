@@ -29,7 +29,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog";
 import { usePromptTags } from "../../../behavior/prompts/use-prompt-tags";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 interface DeployPromptDialogProps {
   isOpen: boolean;

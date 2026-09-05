@@ -22,7 +22,7 @@ import { EmojiPickerModal } from "@langwatch/workflow-web/optimization_studio/co
 import { getRandomWorkflowIcon } from "@langwatch/workflow-web";
 import { customEvaluatorTemplate } from "@langwatch/workflow-web";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 
 export type WorkflowSelectorForEvaluatorDrawerProps = {

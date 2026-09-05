@@ -45,7 +45,7 @@ vi.mock("../../../../behavior/studio-host/use-organization-team-project", () => 
   }),
 }));
 
-vi.mock("../../../../behavior/studio-host/api", () => {
+vi.mock("../../../../model/workflow-api-client", () => {
   const queryStub = (data: unknown) => ({
     useQuery: () => ({ data, isLoading: false, refetch: vi.fn() }),
   });

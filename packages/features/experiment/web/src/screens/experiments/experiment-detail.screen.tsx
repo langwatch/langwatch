@@ -7,7 +7,7 @@ import BatchEvaluation from "../../ui/elements/experiments/batch-evaluation";
 // Note: BatchEvaluationV2 is kept for reference but no longer used - can be deleted after verification
 import { DSPyExperiment } from "../../ui/elements/experiments/ds-py-experiment";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { isNotFound } from "@langwatch/trace-web/utils/trpcError";
 
 export default function ExperimentPage() {

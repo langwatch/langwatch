@@ -24,7 +24,7 @@ import {
   codeEvaluatorOutputFields,
   defaultCodeEvaluatorConfig,
 } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 import {
   CodeEvaluatorEditor,

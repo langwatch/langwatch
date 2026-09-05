@@ -35,7 +35,7 @@ vi.mock("@langwatch/design-system/loading-screen", () => ({
 
 // The page reads the experiment to decide where a slugged URL can open, so the
 // tRPC hook is mocked and the branch under test is driven by `experimentState`.
-vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   api: {
     experiments: {
       getExperimentBySlugOrId: {

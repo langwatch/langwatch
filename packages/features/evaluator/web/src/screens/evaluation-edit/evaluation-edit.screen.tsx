@@ -20,7 +20,7 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 /**
  * The legacy online-evaluation edit form, at `/:project/evaluations/:id/edit`. WHY THIS

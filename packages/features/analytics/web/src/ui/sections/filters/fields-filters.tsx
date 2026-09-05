@@ -27,10 +27,13 @@ import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { type FilterParam, useFilterParams } from "../use-filter-params";
 import { filterOutEmptyFilters } from "../analytics/utils";
-import type { AppRouter, RouterOutputs } from "@langwatch/workflow-web/studio-host/api";
+import type {
+  WorkflowApiRouter,
+  RouterOutputs,
+} from "@langwatch/workflow-web/surfaces/workflow-api";
 import { availableFilters } from "../../../model/filters/registry";
 import type { FilterDefinition, FilterField } from "../../../model/filters/types";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
@@ -805,7 +808,7 @@ function RangeFilter({
 }: {
   filterData: UseTRPCQueryResult<
     RouterOutputs["analytics"]["dataForFilter"],
-    TRPCClientErrorLike<AppRouter>
+    TRPCClientErrorLike<WorkflowApiRouter>
   >;
   currentValues: string[];
   onChange: (value: string[]) => void;

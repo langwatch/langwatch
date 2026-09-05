@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type { TargetConfig } from "../../model/experiments-v3/types";
 import { type NamedEntity, pickTargetName } from "@langwatch/experiment-contract";
 

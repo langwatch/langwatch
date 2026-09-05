@@ -31,7 +31,7 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { useState } from "react";
 
-import { workflowApi } from "../../behavior/workflow-api";
+import { workflowApi } from "../../model/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host";
 
 export function WorkflowReplicateDialog({

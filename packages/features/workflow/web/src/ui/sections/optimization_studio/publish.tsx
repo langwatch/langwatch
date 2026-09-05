@@ -24,7 +24,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../behavior/studio-host/api";
+import { api } from "../../../model/workflow-api-client";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import {

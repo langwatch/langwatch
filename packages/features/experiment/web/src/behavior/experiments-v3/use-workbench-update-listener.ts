@@ -5,7 +5,7 @@ import {
   type ExperimentUpdateSignal,
   experimentUpdateSignalSchema,
 } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type { EvaluationsV3Actions } from "../../model/experiments-v3/types";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 

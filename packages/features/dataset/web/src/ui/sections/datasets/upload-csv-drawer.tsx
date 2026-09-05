@@ -24,7 +24,7 @@ import type { InMemoryDataset } from "./editor/dataset-editor-table";
 import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";

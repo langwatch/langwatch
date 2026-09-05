@@ -24,7 +24,7 @@ const updateMutate = vi.fn();
 const deleteManyMutate = vi.fn();
 const getAllQuery = vi.fn();
 
-vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   api: {
     datasetRecord: {
       getAll: {

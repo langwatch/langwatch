@@ -50,7 +50,7 @@ import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import type { LlmConfigInputType } from "@langwatch/workflow-web/types";
-import { api } from "@langwatch/workflow-web/studio-host/api";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values";
 
 export type PromptEditorDrawerProps = {

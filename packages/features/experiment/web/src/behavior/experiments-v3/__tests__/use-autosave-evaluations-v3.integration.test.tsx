@@ -24,7 +24,7 @@ const mockMutateAsync = vi.hoisted(() =>
 
 const mockStateFetch = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   api: {
     useUtils: () => ({
       experiments: {
