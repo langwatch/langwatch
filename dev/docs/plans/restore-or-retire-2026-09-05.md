@@ -21,7 +21,7 @@ Prior lists: `binding-gaps-2026-09-04.md` (written at 1,333 unbound) and
 | navigation | 15 | `WorkspaceSwitcher` component simplified away | `platform/app/src/components/__tests__/WorkspaceSwitcher.integration.test.tsx` |
 | model providers | 10 | `MissingModelToast` never ported | `platform/app/src/components/__tests__/MissingModelToast.integration.test.tsx` |
 | components | 11 | `GraphicsQualityProvider` and `evaluateFpsSample` (adaptive graphics quality); apps/ui fills the slot with a pending provider | `platform/app/src/components/__tests__/GraphicsQualityProvider.integration.test.tsx` |
-| home | 15 | Langy composer morph (`useComposerMorph`, `LangyHomeLantern`) and briefing receipts | `platform/app/src/features/langy/hooks/__tests__/useComposerMorph.unit.test.tsx` |
+| home | 15 | **retired 2026-09-05**: the morph's host `LangyHomeLantern` was mounted by nothing on main, and main removed the receipts rail for the attention inbox (ported). Unbound scenarios deleted; the three bound ones stay | `platform/app/src/features/langy/hooks/__tests__/useComposerMorph.unit.test.tsx` |
 | langy | 3 | `langyNavigateFallback` (page-name navigation), inline model setup with key field and "Save and continue", derived-stat bar leading marker | `platform/app/src/server/app-layer/langy/streaming/__tests__/langyNavigateFallback.integration.test.ts` |
 | traces-v2 | 10 | `LegacyTraceDrawerRedirect` (5), `PresenceMenuItem` (3), `AnnotationExpectedOutputs` (2) | `platform/app/src/...` per scenario |
 | experiments-v3 | 4 | `TargetVariablesPanel` (3); workbench beside a compact navigation menu (1, `compactMenu` explicitly did not travel) | |
