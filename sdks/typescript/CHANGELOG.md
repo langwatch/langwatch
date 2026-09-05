@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.12.2](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.12.1...typescript-sdk@v1.12.2) (2026-09-05)
+
+
+### Bug Fixes
+
+* **api-keys:** per-device personal ingest keys and hook self-heal on a revoked key ([#7859](https://github.com/langwatch/langwatch/issues/7859)) ([d6d1dda](https://github.com/langwatch/langwatch/commit/d6d1dda3ca126d39da8a64180e2e66bb6d068e30))
+
+
+### Documentation
+
+* **improve-your-agent:** follow-ups: plain connected target, native GEPA tracking, writing-rules sweep ([#7897](https://github.com/langwatch/langwatch/issues/7897)) ([a710273](https://github.com/langwatch/langwatch/commit/a7102738c0f13b9c8dd8152c3b947d72f4b604c4))
+* **improve-your-agent:** the agent improvement loop and the optimization guides ([#7868](https://github.com/langwatch/langwatch/issues/7868)) ([c96d20f](https://github.com/langwatch/langwatch/commit/c96d20f35b9644a84e2345a4e98e8e810b87e936))
+
 ## [1.12.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.12.0...typescript-sdk@v1.12.1) (2026-09-04)
 
 
