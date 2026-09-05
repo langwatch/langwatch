@@ -1,10 +1,13 @@
-// Package toolmap holds the harness-independent tool-frame mapping helpers the
-// coding-agent adapters share: output bounding, the CLI failure-document rule,
-// the plan (todowrite) snapshot mapping, the measured X/Y progress mapper, and
-// the per-turn tool-call de-dupe tracker. Both adapters (opencode and pi) map
-// their own wire events onto internal/frames values through these helpers, so
-// the tool cards, the plan checklist and the progress protocol behave the same
-// whichever harness runs the turn.
+// Package toolmap holds the tool-frame mapping helpers a coding-agent adapter
+// uses: output bounding, the CLI failure-document rule, the plan (todowrite)
+// snapshot mapping, the measured X/Y progress mapper, and the per-turn
+// tool-call de-dupe tracker. The pi adapter maps its wire events onto
+// internal/frames values through these helpers.
+//
+// It was shared by two adapters until ADR-131 and stays a package of its own
+// rather than folding into adapters/pi: these are the rules for what a tool
+// card, a plan checklist and the progress protocol MEAN, which is a product
+// decision the chat panel depends on, not a detail of one agent's wire format.
 package toolmap
 
 import (

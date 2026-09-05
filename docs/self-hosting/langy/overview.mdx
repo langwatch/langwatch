@@ -1,6 +1,6 @@
 ---
 title: Self-Hosting Langy
-description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
+description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the two isolation postures you choose between.
 sidebarTitle: Overview
 keywords:
   - self-host langy
@@ -11,11 +11,11 @@ keywords:
 
 Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, and ships **enabled**: a plain `helm install` deploys it, materialises the shared secret, wires the app and workers to it, and opens Langy to everyone in the install.
 
-The default pins the pod to a `gvisor` RuntimeClass. On a cluster without one, only the agent pod waits (Pending) while the rest of the install runs; provide a sandboxed runtime or accept running without one. See [Setup](/self-hosting/langy/setup).
+Two isolation postures ship as defaults you can change: the pod runs **without** a sandboxed RuntimeClass, because most self-managed clusters cannot offer one, and **with** per-worker Unix identity, which costs the pod root. Pin a RuntimeClass to harden the first; if your cluster refuses root, trade away the second. Both are covered in [Setup](/self-hosting/langy/setup) and stated in full on [the sandbox page](/langy/security/sandbox).
 
 The GitHub App and outbound network egress are both optional and off until you configure them.
 
-The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [opencode](/langy/how-langy-works) worker per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
+The `langyagent` pod is a single Go "manager" process that spawns one [worker](/langy/how-langy-works) per conversation and drives it over stdio pipes. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 
 <Info>
 **Also check:** [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables), [Networking and egress](/self-hosting/langy/networking-and-egress), [The sandbox](/langy/security/sandbox).
@@ -34,7 +34,8 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 | Access | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead |
 | Replicas | 1 (render-time guard blocks more until conversation-sticky routing exists) |
 | Update strategy | `Recreate`, no HPA. Scale vertically. |
-| Sandbox | `runtimeClassName: gvisor` by default; unsandboxed only via explicit `acceptUnsandboxedRuntime: true` |
+| Sandbox | No RuntimeClass by default (`runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`); pin one to harden |
+| Worker isolation | Each worker gets its own uid by default, which costs the pod root; `workerIsolation: none` trades it for a pod a restricted cluster admits |
 | Sizing | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi |
 | Shared secret | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
 | GitHub App | Optional, for bot-authored pull requests |
@@ -42,7 +43,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 
 ## Hard requirements
 
-- **A sandboxed runtime.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so the default pins the pod to gVisor. GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly). On AKS, point `runtimeClassName` at your Kata VM isolation class; any sandboxed RuntimeClass works. EKS has no managed option: install gVisor on the node group, or accept unsandboxed explicitly with `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`. On a cluster without the RuntimeClass, the pod waits with a `RuntimeClass not found` event and the install notes explain the choice. See [The sandbox](/langy/security/sandbox).
+- **A sandboxed runtime — recommended, not required, and not the default.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so a pod-to-host sandbox is worth having. The chart nonetheless ships `runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`, because most self-managed clusters cannot offer one and refusing them made the assistant hosted-only in practice: **a default install runs on the node's own runtime, with no sandbox.** To harden, pin a class and set `acceptUnsandboxedRuntime: false` — GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly), on AKS point `runtimeClassName` at your Kata VM isolation class, and on EKS install gVisor on the node group. Once pinned, blanking it again is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox; and pinning a class the cluster does not define creates no pod at all. See [The sandbox](/langy/security/sandbox).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
@@ -58,7 +59,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 graph LR
     Browser["Browser<br/>(event-sourced UI)"] -->|"HTTPS"| App["LangWatch App<br/>(control plane)"]
     App -->|"Bearer LANGY_INTERNAL_SECRET<br/>ClusterIP only"| Agent["langyagent pod<br/>(Go manager)"]
-    Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>opencode worker"]
+    Agent -->|"one per conversation<br/>(stdio pipes)"| Worker["Langy worker<br/>(own Unix identity)"]
     Worker -->|"langwatch CLI<br/>(per-session key)"| App
     Worker -->|"LLM traffic<br/>(virtual key)"| Gateway["LangWatch AI Gateway"]
     Gateway -->|"completions"| Providers["LLM Providers<br/>(your accounts / BYOK)"]
@@ -84,7 +85,7 @@ The control plane reaches the agent over cluster DNS at `http://<release>-langya
     The NetworkPolicy, the FQDN floor, and the cooperative-vs-mandatory egress limit.
   </Card>
   <Card title="The sandbox" icon="shield-halved" href="/langy/security/sandbox">
-    What the gVisor sandbox can and cannot reach, and where the boundaries sit.
+    What a worker can and cannot reach, which walls are configurable, and where the boundaries sit.
   </Card>
   <Card title="Platform self-hosting" icon="server" href="/self-hosting/overview">
     Deploy the rest of the LangWatch stack that Langy runs alongside.

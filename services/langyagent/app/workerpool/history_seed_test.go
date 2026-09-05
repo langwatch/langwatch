@@ -18,27 +18,34 @@ type seedRecordingAgent struct {
 	postErr error
 }
 
-func (a *seedRecordingAgent) WaitReady(context.Context, app.Endpoint) error { return nil }
-func (a *seedRecordingAgent) OpenSession(context.Context, app.Endpoint) (string, bool, error) {
+func (a *seedRecordingAgent) WaitReady(context.Context) error { return nil }
+func (a *seedRecordingAgent) OpenSession(context.Context) (string, bool, error) {
 	return "sess", false, nil
 }
-func (a *seedRecordingAgent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn) error {
+func (a *seedRecordingAgent) Post(_ context.Context, _ string, turn app.Turn) error {
 	a.posts = append(a.posts, turn)
 	return a.postErr
 }
-func (a *seedRecordingAgent) Stream(context.Context, app.Endpoint, string, app.ChatSink) error {
+func (a *seedRecordingAgent) Stream(context.Context, string, app.ChatSink) error {
 	return nil
 }
-func (a *seedRecordingAgent) NotifyShutdownImminent(context.Context, app.Endpoint, string, time.Time) error {
+
+// AbortTurn and TurnEnded became part of app.CodingAgent in ADR-131 (they were
+// optional capabilities only because the removed harness implemented neither),
+// so every fake agent carries them. The no-ops are the honest default: a fake
+// that does not model aborting should not pretend to abort.
+func (a *seedRecordingAgent) AbortTurn(context.Context, string, string) error { return nil }
+func (a *seedRecordingAgent) TurnEnded()                                      {}
+
+func (a *seedRecordingAgent) NotifyShutdownImminent(context.Context, string, time.Time) error {
 	return nil
 }
 
 func newSeedWorker(agent app.CodingAgent) *Worker {
 	return &Worker{
-		conversationID:    "conv-1",
-		agent:             agent,
-		endpoint:          app.Endpoint{BaseURL: "http://127.0.0.1:0", BearerToken: "b"},
-		openCodeSessionID: "sess",
+		conversationID: "conv-1",
+		agent:          agent,
+		agentSessionID: "sess",
 	}
 }
 

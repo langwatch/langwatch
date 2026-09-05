@@ -255,7 +255,7 @@ type handoffFrame struct {
 // Handoff is terminal (ADR-048): the worker checkpointed the in-flight turn on a
 // shutdown-imminent notice and hands back an opaque resume token the control plane
 // persists, so the NEXT turn resumes from it. The token is opaque here — authored
-// and consumed by opencode, only persisted by the relay.
+// and consumed by the worker, only persisted by the relay.
 func Handoff(resumeToken string) (Frame, error) {
 	return marshal(handoffFrame{Type: "handoff", ResumeToken: resumeToken})
 }

@@ -94,9 +94,18 @@ Feature: Langy comes up with a self-hosted LangWatch install
   # ===========================================================================
 
   # Langy runs LLM-written shell, so what bounds it must be on by default. The
-  # controls that bound the attack that actually happens do exactly that, at no
-  # cost and identically on every cluster: per-worker UID isolation, the
-  # per-worker password, and a NetworkPolicy with egress off.
+  # controls that bound the attack that actually happens are on in a default
+  # install: per-worker identity isolation, the per-worker session boundary,
+  # and a NetworkPolicy with egress off.
+  #
+  # This spec used to claim those cost nothing "and identically on every
+  # cluster". That was wrong, and a customer found the exception. Per-worker
+  # identity isolation costs the container root plus five capabilities, so on a
+  # cluster enforcing Pod Security Admission "restricted" — or any policy engine
+  # requiring runAsNonRoot — it costs the whole install: the pod is refused at
+  # admission. On those clusters the honest choice is between sibling isolation
+  # and having an assistant at all, and ADR-130 makes it the operator's to make
+  # rather than the chart's. Everywhere else the default stands unchanged.
   #
   # A sandboxed runtime is the rung above, guarding the node kernel against a
   # worker that escapes its container. It is NOT the default, because it is the
@@ -104,12 +113,24 @@ Feature: Langy comes up with a self-hosted LangWatch install
   # runtime and sandbox build. A default nobody can test on their nodes fails in
   # ways that read as "Langy is broken", so it is a step an operator takes on
   # purpose, and the install tells them how.
-  Scenario: A default install runs the assistant on any cluster
+  Scenario: A default install runs the assistant on a cluster with no sandboxed runtime
     Given a cluster with no sandboxed runtime available
     When the operator installs with default values
     Then Langy installs and runs
     And the isolation the install does have is stated back to the operator
     And they are told where to read about hardening it further
+
+  # The counterexample to the old "any cluster" promise. Worth stating as its
+  # own scenario because the failure it replaces was not a refusal an operator
+  # could act on: the pod was admitted, reported healthy, and died at the first
+  # chown, which reads as a product bug rather than a policy outcome.
+  Scenario: An install on a cluster that refuses root is told what the choice is
+    Given a cluster whose policy requires every pod to run as a non-root user
+    When the operator installs with default values
+    Then the agent does not run
+    And the operator can tell that their policy is what stopped it
+    And they are told which value trades sibling isolation for an install
+    And the rest of the product installs and runs regardless
 
   Scenario: An operator hardens the agent onto a sandboxed runtime
     Given a cluster with a sandboxed runtime available

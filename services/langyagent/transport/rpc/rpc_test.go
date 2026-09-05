@@ -82,32 +82,32 @@ func TestProbe_BindsSignatureToPrincipal(t *testing.T) {
 	}
 }
 
-// The probe folds the harness into the signature it compares, so a harness
-// flip is a probe MISS: the control plane then mints and the turn replaces
-// the worker, while an omitted harness normalises with the default and keeps
-// hitting workers spawned before harness selection existed.
+// The probe folded a harness into the signature it compares until ADR-131, so
+// that a flip was a MISS. With one harness there is nothing to compare, and
+// what has to hold instead is tolerance: a control plane mid-rollout still
+// sends `harness`, and the probe is the FIRST call of every turn — refusing it
+// would fail the turn before a worker was even looked for.
 //
-// @scenario "The pre-turn probe answers for the harness the turn will use"
-func TestProbe_CarriesHarnessIntoTheSignature(t *testing.T) {
+// @scenario "A turn that names the removed harness still runs"
+func TestProbe_AnswersAnEnvelopeThatStillNamesAHarness(t *testing.T) {
 	pool := &stubPool{liveWorker: true}
 	router := newTestRouter(pool)
 
-	rec := post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m","harness":"pi"}`)
+	rec := post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m","harness":"opencode"}`)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
-	}
-	if pool.lastSig.Harness != "pi" {
-		t.Fatalf("probe signature harness = %q, want pi", pool.lastSig.Harness)
+		t.Fatalf("a probe naming the removed harness must be answered, status = %d", rec.Code)
 	}
 
-	// Omitted harness → the default, so the probe asks the same question a
-	// pre-selection control plane always asked.
+	// And it must ask the SAME question as one that names none — otherwise the
+	// two would disagree about whether the live worker matches, and a turn would
+	// respawn a worker that was already serving it.
+	withHarness := pool.lastSig
 	rec = post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-	if pool.lastSig.Harness != "opencode" {
-		t.Fatalf("probe signature harness = %q, want opencode when omitted", pool.lastSig.Harness)
+	if pool.lastSig != withHarness {
+		t.Fatalf("naming a harness must not change the signature (with=%+v without=%+v)", withHarness, pool.lastSig)
 	}
 }
 

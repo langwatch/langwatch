@@ -89,11 +89,23 @@ dev's Personal Workspace at https://<your-host>/me .
         -o jsonpath='{.status.conditions[?(@.type=="ReplicaFailure")].message}'
     Everything else in the install keeps running either way.
 {{- else }}
+{{- if eq ((index .Values "langyagent").workerIsolation | default "per-uid") "none" }}
+    Isolation: per-worker identity is OFF (workerIsolation: none), so every
+    conversation's worker runs as the same user. One worker can read another's
+    live credentials from /proc/<pid>/environ and another conversation's content
+    from its session directory. This is the posture a cluster that refuses root
+    requires, and you accepted it deliberately; it is right for a single-tenant
+    install whose users are colleagues, and wrong if you serve mutually
+    untrusted users. Workers still open no listener and keep no credentials on
+    disk, and the NetworkPolicy still denies egress to the internet{{ if (index .Values "langyagent").networkPolicy.allowExternalHttps }} (you have turned external HTTPS ON){{ end }}.
+{{- else }}
     Isolation: each conversation's worker runs under its own UID with its own
     credentials, workers cannot read each other's, and the NetworkPolicy denies
-    egress to the internet{{ if (index .Values "langyagent").networkPolicy.allowExternalHttps }} (you have turned external HTTPS ON){{ end }}. The pod runs on the node's
-    normal runtime, so a worker that escapes its container faces the node
-    kernel. Hardening that last step is a sandboxed RuntimeClass:
+    egress to the internet{{ if (index .Values "langyagent").networkPolicy.allowExternalHttps }} (you have turned external HTTPS ON){{ end }}.
+{{- end }}
+    The pod runs on the node's normal runtime, so a worker that escapes its
+    container faces the node kernel. Hardening that last step is a sandboxed
+    RuntimeClass:
       https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
 {{- /* Deliberately NO `lookup` here, and do not reintroduce one. Naming the
        cluster's own sandboxed classes would take a cluster-scoped list of

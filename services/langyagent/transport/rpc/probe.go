@@ -30,13 +30,10 @@ type probeRequest struct {
 	// MISS and the worker re-warms rather than being reused under the tier it
 	// booted with — the relay's mirror decision is bound at spawn.
 	MirrorTier string `json:"mirrorTier,omitempty"`
-	// Harness is the coding-agent harness the turn would run on ("opencode" |
-	// "pi", per the project's flag). It rides the probe so a harness flip is a
-	// probe MISS: the worker is built for its harness, so the turn replaces it
-	// rather than reusing one speaking the other wire protocol. Empty
-	// normalises with "opencode" (domain.NormalizeHarness), so a pre-selection
-	// control plane keeps hitting its running workers.
-	Harness string `json:"harness,omitempty"`
+	// A `harness` field rode this probe until ADR-131, so that a harness flip
+	// was a probe MISS. A control plane that still sends it is not an error:
+	// the field is not decoded, and with one harness every worker answers the
+	// same question.
 }
 
 type probeResponse struct {

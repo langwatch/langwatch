@@ -3217,10 +3217,6 @@ const presentations = {
     title: "The session was lost",
     describe: () => "Start a new message to continue.",
   },
-  opencode_auth_not_enforced: {
-    title: "Temporarily unavailable",
-    describe: () => "We're on it. Try again shortly.",
-  },
   max_workers_reached: {
     title: "Busy right now",
     describe: () => "Try again in a moment.",

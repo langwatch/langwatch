@@ -10,15 +10,31 @@ Feature: Langy minimal harness
     Then the agent configuration carries Langy's own prompt
     And the harness's built-in coding-agent prompt is not used
 
-  @unit
+  # The three scenarios below were written against a harness that arrived with
+  # its own tool and skill surface, so the manager had to subtract from it:
+  # deny the tools the panel cannot render, keep the host's own skills out, and
+  # name the harness's built-in config-editing skill to refuse it. ADR-131
+  # removed that harness. The wrapper now BUILDS the tool surface
+  # (services/langyworker/src/tools/), so there is nothing arriving to subtract
+  # from and no built-in skill to deny by name.
+  #
+  # The outcomes still matter and are still what a user experiences, so they
+  # stay. What changed is where they are enforced and therefore where they have
+  # to be tested: in the wrapper's own construction, not in the manager's
+  # provision. They were bound to the deleted adapter's provision test and are
+  # @unimplemented until the wrapper carries its own — marked rather than
+  # rewritten to fit, because a scenario reworded to match whatever the wrapper
+  # happens to do would assert nothing.
+
+  @unit @unimplemented
   Scenario: The worker does not expose tools the panel cannot show
     When a worker is provisioned
-    Then subagent spawning and interactive questions are denied, because the
-      panel has no way to show either one yet
+    Then subagent spawning and interactive questions are not available, because
+      the panel has no way to show either one yet
     And the shell, file, skill, todo, and web fetching tools stay available,
       since Langy answers questions whose answers are not in LangWatch's docs
 
-  @unit
+  @unit @unimplemented
   Scenario: The worker runs only the skills we ship it
     Given the host account has its own agent skills installed
     When a worker is provisioned
@@ -26,14 +42,14 @@ Feature: Langy minimal harness
     And the operator's skills stay out of Langy's system prompt and out of the
       capabilities it offers the user
 
-  @unit
-  Scenario: The harness's own built-in skill is denied by name
-    Given the harness ships a built-in skill for editing its own configuration,
-      which is work Langy does not do for a customer
+  @unit @unimplemented
+  Scenario: The worker offers no tool for editing its own configuration
+    Given editing the agent's own configuration is work Langy does not do for a
+      customer
     When a worker is provisioned
-    Then that skill is denied by name
-    And every skill we ship stays available, because a rule that denied all of
-      them would also switch the skill tool off
+    Then no such tool is offered
+    And every skill we ship stays available, because removing the surface
+      wholesale would also switch the skill tool off
 
   @unit
   Scenario: The prompt fits its size budget

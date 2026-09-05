@@ -20,16 +20,16 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
-// The pi harness exports no OTLP: the wrapper is a thin stdio process and pi
-// itself ships no exporter. Every one of its LLM calls still crosses THIS
-// proxy, so the relay retells each call as one gen_ai span into the customer's
-// trace, model from the manager-held config, token usage read from the
-// response as it streams through untouched, parent = the turn span. Gated on
-// WorkerInfo.Harness == pi: opencode workers keep exporting their own spans
-// and would double-report if the relay synthesized more.
+// The worker exports no OTLP: the wrapper is a thin stdio process and ships no
+// exporter. Every one of its LLM calls still crosses THIS proxy, so the relay
+// retells each call as one gen_ai span into the customer's trace, model from
+// the manager-held config, token usage read from the response as it streams
+// through untouched, parent = the turn span.
+//
+// This was gated on the worker's harness until ADR-131, because the other
+// harness exported its own spans and would have been double-reported.
 //
 // The gateway's own gen_ai span (joined via the injected traceparent) remains
 // the authoritative METER for tokens and cost, exactly as on the opencode
@@ -123,10 +123,15 @@ type genAICall struct {
 }
 
 // newGenAICall returns the observer for one call, or nil when no span should
-// be synthesized: a non-pi worker, an invalid turn context (nothing to parent
-// under), or a non-generation request (only POSTs carry model calls).
+// be synthesized: an invalid turn context (nothing to parent under), or a
+// non-generation request (only POSTs carry model calls).
+//
+// This also gated on the worker's harness until ADR-131, because the other
+// harness exported its own OTLP spans and a retold copy would have double-
+// counted every call. The surviving harness exports none, so every mediated
+// call is retold.
 func newGenAICall(r *Relay, entry *workerEntry, req *http.Request) *genAICall {
-	if entry.info.Harness != domain.HarnessPi || req.Method != http.MethodPost {
+	if req.Method != http.MethodPost {
 		return nil
 	}
 	turn := entry.turnContext()

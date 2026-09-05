@@ -140,10 +140,10 @@ func (s Stack) OverlayEnv() []string {
 		// as admin@haven.localhost gets a normal user, not a platform admin.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
-	// langyagent (the OpenCode manager): the control plane dials it at its loopback
-	// port with the shared internal secret both sides require. Emitted whenever the
-	// service has a port (local or a baseline fallback). The isolation posture
-	// (LANGY_UNSAFE_DEV_DISABLE_ISOLATION) is NOT set here — it is a langyagent-only
+	// langyagent (the Langy worker manager): the control plane dials it at its
+	// loopback port with the shared internal secret both sides require. Emitted
+	// whenever the service has a port (local or a baseline fallback). The isolation
+	// posture (LANGY_WORKER_ISOLATION) is NOT set here — it is a langyagent-only
 	// concern the plan sets on the worker itself per tier (see LangyTier); the
 	// control plane never reads it.
 	if langy.Port != 0 {

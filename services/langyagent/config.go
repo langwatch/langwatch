@@ -1,7 +1,7 @@
 // Package langyagent is the langyagent manager — process-pool model.
 //
 // One pod, one of THIS process. Per conversation, we spawn a dedicated
-// `opencode` subprocess and route all of that conversation's turns to it.
+// worker subprocess and route all of that conversation's turns to it.
 // Credentials are NEVER held by the manager process; they arrive in each
 // request body, get injected into the worker subprocess's env at spawn time,
 // and die with the subprocess. This is the only thing that makes per-session
@@ -36,7 +36,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/clog"
@@ -130,24 +129,28 @@ type Config struct {
 	// itself). Independent of SESSIONS_ROOT (the per-conversation home dirs).
 	WorkspaceRoot string `env:"LANGY_WORKSPACE_ROOT" validate:"required"`
 
-	// UnsafeDevDisableIsolation disables the ADR-033 per-worker UID sandbox: no
-	// os.Chown of worker homes/config to a per-conversation UID, and no setuid
-	// Credential on the opencode subprocess (it runs as the manager's own user).
-	// This exists ONLY so the manager can spawn opencode on a LOCAL DEV box where
-	// it runs as an unprivileged user — there, the chown and the setuid Credential
-	// both fail with EPERM (they require root + CAP_SETUID/CAP_SETGID/CAP_CHOWN)
-	// and no worker can start at all. Enabling it DESTROYS sibling-worker
-	// isolation: every worker runs under one UID, so worker A can read worker B's
-	// plaintext credentials on the shared volume. It MUST only ever be used
-	// locally — LoadConfig hard-refuses it whenever ENVIRONMENT is not a
-	// local-like value (see environmentPermitsUnsafeDev), so it can never be
-	// switched on in production.
-	UnsafeDevDisableIsolation bool `env:"LANGY_UNSAFE_DEV_DISABLE_ISOLATION"`
-
-	// OpenCodeBinaryPath is the opencode executable (resolved via PATH). Not
-	// env-configurable in the original; kept as a fixed default so behavior is
-	// unchanged, but overridable in tests.
-	OpenCodeBinaryPath string
+	// WorkerIsolation selects the per-worker identity posture (ADR-130).
+	//
+	//   per-uid  (the default) each worker gets its own uid; the manager chowns
+	//            its home and setuids the subprocess into it. Needs root plus
+	//            CAP_SETUID/CAP_SETGID/CAP_CHOWN in the container.
+	//   none     every worker runs as the manager's own user. No chown, no
+	//            setuid, so the pod needs neither root nor any capability — which
+	//            is what makes it admissible where policy refuses a root pod.
+	//
+	// Under "none" one conversation's worker can read another's live credentials
+	// from /proc/<pid>/environ and its conversation content from the session
+	// directory. The chart refuses to render it without an explicit
+	// acknowledgement; the manager warns at boot. Anything other than these two
+	// values fails closed at LoadConfig rather than defaulting, so the weaker
+	// posture is never what a typo selects.
+	//
+	// This was LANGY_UNSAFE_DEV_DISABLE_ISOLATION, a boolean refused outside a
+	// local-like ENVIRONMENT. The allowlist is gone: it made the posture
+	// reachable only by lying about ENVIRONMENT, which telemetry and logging read
+	// too, and it decided for every operator that no assistant beats an assistant
+	// without the UID wall.
+	WorkerIsolation string `env:"LANGY_WORKER_ISOLATION"`
 
 	// PiWorkerBinaryPath is the langy-worker executable the pi harness spawns
 	// (resolved via PATH when bare). Env-overridable so a host-tier dev manager
@@ -191,7 +194,6 @@ func defaultConfig() Config {
 		ReadinessTimeoutMS:        defaultReadinessTimeoutMS,
 		SessionsRoot:              defaultSessionsRoot,
 		WorkspaceRoot:             defaultWorkspaceRoot,
-		OpenCodeBinaryPath:        "opencode",
 		PiWorkerBinaryPath:        "langy-worker",
 		ShutdownHandoffDeadlineMS: defaultShutdownHandoffDeadlineMS,
 		ShutdownDrainBudgetMS:     defaultShutdownDrainBudgetMS,
@@ -229,15 +231,17 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err
 	}
-	// Fail closed: the unsafe UID-isolation bypass may only be armed in a
-	// local-like environment. Checked AFTER hydrate+validate so cfg.Environment
-	// reflects the real ENVIRONMENT value. environmentPermitsUnsafeDev is an
-	// allowlist, so any non-local environment (production, staging, an unknown
-	// "prod-eu", or an empty value that isn't the local default) refuses the flag.
-	if cfg.UnsafeDevDisableIsolation && !environmentPermitsUnsafeDev(cfg.Environment) {
+	// Fail closed on the isolation posture: an unset value is the ISOLATED
+	// default, and an unrecognized one is refused outright rather than
+	// normalised. A typo must never be what selects the weaker posture, and
+	// there is no reading of "per-uidd" that should quietly run as "none".
+	if cfg.WorkerIsolation == "" {
+		cfg.WorkerIsolation = WorkerIsolationPerUID
+	}
+	if cfg.WorkerIsolation != WorkerIsolationPerUID && cfg.WorkerIsolation != WorkerIsolationNone {
 		return Config{}, fmt.Errorf(
-			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION cannot be enabled when ENVIRONMENT=%q — per-worker isolation may only be disabled in local development",
-			cfg.Environment,
+			"LANGY_WORKER_ISOLATION must be %q or %q, got %q",
+			WorkerIsolationPerUID, WorkerIsolationNone, cfg.WorkerIsolation,
 		)
 	}
 	// The mirror lane (ADR-061) is configured whole or not at all: an endpoint
@@ -284,27 +288,22 @@ func validateMirrorEndpoint(endpoint string) error {
 	return nil
 }
 
-// environmentPermitsUnsafeDev reports whether env is a local-like environment in
-// which the ADR-033 per-worker UID sandbox may be disabled. It is an ALLOWLIST,
-// not a production denylist: only the explicitly-listed local-like values return
-// true, so a novel or misconfigured environment name (e.g. "prod-eu", "staging",
-// or an empty string) fails closed and NEVER permits the bypass. Matching is
-// case-insensitive and trims surrounding whitespace.
-func environmentPermitsUnsafeDev(env string) bool {
-	switch strings.ToLower(strings.TrimSpace(env)) {
-	case "local", "dev", "development", "test":
-		return true
-	default:
-		return false
-	}
-}
+// Worker identity postures (ADR-130). LANGY_WORKER_ISOLATION takes one of
+// these; an unset value means WorkerIsolationPerUID, and anything else is
+// refused at LoadConfig.
+const (
+	// WorkerIsolationPerUID gives each worker its own uid — the default.
+	WorkerIsolationPerUID = "per-uid"
+	// WorkerIsolationNone runs every worker as the manager's own user.
+	WorkerIsolationNone = "none"
+)
 
 // WorkerIdle is the idle duration after which a worker is reaped.
 func (c Config) WorkerIdle() time.Duration {
 	return time.Duration(c.WorkerIdleMS) * time.Millisecond
 }
 
-// ReadinessTimeout is how long a spawn waits for opencode to become ready.
+// ReadinessTimeout is how long a spawn waits for the worker to become ready.
 func (c Config) ReadinessTimeout() time.Duration {
 	return time.Duration(c.ReadinessTimeoutMS) * time.Millisecond
 }

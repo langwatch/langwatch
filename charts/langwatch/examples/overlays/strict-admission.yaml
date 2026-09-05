@@ -42,20 +42,43 @@ clickhouse:
   preflight:
     enabled: false
 
-# The Langy assistant's manager process runs as UID 0 with CHOWN, DAC_OVERRIDE,
-# FOWNER, SETUID and SETGID, and carries no seccomp profile. That is deliberate
-# and load-bearing, NOT an oversight: the manager hands every opencode worker a
-# distinct UID via child_process.spawn({uid,gid}), which needs those exact
-# capabilities from a root-effective-uid process. Without them, sibling workers
-# share a UID and can read each other's project API keys and GitHub tokens off
-# disk (ADR-033; specs/langy/langy-deploy-hardening.feature).
+# The Langy assistant's manager runs as UID 0 with CHOWN, DAC_OVERRIDE, FOWNER,
+# SETUID and SETGID in its DEFAULT posture. That is deliberate and load-bearing,
+# NOT an oversight: the manager hands every worker a distinct UID, which needs
+# those exact capabilities from a root-effective-uid process. Without them
+# sibling workers share a UID and can read each other's live credentials out of
+# /proc/<pid>/environ (ADR-033; specs/langy/langy-deploy-hardening.feature).
 #
-# So on a restricted cluster the answer is to NOT deploy the agent, never to
-# "fix" it by forcing runAsNonRoot — that silently re-opens cross-worker
-# credential theft. Opting the whole pod out needs no acceptance value: with
-# nothing deployed there is no workload to sandbox.
+# This overlay keeps the assistant off, which is the conservative default for a
+# restricted cluster and the only setting that needs no security judgement from
+# whoever applies it. LangWatch runs fine without it; you lose the in-product
+# assistant only.
 #
-# LangWatch runs fine without it; you lose the in-product assistant only.
+# THERE IS NOW A SECOND OPTION, and it is the reason this comment changed.
+# ADR-130 made the per-worker identity wall an operator-selectable posture.
+# Turning it off renders the same pod as UID 1000 with drop:[ALL], no adds and
+# RuntimeDefault seccomp — a spec this overlay's own hardening assertions pass.
+# To run the assistant on a restricted cluster, replace the two lines below with:
+#
+#   langyagent:
+#     workerIsolation: none
+#     acceptWorkerIsolationDisabled: true
+#
+# What that costs, stated plainly because it is not small: workers keep no
+# credentials on disk and have no listener, so a sibling can reach neither
+# another's control channel nor a credential file at either setting. What a
+# shared identity opens is that one conversation's worker can read another's
+# live credentials from /proc/<pid>/environ and another conversation's content
+# from its session directory. Take it for a single-tenant install whose users
+# are colleagues; do not take it if you serve mutually untrusted users. It also
+# forecloses the per-worker network namespace (ADR-076), which needs
+# CAP_SYS_ADMIN this pod can never hold.
+#
+# Do NOT instead "fix" the default posture by forcing runAsNonRoot in your own
+# values. Helm merges the capability map rather than replacing it, so the pod
+# still requests all five, the kernel clears them on the UID transition, and the
+# pod is admitted, reports healthy, and dies at the first worker spawn.
+#
 # Pinned here rather than deferred to examples/overlays/langy-disabled.yaml
 # (which sets the same key) so this overlay is self-contained: an operator who
 # applies only strict-admission.yaml must not silently keep a pod their cluster

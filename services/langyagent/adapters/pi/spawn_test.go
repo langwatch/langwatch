@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/assets"
 )
 
 // A stand-in for the embedded AGENTS.md. It carries no placeholder, because
@@ -70,12 +70,15 @@ func modelOf(t *testing.T, cfg map[string]any) map[string]any {
 // path.
 //
 // @scenario "The prompt reaches the worker exactly as it was written"
+// @scenario "The system prompt is Langy's own, not a coding agent's"
 func TestProvision_WritesTheWorkerHome(t *testing.T) {
 	creds := testCreds()
 	home, cfg := provisionHome(t, creds)
 
-	// The persona is the SAME text the opencode provision uses.
-	if cfg["personaPrompt"] != opencode.LangyAgentPrompt {
+	// Langy's own persona, not the harness's stock coding-agent prompt.
+	// Setting one makes the harness drop its own entirely rather than
+	// appending to it, so this field IS the whole persona slot.
+	if cfg["personaPrompt"] != assets.LangyAgentPrompt {
 		t.Errorf("personaPrompt diverged from the shared Langy persona")
 	}
 	if cfg["agentsFilePath"] != filepath.Join(home, "AGENTS.md") {

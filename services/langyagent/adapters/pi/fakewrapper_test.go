@@ -167,6 +167,9 @@ func (testRunner) SysProcAttr(uint32) *syscall.SysProcAttr {
 }
 func (testRunner) Name() string { return "test" }
 
+// AppliesIdentity mirrors sharedidentity: this fake applies no uid.
+func (testRunner) AppliesIdentity() bool { return false }
+
 // fakeWrapperCap smuggles the fake-wrapper marker + mode through the spawn's
 // allowlisted env assembly the way any capability contributes env.
 type fakeWrapperCap struct{ mode string }
