@@ -264,6 +264,27 @@ Feature: The CLI decides what Langy may run on the developer's machine
       When the command line reports the answer the developer gave in the terminal
       Then the settled card reaches the live stream before the durable record is written
 
+    # A tab that did not start the turn has no live stream to read, so the only
+    # thing that moves its cards is the freshness signal. That signal is
+    # published only once the conversation projection has reached the event, and
+    # the projection skipped the two card events, so it never reached them: the
+    # signal for a raised or an answered card was retried until it was dropped.
+    # The card then waited for the next event the projection did read, which is
+    # the command finishing, so a card answered in the terminal kept its buttons
+    # for as long as the command ran.
+    @integration
+    Scenario: A card that was answered while a long command runs still settles
+      Given a card raised on a turn this browser did not start
+      When the developer answers it in the terminal and the command runs on
+      Then the conversation projection reaches the answer straight away
+      And the freshness signal for the answer is published
+
+    @unit
+    Scenario: Every event of the conversation moves its projection forward
+      Given the events the conversation pipeline processes
+      Then the conversation state projection reads every one of them
+      And the ones it does not fold still move its cursor
+
     @integration
     Scenario: A click on a card the terminal already answered answers nothing
       Given a card that the terminal answered while it was still on screen

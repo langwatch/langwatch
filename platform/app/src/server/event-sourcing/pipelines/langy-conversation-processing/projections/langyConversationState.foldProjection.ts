@@ -21,11 +21,18 @@ import type {
   LangyConversationMetadataUpdatedEvent,
   LangyConversationStartedEvent,
   LangyConversationTitleGeneratedEvent,
+  LangyLocalControlRequestedEvent,
+  LangyLocalPolicyChangedEvent,
+  LangyLocalWorkspaceConnectedEvent,
+  LangyLocalWorkspaceDisconnectedEvent,
   LangyMessageImportedEvent,
   LangyMessageRecordedEvent,
+  LangyPlanUpdatedEvent,
   LangyToolCallFailedEvent,
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
+  LangyUserWaitEndedEvent,
+  LangyUserWaitStartedEvent,
 } from "../schemas/events";
 import {
   LangyAgentRespondedEventSchema,
@@ -38,11 +45,18 @@ import {
   LangyConversationMetadataUpdatedEventSchema,
   LangyConversationStartedEventSchema,
   LangyConversationTitleGeneratedEventSchema,
+  LangyLocalControlRequestedEventSchema,
+  LangyLocalPolicyChangedEventSchema,
+  LangyLocalWorkspaceConnectedEventSchema,
+  LangyLocalWorkspaceDisconnectedEventSchema,
   LangyMessageImportedEventSchema,
   LangyMessageRecordedEventSchema,
+  LangyPlanUpdatedEventSchema,
   LangyToolCallFailedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
+  LangyUserWaitEndedEventSchema,
+  LangyUserWaitStartedEventSchema,
 } from "../schemas/events";
 
 export interface LangyConversationState
@@ -66,6 +80,21 @@ const langyConversationEvents = [
   LangyConversationHandoffPendingEventSchema,
   LangyConversationHandoffConsumedEventSchema,
   LangyConversationTitleGeneratedEventSchema,
+  // The events below change nothing in this projection, and it reads them all
+  // the same: the cursor on this row is the conversation's position in its own
+  // event log, and the freshness signal is published only once that cursor has
+  // reached the event that raised it. An event this projection did not read
+  // was an event the cursor could never reach, so its signal was retried until
+  // it was dropped and the panel heard nothing about it. A permission card
+  // answered in the terminal then kept its buttons until the next event this
+  // projection did read, which is the command finishing.
+  LangyPlanUpdatedEventSchema,
+  LangyLocalControlRequestedEventSchema,
+  LangyLocalWorkspaceConnectedEventSchema,
+  LangyLocalWorkspaceDisconnectedEventSchema,
+  LangyLocalPolicyChangedEventSchema,
+  LangyUserWaitStartedEventSchema,
+  LangyUserWaitEndedEventSchema,
 ] as const;
 
 /**
@@ -216,5 +245,61 @@ export class LangyConversationStateFoldProjection
     state: LangyConversationStateData,
   ): LangyConversationStateData {
     return foldLangyConversationState(state, event);
+  }
+
+  // ── Read, and folded into nothing ─────────────────────────────────────────
+  //
+  // The turn document holds what these events say (the plan, the folder, the
+  // cards), and the conversation row holds none of it. They are read here so
+  // the cursor moves over them, which is what lets the freshness signal reach
+  // the panel while a command is still running.
+
+  handleLangyConversationPlanUpdated(
+    _event: LangyPlanUpdatedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationLocalControlRequested(
+    _event: LangyLocalControlRequestedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationLocalWorkspaceConnected(
+    _event: LangyLocalWorkspaceConnectedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationLocalWorkspaceDisconnected(
+    _event: LangyLocalWorkspaceDisconnectedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationLocalPolicyChanged(
+    _event: LangyLocalPolicyChangedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationUserWaitStarted(
+    _event: LangyUserWaitStartedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
+  }
+
+  handleLangyConversationUserWaitEnded(
+    _event: LangyUserWaitEndedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return state;
   }
 }
