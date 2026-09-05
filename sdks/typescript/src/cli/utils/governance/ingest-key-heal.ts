@@ -78,6 +78,15 @@ const REAL_DEPS: HealDeps = {
  */
 const DESCRIBE_TIMEOUT_MS = 3_000;
 
+/**
+ * The revocations the platform did on its own, which a device may repair. A
+ * person's revoke, and a revoke recorded with no cause, are not in this set.
+ */
+const PLATFORM_REVOCATION_CAUSES: ReadonlySet<string | null> = new Set([
+  "cap",
+  "rotation",
+]);
+
 /** The wiring tool slug for each agent the hook runs for. */
 const TOOL_BY_AGENT: Record<string, string> = {
   claude_code: "claude",
@@ -95,10 +104,12 @@ const TOOL_BY_AGENT: Record<string, string> = {
  * the user's, never overwritten, and a request that carried no bearer at all
  * was rejected for another reason).
  *
- * Withholds the repair when the platform says a person revoked the cached key
- * on purpose. A revoke from the API-keys page is a decision about this device,
- * and a device that minted its way past it would make that page a no-op. The
- * platform's own revocations, a rotation or the cap, are re-minted.
+ * Withholds the repair when the platform says the cached key was revoked and
+ * does not say the platform itself did it. A revoke from the API-keys page is
+ * a decision about this device, and a device that minted its way past it
+ * would make that page a no-op. A key revoked before the cause was recorded
+ * reads the same way: it may have been a person, so it is not re-minted. Only
+ * the platform's own revocations, a rotation or the cap, are.
  *
  * Reports a failure once it has gone to the platform and not come back with a
  * wired tool that this device can recognise again: a status call that did not
@@ -139,7 +150,10 @@ export async function healRevokedIngestKey({
       .describeIngestionKey(cfg, lookupId, { timeoutMs: DESCRIBE_TIMEOUT_MS })
       .catch(() => null);
     if (!described) return { status: "failed" };
-    if (described.status === "revoked" && described.revocationCause === "user") {
+    if (
+      described.status === "revoked" &&
+      !PLATFORM_REVOCATION_CAUSES.has(described.revocationCause)
+    ) {
       return { status: "withheld" };
     }
   }

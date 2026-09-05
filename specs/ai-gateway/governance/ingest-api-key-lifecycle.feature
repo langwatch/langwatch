@@ -150,6 +150,17 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     When a device mints a personal key for "codex"
     Then no "claude_code" key is revoked
 
+  # The cap is per source type, so the set of source types must be finite or
+  # a device session holds the cap again under every value it invents. The
+  # personal mint accepts the tools the CLI wraps and nothing else.
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: A personal key is minted only for a tool the CLI wraps
+    Given jane holds a device session
+    When the CLI POSTs a personal mint for a source type no wrapped tool stamps
+    Then the response status is 400
+    And no ingestion key is created under that source type
+
   # The cap runs after the new key exists, and it is the only part of the mint
   # that touches keys the caller does not own. Two devices minting at the same
   # moment read the same list and can pick the same key to retire, and a key

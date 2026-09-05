@@ -119,6 +119,26 @@ describe("healRevokedIngestKey", () => {
     });
   });
 
+  describe("given a key revoked before the platform recorded causes", () => {
+    /** @scenario "A key revoked before the cause was recorded is not re-minted" */
+    it("withholds the repair as it would for a person's revoke", async () => {
+      const d = deps({
+        describeIngestionKey: vi
+          .fn()
+          .mockResolvedValue({ status: "revoked", revocationCause: null }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      expect(healed).toEqual({ status: "withheld" });
+      expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a platform that says the cap retired the cached key", () => {
     /** @scenario "A key the cap retired is re-minted" */
     it("re-mints as it would for any platform revocation", async () => {

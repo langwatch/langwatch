@@ -387,6 +387,16 @@ Rule: A revoked ingest key heals itself
     Then no new key is minted
     And the window is spent, so the next session asks again later
 
+  # A key revoked before the platform recorded causes reads as revoked with
+  # no cause. It may have been a person, so it is treated as one: withheld.
+
+  @unit
+  Scenario: A key revoked before the cause was recorded is not re-minted
+    Given a signed-in CLI whose cached key the platform says was revoked with no recorded cause
+    And a collector that answers 401
+    When the hook runs
+    Then no new key is minted
+
   @unit
   Scenario: A key the cap retired is re-minted
     Given a signed-in CLI whose cached key the platform says the cap retired

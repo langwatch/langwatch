@@ -181,6 +181,19 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
     await stopTestContainers();
   });
 
+  describe("given a source type no wrapped tool stamps", () => {
+    /** @scenario "A personal key is minted only for a tool the CLI wraps" */
+    it("answers 400 and mints nothing under that value", async () => {
+      const made_up = await mintPersonal("made_up");
+      const other = await mintPersonal("toString");
+
+      expect(made_up.status).toBe(400);
+      expect(other.status).toBe(400);
+      expect(await liveKeysFor("made_up")).toHaveLength(0);
+      expect(await liveKeysFor("toString")).toHaveLength(0);
+    });
+  });
+
   describe("given a laptop that already minted a personal key for a tool", () => {
     /** @scenario "Two devices each keep a live personal key for the same tool" */
     it("lets a second device mint its own key without revoking the first", async () => {

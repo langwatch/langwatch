@@ -33,6 +33,7 @@ import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service"
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import {
   IngestionKeyService,
+  PersonalSourceTypeNotAllowedError,
   PersonalWorkspaceMissingError,
 } from "@ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
@@ -2426,11 +2427,20 @@ async function mintPersonalIngestionKey(
       201,
     );
   } catch (err) {
-    // Only the missing workspace is a precondition the caller can fix, so it
-    // is the only failure that reports as one. Everything else is a server
-    // fault: it gets logged and a fixed message, the way the project branch
-    // does, rather than a prompt the user cannot act on and an internal error
-    // string on the wire.
+    // A source type no wrapped tool stamps and a missing workspace are the
+    // two failures the caller can act on, so they are the only ones that
+    // report as such. Everything else is a server fault: it gets logged and a
+    // fixed message, the way the project branch does, rather than a prompt
+    // the user cannot act on and an internal error string on the wire.
+    if (err instanceof PersonalSourceTypeNotAllowedError) {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: `No personal ingestion key is minted for source type ${sourceType}. Personal keys are minted for the tools the LangWatch CLI wraps.`,
+        },
+        400,
+      );
+    }
     if (err instanceof PersonalWorkspaceMissingError) {
       return c.json(
         {

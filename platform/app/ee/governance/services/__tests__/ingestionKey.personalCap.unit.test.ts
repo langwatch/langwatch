@@ -79,6 +79,18 @@ describe("IngestionKeyService.issueForPersonalProject", () => {
     });
   });
 
+  describe("when the source type is one no wrapped tool stamps", () => {
+    /** @scenario "A personal key is minted only for a tool the CLI wraps" */
+    it("refuses before it looks at the workspace or mints", async () => {
+      await expect(
+        service.issueForPersonalProject({ ...PARAMS, sourceType: "made_up" }),
+      ).rejects.toThrow(/made_up/);
+
+      expect(workspace.findExisting).not.toHaveBeenCalled();
+      expect(apiKeys.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when other devices already hold live keys under the cap", () => {
     it("mints a new key and revokes none of them", async () => {
       apiKeyRepo.findIngestKeysForProject.mockResolvedValue([

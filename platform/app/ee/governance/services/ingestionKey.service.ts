@@ -41,6 +41,35 @@ export class PersonalWorkspaceMissingError extends Error {
   }
 }
 
+/**
+ * The source types a personal key may be minted for: the tools the CLI wraps
+ * or captures, each stamped as `langwatch.source`. The personal mint is
+ * capped per source type, so an open set would make the cap meaningless: a
+ * device session could hold the cap again under every value it invents. A
+ * new tool joins here when the CLI learns to wrap it.
+ */
+export const PERSONAL_INGEST_SOURCE_TYPES = [
+  "claude_code",
+  "codex",
+  "gemini",
+  "opencode",
+  "copilot_cli",
+  "copilot_vscode",
+  "copilot_app",
+] as const;
+
+/**
+ * The personal mint was asked for a source type no wrapped tool stamps.
+ * Named so the route can answer with the request as the cause and keep every
+ * other failure a server fault.
+ */
+export class PersonalSourceTypeNotAllowedError extends Error {
+  constructor(sourceType: string) {
+    super(`No personal ingestion key is minted for source type ${sourceType}.`);
+    this.name = "PersonalSourceTypeNotAllowedError";
+  }
+}
+
 /** The plaintext token, returned exactly once, plus its identifiers. */
 export interface IssuedIngestionKey {
   token: string;
@@ -242,7 +271,9 @@ export class IngestionKeyService {
    * This is the CLI device-session mint (`langwatch instrument <tool>`,
    * `langwatch <tool>`): every device that signs in gets its own key, and no
    * device's mint can break another device's telemetry. The just-minted key
-   * is never a candidate for the cap.
+   * is never a candidate for the cap. Only the source types in
+   * `PERSONAL_INGEST_SOURCE_TYPES` are minted, which is what bounds the
+   * whole personal key set: the cap times the number of tools.
    */
   async issueForPersonalProject({
     userId,
@@ -257,6 +288,11 @@ export class IngestionKeyService {
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
   }): Promise<IssuedIngestionKey> {
+    if (
+      !(PERSONAL_INGEST_SOURCE_TYPES as readonly string[]).includes(sourceType)
+    ) {
+      throw new PersonalSourceTypeNotAllowedError(sourceType);
+    }
     const workspace = await this.personalWorkspace.findExisting({
       userId,
       organizationId,

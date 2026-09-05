@@ -291,8 +291,9 @@ async function runHook({
       await own.retry?.(outcome.target);
       if (agent === "claude_code") notifyClaude(HEAL_NOTICE);
     } else if (outcome.status === "withheld") {
-      // A person revoked this key on purpose. The device stays dead until
-      // that person sets it up again, so the only repair is to say so.
+      // The platform did not revoke this key itself, so a person may have.
+      // The device stays dead until a person sets it up again, so the only
+      // repair is to say so.
       debug({ message: "ingest key was revoked by a person; not re-minted", env });
       if (agent === "claude_code") notifyClaude(REVOKED_NOTICE);
     }
@@ -316,7 +317,7 @@ const HEAL_NOTICE =
 
 /** What the user reads when the key was revoked on purpose and stays dead. */
 const REVOKED_NOTICE =
-  "LangWatch: the ingest key this machine exports with was revoked from the API keys page, so it was not replaced. Run `langwatch instrument claude` to set this machine up again.";
+  "LangWatch: the ingest key this machine exports with was revoked and was not replaced. Run `langwatch instrument claude` to set this machine up again.";
 
 /** How long one heal attempt stands before the hook tries again. */
 const HEAL_THROTTLE_MS = 10 * 60 * 1000;
