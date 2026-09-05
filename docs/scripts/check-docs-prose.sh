@@ -67,7 +67,14 @@ encode_property() {
   printf '%s' "$value"
 }
 
+# awk compares against the limit numerically only when it reads as a number.
+# A limit of "eighty" or "80 " compares as a string, every paragraph passes and
+# the rule is off with nothing to show for it, so refuse it up front.
 MAX_PARAGRAPH_WORDS="${DOCS_PROSE_MAX_PARAGRAPH_WORDS:-80}"
+if [[ ! "$MAX_PARAGRAPH_WORDS" =~ ^[0-9]+$ ]]; then
+  echo "DOCS_PROSE_MAX_PARAGRAPH_WORDS must be a whole number, got: $MAX_PARAGRAPH_WORDS" >&2
+  exit 2
+fi
 
 MODE="diff"
 if [[ "${1:-}" == "--all" ]]; then
