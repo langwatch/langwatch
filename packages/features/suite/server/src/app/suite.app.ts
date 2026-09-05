@@ -3,7 +3,6 @@
  */
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { ProjectService } from "@langwatch/project-contract";
-import { jsonValueSchema } from "@langwatch/scenario-contract";
 import type {
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
@@ -183,21 +182,14 @@ export class SuiteApp {
       );
     }
 
+    refuseExecutionSettings(input);
+
     const updated = await this.dependencies.scenarios.updateTestSuite({
       testSuiteId: input.id,
       projectId: input.projectId,
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.description === undefined ? {} : { description: input.description }),
-      // A test suite stores its targets as opaque JSON, and a suite target carries
-      // an `unknown` `runParameters`. Parsed rather than cast, because that is
-      // the claim the scenario contract makes about what it is storing.
-      ...(input.targets === undefined
-        ? {}
-        : { targets: jsonValueSchema.array().parse(input.targets) }),
-      ...(input.repeatCount === undefined ? {} : { repeatCount: input.repeatCount }),
       ...(input.labels === undefined ? {} : { labels: input.labels }),
-      ...(input.simulatorModel === undefined ? {} : { simulatorModel: input.simulatorModel }),
-      ...(input.judgeModel === undefined ? {} : { judgeModel: input.judgeModel }),
     });
     return { kind: "test_suite", testSuite: updated };
   }
@@ -258,4 +250,29 @@ export class SuiteApp {
     if (!project) throw new OrganizationNotFoundForProjectError(projectId);
     return project.team.organizationId;
   }
+}
+
+/**
+ * A test suite holds what it collects, never how a run is executed: the targets,
+ * repeat count and models travel with each run, onto the run plan. A request
+ * carrying any is a caller mistake, so the refusal names every one it carried.
+ */
+const EXECUTION_FIELD_REFUSALS = {
+  targets: "A test suite has no targets; they travel with each run",
+  repeatCount: "A test suite has no repeat count; it travels with each run",
+  simulatorModel: "A test suite has no simulator model; it travels with each run",
+  judgeModel: "A test suite has no judge model; it travels with each run",
+} as const;
+
+function refuseExecutionSettings(input: UpdateSuiteCommand): void {
+  const fieldErrors = Object.fromEntries(
+    Object.entries(EXECUTION_FIELD_REFUSALS)
+      .filter(([field]) => input[field as keyof typeof EXECUTION_FIELD_REFUSALS] !== undefined)
+      .map(([field, refusal]) => [field, [refusal]]),
+  );
+  if (Object.keys(fieldErrors).length === 0) return;
+
+  throw new ValidationError("A test suite holds no execution settings", {
+    meta: { fieldErrors },
+  });
 }

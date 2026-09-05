@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { describe, expect, it } from "vitest";
 import { ApiRestObservabilityComposition } from "../app/api-rest-observability.composition";
 
@@ -58,6 +59,15 @@ class ConversationNotOwnedError extends HandledError {
 function routeThrowing(error: Error): Hono {
   const app = new Hono();
   app.onError(ApiRestObservabilityComposition.create().legacyErrorHandler);
+  app.get("/", () => {
+    throw error;
+  });
+  return app;
+}
+
+function canonicalRouteThrowing(error: Error): Hono {
+  const app = new Hono();
+  app.onError(ApiRestObservabilityComposition.create().canonicalErrorHandler);
   app.get("/", () => {
     throw error;
   });
@@ -205,6 +215,45 @@ describe("ApiRestObservabilityComposition.legacyErrorHandler", () => {
         expect(body.error).toBe("Internal Server Error");
         expect(JSON.stringify(body)).not.toContain("postgres");
       });
+    });
+  });
+});
+
+describe("given a route raises the HTTP framework's own refusal", () => {
+  describe("when the client calls that route", () => {
+    /** @scenario "A framework refusal keeps the status it was raised with" */
+    it("answers the refusal's own status on the legacy body, not 500", async () => {
+      const response = await routeThrowing(
+        new HTTPException(404, { message: "Config not found" }),
+      ).request("/");
+
+      expect(response.status).toBe(404);
+      const body = (await response.json()) as Record<string, unknown>;
+      expect(body.message).toBe("Config not found");
+    });
+
+    /** @scenario "A framework refusal keeps the status it was raised with" */
+    it("answers the refusal's own status on the canonical envelope, not 500", async () => {
+      const response = await canonicalRouteThrowing(
+        new HTTPException(404, { message: "Config not found" }),
+      ).request("/");
+
+      expect(response.status).toBe(404);
+      const body = (await response.json()) as { error: Record<string, unknown> };
+      expect(body.error.code).toBe("not_found");
+      expect(body.error.message).toBe("Config not found");
+    });
+
+    /** @scenario "A framework refusal at 5xx still collapses to the generic body" */
+    it("keeps a 5xx refusal's status but says nothing about its cause", async () => {
+      const response = await routeThrowing(
+        new HTTPException(503, { message: "postgres pool exhausted" }),
+      ).request("/");
+
+      expect(response.status).toBe(503);
+      const body = (await response.json()) as Record<string, unknown>;
+      expect(body.message).toBe("An unknown error occurred");
+      expect(JSON.stringify(body)).not.toContain("postgres");
     });
   });
 });

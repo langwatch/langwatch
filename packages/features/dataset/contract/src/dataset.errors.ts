@@ -401,3 +401,10 @@ export class StorageNotWritableError extends HandledError {
     this.name = "StorageNotWritableError";
   }
 }
+
+export class DatasetRecordNotFoundError extends Error {
+  constructor(message = "Dataset record not found") {
+    super(message);
+    this.name = "DatasetRecordNotFoundError";
+  }
+}

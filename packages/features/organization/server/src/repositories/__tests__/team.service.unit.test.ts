@@ -289,6 +289,7 @@ describe("OrganizationService team membership", () => {
     expect(calls.revoke).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A team administered only through a group accepts member edits" */
   it("counts members of an admin group when applying the last-admin guard", async () => {
     const groups = new MemoryGroups();
     groups.members.set("group", [{ userId: "group_admin", name: null, email: null, image: null }]);
@@ -309,6 +310,7 @@ describe("OrganizationService team membership", () => {
     expect(calls.revoke).toHaveBeenCalledWith(expect.objectContaining({ bindingIds: ["member"] }));
   });
 
+  /** @scenario "Saving the team form cannot take its last admin away" */
   it("refuses a bulk edit that would remove the team's last admin", async () => {
     const { service } = buildService({
       accessBindings: [accessBinding({ id: "admin", userId: "admin", role: "ADMIN" })],
@@ -321,5 +323,158 @@ describe("OrganizationService team membership", () => {
         actor: { type: "user", id: "admin" },
       }),
     ).rejects.toBeInstanceOf(TeamLastAdminRequiredError);
+  });
+});
+
+describe("given a team a seat correction left with no team admin at all", () => {
+  describe("when a member is removed from it", () => {
+    /** @scenario "A team already without a team admin stays editable" */
+    it("saves the change rather than refusing over an admin it never had", async () => {
+      const { service, teams, calls } = buildService({
+        accessBindings: [
+          accessBinding({ id: "member", userId: "member", role: "MEMBER" }),
+          accessBinding({ id: "other", userId: "other", role: "VIEWER" }),
+        ],
+      });
+
+      await service.removeTeamMember({
+        organizationId: "org_1",
+        teamId: team.id,
+        userId: "other",
+        actor: { type: "user", id: "org_admin" },
+      });
+
+      expect(teams.fenced).toHaveLength(1);
+      expect(calls.revoke).toHaveBeenCalledWith(expect.objectContaining({ bindingIds: ["other"] }));
+    });
+  });
+
+  describe("when a member is promoted back to admin from the team form", () => {
+    /** @scenario "A team already without a team admin stays editable" */
+    it("saves the promotion that repairs the team", async () => {
+      const { service, calls } = buildService({
+        accessBindings: [accessBinding({ id: "member", userId: "member", role: "MEMBER" })],
+      });
+
+      await service.updateTeamWithMembers({
+        teamId: team.id,
+        name: team.name,
+        members: [{ userId: "member", role: "ADMIN" }],
+        actor: { type: "user", id: "org_admin" },
+      });
+
+      expect(calls.change).toHaveBeenCalledWith(
+        expect.objectContaining({ bindingId: "member", role: "ADMIN" }),
+      );
+    });
+  });
+});
+
+describe("given a shared team whose only admin is one of its members", () => {
+  describe("when an organization admin removes them from the team's own members", () => {
+    /** @scenario "Editing one team's members still refuses to remove its last admin" */
+    it("refuses, naming the team, before fencing or revoking", async () => {
+      const { service, teams, calls } = buildService({
+        accessBindings: [
+          accessBinding({ id: "admin", userId: "admin", role: "ADMIN" }),
+          accessBinding({ id: "member", userId: "member", role: "MEMBER" }),
+        ],
+      });
+
+      await expect(
+        service.removeTeamMember({
+          organizationId: "org_1",
+          teamId: team.id,
+          userId: "admin",
+          actor: { type: "user", id: "org_admin" },
+        }),
+      ).rejects.toMatchObject({
+        code: "team_last_admin_required",
+        meta: { teamName: team.name },
+      });
+      expect(teams.fenced).toHaveLength(0);
+      expect(calls.revoke).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the save promotes somebody else and demotes them at once", () => {
+    /** @scenario "The team form hands the admin role to somebody else in one save" */
+    it("goes through", async () => {
+      const { service, calls } = buildService({
+        accessBindings: [
+          accessBinding({ id: "admin", userId: "admin", role: "ADMIN" }),
+          accessBinding({ id: "member", userId: "member", role: "MEMBER" }),
+        ],
+      });
+
+      await service.updateTeamWithMembers({
+        teamId: team.id,
+        name: team.name,
+        members: [
+          { userId: "admin", role: "VIEWER" },
+          { userId: "member", role: "ADMIN" },
+        ],
+        actor: { type: "user", id: "admin" },
+      });
+
+      expect(calls.change).toHaveBeenCalledWith(
+        expect.objectContaining({ bindingId: "member", role: "ADMIN" }),
+      );
+    });
+  });
+});
+
+describe("given a group holds the Admin role on a team", () => {
+  describe("when the group has a member and the only direct admin is demoted", () => {
+    /** @scenario "A group that administers the team counts as its admin" */
+    it("saves the demotion, because the group still administers the team", async () => {
+      const groups = new MemoryGroups();
+      groups.members.set("group", [
+        { userId: "group_admin", name: null, email: null, image: null },
+      ]);
+      const { service, calls } = buildService({
+        groups,
+        accessBindings: [
+          accessBinding({ id: "admin", userId: "admin", role: "ADMIN" }),
+          accessBinding({ id: "group_binding", groupId: "group", role: "ADMIN" }),
+        ],
+      });
+
+      await service.updateTeamWithMembers({
+        teamId: team.id,
+        name: team.name,
+        members: [{ userId: "admin", role: "VIEWER" }],
+        actor: { type: "user", id: "group_admin" },
+      });
+
+      expect(calls.change).toHaveBeenCalledWith(
+        expect.objectContaining({ bindingId: "admin", role: "VIEWER" }),
+      );
+    });
+  });
+
+  describe("when the group has no members and the only direct admin is demoted", () => {
+    /** @scenario "A group with no members does not keep a team administered" */
+    it("refuses, naming the team", async () => {
+      const { service } = buildService({
+        groups: new MemoryGroups(),
+        accessBindings: [
+          accessBinding({ id: "admin", userId: "admin", role: "ADMIN" }),
+          accessBinding({ id: "group_binding", groupId: "group", role: "ADMIN" }),
+        ],
+      });
+
+      await expect(
+        service.updateTeamWithMembers({
+          teamId: team.id,
+          name: team.name,
+          members: [{ userId: "admin", role: "VIEWER" }],
+          actor: { type: "user", id: "org_admin" },
+        }),
+      ).rejects.toMatchObject({
+        code: "team_last_admin_required",
+        meta: { teamName: team.name },
+      });
+    });
   });
 });

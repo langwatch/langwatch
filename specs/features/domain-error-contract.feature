@@ -76,6 +76,20 @@ Feature: Handled errors — the handled-error boundary
     And no stack trace or internal detail is present
 
   @unit @bdd @domain-errors
+  Scenario: A framework refusal keeps the status it was raised with
+    Given a route raises the HTTP framework's own refusal with status 404
+    When the client calls that route
+    Then the HTTP status is 404
+    And the body carries the refusal's own sentence
+
+  @unit @bdd @domain-errors
+  Scenario: A framework refusal at 5xx still collapses to the generic body
+    Given a route raises the HTTP framework's own refusal with status 503
+    When the client calls that route
+    Then the HTTP status is 503
+    And the body says only that an unknown error occurred
+
+  @unit @bdd @domain-errors
   Scenario: Validation failures travel the one handled-error channel
     Given a request fails input validation
     When the error is serialised for any transport

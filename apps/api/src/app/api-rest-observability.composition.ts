@@ -7,10 +7,30 @@ import {
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
+import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ApiRestSecurityObservability } from "../api-rest.security";
 
 const logger = createLogger("langwatch:api:rest");
+
+const UNKNOWN_ERROR_MESSAGE = "An unknown error occurred";
+
+/**
+ * The machine name for a framework refusal, which carries a status and a
+ * sentence but no code of its own. Without this a caller branching on the
+ * code would get `internal_error` for a plain 404.
+ */
+const CODE_BY_STATUS: Record<number, string> = {
+  400: "bad_request",
+  401: "unauthorized",
+  403: "forbidden",
+  404: "not_found",
+  409: "conflict",
+  412: "precondition_failed",
+  413: "payload_too_large",
+  422: "unprocessable_entity",
+  429: "rate_limited",
+};
 
 /**
  * The observability and error-rendering half of the API process's REST enforcement.
@@ -47,10 +67,10 @@ const renderLegacy: ErrorHandler = (error, context) => {
   if (HandledError.isHandled(error)) {
     return context.json(legacyErrorBody(error), status);
   }
-  return context.json(
-    { error: "Internal Server Error", message: "An unknown error occurred" },
-    500,
-  );
+  if (error instanceof HTTPException && status < 500) {
+    return context.json({ error: error.message, message: error.message }, status);
+  }
+  return context.json({ error: "Internal Server Error", message: UNKNOWN_ERROR_MESSAGE }, status);
 };
 
 /**
@@ -105,14 +125,25 @@ export function canonicalErrorFor(error: unknown): {
       })
     : apiErrorBody({
         status,
-        code: "internal_error",
-        message: "An unknown error occurred",
+        code:
+          error instanceof HTTPException && status < 500
+            ? (CODE_BY_STATUS[status] ?? "internal_error")
+            : "internal_error",
+        message:
+          error instanceof HTTPException && status < 500 ? error.message : UNKNOWN_ERROR_MESSAGE,
       });
   return { status, body };
 }
 
+/**
+ * The status a thrown value answers with. A framework refusal carries its own,
+ * and the boundary must not flatten it: a handler's 404 answered as a 500 tells
+ * the caller the platform broke when their own request merely missed.
+ */
 function statusOf(error: Error): ContentfulStatusCode {
-  return HandledError.isHandled(error) ? (error.httpStatus as ContentfulStatusCode) : 500;
+  if (HandledError.isHandled(error)) return error.httpStatus as ContentfulStatusCode;
+  if (error instanceof HTTPException) return error.status;
+  return 500;
 }
 
 /**

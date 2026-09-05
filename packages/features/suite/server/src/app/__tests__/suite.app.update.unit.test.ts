@@ -72,4 +72,74 @@ describe("SuiteApp.update", () => {
       expect(updateTestSuite).not.toHaveBeenCalled();
     });
   });
+
+  describe("given a test suite the editor saves execution settings onto", () => {
+    /** @scenario "The suite editor refuses execution settings on a test suite" */
+    it("refuses with validation_error and names every execution field the request carried", async () => {
+      const { app, updateTestSuite } = buildApp();
+
+      await expect(
+        app.update({
+          id: "test_suite_1",
+          projectId: "project_1",
+          targets: [{ type: "prompt", referenceId: "prompt_1" }],
+          repeatCount: 3,
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5-mini",
+        }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: {
+          fieldErrors: {
+            targets: expect.any(Array),
+            repeatCount: expect.any(Array),
+            simulatorModel: expect.any(Array),
+            judgeModel: expect.any(Array),
+          },
+        },
+      });
+
+      expect(updateTestSuite).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Updating a test suite with execution settings is refused with validation_error" */
+    it("names only the execution field the request carried, leaving the row unchanged", async () => {
+      const { app, updateTestSuite } = buildApp();
+
+      await expect(
+        app.update({
+          id: "test_suite_1",
+          projectId: "project_1",
+          name: "Refunds",
+          repeatCount: 5,
+        }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { repeatCount: expect.any(Array) } },
+      });
+
+      const refusal = await app
+        .update({ id: "test_suite_1", projectId: "project_1", repeatCount: 5 })
+        .then(() => null)
+        .catch((error: unknown) => error as { meta: { fieldErrors: Record<string, string[]> } });
+      expect(Object.keys(refusal?.meta.fieldErrors ?? {})).toEqual(["repeatCount"]);
+      expect(updateTestSuite).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The suite editor refuses execution settings on a test suite" */
+    it("still saves a name and labels", async () => {
+      const { app, updateTestSuite } = buildApp();
+
+      await app.update({
+        id: "test_suite_1",
+        projectId: "project_1",
+        name: "Refunds v2",
+        labels: ["billing"],
+      });
+
+      expect(updateTestSuite).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Refunds v2", labels: ["billing"] }),
+      );
+    });
+  });
 });

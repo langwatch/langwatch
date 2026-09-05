@@ -569,19 +569,18 @@ export class OrganizationService extends OrganizationServiceContract {
       throw new TeamMembershipNotFoundError(parsed.userId);
     }
 
+    // The guard refuses a removal that TAKES the last admin away. A team a seat
+    // correction already left with none has none to lose, and staying editable
+    // is how somebody gets promoted back — so it is not refused here.
     const administratorsBefore = await this.effectiveAdminUserIds({
       organizationId: parsed.organizationId,
       bindings,
     });
-    if (administratorsBefore.size === 0) {
-      throw new TeamLastAdminRequiredError(team.name);
-    }
-
     const administratorsAfter = await this.effectiveAdminUserIds({
       organizationId: parsed.organizationId,
       bindings: bindings.filter((binding) => binding.userId !== parsed.userId),
     });
-    if (administratorsAfter.size === 0) {
+    if (administratorsBefore.size > 0 && administratorsAfter.size === 0) {
       if (parsed.actor.type === "user" && parsed.actor.id === parsed.userId) {
         throw new CannotRemoveSelfAsLastAdminError(team.name);
       }
