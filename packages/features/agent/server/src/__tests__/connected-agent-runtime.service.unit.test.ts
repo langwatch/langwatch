@@ -12,21 +12,19 @@ import {
   buildCallEnvelope,
   type StoredResult,
   storedCallSchema,
-} from "../../adapters/connected-agent-envelope.adapter";
-import type { InstanceMeta } from "../../adapters/connected-agent-registry.adapter";
+} from "../rules/connected-agent-envelope.rules";
+import type { InstanceMeta } from "../ports/connected-agent-runtime.port";
+import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
 import {
   callAckKey,
   callKey,
-  createMemoryStateStore,
   INSTANCE_GONE_CHANNEL,
   instanceChannel,
   replyChannel,
   resultKey,
-} from "../../adapters/connected-agent-state.adapter";
-import {
-  type ConnectedAgentRuntime,
-  createConnectedAgentRuntime,
-} from "../connected-agent-runtime.service";
+} from "../rules/connected-agent-keys.rules";
+import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";
+import type { ConnectedAgentRuntime } from "../ports/connected-agent-runtime.port";
 
 const projectId = "proj_1";
 
@@ -150,9 +148,9 @@ async function connectInstance({
 }
 
 async function startRuntime(overrides: { firstTurnGraceMs?: number } = {}): Promise<void> {
-  runtime = createConnectedAgentRuntime({
+  runtime = ConnectedAgentRuntimeAdapter.create({
     podId: "pod_a",
-    store: createMemoryStateStore(),
+    store: ConnectedAgentStateAdapter.memory(),
     firstTurnGraceMs: 300,
     firstTurnPollMs: 20,
     resultPollMs: 50,
@@ -181,7 +179,7 @@ afterEach(async () => {
   await runtime.store.close();
 });
 
-describe("CallDispatcher", () => {
+describe("CallDispatcherAdapter", () => {
   describe("when the instance answers", () => {
     /** @scenario "A call reaches an instance connected to another app replica" */
     it("returns the output, the session and the instance", async () => {

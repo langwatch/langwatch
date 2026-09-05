@@ -12,20 +12,21 @@ import {
 } from "@langwatch/agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { StoredCall } from "../../adapters/connected-agent-envelope.adapter";
-import type { AgentRepository } from "../../repositories/agent.repository";
-import type { ConnectCredentialPort } from "../../ports/connect-credential.port";
+import type { StoredCall } from "../rules/connected-agent-envelope.rules";
+import type { AgentRepository } from "../repositories/agent.repository";
+import type { ConnectCredentialPort } from "../ports/connect-credential.port";
+import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
+import type { AgentStateStorePort } from "../ports/agent-state-store.port";
 import {
   callAckKey,
   callKey,
-  createMemoryStateStore,
   httpSessionKey,
   pendingKey,
   resultKey,
-} from "../../adapters/connected-agent-state.adapter";
-import { createConnectedAgentRuntime } from "../connected-agent-runtime.service";
-import { AgentSessionCore, type SessionInfo } from "../connected-agent-session.service";
-import { LongPollTransport } from "../connected-agent-long-poll.service";
+} from "../rules/connected-agent-keys.rules";
+import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";
+import { AgentSessionService, type SessionInfo } from "../services/connected-agent-session.service";
+import { LongPollTransportService } from "../services/connected-agent-long-poll.service";
 
 const victimProjectId = "project_victim";
 const attackerProjectId = "project_attacker";
@@ -39,11 +40,11 @@ const fakeAgentRepository = {} as AgentRepository;
 const fakeCredentials = {} as ConnectCredentialPort;
 const fakeAgentPlatformUrl = () => "https://example.test/agents";
 
-type MemoryStore = ReturnType<typeof createMemoryStateStore>;
+type MemoryStore = AgentStateStorePort;
 
 function build() {
-  const store = createMemoryStateStore();
-  const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store });
+  const store = ConnectedAgentStateAdapter.memory();
+  const runtime = ConnectedAgentRuntimeAdapter.create({ podId: "pod_solo", store });
   const options = {
     runtime,
     agents: fakeAgents,
@@ -139,7 +140,7 @@ describe("the project fence of connected agent state", () => {
     /** @scenario "An ack for a call of another project is refused" */
     it("refuses the frame and does not mark the call as started", async () => {
       const { store, options } = build();
-      const core = new AgentSessionCore(options);
+      const core = AgentSessionService.create(options);
       // The envelope of the victim's call, reachable under the attacker's own
       // key: the fence has to hold on the envelope, not only on the key.
       await parkCall({ store, writtenBy: victimProjectId, readableBy: attackerProjectId });
@@ -154,7 +155,7 @@ describe("the project fence of connected agent state", () => {
     /** @scenario "An ack for a call of another project is refused" */
     it("refuses a result frame and writes no result for the other project", async () => {
       const { store, options } = build();
-      const core = new AgentSessionCore(options);
+      const core = AgentSessionService.create(options);
       await parkCall({ store, writtenBy: victimProjectId, readableBy: attackerProjectId });
 
       await expect(
@@ -175,7 +176,7 @@ describe("the project fence of connected agent state", () => {
     /** @scenario "An ack for a call of the instance's own project is taken" */
     it("marks the call as started", async () => {
       const { store, options } = build();
-      const core = new AgentSessionCore(options);
+      const core = AgentSessionService.create(options);
       await parkCall({ store, writtenBy: victimProjectId, readableBy: victimProjectId });
 
       await core.ack(sessionOf(victimProjectId), callId);
@@ -188,12 +189,12 @@ describe("the project fence of connected agent state", () => {
     /** @scenario "A poll from another project leaves the calls of an instance untouched" */
     it("answers no frame and leaves the parked call waiting", async () => {
       const { store, options } = build();
-      const transport = new LongPollTransport({ ...options, pollWaitMs: 40 });
-      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue({
+      const transport = LongPollTransportService.create({ ...options, pollWaitMs: 40 });
+      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue({
         project: { id: attackerProjectId, slug: "attacker" },
         userId: null,
       });
-      vi.spyOn(AgentSessionCore.prototype, "refreshPresence").mockResolvedValue(undefined);
+      vi.spyOn(AgentSessionService.prototype, "refreshPresence").mockResolvedValue(undefined);
       await parkCall({ store, writtenBy: victimProjectId, readableBy: victimProjectId });
       await store.set(
         httpSessionKey(attackerProjectId, token),

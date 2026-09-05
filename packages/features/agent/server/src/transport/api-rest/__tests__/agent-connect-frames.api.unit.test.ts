@@ -14,7 +14,7 @@ import {
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { registerConnectEndpoints } from "../agent-connect.api";
-import type { LongPollTransport } from "../../../services/connected-agent-long-poll.service";
+import type { LongPollTransportService } from "../../../services/connected-agent-long-poll.service";
 
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
   const handled = error as Error & { code?: string; httpStatus?: number };
@@ -65,9 +65,11 @@ function buildApi(relayMaxPayloadMb?: number) {
     frames: framesSpy,
     refusedAnswer: (error: unknown) => ({
       status: 422,
-      body: { frame: { type: "refused", code: (error as { meta: { reason: string } }).meta.reason } },
+      body: {
+        frame: { type: "refused", code: (error as { meta: { reason: string } }).meta.reason },
+      },
     }),
-  } as unknown as LongPollTransport;
+  } as unknown as LongPollTransportService;
   registerConnectEndpoints({
     secured,
     transport: () => fakeTransport,

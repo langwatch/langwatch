@@ -15,12 +15,12 @@ import {
   type AgentService,
 } from "@langwatch/agent-contract";
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryStateStore } from "../../adapters/connected-agent-state.adapter";
-import type { ConnectCredentialPort } from "../../ports/connect-credential.port";
-import type { AgentLastSeenWriter } from "../../projections/connected-agent-presence.projection";
-import { createConnectedAgentRuntime } from "../connected-agent-runtime.service";
-import { AgentSessionCore } from "../connected-agent-session.service";
-import { LongPollTransport } from "../connected-agent-long-poll.service";
+import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
+import type { ConnectCredentialPort } from "../ports/connect-credential.port";
+import type { AgentLastSeenWriter } from "../projections/connected-agent-presence.projection";
+import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";
+import { AgentSessionService } from "../services/connected-agent-session.service";
+import { LongPollTransportService } from "../services/connected-agent-long-poll.service";
 
 const projectId = "project_poll_lifecycle";
 const instanceId = "inst_poll_lifecycle";
@@ -63,7 +63,7 @@ function registerFrameBody() {
 }
 
 /** Registers one instance through the transport and returns its id, token and dispatch agent. */
-async function registerInstance(transport: LongPollTransport) {
+async function registerInstance(transport: LongPollTransportService) {
   const answer = await transport.register({ credentials, body: registerFrameBody() });
   const agentId = (answer.body.frame as { agents: { id: string }[] }).agents[0]!.id;
   const token = answer.body.instanceToken as string;
@@ -89,13 +89,16 @@ async function registerInstance(transport: LongPollTransport) {
   };
 }
 
-describe("LongPollTransport lifecycle, against a memory store", () => {
+describe("LongPollTransportService lifecycle, against a memory store", () => {
   describe("when an instance received a call by poll", () => {
     /** @scenario "A result posted over HTTP answers the dispatcher" */
     it("answers the dispatcher's outcome once it posts an ack and a result", async () => {
-      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
-      const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store: createMemoryStateStore() });
-      const transport = new LongPollTransport({
+      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
+      const runtime = ConnectedAgentRuntimeAdapter.create({
+        podId: "pod_solo",
+        store: ConnectedAgentStateAdapter.memory(),
+      });
+      const transport = LongPollTransportService.create({
         runtime,
         agents: registeringAgentService(),
         agentRepository: fakeAgentRepository,
@@ -128,9 +131,12 @@ describe("LongPollTransport lifecycle, against a memory store", () => {
   describe("when the relay request is aborted for an instance that acknowledged by poll", () => {
     /** @scenario "A cancel reaches a polling instance" */
     it("answers the next poll with a cancel frame for that call", async () => {
-      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
-      const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store: createMemoryStateStore() });
-      const transport = new LongPollTransport({
+      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
+      const runtime = ConnectedAgentRuntimeAdapter.create({
+        podId: "pod_solo",
+        store: ConnectedAgentStateAdapter.memory(),
+      });
+      const transport = LongPollTransportService.create({
         runtime,
         agents: registeringAgentService(),
         agentRepository: fakeAgentRepository,
@@ -164,9 +170,7 @@ describe("LongPollTransport lifecycle, against a memory store", () => {
         inFlightCallIds: [callId],
       });
 
-      expect(secondPoll.frames).toEqual([
-        { type: "cancel", protocol: PROTOCOL_VERSION, callId },
-      ]);
+      expect(secondPoll.frames).toEqual([{ type: "cancel", protocol: PROTOCOL_VERSION, callId }]);
       await transport.close();
       vi.restoreAllMocks();
     });
@@ -175,9 +179,12 @@ describe("LongPollTransport lifecycle, against a memory store", () => {
   describe("when an instance registered over HTTP posts a deregister frame", () => {
     /** @scenario "A deregister posted over HTTP retires the instance at once" */
     it("is no longer live and the token answers agent_session_unknown", async () => {
-      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
-      const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store: createMemoryStateStore() });
-      const transport = new LongPollTransport({
+      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
+      const runtime = ConnectedAgentRuntimeAdapter.create({
+        podId: "pod_solo",
+        store: ConnectedAgentStateAdapter.memory(),
+      });
+      const transport = LongPollTransportService.create({
         runtime,
         agents: registeringAgentService(),
         agentRepository: fakeAgentRepository,
@@ -206,7 +213,7 @@ describe("LongPollTransport lifecycle, against a memory store", () => {
   describe("when a poll names an instance token the platform does not know", () => {
     /** @scenario "A poll with an unknown instance token asks the process to register again" */
     it("answers agent_session_unknown with status 410", async () => {
-      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
+      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       const { transport } = build();
 
       const error = await transport
@@ -224,15 +231,15 @@ describe("LongPollTransport lifecycle, against a memory store", () => {
     /** @scenario "A process that stops polling goes offline after the presence TTL" */
     it("fails a call dispatched to its agent with agent_offline", async () => {
       let now = Date.now();
-      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
-      const store = createMemoryStateStore({ now: () => now });
-      const runtime = createConnectedAgentRuntime({
+      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
+      const store = ConnectedAgentStateAdapter.memory({ now: () => now });
+      const runtime = ConnectedAgentRuntimeAdapter.create({
         podId: "pod_solo",
         store,
         firstTurnGraceMs: 20,
         firstTurnPollMs: 5,
       });
-      const transport = new LongPollTransport({
+      const transport = LongPollTransportService.create({
         runtime,
         agents: registeringAgentService(),
         agentRepository: fakeAgentRepository,
@@ -256,9 +263,9 @@ describe("LongPollTransport lifecycle, against a memory store", () => {
 });
 
 function build() {
-  const store = createMemoryStateStore();
-  const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store });
-  const transport = new LongPollTransport({
+  const store = ConnectedAgentStateAdapter.memory();
+  const runtime = ConnectedAgentRuntimeAdapter.create({ podId: "pod_solo", store });
+  const transport = LongPollTransportService.create({
     runtime,
     agents: fakeAgents,
     agentRepository: fakeAgentRepository,

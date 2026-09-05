@@ -1,115 +1,16 @@
 /**
- * The Redis key family of connected agents, and the small key, sorted-set,
- * hash and pub/sub surface they need — over Redis or over process memory
+ * The connected-agent state store, over Redis or over process memory
  * (ADR-128).
  *
- * Every key and channel is built here so no module hand-copies a format. The
- * `v1` segment is the shape version: a later incompatible layout takes `v2`
- * and the two never read each other's keys. Every key of an instance, a call
- * or a session carries the project id, because the instance id is chosen by
- * the client: without it one project's key names another project's state.
- *
- * One interface, two implementations, so the registry and the dispatcher are
- * written once. The memory store stands in when Redis is not configured; it
- * is correct only with one replica, and the gateway refuses connections
- * otherwise. The Redis connection is handed in by the composing process
- * (ADR-093), never read from a module singleton here.
+ * The Redis connection is handed in by the composing process (ADR-093), never
+ * read from a module singleton here. The key family both implementations are
+ * addressed with lives in `rules/connected-agent-keys.rules.ts`.
  */
 
 import { EventEmitter } from "node:events";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-const PREFIX = "v1";
-
-/** ZSET of live instance ids of one agent, scored by last seen. */
-export function instanceSetKey(projectId: string, agentId: string): string {
-  return `agent_instance:${PREFIX}:${projectId}:${agentId}`;
-}
-
-/** Hash describing one instance: hostname, pid, sdk, label, pod, and so on. */
-export function instanceMetaKey(projectId: string, instanceId: string): string {
-  return `agent_instance_meta:${PREFIX}:${projectId}:${instanceId}`;
-}
-
-/** Counter of the calls in flight on one instance. */
-export function inflightKey(projectId: string, instanceId: string): string {
-  return `agent_inflight:${PREFIX}:${projectId}:${instanceId}`;
-}
-
-/** The durable envelope of one call. */
-export function callKey(projectId: string, callId: string): string {
-  return `agent_call:${PREFIX}:${projectId}:${callId}`;
-}
-
-/** Set once the instance started the function of one call. */
-export function callAckKey(projectId: string, callId: string): string {
-  return `agent_call_ack:${PREFIX}:${projectId}:${callId}`;
-}
-
-/** ZSET of the call ids pending on one instance, scored by deadline. */
-export function pendingKey(projectId: string, instanceId: string): string {
-  return `agent_pending:${PREFIX}:${projectId}:${instanceId}`;
-}
-
-/** The result of one call, written by the pod that holds the socket. */
-export function resultKey(projectId: string, callId: string): string {
-  return `agent_result:${PREFIX}:${projectId}:${callId}`;
-}
-
-/** Set once a call was handed to its instance over HTTP; it is never handed twice. */
-export function callDeliveredKey(projectId: string, callId: string): string {
-  return `agent_call_delivered:${PREFIX}:${projectId}:${callId}`;
-}
-
-/** The HTTP long-poll session behind one instance token. */
-export function httpSessionKey(projectId: string, token: string): string {
-  return `agent_http_session:${PREFIX}:${projectId}:${token}`;
-}
-
-/** The instance a sticky thread is pinned to. */
-export function threadPinKey(projectId: string, agentId: string, threadId: string): string {
-  return `agent_thread:${PREFIX}:${projectId}:${agentId}:${threadId}`;
-}
-
-/** Channel nudged when a call or a cancel is written for one instance. */
-export function instanceChannel(projectId: string, instanceId: string): string {
-  return `agent_instance_calls:${PREFIX}:${projectId}:${instanceId}`;
-}
-
-/** Channel nudged when an ack or a result lands for a pod's calls. */
-export function replyChannel(podId: string): string {
-  return `agent_reply:${PREFIX}:${podId}`;
-}
-
-/** Channel every pod listens on for instances that went away. */
-export const INSTANCE_GONE_CHANNEL = `agent_instance_gone:${PREFIX}`;
-
-export type Unsubscribe = () => Promise<void>;
-
-export interface AgentStateStore {
-  /** Whether this store is shared between app replicas. */
-  readonly shared: boolean;
-  set(key: string, value: string, ttlSeconds: number): Promise<void>;
-  /** SET NX: writes only when the key is absent; resolves to whether it wrote. */
-  setIfAbsent(key: string, value: string, ttlSeconds: number): Promise<boolean>;
-  get(key: string): Promise<string | null>;
-  del(key: string): Promise<void>;
-  zadd(params: { key: string; score: number; member: string; ttlSeconds: number }): Promise<void>;
-  /** ZADD XX LT: lowers the score of a present member, never raises it. */
-  zaddLowerIfPresent(key: string, score: number, member: string): Promise<void>;
-  zrem(key: string, member: string): Promise<void>;
-  zremrangebyscore(key: string, max: number): Promise<void>;
-  /** Members with a score at or above `min`, in score order. */
-  zrangebyscore(key: string, min: number): Promise<string[]>;
-  hset(key: string, fields: Record<string, string>, ttlSeconds: number): Promise<void>;
-  hgetall(key: string): Promise<Record<string, string> | null>;
-  incr(key: string, ttlSeconds: number): Promise<number>;
-  decr(key: string): Promise<number>;
-  /** Publishes; resolves to how many subscribers received it. */
-  publish(channel: string, message: string): Promise<number>;
-  subscribe(channel: string, handler: (message: string) => void): Promise<Unsubscribe>;
-  close(): Promise<void>;
-}
+import type { AgentStateStorePort } from "../ports/agent-state-store.port";
 
 // ---------------------------------------------------------------------------
 // Redis
@@ -121,7 +22,9 @@ export interface AgentStateStore {
  * One subscriber connection per store; ioredis puts a subscribing connection
  * into subscriber mode, so it cannot share the command one.
  */
-function createRedisChannels(redis: RedisConnection): Pick<AgentStateStore, "subscribe" | "close"> {
+function createRedisChannels(
+  redis: RedisConnection,
+): Pick<AgentStateStorePort, "subscribe" | "close"> {
   let subscriber: RedisConnection | null = null;
   const handlers = new Map<string, Set<(message: string) => void>>();
   const subscribing = new Map<string, Promise<void>>();
@@ -185,7 +88,7 @@ function createRedisChannels(redis: RedisConnection): Pick<AgentStateStore, "sub
   };
 }
 
-export function createRedisStateStore(redis: RedisConnection): AgentStateStore {
+function createRedisStateStore(redis: RedisConnection): AgentStateStorePort {
   const channels = createRedisChannels(redis);
 
   return {
@@ -271,7 +174,7 @@ function memorySortedSetOps({
   sortedSets: Map<string, Expiring<Map<string, number>>>;
   now: () => number;
 }): Pick<
-  AgentStateStore,
+  AgentStateStorePort,
   "zadd" | "zaddLowerIfPresent" | "zrem" | "zremrangebyscore" | "zrangebyscore"
 > {
   const sortedSet = (key: string, ttlSeconds: number): Map<string, number> => {
@@ -322,7 +225,7 @@ function memoryHashOps({
   hashes: Map<string, Expiring<Record<string, string>>>;
   counters: Map<string, Expiring<number>>;
   now: () => number;
-}): Pick<AgentStateStore, "hset" | "hgetall" | "incr" | "decr"> {
+}): Pick<AgentStateStorePort, "hset" | "hgetall" | "incr" | "decr"> {
   return {
     async hset(key, fields, ttlSeconds) {
       const current = live(hashes, key, now) ?? {};
@@ -354,11 +257,11 @@ function memoryHashOps({
  * The in-process stand-in. Expiry is checked on read, so a test can drive
  * the clock through `now` and never waits on a timer.
  */
-export function createMemoryStateStore({
+function createMemoryStateStore({
   now = () => Date.now(),
 }: {
   now?: () => number;
-} = {}): AgentStateStore {
+} = {}): AgentStateStorePort {
   const strings = new Map<string, Expiring<string>>();
   const sortedSets = new Map<string, Expiring<Map<string, number>>>();
   const hashes = new Map<string, Expiring<Record<string, string>>>();
@@ -413,4 +316,31 @@ export function createMemoryStateStore({
       counters.clear();
     },
   };
+}
+
+/**
+ * The state store a process holds: Redis when one was installed, process
+ * memory otherwise.
+ */
+export class ConnectedAgentStateAdapter {
+  static create(options: { redis?: RedisConnection | null } = {}): AgentStateStorePort {
+    return options.redis
+      ? ConnectedAgentStateAdapter.redis(options.redis)
+      : ConnectedAgentStateAdapter.memory();
+  }
+
+  /** The shared store: every replica reads and writes the same keys. */
+  static redis(redis: RedisConnection): AgentStateStorePort {
+    return createRedisStateStore(redis);
+  }
+
+  /**
+   * The in-process stand-in. Expiry is checked on read, so a test can drive
+   * the clock through `now` and never waits on a timer.
+   */
+  static memory(options: { now?: () => number } = {}): AgentStateStorePort {
+    return createMemoryStateStore(options);
+  }
+
+  private constructor() {}
 }

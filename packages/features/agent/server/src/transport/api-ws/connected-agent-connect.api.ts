@@ -8,7 +8,7 @@
  * while the socket was reconnecting is still delivered. It publishes the
  * instance as gone when the socket closes, so the dispatcher fails that
  * instance's calls at once instead of at the deadline. What a session means
- * to the platform lives in `AgentSessionCore`, shared with the HTTP
+ * to the platform lives in `AgentSessionService`, shared with the HTTP
  * long-poll transport; this file owns the socket and its clocks.
  */
 
@@ -29,14 +29,14 @@ import { WebSocket, WebSocketServer } from "ws";
 import {
   type InstanceNudge,
   instanceNudgeSchema,
-} from "../../adapters/connected-agent-envelope.adapter";
-import { instanceChannel, pendingKey } from "../../adapters/connected-agent-state.adapter";
+} from "../../rules/connected-agent-envelope.rules";
+import { instanceChannel, pendingKey } from "../../rules/connected-agent-keys.rules";
 import {
-  AgentSessionCore,
+  AgentSessionService,
   type SessionCoreOptions,
   type SessionInfo,
 } from "../../services/connected-agent-session.service";
-import type { Unsubscribe } from "../../adapters/connected-agent-state.adapter";
+import type { Unsubscribe } from "../../ports/agent-state-store.port";
 import type { ConnectUpgradeRouterPort } from "../../ports/connect-upgrade-router.port";
 
 const logger = createLogger("langwatch:connected-agents:gateway");
@@ -70,13 +70,13 @@ interface Session {
 
 export class ConnectGateway {
   private readonly wss: WebSocketServer;
-  private readonly core: AgentSessionCore;
+  private readonly core: AgentSessionService;
   private readonly pingIntervalMs: number;
   private readonly pongWaitMs: number;
   private readonly sessions = new Set<Session>();
 
   constructor(options: ConnectGatewayOptions) {
-    this.core = new AgentSessionCore(options);
+    this.core = AgentSessionService.create(options);
     this.pingIntervalMs = options.pingIntervalMs ?? PING_INTERVAL_MS;
     this.pongWaitMs = options.pongWaitMs ?? PONG_WAIT_MS;
     this.wss = new WebSocketServer({
@@ -124,7 +124,7 @@ export class ConnectGateway {
     };
     ws.on("message", hold);
 
-    let resolved: Awaited<ReturnType<AgentSessionCore["authenticate"]>>;
+    let resolved: Awaited<ReturnType<AgentSessionService["authenticate"]>>;
     try {
       const projectHeader = request.headers["x-project-id"];
       resolved = await this.core.authenticate({
@@ -150,7 +150,7 @@ export class ConnectGateway {
   /** Handles the register frame: rows, presence, subscriptions, reply. */
   private async register(
     ws: WebSocket,
-    resolved: Awaited<ReturnType<AgentSessionCore["authenticate"]>>,
+    resolved: Awaited<ReturnType<AgentSessionService["authenticate"]>>,
     raw: WebSocket.RawData,
   ): Promise<void> {
     const parsed = parseSdkFrame(raw);

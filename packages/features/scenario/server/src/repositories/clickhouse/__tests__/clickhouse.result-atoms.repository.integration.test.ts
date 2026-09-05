@@ -378,7 +378,7 @@ integration("findAtoms", () => {
   describe("when the filter names an empty list of scenarios", () => {
     /** @scenario "A filter with an empty list of scenarios returns nothing" */
     it("returns nothing without sending a query", async () => {
-      const failing = new ResultAtomsClickHouseRepository(async () => {
+      const failing = ResultAtomsClickHouseRepository.create(async () => {
         throw new Error("no query should be sent for an empty scope");
       });
 

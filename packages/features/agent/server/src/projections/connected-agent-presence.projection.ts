@@ -28,45 +28,53 @@ export interface AgentLastSeenWriter {
 /** When each agent's row was last written by this process. */
 const lastWrites = new Map<string, number>();
 
-/**
- * Writes `lastSeenAt` unless this process wrote it inside the last minute.
- *
- * The throttle is per process on purpose: with N replicas the row is written
- * at most N times a minute, which is still nothing, and a shared throttle
- * would cost a Redis round trip to save a Postgres one.
- */
-export async function touchAgentLastSeen({
-  repository,
-  projectId,
-  agentId,
-  now = Date.now(),
-  intervalMs = LAST_SEEN_WRITE_INTERVAL_MS,
-}: {
-  repository: AgentLastSeenWriter;
-  projectId: string;
-  agentId: string;
-  now?: number;
-  intervalMs?: number;
-}): Promise<boolean> {
-  const key = `${projectId}:${agentId}`;
-  const last = lastWrites.get(key);
-  if (last !== undefined && now - last < intervalMs) return false;
-  lastWrites.set(key, now);
-  try {
-    await repository.touchLastSeenAt({
-      id: agentId,
-      projectId,
-      at: new Date(now),
-    });
-    return true;
-  } catch (error) {
-    lastWrites.delete(key);
-    logger.warn({ error, projectId, agentId }, "lastSeenAt write failed");
-    return false;
+export class ConnectedAgentPresenceProjection {
+  static create(): ConnectedAgentPresenceProjection {
+    return new ConnectedAgentPresenceProjection();
   }
-}
 
-/** Forgets every throttle mark, for tests that reuse the process. */
-export function resetLastSeenThrottle(): void {
-  lastWrites.clear();
+  /**
+   * Writes `lastSeenAt` unless this process wrote it inside the last minute.
+   *
+   * The throttle is per process on purpose: with N replicas the row is
+   * written at most N times a minute, which is still nothing, and a shared
+   * throttle would cost a Redis round trip to save a Postgres one.
+   */
+  static async touchAgentLastSeen({
+    repository,
+    projectId,
+    agentId,
+    now = Date.now(),
+    intervalMs = LAST_SEEN_WRITE_INTERVAL_MS,
+  }: {
+    repository: AgentLastSeenWriter;
+    projectId: string;
+    agentId: string;
+    now?: number;
+    intervalMs?: number;
+  }): Promise<boolean> {
+    const key = `${projectId}:${agentId}`;
+    const last = lastWrites.get(key);
+    if (last !== undefined && now - last < intervalMs) return false;
+    lastWrites.set(key, now);
+    try {
+      await repository.touchLastSeenAt({
+        id: agentId,
+        projectId,
+        at: new Date(now),
+      });
+      return true;
+    } catch (error) {
+      lastWrites.delete(key);
+      logger.warn({ error, projectId, agentId }, "lastSeenAt write failed");
+      return false;
+    }
+  }
+
+  /** Forgets every throttle mark, for tests that reuse the process. */
+  static resetLastSeenThrottle(): void {
+    lastWrites.clear();
+  }
+
+  private constructor() {}
 }

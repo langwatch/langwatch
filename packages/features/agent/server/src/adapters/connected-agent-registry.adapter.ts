@@ -15,33 +15,13 @@ import {
   RESULT_TTL_SECONDS,
 } from "@langwatch/agent-contract";
 
+import { inflightKey, instanceMetaKey, instanceSetKey } from "../rules/connected-agent-keys.rules";
+import type { AgentStateStorePort } from "../ports/agent-state-store.port";
 import {
-  type AgentStateStore,
-  inflightKey,
-  instanceMetaKey,
-  instanceSetKey,
-} from "./connected-agent-state.adapter";
-
-/** What one instance says about itself, as the agents page shows it. */
-export interface InstanceMeta {
-  instanceId: string;
-  projectId: string;
-  hostname: string;
-  username: string;
-  pid: number;
-  sdk: { name: string; version: string; language: string };
-  label: string | null;
-  /** The app replica that holds the socket. */
-  podId: string;
-  connectedAt: number;
-  maxConcurrency: number;
-}
-
-/** A live instance with the calls it has in flight. */
-export interface LiveInstance extends InstanceMeta {
-  inflight: number;
-  lastSeenAt: number;
-}
+  ConnectedAgentRegistryPort,
+  type InstanceMeta,
+  type LiveInstance,
+} from "../ports/connected-agent-runtime.port";
 
 /** How long a retired member stays readable: it is gone at once. */
 const RETIRED_SCORE_OFFSET_MS = PRESENCE_TTL_SECONDS * 1000;
@@ -52,8 +32,14 @@ const RETIRED_SCORE_OFFSET_MS = PRESENCE_TTL_SECONDS * 1000;
  */
 const INFLIGHT_TTL_SECONDS = Math.ceil(MAX_CALL_TIMEOUT_MS / 1000) + RESULT_TTL_SECONDS;
 
-export class InstanceRegistry {
-  constructor(private readonly store: AgentStateStore) {}
+export class ConnectedAgentRegistryAdapter extends ConnectedAgentRegistryPort {
+  static create(store: AgentStateStorePort): ConnectedAgentRegistryAdapter {
+    return new ConnectedAgentRegistryAdapter(store);
+  }
+
+  private constructor(private readonly store: AgentStateStorePort) {
+    super();
+  }
 
   /** Records a live instance under every agent it registered. */
   async register({

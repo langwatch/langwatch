@@ -55,7 +55,10 @@ class MemoryIdentityRepository extends AgentRepository {
     return this.rows.find((a) => a.id === id) ?? null;
   }
 
-  async tryFindByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Agent | null> {
+  async tryFindByIdIncludingArchived(input: {
+    id: string;
+    projectId: string;
+  }): Promise<Agent | null> {
     return this.rows.find((a) => a.id === input.id && a.projectId === input.projectId) ?? null;
   }
 
@@ -126,7 +129,10 @@ class MemoryIdentityRepository extends AgentRepository {
     /* not used by these scenarios */
   }
 
-  async findByIdentityKey(input: { projectId: string; identityKey: string }): Promise<Agent | null> {
+  async findByIdentityKey(input: {
+    projectId: string;
+    identityKey: string;
+  }): Promise<Agent | null> {
     return (
       this.rows.find(
         (a) => a.projectId === input.projectId && a.identityKey === input.identityKey,

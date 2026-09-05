@@ -13,8 +13,8 @@ import type { Duplex } from "node:stream";
 import { type Agent, type AgentService, PROTOCOL_VERSION } from "@langwatch/agent-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
-import { createConnectedAgentRuntime } from "../../../services/connected-agent-runtime.service";
-import { createMemoryStateStore } from "../../../adapters/connected-agent-state.adapter";
+import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter";
+import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter";
 import type { AgentLastSeenWriter } from "../../../projections/connected-agent-presence.projection";
 import { ConnectCredentialPort } from "../../../ports/connect-credential.port";
 import type {
@@ -50,7 +50,7 @@ class WorkingCredentials extends ConnectCredentialPort {
 
 const fakeAgents = {
   registerConnected: async (input: { id: string; name: string }) =>
-    ({ id: input.id, name: input.name } as Agent),
+    ({ id: input.id, name: input.name }) as Agent,
 } as unknown as AgentService;
 const fakeAgentRepository: AgentLastSeenWriter = { touchLastSeenAt: async () => undefined };
 const fakeAgentPlatformUrl = () => "https://example.test/agents";
@@ -73,7 +73,10 @@ function registerFrame(instanceId: string) {
 }
 
 async function startGateway(options: { pingIntervalMs: number; pongWaitMs: number }) {
-  const runtime = createConnectedAgentRuntime({ podId: "pod_a", store: createMemoryStateStore() });
+  const runtime = ConnectedAgentRuntimeAdapter.create({
+    podId: "pod_a",
+    store: ConnectedAgentStateAdapter.memory(),
+  });
   const server = createServer((_request, response) => {
     response.statusCode = 404;
     response.end();
@@ -133,8 +136,9 @@ describe("ConnectGateway liveness", () => {
       // `ws` answers a ping automatically; stripping its own ping listener
       // stops that, the way a hung SDK process would.
       const socket = await connectAndRegister(url, "inst_missed_pong");
-      (socket as unknown as { _receiver: { removeAllListeners(event: string): void } })
-        ._receiver.removeAllListeners("ping");
+      (
+        socket as unknown as { _receiver: { removeAllListeners(event: string): void } }
+      )._receiver.removeAllListeners("ping");
 
       await new Promise<void>((resolve) => socket.once("close", () => resolve()));
       // The server's own close handling (unsubscribe, retire) runs after its
@@ -178,9 +182,9 @@ describe("ConnectGateway liveness", () => {
           return { project: { id: "proj_1", slug: "proj-1" }, userId: null };
         }
       }
-      const runtime = createConnectedAgentRuntime({
+      const runtime = ConnectedAgentRuntimeAdapter.create({
         podId: "pod_a",
-        store: createMemoryStateStore(),
+        store: ConnectedAgentStateAdapter.memory(),
       });
       const server = createServer((_request, response) => {
         response.statusCode = 404;

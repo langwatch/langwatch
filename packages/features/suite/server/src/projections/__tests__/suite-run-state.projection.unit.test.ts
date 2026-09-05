@@ -13,7 +13,7 @@ const noopStore: FoldProjectionStore<SuiteRunStateData> = {
   store: async () => {},
   get: async () => null,
 };
-const projection = new SuiteRunStateFoldProjection({ store: noopStore });
+const projection = SuiteRunStateFoldProjection.create({ store: noopStore });
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

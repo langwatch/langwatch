@@ -23,9 +23,9 @@ import type {
   AgentTestRunResult,
   AgentTestTurnResult,
 } from "../ports/agent-test.port";
-import { declaredAgentParameters } from "../services/agent.service";
+import { AgentService as AgentServiceImplementation } from "../services/agent.service";
 import {
-  agentPresenceView,
+  ConnectedAgentPresenceService,
   type AgentPresence,
 } from "../services/connected-agent-presence.service";
 
@@ -113,8 +113,8 @@ export class AgentApp {
   ) {
     return {
       ...agent,
-      parameters: declaredAgentParameters(agent),
-      ...agentPresenceView({ agent, owners, presence }),
+      parameters: AgentServiceImplementation.declaredAgentParameters(agent),
+      ...ConnectedAgentPresenceService.agentPresenceView({ agent, owners, presence }),
     };
   }
 

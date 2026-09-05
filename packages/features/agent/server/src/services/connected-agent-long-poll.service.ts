@@ -32,11 +32,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import {
-  type InstanceNudge,
-  instanceNudgeSchema,
-} from "../adapters/connected-agent-envelope.adapter";
-import type { InstanceMeta } from "../adapters/connected-agent-registry.adapter";
+import { type InstanceNudge, instanceNudgeSchema } from "../rules/connected-agent-envelope.rules";
 import {
   callDeliveredKey,
   callKey,
@@ -44,11 +40,11 @@ import {
   instanceChannel,
   instanceMetaKey,
   pendingKey,
-  type Unsubscribe,
-} from "../adapters/connected-agent-state.adapter";
-import type { ConnectedAgentRuntime } from "./connected-agent-runtime.service";
+} from "../rules/connected-agent-keys.rules";
+import type { Unsubscribe } from "../ports/agent-state-store.port";
+import type { ConnectedAgentRuntime, InstanceMeta } from "../ports/connected-agent-runtime.port";
 import {
-  AgentSessionCore,
+  AgentSessionService,
   type ConnectCredentials,
   type SessionCoreOptions,
   type SessionInfo,
@@ -119,15 +115,38 @@ export interface LongPollTransportOptions extends SessionCoreOptions {
   watchTtlMs?: number;
 }
 
-export class LongPollTransport {
-  private readonly core: AgentSessionCore;
+export class LongPollTransportService {
+  static create(options: LongPollTransportOptions): LongPollTransportService {
+    return new LongPollTransportService(options);
+  }
+
+  /** The HTTP status a refusal answers with, by its code. */
+  static refusalStatus(code: RefusedFrame["code"]): number {
+    switch (code) {
+      case "api_key_invalid":
+        return 401;
+      case "project_required":
+        return 400;
+      case "permission_denied":
+      case "key_type_not_allowed":
+        return 403;
+      case "replica_count_unsupported":
+        return 503;
+      case "parameters_invalid":
+      case "environment_invalid":
+      case "protocol_invalid":
+        return 422;
+    }
+  }
+
+  private readonly core: AgentSessionService;
   private readonly pollWaitMs: number;
   private readonly watchTtlMs: number;
   private readonly watches = new Map<string, Watch>();
   private closed = false;
 
-  constructor(options: LongPollTransportOptions) {
-    this.core = new AgentSessionCore(options);
+  private constructor(options: LongPollTransportOptions) {
+    this.core = AgentSessionService.create(options);
     this.pollWaitMs = options.pollWaitMs ?? POLL_WAIT_MS;
     this.watchTtlMs = options.watchTtlMs ?? PRESENCE_TTL_SECONDS * 1000 + GONE_CHECK_SLACK_MS;
   }
@@ -153,7 +172,7 @@ export class LongPollTransport {
       return this.refused(replicaRefusal);
     }
 
-    let resolved: Awaited<ReturnType<AgentSessionCore["authenticate"]>>;
+    let resolved: Awaited<ReturnType<AgentSessionService["authenticate"]>>;
     try {
       resolved = await this.core.authenticate(credentials);
     } catch (error) {
@@ -337,7 +356,7 @@ export class LongPollTransport {
   refusedAnswer(error: unknown): RegisterAnswer {
     const { frame } = this.core.refusal(error);
 
-    return { status: refusalStatus(frame.code), body: { frame } };
+    return { status: LongPollTransportService.refusalStatus(frame.code), body: { frame } };
   }
 
   private async openSession({
@@ -581,23 +600,4 @@ function nudgeOutcome({
   }
 
   return nudge.cancel ? { cancel: nudge.cancel } : "stop";
-}
-
-/** The HTTP status a refusal answers with, by its code. */
-export function refusalStatus(code: RefusedFrame["code"]): number {
-  switch (code) {
-    case "api_key_invalid":
-      return 401;
-    case "project_required":
-      return 400;
-    case "permission_denied":
-    case "key_type_not_allowed":
-      return 403;
-    case "replica_count_unsupported":
-      return 503;
-    case "parameters_invalid":
-    case "environment_invalid":
-    case "protocol_invalid":
-      return 422;
-  }
 }

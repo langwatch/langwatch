@@ -35,7 +35,7 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { createApiKeysRestApp } from "@langwatch/api-key-server";
-import type { ConnectedAgentRuntime, LongPollTransport } from "@langwatch/agent-server";
+import type { ConnectedAgentRuntime, LongPollTransportService } from "@langwatch/agent-server";
 import type { AuthRestPorts } from "@langwatch/auth-server";
 import { createGatewayPlatformRestApp, createGatewaySpendRestApp } from "@langwatch/gateway-server";
 import type { GovernanceIngestRestPorts } from "@langwatch/enterprise-governance-server";
@@ -153,7 +153,7 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
       agentsV1: () => ({
         connectedRuntime: refuse<ConnectedAgentRuntime>("The connected-agent runtime"),
         connect: {
-          transport: refuse<LongPollTransport>("The long-poll transport"),
+          transport: refuse<LongPollTransportService>("The long-poll transport"),
         },
         call: {
           runtime: refuse<ConnectedAgentRuntime>("The connected-agent runtime"),
@@ -189,10 +189,10 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
       // reads the bag to build the family, and only a REQUEST would reach one
       // of the five ports inside it.
       trackedEvents: () => ({
-        assertPredefinedEventPayload: refuse<void>("Tracked-event validation"),
+        assertPredefinedEventPayload: refuse<undefined>("Tracked-event validation"),
         generateEventId: refuse<string>("Tracked-event id generation"),
         recordTrackedEvent: refuse<Promise<void>>("Tracked-event recording"),
-        reportError: refuse<void>("The tracked-event error sink"),
+        reportError: refuse<undefined>("The tracked-event error sink"),
         describeValidationError: refuse<string>("Tracked-event validation prose"),
       }),
       userAvatarObjects: refuse("Avatar object reads"),

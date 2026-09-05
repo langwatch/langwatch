@@ -5,9 +5,9 @@
  * @see specs/agents/connected-agents.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LiveInstance } from "../../adapters/connected-agent-registry.adapter";
-import type { ConnectedAgentRuntime } from "../connected-agent-runtime.service";
-import { NO_PRESENCE, readAgentPresence } from "../connected-agent-presence.service";
+import type { LiveInstance } from "../../ports/connected-agent-runtime.port";
+import type { ConnectedAgentRuntime } from "../../ports/connected-agent-runtime.port";
+import { NO_PRESENCE, ConnectedAgentPresenceService } from "../connected-agent-presence.service";
 
 const listLive = vi.fn();
 
@@ -35,14 +35,14 @@ beforeEach(() => {
   runtime = { registry: { listLive } } as unknown as ConnectedAgentRuntime;
 });
 
-describe("readAgentPresence", () => {
+describe("ConnectedAgentPresenceService.readAgentPresence", () => {
   describe("when the registry answers for every agent", () => {
     it("reports each connected agent as online or offline", async () => {
       listLive.mockImplementation(async ({ agentId }: { agentId: string }) =>
         agentId === "agent_1" ? [instance("inst_1")] : [],
       );
 
-      const presence = await readAgentPresence({
+      const presence = await ConnectedAgentPresenceService.readAgentPresence({
         projectId: "proj_1",
         agents: [
           { id: "agent_1", type: "connected" },
@@ -65,7 +65,7 @@ describe("readAgentPresence", () => {
         return [instance("inst_2")];
       });
 
-      const presence = await readAgentPresence({
+      const presence = await ConnectedAgentPresenceService.readAgentPresence({
         projectId: "proj_1",
         agents: [
           { id: "agent_1", type: "connected" },

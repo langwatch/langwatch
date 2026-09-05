@@ -9,15 +9,19 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { type Agent, type AgentService, PROTOCOL_VERSION, relayPayloadCaps } from "@langwatch/agent-contract";
+import {
+  type Agent,
+  type AgentService,
+  PROTOCOL_VERSION,
+  relayPayloadCaps,
+} from "@langwatch/agent-contract";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
-import { resultCapViolation } from "../../../adapters/connected-agent-envelope.adapter";
-import {
-  createConnectedAgentRuntime,
-  type ConnectedAgentRuntime,
-} from "../../../services/connected-agent-runtime.service";
-import { createMemoryStateStore } from "../../../adapters/connected-agent-state.adapter";
+import { resultCapViolation } from "../../../rules/connected-agent-envelope.rules";
+import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter";
+import type { ConnectedAgentRuntime } from "../../../ports/connected-agent-runtime.port";
+import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter";
+import { AgentSessionService } from "../../../services/connected-agent-session.service";
 import type { AgentRepository } from "../../../repositories/agent.repository";
 import type { ConnectCredentialPort } from "../../../ports/connect-credential.port";
 import type {
@@ -90,9 +94,9 @@ describe("ConnectGateway without Redis", () => {
   let url: string;
 
   beforeAll(async () => {
-    const runtime = createConnectedAgentRuntime({
+    const runtime = ConnectedAgentRuntimeAdapter.create({
       podId: "pod_solo",
-      store: createMemoryStateStore(),
+      store: ConnectedAgentStateAdapter.memory(),
     });
     server = createServer((_request, response) => {
       response.statusCode = 404;
@@ -162,7 +166,9 @@ function registeringAgentService(): AgentService {
   } as unknown as AgentService;
 }
 
-const noopAgentRepository = { touchLastSeenAt: async () => undefined } as unknown as AgentRepository;
+const noopAgentRepository = {
+  touchLastSeenAt: async () => undefined,
+} as unknown as AgentRepository;
 
 const resolvingCredentials = {
   resolve: async () => ({ project: { id: "proj_1", slug: "proj-one" }, userId: null }),
@@ -181,7 +187,9 @@ function registerFrame(overrides: { name?: string; instanceId?: string } = {}) {
       startedAt: new Date().toISOString(),
       inFlightCallIds: [],
     },
-    agents: [{ name: overrides.name ?? "support-agent", environment: "production", parameters: {} }],
+    agents: [
+      { name: overrides.name ?? "support-agent", environment: "production", parameters: {} },
+    ],
   };
 }
 
@@ -190,9 +198,9 @@ async function startPod({
   pingIntervalMs = 10_000,
   pongWaitMs = 200,
 }: { pingIntervalMs?: number; pongWaitMs?: number } = {}) {
-  const runtime = createConnectedAgentRuntime({
+  const runtime = ConnectedAgentRuntimeAdapter.create({
     podId: `pod_${Math.random().toString(36).slice(2)}`,
-    store: createMemoryStateStore(),
+    store: ConnectedAgentStateAdapter.memory(),
   });
   const server = createServer((_request, response) => {
     response.statusCode = 404;
@@ -294,9 +302,9 @@ describe("ConnectGateway socket lifecycle", () => {
         },
       } as unknown as AgentService;
 
-      const runtime = createConnectedAgentRuntime({
+      const runtime = ConnectedAgentRuntimeAdapter.create({
         podId: "pod_slow",
-        store: createMemoryStateStore(),
+        store: ConnectedAgentStateAdapter.memory(),
       });
       const server = createServer((_request, response) => {
         response.statusCode = 404;
@@ -330,18 +338,15 @@ describe("ConnectGateway socket lifecycle", () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     });
   });
-
 });
 
-describe("AgentSessionCore.readCallForSession", () => {
+describe("AgentSessionService.readCallForSession", () => {
   describe("given an instance that registered agent A only, and a call routed at it for agent B", () => {
     /** @scenario "An instance never receives a call for an agent it did not register" */
     it("is not handed the call, and the call is marked undelivered for a retry elsewhere", async () => {
-      const store = createMemoryStateStore();
-      const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store });
-      const core = new (
-        await import("../../../services/connected-agent-session.service")
-      ).AgentSessionCore({
+      const store = ConnectedAgentStateAdapter.memory();
+      const runtime = ConnectedAgentRuntimeAdapter.create({ podId: "pod_solo", store });
+      const core = AgentSessionService.create({
         runtime,
         agents: registeringAgentService(),
         agentRepository: noopAgentRepository,

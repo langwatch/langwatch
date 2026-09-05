@@ -290,16 +290,24 @@ function assertScenarioShape(parameters: ScenarioParameterDefinition[]): void {
  *   a turn field, when more than the cap are declared, or when the schema is
  *   not an object schema at all.
  */
-export function normalizeParameterSchema(schema: Record<string, unknown>): NormalizedParameters {
-  const entries = propertyEntriesOf(schema);
-  const required = requiredNamesOf(schema);
-  const notes: string[] = [];
-  const parameters = entries.map(([name, raw]) =>
-    normalizeProperty({ name, raw, required: required.has(name), notes }),
-  );
-  assertScenarioShape(parameters);
+export class ConnectedAgentParameterSpecService {
+  static create(): ConnectedAgentParameterSpecService {
+    return new ConnectedAgentParameterSpecService();
+  }
 
-  return { parameters, notes };
+  static normalizeParameterSchema(schema: Record<string, unknown>): NormalizedParameters {
+    const entries = propertyEntriesOf(schema);
+    const required = requiredNamesOf(schema);
+    const notes: string[] = [];
+    const parameters = entries.map(([name, raw]) =>
+      normalizeProperty({ name, raw, required: required.has(name), notes }),
+    );
+    assertScenarioShape(parameters);
+
+    return { parameters, notes };
+  }
+
+  private constructor() {}
 }
 
 function describeType(declared: unknown): string {

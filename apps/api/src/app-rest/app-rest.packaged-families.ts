@@ -21,7 +21,7 @@ import type {
   AgentCallDeps,
   AgentPlatformUrlBuilder,
   ConnectedAgentRuntime,
-  LongPollTransport,
+  LongPollTransportService,
 } from "@langwatch/agent-server";
 import { createAgentLegacyRestApp, createAgentV1RestApp } from "@langwatch/agent-server";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
@@ -151,7 +151,7 @@ export type ApiPackagedRestServices = Readonly<{
   agentsV1?:
     | (() => {
         connectedRuntime: () => ConnectedAgentRuntime;
-        connect: { transport: () => LongPollTransport; relayMaxPayloadMb?: number };
+        connect: { transport: () => LongPollTransportService; relayMaxPayloadMb?: number };
         call: Omit<AgentCallDeps, "agents">;
       })
     | undefined;

@@ -35,7 +35,7 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import { AgentApp } from "#app/agent.app";
-import type { ConnectedAgentRuntime } from "../../services/connected-agent-runtime.service";
+import type { ConnectedAgentRuntime } from "../../ports/connected-agent-runtime.port";
 
 export const relayCallBodySchema = z.object({
   messages: z.array(messageSchema).describe("The whole conversation so far, OpenAI style."),

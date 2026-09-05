@@ -1,4 +1,4 @@
-import type { SuiteEventingCapabilities } from "./suite-runtime.adapter";
+import type { SuiteEventingCapabilities } from "../ports/suite-runtime.port";
 import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository";
 

@@ -58,7 +58,10 @@ class MemoryAgentRepository extends AgentRepository {
     return this.agents.find((a) => a.id === id && !a.archivedAt) ?? null;
   }
 
-  async tryFindByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Agent | null> {
+  async tryFindByIdIncludingArchived(input: {
+    id: string;
+    projectId: string;
+  }): Promise<Agent | null> {
     return this.agents.find((a) => a.id === input.id && a.projectId === input.projectId) ?? null;
   }
 

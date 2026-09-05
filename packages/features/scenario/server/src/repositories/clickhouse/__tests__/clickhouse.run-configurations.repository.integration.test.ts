@@ -18,7 +18,10 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { RunParameterValues, ScenarioService } from "@langwatch/scenario-contract";
 import { getSuiteSetId, type SuiteTarget } from "@langwatch/suite-contract";
-import { SuiteExecutionService, type QueueSimulationRunCommandData } from "@langwatch/suite-server";
+import {
+  SuiteExecutionService,
+  type QueueSimulationRunCommandData,
+} from "@langwatch/suite-server/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { QueueRunCommand } from "../../../adapters/simulation-processing-commands.adapter";

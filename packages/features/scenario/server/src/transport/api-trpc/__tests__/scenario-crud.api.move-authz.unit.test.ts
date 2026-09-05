@@ -31,12 +31,13 @@ function harness(permitted: boolean) {
     {
       trackScenarioCreated: () => {},
       fireScenarioCreatedNurturing: () => {},
+      captureException: () => {},
     },
   );
 
-  const app = { scenarios: { moveToTestSuite } } as unknown as ScenarioApp;
+  const scenarios = { moveToTestSuite } as unknown as ScenarioApp;
   const caller = router.createCaller({
-    app,
+    app: { scenarios },
     actor: () => ({ id: "user_viewer" }),
     signal: undefined,
   });

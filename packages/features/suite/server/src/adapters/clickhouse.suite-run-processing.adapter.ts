@@ -3,7 +3,7 @@ import { SUITE_RUN_PROJECTION_VERSIONS, type SuiteRunStateData } from "@langwatc
 import type { Cluster, Redis } from "ioredis";
 import { ClickHouseSuiteEventingAdapter } from "./clickhouse.suite-eventing.adapter";
 import {
-  createSuiteRunProcessingPipeline,
+  SuiteRunProcessingPipelineAdapter,
   type SuiteRunProcessingPipeline,
 } from "./suite-run-processing.adapter";
 import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
@@ -69,7 +69,7 @@ export class ClickHouseSuiteRunProcessingAdapter {
   private constructor(private readonly options: ClickHouseSuiteRunProcessingAdapterOptions) {}
 
   buildProcessing(): SuiteRunProcessingPipeline {
-    return createSuiteRunProcessingPipeline({
+    return SuiteRunProcessingPipelineAdapter.create({
       suiteRunStateFoldStore: new RedisCachedFoldStore<SuiteRunStateData>(
         new RepositoryFoldStore<SuiteRunStateData>(
           ClickHouseSuiteEventingAdapter.create({

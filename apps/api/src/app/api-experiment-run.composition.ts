@@ -95,7 +95,7 @@ import {
   UnconfiguredWorkflowStudioStreamAdapter,
   WorkflowStudioDispatchService,
 } from "@langwatch/workflow-server";
-import { getConnectedAgentRuntime } from "@langwatch/agent-server";
+import { ConnectedAgentRuntimeAdapter } from "@langwatch/agent-server";
 import { ConnectedTargetService } from "@langwatch/suite-server";
 import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
@@ -487,7 +487,7 @@ class ApiExperimentConnectedDispatchAdapter extends ExperimentConnectedDispatchP
     call: DispatchCall;
     signal: AbortSignal;
   }): Promise<CallOutcome> {
-    return getConnectedAgentRuntime().dispatcher.dispatch(input);
+    return ConnectedAgentRuntimeAdapter.get().dispatcher.dispatch(input);
   }
 }
 
@@ -501,7 +501,10 @@ class ApiExperimentConnectedAgentOwnershipAdapter extends ExperimentConnectedAge
     agents: readonly ExperimentConnectedAgentSubject[];
     actor: RunActor | undefined;
   }): Promise<void> {
-    return ConnectedTargetService.assertConnectedAgentsRunnable({ agents: input.agents, actor: input.actor });
+    return ConnectedTargetService.assertConnectedAgentsRunnable({
+      agents: input.agents,
+      actor: input.actor,
+    });
   }
 }
 

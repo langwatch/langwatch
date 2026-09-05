@@ -2,10 +2,7 @@ export {
   PostgresSuiteAdapter,
   type PostgresSuiteAdapterOptions,
 } from "./adapters/postgres.suite.adapter";
-export type {
-  SuiteEventingCapabilities,
-  SuiteRuntimeAdapter,
-} from "./adapters/suite-runtime.adapter";
+export { SuiteRuntimePort, type SuiteEventingCapabilities } from "./ports/suite-runtime.port";
 export {
   ClickHouseSuiteEventingAdapter,
   type ClickHouseSuiteEventingAdapterOptions,
@@ -26,11 +23,7 @@ export {
   type SuiteRunModelsResolver,
 } from "./services/suite-run-models.service";
 export {
-  agentOwnerNameReader,
-  agentParameterDefinitionsOf,
-  assertConnectedAgentsRunnable,
-  isAgentUnseen,
-  resolveConnectedReferences,
+  ConnectedTargetService,
   type AgentOwnerNameReader,
   type ConnectedTargetAgent,
   type ConnectedTargetReferenceReader,
@@ -40,13 +33,14 @@ export {
   CompleteSuiteRunItemCommand,
   RecordSuiteRunItemStartedCommand,
   StartSuiteRunCommand,
+  SuiteRunCommandsAdapter,
 } from "./adapters/suite-run-commands.adapter";
 export {
-  createSuiteRunProcessingPipeline,
+  SuiteRunProcessingPipelineAdapter,
   type SuiteRunProcessingPipeline,
   type SuiteRunProcessingPipelineDeps,
 } from "./adapters/suite-run-processing.adapter";
-export { createSuiteRunProcessingProducerPipeline } from "./adapters/suite-run-processing-producer.adapter";
+export { SuiteRunProcessingProducerAdapter } from "./adapters/suite-run-processing-producer.adapter";
 export {
   SUITE_RUN_PROJECTION_VERSIONS,
   type CompleteSuiteRunItemCommandData,

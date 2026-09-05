@@ -21,8 +21,6 @@ import {
   CALL_KEY_SLACK_SECONDS,
   type CallEnvelope,
   type CallOutcome,
-  type DispatchAgent,
-  type DispatchCall,
   FIRST_TURN_GRACE_MS,
   FIRST_TURN_POLL_MS,
   RESULT_POLL_MS,
@@ -39,10 +37,8 @@ import {
   type StoredCall,
   type StoredResultError,
   storedResultSchema,
-} from "./connected-agent-envelope.adapter";
-import type { InstanceRegistry, LiveInstance } from "./connected-agent-registry.adapter";
+} from "../rules/connected-agent-envelope.rules";
 import {
-  type AgentStateStore,
   callKey,
   INSTANCE_GONE_CHANNEL,
   instanceChannel,
@@ -50,19 +46,16 @@ import {
   replyChannel,
   resultKey,
   threadPinKey,
-  type Unsubscribe,
-} from "./connected-agent-state.adapter";
+} from "../rules/connected-agent-keys.rules";
+import type { AgentStateStorePort, Unsubscribe } from "../ports/agent-state-store.port";
+import {
+  ConnectedAgentDispatchPort,
+  type ConnectedAgentRegistryPort,
+  type DispatchParams,
+  type LiveInstance,
+} from "../ports/connected-agent-runtime.port";
 
 const logger = createLogger("langwatch:connected-agents:dispatcher");
-
-export interface DispatchParams {
-  projectId: string;
-  agent: DispatchAgent;
-  call: DispatchCall;
-  /** Aborted when the relay request goes away; the call is cancelled. */
-  signal?: AbortSignal;
-  now?: () => number;
-}
 
 type Waiter = {
   resolve: (outcome: WaitOutcome) => void;
@@ -77,8 +70,8 @@ type WaitOutcome =
 
 export interface CallDispatcherOptions {
   podId: string;
-  store: AgentStateStore;
-  registry: InstanceRegistry;
+  store: AgentStateStorePort;
+  registry: ConnectedAgentRegistryPort;
   /** Test knob: how long the first turn waits for an instance. */
   firstTurnGraceMs?: number;
   firstTurnPollMs?: number;
@@ -89,10 +82,14 @@ export interface CallDispatcherOptions {
  * One dispatcher per pod: it owns this pod's reply subscription and the
  * in-memory map from call id to the waiter for it.
  */
-export class CallDispatcher {
+export class CallDispatcherAdapter extends ConnectedAgentDispatchPort {
+  static create(options: CallDispatcherOptions): CallDispatcherAdapter {
+    return new CallDispatcherAdapter(options);
+  }
+
   private readonly podId: string;
-  private readonly store: AgentStateStore;
-  private readonly registry: InstanceRegistry;
+  private readonly store: AgentStateStorePort;
+  private readonly registry: ConnectedAgentRegistryPort;
   private readonly firstTurnGraceMs: number;
   private readonly firstTurnPollMs: number;
   private readonly resultPollMs: number;
@@ -100,7 +97,8 @@ export class CallDispatcher {
   private readonly instanceOfCall = new Map<string, { projectId: string; instanceId: string }>();
   private subscriptions: Unsubscribe[] | null = null;
 
-  constructor(options: CallDispatcherOptions) {
+  private constructor(options: CallDispatcherOptions) {
+    super();
     this.podId = options.podId;
     this.store = options.store;
     this.registry = options.registry;

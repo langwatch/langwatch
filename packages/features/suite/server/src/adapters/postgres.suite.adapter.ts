@@ -12,7 +12,7 @@ import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
 import type { SuiteRunReadRepository } from "../repositories/suite-run.repository";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository";
 import { SuiteService } from "../services/suite.service";
-import type { SuiteEventingCapabilities, SuiteRuntimeAdapter } from "./suite-runtime.adapter";
+import type { SuiteEventingCapabilities, SuiteRuntimePort } from "../ports/suite-runtime.port";
 
 export type PostgresSuiteAdapterOptions = {
   database: SuiteDatabase;
@@ -26,7 +26,7 @@ export type PostgresSuiteAdapterOptions = {
   now?: () => Date;
 };
 
-export class PostgresSuiteAdapter implements SuiteRuntimeAdapter {
+export class PostgresSuiteAdapter implements SuiteRuntimePort {
   static create(options: PostgresSuiteAdapterOptions): PostgresSuiteAdapter {
     return new PostgresSuiteAdapter(options);
   }

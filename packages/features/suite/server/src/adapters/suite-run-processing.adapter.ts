@@ -5,11 +5,7 @@ import {
   type FoldProjectionStore,
 } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import {
-  CompleteSuiteRunItemCommand,
-  RecordSuiteRunItemStartedCommand,
-  StartSuiteRunCommand,
-} from "./suite-run-commands.adapter";
+import { SuiteRunCommandsAdapter } from "./suite-run-commands.adapter";
 import { SuiteRunStateFoldProjection } from "../projections/suite-run-state.projection";
 import { SUITE_RUN_PROCESSING_EVENT_TYPES } from "@langwatch/suite-contract";
 import type { SuiteRunProcessingEvent } from "@langwatch/suite-contract";
@@ -72,55 +68,63 @@ function requireJobId<TPayload>(
  *
  * No subscriber on this pipeline — cross-pipeline subscribers live on the simulation pipeline.
  */
-export function createSuiteRunProcessingPipeline(deps: SuiteRunProcessingPipelineDeps) {
-  return (
-    definePipeline<SuiteRunProcessingEvent>({
-      name: "suite_run_processing",
-      aggregate: defineAggregate({
-        type: "suite_run",
-        events: defineEvents(SUITE_RUN_PROCESSING_EVENT_TYPES),
-      }),
-    })
-      .withClickHouseFoldProjection(
-        new SuiteRunStateFoldProjection({
-          store: deps.suiteRunStateFoldStore,
+export class SuiteRunProcessingPipelineAdapter {
+  static create(deps: SuiteRunProcessingPipelineDeps) {
+    const commands = SuiteRunCommandsAdapter.create();
+
+    return (
+      definePipeline<SuiteRunProcessingEvent>({
+        name: "suite_run_processing",
+        aggregate: defineAggregate({
+          type: "suite_run",
+          events: defineEvents(SUITE_RUN_PROCESSING_EVENT_TYPES),
         }),
-      )
-      // Every one of these three folds by addition — StartedCount + 1,
-      // CompletedCount + 1, FailedCount + 1 — and the fold executor drops a
-      // replay by `event.id`, which two deliveries of the same command do not
-      // share. All three commands define `makeJobId`, but `withCommand` reads
-      // deduplication only from these options, so without them the method is
-      // inert and a redelivered simulation event double-counts a suite run's
-      // progress, which can flip its status to SUCCESS or FAILURE before the
-      // run has finished.
-      .withCommand("startSuiteRun", StartSuiteRunCommand, {
-        deduplication: {
-          makeId: requireJobId("startSuiteRun", StartSuiteRunCommand.makeJobId),
-          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-        },
       })
-      .withCommand("recordSuiteRunItemStarted", RecordSuiteRunItemStartedCommand, {
-        deduplication: {
-          makeId: requireJobId(
-            "recordSuiteRunItemStarted",
-            RecordSuiteRunItemStartedCommand.makeJobId,
-          ),
-          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-        },
-      })
-      .withCommand("completeSuiteRunItem", CompleteSuiteRunItemCommand, {
-        deduplication: {
-          makeId: requireJobId("completeSuiteRunItem", CompleteSuiteRunItemCommand.makeJobId),
-          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-        },
-      })
-      .build()
-  );
+        .withClickHouseFoldProjection(
+          SuiteRunStateFoldProjection.create({
+            store: deps.suiteRunStateFoldStore,
+          }),
+        )
+        // Every one of these three folds by addition — StartedCount + 1,
+        // CompletedCount + 1, FailedCount + 1 — and the fold executor drops a
+        // replay by `event.id`, which two deliveries of the same command do not
+        // share. All three commands define `makeJobId`, but `withCommand` reads
+        // deduplication only from these options, so without them the method is
+        // inert and a redelivered simulation event double-counts a suite run's
+        // progress, which can flip its status to SUCCESS or FAILURE before the
+        // run has finished.
+        .withCommand("startSuiteRun", commands.startSuiteRun, {
+          deduplication: {
+            makeId: requireJobId("startSuiteRun", commands.startSuiteRun.makeJobId),
+            ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+          },
+        })
+        .withCommand("recordSuiteRunItemStarted", commands.recordSuiteRunItemStarted, {
+          deduplication: {
+            makeId: requireJobId(
+              "recordSuiteRunItemStarted",
+              commands.recordSuiteRunItemStarted.makeJobId,
+            ),
+            ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+          },
+        })
+        .withCommand("completeSuiteRunItem", commands.completeSuiteRunItem, {
+          deduplication: {
+            makeId: requireJobId("completeSuiteRunItem", commands.completeSuiteRunItem.makeJobId),
+            ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+          },
+        })
+        .build()
+    );
+  }
+
+  private constructor() {}
 }
 
 /**
  * The definition this feature registers, named so a composition root can hold
  * one without restating its shape.
  */
-export type SuiteRunProcessingPipeline = ReturnType<typeof createSuiteRunProcessingPipeline>;
+export type SuiteRunProcessingPipeline = ReturnType<
+  typeof SuiteRunProcessingPipelineAdapter.create
+>;

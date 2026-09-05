@@ -9,8 +9,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { LiveInstance } from "../adapters/connected-agent-registry.adapter";
-import type { ConnectedAgentRuntime } from "./connected-agent-runtime.service";
+import type { ConnectedAgentRuntime, LiveInstance } from "../ports/connected-agent-runtime.port";
 
 const logger = createLogger("langwatch:connected-agents:presence");
 
@@ -52,27 +51,78 @@ export interface AgentOwnerView {
  * missed still reports its id, because the row knows the agent belongs to
  * somebody even when the person cannot be named.
  */
-export function agentPresenceView({
-  agent,
-  owners,
-  presence,
-}: {
-  agent: { id: string; ownerUserId: string | null };
-  owners: Map<string, AgentOwnerView>;
-  presence: Map<string, AgentPresence>;
-}): { owner: AgentOwnerView | null } & AgentPresence {
-  const { status, instances } = presence.get(agent.id) ?? NO_PRESENCE;
+export class ConnectedAgentPresenceService {
+  static create(): ConnectedAgentPresenceService {
+    return new ConnectedAgentPresenceService();
+  }
 
-  return {
-    owner: agent.ownerUserId
-      ? (owners.get(agent.ownerUserId) ?? {
-          userId: agent.ownerUserId,
-          name: null,
-        })
-      : null,
-    status,
-    instances,
-  };
+  static agentPresenceView({
+    agent,
+    owners,
+    presence,
+  }: {
+    agent: { id: string; ownerUserId: string | null };
+    owners: Map<string, AgentOwnerView>;
+    presence: Map<string, AgentPresence>;
+  }): { owner: AgentOwnerView | null } & AgentPresence {
+    const { status, instances } = presence.get(agent.id) ?? NO_PRESENCE;
+
+    return {
+      owner: agent.ownerUserId
+        ? (owners.get(agent.ownerUserId) ?? {
+            userId: agent.ownerUserId,
+            name: null,
+          })
+        : null,
+      status,
+      instances,
+    };
+  }
+
+  /** The presence of every agent given, keyed by id; non-connected ones are offline. */
+  static async readAgentPresence({
+    projectId,
+    agents,
+    runtime,
+  }: {
+    projectId: string;
+    agents: readonly { id: string; type: string }[];
+    runtime: ConnectedAgentRuntime;
+  }): Promise<Map<string, AgentPresence>> {
+    const registry = runtime.registry;
+    const entries = await Promise.all(
+      agents.map(async (agent): Promise<[string, AgentPresence]> => {
+        if (agent.type !== "connected") {
+          return [agent.id, NO_PRESENCE];
+        }
+
+        try {
+          const live = await registry.listLive({ projectId, agentId: agent.id });
+
+          return [
+            agent.id,
+            {
+              status: live.length > 0 ? "online" : "offline",
+              instances: live.map(toView),
+            },
+          ];
+        } catch (error) {
+          // Presence is display data: one unreadable agent shows as offline
+          // rather than taking the whole list down with it.
+          logger.warn(
+            { error, projectId, agentId: agent.id },
+            "presence read failed, reporting the agent as offline",
+          );
+
+          return [agent.id, NO_PRESENCE];
+        }
+      }),
+    );
+
+    return new Map(entries);
+  }
+
+  private constructor() {}
 }
 
 function toView(instance: LiveInstance): AgentInstanceView {
@@ -87,47 +137,4 @@ function toView(instance: LiveInstance): AgentInstanceView {
     inflight: instance.inflight,
     maxConcurrency: instance.maxConcurrency,
   };
-}
-
-/** The presence of every agent given, keyed by id; non-connected ones are offline. */
-export async function readAgentPresence({
-  projectId,
-  agents,
-  runtime,
-}: {
-  projectId: string;
-  agents: readonly { id: string; type: string }[];
-  runtime: ConnectedAgentRuntime;
-}): Promise<Map<string, AgentPresence>> {
-  const registry = runtime.registry;
-  const entries = await Promise.all(
-    agents.map(async (agent): Promise<[string, AgentPresence]> => {
-      if (agent.type !== "connected") {
-        return [agent.id, NO_PRESENCE];
-      }
-
-      try {
-        const live = await registry.listLive({ projectId, agentId: agent.id });
-
-        return [
-          agent.id,
-          {
-            status: live.length > 0 ? "online" : "offline",
-            instances: live.map(toView),
-          },
-        ];
-      } catch (error) {
-        // Presence is display data: one unreadable agent shows as offline
-        // rather than taking the whole list down with it.
-        logger.warn(
-          { error, projectId, agentId: agent.id },
-          "presence read failed, reporting the agent as offline",
-        );
-
-        return [agent.id, NO_PRESENCE];
-      }
-    }),
-  );
-
-  return new Map(entries);
 }

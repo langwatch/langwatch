@@ -6,7 +6,7 @@
  */
 import type { RedisConnection } from "@langwatch/redis-client";
 import { describe, expect, it } from "vitest";
-import { createRedisStateStore } from "../connected-agent-state.adapter";
+import { ConnectedAgentStateAdapter } from "../connected-agent-state.adapter";
 
 type MessageListener = (channel: string, message: string) => void;
 
@@ -63,11 +63,11 @@ function fakeMultiRedis(tuples: [Error | null, unknown][] | null) {
   } as unknown as RedisConnection;
 }
 
-describe("createRedisStateStore", () => {
+describe("ConnectedAgentStateAdapter.redis", () => {
   describe("when a message arrives before SUBSCRIBE resolves", () => {
     it("delivers it to the handler that asked for the channel", async () => {
       const fake = fakeSubscriberRedis();
-      const store = createRedisStateStore(fake.redis);
+      const store = ConnectedAgentStateAdapter.redis(fake.redis);
       const seen: string[] = [];
 
       const subscribing = store.subscribe("channel_1", (message) => seen.push(message));
@@ -86,7 +86,7 @@ describe("createRedisStateStore", () => {
   describe("when a second handler asks for a channel still subscribing", () => {
     it("waits for the first SUBSCRIBE instead of returning early", async () => {
       const fake = fakeSubscriberRedis();
-      const store = createRedisStateStore(fake.redis);
+      const store = ConnectedAgentStateAdapter.redis(fake.redis);
 
       const first = store.subscribe("channel_1", () => undefined);
       let secondSettled = false;
@@ -113,7 +113,7 @@ describe("createRedisStateStore", () => {
   describe("when the INCR of a transaction fails", () => {
     it("raises the error instead of reporting a count of zero", async () => {
       const failure = new Error("WRONGTYPE");
-      const store = createRedisStateStore(
+      const store = ConnectedAgentStateAdapter.redis(
         fakeMultiRedis([
           [failure, null],
           [null, 1],
@@ -124,7 +124,7 @@ describe("createRedisStateStore", () => {
     });
 
     it("reports the count when the command succeeded", async () => {
-      const store = createRedisStateStore(
+      const store = ConnectedAgentStateAdapter.redis(
         fakeMultiRedis([
           [null, 3],
           [null, 1],

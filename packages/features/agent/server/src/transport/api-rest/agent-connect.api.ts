@@ -32,7 +32,7 @@ import { z } from "zod";
 
 import {
   INSTANCE_TOKEN_HEADER,
-  type LongPollTransport,
+  type LongPollTransportService,
 } from "../../services/connected-agent-long-poll.service";
 import type { ConnectCredentials } from "../../services/connected-agent-session.service";
 
@@ -126,7 +126,7 @@ async function jsonBodyOf(c: Context): Promise<unknown> {
 }
 
 /** A credential refusal is a refused frame; anything else stays an error. */
-function refusedOrThrow(c: Context, error: unknown, transport: LongPollTransport): Response {
+function refusedOrThrow(c: Context, error: unknown, transport: LongPollTransportService): Response {
   if (error instanceof AgentRegisterRefusedError) {
     const answer = transport.refusedAnswer(error);
     return c.json(answer.body, answer.status as 200);
@@ -149,7 +149,7 @@ const payloadGuard = (relayMaxPayloadMb: number | undefined) =>
 
 export interface ConnectEndpointDeps {
   secured: SecuredApp<{ Variables: AppRestProjectVariables }>;
-  transport: () => LongPollTransport;
+  transport: () => LongPollTransportService;
   /** `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`; the default cap when absent. */
   relayMaxPayloadMb?: number;
 }

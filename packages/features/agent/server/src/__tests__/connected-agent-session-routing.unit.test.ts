@@ -8,12 +8,13 @@
  */
 import type { AgentService } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
-import type { StoredCall, StoredResult } from "../../adapters/connected-agent-envelope.adapter";
-import type { AgentRepository } from "../../repositories/agent.repository";
-import type { ConnectCredentialPort } from "../../ports/connect-credential.port";
-import { callKey, createMemoryStateStore, resultKey } from "../../adapters/connected-agent-state.adapter";
-import { createConnectedAgentRuntime } from "../connected-agent-runtime.service";
-import { AgentSessionCore, type SessionInfo } from "../connected-agent-session.service";
+import type { StoredCall, StoredResult } from "../rules/connected-agent-envelope.rules";
+import type { AgentRepository } from "../repositories/agent.repository";
+import type { ConnectCredentialPort } from "../ports/connect-credential.port";
+import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
+import { callKey, resultKey } from "../rules/connected-agent-keys.rules";
+import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";
+import { AgentSessionService, type SessionInfo } from "../services/connected-agent-session.service";
 
 const projectId = "proj_1";
 const instanceId = "inst_stranger";
@@ -25,9 +26,9 @@ const fakeCredentials = {} as ConnectCredentialPort;
 const fakeAgentPlatformUrl = () => "https://example.test/agents";
 
 function build() {
-  const store = createMemoryStateStore();
-  const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store });
-  const core = new AgentSessionCore({
+  const store = ConnectedAgentStateAdapter.memory();
+  const runtime = ConnectedAgentRuntimeAdapter.create({ podId: "pod_solo", store });
+  const core = AgentSessionService.create({
     runtime,
     agents: fakeAgents,
     agentRepository: fakeAgentRepository,
@@ -79,7 +80,7 @@ function storedCallFor(agentId: string): StoredCall {
   };
 }
 
-describe("AgentSessionCore.readCallForSession", () => {
+describe("AgentSessionService.readCallForSession", () => {
   describe("when a call is routed at an instance that did not register the agent", () => {
     /** @scenario "An instance never receives a call for an agent it did not register" */
     it("does not send the call to it and marks it undelivered", async () => {

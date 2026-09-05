@@ -18,7 +18,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentApp } from "#app/agent.app";
-import type { ConnectedAgentRuntime } from "../../../services/connected-agent-runtime.service";
+import type { ConnectedAgentRuntime } from "../../../ports/connected-agent-runtime.port";
 import { registerCallEndpoint, type AgentCallDeps } from "../agent-call.api";
 
 class ForbiddenTestError extends HandledError {
@@ -106,21 +106,23 @@ const outcome = {
   durationMs: 12,
 };
 
-function buildApi({
-  projectId = "project-1",
-  apiKeyUserId,
-  authorizeRefuses = false,
-  agent,
-  assertRunnable = vi.fn(async () => undefined),
-  dispatch = vi.fn(async () => outcome),
-}: {
-  projectId?: string;
-  apiKeyUserId?: string | null;
-  authorizeRefuses?: boolean;
-  agent: unknown;
-  assertRunnable?: AgentCallDeps["assertRunnable"];
-  dispatch?: ReturnType<typeof vi.fn>;
-} = {} as never) {
+function buildApi(
+  {
+    projectId = "project-1",
+    apiKeyUserId,
+    authorizeRefuses = false,
+    agent,
+    assertRunnable = vi.fn(async () => undefined),
+    dispatch = vi.fn(async () => outcome),
+  }: {
+    projectId?: string;
+    apiKeyUserId?: string | null;
+    authorizeRefuses?: boolean;
+    agent: unknown;
+    assertRunnable?: AgentCallDeps["assertRunnable"];
+    dispatch?: ReturnType<typeof vi.fn>;
+  } = {} as never,
+) {
   const { security, chain } = testSecurity({ projectId, apiKeyUserId, authorizeRefuses });
   const secured = security.createProjectApp({ basePath: "/api/v1/agents" });
   const getById = vi.fn(async () => agent);

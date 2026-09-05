@@ -10,14 +10,7 @@
  */
 
 import { z } from "zod";
-import {
-  CALL_ENVELOPE_KEYS,
-  type CallEnvelope,
-  callEnvelopeSchema,
-  outputSchema,
-  resultErrorSchema,
-  sessionSchema,
-} from "@langwatch/agent-contract";
+import { CALL_ENVELOPE_KEYS, type CallEnvelope, callEnvelopeSchema, outputSchema, resultErrorSchema, sessionSchema } from "@langwatch/agent-contract";
 
 /** The value under `agent_call:v1:<callId>`. */
 export const storedCallSchema = z.object({

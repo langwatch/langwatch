@@ -485,7 +485,7 @@ export class WorkerProductionComposition {
     // dedup keyspaces and two tenant broadcast channels.
     const processRedis = infrastructure?.redis ?? eventingOptions.groupQueue.redis;
     // The experiment feature's connected cell dispatches through
-    // `getConnectedAgentRuntime()` too (ADR-128); without Redis installed
+    // `ConnectedAgentRuntimeAdapter.get()` too (ADR-128); without Redis installed
     // here it can never see an instance the API process registered.
     installWorkerConnectedAgentRuntime({
       redis: processRedis,

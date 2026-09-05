@@ -59,13 +59,7 @@ import {
 import type { SuiteExecutionPort } from "../ports/suite-execution.port";
 import type { SuiteRepository } from "../repositories/suite.repository";
 import type { SuiteRunReadRepository } from "../repositories/suite-run.repository";
-import {
-  agentOwnerNameReader,
-  assertConnectedAgentsRunnable,
-  isAgentUnseen,
-  resolveConnectedReferences,
-  type ConnectedTargetAgent,
-} from "./connected-target.service";
+import { ConnectedTargetService, type ConnectedTargetAgent } from "./connected-target.service";
 
 const archivedSlugSuffix = "--archived";
 
@@ -240,7 +234,7 @@ export class SuiteService extends SuiteServiceContract {
 
     // A connected target may be named `<name>@<environment>`; from here on
     // every target names an id, so two spellings of one agent fold together.
-    const namedTargets = await resolveConnectedReferences({
+    const namedTargets = await ConnectedTargetService.resolveConnectedReferences({
       targets: suite.targets,
       projectId: parsed.projectId,
       actor: parsed.actor,
@@ -264,10 +258,10 @@ export class SuiteService extends SuiteServiceContract {
       throw new AllTargetsArchivedError();
     }
 
-    await assertConnectedAgentsRunnable({
+    await ConnectedTargetService.assertConnectedAgentsRunnable({
       agents: targetResolution.connectedAgents,
       actor: parsed.actor,
-      owners: agentOwnerNameReader(agents),
+      owners: ConnectedTargetService.agentOwnerNameReader(agents),
     });
 
     const scenarioConfigs = await scenarios.getRunConfigs({
@@ -346,7 +340,7 @@ export class SuiteService extends SuiteServiceContract {
 
     // A connected target may be named `<name>@<environment>`; from here on
     // every target names an id, so two spellings of one agent fold together.
-    const namedTargets = await resolveConnectedReferences({
+    const namedTargets = await ConnectedTargetService.resolveConnectedReferences({
       targets: parsed.config.targets,
       projectId: parsed.projectId,
       actor: parsed.actor,
@@ -369,10 +363,10 @@ export class SuiteService extends SuiteServiceContract {
       throw new AllTargetsArchivedError();
     }
 
-    await assertConnectedAgentsRunnable({
+    await ConnectedTargetService.assertConnectedAgentsRunnable({
       agents: targetResolution.connectedAgents,
       actor: parsed.actor,
-      owners: agentOwnerNameReader(agents),
+      owners: ConnectedTargetService.agentOwnerNameReader(agents),
     });
 
     const scenarioConfigs = await scenarios.getRunConfigs({
@@ -833,7 +827,7 @@ export class SuiteService extends SuiteServiceContract {
       const agent = agentById.get(target.referenceId);
       if (!agent) {
         missing.push(target);
-      } else if (agent.archivedAt || isAgentUnseen(agent)) {
+      } else if (agent.archivedAt || ConnectedTargetService.isAgentUnseen(agent)) {
         archived.push(target);
       } else {
         active.push(target);

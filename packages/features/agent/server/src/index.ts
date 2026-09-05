@@ -8,12 +8,7 @@ export {
 } from "./adapters/prisma.agent.adapter";
 export { UnavailableLinkedWorkflowCopyAdapter } from "./adapters/unavailable.linked-workflow-copy.adapter";
 export { AgentApp, type AgentAppDependencies } from "./app/agent.app";
-export {
-  AgentService,
-  declaredAgentParameters,
-  toAgentListRow,
-  type AgentListRow,
-} from "./services/agent.service";
+export { AgentService, type AgentListRow } from "./services/agent.service";
 export { AgentTrpcApi, type AgentTrpcContext } from "./transport/api-trpc/agent.api";
 export type { AgentsAuditLogPort, AgentsDatabase, AgentsWorkflowPort } from "./ports/agent.port";
 export { LinkedWorkflowCopyPort } from "./ports/linked-workflow-copy.port";
@@ -80,29 +75,22 @@ export {
  * the runtime shared between replicas; without it the process runs on a
  * memory store and is correct only alone.
  */
+export { ConnectedAgentRuntimeAdapter } from "./adapters/connected-agent-runtime.adapter";
 export {
-  closeConnectedAgentRuntime,
+  ConnectedAgentDispatchPort,
+  ConnectedAgentRegistryPort,
   type ConnectedAgentRuntime,
-  createConnectedAgentRuntime,
-  getConnectedAgentRuntime,
-  installConnectedAgentRedis,
-} from "./services/connected-agent-runtime.service";
-export {
-  type AgentStateStore,
-  createMemoryStateStore,
-  createRedisStateStore,
-  type Unsubscribe,
-} from "./adapters/connected-agent-state.adapter";
-export {
-  CallDispatcher,
-  type CallDispatcherOptions,
   type DispatchParams,
-} from "./adapters/connected-agent-dispatch.adapter";
-export {
-  InstanceRegistry,
   type InstanceMeta,
   type LiveInstance,
-} from "./adapters/connected-agent-registry.adapter";
+} from "./ports/connected-agent-runtime.port";
+export { AgentStateStorePort, type Unsubscribe } from "./ports/agent-state-store.port";
+export { ConnectedAgentStateAdapter } from "./adapters/connected-agent-state.adapter";
+export {
+  CallDispatcherAdapter,
+  type CallDispatcherOptions,
+} from "./adapters/connected-agent-dispatch.adapter";
+export { ConnectedAgentRegistryAdapter } from "./adapters/connected-agent-registry.adapter";
 export {
   buildCallEnvelope,
   jsonByteLength,
@@ -110,15 +98,14 @@ export {
   type StoredCall,
   type StoredResult,
   type StoredResultError,
-} from "./adapters/connected-agent-envelope.adapter";
+} from "./rules/connected-agent-envelope.rules";
 export {
-  normalizeParameterSchema,
+  ConnectedAgentParameterSpecService,
   type NormalizedParameters,
 } from "./services/connected-agent-parameter-spec.service";
 export {
-  agentPresenceView,
+  ConnectedAgentPresenceService,
   NO_PRESENCE,
-  readAgentPresence,
   type AgentInstanceView,
   type AgentOwnerView,
   type AgentPresence,
@@ -129,17 +116,16 @@ export {
   type ResolvedConnectCredential,
 } from "./ports/connect-credential.port";
 export {
-  AgentSessionCore,
+  AgentSessionService,
   type ConnectCredentials,
   type SessionCoreOptions,
   type SessionInfo,
 } from "./services/connected-agent-session.service";
 export {
   INSTANCE_TOKEN_HEADER,
-  LongPollTransport,
+  LongPollTransportService,
   type LongPollTransportOptions,
   type RegisterAnswer,
-  refusalStatus,
 } from "./services/connected-agent-long-poll.service";
 export { ConnectUpgradeRouterPort, type UpgradeHandler } from "./ports/connect-upgrade-router.port";
 export {

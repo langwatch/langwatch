@@ -24,7 +24,7 @@
  */
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import { createSuiteRunProcessingPipeline } from "./suite-run-processing.adapter";
+import { SuiteRunProcessingPipelineAdapter } from "./suite-run-processing.adapter";
 
 /** Why the stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {
@@ -56,11 +56,24 @@ class ProducerOnlyFoldStore<TState> implements FoldProjectionStore<TState> {
  * `processName` names the refusal, so a stand-in reached by accident says which
  * process reached it rather than reporting an anonymous failure.
  */
-export function createSuiteRunProcessingProducerPipeline(input: { processName: string }) {
-  return createSuiteRunProcessingPipeline({
+function buildSuiteRunProcessingProducerPipeline(input: { processName: string }) {
+  return SuiteRunProcessingPipelineAdapter.create({
     suiteRunStateFoldStore: new ProducerOnlyFoldStore<SuiteRunStateData>(
       input.processName,
       "suite run state",
     ),
   });
+}
+
+/** The suite-run-processing definition as a command-only producer sees it. */
+export class SuiteRunProcessingProducerAdapter {
+  static create(options: { processName: string }): SuiteRunProcessingProducerAdapter {
+    return new SuiteRunProcessingProducerAdapter(options);
+  }
+
+  private constructor(private readonly options: { processName: string }) {}
+
+  build() {
+    return buildSuiteRunProcessingProducerPipeline(this.options);
+  }
 }

@@ -3,18 +3,16 @@
  * long-poll fallback, and the credential and runnable-target checks both
  * ride on.
  *
- * Composed as one unit because the three share one `AgentSessionCore`
+ * Composed as one unit because the three share one `AgentSessionService`
  * (register, ack, result, retirement) and one Redis-backed runtime — a
  * process either has all of it or none of it, the same rule the family's own
  * REST mount follows.
  */
 import type { AgentService } from "@langwatch/agent-contract";
 import {
-  closeConnectedAgentRuntime,
+  ConnectedAgentRuntimeAdapter,
   ConnectGateway,
-  getConnectedAgentRuntime,
-  installConnectedAgentRedis,
-  LongPollTransport,
+  LongPollTransportService,
   PostgresAgentAdapter,
   type AssertConnectedAgentsRunnablePort,
   type ConnectedAgentRuntime,
@@ -22,7 +20,7 @@ import {
 } from "@langwatch/agent-server";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { runActorFromRequest } from "@langwatch/scenario-contract";
-import { agentOwnerNameReader, assertConnectedAgentsRunnable } from "@langwatch/suite-server";
+import { ConnectedTargetService } from "@langwatch/suite-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
 
@@ -75,11 +73,11 @@ export class ApiConnectedAgentsComposition {
       return undefined;
     }
     if (options.redis) {
-      installConnectedAgentRedis(options.redis);
+      ConnectedAgentRuntimeAdapter.install(options.redis);
     } else if (options.replicaCount > 1) {
       options.report?.withoutSharedStore(options.replicaCount);
     }
-    const runtime = getConnectedAgentRuntime();
+    const runtime = ConnectedAgentRuntimeAdapter.get();
     // Only for the register frame's per-agent deep link; the REST family's
     // OWN response link rides the shared `ports.agentPlatformUrl` a packaged
     // family already takes — this is a second, pure builder, not a second
@@ -108,9 +106,9 @@ export class ApiConnectedAgentsComposition {
         : {}),
     };
     const gateway = new ConnectGateway(sessionOptions);
-    const longPoll = new LongPollTransport(sessionOptions);
+    const longPoll = LongPollTransportService.create(sessionOptions);
     const assertRunnable: AssertConnectedAgentsRunnablePort = ({ agent, apiKeyUserId }) =>
-      assertConnectedAgentsRunnable({
+      ConnectedTargetService.assertConnectedAgentsRunnable({
         agents: [
           {
             id: agent.id,
@@ -120,7 +118,7 @@ export class ApiConnectedAgentsComposition {
           },
         ],
         actor: runActorFromRequest({ userId: apiKeyUserId, surfaceHeader: undefined }),
-        owners: agentOwnerNameReader(options.agents),
+        owners: ConnectedTargetService.agentOwnerNameReader(options.agents),
       });
     return new ApiConnectedAgentsComposition(
       runtime,
@@ -135,7 +133,7 @@ export class ApiConnectedAgentsComposition {
   private constructor(
     readonly runtime: ConnectedAgentRuntime,
     readonly gateway: ConnectGateway,
-    readonly longPoll: LongPollTransport,
+    readonly longPoll: LongPollTransportService,
     readonly credentials: ApiConnectCredentialAdapter,
     readonly assertRunnable: AssertConnectedAgentsRunnablePort,
     readonly relayMaxPayloadMb: number | undefined,
@@ -152,7 +150,7 @@ export class ApiConnectedAgentsComposition {
     for (const closeOne of [
       () => this.gateway.close(),
       () => this.longPoll.close(),
-      () => closeConnectedAgentRuntime(),
+      () => ConnectedAgentRuntimeAdapter.close(),
     ]) {
       try {
         await closeOne();

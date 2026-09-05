@@ -2,7 +2,7 @@
  * ADR-128's credential check for the WebSocket gateway and the HTTP long-poll
  * transport, over this process's own API-key and AuthZ services.
  *
- * Main's `AgentSessionCore.authenticate` (session.core.ts) inlined
+ * Main's `AgentSessionService.authenticate` (session.core.ts) inlined
  * `TokenResolver` and `enforceApiKeyCeiling`, both of which live in
  * `@langwatch/api-key-*`, which `agent-server` may not depend on. This
  * adapter folds its four steps — resolve the token, refuse an ingestion or

@@ -6,7 +6,7 @@
  *
  * @see specs/agents/agent-test-run.feature
  */
-import type { AgentTestRunResult } from "@langwatch/scenario-server";
+import type { AgentTestRunResult } from "../../../ports/agent-test.port";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentApp } from "#app/agent.app";

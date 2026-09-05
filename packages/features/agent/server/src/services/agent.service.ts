@@ -41,33 +41,6 @@ export type AgentListRow = {
   updatedAt: Date;
 };
 
-/** The parameters a connected agent declares; every other type declares none. */
-export function declaredAgentParameters(
-  agent: Pick<Agent, "type" | "config">,
-): ScenarioParameterDefinition[] {
-  if (agent.type !== "connected") {
-    return [];
-  }
-
-  return (agent.config as ConnectedAgentConfig).parameters;
-}
-
-export function toAgentListRow(agent: Agent): AgentListRow {
-  return {
-    id: agent.id,
-    name: agent.name,
-    type: agent.type,
-    config: agent.config,
-    environment: agent.environment ?? null,
-    ownerUserId: agent.ownerUserId ?? null,
-    hostLabel: agent.hostLabel ?? null,
-    lastSeenAt: agent.lastSeenAt ?? null,
-    parameters: declaredAgentParameters(agent),
-    createdAt: agent.createdAt,
-    updatedAt: agent.updatedAt,
-  };
-}
-
 /**
  * Whether Prisma refused a write because a unique index already holds the
  * value. The row the caller wanted exists, written by somebody else.
@@ -86,6 +59,33 @@ type AgentServiceOptions = {
 };
 
 export class AgentService extends AgentServiceContract {
+  /** The parameters a connected agent declares; every other type declares none. */
+  static declaredAgentParameters(
+    agent: Pick<Agent, "type" | "config">,
+  ): ScenarioParameterDefinition[] {
+    if (agent.type !== "connected") {
+      return [];
+    }
+
+    return (agent.config as ConnectedAgentConfig).parameters;
+  }
+
+  static toAgentListRow(agent: Agent): AgentListRow {
+    return {
+      id: agent.id,
+      name: agent.name,
+      type: agent.type,
+      config: agent.config,
+      environment: agent.environment ?? null,
+      ownerUserId: agent.ownerUserId ?? null,
+      hostLabel: agent.hostLabel ?? null,
+      lastSeenAt: agent.lastSeenAt ?? null,
+      parameters: AgentService.declaredAgentParameters(agent),
+      createdAt: agent.createdAt,
+      updatedAt: agent.updatedAt,
+    };
+  }
+
   static create(options: AgentServiceOptions): AgentService {
     return new AgentService(
       options.repository,

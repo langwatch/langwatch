@@ -40,21 +40,20 @@ import {
   type StoredCall,
   type StoredResult,
   storedCallSchema,
-} from "../adapters/connected-agent-envelope.adapter";
+} from "../rules/connected-agent-envelope.rules";
 import {
   callAckKey,
   callKey,
   INSTANCE_GONE_CHANNEL,
   replyChannel,
   resultKey,
-} from "../adapters/connected-agent-state.adapter";
-import type { InstanceMeta } from "../adapters/connected-agent-registry.adapter";
-import { normalizeParameterSchema } from "./connected-agent-parameter-spec.service";
+} from "../rules/connected-agent-keys.rules";
+import { ConnectedAgentParameterSpecService } from "./connected-agent-parameter-spec.service";
 import {
-  touchAgentLastSeen,
+  ConnectedAgentPresenceProjection,
   type AgentLastSeenWriter,
 } from "../projections/connected-agent-presence.projection";
-import type { ConnectedAgentRuntime } from "./connected-agent-runtime.service";
+import type { ConnectedAgentRuntime, InstanceMeta } from "../ports/connected-agent-runtime.port";
 import {
   type ConnectCredentialPort,
   type ResolvedConnectCredential,
@@ -91,7 +90,11 @@ export interface SessionCoreOptions {
   now?: () => number;
 }
 
-export class AgentSessionCore {
+export class AgentSessionService {
+  static create(options: SessionCoreOptions): AgentSessionService {
+    return new AgentSessionService(options);
+  }
+
   readonly runtime: ConnectedAgentRuntime;
   private readonly agents: AgentService;
   private readonly agentRepository: AgentLastSeenWriter;
@@ -101,7 +104,7 @@ export class AgentSessionCore {
   private readonly relayMaxPayloadMb: number | undefined;
   readonly now: () => number;
 
-  constructor(options: SessionCoreOptions) {
+  private constructor(options: SessionCoreOptions) {
     this.runtime = options.runtime;
     this.agents = options.agents;
     this.agentRepository = options.agentRepository;
@@ -240,9 +243,11 @@ export class AgentSessionCore {
         });
       }
 
-      let normalized: ReturnType<typeof normalizeParameterSchema>;
+      let normalized: ReturnType<
+        typeof ConnectedAgentParameterSpecService.normalizeParameterSchema
+      >;
       try {
-        normalized = normalizeParameterSchema(agent.parameters);
+        normalized = ConnectedAgentParameterSpecService.normalizeParameterSchema(agent.parameters);
       } catch (error) {
         if (!HandledError.isHandled(error)) {
           throw error;
@@ -434,7 +439,7 @@ export class AgentSessionCore {
       meta: session.meta,
     });
     for (const agentId of session.agentIds) {
-      void touchAgentLastSeen({
+      void ConnectedAgentPresenceProjection.touchAgentLastSeen({
         repository: this.agentRepository,
         projectId: session.projectId,
         agentId,

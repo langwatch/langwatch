@@ -14,11 +14,11 @@ import {
 import type { AgentService } from "@langwatch/agent-contract";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryStateStore } from "../../../adapters/connected-agent-state.adapter";
+import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter";
 import type { AgentRepository } from "../../../repositories/agent.repository";
 import type { ConnectCredentialPort } from "../../../ports/connect-credential.port";
-import { createConnectedAgentRuntime } from "../../../services/connected-agent-runtime.service";
-import { LongPollTransport } from "../../../services/connected-agent-long-poll.service";
+import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter";
+import { LongPollTransportService } from "../../../services/connected-agent-long-poll.service";
 import { registerConnectEndpoints } from "../agent-connect.api";
 
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
@@ -51,8 +51,11 @@ function testSecurity(): AppRestSecurity {
 }
 
 function buildApi({ relayMaxPayloadMb }: { relayMaxPayloadMb?: number } = {}) {
-  const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store: createMemoryStateStore() });
-  const transport = new LongPollTransport({
+  const runtime = ConnectedAgentRuntimeAdapter.create({
+    podId: "pod_solo",
+    store: ConnectedAgentStateAdapter.memory(),
+  });
+  const transport = LongPollTransportService.create({
     runtime,
     agents: {} as AgentService,
     agentRepository: {} as AgentRepository,

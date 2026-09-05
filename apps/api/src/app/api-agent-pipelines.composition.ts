@@ -68,8 +68,8 @@ import type {
   SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
 import {
-  createSuiteRunProcessingProducerPipeline,
   SuiteRunCommandsPort,
+  SuiteRunProcessingProducerAdapter,
   type QueueSimulationRunCommandData,
   type StartSuiteRunCommandData,
 } from "@langwatch/suite-server";
@@ -165,7 +165,9 @@ export function composeApiAgentPipelines(options: ApiAgentPipelinesOptions): Api
   });
   const suite = commandLookup({
     pipeline: "suite_run_processing",
-    registered: eventing.register(createSuiteRunProcessingProducerPipeline({ processName })),
+    registered: eventing.register(
+      SuiteRunProcessingProducerAdapter.create({ processName }).build(),
+    ),
   });
   const langy = commandLookup({
     pipeline: "langy_conversation_processing",

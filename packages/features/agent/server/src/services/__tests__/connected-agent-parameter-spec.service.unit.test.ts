@@ -4,13 +4,13 @@
  * @see specs/agents/connected-agents.feature
  */
 import { describe, expect, it } from "vitest";
-import { normalizeParameterSchema } from "../connected-agent-parameter-spec.service";
+import { ConnectedAgentParameterSpecService } from "../connected-agent-parameter-spec.service";
 
-describe("normalizeParameterSchema", () => {
+describe("ConnectedAgentParameterSpecService.normalizeParameterSchema", () => {
   describe("when the schema declares scalar properties", () => {
     /** @scenario "A JSON Schema object becomes parameter definitions" */
     it("reads the type, the options, the default and the required flag", () => {
-      const { parameters, notes } = normalizeParameterSchema({
+      const { parameters, notes } = ConnectedAgentParameterSpecService.normalizeParameterSchema({
         type: "object",
         properties: {
           model: {
@@ -39,7 +39,7 @@ describe("normalizeParameterSchema", () => {
     });
 
     it("reads an integer as a number and an optional as its type", () => {
-      const { parameters } = normalizeParameterSchema({
+      const { parameters } = ConnectedAgentParameterSpecService.normalizeParameterSchema({
         properties: {
           retries: { type: "integer", default: 3 },
           region: { type: ["string", "null"] },
@@ -55,7 +55,7 @@ describe("normalizeParameterSchema", () => {
   describe("when a property has an unsupported type", () => {
     /** @scenario "An unsupported property type is downgraded to text with a note" */
     it("presents it as a string and says so", () => {
-      const { parameters, notes } = normalizeParameterSchema({
+      const { parameters, notes } = ConnectedAgentParameterSpecService.normalizeParameterSchema({
         properties: { filters: { type: "object" } },
       });
       expect(parameters).toEqual([{ name: "filters", type: "string" }]);
@@ -69,7 +69,7 @@ describe("normalizeParameterSchema", () => {
     /** @scenario "A parameter name outside the grammar is refused" */
     it("refuses with agent_parameter_invalid", () => {
       expect(() =>
-        normalizeParameterSchema({
+        ConnectedAgentParameterSpecService.normalizeParameterSchema({
           properties: { "my-model": { type: "string" } },
         }),
       ).toThrow(expect.objectContaining({ code: "agent_parameter_invalid" }));
@@ -82,11 +82,11 @@ describe("normalizeParameterSchema", () => {
       const properties = Object.fromEntries(
         Array.from({ length: 21 }, (_, index) => [`param_${index}`, { type: "string" }]),
       );
-      expect(() => normalizeParameterSchema({ properties })).toThrow(
-        expect.objectContaining({ code: "agent_parameter_invalid" }),
-      );
+      expect(() =>
+        ConnectedAgentParameterSpecService.normalizeParameterSchema({ properties }),
+      ).toThrow(expect.objectContaining({ code: "agent_parameter_invalid" }));
       expect(
-        normalizeParameterSchema({
+        ConnectedAgentParameterSpecService.normalizeParameterSchema({
           properties: Object.fromEntries(Object.entries(properties).slice(0, 20)),
         }).parameters,
       ).toHaveLength(20);
@@ -96,7 +96,7 @@ describe("normalizeParameterSchema", () => {
   describe("when an enum holds more than fifty values", () => {
     /** @scenario "More than fifty options are cut to fifty with a note" */
     it("keeps the first fifty and says so", () => {
-      const { parameters, notes } = normalizeParameterSchema({
+      const { parameters, notes } = ConnectedAgentParameterSpecService.normalizeParameterSchema({
         properties: {
           voice: {
             type: "string",
@@ -114,7 +114,7 @@ describe("normalizeParameterSchema", () => {
     it("refuses with agent_parameter_invalid", () => {
       for (const name of ["messages", "thread_id", "session", "new_messages"]) {
         expect(() =>
-          normalizeParameterSchema({
+          ConnectedAgentParameterSpecService.normalizeParameterSchema({
             properties: { [name]: { type: "string" } },
           }),
         ).toThrow(expect.objectContaining({ code: "agent_parameter_invalid" }));
@@ -125,12 +125,12 @@ describe("normalizeParameterSchema", () => {
   describe("when a property is declared secret", () => {
     it("refuses it: secrets stay scenario-declared", () => {
       expect(() =>
-        normalizeParameterSchema({
+        ConnectedAgentParameterSpecService.normalizeParameterSchema({
           properties: { token: { type: "string", secret: true } },
         }),
       ).toThrow(expect.objectContaining({ code: "agent_parameter_invalid" }));
       expect(
-        normalizeParameterSchema({
+        ConnectedAgentParameterSpecService.normalizeParameterSchema({
           properties: { token: { type: "string" } },
         }).parameters[0],
       ).not.toHaveProperty("secret");

@@ -36,15 +36,14 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import { AgentApp } from "#app/agent.app";
-import type { ConnectedAgentRuntime } from "../../services/connected-agent-runtime.service";
-import type { LongPollTransport } from "../../services/connected-agent-long-poll.service";
+import type { ConnectedAgentRuntime } from "../../ports/connected-agent-runtime.port";
+import type { LongPollTransportService } from "../../services/connected-agent-long-poll.service";
 import {
-  agentPresenceView,
+  ConnectedAgentPresenceService,
   NO_PRESENCE,
-  readAgentPresence,
   type AgentPresence,
 } from "../../services/connected-agent-presence.service";
-import { toAgentListRow, type AgentListRow } from "../../services/agent.service";
+import { AgentService, type AgentListRow } from "../../services/agent.service";
 import { registerCallEndpoint, type AgentCallDeps } from "./agent-call.api";
 import { registerConnectEndpoints } from "./agent-connect.api";
 import type { AgentPlatformUrlBuilder } from "./agent-legacy.api";
@@ -172,7 +171,7 @@ export interface AgentsV1Deps {
   connectedRuntime?: () => ConnectedAgentRuntime | undefined;
   /** Absent when this process composes no connected-agent transport. */
   connect?: {
-    transport: () => LongPollTransport;
+    transport: () => LongPollTransportService;
     /** `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`; the default cap when absent. */
     relayMaxPayloadMb?: number;
   };
@@ -194,7 +193,7 @@ async function presenceOf({
 }): Promise<Map<string, AgentPresence>> {
   const runtime = deps.connectedRuntime?.();
   if (!runtime) return new Map(rows.map((row) => [row.id, NO_PRESENCE]));
-  return readAgentPresence({ projectId, agents: rows, runtime });
+  return ConnectedAgentPresenceService.readAgentPresence({ projectId, agents: rows, runtime });
 }
 
 /** The rows as every read answers them: presence, owner and link added. */
@@ -216,7 +215,7 @@ async function rowsWire({
   return rows.map((row) => ({
     ...row,
     type: agentTypeSchema.parse(row.type),
-    ...agentPresenceView({ agent: row, owners, presence }),
+    ...ConnectedAgentPresenceService.agentPresenceView({ agent: row, owners, presence }),
     platformUrl: deps.agentPlatformUrl({
       projectSlug,
       agentId: row.id,
@@ -234,13 +233,13 @@ async function agentWire({
   deps: AgentsV1Deps;
   projectId: string;
   projectSlug: string;
-  agent: Parameters<typeof toAgentListRow>[0];
+  agent: Parameters<typeof AgentService.toAgentListRow>[0];
 }): Promise<AgentWire> {
   const [wire] = await rowsWire({
     deps,
     projectId,
     projectSlug,
-    rows: [toAgentListRow(agent)],
+    rows: [AgentService.toAgentListRow(agent)],
   });
   return wire!;
 }
@@ -334,7 +333,7 @@ function registerCollectionEndpoints({
           deps,
           projectId: project.id,
           projectSlug: project.slug,
-          rows: result.data.map(toAgentListRow),
+          rows: result.data.map(AgentService.toAgentListRow),
         }),
       });
     },

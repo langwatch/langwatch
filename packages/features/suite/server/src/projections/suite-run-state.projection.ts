@@ -36,6 +36,12 @@ export class SuiteRunStateFoldProjection
   extends AbstractFoldProjection<SuiteRunStateData, typeof suiteRunEvents>
   implements FoldEventHandlers<typeof suiteRunEvents, SuiteRunStateData>
 {
+  static create(deps: {
+    store: FoldProjectionStore<SuiteRunStateData>;
+  }): SuiteRunStateFoldProjection {
+    return new SuiteRunStateFoldProjection(deps);
+  }
+
   readonly name = "suiteRunState";
   readonly version = SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE;
   readonly store: FoldProjectionStore<SuiteRunStateData>;

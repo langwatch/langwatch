@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
-import { getConnectedAgentRuntime } from "@langwatch/agent-server";
+import { ConnectedAgentRuntimeAdapter } from "@langwatch/agent-server";
 import {
   AgentTestConnectedDispatchPort,
   type AgentTestConnectedDispatchResult,
@@ -29,7 +29,7 @@ export class ApiAgentTestConnectedDispatchAdapter extends AgentTestConnectedDisp
   }): Promise<AgentTestConnectedDispatchResult> {
     const config = connectedCallConfigSchema.parse(input.config ?? {});
     const messages = [{ role: "user" as const, content: input.message }];
-    const outcome = await getConnectedAgentRuntime().dispatcher.dispatch({
+    const outcome = await ConnectedAgentRuntimeAdapter.get().dispatcher.dispatch({
       projectId: input.projectId,
       agent: {
         id: input.agentId,

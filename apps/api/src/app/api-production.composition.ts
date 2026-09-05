@@ -64,7 +64,7 @@ import {
   ApiConnectedAgentsAbsenceReportPort,
   ApiConnectedAgentsComposition,
 } from "./api-connected-agents.composition";
-import { readAgentPresence } from "@langwatch/agent-server";
+import { ConnectedAgentPresenceService } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router";
 import {
   composeDatasetFeature,
@@ -1472,7 +1472,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ? {
             connectedAgents: {
               presence: (input: { projectId: string; agents: { id: string; type: string }[] }) =>
-                readAgentPresence({ ...input, runtime: this.composedConnectedAgents!.runtime }),
+                ConnectedAgentPresenceService.readAgentPresence({
+                  ...input,
+                  runtime: this.composedConnectedAgents!.runtime,
+                }),
             },
           }
         : {}),

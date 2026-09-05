@@ -215,7 +215,14 @@ describe("given a project with a valid API key", () => {
 
       const response = await api.v1("/api/v1/agents");
       const body = (await response.json()) as {
-        data: { id: string; name: string; type: string; config: unknown; createdAt: string; updatedAt: string }[];
+        data: {
+          id: string;
+          name: string;
+          type: string;
+          config: unknown;
+          createdAt: string;
+          updatedAt: string;
+        }[];
         pagination: { total: number };
       };
 
@@ -443,7 +450,7 @@ describe("given the deprecated /api/agents alias", () => {
 
       const read = await api.legacy(`/api/agents/${created.id}`);
       expect(read.status).toBe(200);
-      expect((await read.json())).toMatchObject({ id: created.id, name: "Aliased" });
+      expect(await read.json()).toMatchObject({ id: created.id, name: "Aliased" });
 
       const updated = await api.legacy(`/api/agents/${created.id}`, {
         method: "PATCH",
@@ -451,11 +458,11 @@ describe("given the deprecated /api/agents alias", () => {
         body: JSON.stringify({ name: "Aliased Renamed" }),
       });
       expect(updated.status).toBe(200);
-      expect((await updated.json())).toMatchObject({ name: "Aliased Renamed" });
+      expect(await updated.json()).toMatchObject({ name: "Aliased Renamed" });
 
       const archived = await api.legacy(`/api/agents/${created.id}`, { method: "DELETE" });
       expect(archived.status).toBe(200);
-      expect((await archived.json())).toMatchObject({ archivedAt: expect.any(String) });
+      expect(await archived.json()).toMatchObject({ archivedAt: expect.any(String) });
 
       const afterArchive = await api.v1(`/api/v1/agents/${created.id}`);
       expect(afterArchive.status).toBe(404);

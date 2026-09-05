@@ -1,4 +1,4 @@
-import { closeConnectedAgentRuntime, installConnectedAgentRedis } from "@langwatch/agent-server";
+import { ConnectedAgentRuntimeAdapter } from "@langwatch/agent-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 
@@ -9,7 +9,7 @@ import type { ResourceScope } from "@langwatch/runtime-composition";
  *
  * The worker mounts no connected-agent transport of its own — the socket
  * and the long-poll session live in the API process that holds them — but
- * `getConnectedAgentRuntime()` is also called from here, by the experiment
+ * `ConnectedAgentRuntimeAdapter.get()` is also called from here, by the experiment
  * feature's connected cell (`relayDispatch`). Left uninstalled, that call
  * runs the dispatcher on a private memory store that can never see an
  * instance the API process registered, so every connected experiment column
@@ -22,6 +22,8 @@ export function installWorkerConnectedAgentRuntime(options: {
 }): void {
   if (!options.redis) return;
 
-  installConnectedAgentRedis(options.redis);
-  options.resources?.own("worker connected-agent runtime", () => closeConnectedAgentRuntime());
+  ConnectedAgentRuntimeAdapter.install(options.redis);
+  options.resources?.own("worker connected-agent runtime", () =>
+    ConnectedAgentRuntimeAdapter.close(),
+  );
 }

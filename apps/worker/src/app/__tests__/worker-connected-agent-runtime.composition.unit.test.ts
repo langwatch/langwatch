@@ -3,18 +3,17 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { installWorkerConnectedAgentRuntime } from "../worker-connected-agent-runtime.composition";
 
-const { installConnectedAgentRedis, closeConnectedAgentRuntime } = vi.hoisted(() => ({
-  installConnectedAgentRedis: vi.fn(),
-  closeConnectedAgentRuntime: vi.fn(async () => undefined),
+const { install, close } = vi.hoisted(() => ({
+  install: vi.fn(),
+  close: vi.fn(async () => undefined),
 }));
 
 vi.mock("@langwatch/agent-server", () => ({
-  installConnectedAgentRedis,
-  closeConnectedAgentRuntime,
+  ConnectedAgentRuntimeAdapter: { install, close },
 }));
 
 /**
- * The experiment feature's connected cell reads `getConnectedAgentRuntime()`
+ * The experiment feature's connected cell reads `ConnectedAgentRuntimeAdapter.get()`
  * from this process too (ADR-128); without Redis installed here it can never
  * see an instance the API process registered.
  */
@@ -30,9 +29,9 @@ describe("installWorkerConnectedAgentRuntime", () => {
 
       installWorkerConnectedAgentRuntime({ redis, resources });
 
-      expect(installConnectedAgentRedis).toHaveBeenCalledWith(redis);
+      expect(install).toHaveBeenCalledWith(redis);
       await resources.close();
-      expect(closeConnectedAgentRuntime).toHaveBeenCalledTimes(1);
+      expect(close).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -40,7 +39,7 @@ describe("installWorkerConnectedAgentRuntime", () => {
     it("installs nothing", () => {
       installWorkerConnectedAgentRuntime({ redis: null });
 
-      expect(installConnectedAgentRedis).not.toHaveBeenCalled();
+      expect(install).not.toHaveBeenCalled();
     });
   });
 });
