@@ -152,6 +152,23 @@ Feature: Evaluators run on scenario runs
     And the result is not failed for the missing contexts
 
   @unit
+  Scenario: No evaluator runs while another one still waits on its trace
+    Given two evaluators attached to a run, one reading the conversation and one reading a tool call
+    And the run's tool span has not arrived
+    When the run is evaluated on an attempt that is not the last
+    Then neither evaluator runs
+    And nothing is recorded until the tool span arrives
+    And once it arrives each evaluator runs exactly once across the attempts
+
+  @unit
+  Scenario: On the final attempt every evaluator runs
+    Given two evaluators attached to a run, one reading the conversation and one reading a tool call
+    And the run's tool span never arrives
+    When the run is evaluated on its last attempt
+    Then the evaluator reading the conversation runs and records its result
+    And the evaluator reading the tool call records a failed result with the reason
+
+  @unit
   Scenario: Trace data that has not arrived yet is retried with a growing delay
     Given an evaluator that reads the trace
     And the run's spans have not arrived

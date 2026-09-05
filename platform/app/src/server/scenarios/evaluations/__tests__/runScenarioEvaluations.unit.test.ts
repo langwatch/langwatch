@@ -288,6 +288,76 @@ describe("runScenarioEvaluations", () => {
     });
   });
 
+  describe("when one evaluator reads the conversation and another still waits on a tool call", () => {
+    const conversationAttachment = attachment({ id: "att-conversation" });
+    const toolAttachment = attachment({
+      id: "att-tool",
+      evaluatorId: "eval-tool",
+      mappings: { output: toolMapping, expected_output: goldenMapping },
+    });
+    const toolEvaluator = evaluator({ id: "eval-tool", name: "SQL check" });
+    const runSqlSpan = {
+      span_id: "s-tool",
+      trace_id: "trace-1",
+      type: "tool",
+      name: "tool",
+      params: { gen_ai: { tool: { name: "run_sql" } } },
+      input: { type: "text", value: "SELECT 1" },
+      output: { type: "text", value: "1" },
+      timestamps: { started_at: 1, finished_at: 2, first_token_at: null },
+    } as unknown as Span;
+    const twoAttachments = () =>
+      makeDeps({
+        attachments: [conversationAttachment, toolAttachment],
+        evaluators: [evaluator(), toolEvaluator],
+        spans: [],
+      });
+
+    /** @scenario "No evaluator runs while another one still waits on its trace" */
+    it("runs no evaluator until the tool span arrives, then each one exactly once", async () => {
+      const deps = twoAttachments();
+
+      await expect(
+        runScenarioEvaluations({ deps, payload, isFinalAttempt: false }),
+      ).rejects.toBeInstanceOf(TraceDataPendingError);
+      expect(deps.runEvaluation).not.toHaveBeenCalled();
+      expect(deps.recordEvaluations).not.toHaveBeenCalled();
+
+      vi.mocked(deps.spans.getSpansByTraceId).mockResolvedValue([runSqlSpan]);
+      await runScenarioEvaluations({
+        deps,
+        payload: { ...payload, attempt: 2 },
+        isFinalAttempt: false,
+      });
+
+      expect(deps.runEvaluation).toHaveBeenCalledTimes(2);
+      expect(recorded(deps)?.evaluations.map((entry) => entry.status)).toEqual([
+        "passed",
+        "passed",
+      ]);
+    });
+
+    /** @scenario "On the final attempt every evaluator runs" */
+    it("runs the conversation evaluator and fails the tool one on the last attempt", async () => {
+      const deps = twoAttachments();
+
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: true });
+
+      expect(deps.runEvaluation).toHaveBeenCalledTimes(1);
+      expect(recorded(deps)?.evaluations).toEqual([
+        expect.objectContaining({
+          evaluatorId: "eval-exact",
+          status: "passed",
+        }),
+        expect.objectContaining({
+          evaluatorId: "eval-tool",
+          status: "failed",
+          details: "no run_sql call in the trace",
+        }),
+      ]);
+    });
+  });
+
   describe("when an evaluator reports an error", () => {
     /** @scenario "An evaluator error is recorded as an error result" */
     it("records the error and the other evaluators still record their results", async () => {

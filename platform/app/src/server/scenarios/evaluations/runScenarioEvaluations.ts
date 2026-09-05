@@ -439,31 +439,49 @@ async function runOne({
 }
 
 /**
- * The result one attachment records: an error when its evaluator is gone,
- * a skip or a failure when its inputs cannot be read, else the evaluator's
- * own verdict, which is also written on the run's last trace.
+ * One attachment after its mappings resolved and before any evaluator runs:
+ * settled with the result it records without running (its evaluator is
+ * gone, an input is skipped or failed), waiting on trace data that has not
+ * arrived, or ready to run with its inputs.
  */
-async function evaluateAttachment({
-  deps,
+type PreparedAttachment =
+  | { kind: "settled"; result: ScenarioEvaluationResult }
+  | { kind: "pending"; details: string }
+  | {
+      kind: "ready";
+      attachment: EvaluatorAttachment;
+      evaluator: RunEvaluatorDefinition;
+      checkType: string;
+      data: Record<string, ResolvedValue>;
+    };
+
+/** Resolves one attachment's inputs; runs nothing. */
+function prepareAttachment({
   context,
   attachment,
   evaluator,
 }: {
-  deps: Pick<RunScenarioEvaluationsDeps, "runEvaluation" | "reportEvaluation">;
   context: RunContext;
   attachment: EvaluatorAttachment;
   evaluator: RunEvaluatorDefinition | undefined;
-}): Promise<ScenarioEvaluationResult> {
+}): PreparedAttachment {
   const name = evaluator?.name ?? attachment.evaluatorId;
-  const record = (result: SingleEvaluationResult, inputs = {}) =>
-    toScenarioEvaluationResult({ attachment, name, result, inputs });
+  const settle = (result: SingleEvaluationResult): PreparedAttachment => ({
+    kind: "settled",
+    result: toScenarioEvaluationResult({
+      attachment,
+      name,
+      result,
+      inputs: {},
+    }),
+  });
 
   if (!evaluator) {
-    return record(errorResult("The evaluator was not found in this project"));
+    return settle(errorResult("The evaluator was not found in this project"));
   }
   const checkType = checkTypeOf(evaluator);
   if (!checkType) {
-    return record(errorResult("The evaluator names no evaluator type"));
+    return settle(errorResult("The evaluator names no evaluator type"));
   }
 
   const resolved = resolveAttachmentInputs({
@@ -474,27 +492,43 @@ async function evaluateAttachment({
     isFinalAttempt: context.isFinalAttempt,
   });
   if (resolved.kind === "pending" && !context.isFinalAttempt) {
-    throw new TraceDataPendingError(resolved.details);
+    return { kind: "pending", details: resolved.details };
   }
   if (resolved.kind === "skipped") {
-    return record({ status: "skipped", details: resolved.details });
+    return settle({ status: "skipped", details: resolved.details });
   }
   if (resolved.kind !== "ready") {
-    return record({
+    return settle({
       status: "processed",
       passed: false,
       details: resolved.details,
     });
   }
-
-  const occurredAt = Date.now();
-  const result = await runOne({
-    deps,
-    context,
+  return {
+    kind: "ready",
+    attachment,
     evaluator,
     checkType,
     data: resolved.data,
-  });
+  };
+}
+
+/**
+ * Runs one ready attachment and records the evaluator's own verdict, which
+ * is also written on the run's last trace.
+ */
+async function executeAttachment({
+  deps,
+  context,
+  ready,
+}: {
+  deps: Pick<RunScenarioEvaluationsDeps, "runEvaluation" | "reportEvaluation">;
+  context: RunContext;
+  ready: Extract<PreparedAttachment, { kind: "ready" }>;
+}): Promise<ScenarioEvaluationResult> {
+  const { attachment, evaluator, checkType, data } = ready;
+  const occurredAt = Date.now();
+  const result = await runOne({ deps, context, evaluator, checkType, data });
   if (context.lastTraceId) {
     try {
       await deps.reportEvaluation(
@@ -505,7 +539,7 @@ async function evaluateAttachment({
           evaluatorType: checkType,
           evaluatorName: evaluator.name,
           result,
-          inputs: resolved.data,
+          inputs: data,
           occurredAt,
         }),
       );
@@ -521,7 +555,52 @@ async function evaluateAttachment({
       );
     }
   }
-  return record(result, storedInputsOf(resolved.data));
+  return toScenarioEvaluationResult({
+    attachment,
+    name: evaluator.name,
+    result,
+    inputs: storedInputsOf(data),
+  });
+}
+
+/**
+ * The results of every attachment, in order. Every attachment is resolved
+ * before any evaluator runs: on any attempt but the last, one attachment
+ * still waiting on its trace throws before a single evaluator executes, so
+ * a retry never runs an evaluator a second time. On the last attempt every
+ * attachment is settled or ready and all of them run.
+ */
+async function evaluateAttachments({
+  deps,
+  context,
+  attachments,
+  evaluatorsById,
+}: {
+  deps: Pick<RunScenarioEvaluationsDeps, "runEvaluation" | "reportEvaluation">;
+  context: RunContext;
+  attachments: readonly EvaluatorAttachment[];
+  evaluatorsById: ReadonlyMap<string, RunEvaluatorDefinition>;
+}): Promise<ScenarioEvaluationResult[]> {
+  const prepared = attachments.map((attachment) => {
+    const entry = prepareAttachment({
+      context,
+      attachment,
+      evaluator: evaluatorsById.get(attachment.evaluatorId),
+    });
+    if (entry.kind === "pending")
+      throw new TraceDataPendingError(entry.details);
+    return entry;
+  });
+
+  const evaluations: ScenarioEvaluationResult[] = [];
+  for (const entry of prepared) {
+    evaluations.push(
+      entry.kind === "ready"
+        ? await executeAttachment({ deps, context, ready: entry })
+        : entry.result,
+    );
+  }
+  return evaluations;
 }
 
 /**
@@ -577,10 +656,13 @@ async function buildRunContext({
 /**
  * Runs the evaluators of one finished run and records the results.
  *
- * On any attempt but the last, a trace that has not arrived throws
- * `TraceDataPendingError` before anything is recorded, so the whole run is
- * graded in one go once the data is there. On the last attempt the missing
- * data is recorded as a failed result with its reason.
+ * Every attachment's inputs are resolved before any evaluator runs. On any
+ * attempt but the last, a trace that has not arrived throws
+ * `TraceDataPendingError` before a single evaluator executes and before
+ * anything is recorded, so the whole run is graded in one go once the data
+ * is there and no evaluator is paid for twice. On the last attempt the
+ * missing data is recorded as a failed result with its reason and every
+ * other evaluator runs.
  */
 export async function runScenarioEvaluations({
   deps,
@@ -635,17 +717,12 @@ export async function runScenarioEvaluations({
     isFinalAttempt,
   });
 
-  const evaluations: ScenarioEvaluationResult[] = [];
-  for (const attachment of attachments) {
-    evaluations.push(
-      await evaluateAttachment({
-        deps,
-        context,
-        attachment,
-        evaluator: evaluatorsById.get(attachment.evaluatorId),
-      }),
-    );
-  }
+  const evaluations = await evaluateAttachments({
+    deps,
+    context,
+    attachments,
+    evaluatorsById,
+  });
 
   await deps.recordEvaluations({
     tenantId: projectId,
