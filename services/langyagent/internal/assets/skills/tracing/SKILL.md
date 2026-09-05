@@ -80,8 +80,9 @@ Do NOT consider the work complete without verifying. In order:
 
 1. Confirm dependencies installed cleanly.
 2. Run the agent with a test input that produces at least one trace (study how the framework starts; only give up if it requires infrastructure you cannot spin up).
-3. Check traces arrived: `langwatch trace search --limit 5 --format json`.
-4. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
+3. Check traces arrived: `langwatch trace search --limit 5 --format json`. A trace is not searchable the moment the run ends: the export leaves the process first and ingestion adds a few seconds more, so an empty first answer means "not yet", not "not working". Wait and ask again, up to three times, about twenty seconds apart, and stop there. Do not change the command between tries: the search already covers the last twenty four hours, so a trace that is in is in.
+4. Say what the wait ended on. Traces found: say what the run produced. Nothing after the third try: say the instrumentation is in place and the trace had not arrived yet, name the project to look in, and do not report the change as verified.
+5. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
 
 ## Common Mistakes
 

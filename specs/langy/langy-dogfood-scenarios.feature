@@ -181,6 +181,18 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And Langy offers the code access card again
     And the judge confirms Langy did not pretend the work continued
 
+  # A filmed run called the trace search seven times in a row, saw nothing, and
+  # reported its own verification as inconclusive. The search was right and the
+  # window was right; the trace had simply not been ingested yet, and the skill
+  # said nothing about waiting.
+  @unit
+  Scenario: The tracing skill waits for the trace instead of asking again at once
+    Given the tracing skill
+    When its verification step is read
+    Then it says an empty first answer means the trace has not arrived yet
+    And it bounds the retries and says how long to leave between them
+    And it says not to report the change as verified when the wait runs out
+
   @unit
   Scenario: A run cleans up the demo folders the runs before it left
     Given several finished runs left their demo folder on disk
