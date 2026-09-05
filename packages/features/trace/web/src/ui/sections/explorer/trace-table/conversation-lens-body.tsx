@@ -34,10 +34,9 @@ const EXPANDED_ROW_BG = { surface: EXPANDED_BG, firstCell: EXPANDED_BG_CSS };
 
 interface ConversationLensBodyProps {
   /**
-   * Server-grouped conversation rows (specs/traces-v2/sessions-lens.feature):
-   * every total is the TRUE rollup over the whole time range, already in
-   * lens sort order. Rows arrive without turn traces; the expanded row's
-   * turns load lazily below.
+   * Server-grouped conversation rows (specs/traces-v2/sessions-lens.feature): every
+   * total is the TRUE rollup over the whole time range, already in lens sort order.
+   * Rows arrive without turn traces; the expanded row's turns load lazily below.
    */
   groups: ConversationGroup[];
   lens: LensConfig;
@@ -151,12 +150,6 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
 
 /**
  * Open a conversation's most recent trace in the trace drawer.
- *
- * The light path on purpose: a conversation row is a rollup, not a trace, so
- * there is no row data to seed the drawer's caches with the way the trace lens
- * does. The store push before the route change is what lets the drawer's hooks
- * render against the right trace on the very next frame; the drawer fetches
- * the rest itself.
  */
 function useOpenLatestTrace(): (group: ConversationGroup) => void {
   const { openDrawer } = useDrawer();

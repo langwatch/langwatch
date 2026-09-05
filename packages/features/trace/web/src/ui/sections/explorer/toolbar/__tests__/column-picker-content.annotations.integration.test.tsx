@@ -1,11 +1,6 @@
 /**
+ * Who is offered the Annotations column.
  * @vitest-environment jsdom
- *
- * Who is offered the Annotations column. Reviews are a team's own judgements,
- * so a reader who may not see them is not offered a column that could only
- * ever come up blank.
- *
- * See specs/traces-v2/trace-list-annotations-column.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

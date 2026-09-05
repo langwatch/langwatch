@@ -1,16 +1,7 @@
 /**
- * Seeds the evaluations workbench the prompt-optimization scenarios run
- * against: a support-bot prompt, an inline dataset, and (per variant) a
- * mapped evaluator, all through the same REST surface any integration uses,
- * so a passing seed also proves the workbench-state endpoints work.
- *
- * No baseline run is seeded: the skill's own first step is a scoped run, the
- * scenarios grade that behavior, and a pre-seeded run would cost model calls
- * per suite run without making any scenario more deterministic.
- *
- * Names carry a minute stamp, so a re-run within the minute seeds a fresh
- * experiment on top of the prompt the last run created, and a later run gets a
- * prompt of its own (same reasoning as the dogfood trace fixtures).
+ * Seeds the evaluations workbench the prompt-optimization scenarios run against: a support-bot prompt, an inline
+ * dataset, and (per variant) a mapped evaluator, all through the same REST surface any integration uses, so a
+ * passing seed also proves the workbench-state endpoints work.
  */
 
 import { PROJECT_ID } from "./config";
@@ -170,14 +161,7 @@ function buildEvaluators({ goldenStyle }: { goldenStyle: GoldenStyle }) {
 }
 
 /**
- * Builds and saves the experiment. Variants:
- * - rows: 0 seeds the empty-dataset bootstrap case; 20 is the loop default;
- *   120 crosses the skill's 100-row ask-before-spending threshold.
- * - goldenStyle: "free-text" pairs with llm_answer_match, "label" with
- *   exact_match, "none" seeds inputs only (the comparison case).
- * - withEvaluator: whether the golden style's evaluator is pre-wired
- *   (bootstrap scenarios seed without it).
- * - withContexts: adds a contexts column (the faithfulness case).
+ * Builds and saves the experiment.
  */
 export async function seedOptimizationWorkbench({
   name,
@@ -273,14 +257,8 @@ const comparisonConfig = () => ({
 });
 
 /**
- * The saved evaluator a column-style comparison needs behind it: the
- * orchestrator skips any column-target with no `targetEvaluatorId`.
- *
- * Created the way the workbench's own "New Comparison" flow creates it: the
- * `evaluators.create` mutation, as the signed-in user. The REST create is a
- * different door: it resolves the project's embeddings model on the way in,
- * for a topic-clustering feature this judge never touches, and refuses on a
- * project that has no embeddings model configured.
+ * The saved evaluator a column-style comparison needs behind it: the orchestrator skips
+ * any column-target with no `targetEvaluatorId`.
  */
 async function createSavedComparisonJudge({
   stampedName,
@@ -335,11 +313,6 @@ function buildComparisonEvaluator({ judgeId }: { judgeId: string }) {
 
 /**
  * A workbench holding two prompt columns and one comparison over them.
- *
- * The carrier decides which shape holds the comparison: a column-target of its
- * own, or a chip attached to the board. A scoped run has the same hole either
- * way: the judge needs every variant's output for the row, and a run that
- * covers only one of them has nothing to compare unless the others are seeded.
  */
 export async function seedComparisonWorkbench({
   name,

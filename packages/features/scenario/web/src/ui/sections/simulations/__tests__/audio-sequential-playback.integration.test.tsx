@@ -1,18 +1,7 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for sequential audio playback coordination in
  * ScenarioMessageRenderer.
- *
- * Tests verify:
- *  - No auto-play on mount
- *  - Exclusivity: starting B pauses A
- *  - Instance isolation: two renderer instances are independent
- *  - Auto-advance skips interleaved non-audio items
- *  - Mid-list start advances from that position onward (not from 0)
- *  - Last audio ending triggers no further play
- *  - Rejected play() is caught and does not propagate as unhandledrejection
- *  - Streaming append: new audio appended after mount is played when chain reaches it
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -21,17 +10,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { SimulationMessage } from "@langwatch/scenario-contract";
 import { ScenarioMessageRenderer } from "../scenario-message-renderer";
 
-// ---------------------------------------------------------------------------
-// jsdom HTMLMediaElement stubs
-//
-// jsdom does not implement HTMLMediaElement.play/pause. We stub them on the
-// prototype and track which element instance called each method so tests can
-// assert "pause was called on audioA" without needing toHaveBeenCalledOn
-// (which does not exist in vitest's expect).
-//
-// Original descriptors are saved before `beforeAll` stubs and restored in
-// `afterAll` so the stubs don't bleed into other test files sharing the worker.
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- jsdom
+// HTMLMediaElement stubs
 
 type LwEl = HTMLMediaElement & {
   _lw_paused?: boolean;

@@ -1,8 +1,5 @@
 /**
  * Sorting utility for scenario sets.
- *
- * Pins internal sets to the top of the list and sorts the rest by last run date.
- *
  * @see specs/scenarios/internal-set-namespace.feature
  */
 

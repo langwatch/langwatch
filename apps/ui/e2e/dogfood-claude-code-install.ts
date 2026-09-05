@@ -1,12 +1,7 @@
 /**
- * Dogfood ritual for claude_code template per rchaves's directive
- * (no fixture-only sign-offs). Real /me UI flow:
- *   1. Visit /me, scroll to Trace Ingest tile grid
- *   2. Click Claude Code tile → install drawer opens
- *   3. Click Install button (mints binding via real tRPC mutation)
- *   4. Reveal token, capture it via DOM scrape (don't log to file —
- *      print to stdout for the wrapper bash to pick up)
- *   5. Capture screenshots of: list, drawer-pre-install, drawer-with-token
+ * Dogfood ritual for claude_code template per rchaves's directive (no fixture-only
+ * sign-offs). Real /me UI flow: 1. Visit /me, scroll to Trace Ingest tile grid 2. Click
+ * Claude Code tile → install drawer opens 3.
  */
 import * as fs from "fs";
 import * as path from "path";

@@ -199,14 +199,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   // Spec: specs/langy/langy-mount-scope.feature
   { path: "/cli/auth", page: "pages/cli/auth" },
 
-  // Everything behind a session, wrapped in the application chrome. The
-  // layout route mounts the navigation host and the header ONCE, above the
-  // two Langy groups, so a screen this package serves gets the project
-  // switcher and the way into settings without asking for them — and the
-  // switcher and the page below it read one workspace graph rather than two.
-  // The front door, the public pages and onboarding stay outside it: those
-  // addresses are reachable with no project to switch between.
-  // See features/chrome/ui/sections/ui-app-chrome.
+  // Everything behind a session, wrapped in the application chrome.
   {
     page: "features/chrome/UiAppChrome",
     children: [
@@ -414,18 +407,11 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/me/budget/request",
           },
 
-          // AI Gateway: org-scoped admin pages live under /gateway/** at the top
-          // level, like /governance. Every gateway resource (VirtualKey /
-          // GatewayBudget / ModelProvider) is org-keyed by the schema, so the
-          // chrome reflects that. Kept OUT of the project layout route below:
-          // these are not /:project/* routes, so Langy must not mount on them.
-          // The static /gateway segment always wins over the /:project catch-all,
-          // and project slug minting refuses reserved top-level names.
+          // AI Gateway: org-scoped admin pages live under /gateway/** at the top level,
+          // like /governance. Every gateway resource (VirtualKey / GatewayBudget /
+          // ModelProvider) is org-keyed by the schema, so the chrome reflects that.
           {
-            // The bare address is a redirect and never a page. `platform/app`
-            // said the same thing with a component whose whole body was a
-            // `router.replace`, which meant a chunk load, a mount and a render
-            // before the browser moved; the table can say it without any of that.
+            // The bare address is a redirect and never a page.
             // Spec: specs/navigation/gateway-url-move.feature
             // (The bare gateway address lands on the virtual keys list).
             path: "/gateway",
@@ -475,12 +461,9 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         ],
       },
 
-      // Project routes — wrapped in a layout route that mounts Langy ONCE per
-      // project, above the swapping page, so the panel + composer draft + any
-      // in-flight response survive navigation between project pages. The layout
-      // component is keyed by :project, so Langy resets on project switch. Loaded
-      // lazily via page() so Langy's chat bundle stays out of the initial load.
-      // See ProjectLangyLayout + specs/langy/langy-navigation-persistence.feature
+      // Project routes — wrapped in a layout route that mounts Langy ONCE per project,
+      // above the swapping page, so the panel + composer draft + any in-flight response
+      // survive navigation between project pages.
       {
         page: "features/langy/ProjectLangyLayout",
         children: [
@@ -567,13 +550,8 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             },
           },
           {
-            // The evaluation wizard was retired in favour of the experiments
-            // workbench, and a brand-new evaluation always opened it. The page's
-            // no-slug branch was nothing but that replace, so a table row says the
-            // same thing without a loader — the same retirement `/:project/evaluations`
-            // above already had. The `:slug` row below is NOT this: with a slug the
-            // destination depends on what kind of experiment it names, which is a
-            // read, not a rewrite.
+            // The evaluation wizard was retired in favour of the experiments workbench,
+            // and a brand-new evaluation always opened it.
             path: "/:project/evaluations/wizard",
             redirect: {
               from: "/:project/evaluations/wizard",

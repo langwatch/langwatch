@@ -1,14 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * A save the seam refused for a newer version is not a failed save.
- *
- * The refusal happens before anything is written, so nothing is lost and the
- * remedy is one reload. Reporting it as "Failed to save" tells the reader their
- * work is gone. It reads worst exactly where it is most common: right after the
- * assistant saves a version of its own, over columns the reader watched it
- * build.
- *
  * @see specs/experiments-v3/workbench-versioning.feature
  *   ("The toolbar names the reason a save was refused")
  */

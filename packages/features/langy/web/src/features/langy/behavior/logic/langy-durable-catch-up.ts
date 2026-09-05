@@ -15,23 +15,11 @@ const MAX_CATCH_UP_PAGES = 3;
 
 /**
  * How a tail fold ended.
- *
- *   - `caught-up` — the server said there is nothing left;
- *   - `behind`    — still truncated at the page ceiling, so the fold is
- *                   knowingly behind the durable record;
- *   - `abandoned` — the user selected another conversation while a page was in
- *                   flight, and the rest of the tail was dropped.
  */
 type TailFoldOutcome = "caught-up" | "behind" | "abandoned";
 
 /**
  * Fetch and fold the durable tail from `from`, one page at a time.
- *
- * Bounded: each page advances the cursor, and three pages is far beyond any
- * real burst. `turnProjection` is one global fold and selecting another
- * conversation resets it, so a page that lands after the user moved on is
- * dropped — folding it would write the previous turn into the open
- * conversation's fresh projection.
  */
 async function foldDurableTail({
   utils,
@@ -68,25 +56,8 @@ async function foldDurableTail({
 }
 
 /**
- * Bring the open conversation's LOCAL turn fold up to a durable cursor by
- * fetching and folding the event tail (ADR-059).
- *
- * Two callers drive it, and that redundancy is the reliability story:
- *
- *   - the freshness SIGNAL (`useLangyFreshness`) — the low-latency path, a
- *     push saying "the projection moved to cursor X";
- *   - the polled history SNAPSHOT (`LangyPanel`'s seed effect) — the messages
- *     query re-polls while a turn is in flight, and every fresh snapshot
- *     cursor is compared here too.
- *
- * The second caller is what makes a dropped SSE connection a latency problem
- * instead of a frozen panel: the turn keeps running server-side, the poll
- * keeps fetching fresher cursors, and the fold keeps converging on the
- * durable record with no signal ever arriving.
- *
- * Idempotent by construction: the tail is fetched from the LOCAL cursor and
- * the fold refuses to rewind, so the two callers racing each other fold the
- * same events once.
+ * Bring the open conversation's LOCAL turn fold up to a durable cursor by fetching and
+ * folding the event tail (ADR-059).
  */
 export async function catchUpConversationFold({
   utils,

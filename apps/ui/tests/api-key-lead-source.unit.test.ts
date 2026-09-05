@@ -1,8 +1,5 @@
 /**
- * `recordLeadSourceIfAbsent` is FIRST-TOUCH. Overwriting would attribute a
- * signup that came from a campaign to the CLI, and storage that throws
- * outright must not take the page down with it.
- *
+ * `recordLeadSourceIfAbsent` is FIRST-TOUCH.
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 

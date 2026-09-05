@@ -265,11 +265,8 @@ export const LensTabs: React.FC = () => {
 };
 
 /**
- * A dimension lens dropdown (e.g. "Cost", "Performance") standing in for a
- * group of built-in lenses. Reads as a tab — muted label, orange underline
- * when one of its lenses is active — so it sits naturally in the lens strip
- * while collapsing several entries into one slot. Items show the full lens
- * name. Renders nothing if all of the group's lenses have been dismissed.
+ * A dimension lens dropdown (e.g. "Cost", "Performance") standing in for a group of
+ * built-in lenses.
  */
 const LensGroupMenu: React.FC<{
   label: string;

@@ -2,10 +2,8 @@ const TRACE_ID_BYTES = 16;
 const SPAN_ID_BYTES = 8;
 
 /**
- * Lowercase-hex random id matching the OpenTelemetry id format
- * (32 hex chars for trace ids, 16 for span ids). Generated with the global
- * Web Crypto API, which is available in both modern Node and the browser,
- * so it works the same on the server and in the bundled client.
+ * Lowercase-hex random id matching the OpenTelemetry id format (32 hex chars for trace
+ * ids, 16 for span ids).
  */
 const generateRandomHexId = (byteCount: number): string => {
   const bytes = new Uint8Array(byteCount);

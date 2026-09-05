@@ -29,12 +29,6 @@ type VariantOutputOption = {
 
 /**
  * The four default judge prompts, one per (golden × input) presence combo.
- * Each mirrors the langevals evaluator's shipped default VERBATIM (including
- * whitespace) — kept in sync with select_best_compare.py so the auto-swap
- * equality check below recognizes an untouched prompt. When the reference
- * answer or the task context is absent, its framing is dropped entirely
- * rather than left as an empty "Reference: " / "Task: " line, which confuses
- * the judge more than removing it.
  */
 export const JUDGE_PROMPT_GOLDEN_INPUT =
   'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
@@ -75,21 +69,8 @@ export function pickDefaultJudgePrompt({
 
 /**
  * Configuration form for the langevals/select_best_compare evaluator — the one
- * Comparison flow, whether it compares two candidates or ten (#5100, #5101).
- * Four configurable sections:
- *
- *   1. Variants   — multiselect of ≥2 TargetConfig ids whose per-row
- *                   outputs are the candidates the judge picks between
- *   2. Golden     — dataset column whose value is the reference answer
- *   3. Shuffle    — candidate-order randomization, mirrored into
- *                   `settings.randomize_order`
- *   4. Metrics    — cost / duration toggles mirrored into `settings.include_metrics`
- *
- * A single judge call per row picks a winner; candidate order is shuffled
- * deterministically per row (seeded by rowIndex) to mitigate position bias.
- *
- * This form also renders for experiments saved with the legacy two-slot
- * `pairwise` config, which `toComparisonConfig` folds into `variants` on load.
+ * Comparison flow, whether it compares two candidates or ten (#5100, #5101). Four
+ * configurable sections:
  */
 
 export type DatasetColumn = { id: string; name: string };
@@ -160,10 +141,7 @@ export function ComparisonConfigForm({
 }
 
 /**
- * Multi-select over available targets. Requires ≥2 to be picked before
- * the evaluator can save (enforced downstream by the orchestrator's
- * `Select-best evaluator skipped: fewer than 2 variants configured`
- * guard, and mirrored client-side here via a validation message).
+ * Multi-select over available targets.
  */
 function VariantsMultiSelect({
   draft,
@@ -178,12 +156,9 @@ function VariantsMultiSelect({
   const remaining = targets.filter((t) => !selected.includes(t.id));
   const outputPaths = draft.variantOutputPaths ?? {};
 
-  // Same-name variants (e.g. a duplicated prompt whose model was changed) must
-  // read as "Name (1)", "Name (2)" so the picker card, its verdict column, and
-  // the scoreboard all line up one-to-one. Disambiguate over the SELECTED set
-  // in variant order — the exact order ComparisonColumnHeader numbers by — so
-  // "(2)" here is the same column as "(2)" there. Batched via useTargetNames
-  // (shared query cache) since a hook can't be called once per card in a loop.
+  // Same-name variants (e.g. a duplicated prompt whose model was changed) must read as
+  // "Name (1)", "Name (2)" so the picker card, its verdict column, and the scoreboard
+  // all line up one-to-one.
   const selectedTargets = useMemo(
     () => selected.map((id) => targets.find((t) => t.id === id)),
     [selected, targets],
@@ -297,20 +272,8 @@ function VariantsMultiSelect({
 }
 
 /**
- * One cell of the variants grid: which column, and — when the target emits
- * more than one output field — which of those fields feeds the judge.
- *
- * A variant emitting a structured output needs a way to say "judge the
- * `.answer` field", or the whole object reaches the judge serialized as JSON.
- * Which field to pick is a per-variant call: two variants may name the same
- * answer differently, and the user is the only one who knows they mean the
- * same thing.
- *
- * The picker is hidden when the target has a single output field, because
- * there is no choice to make. That is the common case — a plain prompt
- * declares one `output` field — and the runtime unwraps a single-field
- * target's dict back to a scalar before the judge sees it, so an unset path
- * already feeds the judge the plain string.
+ * One cell of the variants grid: which column, and — when the target emits more than
+ * one output field — which of those fields feeds the judge.
  */
 function VariantCard({
   target,
@@ -336,13 +299,6 @@ function VariantCard({
   const outputOptions = getVariantOutputOptions(outputs ?? []);
 
   // Mirrors the Golden/Input field pickers: one AvailableSource per variant.
-  // Each option's already-qualified label ("output.answer") doubles as the
-  // field's unique path segment, so selecting stays a single click (no
-  // drill-down) and the chip renders "support-detailed.output.answer" for
-  // free — the same Source.field shape the dataset pickers use. The real
-  // stored path (which may be the deliberately-unwrapped single segment from
-  // getVariantOutputOptions, see its own comment) is looked up by that label
-  // on selection rather than trusted from the mapping's path directly.
   const outputSource: AvailableSource = useMemo(
     () => ({
       id: target.id,
@@ -438,16 +394,6 @@ function getVariantOutputOptions(outputs: TargetConfig["outputs"]): VariantOutpu
     }
 
     // Label and path deliberately diverge for a single "output" field.
-    //
-    // Label names the whole path from the output field down, so a structured
-    // variant reads "support-detailed.output.answer" — the same Source.field
-    // shape as the dataset pickers and the prompt mapping chips, and it says
-    // plainly WHICH output the field came from.
-    //
-    // The stored path must stay UNWRAPPED though: the backend's
-    // extractTargetOutput unwraps a single "output" field before pickOutputPath
-    // walks the object, so persisting ["output", "answer"] would leave the
-    // judge comparing an empty candidate. Never "simplify" these two to match.
     const nested = properties.map((property) => ({
       label: `${field.identifier}.${property}`,
       path:
@@ -479,15 +425,9 @@ function VariantMenuItem({ target, onAdd }: { target: TargetConfig; onAdd: () =>
 }
 
 /**
- * Golden field picker. Golden-answer is opt-in (#5378) and is now driven
- * entirely by this picker: choosing a dataset column turns golden ON,
- * choosing "None — judge on merits" turns it OFF. Source of truth is the
- * parent form's `settings.has_golden_answer` (the field the judge reads);
- * `comparison.hasGoldenAnswer` is mirrored on every write so the
- * orchestrator's cell-generation guard and the missing-mappings validator
- * — which only see `evaluator.comparison`, not the evaluator's Python
- * settings — can read it too. Same dual-representation pattern as
- * MetricsSection/include_metrics below.
+ * Golden field picker. Golden-answer is opt-in (#5378) and is now driven entirely by
+ * this picker: choosing a dataset column turns golden ON, choosing "None — judge on
+ * merits" turns it OFF.
  */
 function GoldenAnswerSection({
   draft,
@@ -512,13 +452,9 @@ function GoldenAnswerSection({
     name: "settings.prompt",
   }) as string | undefined;
 
-  // Keep the judge prompt in sync with the golden setting reactively — on
-  // every change of either field, not just a click — so the correct default
-  // is enforced regardless of HOW state changed (form init, external
-  // setValue, load from persistence). Only swap when the current prompt is
-  // still an untouched shipped default (matches ANY of the four defaults,
-  // trimmed) so hand-tuned prompts survive. hasInput is always true at config
-  // time; the input axis is resolved per row at runtime in Python.
+  // Keep the judge prompt in sync with the golden setting reactively — on every change
+  // of either field, not just a click — so the correct default is enforced regardless
+  // of HOW state changed (form init, external setValue, load from persistence).
   const isUntouchedDefault = useCallback(
     (value: string | undefined): boolean =>
       typeof value === "string" &&
@@ -554,17 +490,8 @@ function GoldenAnswerSection({
     update({ hasGoldenAnswer: on, ...(on ? {} : { goldenField: "" }) });
   };
 
-  // Reconcile the store's `hasGoldenAnswer` with the form's true source of
-  // truth on MOUNT too, not just on click (#5528). Selecting an EXISTING
-  // saved comparison evaluator as a new column target seeds `comparison`
-  // before this form ever mounts, independently of the evaluator's real
-  // persisted `settings.has_golden_answer` — the two can start out
-  // mismatched. The toggle above already renders correctly because it reads
-  // `watchedHasGoldenAnswer` (the form), which gives false confidence: the
-  // underlying store keeps the wrong seeded value until the user clicks the
-  // toggle themselves, and that stale value is what gets saved and read at
-  // execution time. `update()` only writes to the store/draft, never to the
-  // RHF form, so this cannot loop back into `watchedHasGoldenAnswer`.
+  // Reconcile the store's `hasGoldenAnswer` with the form's true source of truth on
+  // MOUNT too, not just on click (#5528).
   useEffect(() => {
     if (typeof watchedHasGoldenAnswer !== "boolean") return;
     if (watchedHasGoldenAnswer === draft.hasGoldenAnswer) return;
@@ -692,19 +619,6 @@ function InputContextSection({
 
 /**
  * "Shuffle candidate order" toggle.
- *
- * LLM judges favour whichever candidate they read first. The judge counters
- * this by shuffling the candidates before every call, deterministically seeded
- * on the row index — so a row presents the same order every time it runs, and
- * re-running an experiment doesn't reshuffle the verdicts underneath the user.
- *
- * On by default. Turning it off is for reproducing a run against a fixed
- * candidate order, not something a normal comparison wants.
- *
- * Source of truth is `settings.randomize_order` (what the Python judge reads);
- * `comparison.randomizeOrder` is mirrored on every write for the code paths
- * that only see `evaluator.comparison`. Same dual-representation pattern as
- * GoldenAnswerSection and MetricsSection.
  */
 function RandomizeOrderSection({
   draft,
@@ -755,11 +669,9 @@ function RandomizeOrderSection({
 }
 
 /**
- * Inline metric toggles. Source of truth is `settings.include_metrics`
- * (what the Python judge reads); the legacy `comparison.includeMetrics`
- * mirror is kept in sync on every write so any orchestrator path reading
- * from it doesn't drift. Same dual-representation pattern
- * GoldenAnswerSection uses.
+ * Inline metric toggles. Source of truth is `settings.include_metrics` (what the Python
+ * judge reads); the legacy `comparison.includeMetrics` mirror is kept in sync on every
+ * write so any orchestrator path reading from it doesn't drift.
  */
 function MetricsSection({
   draft,

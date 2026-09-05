@@ -1,12 +1,7 @@
 /**
+ * Leaving the "Add to Dataset" drawer hands the reader back to the drawer it was opened
+ * from.
  * @vitest-environment jsdom
- *
- * Leaving the "Add to Dataset" drawer hands the reader back to the drawer it
- * was opened from. The real drawer component and the real drawer stack are
- * exercised; the router is a faithful harness that lands every navigation in
- * the address bar, and the dataset queries are stubbed so the drawer can reach
- * its submit.
- * See specs/traces-v2/drawer-stacking.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";

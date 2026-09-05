@@ -1,30 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * What the two data-governance addresses are actually behind, proved by
- * mounting them.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice a
- * loader that names the wrong grant — the failure that refuses a reader the
- * platform page admitted, or admits one it refused. So this file loads the real
- * loaders, mounts what they hand back under a session that answers precisely,
- * and reads the result.
- *
- * The screens are faked, and so is the transport their host providers read
- * over. What is under test is the policy the frontend features wrap the screens
- * in, plus one thing this family adds: the SETTINGS CHROME is inside the guard,
- * so a refused reader still sees the settings frame they navigated into. That
- * is what `withPermissionGuard({ layoutComponent: SettingsLayout })` did, and
- * it is the one wrapper this family carries over rather than drops.
- *
- * `project:view` is both platform pages' own grant, carried over one for one.
- * Neither page was behind a flag.
- *
- * THE CHROME IS `NavigationShell` NOW, MOUNTED HERE — see
- * `settings-family-page-policy.integration.test.tsx` for why: this
- * application's own settings layout, which drew a duplicate of
- * `NavigationShell`'s own sidebar, is deleted.
- *
  * Spec: specs/data-retention/retention-policy-configuration.feature
  * Spec: specs/data-privacy/policy-configuration.feature
  */

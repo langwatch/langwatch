@@ -1,12 +1,5 @@
 /**
  * useComparisonMode - Hook for managing comparison mode state
- *
- * Handles:
- * - Entering/exiting compare mode
- * - Selecting/deselecting runs for comparison
- * - Auto-selecting runs when entering compare mode
- * - Enforcing minimum selection (at least 2 runs)
- * - URL query param sync (when onSelectionChange provided)
  */
 import { useCallback, useEffect, useState } from "react";
 

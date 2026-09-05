@@ -3,16 +3,9 @@ import { SELECT_ALL_MATCHING_CAP, useFilterStore, useSelectionStore } from "@lan
 import { ALL_MATCHING_PREFIX, type LangyContextChip } from "../../../index";
 
 /**
- * Turns the Trace Explorer's bulk-selection (the row checkboxes) into a Langy
- * context chip — "N traces selected" — so the agent can act on exactly what the
- * user has checked instead of guessing. Reads the shared `selectionStore` that
- * the table writes to.
- *
- * Returns `null` when nothing is selected. The caller route-gates this to the
- * Trace Explorer: the selection store is a module singleton that keeps its set
- * across navigation (it only clears on filter/time/lens changes — see
- * `useResetSelectionOnViewChange`), so a stale selection must not leak a chip
- * onto unrelated pages.
+ * Turns the Trace Explorer's bulk-selection (the row checkboxes) into a Langy context
+ * chip — "N traces selected" — so the agent can act on exactly what the user has
+ * checked instead of guessing.
  */
 export function useLangySelectionContext(): LangyContextChip | null {
   const mode = useSelectionStore((s) => s.mode);
@@ -29,9 +22,7 @@ export function useLangySelectionContext(): LangyContextChip | null {
 
 /**
  * Build the selection chip from the selection store's shape. Pure so it can be
- * unit-tested. The id encodes the exact selection (sorted so order doesn't
- * matter) so a dismissed chip re-surfaces the moment the user's selection
- * changes to a different set.
+ * unit-tested.
  */
 export function selectionContextChip({
   mode,

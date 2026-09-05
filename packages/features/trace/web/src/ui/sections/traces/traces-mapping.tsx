@@ -88,15 +88,9 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
 type KeyOption = { key: string; label: string };
 
 /**
- * Sources whose key dropdowns are expanded with the project's distinct field
- * names from the last 30 days (not just the names on the loaded trace), served
- * by getDistinctFieldNames / useProjectSpanNames.
- *
- * Events are not in this list because their types are not served from
- * getDistinctFieldNames (they live only in the heavy stored_spans.SpanAttributes
- * map, which that query must not scan). They get the same project-wide treatment
- * through a separate, bounded source — useProjectEventTypes, which reuses the
- * analytics event-type filter options query.
+ * Sources whose key dropdowns are expanded with the project's distinct field names from
+ * the last 30 days (not just the names on the loaded trace), served by
+ * getDistinctFieldNames / useProjectSpanNames.
  */
 const PROJECT_FIELD_NAME_SOURCES: string[] = ["spans", "metadata", "evaluations"];
 
@@ -138,12 +132,6 @@ const sameExpansions = ({
 
 /**
  * The expansions after a column is mapped to a new source.
- *
- * Mapping a source that can be expanded turns its expansion on for you, but
- * only where expanding is what mapping it usually means: a dataset of traces
- * stays a row per trace until the reader asks for the span expansion. A source
- * whose expansion is already on offer changes nothing, since some other column
- * already brought it.
  */
 const expansionsAfterMapping = ({
   expansions,
@@ -199,23 +187,11 @@ export const TracesMapping = ({
   setTraceMapping?: (mapping: MappingState) => void;
   disableExpansions?: boolean;
   /**
-   * To consider:
-   * This is a hacky way to prevent the default edges from being set.
-   * This component shouldn't be setting the default edges on mount,
-   * but because we need it to do this for the optimization studio,
-   * we need to pass this prop in so we can skip this behavior for the wizard.
-   *
-   * Please refactor asap.
-   * Date: April 10th, 2025
-   * @Author: @drewdrewthis
+   * To consider: This is a hacky way to prevent the default edges from being set.
    */
   skipSettingDefaultEdges?: boolean;
   /**
    * Whether the traces handed in already carry the reviewer's corrections.
-   * The thread this mapping reads for its `thread_*` columns then has to be
-   * read the same way, or one column would quote the corrected conversation
-   * while the next quotes the captured one. Only the dataset path asks for
-   * corrections, so this stays off everywhere else.
    */
   shouldApplyCorrections?: boolean;
 }) => {

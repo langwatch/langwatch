@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The policy in front of a routed page, and the order it is applied in.
- *
- * Both halves are here: the decision on its own, because the ordering is the
- * whole point and a decision is cheaper to pin than three mounted components,
- * and the rendering, because a guard that decides correctly and renders the
- * wrong fallback is the same bug to a reader.
+ * @vitest-environment jsdom
  */
 
 import { cleanup, render, screen } from "@testing-library/react";

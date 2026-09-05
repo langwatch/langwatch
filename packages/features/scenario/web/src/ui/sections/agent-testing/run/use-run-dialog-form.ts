@@ -1,10 +1,4 @@
 /**
- * The state of an open run dialog: the fields it holds, the targets it can
- * offer, the parameter overrides, and the chips that add them.
- *
- * The fields reset once per subject, so opening the dialog on another suite
- * or scenario starts from that subject's remembered target.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/features/agent-testing/comparison-mode.feature
  * @see specs/suites/run-notes.feature
@@ -111,9 +105,6 @@ function rememberedParameterLine(subject: RunDialogSubject | null): string {
 
 /**
  * The secret rows the subject remembers, by name and with no value.
- *
- * A run never writes a secret value down, so the row comes back empty and the
- * next run asks for the value again.
  */
 function rememberedSecretRows(subject: RunDialogSubject | null): ParameterRow[] {
   if (subject?.kind !== "suite") return [];
@@ -295,9 +286,6 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
 
 /**
  * The declared default of every plain parameter the run can carry.
- *
- * A value typed equal to its default is no override: the dialog keys, sorts
- * and names a target the way the server does, without it.
  */
 function useParameterDefaults(definitions: readonly DeclaredParameter[]): ParameterDefaults {
   return useMemo(() => declaredDefaults(definitions), [definitions]);
@@ -381,16 +369,6 @@ function targetLabelOf({
 
 /**
  * The plain overrides the block holds that nothing in the run declares.
- *
- * A line the dialog wrote itself is shortened to what the run can read. A run
- * remembers the values of the agent it went against, so opening the dialog on
- * another agent would otherwise carry them to one whose function has no
- * parameter by that name, and the run would be refused the moment it started.
- *
- * A line somebody wrote is left as it is and read back to them instead: a
- * value that was typed is never taken away in silence, and a name the run
- * cannot read still goes out, so the server refuses it by name rather than
- * the dialog dropping it. The field says so first, under the value itself.
  */
 function useUndeclaredParameters({
   fields,
@@ -464,11 +442,8 @@ function useUndeclaredParameters({
 }
 
 /**
- * The secrets of the block: their values, whether the run still waits for one,
- * and whether the block may fold back into its single line.
- *
- * A declared secret holds the block in its rows, since a value that must stay
- * hidden cannot be read on a line beside the plain ones.
+ * The secrets of the block: their values, whether the run still waits for one, and
+ * whether the block may fold back into its single line.
  */
 function useSecretParameterFields({
   fields,
@@ -509,12 +484,6 @@ function useSecretParameterFields({
 
 /**
  * The overrides the run can carry, and the fields that collect them.
- *
- * The declared parameters are what the scenarios of the run declare plus
- * what the agents it goes against declare, so the line can offer an agent's
- * options. In a comparison the plain values ride on the rows of the targets,
- * so the block here holds the secrets alone and they are what the run sends
- * at run level.
  */
 function useRunDialogParameters({
   subject,
@@ -719,9 +688,6 @@ function useParameterRowActions({
 
 /**
  * What the run carries, and the part of it the suite may remember.
- *
- * A secret value goes to the run alone. A secret row leaves its key behind, so
- * the next dialog shows the row again and asks for the value.
  */
 function resolveParameterValues({
   showParams,
@@ -813,9 +779,6 @@ function useRunDialogTargeting({
 
 /**
  * The chips that add the optional parts of a run, in one fixed order.
- *
- * A chip is offered while the block it adds is closed, so the row shortens as
- * the run is customised and each block can be taken away again.
  */
 function buildCustomizeRunChips({
   fields,
@@ -900,12 +863,8 @@ function caseCountOf(
 }
 
 /**
- * The targets the run goes against: the rows of a comparison, each with its
- * own overrides, or the one agent.
- *
- * A row's overrides are canonical: a value typed equal to the declared
- * default is left out, so what the dialog sends, sorts and names is the
- * target the server keys.
+ * The targets the run goes against: the rows of a comparison, each with its own
+ * overrides, or the one agent.
  */
 function runTargetsOf({
   target,
@@ -933,11 +892,6 @@ function runTargetsOf({
 
 /**
  * The name of the run, and the configurations this scope already ran with.
- *
- * The scope is folded the way the server folds it before the history is read:
- * a scope naming every test suite of the project IS every scenario, and a
- * dialog that did not fold it would read the history of a scope its run never
- * lands in.
  */
 function useRunDialogNaming({
   subject,

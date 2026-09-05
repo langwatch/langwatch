@@ -1,12 +1,6 @@
 /**
+ * A refused `organization.getAll` used to render an empty document: the host exposed only `isLoading`, which a 401 leaves false, so every screen inside the shell was told the graph had settled and held no organization.
  * @vitest-environment jsdom
- *
- * A refused `organization.getAll` used to render an empty document: the host
- * exposed only `isLoading`, which a 401 leaves false, so every screen inside
- * the shell was told the graph had settled and held no organization. The two
- * refusals are answered differently — one is "we do not know who you are" and
- * goes to sign-in, the other is copy the reader can act on plus a trace id.
- *
  * Spec: specs/auth/session-failure.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

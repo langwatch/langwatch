@@ -1,9 +1,6 @@
 /**
+ * The connect card opens the real GitHub App integration flow (the popup).
  * @vitest-environment jsdom
- *
- * The connect card opens the real GitHub App integration flow (the popup). When
- * the browser blocks that popup, it offers the in-app Settings route into the
- * SAME flow rather than dead-ending.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

@@ -11,20 +11,6 @@ const MotionBox = motion.create(Box);
 
 /**
  * ONE geometry for every pre-work / thinking / status line of a live turn.
- *
- * The startup sequence used to hop between layouts: the waiting ladder drew as
- * the bare thinking line, the manager status as an orb-led status row with its own
- * gap and no padding, and the first real work line flipped back — three
- * different left offsets and baselines for what reads as one evolving line.
- * Both components (LangyThinkingLine, StreamingStatusLine) now share this row
- * frame — same leading-indicator slot, same gap, same padding, same text
- * metrics — so the words change and nothing moves.
- *
- * The row carries NO vertical padding, and that is what makes the answer land
- * where the line stood: these lines and the reply's first paragraph are
- * siblings in the same column, so 2px here plus the block's own margin put the
- * working line 8px below the text that replaced it, and the whole column
- * appeared to jump up the moment the answer arrived.
  */
 export const STATUS_LINE_ROW = {
   gap: 2,
@@ -40,15 +26,9 @@ export const STATUS_LINE_TEXT = {
 } as const;
 
 /**
- * The status dot, alive: a warm core with a soft halo that breathes. A moving
- * light next to "working…" copy reads as progress, so the wait feels shorter
- * than the same words beside a dead dot. Reduced motion gets a static lit orb.
- *
- * The orb is the shared leading-indicator slot of {@link STATUS_LINE_ROW}: it
- * occupies the same 10px whatever the line says, so swapping between the
- * status row and the thinking line never shifts the text. `active={false}`
- * (a stuck turn) keeps the slot but drops the glow to a static muted dot —
- * the one state that must not claim "alive".
+ * The status dot, alive: a warm core with a soft halo that breathes. A moving light
+ * next to "working…" copy reads as progress, so the wait feels shorter than the same
+ * words beside a dead dot. Reduced motion gets a static lit orb.
  */
 export function StatusOrb({ active = true }: { active?: boolean }) {
   const reduce = useReducedMotion();
@@ -129,11 +109,6 @@ function normaliseProgress(progress: number): number {
 
 /**
  * Smooth a measured X/Y stream between real samples.
- *
- * The first completed batch supplies `batchItems / batchDurationMs`; later
- * batches refine that rate with an EWMA so one noisy fetch cannot make the bar
- * lurch. Projection is monotonic and capped at 99% until `current === total` —
- * the client may estimate motion, but only the worker may claim completion.
  */
 export function useProjectedProgress({
   progress,
@@ -213,18 +188,9 @@ export function useProjectedProgress({
 }
 
 /**
- * Granular streaming state, driven by the event-sourcing turn vocabulary:
- *   - `status` (from `status_reported`, e.g. "Analysing 1,204 traces") drives a
- *     quiet status row: a brand dot + the line itself.
- *   - `metrics` (from metric events) drives a compact statcard whose numbers
- *     roll up from 0.
- *   - `progress` (from `progress_reported`, 0..1 or 0..100) drives a thin
- *     mesh-gradient bar plus a monospace percent (with an optional
- *     "· segment 7 / 11" when the turn reports segment framing).
- *
- * When none of those are present the caller shows its shimmer thinking
- * indicator instead — this component renders nothing in that case. Respects
- * `prefers-reduced-motion` (no bar spring; static ticker).
+ * Granular streaming state, driven by the event-sourcing turn vocabulary: - `status` (from `status_reported`, e.g. "Analysing 1,204 traces") drives a quiet status row: a brand dot + the line
+ * itself. - `metrics` (from metric events) drives a compact statcard whose numbers roll up from 0. - `progress` (from `progress_reported`, 0..1 or 0..100) drives a thin mesh-gradient bar plus
+ * a monospace percent (with an optional "· segment 7 / 11" when the turn reports segment framing).
  */
 export function StreamingStatusLine({
   status,

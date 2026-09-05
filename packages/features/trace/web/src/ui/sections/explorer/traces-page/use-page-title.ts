@@ -38,10 +38,7 @@ function buildTitle({
 }
 
 /**
- * Keeps `document.title` in sync with the trace view's drawer + filter
- * state. The microtask defer ensures this runs after `DashboardLayout`'s
- * own title-setting effect on the same commit (parent effects run last,
- * so we schedule a microtask that fires after both have committed).
+ * Keeps `document.title` in sync with the trace view's drawer + filter state.
  */
 export function useTracesPageTitle(): void {
   const { project } = useOrganizationTeamProject();

@@ -1,15 +1,6 @@
 /**
- * The way into a recent run of the scenario being edited, in the header of the
- * editor drawer beside its version.
- *
- * It offers the same list the line above the table offers, narrowed to this one
- * scenario, so a person reading a scenario can see what it last did without
- * leaving the editor to look for it.
- *
- * Whether the scenario ran at all is one scoped read, so the button can be off
- * with a reason rather than opening onto an empty list. The runs themselves are
- * still read only once the list is opened.
- *
+ * The way into a recent run of the scenario being edited, in the header of the editor
+ * drawer beside its version.
  * @see specs/features/agent-testing/cases-table.feature
  */
 

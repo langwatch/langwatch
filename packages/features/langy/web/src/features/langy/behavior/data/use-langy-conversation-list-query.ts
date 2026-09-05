@@ -34,14 +34,8 @@ export interface LangyConversationListQueryResult {
 }
 
 /**
- * PURE conversation-list query. Reads only the slim spine projection
- * (`langy.list`) — no message content — and never runs side effects. Mirrors
- * `useTraceListQuery`: `keepPreviousData` so a freshness refetch never blanks
- * the recents list, and a `staleTime` so re-opening the panel doesn't refetch
- * on every mount.
- *
- * The side-effect layer (new-arrival marking) lives in `useLangyConversationList`
- * so this hook stays trivially testable and re-composable.
+ * PURE conversation-list query. Reads only the slim spine projection (`langy.list`) —
+ * no message content — and never runs side effects.
  */
 export function useLangyConversationListQuery(queryText = ""): LangyConversationListQueryResult {
   const { project } = useOrganizationTeamProject();

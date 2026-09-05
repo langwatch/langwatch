@@ -1,19 +1,6 @@
 /**
- * formatLeaderboardHeadline — the one sentence a reader who reads nothing
- * else should leave with.
- *
- * Every input to this sentence is already computed deterministically: the
- * verdict, the tie set, the cost gap. Generating the sentence with a model
- * would add fluency and nothing else, while introducing the one component
- * of this feature capable of being wrong — and being wrong in fluent
- * English, which is harder to catch than being wrong in a chart. The whole
- * point of the leaderboard is that it refuses to name a winner the data
- * cannot support; a summariser that rounds a tie up to a winner would undo
- * that in a single line.
- *
- * So it lives here, in code, where it is a pure function of the numbers and
- * is covered by tests. The optional written explanation sits BELOW this
- * sentence and cannot replace it.
+ * formatLeaderboardHeadline — the one sentence a reader who reads nothing else should
+ * leave with.
  */
 
 import type { CheaperAlternative, LeaderboardVerdict } from "./batch-evaluation-results.verdict";
@@ -62,13 +49,9 @@ export const formatLeaderboardHeadline = ({
     return {
       tone: "positive",
       heading: `Ship ${nameOf(verdict.leaderId!, variantNames)}`,
-      // Not "by more than the run's own margin of error". Separation is
-      // decided on the uncertainty of the GAP between two scores, which is
-      // tighter than either printed margin because both scores move together
-      // across resamples. A legitimate clear winner can therefore fail to
-      // clear those margins, and this sentence was asserting it had — a
-      // stronger claim than the one actually tested, in the heading a reader
-      // acts on.
+      // Not "by more than the run's own margin of error". Separation is decided on the
+      // uncertainty of the GAP between two scores, which is tighter than either printed
+      // margin because both scores move together across resamples.
       detail:
         "The run separates it from every other variant: the gap to each of them is bigger than the uncertainty in that gap, so the ranking is not a coin flip.",
     };

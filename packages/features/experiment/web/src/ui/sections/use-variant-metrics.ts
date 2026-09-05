@@ -1,29 +1,5 @@
 /**
  * Per-variant cost and duration statistics, computed at most once per row set.
- *
- * The same argument as `useBTLeaderboard`, and it now applies here for the
- * same reason: this stopped being cheap. Adding the paired difference
- * intervals made it O(variants²) bootstraps of a thousand resamples each —
- * measured at 19ms for four variants over sixty rows, but 191ms at ten and
- * 422ms at fifteen, all synchronous on the render thread.
- *
- * The compact card and the expanded drawer both need the answer for the same
- * rows, and each called `computeVariantMetrics` itself, so opening the drawer
- * paid the whole cost a second time to arrive at a value already in memory.
- * `useMemo` cannot fix that — they are siblings with separate memo caches.
- *
- * ── Keyed on CONTENT, not on the row array ──
- *
- * This was keyed on the array's identity (a WeakMap), which is free but wrong
- * while a run is live: the results page polls every second and rebuilds the
- * transformed rows from each response, so every poll produced a new array and
- * missed the cache even when no row had changed. The whole O(variants squared)
- * bootstrap then ran once a second on the render thread.
- *
- * Only the two numbers this reads are folded into the signature — cost and
- * duration per target. The outputs, which are what make a row large, are left
- * out, so the fold is integer work proportional to rows × targets rather than
- * to the size of the payload.
  */
 
 import { useMemo } from "react";

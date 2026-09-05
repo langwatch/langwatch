@@ -1,18 +1,7 @@
 /**
- * Hydrate a choices card's entity refs AS THE VIEWER (ADR-060 §6), through
- * the same hydrator registry every capability card resolves references with
- * (`CAPABILITY_HYDRATORS`) — so an option row always shows what the viewer
- * is allowed to see today, never what the model asserted.
- *
- * Verdicts per option:
- *   - `live`     the hydrator returned the entity — render its current name
- *                and vital line.
- *   - `dead`     a hydrator exists for the ref type and did NOT return the
- *                entity — the thing is gone (or invisible to this viewer);
- *                the option renders disabled.
- *   - `plain`    no ref, or a ref type this registry cannot resolve — the
- *                option renders from its own label, selectable as given.
- *   - `pending`  the fetch is still in flight.
+ * Hydrate a choices card's entity refs AS THE VIEWER (ADR-060 §6), through the same hydrator registry every
+ * capability card resolves references with (`CAPABILITY_HYDRATORS`) — so an option row always shows what the
+ * viewer is allowed to see today, never what the model asserted.
  */
 
 import type { LangyDerivedChoicesCard } from "@langwatch/langy-contract";
@@ -29,10 +18,9 @@ export type ChoicesRefRow =
   | { state: "live"; primary?: string; secondary?: string };
 
 /**
- * Hydrates one ref type's entries, writing each option's verdict into `next`
- * — `live`/`dead` from the hydrator's answer, or `plain` for every entry of
- * this type on a hydrator failure (kept selectable rather than disabled on a
- * transient error).
+ * Hydrates one ref type's entries, writing each option's verdict into `next` —
+ * `live`/`dead` from the hydrator's answer, or `plain` for every entry of this type on
+ * a hydrator failure (kept selectable rather than disabled on a transient error).
  */
 async function hydrateRefType(
   entries: { optionId: string; refId: string }[],

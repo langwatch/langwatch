@@ -10,14 +10,7 @@ import {
 } from "../src/behavior/ui-sse-subscription-link";
 
 /**
- * The link that carries every live procedure. What it has to get right is not
- * the happy path — it is the four places a live channel goes quiet without
- * anyone noticing: a reconnect that never happens, a reconnect that never
- * stops, a domain failure mistaken for a dead channel, and a channel left open
- * after the screen unmounted. Each of those looks like a working page.
- *
- * The transport is a fake EventSource rather than a server, so a frame, a
- * drop and a reopen are all things this test can cause exactly when it wants.
+ * The link that carries every live procedure.
  */
 
 /** One live channel the link opened. */
@@ -403,10 +396,7 @@ describe("given a base address the link cannot open a channel against", () => {
 describe("given a runtime with no EventSource", () => {
   describe("when a screen watches a live procedure", () => {
     /**
-     * Loudly, and on the spot. A browser always has one, so reaching this is a
-     * composition mistake rather than a channel failure — reporting it as the
-     * latter would put "the connection failed" in front of a reader for a
-     * defect no reconnect can fix.
+     * Loudly, and on the spot.
      */
     it("says so rather than failing silently", () => {
       const client = getUntypedClient(

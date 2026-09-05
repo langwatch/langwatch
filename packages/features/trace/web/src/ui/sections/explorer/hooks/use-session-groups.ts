@@ -24,11 +24,9 @@ export interface SessionGroupsResult {
 }
 
 /**
- * Server page ceiling of `tracesV2.sessions`, mirrored by the pagination
- * chrome while this lens is active so the range copy and the offered page
- * sizes never claim more rows than a page can hold. Sessions pages stay
- * small on purpose: every row costs a per-session coding-agent enrichment
- * lookup, so the read is priced for browsing, not export.
+ * Server page ceiling of `tracesV2.sessions`, mirrored by the pagination chrome while
+ * this lens is active so the range copy and the offered page sizes never claim more
+ * rows than a page can hold.
  */
 export const SESSIONS_MAX_PAGE_SIZE = 100;
 
@@ -80,10 +78,7 @@ const settledResult = (groups: ConversationGroup[]): SessionGroupsResult => ({
 const SERVER_SORTABLE = new Set(["started", "lastTurn", "duration", "cost", "tokens", "turns"]);
 
 /**
- * Onboarding sample-preview groups, or null when no preview is active. The
- * fixture traces are grouped client-side, exactly like the lens used to work,
- * and they are one page by construction, so page-local grouping is honest
- * here in a way it never was for live data.
+ * Onboarding sample-preview groups, or null when no preview is active.
  */
 function useSamplePreviewGroups(): ConversationGroup[] | null {
   const sort = useViewStore((s) => s.sort);
@@ -100,14 +95,8 @@ function useSamplePreviewGroups(): ConversationGroup[] | null {
 
 /**
  * Data source of the Sessions lens (specs/traces-v2/sessions-lens.feature):
- * server-grouped session rollups over the WHOLE time range, so every total
- * on a row sums all of the session's traces, never just the fetched page.
- * The free-text query is forwarded too, server-side it also matches session
- * transcript content, so searching "#6418" finds the session that mentions
- * it even when no trace summary column carries the text.
- *
- * During onboarding sample preview the tRPC call is skipped and the fixtures
- * answer instead.
+ * server-grouped session rollups over the WHOLE time range, so every total on a row
+ * sums all of the session's traces, never just the fetched page.
  */
 export function useSessionGroups(): SessionGroupsResult {
   const { project } = useOrganizationTeamProject();

@@ -1,14 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for simulation page URL routing.
- *
- * Verifies that selection is driven by URL path segments:
- *   /simulations                              → All Runs
- *   /simulations/run-plans/:suiteSlug         → Suite detail
- *   /simulations/:externalSetSlug             → External set
- *   /simulations/:externalSetSlug/:batchId    → External set + highlight
- *
+ * @vitest-environment jsdom
  * @see specs/suites/simulation-runs-page.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

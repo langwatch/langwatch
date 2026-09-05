@@ -1,12 +1,4 @@
 /**
- * The Agent Testing run detail drawer: the same run drawer the classic pages
- * use, wider, with the judge results beside the conversation when the screen
- * gives enough room and stacked under it when it does not.
- *
- * It can open before the run has an id: a run of one scenario opens the drawer
- * the moment it is queued, the batch is watched until the run appears, and the
- * conversation then streams in live.
- *
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  * @see specs/features/agent-testing/live-single-scenario-run.feature
  * @see specs/scenarios/scenario-version-on-runs.feature

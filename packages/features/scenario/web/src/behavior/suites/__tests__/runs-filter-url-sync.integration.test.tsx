@@ -1,14 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Regression test for bug #3191 — applying a filter on the Runs page must not
- * flip the page into the "external set" view with the querystring rendered as
- * the set identifier.
- *
- * Exercises the real compat layer (~/utils/compat/next-router) inside a real
- * react-router MemoryRouter, so the buildUrl/routeParamKeys logic introduced
- * in #3205 is actually under test. No useRouter mocks.
- *
  * @see https://github.com/langwatch/langwatch/issues/3191
  * @see https://github.com/langwatch/langwatch/pull/3205
  */
@@ -36,12 +27,6 @@ type Store = ReturnType<typeof createRunHistoryStore>;
 
 /**
  * The host the compat router reads, wired to the MemoryRouter this test drives.
- *
- * The shim answers the ADDRESS off `ScenarioHostPort` rather than off
- * react-router, so exercising "the real compat layer" now means mounting a
- * real host over a real router rather than mounting the router alone. The
- * writes go straight back to `useNavigate`, which is what keeps
- * `buildUrl`/`routeParamKeys` — the logic the bug lived in — under test.
  */
 function TestScenarioHost({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -115,10 +100,8 @@ function TestScenarioHost({ children }: { children: ReactNode }) {
 
 /**
  * Mirrors the syncToUrl-on-filter-change effect in RunHistoryPanel
- * (src/components/suites/run-history-panel.tsx, look for the prevFilters/
- * prevGroupBy useRef + useEffect). Must be kept in sync with that component.
- * Extracting into a shared hook would be cleaner, but the effect is small
- * enough that duplication is cheaper than the indirection for now.
+ * (src/components/suites/run-history-panel.tsx, look for the prevFilters/ prevGroupBy
+ * useRef + useEffect). Must be kept in sync with that component.
  */
 function Harness({ store }: { store: Store }) {
   const { selectedSuiteSlug } = useSuiteRouting();

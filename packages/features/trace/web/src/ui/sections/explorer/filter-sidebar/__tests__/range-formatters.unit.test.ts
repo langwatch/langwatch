@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import { getRangeFormatter } from "../utils";
 
 /**
- * Range facet endpoints render a bare slider with min/max numbers and no
- * per-endpoint header to carry the unit — "16 / 575" is ambiguous on its
- * own. Each numeric facet therefore stamps a compact unit suffix. These
- * tests pin the unit per facet so the labels can't silently drift back to
- * unitless numbers.
+ * Range facet endpoints render a bare slider with min/max numbers and no per-endpoint
+ * header to carry the unit — "16 / 575" is ambiguous on its own. Each numeric facet
+ * therefore stamps a compact unit suffix.
  */
 describe("getRangeFormatter", () => {
   describe("when the facet measures duration (ms)", () => {

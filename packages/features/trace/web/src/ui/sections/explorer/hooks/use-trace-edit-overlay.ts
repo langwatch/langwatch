@@ -7,9 +7,6 @@ import { useTraceQueryArgs } from "./use-trace-query-args";
 
 /**
  * The correction stored for the open trace, or null when there is none.
- *
- * Disabled on the public share surface: a share carries its own payload and no
- * session, and a correction is review work that is not part of what was shared.
  */
 export function useTraceEditOverlay() {
   const shared = useSharedTrace();
@@ -36,12 +33,8 @@ export function useTraceEditOverlay() {
 }
 
 /**
- * The correction to apply to what the reader is looking at, or null to show the
- * trace exactly as captured.
- *
- * Three things turn it off: there is no correction; the reader asked for the
- * captured trace; or they are editing, in which case the drawer must show what
- * they are correcting rather than a correction applied on top of itself.
+ * The correction to apply to what the reader is looking at, or null to show the trace
+ * exactly as captured.
  */
 export function useAppliedTraceEditPatch(): TraceEditOverlayPatch | null {
   const overlay = useTraceEditOverlay();

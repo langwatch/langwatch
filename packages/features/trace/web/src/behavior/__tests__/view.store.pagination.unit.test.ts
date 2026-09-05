@@ -3,17 +3,9 @@ import { useFilterStore } from "../filter.store";
 import { useViewStore } from "../view.store";
 
 /**
- * Sort lives in viewStore, the keyset cursors live in filterStore, and the
- * server joins them: it pages by comparing a cursor's stored `sortValue`
- * against whatever the current sort expression is. So every route into a new
- * sort has to drop the cursors — including the one that doesn't look like a
- * sort change at all. `setGrouping` rewrites `sort` through `reconcileSort`,
- * because a grouped RowKind can't order by `time`/`spans`/`ttft`/`size` and
- * those all reconcile to `count`. Left carrying a flat-lens cursor, the query
- * compares a span count against epoch milliseconds and returns nothing, while
- * the cursor-free `totalHits` keeps reporting the whole count and `Pagination`
- * keeps captioning a row range off the page number ("… traces · showing
- * 101–101" on page 3) — so the blank table never admits to being empty.
+ * Sort lives in viewStore, the keyset cursors live in filterStore, and the server joins
+ * them: it pages by comparing a cursor's stored `sortValue` against whatever the
+ * current sort expression is.
  */
 
 const CURSOR_PAGE_2 = { sortValue: 42, traceId: "trace-b" };

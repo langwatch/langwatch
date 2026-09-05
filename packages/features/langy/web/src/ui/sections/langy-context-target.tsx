@@ -4,39 +4,8 @@ import { useLangyContextTarget } from "../../behavior/use-langy-context-target";
 import type { LangyContextTarget as LangyContextTargetDescriptor } from "../../behavior/langy-context-target.store";
 
 /**
- * Declare a thing on the page as something Langy can be pointed at — the
- * one-wrapper version of `useLangyContextTarget`.
- *
- * Wrap the element that IS the thing. Nothing changes until the user arms the
- * page (`#`); armed, it picks up a quiet outline and a click
- * or a drag onto the panel takes the resource into Langy's context. Disarmed —
- * which is almost always — the child is handed straight back, untouched: no
- * clone, no merged props, no wrapper node, and the element's own click does
- * exactly what it always did.
- *
- *   <LangyContextTarget target={traceContextChip(trace.id, trace.traceName ?? trace.name)}>
- *     <Card.Root onClick={open}>…</Card.Root>
- *   </LangyContextTarget>
- *
- * Pass the trace's human name (its resolved trace name / root span name) as the
- * chip's display label, not just the id — the chip and its hover lead with a
- * name a person recognises, and keep the raw id as secondary detail. The chip
- * factories (`traceContextChip`, `datasetContextChip`, …) fall back to a
- * shortened id only when no name is known.
- *
- * The child must carry the border-radius of the thing it wraps — Langy's
- * outline follows the element's own radius, so a square wrapper around a
- * rounded card will square off its corner.
- *
- * Prefer this over the hook. Because it is a component, it can be used INLINE
- * inside a `.map()` — where a hook can't go — so a list of rows or cards opts in
- * without anyone having to extract a wrapper component first. Reach for the hook
- * directly only when the target's root is already a component you own and you'd
- * rather spread the props than nest an element (the trace table's virtualized
- * row does this, because its root is a <tbody> the virtualizer measures).
- *
- * `target` may be null — for a row that hasn't loaded, or a skeleton — which
- * makes the whole thing inert without breaking the rules of hooks.
+ * Declare a thing on the page as something Langy can be pointed at — the one-wrapper
+ * version of `useLangyContextTarget`.
  */
 export function LangyContextTarget({
   target,

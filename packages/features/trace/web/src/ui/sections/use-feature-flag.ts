@@ -12,19 +12,6 @@ export const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
 
 /**
  * Targeting identity and query control for one flag read.
- *
- * `projectId` and `organizationId` are both required. A targeting rule that
- * names a scope the read left out can never match, so an omitted field turns
- * a per-organization or per-project rollout into a silent no-op. Requiring
- * both makes a forgotten field a compile error.
- *
- * Each id takes one of three values:
- * - a real id, so rules that name it can match.
- * - `NOT_TARGETED`, when the surface has no such id at all. Rules that name
- *   this scope never match, which is the point of saying it out loud.
- * - `undefined`, when the id is still loading. Write it out and pair it with
- *   `enabled: false`, so the read waits for the id instead of resolving
- *   against an empty context.
  */
 interface UseFeatureFlagOptions {
   /** The project this read is about, or `NOT_TARGETED`. */

@@ -1,14 +1,6 @@
 /**
- * The refusal a retired provider hands back is only actionable if the
- * customer is told what to add instead. That name comes from two places
- * that nothing joins: `deprecated.replacedBy` in the provider registry,
- * and the slug -> brand-name table in `presentation.ts`. A slug present
- * in one and missing from the other degrades silently to a sentence that
- * omits the name — safe, but the customer is left without the one fact
- * the error exists to give them.
- *
- * Covers @unit scenario from
- * specs/model-providers/google-agent-platform.feature.
+ * The refusal a retired provider hands back is only actionable if the customer is told
+ * what to add instead.
  */
 import { describe, expect, it } from "vitest";
 import { modelProviders, providerDeprecation } from "@langwatch/model-provider-contract";

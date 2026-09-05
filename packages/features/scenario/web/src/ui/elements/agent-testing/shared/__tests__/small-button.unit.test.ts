@@ -1,7 +1,6 @@
 /**
- * The chrome the small button of the Agent Testing surface applies, and the
- * variants it leaves alone.
- *
+ * The chrome the small button of the Agent Testing surface applies, and the variants it
+ * leaves alone.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

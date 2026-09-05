@@ -6,11 +6,6 @@ import type { Transform } from "./types";
 
 /**
  * Write the target's draft prompt.
- *
- * `localPromptConfig` is the unsaved buffer the workbench runs from until the
- * user saves the prompt back to the prompt registry, so this is how a prompt
- * edit lands without touching the saved version. Inputs and outputs travel with
- * it: a changed message set usually changes the variables the target needs.
  */
 export const setTargetPrompt: Transform<SetTargetPromptPayload, { targetId: string }> = ({
   state,

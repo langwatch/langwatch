@@ -1,14 +1,5 @@
 /**
  * Which projects the prompt replication picker offers.
- *
- * The answer is per TEAM rather than per current scope, and it is rebuilt over
- * `@langwatch/authz-contract`'s published rules because the platform hook read
- * `~/server/api/rbac`, which a browser package may not reach. What is worth
- * asserting is the two ways a project drops out — no membership row at all, and
- * a membership whose role does not grant `prompts:create` — because both are
- * silent: a picker that got either wrong offers a target the server then
- * refuses.
- *
  * Spec: specs/prompts/prompt-studio-page.feature
  */
 

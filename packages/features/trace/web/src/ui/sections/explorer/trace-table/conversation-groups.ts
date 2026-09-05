@@ -21,10 +21,9 @@ export interface ConversationGroup {
   evalsFailedCount: number;
   worstStatus: TraceStatus;
   /**
-   * The conversation's most recent trace, the one a click on the row opens.
-   * Server rows carry the field but its value is null when the rollup named no
-   * trace; page-local groups built client-side (sample preview) and skeleton
-   * rows leave it out entirely. A row without one expands on click instead.
+   * The conversation's most recent trace, the one a click on the row opens. Server rows
+   * carry the field but its value is null when the rollup named no trace; page-local
+   * groups built client-side (sample preview) and skeleton rows leave it out entirely.
    */
   lastTraceId?: string | null;
   latestTimestamp: number;
@@ -54,10 +53,9 @@ export interface ConversationGroup {
   title?: string | null;
   titleRedacted?: boolean;
   /**
-   * The pull request this session's work belongs to, decided server-side from
-   * the branch's pull-request history. Null when the session has no git
-   * context, the repository is not connected, or the branch has no pull
-   * request yet.
+   * The pull request this session's work belongs to, decided server-side from the
+   * branch's pull-request history. Null when the session has no git context, the
+   * repository is not connected, or the branch has no pull request yet.
    */
   pullRequest?: ConversationPullRequest | null;
 }
@@ -171,14 +169,9 @@ const GROUP_SORT_ACCESSORS: Record<string, (g: ConversationGroup) => number> = {
 };
 
 /**
- * Order conversation groups by the active lens sort, using the per-group
- * aggregates. The conversation table renders with `manualSorting`, so the
- * order it shows is whatever we return here.
- *
- * Only the onboarding sample-preview path still comes through here: real
- * data uses the server-side session rollup, which sorts and paginates in
- * ClickHouse (specs/traces-v2/sessions-lens.feature). Sample preview groups
- * the fixture page client-side, so it keeps needing a local sort.
+ * Order conversation groups by the active lens sort, using the per-group aggregates.
+ * The conversation table renders with `manualSorting`, so the order it shows is
+ * whatever we return here.
  */
 export function sortConversationGroups({
   groups,

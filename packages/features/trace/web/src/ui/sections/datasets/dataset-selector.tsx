@@ -1,10 +1,5 @@
 /**
  * The dataset picker the "Add to Dataset" drawer opens with.
- *
- * Recovered from `platform/app/src/components/datasets/DatasetSelector.tsx`,
- * deleted in `cc91631cd8`. It lives here rather than in
- * `@langwatch/dataset-web` because the drawer that opens it is the trace
- * family's, and nothing else in the product reads it any more.
  */
 
 import { Button, createListCollection, Field, HStack, Spinner, Text } from "@chakra-ui/react";
@@ -16,11 +11,7 @@ import type { FieldErrors, Path, PathValue, UseFormSetValue } from "react-hook-f
 type DatasetOption = { id: string; name: string };
 
 /**
- * What the picker has to show. An empty dropdown renders identically whether
- * the list is still coming, genuinely empty, or failed to arrive, so the three
- * are kept apart here rather than collapsing into "no items": a slow project
- * reads as having no datasets, and a failed request reads as the same, which
- * is the one thing we know is false.
+ * What the picker has to show.
  */
 type PickerState = "loading" | "unavailable" | "empty" | "ready";
 

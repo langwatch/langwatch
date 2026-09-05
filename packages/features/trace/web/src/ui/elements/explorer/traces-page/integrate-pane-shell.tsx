@@ -1,15 +1,7 @@
 /**
- * IntegratePaneShell — the shared frame for a no-traces empty state: a
- * `safe center` hero container that floats its content to the middle
- * when there's room and falls back to the top when there isn't.
- *
- * Two empty states render their own hero + body inside this so they
- * share one layout instead of each re-deriving the centring:
- *   - the project traces page (`IntegratePane`): full-screen, with its
- *     faded SearchBar + Toolbar chrome passed via `chrome`, and the
- *     token plus the setup actions as the body.
- *   - the /me recent-activity card (`PersonalTracesEmptyState`):
- *     `isCompact`, no chrome, with a tiles pitch as the body.
+ * IntegratePaneShell — the shared frame for a no-traces empty state: a `safe center`
+ * hero container that floats its content to the middle when there's room and falls back
+ * to the top when there isn't.
  */
 import { Box, Flex } from "@chakra-ui/react";
 import type React from "react";

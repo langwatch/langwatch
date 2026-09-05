@@ -1,15 +1,5 @@
 /**
  * Scenario Mappings Section
- *
- * A visually distinct section in the agent editor that configures how
- * the agent interacts with the scenario framework.
- *
- * Contains two sub-sections:
- * - Input mapping: which agent input receives each scenario field
- * - Output mapping: which output field is the agent's response
- *
- * Stored format (on agent config) maps agent_input → scenario_source.
- * Display format is inverted: scenario_field → agent_input.
  */
 
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
@@ -107,10 +97,8 @@ function buildAgentOutputSource(outputs: Variable[]): AvailableSource {
 }
 
 /**
- * Checks whether at least one source mapping wires to a required scenario
- * input field (`input` or `messages`). Shared between the full mapping check
- * and the Save & Run drawer gate — keeps both sides in agreement on what
- * "mapped enough to run" means for the input half.
+ * Checks whether at least one source mapping wires to a required scenario input field
+ * (`input` or `messages`).
  */
 export function hasScenarioInputMapping(mappings: Record<string, FieldMapping>): boolean {
   const mappedPaths = Object.values(mappings)
@@ -121,12 +109,6 @@ export function hasScenarioInputMapping(mappings: Record<string, FieldMapping>):
 
 /**
  * Whether the scenario mappings are sufficient to save and run an agent.
- *
- * Minimum (and only) requirement: a single source mapping whose path is
- * "input" or "messages". An output mapping is optional — when omitted the run
- * auto-populates the first output or gracefully stringifies the full result.
- * Shared by the editor Save gate and the Save-&-Run drawer gate via
- * hasScenarioInputMapping (the single source of truth).
  */
 export function isScenarioMappingValid({
   mappings,

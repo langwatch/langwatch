@@ -5,24 +5,8 @@ import { useLangyStore } from "../../../../index";
 type ApiUtils = ReturnType<typeof api.useUtils>;
 
 /**
- * Client-side follow-up to a server-side default-model write (a codex connect
- * with defaults, or the settings drawer saving the Default Models config).
- * The server already moved the role defaults; this makes the open UI agree
- * with it without a reload:
- *
- * 1. Remember what Langy's feature key resolved to BEFORE the write (from
- *    the query cache, so no extra request), as the fallback for a resolver
- *    re-read that fails.
- * 2. Invalidate the modelProvider caches (resolved defaults, the Default
- *    Models table, provider lists) so every mounted consumer refetches.
- * 3. Ask the resolver what the key resolves to NOW and hand the change to
- *    the langy store, which snaps the pill to it only while the pill still
- *    holds a seeded value (see followCodingDefaultChange).
- *
- * `fallbackModel` is what the pill follows when the resolver re-read fails —
- * the codex flow passes the codex model it just wrote (still the right thing
- * to show). Without one, a failed re-read follows the previous default, which
- * makes the follow a no-op rather than a guess.
+ * Client-side follow-up to a server-side default-model write (a codex connect with
+ * defaults, or the settings drawer saving the Default Models config).
  */
 export async function syncLangyAfterDefaultModelWrite({
   utils,

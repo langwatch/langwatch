@@ -8,16 +8,7 @@ import { Link } from "../link";
 
 /**
  * Upgrade treatment for visibility-window-redacted content (ADR-028 §7).
- *
- * Wraps a tab's content section: the real (server-teased, "…"-terminated)
- * content renders normally and stays readable near the top, while a
- * progressive backdrop blur — light at the top, maximal at the bottom —
- * dissolves the rest of the container, with the upgrade card centered over
- * it. No fabricated text: the ellipsis already ships in the API payload, so
- * every surface (UI, SDK, exports) sees the same truncation marker.
  */
-// Same rainbow recipe as ShikiCommandBox (PostHog's rainbow-scroll):
-// 5-stop gradient, background-clip: text, 3s background-position sweep.
 const lwRainbowScroll = keyframes`
   0% { background-position-x: 0%; }
   100% { background-position-x: 200%; }
@@ -41,10 +32,9 @@ export const BlurredContentGate = memo(function BlurredContentGate({
   children,
 }: {
   /**
-   * When provided, wraps the content in a relative box. When omitted, the
-   * gate renders as a pure absolute overlay — drop it as the LAST child of
-   * a `position: relative` container (e.g. the trace drawer's content
-   * pane) so one layer covers every tab.
+   * When provided, wraps the content in a relative box. When omitted, the gate renders
+   * as a pure absolute overlay — drop it as the LAST child of a `position: relative`
+   * container (e.g. the trace drawer's content pane) so one layer covers every tab.
    */
   children?: ReactNode;
 }) {

@@ -1,9 +1,7 @@
 /**
+ * The trace's whole comment list: what each comment says it is about, and what a
+ * comment reads as once the part it was left on is gone.
  * @vitest-environment jsdom
- *
- * The trace's whole comment list: what each comment says it is about, and what
- * a comment reads as once the part it was left on is gone.
- * See specs/traces-v2/anchored-comments.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

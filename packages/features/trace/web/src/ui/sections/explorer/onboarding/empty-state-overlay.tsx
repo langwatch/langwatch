@@ -9,17 +9,8 @@ import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/sto
 import { TracesEmptyOnboarding } from "./traces-empty-onboarding";
 
 /**
- * Onboarding overlay rendered above the populated trace preview when
- * the project hasn't received real traces yet.
- *
- * Layering, bottom → top:
- *   1. `OnboardingMeshBackground` — soft warm radial gradients.
- *   2. Hero band — full-width horizontal stripe of `bg.muted` with
- *      a vertical fade, sized to ~58vh. Auto-centres with the hero.
- *   3. Hero composition (positioned per `stageDef.heroLayout`).
- *
- * Density toggles visibly reflow the rows above and below the band
- * in real time — that's the demo.
+ * Onboarding overlay rendered above the populated trace preview when the project hasn't
+ * received real traces yet.
  */
 export const EmptyStateOverlay = () => {
   const stage = useOnboardingStore((s) => s.stage);
@@ -68,16 +59,9 @@ export const EmptyStateOverlay = () => {
       >
         <Box
           width="full"
-          // `clamp` keeps the band big enough to mask the hero +
-          // CTAs on short viewports (~650px tall, where 58vh is
-          // only 377px and the buttons would land below the
-          // band) while preventing it from ballooning to half a
-          // metre of grey on very tall viewports (1400px+ would
-          // otherwise hit 812px). The 420px floor and 680px
-          // ceiling were eyeballed against the journey hero —
-          // tall enough to cover heading + subhead + CTAs +
-          // density cards, short enough to leave room for the
-          // table rows top and bottom of the band.
+          // `clamp` keeps the band big enough to mask the hero + CTAs on short viewports (~650px tall, where
+          // 58vh is only 377px and the buttons would land below the band) while preventing it from ballooning
+          // to half a metre of grey on very tall viewports (1400px+ would otherwise hit 812px).
           height={{
             base: "clamp(420px, 62vh, 680px)",
             md: "clamp(420px, 58vh, 680px)",
@@ -115,12 +99,6 @@ export const EmptyStateOverlay = () => {
 function layoutFlexProps(layout: HeroLayout, drawerLeftX: number | null) {
   if (layout === "left") {
     // When the drawer is mounted we know its left X-coordinate.
-    // Setting `paddingRight` to `(viewport - drawerLeft)` shrinks
-    // the flex container's effective width down to just the
-    // visible canvas, and `justify: center` then naturally lands
-    // the hero at the midpoint between the dashboard left edge
-    // and the drawer. Vertical centring stays the same.
-    // Fallback to a fixed left padding before the drawer mounts.
     if (drawerLeftX != null && typeof window !== "undefined") {
       const viewportRight = window.innerWidth;
       const paddingRightPx = Math.max(0, viewportRight - drawerLeftX);

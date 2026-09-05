@@ -1,13 +1,5 @@
 /**
  * One input that edits parameters and offers what the run declares.
- *
- * The field edits a `name=value, name=value` line, or the name or the value
- * of one row. Before the "=" of the token under the cursor it lists the
- * declared parameters, with their description, default and where they come
- * from; after it, it lists what the parameter accepts. The arrow keys move
- * through the list, Enter and Tab take the highlighted entry, Escape closes
- * the list. Free text always commits.
- *
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 

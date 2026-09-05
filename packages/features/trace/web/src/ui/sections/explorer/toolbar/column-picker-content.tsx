@@ -26,11 +26,8 @@ const TIME_FORMAT_OPTIONS: { value: TimeColumnFormat; label: string }[] = [
 ];
 
 /**
- * The column picker body — shared by the toolbar Columns button and the
- * trailing "+" column header. A "Visible order" reorder strip, the column
- * toggles grouped by section, and an "Add custom column" section at the
- * bottom for per-evaluator eval columns. No column is pinned: every column
- * can be toggled and reordered here, matching the table header.
+ * The column picker body — shared by the toolbar Columns button and the trailing "+"
+ * column header.
  */
 export const ColumnPickerContent: React.FC = () => {
   const columnOrder = useViewStore((s) => s.columnOrder);

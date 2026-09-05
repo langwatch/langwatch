@@ -16,10 +16,8 @@ export interface UseFlameViewportResult {
 }
 
 /**
- * Manages the time-range viewport state for the flame view:
- * clamping, smooth animation (rAF-based ease-out cubic), and wheel-based
- * zoom/pan. Keeps a ref mirror of viewport so stale-closure-safe callbacks
- * can read the latest value without being in the dependency array.
+ * Manages the time-range viewport state for the flame view: clamping, smooth animation
+ * (rAF-based ease-out cubic), and wheel-based zoom/pan.
  */
 export function useFlameViewport({
   fullRange,

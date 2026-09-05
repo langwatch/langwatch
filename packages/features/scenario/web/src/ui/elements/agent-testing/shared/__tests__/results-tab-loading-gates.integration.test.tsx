@@ -1,12 +1,6 @@
 /**
+ * How the Results tab reads while a run plan is on its way in, and which stored rows reach the list.
  * @vitest-environment jsdom
- *
- * How the Results tab reads while a run plan is on its way in, and which
- * stored rows reach the list. The empty "no plans yet" state is reserved for
- * `!isLoading && !hasAnyPlans`. Between "the URL names a plan" and "the plan
- * record is in the store" the tab reads as a skeleton, not as the plans list,
- * and not as an empty state.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

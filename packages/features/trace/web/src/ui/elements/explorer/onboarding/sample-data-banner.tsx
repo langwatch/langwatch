@@ -3,28 +3,8 @@ import { Sparkles } from "lucide-react";
 import type React from "react";
 
 /**
- * Persistent banner across the top of the table while the trace list
- * is rendering `SAMPLE_PREVIEW_TRACES` (i.e. `usePreviewTracesActive`
- * is true).
- *
- * Honesty affordance — the moment the user tries a facet, search, or
- * filter the substring matcher in `filterPreviewTraces` will
- * frequently return zero rows (e.g. a service facet for
- * "production-api" doesn't substring-match the fixture services).
- * Without the banner that reads as a broken product. With it, the
- * user knows "ah, sample data, this is just a tour."
- *
- * Visual treatment: a one-shot orange glow blooms on mount and fades
- * out over ~10s. The point is "catch the eye on first arrival without
- * permanently shouting." After the glow fades the banner stays as a
- * slightly bolder, slightly taller strip — still honest, no longer
- * demanding attention.
- *
- * Exit lives on the toolbar's "Hide sample data" button, not here —
- * one exit affordance, not two.
- *
- * Visible only when preview is active — once dismissed, this whole
- * pane unmounts and the banner with it.
+ * Persistent banner across the top of the table while the trace list is rendering
+ * `SAMPLE_PREVIEW_TRACES` (i.e. `usePreviewTracesActive` is true).
  */
 export const SampleDataBanner: React.FC = () => {
   return (

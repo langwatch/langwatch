@@ -1,16 +1,5 @@
 /**
  * The address a registered automations drawer opens at.
- *
- * `@langwatch/automation-web` deliberately does not know this vocabulary. Its
- * screen names a drawer — `automation`, `viewAutomation` — and turning that
- * into `?drawer.open=<name>&drawer.<key>=<value>` is composition, and this is
- * the only place an alert email's link and a row click can be shown to be the
- * same address.
- *
- * THE STALE-KEY CASE IS THE ONE THAT BITES. `resolveAutomationsDrawerAddress`
- * clears every `drawer.*` key on the way, and without that a create opened
- * from a page where the reader had just been editing something opens on the
- * thing they were editing.
  */
 
 import { describe, expect, it } from "vitest";

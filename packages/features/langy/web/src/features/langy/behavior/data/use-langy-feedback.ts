@@ -16,9 +16,6 @@ export interface LangyFeedbackInput {
 
 /**
  * Thin wrapper over the backend feedback capture (`langy.recordFeedback`).
- * Feedback goes through the backend (never client-side capture) to PostHog and,
- * seamed on `traceId`, back into LangWatch itself as a feedback event on the
- * conversation's trace — so we dogfood Langy in our own account.
  */
 export function useLangyFeedback() {
   const { project } = useOrganizationTeamProject();

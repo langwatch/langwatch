@@ -4,10 +4,6 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * Where a criterion stops growing and starts scrolling.
- *
- * A criterion is one sentence, so the field follows it rather than holding a
- * fixed box. Without a stop, one pasted paragraph would push the buttons under
- * the list off the screen.
  */
 const CRITERION_MAX_HEIGHT = "120px";
 

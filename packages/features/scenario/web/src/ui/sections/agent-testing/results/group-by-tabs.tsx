@@ -1,12 +1,5 @@
 /**
  * How the results are grouped: four connected tabs inside one enclosure.
- *
- * A segmented control rather than a dropdown. As a plain select this sat
- * closed and nobody opened it: the four ways of reading the page are the point
- * of the page, so they are all on screen and one click apart. It is the
- * product's own `SegmentedControl`, so the enclosure and the moving indicator
- * match every other one in the app.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

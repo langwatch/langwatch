@@ -1,15 +1,8 @@
 import { create } from "zustand";
 
 /**
- * Tracks which facet the user is currently hovering, so the search
- * bar's chips and the sidebar's rows can cross-highlight each other. A
- * single global store keeps the wiring trivial: every chip/row reports
- * hover events here and a single style renderer (mounted in the
- * sidebar) reads back to inject targeted CSS outlines.
- *
- * `hoveredFacet` carries the single (field, value) pair under the
- * cursor; the highlighter draws across the matching chip ↔ row pair so
- * users see the link.
+ * Tracks which facet the user is currently hovering, so the search bar's chips and the
+ * sidebar's rows can cross-highlight each other.
  */
 interface HoveredFacet {
   field: string;

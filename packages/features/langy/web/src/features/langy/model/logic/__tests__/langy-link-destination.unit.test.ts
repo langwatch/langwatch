@@ -1,15 +1,7 @@
 /**
+ * The security-relevant half of the leaving-LangWatch guard: deciding what a link in
+ * the Langy panel ACTUALLY points at.
  * @vitest-environment jsdom
- *
- * The security-relevant half of the leaving-LangWatch guard: deciding what a
- * link in the Langy panel ACTUALLY points at.
- *
- * Langy renders model output, so a link's words are attacker-shapeable. Every
- * case below is a way of making an address read as LangWatch when it is not,
- * or of smuggling something that is not a destination at all into an anchor.
- *
- * (jsdom because the classifier reuses `isInternalHref` from the Markdown
- * component, which pulls in the React renderer.)
  */
 import { describe, expect, it } from "vitest";
 

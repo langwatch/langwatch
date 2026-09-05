@@ -1,13 +1,5 @@
 /** @vitest-environment jsdom */
 /**
- * The card a plan limit renders as, and who gets the way out of it.
- *
- * What the user saw instead: "Creating scenario failed / Your access in this
- * project doesn't cover this action" — the access-denied copy, on a failure
- * whose code, message and meta all said the project was on the free plan with
- * three of three scenarios in use. The card sent them to check permissions they
- * had nothing wrong with.
- *
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A plan limit is a decision, not a broken step"
  */

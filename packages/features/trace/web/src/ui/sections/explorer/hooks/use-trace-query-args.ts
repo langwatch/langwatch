@@ -4,19 +4,8 @@ import { useTraceViewer } from "../../../elements/explorer/context/trace-viewer-
 import { useDrawerProjectId } from "./use-drawer-project-id";
 
 /**
- * Shared base wiring for the per-trace tRPC queries fired off the open
- * drawer (header, span tree, signals, detail prefetch, etc.). Each
- * caller composes their own React Query options on top — this hook just
- * derives the inputs that they all recompute identically:
- *
- *   - `project` (resolved org/team/project),
- *   - `traceId` from the drawer store,
- *   - `occurredAtMs` URL hint for ClickHouse partition pruning,
- *   - `isLive` rolling-window flag for live refetch cadence,
- *   - `queryArgs` ready to spread into a `useQuery({ ... })` input.
- *
- * Callers should still gate `enabled` on their own preconditions and
- * decide their own staleTime / refetchInterval.
+ * Shared base wiring for the per-trace tRPC queries fired off the open drawer (header,
+ * span tree, signals, detail prefetch, etc.).
  */
 export function useTraceQueryArgs() {
   const { project } = useOrganizationTeamProject();

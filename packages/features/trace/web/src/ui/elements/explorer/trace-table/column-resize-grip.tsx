@@ -7,16 +7,7 @@ interface ColumnResizeGripProps<T> {
 }
 
 /**
- * Right-edge handle that drives TanStack's column-resize state. The header
- * cell positions this absolutely against its right border; we don't pick a
- * position — we just consume `header.getResizeHandler()` (which already
- * wires mouse + touch + keyboard) and reflect `getIsResizing()` for visual
- * feedback. Lifted out of `TraceTableShell` so the resize affordance lives
- * in one place and the header cell doesn't grow a fourth responsibility.
- *
- * Double-click resets the column to its default size — the canonical
- * pattern from TanStack examples — so users can recover from an accidental
- * drag without opening the column menu.
+ * Right-edge handle that drives TanStack's column-resize state.
  */
 export function ColumnResizeGrip<T>({
   header,

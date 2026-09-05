@@ -1,15 +1,6 @@
 /**
+ * The Agent Testing address is behind the release flag AND behind permission to read scenarios.
  * @vitest-environment jsdom
- *
- * The Agent Testing address is behind the release flag AND behind permission
- * to read scenarios. The flag decides whether the address exists at all, and
- * it grants nothing on its own.
- *
- * MOVED from `platform/app/src/pages/__tests__/agentTestingRouteGuards.integration.test.tsx`,
- * where the two guards were higher-order components the page composed itself.
- * They are now the route's own declaration, so the route install is what is
- * rendered here.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 

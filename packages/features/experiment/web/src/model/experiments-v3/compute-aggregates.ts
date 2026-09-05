@@ -211,21 +211,9 @@ export const computeTargetAggregates = (
 };
 
 /**
- * Compute a TargetAggregate-shaped object for a comparison column-target so
- * the workbench header can render the same Rows / Avg Latency / Total Cost /
- * Execution Time chip prompt/agent columns render (dogfood: "I already have
- * the scores on the results page — I want the same in the workbench").
- *
- * Comparison column-target cells hit the orchestrator's `skipTarget: true`
- * branch — no target execution → target_result fires with undefined
- * cost/duration → workbench `targetMetadata[comparisonId]` carries no
- * metrics. We reconstruct them the way the results page does:
- *   - cost per row = every variant's cost + judge (evaluator) cost
- *   - duration per row = every variant's duration (judge duration isn't
- *     persisted on evaluator results)
- *
- * A row counts as "complete" when any variant produced metadata for it —
- * matching how the popover renders on the results page.
+ * Compute a TargetAggregate-shaped object for a comparison column-target so the workbench header can render the
+ * same Rows / Avg Latency / Total Cost / Execution Time chip prompt/agent columns render (dogfood: "I already
+ * have the scores on the results page — I want the same in the workbench").
  */
 export const computeComparisonColumnTargetAggregate = (
   target: {
@@ -307,14 +295,6 @@ const readCostAmount = (raw: unknown): number => {
 
 /**
  * A comparison's win tally across all rows, for any number of variants.
- *
- * Wins are keyed by the raw identifier the judge returned rather than by
- * variant id, because resolving an identifier back to a variant needs that
- * variant's prompt handle — and handles only come from `useTargetName`, a
- * hook, which cannot be called once per variant from a loop. Each variant
- * therefore looks up its own count (see `ComparisonScoreboard`), and the
- * winner is derived from the counts alone: every non-tie identifier the
- * judge emits belongs to some variant, so whichever holds `topCount` won.
  */
 export type ComparisonAggregate = {
   evaluatorId: string;

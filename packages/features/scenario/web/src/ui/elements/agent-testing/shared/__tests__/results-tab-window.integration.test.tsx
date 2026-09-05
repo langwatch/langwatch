@@ -1,9 +1,6 @@
 /**
+ * The window the Results tab reads, and what happens when the run being opened is older than it.
  * @vitest-environment jsdom
- *
- * The window the Results tab reads, and what happens when the run being
- * opened is older than it.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

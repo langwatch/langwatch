@@ -1,15 +1,7 @@
 import { create } from "zustand";
 
 /**
- * Closed set of section ids that header chips and comment anchors can deep-link
- * into. Kept closed on purpose — adding a new section here is intentional and
- * the extra typing makes typos surface at the call site instead of silently
- * triggering a no-op at runtime when the accordion stack fails to find a
- * matching `data-section` element.
- *
- * Holds every section either stack renders, because a comment can be left on
- * any part a reader can read and jumping to it has to land on the section
- * holding that part.
+ * Closed set of section ids that header chips and comment anchors can deep-link into.
  */
 const FOCUS_SECTIONS = [
   "attributes",
@@ -49,14 +41,7 @@ interface FocusSectionState {
 }
 
 /**
- * One-shot signal store for "expand + scroll the trace summary section
- * with id X". Used by header chips (eval chip, error chip, …) to deep-
- * link operators from a compact metadata pill straight to the relevant
- * accordion section without prop-drilling refs across the drawer.
- *
- * `TraceSummaryAccordions` observes `pending`; when it matches the
- * mounted trace, it adds the section to its open list and scrolls the
- * section into view, then calls `clear()`.
+ * One-shot signal store for "expand + scroll the trace summary section with id X".
  */
 export const useFocusSectionStore = create<FocusSectionState>((set, get) => ({
   pending: null,

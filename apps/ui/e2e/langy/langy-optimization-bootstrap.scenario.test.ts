@@ -1,14 +1,6 @@
 /**
- * The bootstrap branches of the prompt optimization skill: a workbench missing
- * its dataset, a goal that could mean several things, and a user who names
- * nothing at all. The evaluator-choice branches live next door in
- * langy-evaluator-inference.scenario.test.ts.
- *
- * Judge-graded, with what actually landed asserted through the
- * workbench-state REST surface.
- *
- * RUN (one file per vitest run, see README):
- *   cd apps/ui/e2e/langy && npx vitest run langy-optimization-bootstrap.scenario.test.ts --reporter=verbose
+ * The bootstrap branches of the prompt optimization skill: a workbench missing its
+ * dataset, a goal that could mean several things, and a user who names nothing at all.
  */
 
 import { openai } from "@ai-sdk/openai";

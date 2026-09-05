@@ -34,14 +34,6 @@ interface IOViewerState {
 
 /**
  * Shared chat-layout preference across every IOViewer instance.
- *
- * Operator complaint: toggling thread↔bubbles in INPUT didn't affect
- * OUTPUT (and vice-versa), even though they're two halves of the
- * same conversation. The toggle now lives in a tiny module-level
- * store so both panels read and write the same value.
- *
- * Thread is the default — flat ChatGPT-style stack reads naturally
- * for both the full input history and the single assistant reply.
  */
 interface ChatLayoutPrefState {
   chatLayout: ChatLayout;
@@ -60,12 +52,8 @@ const useChatLayoutPref = create<ChatLayoutPrefState>((set) => ({
 export function useIOViewerState({ mode }: UseIOViewerStateArgs): IOViewerState {
   const [format, setFormat] = useState<ViewFormat>("pretty");
   const chatLayout = useChatLayoutPref((s) => s.chatLayout);
-  // Wrap the store setter as a `SetStateAction` so the existing IOViewer
-  // call sites (`setChatLayout(v as ChatLayout)`, etc.) keep typechecking
-  // without churn. The functional-updater branch evaluates against the
-  // LATEST store state (not the render-time `chatLayout` closure), so
-  // concurrent updates from multiple subscribers compose correctly
-  // (CodeRabbit suggestion, PR #4084).
+  // Wrap the store setter as a `SetStateAction` so the existing IOViewer call sites
+  // (`setChatLayout(v as ChatLayout)`, etc.) keep typechecking without churn.
   const setChatLayout = useCallback<Dispatch<SetStateAction<ChatLayout>>>((value) => {
     useChatLayoutPref.setState((state) => ({
       chatLayout:
@@ -83,13 +71,9 @@ export function useIOViewerState({ mode }: UseIOViewerStateArgs): IOViewerState 
   const [expanded, setExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
-  // The previous two-mode interaction (idle vs. engaged) existed because
-  // the IOViewer sat inside a single, full-drawer scroll container —
-  // wheel events captured inside the panel would compete with the drawer
-  // scroller. The new pane layout (TraceDrawerShell) gives every section
-  // its own scroll container, so wheel events naturally scope to the
-  // pane the cursor is over. The panel is now permanently "engaged" and
-  // there is no outside-click disengage listener.
+  // The previous two-mode interaction (idle vs. engaged) existed because the IOViewer
+  // sat inside a single, full-drawer scroll container — wheel events captured inside
+  // the panel would compete with the drawer scroller.
   const [engaged, setEngaged] = useState(true);
   const engagedRef = useRef<HTMLDivElement>(null);
 

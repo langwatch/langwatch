@@ -3,11 +3,9 @@ import type React from "react";
 import type { ColumnMeta } from "./trace-table-shell";
 
 /**
- * Skeleton bars rendered inside the real table cells while data loads.
- * Uses Chakra's `<Skeleton>` so we get the built-in shimmer animation —
- * the previous custom `<Box bg="…/20">` looked dead because nothing
- * was animating. Matches the old `MessagesTable` height (16px) so the
- * loading state and the legacy traces page feel like the same product.
+ * Skeleton bars rendered inside the real table cells while data loads. Uses Chakra's
+ * `<Skeleton>` so we get the built-in shimmer animation — the previous custom `<Box
+ * bg="…/20">` looked dead because nothing was animating.
  */
 const SKELETON_BAR_HEIGHT = "16px";
 
@@ -68,11 +66,8 @@ interface SkeletonAddonRowProps {
 const IO_SKELETON_MAX_WIDTH = "300px";
 
 /**
- * Stand-in for the IO-preview addon (the only addon that renders
- * unconditionally for trace-list rows). Two skeleton lines, no
- * leading-icon placeholders — the previous round-dot stand-ins for
- * the ↑/↓ arrows added visual noise without telling the user
- * anything useful while loading.
+ * Stand-in for the IO-preview addon (the only addon that renders unconditionally for
+ * trace-list rows).
  */
 export const SkeletonAddonRow: React.FC<SkeletonAddonRowProps> = ({ rowIdx }) => {
   const inputWidth = widthFor(rowIdx, 1, 0);

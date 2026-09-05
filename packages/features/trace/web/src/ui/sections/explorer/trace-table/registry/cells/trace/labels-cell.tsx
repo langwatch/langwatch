@@ -8,14 +8,9 @@ import { FilterChip } from "../../../../../../blocks/explorer/trace-table/regist
 type Density = "compact" | "comfortable";
 
 /**
- * Trace-level labels rendered as colour-coded badges — the v2 successor
- * to the old messages table's Labels column. Each label's hue is derived
- * from its text via `getColorPaletteForString` so the same label reads
- * the same colour across every row. The `surface` variant carries a
- * border so each chip stays legible in dark mode (a bare subtle fill
- * sat too close to the near-black table background). All labels are
- * shown (labels are the whole point of the column); they wrap within the
- * cell rather than collapsing behind a "+N" the way the Model column does.
+ * Trace-level labels rendered as colour-coded badges — the v2 successor to the old
+ * messages table's Labels column. Each label's hue is derived from its text via
+ * `getColorPaletteForString` so the same label reads the same colour across every row.
  */
 function renderLabels({ row, density }: { row: TraceListItem; density: Density }) {
   // Defensive default: a row that bypassed `mapTraceListPayload` (cached

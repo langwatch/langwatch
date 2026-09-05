@@ -10,15 +10,6 @@ import type { ChatLayout, ConversationTurn } from "../../../model/transcript/typ
 
 /**
  * Collapsible Gmail-style turn row.
- *
- * - **Collapsed**: a single compact button showing role icon + label +
- *   summary, with a chevron on the right. No outer indentation, no
- *   thread line — turns sit flush in the container's own padding.
- * - **Expanded**: the turn's own `<TurnView>` body renders directly with
- *   no outer header chrome. The body's inner role header (system /
- *   user / assistant chip) gains a collapse chevron inline, so we never
- *   duplicate the role icon + label across an outer row and an inner
- *   row.
  */
 export function ThreadedTurnView({
   turn,
@@ -38,11 +29,9 @@ export function ThreadedTurnView({
   defaultExpanded: boolean;
   collapseTools?: boolean;
   /**
-   * Which expanded body to render. "thread" → flat ChatGPT-style stack
-   * (role chip on top, content below, no boxes). "bubbles" → the
-   * canonical bubble/card UI from `TurnView`. The collapsed compact
-   * row is identical for both — only the expanded body differs, so
-   * users can flip between the two without losing the structure.
+   * Which expanded body to render. "thread" → flat ChatGPT-style stack (role chip on
+   * top, content below, no boxes). "bubbles" → the canonical bubble/card UI from
+   * `TurnView`.
    */
   layout?: ChatLayout;
 }) {

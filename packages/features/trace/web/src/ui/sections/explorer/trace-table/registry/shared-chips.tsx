@@ -8,10 +8,9 @@ import { type EvalChipDisplay, getEvalChipDisplay } from "../../../../../model/e
 import type { TraceEvalResult, TraceListEventGroup } from "../../types/trace";
 
 /**
- * Re-exported for callers that already imported from this module — the
- * canonical formatter now lives in `evaluationResults.ts` so the trace
- * table, the drawer header and any future surface format scores
- * identically.
+ * Re-exported for callers that already imported from this module — the canonical
+ * formatter now lives in `evaluationResults.ts` so the trace table, the drawer header
+ * and any future surface format scores identically.
  */
 export function formatEvalScore(ev: TraceEvalResult): string | null {
   return getEvalChipDisplay(ev).scoreText;
@@ -22,10 +21,9 @@ export function evalChipColor(ev: TraceEvalResult): string {
 }
 
 /**
- * Render the trailing verdict slot. Skipped / error get a tinted-bg
- * badge with a leading icon so they don't look like a real score; pure
- * boolean verdicts get colored "Pass" / "Fail" text; numeric scores stay
- * as muted-foreground numerals.
+ * Render the trailing verdict slot. Skipped / error get a tinted-bg badge with a
+ * leading icon so they don't look like a real score; pure boolean verdicts get colored
+ * "Pass" / "Fail" text; numeric scores stay as muted-foreground numerals.
  */
 function VerdictSlot({ display }: { display: EvalChipDisplay }) {
   if (display.status === "skipped") return <NoVerdictBadge label="SKIPPED" icon={LuCircleSlash} />;

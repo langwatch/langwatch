@@ -343,11 +343,7 @@ export default function ExperimentsWorkbenchPage() {
   useRegisterLangyHandlers(proposalHandlers, { experimentSlug: slug });
 
   // The live UI actions this page executes for the agent
-  // (specs/langy/langy-ui-actions.feature). Transform-backed kinds run
-  // through the store's one shared code path (`applyWorkbenchAction`), so an
-  // agent edit and a user edit are the same mutation, one undo entry each.
-  // Reads the LIVE store — unsaved prompt drafts, pending cells and in-memory
-  // results included, which the saved copy cannot show.
+  // (specs/langy/langy-ui-actions.feature).
   const uiActionHandlers = useMemo<LangyUiActionHandlers>(() => {
     // A page the server has already moved past cannot write: autosave stands
     // down there by design. Answering "done" from that state told the agent a
@@ -361,13 +357,6 @@ export default function ExperimentsWorkbenchPage() {
     };
     /**
      * Persist, and answer only if the write landed.
-     *
-     * `saveNow` reports its outcome rather than throwing, because the debounced
-     * path treats a failure as a status change on the badge. A dropped network
-     * or a rejected document therefore left it resolving normally, and the
-     * handler read that as a save: the agent was told the change was on the
-     * server when only this tab had it, which is the same false success a
-     * stale page used to give.
      */
     const saveOrRefuse = async () => {
       const outcome = await saveNow();
@@ -387,14 +376,9 @@ export default function ExperimentsWorkbenchPage() {
       if (definition.backend !== "transform") continue;
       handlers[kind] = {
         payloadSchema: definition.payloadSchema,
-        // Apply, then persist before answering. The agent reads a successful
-        // action as "the document now says this", and its next step is usually
-        // a server-side one — a run, a REST read, a version. Left on the 1.5s
-        // autosave debounce, the duplicate column existed only in this tab:
-        // the run that followed wrote results from the state without it, the
-        // broadcast came back with a newer version, and the pending save was
-        // then refused as out of date. The column could never be saved after
-        // that, so the loop worked on a page nothing else could see.
+        // Apply, then persist before answering. The agent reads a successful action as
+        // "the document now says this", and its next step is usually a server-side one
+        // — a run, a REST read, a version.
         run: async (payload: unknown) => {
           // Named while it works, so the panel's status line says what this
           // page is doing rather than falling back to a verb that claims
@@ -448,15 +432,8 @@ export default function ExperimentsWorkbenchPage() {
           // wrong document.
           assertPageIsCurrent();
           await saveOrRefuse();
-          // The run itself streams into the table the user is watching and is
-          // not waited for; only its id is. The id is minted server-side and
-          // arrives on the first frame, and without it the agent has nothing to
-          // poll: it cannot ask how the run is going, read its results, or stop
-          // it, so it reads the page instead and guesses. The backend fallback
-          // answers with the id too, so both dispatch paths answer alike.
-          //
-          // The payload-to-scope mapping is shared with that fallback so both
-          // cover the same cells.
+          // The run itself streams into the table the user is watching and is not
+          // waited for; only its id is.
           const runId = await startAndIdentifyRun({
             start: (onRunStarted) =>
               executeEvaluation(scopeFromRunPayload(payload), { onRunStarted }),

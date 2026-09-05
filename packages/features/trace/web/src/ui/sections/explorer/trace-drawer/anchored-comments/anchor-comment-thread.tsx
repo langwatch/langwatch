@@ -3,12 +3,8 @@ import { UserAvatar } from "../../../../elements/user-avatar";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
 
 /**
- * What has already been said about one part of the trace, read above the
- * composer that adds to it.
- *
- * Display only. Editing a comment happens where the comment lives beside its
- * turn, so a reader who opens a count here is reading, and the one thing they
- * can do from here is add another.
+ * What has already been said about one part of the trace, read above the composer that
+ * adds to it.
  */
 export function AnchorCommentThread({ comments }: { comments: AnnotationByTrace[] }) {
   if (comments.length === 0) return null;

@@ -1,10 +1,7 @@
 /**
+ * A workflow agent target's fields live on its Studio workflow, not on the agent, so
+ * the workbench reconciles them from the API on load.
  * @vitest-environment jsdom
- *
- * A workflow agent target's fields live on its Studio workflow, not on the
- * agent, so the workbench reconciles them from the API on load. Before that,
- * a workflow producing "output" and "chunks" reached the evaluator's variable
- * picker as a single invented field called "output".
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

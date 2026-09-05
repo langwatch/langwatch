@@ -19,17 +19,9 @@ interface LlmPanelProps {
 }
 
 /**
- * The LLM summary tab. Renders the trace as proper markdown (so quoted
- * email threads, lists, and tables read naturally) while Copy still hands
- * back the raw markdown source — the rendered view is for humans, the
- * clipboard is for the next LLM.
- *
- * The body is split at top-level `# section` headings and virtualised so
- * traces with hundreds of spans don't pay the markdown-parse + Shiki cost
- * up front for content that's never scrolled into view. Cmd+F find-in-page
- * stops working on off-screen sections; that's the well-understood cost
- * of virtualisation, and the Copy button reconstructs the full string from
- * the source data so "select all → paste" still works.
+ * The LLM summary tab. Renders the trace as proper markdown (so quoted email threads,
+ * lists, and tables read naturally) while Copy still hands back the raw markdown source
+ * — the rendered view is for humans, the clipboard is for the next LLM.
  */
 const LLM_PANEL_DEFAULT: MarkdownConfig = {
   ...DEFAULT_MARKDOWN_CONFIG,

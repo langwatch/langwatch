@@ -5,23 +5,9 @@ import { shouldShowAurora } from "../../../../../model/explorer/onboarding/chapt
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store";
 
 /**
- * Aurora ribbon that flares across the top of the trace table during
- * the `auroraArrival` stage — the marquee visual moment of the
- * journey, mirroring `RefreshProgressBar`'s aurora pattern so the
- * "new traces are arriving" idea reads consistently across the
- * platform.
- *
- * Self-gating: returns `null` outside aurora stages so the parent
- * doesn't have to know about `shouldShowAurora`. The component
- * absolute-positions itself within whatever ancestor establishes a
- * positioning context — currently the table-area `Box` inside
- * `EmptyResultsPane`, which the host structure preserves.
- *
- * Position math (top: -90px, height: 200px) was tuned so the ribbon
- * peaks above the table's first row and fades into transparent over
- * the first ~65% of its height; the horizontal mask fades the
- * ribbon into the page edges so it doesn't read as a banner when
- * the sidebar is hidden.
+ * Aurora ribbon that flares across the top of the trace table during the `auroraArrival` stage — the marquee
+ * visual moment of the journey, mirroring `RefreshProgressBar`'s aurora pattern so the "new traces are arriving"
+ * idea reads consistently across the platform.
  */
 export const OnboardingAurora: React.FC = () => {
   const stage = useOnboardingStore((s) => s.stage);

@@ -1,15 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for Scenario Input Mapping UI.
- *
- * The component shows scenario fields as rows (input,
- * messages, threadId) and agent inputs as sources in the
- * dropdown. Direction: "Where does each scenario field go?"
- *
- * Stored format: agent_input → scenario_source
- * Display format (inverted): scenario_field → agent_input
- *
+ * @vitest-environment jsdom
  * @see specs/scenarios/scenario-input-mapping.feature (UI section, @integration)
  */
 
@@ -94,11 +85,9 @@ describe("ScenarioInputMappingSection", () => {
 
   describe("given an agent declaring the output 'answer'", () => {
     /**
-     * The stored value carries three states in one optional string, and these
-     * two are the pair that must not collapse: `undefined` means the user has
-     * not chosen and the first output is auto-populated, `""` means they
-     * cleared it on purpose. Reading `""` as "not chosen" would silently
-     * re-map the output the user just unmapped. See #3119.
+     * The stored value carries three states in one optional string, and these two are
+     * the pair that must not collapse: `undefined` means the user has not chosen and
+     * the first output is auto-populated, `""` means they cleared it on purpose.
      */
     describe("when the output field has not been chosen yet", () => {
       it("maps the agent's first output automatically", () => {
@@ -222,12 +211,6 @@ describe("ScenarioInputMappingSection", () => {
 
   // ============================================================================
   // Scenario: Static value mappings can NOT be created from the inverted UI
-  //
-  // The scenario-field-row display has no natural agent-input target for a literal,
-  // so the section intentionally ignores type:"value" emissions from the child widget.
-  // Stored static values still render read-only (see the round-trip test below).
-  // Creating/editing value mappings belongs in a future agent-input-row UI.
-  // ============================================================================
 
   describe("given the mapping UI with an empty mappings state", () => {
     describe("when the child widget emits a type:value mapping for input", () => {

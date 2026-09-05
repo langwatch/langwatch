@@ -1,16 +1,5 @@
 /**
  * The error id is offered on every failure, without exception.
- *
- * It was briefly withheld from errors judged "self-serviceable" — a taken
- * name, an expired share link — on the reasoning that offering it invites a
- * support ticket for something the reader could fix alone. That reasoning is
- * wrong twice over. It turns the id's presence into a signal, so its ABSENCE
- * becomes something the reader has to interpret. And the person it fails is
- * whoever is looking at a screen we classified wrongly — precisely the case
- * where a handle to quote matters most.
- *
- * So this file guards the rule in the direction that can actually regress: no
- * future "tidy-up" gets to decide, per code, that someone does not need it.
  */
 import { describe, expect, it } from "vitest";
 

@@ -2,16 +2,8 @@ import "@testing-library/jest-dom/vitest";
 
 // @vitest-environment jsdom
 /**
- * A dataset value too long for its row collapses behind a fade overlay and
- * expands over the page on click, the same affordance the target and Winner
- * cells offer in the same table.
- *
- * What is pinned here is the way back out. The expanded view sits on a fixed,
- * full-viewport backdrop that swallows every pointer event, so an overlay that
- * survives Escape does not merely ignore a keystroke: the toolbar above the
- * table stops responding until the reader happens to click the backdrop. All
- * three cells of this table have to answer Escape, or the table teaches the
- * reader a rule it then breaks one column over.
+ * A dataset value too long for its row collapses behind a fade overlay and expands over the page on click, the
+ * same affordance the target and Winner cells offer in the same table.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

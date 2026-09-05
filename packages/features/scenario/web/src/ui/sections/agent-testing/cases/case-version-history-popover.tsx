@@ -1,11 +1,6 @@
 /**
- * The version history of the case being edited, anchored to the version chip
- * of the dialog header.
- *
- * The history reads beside the case it belongs to rather than in a drawer over
- * it, so the dialog under it stays where it was, the way the prompt editor
- * reads its own versions.
- *
+ * The version history of the case being edited, anchored to the version chip of the
+ * dialog header.
  * @see specs/features/agent-testing/case-version-history.feature
  */
 

@@ -1,40 +1,13 @@
 /**
  * The capability catalog — one declarative row per CLI resource.
- *
- * Langy's tool calls arrive as `langwatch.<resource>.<verb>`, and this file is
- * the panel's answer to "what does a result for that resource look like":
- * which surface it belongs to, what the thing is called, and which body widget
- * draws the result. It is DATA ONLY — no JSX, no functions — so adding a new
- * CLI resource to the panel is adding one row here, and the coverage test
- * (`capability-catalog.coverage.unit.test.ts`) fails the build when this map
- * and the CLI's own command tree drift in either direction.
- *
- * WHICH card kind a verb produces and its tone are NOT here: those are CLI
- * grammar, owned by `@langwatch/langy` (`cardKindFor`, `cliVerbTone`).
- * This catalog only binds the view on top — the same split the registry has
- * always kept.
- *
- * A resource missing from this catalog still renders (see
- * `resolveCliCapability`): the name is humanised into wording, the shared
- * grammar picks the card kind, and the card shows without a deep link. The
- * catalog makes cards GOOD; it is deliberately not what makes them EXIST.
- *
  * @see specs/langy/langy-capability-cards.feature
  */
 import type { DigestStrategy } from "@langwatch/langy-contract";
 
 /**
- * Every platform surface a card can point at. The label, path, icon and
- * deep-link rules for each live in `langy-capability-registry.ts` /
- * `langy-capability-card.tsx`; this is the vocabulary they key off.
- *
- * `gateway` covers the AI Gateway's org-level pages (virtual keys, budgets,
- * governance, ingestion) — settings surfaces, so never deep-linked.
- * `organization` covers the provisioning surface (the organization itself,
- * members, invites, teams, groups, roles, role bindings, SCIM tokens), which
- * are settings pages too, so also never deep-linked.
- * `platform` is the fallback surface for a resource the catalog has never
- * heard of: a neutral icon, no deep link, wording from the command itself.
+ * Every platform surface a card can point at. The label, path, icon and deep-link rules
+ * for each live in `langy-capability-registry.ts` / `langy-capability-card.tsx`; this
+ * is the vocabulary they key off.
  */
 export const CAPABILITY_SURFACES = [
   "traces",
@@ -65,20 +38,12 @@ export type CapabilitySurface = (typeof CAPABILITY_SURFACES)[number];
 /**
  * The widget vocabulary a card body can be drawn with. Rendering lives in
  * `langy-declarative-card.tsx`; the catalog only names which one.
- *
- *   - `stats` — labelled figures that roll up on mount (counts, pass rates).
- *   - `rows`  — a short list of items, each with a primary/secondary line.
- *   - `facts` — a label→value grid for one resource (name, status, dates).
- *   - `diff`  — name/version header plus the fields that changed.
- *   - `text`  — the plain summary-lines fallback.
  */
 export type CapabilityBodyWidget = "stats" | "rows" | "facts" | "diff" | "text" | "chart";
 
 /**
- * Icon overrides a catalog row may name when the surface's own icon is wrong
- * for the resource (a virtual key on the gateway surface is a key, not a
- * network). The name→glyph binding lives with the JSX in
- * `langy-capability-card.tsx`, keyed exhaustively off this union.
+ * Icon overrides a catalog row may name when the surface's own icon is wrong for the
+ * resource (a virtual key on the gateway surface is a key, not a network).
  */
 export type CapabilityIconName =
   | "key"
@@ -96,22 +61,9 @@ export interface CapabilityCatalogEntry {
   /** The platform surface this resource's cards belong to and deep-link into. */
   surface: CapabilitySurface;
   /**
-   * How this resource's results are remembered and re-rendered — REQUIRED, so
-   * a new CLI resource cannot ship without deciding it (the coverage test
-   * enforces the declaration alongside the row itself):
-   *
-   *   - `id-ref`     results name entities; the digest stores ids and the card
-   *                  hydrates fresh data with the viewer's session.
-   *   - `query-ref`  results are aggregates; the digest stores the query and
-   *                  the card re-runs it.
-   *   - `reduced`    results parse but name nothing fetchable; the card renders
-   *                  the stored structure.
-   *   - `text`       results are opaque output, rendered as text.
-   *
-   * This is the resource's INTENDED tier. The extractor still resolves the
-   * actual tier per result (an id-ref resource whose output held no ids
-   * degrades to reduced/text), so the declaration documents and enforces,
-   * never fabricates.
+   * How this resource's results are remembered and re-rendered — REQUIRED, so a new CLI
+   * resource cannot ship without deciding it (the coverage test enforces the
+   * declaration alongside the row itself):
    */
   digestStrategy: DigestStrategy;
   /**
@@ -124,9 +76,8 @@ export interface CapabilityCatalogEntry {
   icon?: CapabilityIconName;
   /**
    * Which body widget draws the result. Resolution order: `byVerb[verb]` →
-   * `byTone[tone]` → `default` → derived from the card kind (collection →
-   * rows, single resource → facts, run → stats, diff → diff, write → text).
-   * Most rows omit this entirely and ride the derived default.
+   * `byTone[tone]` → `default` → derived from the card kind (collection → rows, single
+   * resource → facts, run → stats, diff → diff, write → text).
    */
   body?: {
     default?: CapabilityBodyWidget;
@@ -136,10 +87,9 @@ export interface CapabilityCatalogEntry {
 }
 
 /**
- * One row per CLI resource — every top-level `langwatch <resource>` command
- * except the auth/utility ones a card would be meaningless for (login, config,
- * daemon…; the coverage test pins that exclusion list). Keyed by the resource
- * word exactly as the CLI spells it.
+ * One row per CLI resource — every top-level `langwatch <resource>` command except the
+ * auth/utility ones a card would be meaningless for (login, config, daemon…; the
+ * coverage test pins that exclusion list).
  */
 export const CAPABILITY_CATALOG = {
   trace: {

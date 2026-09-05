@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the FloatingAiBar's own error surface.
- *
- * Feature: specs/traces-v2/search.feature — "Provider error is visible
- * while the FloatingAiBar is open". The floating overlay covers the
- * docked search bar's unified banner, so a failure that only renders
- * there is invisible exactly when the user is looking for it.
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

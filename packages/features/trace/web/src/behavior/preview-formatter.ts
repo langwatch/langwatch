@@ -1,24 +1,6 @@
 /**
- * Single-source preview formatter for the trace explorer's truncated I/O
- * surfaces (table cell, group preview, conversation-context strip, system
- * prompt banner).
- *
- * The codebase had four separate paths into "render this content as a one-
- * line preview" — `tryParseChat`, `extractReadableSnippet`, `truncateText`,
- * raw `lineClamp`. Each one solved a different subset of the formatting
- * problems and the surfaces leaked the rest:
- *
- *   - `\`\`\`python\n…\n\`\`\`` → fences shown literally, eating preview width.
- *   - `{"question":"…"}` → JSON envelope shown verbatim instead of unwrapped.
- *   - `![](url)` → markdown image rendered as raw `![](…)`.
- *   - `\n` inside a `whitespace: nowrap` cell → collapsed silently, the
- *     reader can't tell the original was multi-line.
- *
- * `formatPreview` runs the full pipeline once and returns a single result
- * shape, so each preview surface just calls it. Failure-soft at every step:
- * if any part of the pipeline can't make sense of the input, we keep going
- * with what we have. Returning the raw input (truncated) is always a valid
- * outcome — a worse-but-correct preview is better than a thrown error.
+ * Single-source preview formatter for the trace explorer's truncated I/O surfaces
+ * (table cell, group preview, conversation-context strip, system prompt banner).
  */
 
 import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
@@ -32,14 +14,8 @@ export type { NewlineTreatment, PreviewOptions, PreviewResult } from "../model/p
 const ELLIPSIS = "…";
 
 /**
- * Single-key JSON envelopes worth unwrapping. Matched against the *only* key
- * of the object — multi-key objects keep their JSON shape.
- *
- * Scoped to keys whose value is reliably user-meaningful prose (the kind a
- * preview should surface). `id`, `name`, etc. are intentionally excluded:
- * unwrapping `{"id":"abc"}` to `"abc"` would lose the structural signal
- * that the trace's input *was* an envelope of an id, which is itself
- * meaningful in some integrations.
+ * Single-key JSON envelopes worth unwrapping. Matched against the *only* key of the
+ * object — multi-key objects keep their JSON shape.
  */
 const UNWRAP_KEY_ALLOWLIST = new Set([
   "question",
@@ -56,12 +32,8 @@ interface ChatMessageLike {
   role?: string;
   content?: unknown;
   /**
-   * Genkit / AI SDK / Mastra emit a `parts` array (sibling of `content`),
-   * where each part is `{ type: "text" | "blob" | "reasoning" | ..., content? | text? }`.
-   * The backend's `extractMessageContentText` handles this shape; without
-   * the matching support here, the new traces explorer renders these
-   * payloads as raw JSON. Reported on 2026-05-14 by rchaves with a real
-   * G'nger product-classification trace.
+   * Genkit / AI SDK / Mastra emit a `parts` array (sibling of `content`), where each
+   * part is `{ type: "text" | "blob" | "reasoning" | ..., content? | text? }`.
    */
   parts?: unknown;
   tool_calls?: Array<{ function?: { name?: string } }>;
@@ -200,26 +172,8 @@ function unwrapChatArray(arr: unknown[]): UnwrapResult | null {
 }
 
 /**
- * Pull text out of a `parts` array. Each part is typically one of:
- *   - `{ type: "text", content: "..." }`  ← Genkit / Mastra
- *   - `{ type: "text", text: "..." }`     ← Anthropic style
- *   - `{ type: "blob" | "image" | "reasoning" | ... }` ← skip; non-text
- *   - `{ content: "..." }` / `{ text: "..." }` ← typeless wrapper
- *   - plain string                            ← rare; pass through
- *
- * Skips non-text parts so a multi-modal message (image + text)
- * surfaces just the text in a one-line preview. Non-text parts that
- * *are* the whole content (e.g. an image-only message) intentionally
- * yield no preview — fall-through to JSON.stringify keeps the wrapper
- * visible rather than rendering "(blob)" placeholders that the caller
- * couldn't distinguish from a real text "(blob)".
+ * Pull text out of a `parts` array.
  */
-// Typed `parts` entries we treat as user-meaningful prose. `text` covers
-// Anthropic / Genkit / Mastra and AI SDK v4. `reasoning` is AI SDK v5
-// where the model's chain-of-thought lands in a sibling part with its
-// own `.text` string — same wire shape, different `type`. Skipping it
-// would re-introduce the wrapper-JSON failure mode this PR is fixing,
-// just for the next payload generation.
 const RENDERABLE_PART_TYPES = new Set(["text", "reasoning"]);
 
 function extractMessagePartsText(parts: unknown[]): string | null {
@@ -254,12 +208,9 @@ function extractMessagePartsText(parts: unknown[]): string | null {
 }
 
 /**
- * Typed content-part arrays that aren't chat messages — no `role`, just
- * `[{type: "text", text}, {type: "input_audio", ...}, ...]` (OpenAI
- * multi-modal user content logged bare). Joins the text parts and
- * renders non-text parts as a compact glyph so an audio/image payload
- * reads as "🎙 [shouting] you charged me twice…" instead of a wall of
- * base64.
+ * Typed content-part arrays that aren't chat messages — no `role`, just `[{type:
+ * "text", text}, {type: "input_audio", ...}, ...]` (OpenAI multi-modal user content
+ * logged bare).
  */
 function unwrapContentParts(arr: unknown[]): UnwrapResult | null {
   const pieces: string[] = [];

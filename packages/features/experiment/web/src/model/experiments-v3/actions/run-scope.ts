@@ -2,11 +2,7 @@ import type { ExecutionScope } from "@langwatch/experiment-contract";
 import type { RunPayload } from "./schemas";
 
 /**
- * Map a `workbench.run` payload onto an ExecutionScope. Shared by the browser
- * handler and the backend fallback executor so the two dispatch paths can
- * never disagree about what a scoped run covers: targets and rows compose
- * (each filter applies), and an omitted filter means "all of that dimension"
- * exactly as the payload schema documents.
+ * Map a `workbench.run` payload onto an ExecutionScope.
  */
 export function scopeFromRunPayload(payload: RunPayload): ExecutionScope {
   const targetIds = payload.targetIds ?? [];

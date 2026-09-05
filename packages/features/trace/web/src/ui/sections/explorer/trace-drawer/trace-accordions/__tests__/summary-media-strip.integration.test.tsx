@@ -1,12 +1,7 @@
 /**
+ * The drawer summary's media strip renders fold-derived refs from the summary's reserved attributes (specs/traces-v2/media-rendering.feature) — the trace-level
+ * input/output are flattened text, so this strip is the only way the summary panel surfaces the winning span's recording / image / attachment.
  * @vitest-environment jsdom
- *
- * The drawer summary's media strip renders fold-derived refs from the
- * summary's reserved attributes (specs/traces-v2/media-rendering.feature) —
- * the trace-level input/output are flattened text, so this strip is the only
- * way the summary panel surfaces the winning span's recording / image /
- * attachment. Also pins the metadata-table filter that keeps those reserved
- * JSON blobs out of the attributes section.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

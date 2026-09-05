@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * `useTraceListEvents` merges each row's events in from their own read.
- * Events are not on the trace summary, so the list asks for them separately —
- * which makes when it asks, and what a row shows before the answer arrives,
- * part of the behaviour rather than an implementation detail.
- *
- * See specs/traces-v2/trace-list-events-column.feature.
+ * @vitest-environment jsdom
  */
 
 import { renderHook } from "@testing-library/react";

@@ -3,16 +3,6 @@ import { useLangyStore } from "../behavior/langy.store";
 
 /**
  * "New chat" must actually START a new chat.
- *
- * The reported bug: after a failed turn, hitting New chat left the red error
- * card sitting under an otherwise-empty panel, and the half-typed draft was
- * still in the composer. Two separate leaks, in two separate places — the chat
- * ENGINE's error (useChat state, cleared in the panel via `clearError()`; see
- * `resetChatEngine` in langy-panel.tsx) and the STORE's draft, pinned here.
- *
- * The store half is what this file guards: `startNewConversation` must leave no
- * field of the abandoned conversation behind, so that adding a field tomorrow
- * and forgetting to reset it fails loudly here.
  */
 
 /** Every field a conversation dirties. A new chat must clear all of them. */

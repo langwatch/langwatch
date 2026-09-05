@@ -1,11 +1,6 @@
 /**
+ * Which view carries the marks a correction leaves.
  * @vitest-environment jsdom
- *
- * Which view carries the marks a correction leaves. The corrected trace is where
- * a reader goes to see what the correction did, so a removal is legible there;
- * the captured trace is the trace as it arrived and says nothing about it.
- *
- * See specs/traces-v2/trace-edit-mode.feature.
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

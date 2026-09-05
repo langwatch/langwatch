@@ -27,21 +27,6 @@ export interface HandledErrorStateProps {
 
 /**
  * A whole page that failed, told the way the 404 page tells it.
- *
- * The third error surface, after the toast (something just happened) and
- * `HandledErrorAlert` (a region of a page is still broken). This one is for
- * when there IS no page — the workflow is gone, the share link is dead — and
- * the alert is the only thing to look at.
- *
- * It exists because using the inline alert for that read as damage: a thin
- * red-hairline bar pinned to the top-left of an otherwise blank screen, or
- * floating in the middle of one, with no way onward. The same words in the
- * shape the app already uses for "page not found" — centred, a muted glyph, a
- * heading, and an action — read as a considered state instead of a stack
- * trace that happened to have a sentence in it.
- *
- * Copy still comes from the registry keyed by `code`, and the error id still
- * rides along: the affordance is the same everywhere, only the setting changes.
  */
 export function HandledErrorState({
   error,

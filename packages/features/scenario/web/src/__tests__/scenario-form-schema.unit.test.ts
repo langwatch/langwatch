@@ -1,8 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Form schema validation for maxTurns / minTurns fields.
- *
  * @see specs/scenarios/scenario-editor.feature (Turn Configuration ADR-015)
  * @see docs/adr/015-scenario-turn-config-ui.md
  */

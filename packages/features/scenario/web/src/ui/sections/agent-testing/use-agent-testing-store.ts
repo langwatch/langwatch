@@ -1,15 +1,5 @@
 /**
  * Ephemeral view state for the Agent Testing page.
- *
- * The address holds everything a person can link to (tab, suite, plan, run,
- * period). This store holds what only this browser cares about: how the
- * results are drawn, whether the rail is folded, which test suites are open, and
- * the run that was just started but has no rows yet.
- *
- * The view mode is the exception: it is written to the address as `?view=` so
- * a shared link opens the same way. The store stays the single source of
- * truth and the address is a serialized view of it, the same contract
- * useRunHistoryStore keeps.
  */
 
 import { create } from "zustand";

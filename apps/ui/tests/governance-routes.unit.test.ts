@@ -1,11 +1,5 @@
 /**
  * Which page key each governance screen answers, and what it is behind.
- *
- * The eleven keys are the contract with the route table, and the flags are the
- * policy that used to be spelled out at the bottom of each page file. Both are
- * easy to get subtly wrong in a way nothing else notices — a missing key throws
- * only when someone navigates, and a missing flag opens an unreleased page — so
- * both are stated here.
  */
 
 import { describe, expect, it } from "vitest";

@@ -1,10 +1,7 @@
 /**
+ * The reconciliation rule for a workbench someone else wrote to (specs/langy/langy-ui-actions-fallback.feature): a clean workbench reloads
+ * silently, a dirty one banners and waits for the user, and a stale signal for some other experiment changes nothing.
  * @vitest-environment jsdom
- *
- * The reconciliation rule for a workbench someone else wrote to
- * (specs/langy/langy-ui-actions-fallback.feature): a clean workbench reloads
- * silently, a dirty one banners and waits for the user, and a stale signal for
- * some other experiment changes nothing.
  */
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

@@ -5,12 +5,6 @@ import { computeScoreBarScale } from "../leaderboard-verdict-panel";
 
 /**
  * The score-bar scale, and specifically which entries get a vote on it.
- *
- * This has regressed once already. A review caught degenerate scores blowing
- * out the axis when the bounds came from CI bounds; the rewrite to score-based
- * bounds kept the non-finite guard and dropped the degenerate one, so the same
- * defect came back through a different code path. These tests pin the rule
- * itself rather than the shape of the filter chain.
  */
 
 const entry = (variantId: string, score: number, isDegenerate = false): BTLeaderboardEntry => ({

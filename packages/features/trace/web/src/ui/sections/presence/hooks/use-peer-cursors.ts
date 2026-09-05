@@ -19,10 +19,8 @@ interface UsePeerCursorsOptions {
 }
 
 /**
- * Subscribes to the cursor channel for a single anchor and returns the
- * currently-live peer cursors keyed by sessionId. Cursors are evicted
- * after {@link STALE_AFTER_MS} of silence so a peer who navigates away
- * stops rendering even if the unmount-leave didn't make it through.
+ * Subscribes to the cursor channel for a single anchor and returns the currently-live
+ * peer cursors keyed by sessionId.
  */
 export function usePeerCursors({
   projectId,

@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for EvaluationStatusItem — error rendering.
- *
- * Covers @integration scenarios from
- * specs/evaluators/evaluator-error-propagation.feature:
- * - "the trace evaluations tab shows the failure message on an errored row"
- * - "the trace evaluations tab shows details even when error message is empty"
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

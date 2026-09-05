@@ -3,14 +3,9 @@ import { isPreviewTraceId } from "../model/preview-trace-id";
 import { selectIsTraceEditDirty, useTraceEditStore } from "./trace-edit.store";
 
 export type DrawerViewMode = "trace" | "summary" | "conversation" | "terminal" | "session";
-// Flame was retired during the trace-view redesign on the grounds that
-// Waterfall already showed depth/parent/child — then brought back in
-// Round 3 because the time-weighted block layout reads completely
-// differently from the indented-row waterfall when scanning *where*
-// time is spent (the waterfall makes parent/child easy; flame makes
-// hot paths obvious). Span list stays retired — it didn't add a new
-// data axis, just filter chrome over the same rows. URL params
-// pointing at "spanlist" fall back to "waterfall" via isVizTab.
+// Flame was retired during the trace-view redesign on the grounds that Waterfall already showed depth/parent/child — then brought back in
+// Round 3 because the time-weighted block layout reads completely differently from the indented-row waterfall when scanning *where* time is
+// spent (the waterfall makes parent/child easy; flame makes hot paths obvious).
 export type VizTab = "waterfall" | "topology" | "sequence" | "flame";
 // "summary" / "llm" / "prompts" were removed from the SpanTabBar in the
 // redesign — Summary is now its own DrawerViewMode, and LLM / prompts
@@ -25,43 +20,30 @@ interface TraceHistoryEntry {
   traceId: string;
   viewMode: DrawerViewMode;
   /**
-   * The trace's `occurredAt` timestamp (ms since epoch) at the time it was
-   * pushed onto the back stack. Carrying this lets back-navigation forward
-   * the partition-pruning hint to the drawer queries — without it, going
-   * back loses the hint and re-opens the drawer on a cold partition scan.
+   * The trace's `occurredAt` timestamp (ms since epoch) at the time it was pushed onto
+   * the back stack.
    */
   occurredAtMs?: number;
 }
 
 /**
- * The slice of drawer state that is mirrored into the URL. Owning these in
- * one shape keeps the URL ↔ store sync hook to a single diff + push.
- *
- * `activeTab` used to live here when the SpanDetailPane mixed trace-scope
- * tabs (Summary / LLM / Prompts) with span-scope tabs. After the redesign
- * the pane shows a span detail whenever `selectedSpanId` is set and the
- * body adapts to the span's kind — there's no separate tab choice for the
- * user to make, so `activeTab` was retired.
+ * The slice of drawer state that is mirrored into the URL. Owning these in one shape
+ * keeps the URL ↔ store sync hook to a single diff + push.
  */
 export interface DrawerUrlState {
   viewMode: DrawerViewMode;
   vizTab: VizTab;
   selectedSpanId: string | null;
   /**
-   * Pinned span ids in the SpanTabBar, in the order they were pinned.
-   * Persisted via the `drawer.pinnedSpans` URL param (comma-separated)
-   * so links into the drawer can carry the operator's open tabs. Capped
-   * at {@link MAX_PINNED_SPANS} both on read and on write so a runaway
-   * pin loop can't bloat the URL.
+   * Pinned span ids in the SpanTabBar, in the order they were pinned. Persisted via the
+   * `drawer.pinnedSpans` URL param (comma-separated) so links into the drawer can carry
+   * the operator's open tabs.
    */
   pinnedSpanIds: string[];
   /**
-   * Whether the drawer is correcting the trace rather than reading it.
-   * Serialised as `drawer.edit=1` (`drawer.mode` is the view mode), so a link
-   * can drop a reviewer straight into edit mode. Only the mode bit travels:
-   * the uncommitted correction itself lives in `traceEditStore` and is never
-   * put in a URL, so a shared link never carries somebody else's half-finished
-   * work.
+   * Whether the drawer is correcting the trace rather than reading it. Serialised as
+   * `drawer.edit=1` (`drawer.mode` is the view mode), so a link can drop a reviewer
+   * straight into edit mode.
    */
   isEditing: boolean;
 }
@@ -70,10 +52,9 @@ export interface DrawerUrlState {
 export const MAX_PINNED_SPANS = 8;
 
 /**
- * Per-pane state inside the drawer body. Panes are independently sizable
- * (via `<PanelResizeHandle>`), collapsible to a header bar, and
- * temporarily maximizable within their group (double-click on header
- * hides siblings until toggled off). See trace-drawer-panes.feature.
+ * Per-pane state inside the drawer body. Panes are independently sizable (via
+ * `<PanelResizeHandle>`), collapsible to a header bar, and temporarily maximizable
+ * within their group (double-click on header hides siblings until toggled off).
  */
 export interface PaneState {
   collapsed: boolean;
@@ -88,10 +69,9 @@ interface DrawerState extends DrawerUrlState {
   isMaximized: boolean;
   shortcutsOpen: boolean;
   /**
-   * Operator-driven drawer width in pixels. `null` means "fall back to
-   * the default 45% viewport rule". When the user drags the left-edge
-   * grip we write the resolved pixel value here so the drawer position
-   * follows the cursor in real time. Persisted to localStorage.
+   * Operator-driven drawer width in pixels. `null` means "fall back to the default 45%
+   * viewport rule". When the user drags the left-edge grip we write the resolved pixel
+   * value here so the drawer position follows the cursor in real time.
    */
   widthPx: number | null;
   /**
@@ -103,23 +83,15 @@ interface DrawerState extends DrawerUrlState {
   /** Per-pane state keyed by `PaneId`. Persisted. */
   paneState: Record<PaneId, PaneState>;
   /**
-   * When true, clicking outside the drawer panel does NOT dismiss it —
-   * the user closes via the explicit X button, Esc, or double-click.
-   * When false, the drawer behaves like a standard modal: click-outside
-   * (or Esc) closes it. Persisted to localStorage so the operator's
-   * preference survives reloads.
+   * When true, clicking outside the drawer panel does NOT dismiss it — the user closes
+   * via the explicit X button, Esc, or double-click. When false, the drawer behaves
+   * like a standard modal: click-outside (or Esc) closes it.
    */
   pinned: boolean;
   traceId: string | null;
   /**
-   * The project the open trace belongs to, when it is not the project the app
-   * chrome is currently sitting in. The personal pages (`/me/…`) are the case
-   * that needs it: they read the caller's own workspace while the ambient
-   * project stays whatever was last visited, so a trace opened from there and
-   * queried against the ambient project reads as "Trace not found".
-   *
-   * `null` means "the ambient project", which is right everywhere the drawer
-   * opens over a project's own pages.
+   * The project the open trace belongs to, when it is not the project the app chrome is
+   * currently sitting in.
    */
   projectId: string | null;
   /**
@@ -128,12 +100,9 @@ interface DrawerState extends DrawerUrlState {
    */
   occurredAtMs: number | null;
   /**
-   * Span count carried over from the table row that opened the drawer
-   * — used by `TraceDrawerSkeleton` to render an accurate-height
-   * placeholder while the real spanTree query is in flight, so the
-   * drawer body doesn't reflow when the data lands. `null` for entry
-   * paths (URL hydration, history navigation) that don't have the row
-   * in hand — the skeleton falls back to its default size in that case.
+   * Span count carried over from the table row that opened the drawer — used by
+   * `TraceDrawerSkeleton` to render an accurate-height placeholder while the real
+   * spanTree query is in flight, so the drawer body doesn't reflow when the data lands.
    */
   expectedSpanCount: number | null;
   pinnedSpanIds: string[];
@@ -146,24 +115,18 @@ interface DrawerState extends DrawerUrlState {
 
   openTrace: (traceId: string, occurredAtMs?: number | null, options?: OpenTraceOptions) => void;
   /**
-   * Fill in the partition-pruning hint after the fact, from a resolved
-   * trace timestamp, when the drawer was opened without one (deep link /
-   * refresh whose URL carries no `t`). Only sets when `occurredAtMs` is
-   * currently null, so it never overwrites a hint the opener already
-   * supplied. Once set, the drawer's per-trace `stored_spans` reads can
-   * prune to the trace's weekly partitions instead of cold-scanning S3.
+   * Fill in the partition-pruning hint after the fact, from a resolved trace timestamp,
+   * when the drawer was opened without one (deep link / refresh whose URL carries no
+   * `t`).
    */
   backfillOccurredAtMs: (occurredAtMs: number) => void;
   closeDrawer: () => void;
   selectSpan: (spanId: string) => void;
   clearSpan: () => void;
   /**
-   * Jump to a span from anywhere in the drawer (header error chip, Summary
-   * tab eval/event/exception rows, Conversation tab span refs): switch to
-   * the Trace view and select the span so the waterfall scrolls to it and
-   * the detail pane opens. The mode switch is transient — it doesn't
-   * clobber the operator's remembered tab preference, matching the
-   * conversation-turn jump. See specs/traces-v2/span-reference-jump-to-trace.feature
+   * Jump to a span from anywhere in the drawer (header error chip, Summary tab
+   * eval/event/exception rows, Conversation tab span refs): switch to the Trace view
+   * and select the span so the waterfall scrolls to it and the detail pane opens.
    */
   openSpanInTrace: (spanId: string) => void;
   /**
@@ -185,10 +148,7 @@ interface DrawerState extends DrawerUrlState {
    */
   setVizTab: (tab: VizTab) => void;
   /**
-   * Apply a viz tab without writing to localStorage. Use for programmatic
-   * one-off forcing (e.g. preview/onboarding traces always landing on
-   * the waterfall) so the operator's remembered preference isn't
-   * clobbered the next time they open a normal trace.
+   * Apply a viz tab without writing to localStorage.
    */
   setVizTabTransient: (tab: VizTab) => void;
   setMaximized: (value: boolean) => void;
@@ -212,10 +172,9 @@ interface DrawerState extends DrawerUrlState {
   pushTraceHistory: (entry: TraceHistoryEntry) => void;
   popTraceHistory: () => TraceHistoryEntry | null;
   /**
-   * Drop everything *above* `index` in the back stack and return the
-   * entry at `index` (which becomes the navigation target). Used by the
-   * back-button context menu so the user can jump multiple steps back
-   * in one action without re-traversing the stack.
+   * Drop everything *above* `index` in the back stack and return the entry at `index`
+   * (which becomes the navigation target). Used by the back-button context menu so the
+   * user can jump multiple steps back in one action without re-traversing the stack.
    */
   popTraceHistoryTo: (index: number) => TraceHistoryEntry | null;
   /** Apply URL-derived state to the store (mount hydration, popstate). */
@@ -269,11 +228,9 @@ function isVizTab(value: string | null): value is VizTab {
 // store doesn't expose a tab choice for callers to validate.
 
 /**
- * Persisted last-chosen drawer view mode. Read at boot to decide which
- * mode a freshly-opened trace lands in (when the URL doesn't pin one
- * explicitly), and written every time the user picks a mode from
- * ModeSwitch. Lets observability-first users (who pick Summary) keep
- * landing on Summary as they navigate between traces.
+ * Persisted last-chosen drawer view mode. Read at boot to decide which mode a
+ * freshly-opened trace lands in (when the URL doesn't pin one explicitly), and written
+ * every time the user picks a mode from ModeSwitch.
  */
 const LAST_VIEW_MODE_STORAGE_KEY = "langwatch:traces-v2:drawer-last-mode:v1";
 const LAST_VIZ_TAB_STORAGE_KEY = "langwatch:traces-v2:drawer-last-viz:v1";
@@ -317,11 +274,7 @@ function persistLastVizTab(tab: VizTab): void {
 }
 
 /**
- * Read drawer state out of the URL synchronously at module load. Without
- * this, a hard reload onto `?drawer.open=traceV2Details&drawer.traceId=…`
- * would render the drawer once with `traceId === null` and any consumer
- * reading from the store gets a "trace not found" flash before the URL
- * sync effect fires.
+ * Read drawer state out of the URL synchronously at module load.
  */
 function readInitialFromURL(): InitialFromURL {
   const fallback: InitialFromURL = {
@@ -383,10 +336,9 @@ function readInitialFromURL(): InitialFromURL {
 }
 
 /**
- * Views that replay an agent run rather than showing the trace's own spans.
- * There is nothing in them to correct and nothing to point a comment at, so
- * annotation mode never renders one. The conversation is not one of them: a
- * turn is a trace, and it is where commenting on one reads best.
+ * Views that replay an agent run rather than showing the trace's own spans. There is
+ * nothing in them to correct and nothing to point a comment at, so annotation mode
+ * never renders one.
  */
 const UNEDITABLE_VIEW_MODES = new Set<DrawerViewMode>(["terminal", "session"]);
 
@@ -410,10 +362,7 @@ export function viewModeForEditState({
 }
 
 /**
- * Parse the `drawer.edit` URL param. A sample preview trace is never editable
- * because it exists only to show an empty project what a trace looks like and
- * has nothing to correct, so the flag is dropped rather than opening an edit
- * session that could never be saved.
+ * Parse the `drawer.edit` URL param.
  */
 export function parseEditParam({
   raw,
@@ -479,12 +428,6 @@ export const DRAWER_RESTORE_EDGE_PX = 80;
 
 /**
  * Initial drawer width before the operator has dragged it once.
- * Flat px (no viewport % math) so first-paint is deterministic — the
- * previous `45%` fallback meant the drawer width visibly shifted
- * after the user first dragged because the persisted px and the
- * computed % rarely matched. Once the operator drags, the chosen
- * width is persisted to localStorage and this default no longer
- * applies. Clamped at the call sites against the current viewport.
  */
 export const DRAWER_DEFAULT_WIDTH_PX = 920;
 
@@ -525,12 +468,9 @@ function readWidthFromStorage(): number | null {
     if (raw === null) return null;
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) return null;
-    // Clamp the persisted value against the *current* viewport so that
-    // a width remembered on a wide monitor doesn't push the drawer off
-    // the right edge when reloaded on a smaller laptop. The ResizeRail
-    // also re-clamps on `window.resize`, but that listener can't catch
-    // the initial-load case where the viewport changed between
-    // sessions.
+    // Clamp the persisted value against the *current* viewport so that a width
+    // remembered on a wide monitor doesn't push the drawer off the right edge when
+    // reloaded on a smaller laptop.
     const maxWidth = window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX;
     return Math.max(DRAWER_MIN_WIDTH_PX, Math.min(n, maxWidth));
   } catch {
@@ -612,13 +552,8 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     set({
       isOpen: true,
       traceId,
-      // An opener that names no project keeps the one already open rather than
-      // falling back to the ambient project. Every in-drawer move stays inside
-      // the trace's own project: stepping through the back stack, walking to a
-      // sibling trace, re-opening the same trace to leave edit mode. Resetting
-      // here would send the second trace of a session to whichever project the
-      // chrome happens to sit in, which is the same "Trace not found" one click
-      // deeper. A fresh open always starts clean because `closeTrace` clears it.
+      // An opener that names no project keeps the one already open rather than falling
+      // back to the ambient project.
       projectId: options?.projectId ?? get().projectId,
       occurredAtMs: occurredAtMs ?? null,
       expectedSpanCount: options?.expectedSpanCount ?? null,

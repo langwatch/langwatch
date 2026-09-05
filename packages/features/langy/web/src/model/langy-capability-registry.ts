@@ -1,41 +1,5 @@
 /**
  * Domain-capability registry (task #12 / #27).
- *
- * Langy's worker streams every CLI/MCP tool call into the assistant turn as an
- * AI-SDK tool part (`tool-<name>` / `dynamic-tool`). This module is the pure,
- * JSX-free mapping from a tool NAME to the bespoke card that should render it —
- * keyed off the real `langwatch-mcp-server` tool names (grounded against
- * `mcp/typescript/src/create-mcp-server.ts`).
- *
- * Governing rule — propose-then-apply:
- *   - READ tools (search/get/list, analytics, run results) render their result
- *     inline with NO Apply. The deep-link chip is the only affordance.
- *   - WRITE tools that the backend STAGES as a proposal ride the existing
- *     ProposalCard path (`langyProposal: true` output) with Apply / Discard;
- *     that path is untouched here. A write tool that has already EXECUTED (a
- *     bare MCP result) renders as a "created"/"updated" card with an
- *     "Open in <surface>" link — the applied half of the lifecycle.
- *   - DESTRUCTIVE tools that the backend stages ride ProposalCard's red,
- *     confirm-gated variant; an already-executed delete renders as a quiet
- *     "removed" card here.
- * Only a tool name that is not a LangWatch CLI call returns null and falls
- * through to the existing raw fallback in LangyToolActivity — the docs/schema
- * helpers (`fetch_langwatch_docs`, `fetch_scenario_docs`, `discover_schema`)
- * render as clean activity lines there. Every `langwatch.<resource>.<verb>`
- * call has a card, cataloged or not.
- *
- * TRANSPORT: Langy calls the `langwatch` CLI, so a live tool call arrives as
- * `langwatch.<resource>.<verb>` — rewritten server-side by the CLI envelope out
- * of the `bash` call opencode actually made. `resolveCliCapability` (below)
- * resolves EVERY such name to a card: the capability catalog
- * (`langy-capability-catalog.ts`) binds the view (surface, noun, body widget) for the
- * resources it lists, and anything it has never heard of — a command the
- * backend shipped before this UI did — degrades to a humanised card on the
- * neutral `platform` surface with no deep link. WHICH card / verb tone comes
- * from the shared `@langwatch/langy` contract, so the panel and the CLI
- * share one grammar. Only a name that is not a CLI call at all (a raw `bash`)
- * falls through to the raw view. The older MCP transport (`platform_*` /
- * `search_traces`) has been retired.
  */
 
 import {
@@ -59,13 +23,9 @@ export type CapabilityTone = "read" | "created" | "updated" | "removed";
 
 export interface CapabilityDescriptor {
   /**
-   * Which bespoke renderer draws the card. The vocabulary is the shared CLI
-   * contract's `MeasuredCardKind` (`@langwatch/langy`), rendered by
-   * {@link LangyCapabilityRenderer}. A `traces` kind is a trace SEARCH (the
-   * sample card), `trace` a single get.
-   *
-   * `cardKindFor` seeds this from the command's name; when the call carries a
-   * result envelope, the card stamped there wins (see {@link withDecidedCard}).
+   * Which bespoke renderer draws the card. The vocabulary is the shared CLI contract's
+   * `MeasuredCardKind` (`@langwatch/langy`), rendered by {@link
+   * LangyCapabilityRenderer}.
    */
   render: MeasuredCardKind;
   tone: CapabilityTone;
@@ -216,10 +176,7 @@ export function buildSurfaceHref({
 }
 
 /**
- * Deep link to ONE resource, or null when the surface has no per-resource
- * page. Unlike {@link buildSurfaceHref} this never falls back to the index —
- * it is for row-level links, where five rows all pointing at the same index
- * page would be noise pretending to be navigation.
+ * Deep link to ONE resource, or null when the surface has no per-resource page.
  */
 export function buildResourceHref({
   surface,
@@ -236,16 +193,7 @@ export function buildResourceHref({
 
 /**
  * How a CLI verb READS, in both tenses. `past` titles a SETTLED write card ("New
- * evaluator", "Delete trigger"); `present` titles a RUNNING one ("Creating
- * evaluator"). Keeping the two tenses in ONE row is the point: the two switch
- * statements this replaced could word the same verb inconsistently, and did.
- * A read verb has no past-tense label — a read card is titled by its surface,
- * not its verb — so its `past` is empty.
- *
- * The verb's TONE (read / create / update / remove) is the shared contract's to
- * decide (`cliVerbTone` in `@langwatch/langy`); it classifies verbs for the
- * whole card catalogue and stays the single source of that truth, so it is
- * deliberately not duplicated here.
+ * evaluator", "Delete trigger"); `present` titles a RUNNING one ("Creating evaluator").
  */
 const VERB_WORDING: Record<string, { past: string; present: string }> = {
   search: { past: "", present: "Searching" },
@@ -291,10 +239,9 @@ function verbLabel(verb: string): string {
 }
 
 /**
- * Wording for a resource the catalog has never heard of — the version-skew
- * fallback. The command's own resource word is the only truth available, so it
- * is humanised as-is: `virtual-keys` → "virtual keys". Plural is the naive
- * `+s` unless the word already ends in one.
+ * Wording for a resource the catalog has never heard of — the version-skew fallback.
+ * The command's own resource word is the only truth available, so it is humanised
+ * as-is: `virtual-keys` → "virtual keys".
  */
 function humanizeResource(resource: string): {
   singular: string;
@@ -326,15 +273,6 @@ export interface CliCapability {
 
 /**
  * The platform surface each mapped feature deep-links to, keyed by feature id.
- * The capability catalog is the primary surface binding now; this map only
- * ENRICHES the fallback path — when the catalog has never heard of a resource
- * but the feature map lists its command, the feature's surface still gives the
- * card a home instead of the neutral `platform` one.
- *
- * WHICH card, and the verb's tone, are NOT here: those are CLI grammar, resolved
- * once in `@langwatch/langy` (`cardKindFor`, `cliVerbTone`) and shared with
- * the CLI itself. This module owns only the view binding layered on top of them,
- * so the panel and the CLI can never disagree about what a command produced.
  */
 export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   "observability.tracing": "traces",
@@ -429,20 +367,8 @@ function bodyWidgetFor({
 }
 
 /**
- * Resolve a CLI tool name (`langwatch.<resource>.<verb>`) to its card, surface,
- * wording and tone. Null ONLY when the name is not a LangWatch CLI call at all
- * (a raw `bash`, an arbitrary shell command) — those fall through to the raw
- * activity view, which is where they belong.
- *
- * A well-formed `langwatch.*` name ALWAYS resolves:
- *   1. The catalog knows the resource → its surface, noun and body widget.
- *   2. The catalog doesn't, but the feature map lists the command → the
- *      feature's surface enriches the card; wording is humanised.
- *   3. Nobody has heard of it (the backend shipped a command this UI predates)
- *      → the neutral `platform` surface, humanised wording, no deep link.
- * The card kind and tone come from the shared contract in every branch, and
- * `cardKindFor` already lands an unknown resource on the generic read card —
- * so version skew degrades to a plainer card, never to a wall of output.
+ * Resolve a CLI tool name (`langwatch.<resource>.<verb>`) to its card, surface, wording
+ * and tone.
  */
 export function resolveCliCapability(
   rawName: string,
@@ -483,18 +409,6 @@ export function resolveCliCapability(
 
 /**
  * Re-seat a descriptor on the card the RESULT was stamped with.
- *
- * `cardKindFor` answers from the command's NAME, which is a PRIOR. The card on
- * the envelope is the DECISION — made once at the command boundary, where the
- * payload was in hand, and carried from there to the event log, the live edge
- * and this panel (ADR-079 §1/§3). When the two differ it is because the payload
- * earned a richer card than its name could give it, which is the only thing
- * promotion ever produces. So the decision wins, and the body widget is
- * re-derived for the card that is actually being drawn.
- *
- * Without this the panel re-decided from the name and discarded anything that
- * disagreed — so a promotion, whose defining property is that it disagrees,
- * could only ever make a card vanish.
  */
 export function withDecidedCard({
   descriptor,
@@ -521,11 +435,7 @@ export function withDecidedCard({
 }
 
 /**
- * Word a CLI capability. The CLI's verb grammar is resolved in the shared
- * contract; how it READS is decided here: a collection read is titled by what
- * it lists ("Traces", "Virtual keys"), a single read by its resource
- * ("trace"), a write by what it did ("New evaluator"). The noun comes from the
- * catalog when it has one, and from the command's own words otherwise.
+ * Word a CLI capability.
  */
 function cliOverline({ command, tone, noun }: CliCapability): string {
   if (tone !== "read") {
@@ -556,12 +466,6 @@ export interface CapabilityProgress {
 
 /**
  * Word a RUNNING capability call, or null when the name maps to no card.
- *
- * The settled card says what came back; this says what is happening, named
- * after the thing it is happening to — "Analytics · searching traces", not
- * "Coding". Tone is deliberately NOT carried: a create that hasn't finished is
- * not yet a "created" (green, ticked) card, so the in-progress shell always
- * renders in the neutral read tone.
  */
 export function resolveCapabilityProgress(
   rawName: string,
@@ -578,10 +482,9 @@ export function resolveCapabilityProgress(
 }
 
 /**
- * Resolve a CLI tool name (`langwatch.<resource>.<verb>`) to the card that
- * should render it, or null to fall through to the raw-JSON view.
- * `resolveCliCapability` decides the structure (gate + shared contract);
- * `cliOverline` words it.
+ * Resolve a CLI tool name (`langwatch.<resource>.<verb>`) to the card that should
+ * render it, or null to fall through to the raw-JSON view. `resolveCliCapability`
+ * decides the structure (gate + shared contract); `cliOverline` words it.
  */
 export function resolveCapability(
   rawName: string,
@@ -603,10 +506,9 @@ export function resolveCapability(
 }
 
 /**
- * Pull readable text out of a tool's `output`, which may be a plain string, an
- * MCP `{ content: [{ type, text }] }` envelope, a `{ text }` object, or an
- * arbitrary structured value. Falls back to pretty JSON so a card always has
- * something to show without leaking `[object Object]`.
+ * Pull readable text out of a tool's `output`, which may be a plain string, an MCP `{
+ * content: [{ type, text }] }` envelope, a `{ text }` object, or an arbitrary
+ * structured value.
  */
 export function extractToolText(output: unknown): string {
   if (output == null) return "";

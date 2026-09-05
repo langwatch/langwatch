@@ -22,8 +22,6 @@ export const convertToUIMapping = (mapping: StoreFieldMapping): UIFieldMapping =
 
 /**
  * Convert UI FieldMapping to store FieldMapping format.
- * Used when saving mappings from the UI to the store.
- *
  * @param mapping - The UI mapping to convert
  * @param isDatasetSource - Function to check if a sourceId refers to a dataset
  */

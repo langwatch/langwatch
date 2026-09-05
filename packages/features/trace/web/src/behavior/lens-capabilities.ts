@@ -3,13 +3,6 @@ import type { GroupingMode, SortConfig } from "./view.store";
 
 /**
  * Single source of truth for "what can a lens look like under grouping X".
- *
- * Every grouping mode renders a different `RowKind` (trace / conversation /
- * group), and each row kind has its own column registry + addon registry.
- * Surfacing those constraints as a flat capability descriptor keeps the
- * lens dialog, validation schema, and any future server-side guard in lockstep
- * — adding a new grouping mode means extending exactly this file (plus the
- * underlying registries).
  */
 
 export interface LensColumnOption {
@@ -186,13 +179,7 @@ export function getCapability(grouping: GroupingMode): LensCapability {
 }
 
 /**
- * Drop ids that the capability doesn't expose — protects against stale
- * state. Dynamic per-evaluator `eval:*` columns are retained only for the
- * trace (flat) capability — the one that renders per-trace `evaluations`;
- * they are dropped from conversation/group lenses where they'd be dead ids.
- * A retained eval column whose evaluator has no runs in range renders
- * em-dashes rather than vanishing (see
- * dev/docs/adr/029-trace-table-per-evaluator-columns.md).
+ * Drop ids that the capability doesn't expose — protects against stale state.
  */
 export function reconcileColumns({
   ids,

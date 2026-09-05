@@ -1,12 +1,7 @@
 /**
+ * Numeric-facet mode toggle — the small slider/tick-list glyph in the section header
+ * that flips between the discrete value list and the range slider.
  * @vitest-environment jsdom
- *
- * Numeric-facet mode toggle — the small slider/tick-list glyph in the
- * section header that flips between the discrete value list and the
- * range slider. `SectionRenderer` only wires up this toggle when a
- * facet is `discrete`-eligible; this test pins the render + click
- * behaviour at the FacetSection level so the actual button (and its
- * aria-label) are exercised end-to-end.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render } from "@testing-library/react";

@@ -35,10 +35,9 @@ interface TypewriterHeroProps {
 }
 
 /**
- * Two-stage typewriter — heading types char-by-char, then a brief pause,
- * then subhead types char-by-char. Once everything is on screen we linger
- * for `lingerMs` and call `onDone` (which advances the journey to the next
- * stage). A blinking cursor sits at the active typing position.
+ * Two-stage typewriter — heading types char-by-char, then a brief pause, then subhead
+ * types char-by-char. Once everything is on screen we linger for `lingerMs` and call
+ * `onDone` (which advances the journey to the next stage).
  */
 export function TypewriterHero({
   heading,

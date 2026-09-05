@@ -1,22 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * A page that cannot save must not tell the agent that it did.
- *
- * Autosave stands down once the server holds a newer version, which is correct:
- * writing then would clobber it. But a browser-executed UI action still applied
- * its change to the store and answered "done", so the agent built every later
- * step on a document only that tab could see. On camera this ran a whole
- * optimization loop into a workbench whose extra columns the server never had.
- *
- * The page refuses instead, with a code the agent can act on: the backend path
- * (`--experiment <slug>`) writes the saved document directly.
- *
- * A save that simply does not land is the same false success by another door.
- * Autosave reports that one on the badge and keeps the edit for its next try,
- * so it resolves normally, and the page used to read that as a write. It
- * refuses under its own code now.
- *
  * @see specs/langy/langy-ui-actions.feature
  *   ("A page that cannot save refuses the action instead of reporting success")
  */

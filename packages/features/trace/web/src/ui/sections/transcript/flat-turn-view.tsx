@@ -11,12 +11,9 @@ import {
 import type { ContentBlock, ConversationTurn } from "../../../model/transcript/types";
 
 /**
- * Flat, ChatGPT-style turn body. Renders the role chip on its own row
- * followed by the message content stacked below — no boxed cards, no
- * left accent borders, no right-aligned user bubble. Used as the
- * expanded body when the chat layout is "thread", so the threaded
- * view actually *looks* different from the bubble view (previously
- * both layouts shared the bubble/card UI underneath).
+ * Flat, ChatGPT-style turn body. Renders the role chip on its own row followed by the
+ * message content stacked below — no boxed cards, no left accent borders, no
+ * right-aligned user bubble.
  */
 export function FlatTurnView({
   turn,
@@ -68,10 +65,9 @@ export function FlatTurnView({
 }
 
 /**
- * Plain-text renderer for system prompts in thread layout. Sidesteps
- * the markdown / code-fence pipeline so the operator sees the prompt
- * at the same size as every other turn. `whiteSpace="pre-wrap"`
- * preserves the original line breaks + indentation.
+ * Plain-text renderer for system prompts in thread layout. Sidesteps the markdown /
+ * code-fence pipeline so the operator sees the prompt at the same size as every other
+ * turn. `whiteSpace="pre-wrap"` preserves the original line breaks + indentation.
  */
 function SystemPlainText({ blocks }: { blocks: ContentBlock[] }) {
   const text = blocks
@@ -112,12 +108,9 @@ function FlatBody({
   onCollapse?: () => void;
   children: React.ReactNode;
 }) {
-  // Header always renders the same row chrome regardless of collapsed
-  // state — operator complaint: "why when its not expanded the
-  // system/agent/simulator/user header becomes smaller padded to the
-  // middle?". Same padding + avatar size in both states. The whole
-  // header is the click target when expanded (so clicking anywhere on
-  // it collapses the turn), not just the chevron.
+  // Header always renders the same row chrome regardless of collapsed state — operator
+  // complaint: "why when its not expanded the system/agent/simulator/user header
+  // becomes smaller padded to the middle?". Same padding + avatar size in both states.
   return (
     <Box paddingY={1.5}>
       <chakra.button

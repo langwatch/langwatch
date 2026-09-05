@@ -1,15 +1,5 @@
 /**
  * The run plans of a project, and the small numbers their rows read.
- *
- * A run plan is anything a person can open to read runs: a stored plan, or an
- * external set that a code run writes into. Both are addressed by a slug and
- * both point at one scenario set, so the rest of the Results tab reads one
- * shape. A test suite is a group of scenarios and never a row of this list;
- * the plans that run it are.
- *
- * Everything here is pure, so the list rules can be read and tested without a
- * router or a query.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
@@ -36,11 +26,6 @@ export type StoredSuite = { kind?: string | null; labels: string[] };
 
 /**
  * The suites of a project that are run plans.
- *
- * A test suite is a group of scenarios and never a row of the Test Runs list,
- * and the throwaway suites `scenario run` makes are deleted again. Every
- * surface that counts or lists run plans reads this one rule, so the number
- * beside the Results tab can never disagree with the rows under it.
  */
 export function toRunPlanSuites<T extends StoredSuite>(suites: T[]): T[] {
   return suites.filter(
@@ -78,9 +63,6 @@ export type RunPlan = {
   lastRun: RunPlanLastRun | null;
   /**
    * What the plan covers, in words, for the Scope column.
-   *
-   * Resolved when the plans are built, because a scope naming other suites can
-   * only be read as names while the whole suite list is in hand.
    */
   scopeLabel: string;
   /** What kind of scope that is, which is the mark drawn beside the label. */
@@ -110,11 +92,6 @@ export type RunPlanSuite = {
 
 /**
  * What a run plan covers, in words.
- *
- * The plan reads its stored rule, with the suites of a `test_suites` scope named
- * rather than counted, because "Checkout, Refunds" answers the question and
- * "2 suites" does not.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 export function suiteScopeLabel({
@@ -160,10 +137,9 @@ export function suiteScopeKind(suite: RunPlanSuite): RunPlanScopeKind {
 export const CODE_RUN_LABEL = "From code";
 
 /**
- * How the target of a run from code is named. The code pointed the run at its
- * own agent, so the platform holds no target for it, and the run reads under
- * the default target the same way a run without a set reads under the
- * default set. Surfaces that list it mark it with the from-code badge.
+ * How the target of a run from code is named. The code pointed the run at its own
+ * agent, so the platform holds no target for it, and the run reads under the default
+ * target the same way a run without a set reads under the default set.
  */
 export const CODE_TARGET_NAME = "default";
 
@@ -173,15 +149,6 @@ export function toExternalPlanSlug(scenarioSetId: string): string {
 
 /**
  * The Agent Testing address that shows the run a v1 handoff names.
- *
- * The SDK hands a tab a `/simulations/:scenarioSetId/:batchRunId` address,
- * built on the server from ids. A reader of the v2 interface belongs on the
- * run of the plan that set is read as, not on the v1 page.
- *
- * Returns null for anything that is not a v1 run address, and for the
- * project's internal set, which the Results tab lists no plan for. The caller
- * then follows the address as it stands.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 export function toAgentTestingRunPath(pathname: string): string | null {
@@ -221,10 +188,6 @@ function byLastRunDesc(a: RunPlan, b: RunPlan): number {
 
 /**
  * Every run plan of a project, newest run first.
- *
- * `suiteNames` carries every suite of the project, test suites included,
- * because a plan whose scope names test suites reads them by name and those
- * rows are not in `plans`.
  */
 export function buildRunPlans({
   plans,
@@ -329,14 +292,6 @@ export function toRunGroupSummary(lastRun: RunPlanLastRun): RunGroupSummary {
 
 /**
  * The number a run reads by inside its window.
- *
- * The newest run of the window is the last one that happened in it, so the
- * count of runs in the window names it. Older runs count down from there.
- * When the total is not known yet, the loaded runs are the best answer.
- *
- * The loaded runs are also the floor of the count. A run that has just
- * finished is in the list before the count query has read it again, and a
- * count lower than the list would name two runs the same.
  */
 export function runOrdinal({
   index,
@@ -355,9 +310,8 @@ export function runOrdinal({
 }
 
 /**
- * The note a batch carries, or nothing. Every run of a batch carries the same
- * note, so the first run that has one answers for the batch.
- *
+ * The note a batch carries, or nothing. Every run of a batch carries the same note, so
+ * the first run that has one answers for the batch.
  * @see specs/suites/run-notes.feature
  */
 export function batchNote(scenarioRuns: ScenarioRunData[]): string | null {

@@ -1,11 +1,4 @@
 /**
- * The run dialog of the Results tab: Run on an open run plan, and Rerun on one
- * result row.
- *
- * The plan is run as its test suite, so the dialog offers the same targets and
- * the same remembered choice as running it from the rail. A single row runs the
- * one case it holds, which is an ordinary run plan of that case and its agent.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/suites/run-plan-identity-by-name.feature

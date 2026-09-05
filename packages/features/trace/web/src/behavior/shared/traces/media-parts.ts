@@ -1,24 +1,7 @@
 /**
  * mediaParts — pure helpers that turn raw trace message content into the
- * `MediaPartData` shape the simulations `MediaPart` renders: audio players,
- * inline images, video, and file-attachment chips.
- *
- * Lives in `shared/` because both sides of the stack depend on it: the
- * traces-v2 transcript and the legacy trace views map parts for rendering,
- * and the fold projection derives compact trace-summary media refs from the
- * same walk (`media-refs.ts`). Nothing here may import React or component
- * code — the fold worker loads this at boot.
- *
- * All the shape-sniffing is delegated to the canonical `visitContentPart`
- * decoder — we never hand-parse the `input_audio` / AG-UI media / `binary` /
- * `image_url` content-part shapes here.
- *
- * The collector walk mirrors the server-side extraction walker
- * (`value-media-extractor.ts`): same depth ceiling, same part-first-stop
- * rule, same generic recursion over every object key, same marker-gated
- * nested-JSON-string hop. The two must agree on which shapes they reach —
- * a part the extractor externalizes but the collector never surfaces is
- * stored bytes nothing renders. `media-walk-parity.unit.test.ts` pins that.
+ * `MediaPartData` shape the simulations `MediaPart` renders: audio players, inline
+ * images, video, and file-attachment chips.
  */
 import { rawPcmBase64ToWavBase64, resolveRawPcmFormat } from "@langwatch/trace-contract";
 import { containsMediaMarkers } from "../content-parts/media-markers";
@@ -52,10 +35,9 @@ export type MediaPartData =
     };
 
 /**
- * Shared recursion ceiling for media walks — identical on the render-side
- * collector (below) and the ingestion-side extractor
- * (`value-media-extractor.ts`), so a part nested at the boundary is either
- * reached by both or by neither.
+ * Shared recursion ceiling for media walks — identical on the render-side collector
+ * (below) and the ingestion-side extractor (`value-media-extractor.ts`), so a part
+ * nested at the boundary is either reached by both or by neither.
  */
 export const MAX_MEDIA_WALK_DEPTH = 8;
 
@@ -92,11 +74,8 @@ function defaultDataMimeType(type: "image" | "audio" | "video"): string {
 }
 
 /**
- * Scheme allowlist for any URL that reaches an `href`/`src` from
- * attacker-controllable span content. `/api/files/` references, `data:`
- * URIs, and absolute http(s) pass; everything else — `javascript:`,
- * `vbscript:`, `blob:`, protocol-relative `//host`, relative paths — is
- * rejected.
+ * Scheme allowlist for any URL that reaches an `href`/`src` from attacker-controllable
+ * span content.
  */
 export function isSafeMediaUrl(url: string): boolean {
   // Browsers strip ASCII control characters and spaces when parsing an href,
@@ -119,15 +98,9 @@ function isStoredObjectUrl(url: string): boolean {
 }
 
 /**
- * `[image/png, 12345 bytes]` is what an engine writes in place of an attachment
- * it decided not to carry into the trace, most often because the payload was
- * too large for the collector's body limit.
- *
- * Reading it matters because the alternative is worse than saying nothing: the
- * summary sits where a URL belongs, fails the scheme allowlist, and renders as
- * "no longer available", which sends the reader looking for bytes that were
- * never stored. Recognising the shape lets the renderer say what actually
- * happened, and it does so for traces already captured as well as new ones.
+ * `[image/png, 12345 bytes]` is what an engine writes in place of an attachment it
+ * decided not to carry into the trace, most often because the payload was too large for
+ * the collector's body limit.
  */
 export interface NotCapturedMedia {
   mediaType: string;
@@ -201,12 +174,9 @@ export function mediaPartToMediaData(part: unknown): MediaPartData | null {
       source: { type: "url", value: src },
     }),
     inputAudio: (p) => {
-      // Raw, header-less realtime formats aren't playable as a bare data: URI.
-      // Wrap them into a playable WAV: pcm16 gets a header as-is, the
-      // companded G.711 formats are decoded to linear PCM first (browser WAV
-      // decoders are PCM-only). Only inline `data` needs wrapping here:
-      // externalized `url` references are WAV-wrapped at store time by the
-      // content extractor and served as playable audio/wav.
+      // Raw, header-less realtime formats aren't playable as a bare data: URI. Wrap
+      // them into a playable WAV: pcm16 gets a header as-is, the companded G.711
+      // formats are decoded to linear PCM first (browser WAV decoders are PCM-only).
       const rawFormat = resolveRawPcmFormat(p.format, p.mimeType);
       if (p.data && rawFormat) {
         const wav = rawPcmBase64ToWavBase64(p.data, rawFormat);
@@ -263,17 +233,8 @@ export function audioPartToMediaData(part: unknown): MediaPartData | null {
 }
 
 /**
- * Collection gate: which mapped parts may be auto-mounted (players, <img>,
- * chips) by the strips and list previews.
- *
- * Only content our own pipeline produced — externalized `/api/files/`
- * references and inline `data:` payloads — passes. An external http(s) URL
- * inside span content would otherwise mount an <img>/<audio>/<video src>
- * that beacons every viewer's IP and timing to an attacker-chosen host, and
- * a `javascript:` URL would reach an anchor href. External links stay links
- * in the raw text view. Applies to EVERY part category: a `binary` part
- * declaring an image mime resolves to an <img> just like an `image` part
- * does, so it is gated the same way.
+ * Collection gate: which mapped parts may be auto-mounted (players, <img>, chips) by
+ * the strips and list previews.
  */
 export function isRenderableCollectedMedia(media: MediaPartData): boolean {
   if (media.type === "binary") {
@@ -288,22 +249,15 @@ export function isRenderableCollectedMedia(media: MediaPartData): boolean {
 }
 
 /**
- * Rendering-side gate for parsing a nested JSON string. The ingest markers
- * (`containsMediaMarkers`) detect INLINE media; after extraction an
- * `image_url` part referencing `/api/files/...` carries none of them, so the
- * collector also hints on the reference shape. Bare substrings, same
- * escape-proofing rationale as the ingest markers; a false positive costs
- * one JSON.parse of a string that already looked like JSON.
+ * Rendering-side gate for parsing a nested JSON string.
  */
 function containsRenderableMediaHints(value: string): boolean {
   return containsMediaMarkers(value) || value.includes("/api/files/");
 }
 
 /**
- * A string whose ENTIRE value is one media reference — a base64 `data:` URI
- * or an externalized `/api/files/` URL — synthesized into a renderable part.
- * This is how a bare data-URI span attribute (no JSON around it) surfaces,
- * and how the bare reference string the extractor rewrites it to renders.
+ * A string whose ENTIRE value is one media reference — a base64 `data:` URI or an
+ * externalized `/api/files/` URL — synthesized into a renderable part.
  */
 function bareStringToMediaData(value: string): MediaPartData | null {
   const trimmed = value.trim();
@@ -339,24 +293,16 @@ function bareStringToMediaData(value: string): MediaPartData | null {
 }
 
 /**
- * Structured walk of an arbitrary trace input/output value, collecting every
- * media part (audio, images, video, attachments).
- *
- * Mirrors the ingestion-side extraction walker: part-first (an object that IS
- * a media part is surfaced and not descended into), generic recursion over
- * every object key and array element, and media-hint-gated nested JSON
- * strings so a typed-raw envelope (`{type:"raw", value:"[{...}]"}`) still
- * surfaces its media.
+ * Structured walk of an arbitrary trace input/output value, collecting every media part
+ * (audio, images, video, attachments).
  */
 export function collectMediaParts(value: unknown, depth = 0): MediaPartData[] {
   return collectAnnotatedMediaParts(value, depth).map((part) => part.media);
 }
 
 /**
- * The same walk as `collectMediaParts`, keeping the chat role each part was
- * found under. One walker serves both: consumers that only render parts stay
- * on the plain list, and consumers that must tell the caller's media from the
- * agent's reply (the trace summary strips) read the role.
+ * The same walk as `collectMediaParts`, keeping the chat role each part was found
+ * under.
  */
 export function collectAnnotatedMediaParts(value: unknown, depth = 0): CollectedMediaPart[] {
   const out: CollectedMediaPart[] = [];

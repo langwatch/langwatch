@@ -21,15 +21,6 @@ const metricStats = (avg: number, count: number) => ({
 
 /**
  * Three panels answer the same question — which pairs did this run separate?
- * The verdict builds its tie set from it, the trust panel counts it, and the
- * trade-off summary gates its quality comparison on it.
- *
- * They were computed independently once and drifted: the verdict named a
- * clear winner while the adequacy panel beside it reported zero separated
- * pairs, both on screen at the same time. Consolidating them into
- * `scoreSeparation` fixed that, but nothing pinned the three together
- * afterwards — so a future change could silently split them again.
- *
  * @see specs/experiments/comparison-leaderboard.feature
  */
 
@@ -50,10 +41,9 @@ const entry = (
 });
 
 /**
- * Deliberately a case where the two answers DIVERGE: every pair's printed
- * range overlaps its neighbour's, so the old overlap test would separate
- * nothing, while the difference intervals separate a–c and b–c. A fixture
- * where both tests agree would pass even if a panel reverted.
+ * Deliberately a case where the two answers DIVERGE: every pair's printed range
+ * overlaps its neighbour's, so the old overlap test would separate nothing, while the
+ * difference intervals separate a–c and b–c.
  */
 const leaderboard: BTLeaderboard = {
   entries: [entry("a", 120, [20, 220]), entry("b", 100, [0, 200]), entry("c", 10, [-90, 110])],

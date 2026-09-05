@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The address a screen reads, over the router it may not import.
- *
- * Two properties matter and neither is obvious from the type: a repeated query
- * key collapses to one value rather than reaching a screen as an array it never
- * writes, and `setQuery` replaces the whole query rather than merging, so a
- * screen can remove a key it put there.
+ * @vitest-environment jsdom
  */
 
 import { render } from "@testing-library/react";

@@ -25,12 +25,9 @@ interface SidebarSectionProps {
   /** Drag handle props from a sortable parent — enables the grip. */
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   /**
-   * Optional handler that removes this section from the sidebar (writes
-   * to the per-user `facetVisibilityStore`). When provided, the header
-   * grows a small × button that's revealed on hover so the affordance
-   * doesn't claim chrome on every row. When omitted, no hide button is
-   * rendered — used for sections without a registered key (or where
-   * the parent doesn't want to expose hiding).
+   * Optional handler that removes this section from the sidebar (writes to the per-user
+   * `facetVisibilityStore`). When provided, the header grows a small × button that's
+   * revealed on hover so the affordance doesn't claim chrome on every row.
    */
   onHide?: () => void;
   /** Tooltip text for the hide button (defaults to "Hide section"). */
@@ -42,48 +39,33 @@ interface SidebarSectionProps {
    */
   onShiftToggle?: (nextOpen: boolean) => void;
   /**
-   * When provided, a small filter toggle renders just before the chevron
-   * in the section header. `open` reflects whether the typed-value filter
-   * is currently revealed. Clicks call `onToggle`. The glyph is a
-   * list-filter funnel (not a magnifying glass) so it reads as "narrow
-   * THESE values" rather than the global search bar at the top of the
-   * page. If the section is collapsed when the user opens it, we expand
-   * first so the input is actually visible — "filter the values"
-   * implicitly means "look at the values."
+   * When provided, a small filter toggle renders just before the chevron in the section
+   * header. `open` reflects whether the typed-value filter is currently revealed.
+   * Clicks call `onToggle`.
    */
   searchToggleProps?: {
     open: boolean;
     onToggle: () => void;
   };
   /**
-   * When provided, a small toggle renders in the header (beside search /
-   * chevron) that flips a numeric facet between its slider ("range") and its
-   * tick-list ("discrete") presentation. Only set on discrete-eligible numeric
-   * facets — categorical facets and non-eligible ranges omit it.
+   * When provided, a small toggle renders in the header (beside search / chevron) that
+   * flips a numeric facet between its slider ("range") and its tick-list ("discrete")
+   * presentation.
    */
   modeToggleProps?: {
     mode: "range" | "discrete";
     onToggle: () => void;
   };
   /**
-   * Content rendered between the header and the collapsible — always
-   * visible, even when the section is collapsed. Used by FacetSection
-   * to keep active values visible at all times so the at-a-glance read
-   * of "what's filtered" never depends on the section being expanded.
+   * Content rendered between the header and the collapsible — always visible, even when
+   * the section is collapsed.
    */
   pinnedContent?: React.ReactNode;
   children: React.ReactNode;
 }
 
-// The grip lives in the section's left padding gutter as an absolutely
-// positioned overlay rather than as a leading in-flow element. In flow it
-// pushed the header's icon + title ~20px to the right of the value rows
-// beneath (which start at their status-dot), so each section read as two
-// misaligned columns. Pulling it into the gutter lets the header icon line up
-// with the value dots and the header title line up with the value-row text —
-// the section then reads as one cohesive left-aligned block (T20). The hit
-// area matches the 8px gutter (paddingX={2}) so the overlay never spills past
-// the section's left edge into the `paint`-contained sortable wrapper.
+// The grip lives in the section's left padding gutter as an absolutely positioned
+// overlay rather than as a leading in-flow element.
 const DRAG_HANDLE_HIT_AREA = "8px";
 const DRAG_HANDLE_GLYPH = "10px";
 // Negative inline-start that seats the absolute grip in the left padding
@@ -211,20 +193,13 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
                   textTransform="uppercase"
                   letterSpacing="0.02em"
                   transition="color 100ms ease"
-                  // The Chakra Button recipe sets `text-align: center`, which
-                  // the title inherits. With `flex={1}` the title box spans the
-                  // whole header, so the centred text floated to the middle of
-                  // the row while the value dots/text below stayed left-aligned
-                  // — the section read as two misaligned columns. Pin the title
-                  // to the inline start so it lines up with the value rows (T20).
+                  // The Chakra Button recipe sets `text-align: center`, which the title
+                  // inherits.
                   textAlign="start"
                   _hover={{ color: "fg" }}
-                  // flex+minWidth=0 lets the title claim all the Button's
-                  // free width before `truncate` engages; without flex it
-                  // shrinks to min-content and ellipsises far too early
-                  // (e.g. "TRACE ATTRIBUT…" at the default 220px rail).
-                  // The active badge after it stays at its natural size
-                  // (flexShrink=0) so only the title gives.
+                  // flex+minWidth=0 lets the title claim all the Button's free width before `truncate`
+                  // engages; without flex it shrinks to min-content and ellipsises far too early (e.g.
+                  // "TRACE ATTRIBUT…" at the default 220px rail).
                   flex={1}
                   minWidth={0}
                   truncate
@@ -286,13 +261,9 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
-                  // Pressing search on a collapsed section also expands
-                  // it — otherwise the input toggles open behind a
-                  // closed Collapsible and the user types into invisible
-                  // chrome. We only auto-expand on the "opening" press;
-                  // once search is up, a second press hides the input
-                  // but leaves the section state alone (closing the
-                  // section is the chevron's job).
+                  // Pressing search on a collapsed section also expands it — otherwise
+                  // the input toggles open behind a closed Collapsible and the user
+                  // types into invisible chrome.
                   if (!searchToggleProps.open && !effectiveOpen) {
                     handleOpenChange(true);
                   }

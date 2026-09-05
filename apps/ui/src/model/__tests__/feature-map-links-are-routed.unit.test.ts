@@ -1,9 +1,6 @@
 /**
- * `feature-map.json`'s `platform.ui` addresses must resolve to a real route,
- * the same way a sidebar link must (`navigation-destinations-are-routed`).
- * The catalogue is hand-maintained data with no runtime consumer inside the
- * app, so nothing else notices a page rename leaving it dangling.
- *
+ * `feature-map.json`'s `platform.ui` addresses must resolve to a real route, the same
+ * way a sidebar link must (`navigation-destinations-are-routed`).
  * Spec: specs/navigation/destination-route-registration.feature
  */
 import { readFileSync } from "node:fs";

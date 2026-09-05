@@ -18,10 +18,7 @@ type ComparisonScoreboardProps = {
 const shorten = (name: string) => (name.length > 18 ? `${name.slice(0, 17)}…` : name);
 
 /**
- * Wins this variant holds. A single run can label the same variant by its
- * prompt handle on one row and its target id on another (the orchestrator
- * falls back when a prompt fails to load), so sum across every identifier
- * that names it rather than reading one key.
+ * Wins this variant holds.
  */
 const winsForVariant = ({
   winsByLabel,
@@ -39,14 +36,7 @@ const winsForVariant = ({
 };
 
 /**
- * The comparison column's header summary: who won overall, for any number of
- * variants.
- *
- * Shows only the qualitative outcome ("<winner> wins" / "Tied"). The exact
- * per-variant counts live in the hover tooltip so numerically-curious users
- * get details while the header itself stays uncluttered (dogfood: "structured-
- * demo-a wins 3 — random number, not useful in the header"). The full
- * per-variant breakdown is on the results page, as a win-rate chart.
+ * The comparison column's header summary: who won overall, for any number of variants.
  */
 export function ComparisonScoreboard({
   aggregate,

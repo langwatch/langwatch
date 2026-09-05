@@ -17,21 +17,17 @@ interface EventCardProps {
   /** Selection callback for the "Open span" affordance. */
   onSelectSpan?: (spanId: string) => void;
   /**
-   * Outcome colour for events whose structure we know (a denied tool call, a
-   * failed result) — the same tone vocabulary SessionView's Signals use, so a
-   * bad outcome reads at a glance instead of requiring a read through the
-   * attribute table underneath. Omitted (or "neutral") renders the plain card.
+   * Outcome colour for events whose structure we know (a denied tool call, a failed result) — the same tone
+   * vocabulary SessionView's Signals use, so a bad outcome reads at a glance instead of requiring a read through
+   * the attribute table underneath.
    */
   tone?: "danger" | "warning" | "neutral";
 }
 
 /**
- * One event in the Events accordion. The previous renderer was a single
- * line ("name +Nms") — way too sparse: attribute payloads (the actual
- * "what happened?") were hidden, and trace-level events had no way to
- * jump to the originating span. This card surfaces both, with the
- * attribute table visually nested under the header so the section
- * still scans quickly when there are many events.
+ * One event in the Events accordion. The previous renderer was a single line ("name
+ * +Nms") — way too sparse: attribute payloads (the actual "what happened?") were
+ * hidden, and trace-level events had no way to jump to the originating span.
  */
 export const EventCard: React.FC<EventCardProps> = ({
   name,

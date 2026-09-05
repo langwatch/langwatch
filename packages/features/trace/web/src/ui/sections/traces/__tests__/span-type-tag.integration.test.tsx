@@ -1,9 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the SpanTypeTag component.
- * Verifies that evaluation spans render correctly and that the evaluation result
- * is properly extracted for styling decisions.
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

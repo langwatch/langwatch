@@ -1,8 +1,5 @@
 /**
  * useMultiRunData - Hook for fetching multiple run data in compare mode
- *
- * Uses separate queries for each run and combines the results.
- * Includes run color assignments for visual differentiation.
  */
 import { useMemo } from "react";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
@@ -48,9 +45,6 @@ type UseMultiRunDataReturn = {
 
 /**
  * Fetches data for multiple runs in parallel
- *
- * Note: Due to hooks rules, we use a fixed number of queries (max 8)
- * and conditionally enable them based on the runIds array.
  */
 export const useMultiRunData = ({
   projectId,

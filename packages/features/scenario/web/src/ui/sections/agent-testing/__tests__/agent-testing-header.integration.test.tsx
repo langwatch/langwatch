@@ -1,9 +1,6 @@
 /**
+ * The Agent Testing header is one line: the page title, then the tabs.
  * @vitest-environment jsdom
- *
- * The Agent Testing header is one line: the page title, then the tabs. The
- * actions of each tab sit in the section header above their own table.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

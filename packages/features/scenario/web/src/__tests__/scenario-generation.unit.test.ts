@@ -81,14 +81,7 @@ describe("generateScenarioWithAI()", () => {
   });
 
   describe("when the response body is not JSON (HTML error page)", () => {
-    // Regression for langwatch#5758. The generate endpoint answers with JSON on
-    // every outcome, so a NON-JSON body means the response came from a layer in
-    // FRONT of the app — a reverse-proxy / gateway 502·504, an auth-redirect
-    // login page, a timeout error page, or an older self-hosted Next.js build.
-    // Before the fix, `response.json()` threw a raw
-    // `Unexpected token '<', "<!DOCTYPE "... is not valid JSON` that leaked to
-    // the user and masked the real HTTP status. A real Response is used so the
-    // genuine JSON.parse crash is exercised, not a hand-faked reject.
+    // Regression for langwatch#5758.
     const HTML_ERROR_BODY =
       "<!DOCTYPE html>\n<html><head><title>502 Bad Gateway</title></head>" +
       "<body><h1>502 Bad Gateway</h1></body></html>";

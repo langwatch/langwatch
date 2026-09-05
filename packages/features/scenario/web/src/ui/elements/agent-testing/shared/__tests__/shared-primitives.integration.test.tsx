@@ -1,10 +1,6 @@
 /**
+ * The small pieces every Agent Testing surface shares: what the last run said, what it cost, which version of a scenario ran, and the row that opens a test suite of scenarios.
  * @vitest-environment jsdom
- *
- * The small pieces every Agent Testing surface shares: what the last run
- * said, what it cost, which version of a scenario ran, and the row that opens a
- * test suite of scenarios.
- *
  * @see specs/features/agent-testing/cases-table.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

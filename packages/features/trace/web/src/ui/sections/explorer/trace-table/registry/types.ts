@@ -19,13 +19,7 @@ export interface CellRenderContext<TRow> {
   isFocused: boolean;
   actions: RowActions;
   /**
-   * Addon ids enabled for this lens (e.g. `["io-preview"]`). Lets a
-   * cell ask "will the addon row below me actually render?" instead of
-   * mirroring the addon's `shouldRender` predicate blindly — the lens
-   * might not even register the addon, in which case mirroring the
-   * predicate would lie. Cells should treat the addon as visible only
-   * when its id appears here AND its own row-level predicate would
-   * approve, matching what the registry actually emits.
+   * Addon ids enabled for this lens (e.g. `["io-preview"]`).
    */
   enabledAddonIds: string[];
 }
@@ -49,14 +43,8 @@ export interface AddonRenderContext<TRow> {
   tanstackRow: Row<TRow>;
   actions: RowActions;
   /**
-   * Indices (within the visible-cell list) of main-row cells that
-   * declared `rowSpan=2` and therefore "own" the slot in this addon
-   * row. The addon must skip these column positions when emitting its
-   * own `<Td>` siblings — otherwise the browser shoves the addon's
-   * cells past the rowspan and the table layout collapses.
-   *
-   * Empty when no cell on the main row is rowspan-claimed; addons that
-   * don't care about this can keep using `colSpan` directly.
+   * Indices (within the visible-cell list) of main-row cells that declared `rowSpan=2`
+   * and therefore "own" the slot in this addon row.
    */
   rowSpanClaimedIndices: number[];
 }

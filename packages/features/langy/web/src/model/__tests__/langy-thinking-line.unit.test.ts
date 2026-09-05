@@ -1,17 +1,6 @@
 /**
- * @vitest-environment node
- *
  * The thinking line may only say TRUE things.
- *
- * It used to cycle whimsical verbs on a timer for as long as a turn was open,
- * whether or not anything was happening. On a turn whose worker never spawned it
- * spent ninety-seven seconds claiming "Writing a TODO list…", "Calling one more
- * tool…", "Reading the whole file…" — while nothing was running and not one
- * token had arrived. That is not a cosmetic bug: it made a DEAD turn read as a
- * healthy one, and "Langy is slow" was chased for a whole session before anyone
- * noticed the turn had never started.
- *
- * These tests are the guarantee that it cannot happen again.
+ * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
 import { LANGY_THINKING_VERBS } from "../values/langy-thinking-verbs";
@@ -281,10 +270,9 @@ describe("langyThinkingLine", () => {
 
   describe("the whimsy pool itself", () => {
     /**
-     * The pool is only ever shown while the model is genuinely thinking, so a
-     * verb may joke about Langy's CHARACTER but must never CLAIM AN ACT.
-     * "Bribing the GPUs" is a joke. "Reading the whole file" is a false
-     * statement — and it was the one we told for 97 seconds.
+     * The pool is only ever shown while the model is genuinely thinking, so a verb may
+     * joke about Langy's CHARACTER but must never CLAIM AN ACT. "Bribing the GPUs" is a
+     * joke.
      */
     it("contains no verb that claims work Langy might not be doing", () => {
       const claims = [
@@ -309,11 +297,9 @@ describe("langyThinkingLine", () => {
   });
 
   /**
-   * The page Langy is driving holds a better truth than the turn does. While
-   * it applies an action or streams a run's cells, it knows which column and
-   * how far along, and the turn knows only that the agent is blocked on a
-   * poll. Filming the optimization loop is what made the gap plain: minutes of
-   * "Cooking…" over a page that was busy the whole time.
+   * The page Langy is driving holds a better truth than the turn does. While it applies
+   * an action or streams a run's cells, it knows which column and how far along, and
+   * the turn knows only that the agent is blocked on a poll.
    */
   describe("given the open page reports what it is doing", () => {
     const RUN = "Running Version A — 12 of 20 rows";

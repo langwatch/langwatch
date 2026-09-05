@@ -1,14 +1,7 @@
 /**
+ * Guards the horizontal-scroll fix: the IO preview content cell must NOT inherit the table shell's global
+ * sticky-first-column rule (`tbody > tr > td:first-child { position: sticky }`).
  * @vitest-environment jsdom
- *
- * Guards the horizontal-scroll fix: the IO preview content cell must NOT
- * inherit the table shell's global sticky-first-column rule
- * (`tbody > tr > td:first-child { position: sticky }`). A sticky cell keeps
- * its full width while sliding to the viewport's left edge, so on horizontal
- * scroll it slid right and painted the preview text OVER the reserved columns
- * (labels / evals / events / prompt). The cell defeats the rule with an inline
- * `position: static` so it scrolls with the body and its colSpan-bounded right
- * edge stays glued to the reserved-column boundary.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { Row } from "@tanstack/react-table";

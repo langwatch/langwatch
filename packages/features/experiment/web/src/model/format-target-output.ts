@@ -1,14 +1,5 @@
 /**
  * Shared utility for formatting target outputs for display.
- *
- * This function is used by both experiments-v3 table and batch results table
- * to ensure consistent output rendering.
- *
- * Rules:
- * - If object with exactly one key named "output" -> render the content of that key
- * - All other objects -> render as formatted JSON
- * - Primitives -> render as String(value)
- * - null/undefined -> render as ""
  */
 
 /**
@@ -26,13 +17,6 @@ const isSingleOutputKey = (output: unknown): output is { output: unknown } => {
 
 /**
  * Formats a target output value for display.
- *
- * This function handles the "single output key" unwrap rule:
- * - If the output is an object with exactly one key named "output",
- *   we display the content of that key (unwrapped).
- * - For all other cases (multiple keys, differently named keys, primitives),
- *   we display the formatted JSON or string representation.
- *
  * @param output - The raw output value (could be object, primitive, null, etc.)
  * @returns The formatted string for display
  */
@@ -71,11 +55,6 @@ export const formatTargetOutput = (output: unknown): string => {
 
 /**
  * Unwraps the output value if it's a single-key "output" object.
- * Returns the unwrapped value, or the original value if no unwrapping is needed.
- *
- * This is useful when you need the raw value (not formatted string),
- * e.g., for copy-to-clipboard operations.
- *
  * @param output - The raw output value
  * @returns The unwrapped value or original value
  */

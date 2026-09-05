@@ -1,11 +1,6 @@
 /**
+ * Which views a reviewer annotating a trace can still open.
  * @vitest-environment jsdom
- *
- * Which views a reviewer annotating a trace can still open. Usage and Terminal
- * replay an agent run rather than showing the trace's own spans, so they stay
- * unavailable, and say why, until the reviewer finishes. The Conversation is
- * where commenting on a turn happens, so it stays open.
- * See specs/traces-v2/trace-edit-mode.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

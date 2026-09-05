@@ -1,8 +1,4 @@
 /**
- * A model pick lives with its conversation. `followConversationModel` seeds
- * the picker from the durable record when a conversation's history lands, and
- * switching conversations resets the pick so it never leaks across.
- *
  * @see specs/langy/langy-model-selection.feature
  *      "Reopening a conversation restores the model it last ran on"
  *      "A new conversation starts on the resolved default again"

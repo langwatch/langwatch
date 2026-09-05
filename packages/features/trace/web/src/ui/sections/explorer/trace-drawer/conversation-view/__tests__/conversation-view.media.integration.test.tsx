@@ -1,9 +1,7 @@
 /**
+ * Media in the conversation thread: a turn's recordings, images and attachments hang off the message that carried
+ * them, split by the same side rule the trace summary strips use.
  * @vitest-environment jsdom
- *
- * Media in the conversation thread: a turn's recordings, images and
- * attachments hang off the message that carried them, split by the same side
- * rule the trace summary strips use. See specs/traces-v2/media-rendering.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

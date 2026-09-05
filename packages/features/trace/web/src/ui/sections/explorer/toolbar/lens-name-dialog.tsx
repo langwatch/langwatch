@@ -20,12 +20,9 @@ interface LensNameDialogProps {
 }
 
 /**
- * Chakra-dialog version of the "name this new lens" prompt. Used from
- * places that can't host an anchored popover (right-click menus, where
- * the menu closes before a popover gets a chance to render; and the
- * unsaved-changes prompt's Save-as-new hand-off). The Toolbar's Save
- * Lens button uses `LensNamePopover` instead so it stays attached to
- * its trigger.
+ * Chakra-dialog version of the "name this new lens" prompt. Used from places that can't
+ * host an anchored popover (right-click menus, where the menu closes before a popover
+ * gets a chance to render; and the unsaved-changes prompt's Save-as-new hand-off).
  */
 export const LensNameDialog: React.FC<LensNameDialogProps> = ({
   open,

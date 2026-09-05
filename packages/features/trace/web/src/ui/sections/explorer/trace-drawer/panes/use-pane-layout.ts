@@ -4,32 +4,9 @@ import { useDrawerStore } from "../../../../../index";
 export type DrawerLayout = "vertical" | "horizontal";
 
 /**
- * Returns "horizontal" when the drawer's content area is wider than
- * tall (typical once the operator drags the drawer wide on a laptop),
- * otherwise "vertical" — the same rule Chrome DevTools uses for its
- * Network tab "split below" vs. "split right" auto orientation.
- *
- * The decision is driven by two complementary signals:
- *
- *   1. **Store width (`widthPx`) + viewport height.** This handles the
- *      most common case — the operator drags the rail wide and wants
- *      the side-by-side layout immediately. We compare the
- *      drag-persisted width against the live viewport height (minus a
- *      conservative reservation for the drawer header chrome) so the
- *      flip happens on the same frame as the drag.
- *
- *   2. **ResizeObserver on the pane container.** Belt-and-suspenders for
- *      cases where the inline `widthPx` is `null` (i.e. the 45% default
- *      is in effect) or the viewport itself changes (window resize,
- *      DevTools opening). Measures the real rendered container.
- *
- * Either signal can flip the layout to horizontal — first one wins, no
- * hysteresis. The pane content uses `react-resizable-panels` which
- * absorbs orientation changes cleanly so live flips during a drag are
- * cheap.
- *
- * A `null` ref or SSR returns "vertical" to match the legacy stacked
- * layout.
+ * Returns "horizontal" when the drawer's content area is wider than tall (typical once the operator drags the
+ * drawer wide on a laptop), otherwise "vertical" — the same rule Chrome DevTools uses for its Network tab "split
+ * below" vs. "split right" auto orientation.
  */
 export function usePaneLayout(containerRef: RefObject<HTMLElement | null>): DrawerLayout {
   const widthPx = useDrawerStore((s) => s.widthPx);

@@ -131,10 +131,6 @@ const readMeanCI = ({
 
 /**
  * Offsets, not bounds — recharts draws the bar relative to the point.
- *
- * `clampAtZero` is for the x arm: on a skewed cost distribution the resampled
- * mean can land below the point estimate by more than the point estimate
- * itself, and a negative arm renders as a bar pointing the wrong way.
  */
 const offsetsAround = ({
   value,

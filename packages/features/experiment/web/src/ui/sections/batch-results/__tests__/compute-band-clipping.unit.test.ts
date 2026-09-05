@@ -8,13 +8,8 @@ import {
 import type { BTLeaderboardEntry } from "../../../../model/batch-evaluation-results.bt-leaderboard";
 
 /**
- * The score bars scale to the SCORES, not to the intervals, so a wide
- * interval routinely runs past both bounds and gets clamped onto the track.
- *
- * Clamping on its own understates uncertainty: a band sliced off at the edge
- * paints exactly like a band that genuinely stops there, and the reader sees
- * a tighter estimate than the run supports. These cover the detection half —
- * which edges ran over — so the fade cue cannot silently stop firing.
+ * The score bars scale to the SCORES, not to the intervals, so a wide interval
+ * routinely runs past both bounds and gets clamped onto the track.
  */
 
 const entry = (variantId: string, score: number, isDegenerate = false): BTLeaderboardEntry => ({

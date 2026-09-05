@@ -28,11 +28,9 @@ interface LensNamePopoverProps {
 }
 
 /**
- * Shared "name this new lens" popover used by every save-as-new entry
- * point (Toolbar Save Lens, the inline + new-lens button, lens tab
- * right-click → Save as new, lens draft dot → Save as new). One Chakra
- * popover everywhere replaces the legacy `window.prompt` dialogs
- * scattered across the codebase.
+ * Shared "name this new lens" popover used by every save-as-new entry point (Toolbar
+ * Save Lens, the inline + new-lens button, lens tab right-click → Save as new, lens
+ * draft dot → Save as new).
  */
 export const LensNamePopover: React.FC<LensNamePopoverProps> = ({
   defaultName = "",

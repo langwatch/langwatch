@@ -148,12 +148,9 @@ export function SpanAccordions({
     if (hasLogs) list.push("logs");
     if (hasPrompt) list.push("prompt");
     list.push("attributes");
-    // Instrumentation scope used to be a chip pinned to the right of
-    // the SpanTabBar. Operator feedback: it took up tab-row real estate
-    // for a piece of metadata most users glance at once and ignore.
-    // Folded back into the accordion stack here — collapsed by default
-    // unless the span actually reports a scope, so it's quiet when
-    // empty and reachable when needed.
+    // Instrumentation scope used to be a chip pinned to the right of the SpanTabBar.
+    // Operator feedback: it took up tab-row real estate for a piece of metadata most
+    // users glance at once and ignore.
     if (hasScope) list.push("scope");
     list.push("events");
     return list;
@@ -364,12 +361,9 @@ export function SpanAccordions({
                             ? `[redacted — visible to ${log.bodyVisibleTo}]`
                             : "[redacted]";
                         } else if (log.body && log.body !== eventName) {
-                          // Same discrimination the redaction layer applies:
-                          // claude stamps the event-name MARKER into the
-                          // top-level body, and copying that would both add a
-                          // redundant row and overwrite the real content the
-                          // raw api_*_body records carry under the `body`
-                          // attribute.
+                          // Same discrimination the redaction layer applies: claude stamps the event-name MARKER into the
+                          // top-level body, and copying that would both add a redundant row and overwrite the real content the
+                          // raw api_*_body records carry under the `body` attribute.
                           attributes.body = log.body;
                         }
                         return (

@@ -1,10 +1,6 @@
 /**
+ * What the metadata auto-pin sweep promotes onto the pinned-context strip.
  * @vitest-environment jsdom
- *
- * What the metadata auto-pin sweep promotes onto the pinned-context strip. The
- * models a trace used are already stated by the metrics row one line above, so
- * the sweep leaves those keys alone, while a key the reviewer pinned by hand is
- * still theirs. See specs/traces-v2/drawer-header-model-pins.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

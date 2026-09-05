@@ -1,13 +1,6 @@
 /**
+ * Agent-driven navigation, at the panel: a `navigate` entry on the live turn stream must move the browser through the SPA router (never a full reload), and only when the turn actually asked to navigate.
  * @vitest-environment jsdom
- *
- * Agent-driven navigation, at the panel: a `navigate` entry on the live turn
- * stream must move the browser through the SPA router (never a full
- * reload), and only when the turn actually asked to navigate. Boundary mocks
- * mirror langy-panel-ui-actions.integration.test.tsx (useChat captures the
- * real transport; `behavior/langy-api` is a hand-rolled double at the
- * network boundary) plus the host's `navigate`, which the test observes.
- *
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

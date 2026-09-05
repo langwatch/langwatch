@@ -7,19 +7,6 @@ import type { FlatRow } from "./types";
 
 /**
  * Brings the selected span's row into view.
- *
- * Selecting a span is not the same as showing it. A comment, a header chip or
- * an error pill can select a span hundreds of rows down a virtualized list, and
- * without this the reader is told the span is selected while looking at a part
- * of the tree that does not hold it. A row already fully on screen is left
- * where it is: `auto` scrolls the shortest distance that reveals it, and
- * nothing at all when there is no distance to travel.
- *
- * A row can also be folded away rather than merely off screen, under a
- * collapsed parent or inside a folded group of repeated siblings. Unfolding
- * what hides it changes `rows`, and this same effect then finds the row and
- * scrolls to it. A span the trace does not carry unfolds nothing and leaves the
- * state untouched, so there is no loop to fall into.
  */
 export function useScrollSelectedSpanIntoView({
   selectedSpanId,

@@ -1,10 +1,7 @@
 /**
- * @vitest-environment jsdom
- *
  * The search-bar tips moved out of a lightbulb popover into the single
  * keyboard-shortcuts dialog, and the dead "Find a facet" shortcut is gone.
- * See specs/traces-v2/search.feature ("Search tips live in the keyboard
- * shortcuts dialog").
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

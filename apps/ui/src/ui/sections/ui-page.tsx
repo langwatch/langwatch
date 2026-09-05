@@ -1,14 +1,7 @@
 /**
- * The wrapping order, fixed once here instead of in 38 route files: host
- * OUTERMOST (a page needs it mounted before first render even when refused),
- * guard innermost around the screen.
- *
- * There is no settings-chrome layer here any more. `NavigationShell` (mounted
- * by `apps/ui`'s chrome route for every matched page) already draws the
- * settings sidebar for any `/settings` or `/ops` address —
- * `resolveShellRoute`'s `isSettingsRoute` is a path test, not an opt-in — so a
- * second, page-level settings layout produced two sidebars nested inside one
- * another. See `specs/ui/ui-page-composition.feature`.
+ * The wrapping order, fixed once here instead of in 38 route files: host OUTERMOST (a
+ * page needs it mounted before first render even when refused), guard innermost around
+ * the screen.
  */
 
 import type { ComponentType, ReactNode } from "react";

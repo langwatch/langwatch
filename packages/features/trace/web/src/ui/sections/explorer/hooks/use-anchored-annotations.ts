@@ -22,10 +22,6 @@ const NO_ANNOTATIONS: AnnotationByTrace[] = [];
 
 /**
  * One key per part of a trace, so a comment can be found by what it is about.
- *
- * A null and an absent segment are the same thing, because a comment read back
- * from the server carries nulls where a surface pointing at the same part
- * carries nothing at all.
  */
 export function traceAnchorKey(anchor: {
   anchorKind?: string | null;
@@ -44,18 +40,8 @@ export interface AnchoredAnnotations {
 }
 
 /**
- * Every comment on the trace the drawer has open, grouped by the part of it
- * each one is about.
- *
- * Read once per surface rather than once per row: the waterfall, the attribute
- * table and the section stack each ask for the whole trace's comments and pick
- * the ones for the row they are drawing, so a trace with a hundred spans still
- * costs one read. Every caller shares the same query key, so several of them on
- * screen together share one fetch.
- *
- * A viewer holding a share link reads no comments at all: the affordance is not
- * offered there, and asking would fire an authenticated query that legitimately
- * cannot be answered.
+ * Every comment on the trace the drawer has open, grouped by the part of it each one is
+ * about.
  */
 export function useAnchoredAnnotations(): AnchoredAnnotations {
   const { project, hasPermission } = useOrganizationTeamProject();

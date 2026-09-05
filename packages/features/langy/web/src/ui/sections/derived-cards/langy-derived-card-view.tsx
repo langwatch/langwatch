@@ -1,23 +1,6 @@
 /**
- * The derived-block dispatcher — one stamped `langy-card` part in, the card
- * it validates as out (ADR-060 §3). Registry-shaped like the capability
- * card switch: a kind this switch has never heard of cannot occur (the part
- * parsed against the closed allowlist), and every body renders inside the
- * ONE derived frame — provenance is the frame's job, never a body's.
- *
- * Bodies reuse the measured kit where a widget exists: the timeseries block
- * draws through the SAME `TimeseriesPlot` the analytics card uses (the
- * chrome, not the chart, is what says derived), stats reuse the stat-card
- * figures when numeric. The table body is new — no measured card renders a
- * generic column/row table.
- *
- * Affordance hints are BOUND here, platform-side (ADR-060 §5): an `explore`
- * hint becomes a Trace Explorer link only when the existing explorer-handoff
- * seam can carry the query (otherwise it silently drops); a `verify` hint
- * becomes "Verify with a real query", which asks Langy — through the
- * ordinary send path — to run the platform computation, so the measured
- * result arrives as an ordinary measured card. The model never authors a
- * URL, an action, or a component.
+ * The derived-block dispatcher — one stamped `langy-card` part in, the card it
+ * validates as out (ADR-060 §3).
  */
 import { Box, Button, Grid, Table, Text } from "@chakra-ui/react";
 import type {
@@ -111,10 +94,8 @@ export function LangyDerivedCardView({
 }
 
 /**
- * Kind → body, one flat exhaustive dispatch (the registry idiom the
- * capability cards use). The union is closed at the schema, so a kind this
- * switch has not heard of cannot reach it — and if the allowlist ever grows,
- * the missing case is a compile error here, not a blank card.
+ * Kind → body, one flat exhaustive dispatch (the registry idiom the capability cards
+ * use).
  */
 function DerivedBlockBody({
   card,

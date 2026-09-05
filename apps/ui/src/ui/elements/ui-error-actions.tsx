@@ -1,14 +1,5 @@
 /**
  * The footer of an error toast: read the docs, copy the id to hand to support.
- *
- * `BrowserUiFeedback` puts `docsUrl` and `traceId` on the toast's `meta`; this
- * is what turns them into something a reader can use. The trace id is the ONLY
- * technical detail a customer is shown — raw `meta` and the reason chain stay
- * server-side, because they are for agents and logs (ADR-045).
- *
- * A leaner port of `platform/app`'s `ErrorActions`: the inline alert that
- * shared it there has not moved here yet, so this renders only what the toast
- * needs. When `<HandledErrorAlert>` follows, it renders this same row.
  */
 
 import { chakra, HStack, Link } from "@chakra-ui/react";

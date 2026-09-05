@@ -1,26 +1,5 @@
 /**
  * What one run was configured with, read back off the run itself.
- *
- * A run says how it scored. It must also say what it was, so a person
- * comparing run 2 with run 3 can see which setting moved the number. Every
- * part of that is already stamped on the queued run: the two simulation
- * models sit in the reserved `langwatch` namespace of the run metadata, the
- * resolved parameters sit beside it, and the repeat count is the number of
- * runs of one batch that share a scenario and a target.
- *
- * Who started the run is stamped on it the same way, in the reserved
- * `langwatch` namespace. A run started by a project key names no person and
- * reads back as none.
- *
- * A model reads back as the model the run RESOLVED, which is the plan's
- * choice, or the case's own choice, or the project default of the moment the
- * run was queued. That is the one a person needs after the fact, because the
- * project default of today is not always the model the run took. A run
- * recorded before the resolved models were stamped falls back to the value its
- * plan was configured with, and reads as nothing when the plan named none.
- *
- * The run NOTE is not here. It reads in the header line and does not move.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/scenarios/run-configuration-on-runs.feature
  */
@@ -65,20 +44,6 @@ export type RunSettings = {
 
 /**
  * The run-level parameter values of a batch.
- *
- * A person who sets a parameter in the run dialog sets it for every scenario,
- * so a run of the batch that carries values carries the ones they chose.
- * Values only differ between scenarios for defaults nobody set.
- *
- * A run carries the values its target resolved, which are the run-level
- * values with the target's own overrides on top. The overrides are taken back
- * out: they belong to the target, and the Targets row reads them beside the
- * target they belong to.
- *
- * Every run is read, not the first one that carries anything, and a name is
- * answered by the first run that did NOT override it. One target overriding
- * `plan` would otherwise drop the run-level `plan` from the block for the
- * whole batch, and which run came first would decide what the block prints.
  */
 function readParameters(scenarioRuns: ScenarioRunData[]): RunSettingParameter[] {
   const valueByName = new Map<string, string>();
@@ -110,15 +75,6 @@ function parametersOfRun(run: ScenarioRunData): RunSettingParameter[] {
 
 /**
  * The full set of values each target received, over every run of it.
- *
- * This is the merged set, the run-level values with the target's own on top,
- * which is what the agent was called with. On a comparison, it is the one
- * layer of parameters the settings read.
- *
- * Every scenario declares its own parameters, so one run of the target can
- * carry a name another does not. The names are taken together, the first
- * value seen for a name kept, so the line reads everything the target was
- * called with somewhere in the run.
  */
 function readParametersByTarget(
   scenarioRuns: ScenarioRunData[],
@@ -147,13 +103,6 @@ function readParametersByTarget(
 
 /**
  * How many times the batch ran each scenario against each target.
- *
- * The largest group answers for the batch: a scenario that was cancelled
- * before its later iterations started would otherwise pull the count under
- * what the run was started with.
- *
- * A target is its key, so the same agent on two sets of parameters is two
- * targets and a scenario that ran once against each is not a repeat.
  */
 function readRepeatCount(scenarioRuns: ScenarioRunData[]): number {
   const counts = new Map<string, number>();
@@ -167,10 +116,6 @@ function readRepeatCount(scenarioRuns: ScenarioRunData[]): number {
 
 /**
  * The model the batch ran on: the first run that names one.
- *
- * The resolved model answers first, because it is the model that really ran.
- * The configured model answers for a run recorded before resolved models were
- * stamped, and such a run names one only when its plan did.
  */
 function readModel(
   scenarioRuns: ScenarioRunData[],
@@ -193,10 +138,6 @@ function readModel(
 
 /**
  * Who started the batch: the first run that names a person.
- *
- * Every run of a batch is stamped with the same actor at queue time, so the
- * first one to carry it answers for the batch.
- *
  * @see specs/scenarios/run-actor-on-runs.feature
  */
 function readActor(scenarioRuns: ScenarioRunData[]): RunActor | null {
@@ -210,18 +151,6 @@ function readActor(scenarioRuns: ScenarioRunData[]): RunActor | null {
 
 /**
  * What the settings row calls the person who started the run.
- *
- * The two key surfaces name themselves. A run the reader started reads as
- * "You", which is how the rest of the product names them. Any other person
- * reads by the name their organization membership holds, because on a shared
- * project most runs were started by somebody else and a blank row would hide
- * the answer exactly when it is wanted.
- *
- * The name is resolved for display only. The run stores the id, so a run from
- * last month still points at the right person after a rename.
- *
- * An id no membership holds reads as nothing at all. A name is never made up
- * from an id, and the row never carries a placeholder.
  */
 export function runActorName({
   actor,
@@ -242,14 +171,6 @@ export function runActorName({
 
 /**
  * The connected agent instance that answered each target's runs (ADR-128).
- *
- * Stamped on the run by the platform when a connected agent served it. It is
- * read off the reserved namespace defensively rather than through the parsed
- * shape, so a run recorded before the field existed simply names none.
- *
- * The first run of a target answers for it: production with ten pods can
- * spread one batch over several of them, and naming the first is what tells
- * a reader which machine to look at.
  */
 function readInstanceByTarget(scenarioRuns: ScenarioRunData[]): Map<string, string> {
   const byTarget = new Map<string, string>();

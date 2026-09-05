@@ -42,12 +42,7 @@ describe("TraceMessage", () => {
     describe("when the trace query returns a 404", () => {
       /** @scenario A prompt with a running conversation re-opens without crashing */
       it("renders nothing instead of throwing", () => {
-        // A "View Trace" link is attached to each assistant turn. When that
-        // turn's trace cannot be fetched (it was never written, or expired),
-        // the link must degrade to an empty render, never throw to the page
-        // error boundary, so re-opening a prompt with an old conversation does
-        // not crash the playground. TraceMessage returns null while loading, on
-        // error, or with no data; here the query is in the 404 error state.
+        // A "View Trace" link is attached to each assistant turn.
         useGetByIdQueryMock.mockReturnValue({
           isLoading: false,
           isError: true,

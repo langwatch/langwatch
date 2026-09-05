@@ -24,13 +24,8 @@ interface VirtualizerResult {
 }
 
 /**
- * Shared virtualizer for the trace lens bodies. Each "item" is one row's
- * outer <tbody>; spacers are emitted by the lens body.
- *
- * Subscribes to the scroll-element store rather than reading a RefObject so
- * the virtualizer re-renders when the element attaches; otherwise the first
- * `getScrollElement()` call returns `null` and the virtualizer never
- * recovers, leaving the table body empty on initial load.
+ * Shared virtualizer for the trace lens bodies. Each "item" is one row's outer <tbody>;
+ * spacers are emitted by the lens body.
  */
 export function useTraceTableVirtualizer({
   count,

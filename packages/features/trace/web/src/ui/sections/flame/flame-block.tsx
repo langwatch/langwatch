@@ -66,14 +66,9 @@ export function FlameBlock({
   if (widthPct < 0.05 && totalSpanCount > 200) return null;
 
   const color = getSpanColor(span.type);
-  // `gray.solid` is too low-saturation for the white-on-fill recipe
-  // every other palette uses — at 85% alpha on a white canvas the
-  // result is a pale grey that white text dissolves into (operator
-  // report: "can't read the letters" on Scenario Turn / module /
-  // execute_event_loop_cycle bars). Dark mode is fine because the
-  // canvas is already dark. So flip text to `fg` only for grey
-  // palettes in light mode; everything else stays the saturated
-  // white-on-colour treatment.
+  // `gray.solid` is too low-saturation for the white-on-fill recipe every other palette uses — at 85% alpha on a
+  // white canvas the result is a pale grey that white text dissolves into (operator report: "can't read the
+  // letters" on Scenario Turn / module / execute_event_loop_cycle bars).
   const isLowContrastPalette = color === "gray.solid";
   // Sub-label-width blocks render calmer: softer fill, no border noise,
   // a 1px right gap and pill ends so a dense strip of adjacent tiny spans
@@ -104,12 +99,8 @@ export function FlameBlock({
               ? depthAlpha * TINY_BLOCK_ALPHA_FACTOR
               : depthAlpha) * 100,
   );
-  // Light mode runs on a much stronger floor: alpha-tinted `.solid`
-  // tokens against a white surface produce pale fills that white text
-  // disappears into. Pin every state to a "saturated, readable" floor
-  // and let the hover/select/dim states still nudge the alpha around
-  // without ever landing in unreadable-text territory. White text is
-  // legible against this whole band.
+  // Light mode runs on a much stronger floor: alpha-tinted `.solid` tokens against a
+  // white surface produce pale fills that white text disappears into.
   const lightBgAlphaPct = isEmphasized
     ? 100
     : isDimmed
@@ -217,12 +208,8 @@ export function FlameBlock({
         <Text
           textStyle="xs"
           // White text in both modes for the saturated palettes
-          // (blue/green/purple/teal/orange/pink/cyan) — `lightBgAlphaPct`
-          // keeps the fill saturated enough that white reads cleanly.
-          // Grey-palette spans (span/module) get `fg` in light mode
-          // instead because grey.solid at 85% alpha is too pale for
-          // white text — dark mode stays white because the canvas
-          // already pushes the fill into a dark band.
+          // (blue/green/purple/teal/orange/pink/cyan) — `lightBgAlphaPct` keeps the
+          // fill saturated enough that white reads cleanly.
           color={isLowContrastPalette ? { base: "fg", _dark: "white" } : "white"}
           truncate
           lineHeight={1}

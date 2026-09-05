@@ -1,12 +1,7 @@
 /**
+ * Links inside the Langy panel, clicked for real: the panel root's guard, the dialog it opens, and the answer's
+ * own markdown links rendered exactly as the panel renders them.
  * @vitest-environment jsdom
- *
- * Links inside the Langy panel, clicked for real: the panel root's guard, the
- * dialog it opens, and the answer's own markdown links rendered exactly as the
- * panel renders them.
- *
- * The links here are written the way an agent writes them, including the ones
- * whose words say LangWatch and whose address does not.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -338,10 +333,8 @@ describe("given a link that is not a place to go", () => {
 });
 
 /**
- * The panel's own chrome beside an answer linking to the very same address:
- * the codex sign-in's "Open openai.com" button, in miniature. The chrome link
- * carries the first-party marker a LangWatch component spells out; the answer
- * cannot (the markdown pipeline emits no data attributes on anchors).
+ * The panel's own chrome beside an answer linking to the very same address: the codex
+ * sign-in's "Open openai.com" button, in miniature.
  */
 function ChromeAndAnswerHarness() {
   const guard = useLangyExternalLinkGuard();

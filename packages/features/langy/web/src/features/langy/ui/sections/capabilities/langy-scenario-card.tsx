@@ -1,9 +1,6 @@
 /**
  * Scenario capability card (`platform_*_scenario(s)`, `platform_*_suite(s)`,
  * `platform_*_simulation_run(s)` reads).
- *
- * Renders a scenario / simulation result — its verdict or status plus a short
- * summary — and links into Simulations. Read-only.
  */
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
 import { extractPlatformUrl } from "@langwatch/langy-contract";

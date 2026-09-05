@@ -1,13 +1,6 @@
 /**
  * @vitest-environment jsdom
  * @vitest-environment-options { "url": "https://app.langwatch.ai/" }
- *
- * The run card's "Open in Simulations" link used to always point at the
- * simulations INDEX page, whatever run the card was actually showing — a
- * rebuilt href cannot address one run at all. This locks that the card
- * prefers the platform's own `platformUrl` (from the CLI result) — the run's
- * `scenarioRunDetail` drawer link — and rides the SPA router when it does.
- *
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

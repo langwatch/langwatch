@@ -24,12 +24,9 @@ type DatasetTabsProps = {
 };
 
 /**
- * Dataset tabs component for switching between multiple datasets.
- * - Clicking a tab switches to that dataset
- * - Dropdown menu only appears on the active/selected tab, offering
- *   Switch Dataset (the picker), Save as dataset (inline only) and
- *   Remove from workbench
- * - Shows "Datasets" label with database icon
+ * Dataset tabs component for switching between multiple datasets. - Clicking a tab switches to that dataset -
+ * Dropdown menu only appears on the active/selected tab, offering Switch Dataset (the picker), Save as dataset
+ * (inline only) and Remove from workbench - Shows "Datasets" label with database icon
  */
 export function DatasetTabs({
   onSelectExisting,

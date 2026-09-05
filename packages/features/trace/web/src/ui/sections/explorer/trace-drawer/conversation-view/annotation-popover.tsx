@@ -23,10 +23,9 @@ interface AnnotationPopoverProps extends PopoverAnnotationFormInput {
 }
 
 /**
- * Both annotate and suggest live in popovers anchored to the trigger.
- * Suggest is wider and uses a fixed-height layout so the popover doesn't
- * resize as the user types — the diff panel scrolls internally rather than
- * pushing the textarea around.
+ * Both annotate and suggest live in popovers anchored to the trigger. Suggest is wider
+ * and uses a fixed-height layout so the popover doesn't resize as the user types — the
+ * diff panel scrolls internally rather than pushing the textarea around.
  */
 export function AnnotationPopover(props: AnnotationPopoverProps) {
   const formState = usePopoverAnnotationForm(props);
@@ -62,12 +61,8 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
       )}
       <Popover.Content
         width={isSuggest ? "560px" : "380px"}
-        // The popover caps itself at `--available-height`, the room the
-        // positioner measured on the side it settled on. Capping at the
-        // viewport height instead replaced that measurement with a number that
-        // never binds, so the form kept its natural height and hung off the
-        // bottom of a short window with Save below the fold. Keep both: the
-        // measured room, and 640px so a tall window does not get a tall form.
+        // The popover caps itself at `--available-height`, the room the positioner
+        // measured on the side it settled on.
         maxHeight="min(640px, var(--available-height, 100vh))"
         overflow="hidden"
         onClick={(e) => e.stopPropagation()}

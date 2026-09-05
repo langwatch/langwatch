@@ -4,13 +4,6 @@ import { useTraceEditOverlay } from "./use-trace-edit-overlay";
 
 /**
  * Keeps an editing session honest for as long as it is open:
- *
- *   - the stored correction becomes the session's baseline once the read for
- *     it lands, so correcting a trace twice adds to the first correction
- *     rather than replacing it,
- *   - leaving the page with unsaved work asks first.
- *
- * Mounted by the drawer body, which is the only place edit mode exists.
  */
 export function useTraceEditSession(traceId: string | undefined): void {
   const isEditing = useDrawerStore((s) => s.isEditing);

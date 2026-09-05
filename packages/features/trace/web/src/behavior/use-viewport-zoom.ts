@@ -59,10 +59,9 @@ interface ViewportZoomReturn {
 }
 
 /**
- * State + handlers for the pannable / pinch-zoomable SVG canvas. Owns the
- * `view` (translate + zoom), viewport + svg size tracking, fit-to-screen
- * computation, animated transitions, wheel pinch/pan, drag-to-pan, and the
- * minimap rectangle math.
+ * State + handlers for the pannable / pinch-zoomable SVG canvas. Owns the `view`
+ * (translate + zoom), viewport + svg size tracking, fit-to-screen computation, animated
+ * transitions, wheel pinch/pan, drag-to-pan, and the minimap rectangle math.
  */
 export function useViewportZoom(): ViewportZoomReturn {
   const [view, setView] = useState<View>(IDENTITY);

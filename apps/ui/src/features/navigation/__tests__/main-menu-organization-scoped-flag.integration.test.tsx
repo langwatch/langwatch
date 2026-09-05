@@ -1,17 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The Agent Testing release flag is off by default and carries one rule that
- * names an organization. The flag read the shell makes must state the
- * organization it reads for, or the rule matches nothing and the rollout
- * reaches no one.
- *
- * The matcher is NOT stubbed: the fake transport runs the real rule matcher
- * over the input the read sends, so a read that drops a scope fails this test
- * the way it failed in production.
- *
- * MOVED from `platform/app/src/components/__tests__/MainMenu.orgScopedFlag.integration.test.tsx`.
- *
  * @see specs/features/agent-testing/page-structure.feature
  * @see specs/ops/internal-feature-flags.feature
  */

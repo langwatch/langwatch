@@ -1,13 +1,6 @@
 /**
+ * The fold moves with LANGY'S BEHAVIOUR, never the cursor — and its motion is a quiet status channel, not a spectacle.
  * @vitest-environment node
- *
- * The fold moves with LANGY'S BEHAVIOUR, never the cursor — and its motion is
- * a quiet status channel, not a spectacle. These tests pin the vocabulary
- * (which state produces which motion character), the truth of the derivation
- * (it reads the same wire signals as the thinking line, so it can't perform
- * work that isn't happening), and the no-pop guarantee (one smoothed vector,
- * rising fast enough to be legible, falling slowly enough to ease out).
- *
  * Spec: specs/langy/langy-panel-fold-motion.feature
  */
 import { describe, expect, it } from "vitest";

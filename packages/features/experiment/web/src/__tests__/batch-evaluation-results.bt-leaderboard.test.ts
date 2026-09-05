@@ -178,18 +178,6 @@ describe("computeBTLeaderboard", () => {
 
   describe("when the resample count changes", () => {
     // Guards the wiring between `bootstrapSamples` and the resample loop.
-    //
-    // The determinism test above cannot: it compares two runs configured
-    // identically, so it passes just as happily if `samples` and `seed` are
-    // crossed on the way in — both runs are then wrong in the same way. That
-    // is not hypothetical; those two arguments were adjacent numbers, and
-    // swapping them silently reduces 200 resamples to 1 while still
-    // rendering a plausible-looking interval.
-    //
-    // Sample count leaves a signature a seed cannot fake: `quantile` over a
-    // one-element array returns that element for every q, so a single
-    // resample collapses the interval to a point, while many resamples must
-    // spread it. Asserting on that shape pins which argument is which.
     const data: PairwiseComparison[] = [...wins("A", ["B"], 8), ...wins("B", ["A"], 4)];
 
     it("collapses the interval to a point for a single resample", () => {
@@ -260,12 +248,6 @@ describe("computeBTLeaderboard", () => {
       bootstrapSamples: 0,
     });
     // Z dropped → only the A>B row contributes, and the count says so.
-    //
-    // This used to assert 2, on the grounds that both rows passed the
-    // `winner !== null` filter and the real drop happened later inside
-    // buildWinMatrix. But comparisonCount is what the UI narrates as "based
-    // on N comparisons" and what it actually ranked on, so counting a row that
-    // contributed no evidence overstated the run to the reader.
     expect(result.comparisonCount).toBe(1);
     expect(result.winMatrix.A!.B).toBe(1);
     const aEntry = result.entries.find((e) => e.variantId === "A")!;

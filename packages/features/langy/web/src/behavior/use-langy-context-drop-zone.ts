@@ -8,16 +8,6 @@ import {
 
 /**
  * Makes the panel a place you can drop things on.
- *
- * The click is the fast path; the drag is the obvious one. "Drag it onto the
- * assistant" is a gesture nobody has to be taught, and it also answers the
- * question the click can't — where does the thing GO? — by making the
- * destination something you aim at.
- *
- * It accepts only Langy's own payload type. Files, links and selected text
- * dragged onto the panel are left alone (no `preventDefault`), so the browser
- * keeps whatever behaviour it would otherwise have and the panel never
- * swallows a drag it has no idea what to do with.
  */
 export function useLangyContextDropZone(): {
   /** A target is hovering over the panel right now — worth showing. */

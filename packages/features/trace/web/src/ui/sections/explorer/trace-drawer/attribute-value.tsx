@@ -65,12 +65,8 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
   }
 
   return (
-    // The trigger is the whole row — left-aligned preview + format
-    // glyph + size hint + chevron. Hovering tints the row so the
-    // affordance reads as a clickable card rather than as a button
-    // glued to a sibling pill (the previous design's "[CHAT pill] +
-    // [button]" layout had two visually distinct halves and didn't
-    // make it obvious you could click anywhere on the row to expand).
+    // The trigger is the whole row — left-aligned preview + format glyph + size hint +
+    // chevron.
     <Popover.Root positioning={{ placement: "right-start" }} lazyMount unmountOnExit>
       <Popover.Trigger asChild>
         <chakra.button
@@ -161,12 +157,9 @@ const FORMAT_VISUALS: Record<
 };
 
 /**
- * Format indicator — small tinted icon at the leading edge of the
- * trigger / popover header. Replaces the previous "PILL with text"
- * treatment which doubled up on the format toggle inside the popover
- * and ate horizontal room in narrow drawer columns. The icon alone
- * is enough to telegraph chat / json / text at a glance; the toggle
- * still spells the word out for users who'd rather read it.
+ * Format indicator — small tinted icon at the leading edge of the trigger / popover
+ * header. Replaces the previous "PILL with text" treatment which doubled up on the
+ * format toggle inside the popover and ate horizontal room in narrow drawer columns.
  */
 function FormatGlyph({ format }: { format: Exclude<AttributeFormat, "leaf"> }) {
   const v = FORMAT_VISUALS[format];

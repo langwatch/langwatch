@@ -83,11 +83,7 @@ export const NORMAL_CASE_FIELDS = new Set([
 ]);
 
 /**
- * Status keeps a fixed traffic-light mapping. Origin derives its dot
- * colours from the shared `ORIGIN_DISPLAY` table — the same one the
- * Origin column badge consumes — so "evaluation" is always green,
- * "application" always blue, in both the sidebar and the table.
- * Span Type still hashes — the value set is open-ended.
+ * Status keeps a fixed traffic-light mapping.
  */
 export const FACET_COLORS: Record<string, Record<string, Tokens["colors"]>> = {
   status: STATUS_COLORS,
@@ -133,10 +129,8 @@ export const FACET_DEFAULTS: Record<string, string[]> = {
 };
 
 /**
- * Range keys that should appear in the sidebar immediately — even before
- * discover responds — as synthetic placeholder sections. Rendered with
- * a disabled state (min === max === 0, flagged synthetic) so users can
- * see the affordance without being able to interact with a zero-span range.
+ * Range keys that should appear in the sidebar immediately — even before discover
+ * responds — as synthetic placeholder sections.
  */
 export const RANGE_DEFAULTS: readonly string[] = ["duration", "cost", "tokens"];
 
@@ -193,10 +187,9 @@ export const FACET_ICONS: Record<string, LucideIcon> = {
 };
 
 /**
- * Icons for the popover's group headers. The sidebar itself no longer
- * renders group headings (the section list is flat); these icons are
- * for the FacetManagerPopover which still groups facets by AI-
- * observability axis.
+ * Icons for the popover's group headers. The sidebar itself no longer renders group
+ * headings (the section list is flat); these icons are for the FacetManagerPopover
+ * which still groups facets by AI- observability axis.
  */
 export const GROUP_ICONS: Record<string, LucideIcon> = {
   traces: Compass,
@@ -232,15 +225,9 @@ export interface FacetGroupDef {
 }
 
 /**
- * Finer-grained facet sub-groups, surfaced through three task-oriented
- * "perspectives" (see {@link FACET_PERSPECTIVES}). Every facet belongs to
- * exactly one sub-group; a perspective only reorders the sub-groups so the
- * ones relevant to that task lead. The array order here is the default
- * (Observability) perspective.
- *
- * The sidebar itself stays a flat, drag-reorderable column — these headings
- * are the FacetManagerPopover's "browse what's available" structure and the
- * unit by which a perspective reorders the sidebar.
+ * Finer-grained facet sub-groups, surfaced through three task-oriented "perspectives"
+ * (see {@link FACET_PERSPECTIVES}). Every facet belongs to exactly one sub-group; a
+ * perspective only reorders the sub-groups so the ones relevant to that task lead.
  */
 export const FACET_GROUPS: FacetGroupDef[] = [
   // "What kind of trace is this?" — origin / shape / human-readable name,
@@ -356,14 +343,9 @@ export function getFacetGroupId(key: string): FacetGroupDef["id"] | undefined {
 }
 
 /**
- * Facet perspectives — three task-oriented views over the *same* full facet
- * set. A perspective never hides a facet; it only reorders the sub-groups
- * (and therefore the sidebar) so the ones relevant to that task lead. The
- * facet manager exposes a switcher; selecting one stamps the perspective's
- * order into the facet lens (see `facetLensStore.selectPerspective`).
- *
- * Named "perspectives", deliberately NOT "lenses" — the toolbar already owns
- * "lens" for trace-list sort/filter presets (a separate control).
+ * Facet perspectives — three task-oriented views over the *same* full facet set. A
+ * perspective never hides a facet; it only reorders the sub-groups (and therefore the
+ * sidebar) so the ones relevant to that task lead.
  */
 export type FacetPerspectiveId = "observability" | "llm" | "cost-performance";
 
@@ -475,20 +457,7 @@ export function sectionOrderForPerspective(id: FacetPerspectiveId): string[] {
 }
 
 /**
- * Maps a facet field key to its `has:`/`none:` toggle value. A field
- * listed here grows a pinned "(none)" row at the bottom of the section
- * that adds `NOT none:<value>` (i.e. "show only traces where this is
- * present") on first click and `none:<value>` ("show only traces
- * where this is absent") on second click — the toggle cycles
- * present → absent → cleared.
- *
- * Coverage criteria: any field where "is this set or not" is itself a
- * useful filter, not just "what value does it have". errorMessage is
- * the canonical case — users care about "any error" / "no error"
- * almost as often as they care about a specific error string.
- * Annotation / scenarioRun / selectedPrompt / lastUsedPrompt /
- * promptVersion / evaluatorVerdict / evaluatorScore all have the same
- * present/absent shape that's worth surfacing as a one-click filter.
+ * Maps a facet field key to its `has:`/`none:` toggle value.
  */
 export const NONE_TOGGLE_VALUE: Record<string, string> = {
   user: "user",
@@ -523,23 +492,16 @@ export const NONE_TOGGLE_VALUE: Record<string, string> = {
  */
 export const MAX_VISIBLE_FACETS = 5;
 /**
- * Cap for the "show more" expansion. The backend `discover` query
- * returns up to TOP_N=50 facet values per section; mirroring that
- * here lets the user see EVERY value the backend returned without
- * having to fall back to the always-on search input. If the section
- * has more than 50 distinct values they don't surface in the top
- * response at all — only via the type-and-Enter search path.
+ * Cap for the "show more" expansion. The backend `discover` query returns up to
+ * TOP_N=50 facet values per section; mirroring that here lets the user see EVERY value
+ * the backend returned without having to fall back to the always-on search input.
  */
 export const MAX_EXPANDED_FACETS = 50;
 /** Sections with at most this many values get auto-expanded. */
 export const AUTO_EXPAND_THRESHOLD = 5;
 
 /**
- * Attribute sections (Trace / Span / Event attributes, Metadata) can
- * discover 30+ keys. We render only the top-N (already sorted by count
- * desc) with a quiet "Show N more" expander for the rest, so a high-
- * cardinality attribute map doesn't balloon the sidebar. The key filter
- * still searches the FULL set; the cap only applies to the unfiltered list.
+ * Attribute sections (Trace / Span / Event attributes, Metadata) can discover 30+ keys.
  */
 export const MAX_VISIBLE_ATTRIBUTE_KEYS = 10;
 
@@ -551,16 +513,9 @@ export const MAX_VISIBLE_ATTRIBUTE_KEYS = 10;
 export const DISCRETE_MODE_MAX_VALUES = 30;
 
 /**
- * The "easy mode" set of facet keys shown by default in **comfortable**
- * density. Curated to the handful of cross-cutting filters that almost
- * every workflow needs — status, origin, model, who, when, how much.
- * Anything outside this set still appears in **compact** density (which
- * preserves the historical "show me all 40+ facets" engineering view)
- * and can be added back individually via the per-user "+ Add facet"
- * menu when on comfortable.
- *
- * Density change ↔ sidebar coupling: see `useFilterSidebarData` for the
- * runtime filter that consumes this set.
+ * The "easy mode" set of facet keys shown by default in **comfortable** density.
+ * Curated to the handful of cross-cutting filters that almost every workflow needs —
+ * status, origin, model, who, when, how much.
  */
 export const COMFORTABLE_DEFAULT_SECTIONS: ReadonlySet<string> = new Set([
   "origin",

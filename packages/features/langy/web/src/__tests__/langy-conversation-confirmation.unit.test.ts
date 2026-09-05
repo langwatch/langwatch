@@ -2,10 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useLangyStore } from "../behavior/langy.store";
 
 /**
- * A conversation this tab just minted may not be readable yet: the create
- * command is accepted before the read-side projection lands, so the history
- * read's not-found must present as pending until a durable confirmation
- * arrives. The store tracks exactly that window.
+ * A conversation this tab just minted may not be readable yet: the create command is
+ * accepted before the read-side projection lands, so the history read's not-found must
+ * present as pending until a durable confirmation arrives.
  */
 describe("langyStore conversation confirmation", () => {
   beforeEach(() => {

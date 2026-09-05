@@ -1,7 +1,6 @@
 /**
- * The page beside the runs rail: what the selected run is called, how to read
- * it, and the results themselves.
- *
+ * The page beside the runs rail: what the selected run is called, how to read it, and
+ * the results themselves.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

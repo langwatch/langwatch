@@ -2,26 +2,6 @@ import { useCallback, useEffect, useRef } from "react";
 
 /**
  * The closed-state Langy orb's proximity micro-interaction.
- *
- * As the cursor approaches the orb (within `PROXIMITY_RADIUS` of its edge) two
- * things bloom, both scaled by how close the cursor is and eased every frame so
- * nothing pops:
- *
- *   • a soft warm GLOW leans OUT of the orb toward the cursor — light reaching
- *     for the pointer;
- *   • the orb itself DEFORMS toward the cursor — a small translate plus a
- *     directional stretch (elongated along the cursor axis), so it reads as
- *     liquid glass being drawn, not a rigid button nudging.
- *
- * This is the ONE place a Langy surface reacts to the pointer, and deliberately
- * so: it is a hover affordance on an interactive target (you are aiming AT it),
- * not ambient chrome reacting to unrelated movement — the mistake the fold's
- * old cursor physics made. It is imperative (refs + a rAF that self-parks when
- * settled) so a moving pointer never triggers React renders, and it is disabled
- * wholesale under reduced motion.
- *
- * Returns the refs to attach: `orbRef` on the orb button, `glowRef` on the glow
- * layer inside it.
  */
 
 /** How far BEYOND the orb's own radius the cursor still pulls at it, in px. */

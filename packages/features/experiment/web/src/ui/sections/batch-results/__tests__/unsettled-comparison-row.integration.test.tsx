@@ -2,20 +2,8 @@ import "@testing-library/jest-dom/vitest";
 
 // @vitest-environment jsdom
 /**
- * The row the judge ran and could not settle, end to end across every surface
- * that reads a verdict.
- *
- * Such a row is the most expensive kind in a run: swap-and-reconcile pays for
- * two judge calls and then keeps neither answer. The judge writes 1,300 to
- * 1,500 characters explaining the disagreement, we store it, and the page used
- * to answer with a bare dash, which reads as missing data rather than as a
- * finding. The first question a dogfooded screenshot drew was whether those
- * rows had failed to load.
- *
- * The other half of the behaviour is what an unsettled row must NOT become. It
- * shares `winnerId === null` with a tie, and four separate surfaces used to
- * read that as one thing, so the tests below pin each of them: counting these
- * rows as ties would hand the chart and the ranking a result nobody produced.
+ * The row the judge ran and could not settle, end to end across every surface that
+ * reads a verdict.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

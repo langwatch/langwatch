@@ -1,11 +1,6 @@
 /**
+ * The drawer back stack, driven through the real hook and the real `qs` serialization.
  * @vitest-environment jsdom
- *
- * The drawer back stack, driven through the real hook and the real `qs`
- * serialization. Only the router is harnessed, and it is a faithful one: every
- * push and replace lands in the address bar, so what the next call reads is
- * what the browser would have shown it.
- * See specs/traces-v2/drawer-stacking.feature.
  */
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

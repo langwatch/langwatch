@@ -1,8 +1,6 @@
 /**
- * Anything under /simulations that is not a known shape is read as an external
- * SET slug, so a near-miss URL renders an empty run history instead of the page
- * the user meant. These pin the redirects that catch the near-misses.
- *
+ * Anything under /simulations that is not a known shape is read as an external SET slug, so a near-miss URL
+ * renders an empty run history instead of the page the user meant.
  * @see specs/langy/langy-capability-cards.feature
  */
 import { describe, expect, it } from "vitest";

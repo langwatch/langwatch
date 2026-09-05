@@ -7,12 +7,6 @@ import { getCurrentFilterText } from "../../../../index";
 
 /**
  * Filtered traces → automation entry point (ADR-043).
- *
- * Turns the current Traces-V2 search query into a new trace-subject
- * automation: opens the automation drawer pre-seeded with the applied
- * filter as its Subject (`initialFilterQuery`). The drawer persists the
- * query on `Trigger.filterQuery`, and the dispatcher matches it in-memory
- * against every settling trace — no per-trace ClickHouse round-trip.
  */
 export const AutomateButton: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const { hasPermission } = useOrganizationTeamProject();

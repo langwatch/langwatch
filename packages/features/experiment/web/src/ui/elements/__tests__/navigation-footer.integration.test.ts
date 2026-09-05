@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for useMessagesNavigationFooter hook.
- *
- * Regression test for issue #2129: pagination controls not working because
- * buildPaginationQuery stripped the `project` dynamic route segment from
- * the query, causing router.push to fail to resolve the [project] pathname.
- *
+ * @vitest-environment jsdom
  * @see specs/traces/pagination-controls.feature
  */
 import { act, renderHook } from "@testing-library/react";

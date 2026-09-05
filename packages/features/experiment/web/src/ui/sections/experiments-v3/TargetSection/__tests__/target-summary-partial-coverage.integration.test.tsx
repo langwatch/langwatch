@@ -1,10 +1,6 @@
 // @vitest-environment jsdom
 /**
- * A stopped run's column can have results for only part of the dataset. The
- * score alone would read as the column's final answer, so the coverage
- * count has to ride along beside it whenever the run stopped short — and
- * has to disappear once the run actually covered every row, so a complete
- * column isn't second-guessed by a count nobody asked for.
+ * A stopped run's column can have results for only part of the dataset.
  */
 import "@testing-library/jest-dom/vitest";
 

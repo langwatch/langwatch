@@ -1,9 +1,7 @@
 /**
- * Bradley-Terry scores are comparable only inside a strongly connected win
- * graph (Ford 1957; Hunter 2004 §4). Per-variant wins and losses are not
- * enough: tiered or disconnected fields make between-group magnitudes
- * unidentifiable. We therefore expose components and only retain a direction
- * where one component actually beat another.
+ * Bradley-Terry scores are comparable only inside a strongly connected win graph (Ford
+ * 1957; Hunter 2004 §4). Per-variant wins and losses are not enough: tiered or
+ * disconnected fields make between-group magnitudes unidentifiable.
  */
 
 import type { WinMatrix } from "./batch-evaluation-results.bt-leaderboard";
@@ -39,11 +37,6 @@ export const groupIndexOf = (comparability: Comparability): Record<string, numbe
 
 /**
  * Whether the run is entitled to compare these two variants at all.
- *
- * Same group — yes, the usual interval test applies. Different groups where
- * one dominates — the direction is certain but the score gap is fictional,
- * so a caller must not quote it. Different groups with no path — nothing is
- * known, and treating the scores as ordered would be inventing a result.
  */
 export const comparabilityOf = ({
   comparability,
@@ -66,14 +59,6 @@ export const comparabilityOf = ({
 
 /**
  * Whether the fit POSITIVELY establishes that these two never met.
- *
- * The distinction from `comparabilityOf` is the absent-evidence case. That
- * function answers "incomparable" both for a pair it knows never met and for
- * a variant it has never heard of — right for its own question, wrong as a
- * veto, since a leaderboard whose graph was never decomposed (no groups at
- * all) would then have every pair vetoed. Callers that suppress a claim on
- * the strength of a break need the narrower question, and they need to ask it
- * the same way, so it is asked once here.
  */
 export const isIncomparable = ({
   comparability,
@@ -90,11 +75,6 @@ export const isIncomparable = ({
 
 /**
  * The win digraph as adjacency lists over variant indices.
- *
- * An edge a -> b exists when a beat b at least once. Ties count: a 0.5/0.5
- * row puts weight in both directions, which is exactly right — a tie is
- * evidence that connects the two variants, and it is what makes an otherwise
- * split field identifiable.
  */
 const buildAdjacency = ({
   winMatrix,
@@ -115,13 +95,8 @@ const buildAdjacency = ({
 };
 
 /**
- * Tarjan's bookkeeping. It is one algorithm split across the four functions
- * below only so each stays readable; they are not independently useful.
- *
- * `work` is the explicit call stack — (node, next-neighbour-to-visit) — which
- * is what makes the traversal iterative. A pathological field is still only a
- * few hundred variants, but a stack overflow inside a results page is a bad
- * way to find that out.
+ * Tarjan's bookkeeping. It is one algorithm split across the four functions below only
+ * so each stays readable; they are not independently useful.
  */
 type Tarjan = {
   adjacency: number[][];

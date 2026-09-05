@@ -42,11 +42,6 @@ export interface ScenarioTabFollowState {
 
 /**
  * Makes the current simulations tab the one the SDK reuses.
- *
- * The SDK stamps `?scenarioTab=<key>` on the tab it opens; that key is lifted
- * into session storage and scrubbed from the address bar so a copied link never
- * carries another machine's key. Callers feed the returned ids into the
- * simulation SSE subscription, which is what actually registers the tab.
  */
 export function useScenarioTabFollow(): ScenarioTabFollowState {
   const router = useRouter();

@@ -1,6 +1,5 @@
 /**
  * What one saved version of a scenario says about itself.
- *
  * @see specs/features/agent-testing/case-version-history.feature
  * @see specs/scenarios/scenario-versioning.feature
  */
@@ -27,10 +26,6 @@ export function authorOf(entry: VersionEntry): string | null {
 
 /**
  * What one entry says changed.
- *
- * A version that carries its own description says that: a restore writes the
- * old content forward, so its field list reads like an ordinary edit and
- * would not say where the content came from.
  */
 export function changeLineOf(entry: VersionEntry): string {
   if (entry.changeDescription) return entry.changeDescription;

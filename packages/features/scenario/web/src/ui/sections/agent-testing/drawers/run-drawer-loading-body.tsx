@@ -1,12 +1,6 @@
 /**
- * The skeleton the run drawer reads while the tRPC query for the run record is
- * still on its way.
- *
- * The queued state is a real scenario status; showing it before the record has
- * been fetched would tell the reader "the run is waiting to start" when the
- * truth is only that the app has not read the record yet. This skeleton stands
- * in for that moment: chat bubbles on the left, results column on the right.
- *
+ * The skeleton the run drawer reads while the tRPC query for the run record is still on
+ * its way.
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 

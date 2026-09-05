@@ -9,31 +9,6 @@ import {
 
 /**
  * Langy error explainer (ADR-045).
- *
- * The platform serializes handled `HandledError`s to `{ code, kind, meta,
- * httpStatus, traceId, spanId, reasons }` — over tRPC as `error.data.error`, and (new in
- * this PR) over the chat stream as a JSON-encoded string in the error part.
- * This module turns either into a keyed presentation the UI renders:
- *
- *   - `card`     — a titled, actionable explanation (the default for handled).
- *   - `inline`   — a compact one-liner beside the failed message.
- *   - `suppress` — NOT an error at all: not-connected / no-data conditions
- *                  render the connect card / empty state instead of red.
- *
- * The WORDS are not decided here. Every title and description comes from the
- * shared presentation registry (`features/errors/logic/presentation.ts`),
- * keyed by code; this module decides only what Langy owns — how the failure is
- * rendered, which action button it offers, and whether the meta and reason
- * chain are surfaced for debugging. Both files used to author copy for the
- * same twenty-one codes, and they had drifted into contradicting each other:
- * `langy_egress_misconfigured` was "we're on it, try again shortly" in one and
- * "a network policy an admin must fix" in the other. Only one could be true.
- *
- * Cases are keyed on an EXACT, static list of known `kind`s — never a
- * heuristic match on the string — so a new backend kind lands in the explicit
- * generic default (with its `meta` + `reasons` surfaced for debugging) rather
- * than being silently pattern-matched into the wrong bucket. `unknown`
- * (unhandled) gets one calm generic message plus a trace id.
  */
 
 export type LangyErrorRender =
@@ -74,12 +49,6 @@ export interface LangyErrorPresentation {
   traceId?: string;
   /**
    * The raw domain code, shown under the message on the GENERIC cards only.
-   *
-   * A card that says "Something went wrong" and nothing else is unactionable
-   * for everyone: support cannot correlate it and a developer cannot tell
-   * `clickhouse_unavailable` (your local stack is down) from a genuine bug.
-   * The bespoke cases do not set this — their copy already names the problem,
-   * and a code under prose that already explains itself is just noise.
    */
   code?: string;
   /** Renderable domain metadata, surfaced under the message when present. */
@@ -109,10 +78,7 @@ export interface LangyDomainError extends Omit<
 }
 
 /**
- * The exact set of Langy-emittable handled `kind`s. Adding a new handled kind
- * to the backend means adding it here — the typechecker won't force it, but the
- * `KNOWN_LANGY_ERROR_KINDS` array keeps the source of truth in one place and is
- * pinned by a test.
+ * The exact set of Langy-emittable handled `kind`s.
  */
 export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_conversation_not_found",
@@ -165,9 +131,6 @@ export const KNOWN_LANGY_ERROR_KINDS = [
 /**
  * The gateway's typed codex failures ride the received reason chain of a
  * `langy_agent_errored` (herr ⇄ HandledError, one model across the wire).
- * Promote them to their own kinds by EXACT reason-code match — never by
- * sniffing message strings — so the panel renders the re-authenticate card /
- * the plan-limit explanation instead of a generic "reply failed".
  */
 export function promoteCodexAgentError(domain: LangyDomainError): LangyDomainError {
   if (domain.code !== "langy_agent_errored") return domain;
@@ -189,20 +152,8 @@ export function promoteCodexAgentError(domain: LangyDomainError): LangyDomainErr
 }
 
 /**
- * The reason codes that mean the customer's OpenAI account has no allowance
- * left, in any of the shapes the backends spell it.
- *
- * `usage_limit_reached` / `codex_plan_limit` come from the Codex backend;
- * `insufficient_quota` / `billing_hard_limit_reached` are OpenAI's own API
- * codes for the same situation reached from the other direction (no credit, or
- * a hard billing cap). Codex runs on the customer's OpenAI account either way,
- * so `langy_codex_plan_limit`'s copy — wait for the reset, or raise the limit
- * with OpenAI — is the correct remediation for all four.
- *
- * The last two were added when the card stopped reciting the provider's
- * sentence. "Your credit balance is too low" was the single most useful thing
- * that relay ever carried, and it arrives as one of these codes; promoting them
- * keeps that meaning as copy we wrote instead of prose we forwarded.
+ * The reason codes that mean the customer's OpenAI account has no allowance left, in
+ * any of the shapes the backends spell it.
  */
 const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
   "usage_limit_reached",
@@ -213,12 +164,6 @@ const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
 
 /**
  * The proxy's upstream-status reasons (llmproxy.go `upstreamReasonCodes`).
- * They say the call to the MODEL PROVIDER failed and which way, which is a
- * different fact from "Langy's reply failed" and carries a different next
- * step: wait out a rate limit, fix a credential, pick another model.
- *
- * `llm_upstream_error` already writes one sentence per group, so promoting to
- * it reuses that copy rather than restating it here.
  */
 const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
   "upstream_stream_error",
@@ -235,12 +180,8 @@ const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * A turn that died because the model provider refused the call reads as the
- * provider failure it was, not as a nameless "Langy hit an error".
- *
- * Same rule as `promoteCodexAgentError`: promote by EXACT reason-code match,
- * never by sniffing the provider's message. Runs after it, so the codex codes
- * keep their more specific cards.
+ * A turn that died because the model provider refused the call reads as the provider
+ * failure it was, not as a nameless "Langy hit an error".
  */
 export function promoteUpstreamProviderError(domain: LangyDomainError): LangyDomainError {
   if (domain.code !== "langy_agent_errored") return domain;
@@ -251,19 +192,6 @@ export function promoteUpstreamProviderError(domain: LangyDomainError): LangyDom
 
 /**
  * The gateway's reasons for "this key cannot serve that model at all".
- *
- * `model_provider_not_bound` means the model named a provider the project has
- * no credential for; `model_not_recognized` means no bound provider declares
- * the model; `model_provider_disabled` means the credential exists but is
- * turned off. One remediation covers all three: choose a model the project can
- * reach, or connect the provider that serves this one.
- *
- * Their registry entries are written for whoever configures a virtual key, and
- * say to bind the provider to the key or drop the prefix from the model name.
- * That is the right advice at the gateway and the wrong advice in the panel,
- * where the model came from a menu and there is no key or prefix to edit. So
- * these promote to a Langy code with Langy's own copy, rather than reusing the
- * gateway's.
  */
 const MODEL_UNAVAILABLE_REASONS: ReadonlySet<string> = new Set([
   "model_provider_not_bound",
@@ -272,13 +200,8 @@ const MODEL_UNAVAILABLE_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * A turn that died because the chosen model is not reachable says so, and
- * offers the model settings.
- *
- * Distinct from `promoteUpstreamProviderError`: there the provider was reached
- * and refused the call, so waiting or retrying can work. Here there is nothing
- * to reach, and the same request fails the same way forever, so the card
- * offers the setting instead of a retry.
+ * A turn that died because the chosen model is not reachable says so, and offers the
+ * model settings.
  */
 export function promoteModelUnavailableError(domain: LangyDomainError): LangyDomainError {
   if (domain.code !== "langy_agent_errored") return domain;
@@ -300,22 +223,9 @@ function hasReasonKind(
 }
 
 /*
- * `firstReasonMessage` used to live here: it walked the reason chain for the
- * first `meta.message` and the cards rendered it, on the grounds that the
- * langyagent proxy captures the model provider's own error text there and that
- * text is "safe to show".
- *
- * It is not. A provider's error body is written for whoever holds the key, and
- * for a mediated call that is LangWatch — OpenAI rejects a bad key with
- * `Incorrect API key provided: sk-proj-…`, so forwarding the sentence puts a
- * platform credential in the panel. Nor could a scrubber save it: matching
- * credential SHAPES only catches the shapes someone listed.
- *
- * `promoteCodexAgentError` above already had the right idea and the comment to
- * go with it — promote by EXACT reason-code match, never by sniffing message
- * strings. Everything the relay was carrying that a customer could act on is a
- * discriminant in `PLAN_LIMIT_REASONS`, and it now selects copy from the
- * registry. What is left is prose we cannot vouch for, so it is not rendered.
+ * `firstReasonMessage` used to live here: it walked the reason chain for the first
+ * `meta.message` and the cards rendered it, on the grounds that the langyagent proxy
+ * captures the model provider's own error text there and that text is "safe to show".
  */
 
 function parseReasons(value: unknown): LangySerializedReason[] | undefined {
@@ -385,22 +295,7 @@ export function readLangyStreamError(message: string | undefined | null): LangyD
 }
 
 /**
- * Resolve the domain error behind a LIVE turn failure. Three roads, in order:
- * a turn-START rejection carries it on the tRPC error (`error.data.error`); a
- * mid-turn failure rides the stream's terminal entry as a JSON message; and
- * when the stream itself died with no typed payload (a genuinely broken
- * connection), the turn's real, classified failure is usually already on the
- * DURABLE record: naming it beats a generic apology whose cause the server
- * knew all along. Only when all three come up empty does the caller fall back
- * to the unknown card.
- *
- * That fallback carries an EMPTY `meta`. `meta` is the client contract for a
- * code — the fields a card actually renders — not a scratchpad for debug
- * context, and the raw message is not a field: since #5984 a handled error's
- * wire message is only its code slug, so `{ error: error.message }` printed
- * `langy_agent_errored` under the card for anything handled and a stray
- * transport string for anything else. The caller logs the message instead (see
- * LangyPanel), which is where debug context belongs.
+ * Resolve the domain error behind a LIVE turn failure.
  */
 export function resolveLiveTurnError({
   error,
@@ -431,15 +326,8 @@ export function readLangyTrpcError(err: unknown): LangyDomainError | null {
 }
 
 /**
- * Codes Langy mints CLIENT-SIDE that the registry already answers for under
- * another name.
- *
- * `promoteCodexAgentError` renames the gateway's `codex_session_expired` so the
- * panel can hang a "Sign in to Codex" action off it — a rendering decision,
- * which is Langy's to make. The WORDS are still the registry's, and they are
- * filed under the code the registry knows, so the lookup is aliased rather than
- * the copy re-authored here. (`langy_codex_plan_limit` needs no alias: it is an
- * enumerated app code with its own registry entry.)
+ * Codes Langy mints CLIENT-SIDE that the registry already answers for under another
+ * name.
  */
 const REGISTRY_CODE_ALIASES: Record<string, string> = {
   langy_codex_session_expired: "codex_session_expired",
@@ -447,22 +335,6 @@ const REGISTRY_CODE_ALIASES: Record<string, string> = {
 
 /**
  * The registry's words for this code.
- *
- * `LangyDomainError` is the same shape with the remediation channel made
- * optional (a stream frame and a synthesised "unknown" have no fault or tips),
- * so the gaps are filled with the server-side defaults before asking. Reasons
- * are dropped: the registry never reads them, and Langy's parsed form is its
- * own.
- */
-/**
- * A Langy reason carries only `kind`; the registry matches on `code` OR
- * `kind`, so the one name fills both. Nothing is read out of a reason except
- * membership of an enumerated set, so no upstream prose can ride along.
- *
- * Returns the mutable element array rather than the readonly one the shape
- * declares: a nested `reasons` field is `SerializedReason[]`, so the recursive
- * step has to produce that to build the chain. A caller reading the whole
- * result as readonly still works, since mutable widens to readonly.
  */
 type RegistryReason = HandledErrorShape["reasons"][number];
 
@@ -498,22 +370,6 @@ function registryCopy(domain: LangyDomainError) {
 
 /**
  * A failed history read that will NEVER succeed on its own.
- *
- * The conversation is gone, or it was never this reader's to continue. Nothing
- * about it self-heals: the 3s poll returns the same answer forever, and the only
- * way forward is the card's own instruction (start a new chat).
- *
- * The panel demotes a failed read to a quiet "showing the messages we last
- * loaded" line whenever the transcript is still on screen, which is right for a
- * blip and wrong for these: the reader would go on reading a conversation that
- * no longer exists, with no retry offered and no next step, indefinitely. So
- * these keep the column.
- *
- * The set is a DENYLIST, and deliberately: everything unrecognised is treated as
- * transient. Getting that polarity wrong the other way is the more expensive
- * mistake — an infrastructure code we have no bespoke copy for would replace a
- * streaming answer with a red card, which is exactly the regression the stale
- * path exists to prevent (see `LangyHistoryStaleRead.integration.test.tsx`).
  */
 const TERMINAL_LANGY_HISTORY_READ_KINDS = new Set([
   "langy_conversation_not_found",
@@ -526,14 +382,8 @@ function isTransientLangyHistoryReadFailure(kind: string): boolean {
 }
 
 /**
- * May this failed history read be demoted to the panel's quiet "showing the
- * messages we last loaded" line, rather than owning the message column?
- *
- * Two conditions, and the second is the one that was missing. There has to be
- * something on screen worth protecting — a transcript, or a turn in flight,
- * which is content of its own — AND the failure has to be one that might go
- * away. A failure that never will is not a stale read; it is the answer.
- *
+ * May this failed history read be demoted to the panel's quiet "showing the messages we
+ * last loaded" line, rather than owning the message column?
  * @see TERMINAL_LANGY_HISTORY_READ_KINDS
  */
 export function isStaleLangyHistoryRead({
@@ -578,25 +428,13 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
 
     case "langy_worker_stopped":
       // The worker stopped mid-reply (its process died, or the liveness sweep
-      // re-dispatched it and it never came back). A FINAL state: the control plane
-      // already exhausted its recovery, so this offers a manual "Try again" but is
-      // never auto-retried — re-driving would only walk into the same dead worker,
-      // which is exactly the flicker this replaced. Nothing was lost: the user's
-      // message is on record, so retrying is safe, it is just their call.
+      // re-dispatched it and it never came back).
       return { ...copy, render: "card", action: retry, ...debug };
 
     case "langy_agent_errored": {
-      // The agent reported its own failure — usually the model call was
-      // rejected upstream. Nothing crashed and nothing was lost. Deterministic,
-      // so no auto-retry — the user decides.
-      //
-      // The card used to splice the provider's own message in here. It no
-      // longer does (see the note above), and the one case where that sentence
-      // was worth having — an account with no allowance left — reaches this
-      // switch as `langy_codex_plan_limit` instead, promoted by reason code in
-      // `promoteCodexAgentError` and answered with copy we wrote. Anything
-      // still landing on `langy_agent_errored` is a rejection we cannot name,
-      // so the registry's line plus the trace id is the honest answer.
+      // The agent reported its own failure — usually the model call was rejected
+      // upstream. Nothing crashed and nothing was lost. Deterministic, so no auto-retry
+      // — the user decides.
       return { ...copy, render: "card", action: retry, ...debug };
     }
 
@@ -611,17 +449,6 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
 
     case "langy_github_not_connected":
       // The ONLY suppressed kind, and the reason the mode exists.
-      //
-      // Langy needing GitHub and not having it is a setup step, not a fault:
-      // nothing broke, the user did nothing wrong, and there is a perfectly good
-      // next action. Rendering it red would be the product blaming someone for
-      // not having finished onboarding. `suppress` means the caller draws the
-      // connect card in the message flow instead (see LangyPanel), so the answer
-      // to "I need GitHub" is a Connect button exactly where the turn stopped.
-      //
-      // The title/description still come through: they are what the card falls
-      // back to if a future caller renders this generically, and they are what a
-      // test reads. Nothing in the UI shows them today.
       return {
         ...copy,
         render: "suppress",
@@ -699,13 +526,9 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
       return { ...copy, render: "composer-notice", ...debug };
 
     case "langy_rate_limited":
-      // Throttled, not broken. Nothing failed, nothing was lost, and the only
-      // fix is a few seconds of patience — so there is no "Try again" action,
-      // which would be an invitation to walk straight back into the limit.
-      // Like `langy_turn_in_progress` this is a WAIT rather than a turn
-      // failure, so it rides above the composer as a dismissable notice and
-      // the draft the user tried to send stays in the field (ADR-078), instead
-      // of a red history card that claims Langy is the thing at fault.
+      // Throttled, not broken. Nothing failed, nothing was lost, and the only fix is a
+      // few seconds of patience — so there is no "Try again" action, which would be an
+      // invitation to walk straight back into the limit.
       return {
         kind: domain.code,
         title: "You're sending messages too quickly",
@@ -715,23 +538,9 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
       };
 
     case "unknown":
-      // NO `code`. `unknown` is the explainer's own "this was never a handled
-      // error" discriminant, not a domain code, so printing it under the message
-      // gives support and the reader the literal word "unknown" and nothing
-      // else.
-      //
-      // The TITLE comes from the shared module (ADR-045) — a third Langy
-      // wording of "something went wrong" would drift from the toast and the
-      // inline alert, which is exactly the drift this file's docblock is about.
-      //
-      // The DESCRIPTION deliberately does NOT. The shared copy is
-      // "We've been notified. Try again in a moment." — a different promise
-      // from a trace-id handoff, and it is unconditional. Here the second
-      // sentence has to be conditional: an untyped browser failure
-      // (`Error("Failed to fetch")`) carries no trace id, and a card must not
-      // promise details it is about to render nothing for. That behaviour is
-      // pinned by `langyErrorExplainer.unit.test.ts`. If the shared module ever
-      // grows a trace-id-aware description, collapse this back onto it.
+      // NO `code`. `unknown` is the explainer's own "this was never a handled error"
+      // discriminant, not a domain code, so printing it under the message gives support
+      // and the reader the literal word "unknown" and nothing else.
       return {
         kind: "unknown",
         title: UNKNOWN_ERROR_PRESENTATION.title,
@@ -745,18 +554,8 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
       };
 
     default: {
-      // A code with no registered copy: still useful, never a raw string, and
-      // its meta + reasons are surfaced for debugging. Registered copy wins
-      // whenever there is any — a Langy-adjacent code the switch above doesn't
-      // name (`langy_empty_message`, `langy_credential_resolution`) is far
-      // better served by its own entry than by the stock line.
-      //
-      // Below that used to sit the reason chain's first message, one hop deeper
-      // than the registry looks. That is precisely where a proxied Go herr
-      // parks the PROVIDER's body, so this branch — the one handling codes
-      // nobody has written copy for — was the most likely of all to render a
-      // sentence no one at LangWatch had ever read. Removed; the stock line is
-      // what an unnamed failure gets, alongside its trace id.
+      // A code with no registered copy: still useful, never a raw string, and its meta
+      // + reasons are surfaced for debugging.
       return {
         kind: domain.code,
         title: isRegistered ? title : "Langy couldn't finish that",

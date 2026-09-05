@@ -1,27 +1,5 @@
 /**
  * The derived chrome — provenance, styled ONCE (ADR-060 §4).
- *
- * Every model-emitted card renders inside this frame and nowhere else gets to
- * look like it: a dashed hairline, and no measured card in the kit is dashed.
- * A card Langy composed must never pass as a platform measurement, and the
- * frame is the enforcement — per-card renderers draw bodies, never chrome.
- *
- * ── THE WORDS ──────────────────────────────────────────────────────────────
- *
- * This line said "Derived by Langy", which failed the first rule in
- * dev/docs/best_practices/copywriting.md: "derived" is an internal concept
- * name, and a reader who has not read our code has no idea what it means or
- * what they are supposed to do about it.
- *
- * What it says now is the plain fact — Langy put this together — and the
- * calibration lives in the tooltip, where someone who wants it can find it.
- * The tone is deliberate: this is provenance, NOT a safety warning. The
- * figures are the reader's own data and the feature is safe to use, so the
- * line must not read like a disclaimer on a medicine bottle. It tells them
- * who made the view so they can judge it, and stops there.
- *
- * The transient state says its own thing: `forming` marks a card still
- * streaming (ADR-060 §7), and shimmers until the settled part reconciles it.
  */
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";

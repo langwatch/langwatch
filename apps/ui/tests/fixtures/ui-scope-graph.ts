@@ -1,13 +1,6 @@
 /**
  * The organization graph the scope tests resolve against, shaped the way
  * `organization.getAll` returns it.
- *
- * The personal team is listed BEFORE the shared one on purpose: that ordering
- * is what let a personal workspace win the ambient context, so a fixture that
- * quietly sorted the shared team first would let the tests pass without
- * meaning anything. Ported from the application's own fixture for the same
- * reason the resolution was — a second graph that disagreed would prove
- * nothing about the rules being carried.
  */
 
 import type { UiScopeOrganization, UiScopeTeam } from "../../src/model/ui-scope";

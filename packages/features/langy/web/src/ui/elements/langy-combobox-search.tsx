@@ -3,11 +3,6 @@ import { Search } from "lucide-react";
 
 /**
  * Shared search chrome for Langy's compact listboxes.
- *
- * The input is part of the popup, not a form dropped inside it: one quiet
- * inset surface, a search glyph, a neutral focus treatment, and a hairline
- * separating it from the results. Chat history and model selection should not
- * teach two different search patterns two inches apart.
  */
 export function LangyComboboxSearch({ placeholder }: { placeholder: string }) {
   return (

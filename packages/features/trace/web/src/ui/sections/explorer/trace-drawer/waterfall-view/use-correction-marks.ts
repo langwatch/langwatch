@@ -12,18 +12,6 @@ const NO_MARKS = {
 
 /**
  * Which rows a stored correction changed, and which ones it removed.
- *
- * The removed set belongs to the corrected trace, which is where a reader goes
- * to see what the correction did: those rows are kept on screen and struck
- * through rather than dropped, because a row that simply vanished reads as one
- * that was never captured. The captured trace is the trace as it arrived and
- * carries no marks about removal at all. While the correction is being written
- * the editing marks already say what is going away, so there is nothing left
- * to mark.
- *
- * The changed set is the rows whose values the correction replaces, and only
- * those: it promises a captured value the reader can go and compare, which a
- * removal has none of.
  */
 export function useCorrectionMarks(spans: SpanTreeNode[]): {
   correctedSpanIds: Set<string>;

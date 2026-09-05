@@ -1,20 +1,5 @@
 /**
  * The empty-state onboarding journey, as one editable config.
- *
- * Tweak copy, timings, and stage order *here* — every consumer
- * (`TracesEmptyOnboarding`, `TracesPage`, `useTraceListQuery`) reads
- * from this single source so changes show up without component-code
- * edits.
- *
- * Stage flow:
- *
- *   welcome1  →  welcome2  →  densityIntro  →  auroraArrival  →  auroraLanding  →  postArrival  →  complete
- *   (auto)       (auto)       (manual CTA)     (ribbon only)     (rows arrive)     (row click)
- *
- * `holdMs + next` ⇒ auto-advance after the delay.
- * `cta + next`    ⇒ render an inline CTA button that advances on click.
- * Both omitted    ⇒ terminal until an external event (row click,
- *                   dismiss) advances or unmounts the journey.
  */
 export type StageId =
   | "settle"
@@ -32,43 +17,29 @@ export type StageId =
   | "complete";
 
 /**
- * Where the hero composition sits on the page during a stage.
- *  - `centre`       — default. Flex-centred over the (cut-out) table.
- *  - `left`         — narrow column anchored to the left, used while
- *                     the trace drawer is open on the right.
- *  - `bottomCentre` — bottom-anchored, centred horizontally, used
- *                     while the facet sidebar takes the left rail.
- *  - `topBanner`    — top-anchored thin banner. The hero band fades
- *                     out so the live table reads as the user's
- *                     space, with the banner sitting above it as a
- *                     "wrap-up" strip rather than an overlay.
+ * Where the hero composition sits on the page during a stage. - `centre` — default.
  */
 export type HeroLayout = "centre" | "left" | "bottomCentre" | "topBanner";
 
 export interface StageDef {
   id: StageId;
   /**
-   * Top-line copy. Lighter weight, large display type in the hero.
-   * Optional — stages can hide the hero entirely (e.g. the
-   * aurora-arrival beat is purely visual, the aurora itself does
-   * the talking, no copy on screen).
+   * Top-line copy. Lighter weight, large display type in the hero. Optional — stages
+   * can hide the hero entirely (e.g. the aurora-arrival beat is purely visual, the
+   * aurora itself does the talking, no copy on screen).
    */
   heading?: string;
   /** Optional secondary copy. Reads as muted, line below the heading. */
   subhead?: string;
   /**
-   * If set, the stage auto-advances to `next` after this many ms.
-   * Use for narrative beats where we don't need user input.
-   * Stages with `typewriter: true` should *not* set this — the
-   * typewriter effect calls advance itself once the text finishes
-   * typing + a small linger pause.
+   * If set, the stage auto-advances to `next` after this many ms. Use for narrative
+   * beats where we don't need user input.
    */
   holdMs?: number;
   /**
-   * If set, render an inline button with this label that advances
-   * to `next` when clicked. Use for stages that wait for the user
-   * to explicitly say "ok, next." Pairs with `typewriter` to act
-   * as a "skip ahead" while the text is still typing.
+   * If set, render an inline button with this label that advances to `next` when
+   * clicked. Use for stages that wait for the user to explicitly say "ok, next." Pairs
+   * with `typewriter` to act as a "skip ahead" while the text is still typing.
    */
   cta?: string;
   /** Stage to transition to via auto-advance or CTA click. */
@@ -99,19 +70,17 @@ export interface StageDef {
    */
   showDensitySpotlight?: boolean;
   /**
-   * Show the always-on `Integrate my code` CTA during this stage.
-   * Defaults to `true`. We hide it during welcome + densityIntro
-   * so the user isn't reading copy / picking density next to a
-   * blinking primary action.
+   * Show the always-on `Integrate my code` CTA during this stage. Defaults to `true`.
+   * We hide it during welcome + densityIntro so the user isn't reading copy / picking
+   * density next to a blinking primary action.
    */
   showIntegrateCta?: boolean;
   /** Where the hero composition sits during this stage. */
   heroLayout?: HeroLayout;
   /**
-   * Dim the hero text during this stage so the user's attention
-   * is drawn away from the copy and toward the visual moment
-   * (currently used during `auroraArrival` so the aurora steals
-   * the spotlight).
+   * Dim the hero text during this stage so the user's attention is drawn away from the
+   * copy and toward the visual moment (currently used during `auroraArrival` so the
+   * aurora steals the spotlight).
    */
   dimHero?: boolean;
 }
@@ -121,14 +90,8 @@ export const INITIAL_STAGE: StageId = "settle";
 export const ONBOARDING_JOURNEY: StageDef[] = [
   {
     id: "settle",
-    // No copy on screen during settle — this stage just gives the
-    // table + mesh background a beat to render before we drop the
-    // mask + welcome typewriter on top. On a fresh refresh the
-    // previous behaviour was "instantly show heading," which felt
-    // grabby — like the page was trying to seize attention before
-    // the user had taken in what they were looking at. 1.4s is
-    // enough time for the spans to land and the eye to settle, not
-    // long enough to read as "stuck loading."
+    // No copy on screen during settle — this stage just gives the table + mesh
+    // background a beat to render before we drop the mask + welcome typewriter on top.
     holdMs: 1400,
     next: "welcome",
     showIntegrateCta: false,
@@ -169,12 +132,9 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     showIntegrateCta: false,
   },
   {
-    // ---- SLICE chapter (renamed from the old "filter the table"
-    // detour). Slice now comes BEFORE arrivals so the user
-    // understands "I can filter this" before data lands. Drawer is
-    // the climax (after arrivals), not a navigation gate. See
-    // `chapters.ts` and the §14 design discussion for the arc
-    // rationale.
+    // ---- SLICE chapter (renamed from the old "filter the table" detour). Slice now
+    // comes BEFORE arrivals so the user understands "I can filter this" before data
+    // lands. Drawer is the climax (after arrivals), not a navigation gate.
     id: "serviceSegue",
     heading: "Two ways to cut through.",
     subhead: "Lens tabs above reshape the whole table. Facets in the sidebar narrow what you see.",
@@ -203,33 +163,16 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     id: "arrivalPrep",
     heading: "Watch out for the aurora...\nNew traces tend to follow it.",
     typewriter: true,
-    // Bumped back up — the previous 600ms made the aurora warning
-    // feel like a "blink and you missed it" beat. The aurora itself
-    // is the held frame, but the *warning* needs enough time on
-    // screen for the user to read both lines and look up. ~2.2s
-    // after the typewriter finishes is the sweet spot — long enough
-    // that the eye reaches "aurora" before the ribbon plays, short
-    // enough that it doesn't read as stalled.
+    // Bumped back up — the previous 600ms made the aurora warning feel like a "blink
+    // and you missed it" beat.
     holdMs: 2200,
     next: "auroraArrival",
     showIntegrateCta: false,
   },
   {
     id: "auroraArrival",
-    // Heading carries through from arrivalPrep so the screen
-    // doesn't go blank while the aurora actually plays — that
-    // read like a skipped stage. Heading is kept identical so the
-    // hero motion key (based on heading text) doesn't remount and
-    // we don't get a re-fade flicker. Hero text dims during the
-    // aurora so the user's eye is pulled UP to the ribbon, then
-    // fades back when we advance.
-    //
-    // Ribbon-only beat: the aurora flares first, *without* the new
-    // arrivals in the table below it. If the rows land at the same
-    // moment the ribbon plays, the eye doesn't get a chance to read
-    // "aurora → then traces" — it reads "ribbon and items appear at
-    // once," which loses the cause-and-effect of the metaphor. The
-    // landing happens in the next stage.
+    // Heading carries through from arrivalPrep so the screen doesn't go blank while the
+    // aurora actually plays — that read like a skipped stage.
     heading: "Watch out for the aurora...\nNew traces tend to follow it.",
     holdMs: 1800,
     next: "auroraLanding",
@@ -240,12 +183,9 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
   },
   {
     id: "auroraLanding",
-    // Second beat of the marquee moment: ribbon stays visible while
-    // the new arrivals slide in underneath it, so the user reads
-    // "the aurora is what brought these in." Total time on the
-    // ribbon (auroraArrival + auroraLanding) lands ~5.8s, matching
-    // what the previous single stage held. Heading still carries
-    // through so we don't re-fade the hero text mid-moment.
+    // Second beat of the marquee moment: ribbon stays visible while the new arrivals slide in underneath it, so
+    // the user reads "the aurora is what brought these in." Total time on the ribbon (auroraArrival +
+    // auroraLanding) lands ~5.8s, matching what the previous single stage held.
     heading: "Watch out for the aurora...\nNew traces tend to follow it.",
     holdMs: 4000,
     next: "postArrival",
@@ -256,12 +196,8 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
   },
   {
     id: "postArrival",
-    // Direct + neutral — points at the row without telegraphing the
-    // content of the trace. The juicy bit is what's *inside* the
-    // drawer; this just opens the door. Clicking the row advances
-    // straight to drawerOverview — there's no tour gate any more,
-    // because the drawer is now the finale of the journey rather
-    // than an optional detour.
+    // Direct + neutral — points at the row without telegraphing the content of the
+    // trace. The juicy bit is what's *inside* the drawer; this just opens the door.
     heading: "There's a juicy one.",
     subhead: "Click the highlighted row to see how the agent worked through it.",
     typewriter: true,
@@ -288,14 +224,8 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
   },
   {
     id: "outro",
-    // Terminal chapter — renders as a thin top banner instead of a
-    // centred hero overlay. The journey already taught the user the
-    // basics; the outro is now a "tour done, here's the CTA" strip
-    // that pins to the top of the table area so the live data is
-    // visible underneath without overlap. `showIntegrateCta: false`
-    // suppresses the standalone "Integrate my code" button that
-    // would otherwise stack a duplicate primary CTA next to the
-    // banner's own "Send your own traces" button.
+    // Terminal chapter — renders as a thin top banner instead of a centred hero
+    // overlay.
     showArrivals: true,
     heroLayout: "topBanner",
     showIntegrateCta: false,
@@ -311,12 +241,9 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
 export function findStageDef(id: StageId): StageDef {
   const def = ONBOARDING_JOURNEY.find((s) => s.id === id);
   if (def) return def;
-  // Defensive fallback — a stage id from an older shape of the
-  // journey can still be sitting in the (in-memory) zustand store
-  // after HMR or a code change that drops a stage. Rather than
-  // crashing the whole pane, log once and fall back to the first
-  // stage. The journey will resume from the start, which matches
-  // what we'd want anyway.
+  // Defensive fallback — a stage id from an older shape of the journey can still be
+  // sitting in the (in-memory) zustand store after HMR or a code change that drops a
+  // stage.
   // eslint-disable-next-line no-console
   console.warn(`[onboarding] Unknown stage "${id}", falling back to "${INITIAL_STAGE}"`);
   return ONBOARDING_JOURNEY[0]!;

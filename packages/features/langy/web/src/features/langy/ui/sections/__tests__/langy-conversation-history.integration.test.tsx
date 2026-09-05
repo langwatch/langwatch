@@ -1,16 +1,7 @@
 /**
+ * Integration tests for LangyPanel conversation history, the turn failures it must not
+ * swallow, and stopping a turn.
  * @vitest-environment jsdom
- *
- * Integration tests for LangyPanel conversation history, the turn failures it
- * must not swallow, and stopping a turn.
- * Specs: specs/langy/langy-baseline.feature,
- *        specs/langy/langy-stop-and-resume.feature
- *
- * Boundary mocks: the host port (project context), `@ai-sdk/react` useChat (no
- * real streaming), `@langwatch/ui-drawer`, and the `behavior/langy-api` tRPC
- * surface (an in-memory stand-in that serves the real DTO shapes). No REST
- * fetch, no DB, no MSW — the whole Langy conversation surface goes through
- * tRPC now, so the mock does too.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -32,14 +23,8 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Shared fixtures + observation state
-//
-// Declared at top level so the hoisted vi.mock factory below closes over them
-// (the same mechanism the existing projectRef / chatRef mocks rely on): the
-// factory only runs when `behavior/langy-api` is first imported — by which
-// point these are live — and reads them on every render.
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- Shared
+// fixtures + observation state
 
 /** A recent-list row, in the real `langyConversationListItemSchema` shape. */
 interface ApiConversation {
@@ -64,9 +49,7 @@ interface Scenario {
   slowList: { gate: Promise<void> } | null;
   /**
    * What the DURABLE record says about a turn in flight, per conversation —
-   * `langy.messages`'s `isTurnInFlight` / `inFlightTurnId`. A turn is in flight
-   * whenever this is set, and `turnId` is null to model the window between a
-   * message being sent and its turn being accepted on the record.
+   * `langy.messages`'s `isTurnInFlight` / `inFlightTurnId`.
    */
   turnInFlightById: Record<string, { turnId: string | null }>;
   /** Reject the stop mutation, to model a request that never lands. */
@@ -166,12 +149,7 @@ vi.mock("@ai-sdk/react", () => ({
   }),
 }));
 
-// The whole Langy tRPC surface, served from `scenarioRef`. Each procedure
-// returns the exact shape the real router returns — `langy.list` yields
-// `{ items }` of list rows, `langy.messages` yields `{ messages, lastError,
-// isTurnInFlight }` with real `parts`, `deleteConversation` archives + drives
-// the invalidation channel. The model-picker queries are stubbed idle-but-
-// finished so React Query treats them as settled.
+// The whole Langy tRPC surface, served from `scenarioRef`.
 vi.mock("../../../../../behavior/langy-api", async () => {
   const React = await import("react");
   // Peripheral menus in the panel header (GitHub connect, etc.) each pull
@@ -181,12 +159,8 @@ vi.mock("../../../../../behavior/langy-api", async () => {
   const { createTrpcUtils, modelProviderRouter, withFallback } =
     await import("../../../__tests__/support/langy-api-mock");
 
-  // A minimal, `enabled`-honouring stand-in for a tRPC query: one async
-  // resolution per arm / refetch / invalidate, loading → success | error, no
-  // retries. `resolve` reads the in-memory scenario and may throw to model an
-  // error; `subscribeInvalidation` re-runs it when the list cache is bumped.
-  // Disabled queries never resolve, exactly like React Query — the closed-panel
-  // scenarios depend on that being real.
+  // A minimal, `enabled`-honouring stand-in for a tRPC query: one async resolution per
+  // arm / refetch / invalidate, loading → success | error, no retries.
   const useScenarioQuery = <TData,>(
     resolve: () => Promise<TData>,
     enabled: boolean,
@@ -628,10 +602,7 @@ function renderPanel() {
 }
 
 /**
- * History is its own icon control in the header rail. Activating it swaps the
- * panel BODY to the full-height recents list (RecentChatsView), so
- * conversations are only in the DOM while that view is showing — the rows are
- * ordinary list items, not combobox options.
+ * History is its own icon control in the header rail.
  */
 const recentsTrigger = () => screen.findByRole("button", { name: "Recent chats" });
 
@@ -700,13 +671,8 @@ beforeEach(() => {
     turnInFlightById: {},
     failStop: false,
   };
-  // These suites exercise an OPEN panel; a closed panel deliberately never
-  // fetches the recents list (see useLangyConversationListQuery).
-  //
-  // The conversation pointer is cleared explicitly because the store is a module
-  // SINGLETON and the pointer is now durable: without this, a conversation
-  // selected in one test is restored by the next one's mount (which is the
-  // correct product behaviour, and exactly why the test has to opt out of it).
+  // These suites exercise an OPEN panel; a closed panel deliberately never fetches the
+  // recents list (see useLangyConversationListQuery).
   useLangyStore.setState({
     isOpen: true,
     activeConversationId: null,
@@ -1144,12 +1110,6 @@ describe("LangyPanel conversation history", () => {
 
 /**
  * The failure the panel used to swallow.
- *
- * The error card, the recovering line and the GitHub connect card all lived
- * INSIDE the `isEmpty ? <EmptyState/> : …` else-branch, so a turn that failed
- * before any message reached the engine — the first send of a fresh chat —
- * rendered the empty state and absolutely nothing else. The user's turn 500'd
- * and the panel said nothing at all.
  */
 describe("LangyPanel turn failures", () => {
   describe("given a turn failed before any message reached the thread", () => {
@@ -1173,13 +1133,6 @@ describe("LangyPanel turn failures", () => {
 /**
  * Stop, for a turn this tab did not start.
  * Spec: specs/langy/langy-stop-and-resume.feature (§1)
- *
- * A tab only learns a turn id from its OWN send, so a turn adopted from the
- * durable record — started in another tab, or rejoined after a refresh — used
- * to render a Stop button with nothing behind it: the click moved the control
- * to a disabled "Stopping" spinner and dispatched no request at all, while the
- * agent kept running and kept spending. These tests drive the real panel, so
- * they fail on the panel's WIRING, not just on the resolver's arithmetic.
  */
 describe("LangyPanel stopping a turn", () => {
   const conversations = [makeConv("conv-live", "Live chat", "2026-05-10T10:00:00.000Z")];

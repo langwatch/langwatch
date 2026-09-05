@@ -6,10 +6,9 @@ import type { CellDef } from "../../types";
 import { TimeHoverCard } from "./time-hover-card";
 
 /**
- * Full ISO 8601 column ("2026-06-02T13:14:15.123Z"). For users who
- * paste timestamps into log queries / external tools and need the
- * precise wall-clock without translating from a relative string.
- * Always renders monospace so digit columns align across rows.
+ * Full ISO 8601 column ("2026-06-02T13:14:15.123Z"). For users who paste timestamps
+ * into log queries / external tools and need the precise wall-clock without translating
+ * from a relative string. Always renders monospace so digit columns align across rows.
  */
 const TimestampText: React.FC<{ timestamp: number }> = ({ timestamp }) => (
   <TimeHoverCard timestamp={timestamp}>

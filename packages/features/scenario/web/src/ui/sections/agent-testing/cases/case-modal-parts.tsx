@@ -1,7 +1,5 @@
 /**
- * The parts of the scenario dialog: its heading, the four questions it asks,
- * the blocks its chips open, and the line of actions at its foot.
- *
+ * The parts of the scenario dialog: its heading, the four questions it asks, the blocks its chips open, and the line of actions at its foot.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/case-version-history.feature
  */
@@ -44,15 +42,6 @@ const CASE_MODAL_SUBTITLE = "Test your agent on a critical path or edge case";
 
 /**
  * What a field that grows with its text carries.
- *
- * The two long fields of the dialog follow their own text rather than holding a
- * fixed box, the way the prompt editor does. Growing stops at three times the
- * height the field opens at, and the field scrolls from there, so one long
- * scenario cannot push the footer of the drawer off the screen.
- *
- * A grown field writes its height inline, so each field states the height it
- * opens at as well; without it the field would shrink under its own rows while
- * it is empty.
  */
 const GROWING_FIELD = { autoresize: true, resize: "none" } as const;
 
@@ -209,10 +198,6 @@ function SituationAndCriteria({
 
 /**
  * The declared parameters of the scenario, as one `name=value` line.
- *
- * The line offers what the agents of the project declare, so a scenario can
- * name an agent's parameter and pick one of its options without opening the
- * agent.
  */
 function ParametersBlock({
   draft,
@@ -430,13 +415,8 @@ function ModelsBlock({
 }
 
 /**
- * What the scenario can carry beyond the four questions: the parameters, the
- * turn limits and the model overrides, each behind a chip until it is asked
- * for.
- *
- * The blocks read in the order their chips sit in, and they read as part of the
- * scenario rather than as part of the chip row: a scenario with one block open
- * runs criteria, block, chips, top to bottom.
+ * What the scenario can carry beyond the four questions: the parameters, the turn
+ * limits and the model overrides, each behind a chip until it is asked for.
  */
 function CustomizeBlocks({ editor }: { editor: CaseEditorState }) {
   const { draft, setDraft, customize } = editor;
@@ -469,9 +449,6 @@ function toTurnCount(raw: string): number | null {
 
 /**
  * Says the scenario changed since it was opened, and offers the reload.
- *
- * The refused save wrote nothing, so nothing is lost by leaving the draft as
- * it is. Reloading is the destructive choice, and the button says so.
  */
 function StaleVersionNotice({
   currentVersion,

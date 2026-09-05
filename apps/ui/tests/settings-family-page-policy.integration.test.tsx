@@ -1,38 +1,6 @@
 /**
+ * What the thirteen settings addresses are actually behind, proved by mounting them under the real chrome.
  * @vitest-environment jsdom
- *
- * What the thirteen settings addresses are actually behind, proved by mounting
- * them under the real chrome.
- *
- * THIRTEEN KEYS LEFT `platform/app` AT ONCE, and three guarantees left with
- * them that nothing in this application would otherwise hold. Each one used to
- * be pinned by a file that read the platform page's source, and a source read
- * cannot follow a page into a package:
- *
- *   - the settings chrome around every one of them, which
- *     `pages/settings/__tests__/settings-page-chrome.unit.test.ts` held and
- *     `settings-page-chrome.unit.test.ts` next door now holds for the whole
- *     route table;
- *   - `organization:manage` on members, teams and groups, which
- *     `pages/settings/__tests__/admin-page-guards.unit.test.ts` held by reading
- *     four filenames — the post-merge RBAC closure that stopped those pages
- *     leaking the whole organization to a plain member;
- *   - the email suppressions page opening framed rather than bare, which
- *     `email-suppressions.chrome.integration.test.tsx` held by mounting it.
- *
- * All three are stated here by MOUNTING what the loader hands back under a
- * session that answers precisely, so a loader that names the wrong grant fails
- * rather than a file that merely mentions the right word.
- *
- * THE CHROME IS `NavigationShell` NOW, MOUNTED HERE ON PURPOSE. `uiPage()`
- * used to wrap a `settingsLayout: true` screen in this application's own
- * `withUiSettingsLayout`, a second settings sidebar nested inside the one
- * `NavigationShell` already draws for every `/settings` address — two menus,
- * "General Settings" from the local copy beside "General" from the real one.
- * That local copy is deleted; `settingsSidebarCount()` below counts the survivor's
- * "General" link, so a page that opened with two of them, or none, fails
- * here rather than only reading correctly to the eye.
- *
  * Spec: specs/settings/settings-page-chrome.feature
  */
 
@@ -243,10 +211,6 @@ const SETTINGS_LOADERS: UiPageLoaderRegistry = {
 
 /**
  * A desktop viewport, because jsdom does not implement `matchMedia` at all.
- *
- * Without it every Chakra breakpoint query reports false, `base` wins, and
- * `NavigationShell` draws its phone chrome — a compact bar with no sidebar
- * column to count links in.
  */
 function useDesktopViewport() {
   window.matchMedia = ((query: string) => ({
@@ -298,10 +262,9 @@ const SHELL_READINGS: StubNavigationReadings = {
 };
 
 /**
- * Mounts what the loader hands back the way `UiAppChrome` actually does:
- * inside `NavigationShell`, which draws the settings sidebar for this
- * pathname on its own. A page that also drew one used to nest a second
- * inside it.
+ * Mounts what the loader hands back the way `UiAppChrome` actually does: inside
+ * `NavigationShell`, which draws the settings sidebar for this pathname on its own. A
+ * page that also drew one used to nest a second inside it.
  */
 async function open(pageKey: string, permissions: readonly string[]): Promise<void> {
   const loader = SETTINGS_LOADERS[pageKey];
@@ -404,10 +367,9 @@ describe("the thirteen settings pages that moved", () => {
 
   describe("when a page is behind no grant at all", () => {
     /**
-     * License and subscription were unguarded on the platform side, and are
-     * kept that way one for one: what a reader may DO on them is decided by the
-     * procedures behind them, and hiding the page would hide the plan a reader
-     * is trying to buy.
+     * License and subscription were unguarded on the platform side, and are kept that
+     * way one for one: what a reader may DO on them is decided by the procedures behind
+     * them, and hiding the page would hide the plan a reader is trying to buy.
      */
     it.each([
       ["pages/settings/license", "the license page"],

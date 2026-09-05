@@ -9,12 +9,7 @@ import { TurnCollapseChevron } from "../../elements/transcript/turn-collapse-che
 import type { ChatMessage, ContentBlock } from "../../../model/transcript/types";
 
 /**
- * User turn — renders every block the user message had. Pure-text turns
- * collapse into a right-aligned blue bubble (the canonical chat-user
- * look); turns with mixed blocks (text + thinking + tool_use) render
- * full-width with the same block stack as an assistant turn but with a
- * blue accent + "User" chip, so it's still obvious *which* role this turn
- * belonged to AND visible that it had thinking/tool_use/etc inside.
+ * User turn — renders every block the user message had.
  */
 export function UserTurnBubble({
   blocks,

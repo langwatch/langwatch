@@ -7,23 +7,7 @@ import { api } from "../trace-api";
 export type PersonalFeatureKey = "evaluations" | "datasets" | "annotations" | "automations";
 
 /**
- * Click-to-enable gate for personal-workspace advanced features. Used
- * inside the trace explorer (and any other surface that triggers an
- * advanced action) so the user can flip the bundle from the place they
- * tried to use it, with one-step continuation per modal-flow (b).
- *
- * Behavior:
- * - When the user is NOT on their own personal project, returns
- *   `isGated: false` and `requestEnable` resolves true synchronously.
- *   Existing behavior — non-personal projects don't have the bundle
- *   model.
- * - When the user IS on their own personal project AND the feature is
- *   already enabled, same shape — `isGated: false`, immediate true.
- * - When the user IS on their own personal project AND the feature is
- *   off, exposes `isGated: true`. The consumer renders the gate dialog
- *   driven by `dialogState`. On confirm, fires `enableAll` and resolves
- *   true. On cancel, resolves false (caller should bail).
- *
+ * Click-to-enable gate for personal-workspace advanced features.
  * Spec: specs/ai-gateway/governance/personal-workspace-features.feature
  *       @modal scenarios — modal-flow (b), one-step continuation
  */

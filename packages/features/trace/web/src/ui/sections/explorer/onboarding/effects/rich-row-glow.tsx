@@ -2,36 +2,8 @@ import type React from "react";
 import { RICH_ARRIVAL_TRACE_ID } from "../data/sample-preview-traces";
 
 /**
- * Global `<style>` tag for the rich-arrival row's tour highlight —
- * the soft blue halo + outer ring that pulses around the highlighted
- * row. Active across the arrival → drawer chapters
- * (`auroraLanding`, `postArrival`, `drawerOverview`) so the row
- * "comes out glowing" the moment it lands and stays visibly tagged
- * while the drawer is open. Note: ribbon-only `auroraArrival` is
- * intentionally excluded — the row hasn't arrived yet during that
- * beat, so there's nothing to glow.
- *
- * Why a global stylesheet (not a Chakra `css` prop on a wrapper):
- * the table renders inside the always-on `ResultsPane` chrome, and
- * the row glow is conceptually owned by the onboarding journey, not
- * by the page chrome. Mounting the rule from inside the onboarding
- * module means the chrome doesn't have to know about
- * `RICH_ARRIVAL_TRACE_ID` at all, and lazy-mount discipline
- * (`OnboardingHost` only renders this when active) keeps the rule
- * out of stylesheet for users who aren't onboarding.
- *
- * The trace's `<tbody>` may contain one or two `<tr>` elements:
- *  - Compact density: a single main row.
- *  - Comfortable density: a main row + an IOPreview addon row.
- *
- * The outline is drawn so the two rows read as one block: top stroke on
- * the first row, bottom stroke on the last row, side strokes that wrap
- * the whole tbody. In compact density `:first-child === :last-child` so
- * both rules apply to the same row and it gets all four strokes
- * naturally — no special-casing needed.
- *
- * Uses `html.dark` for the dark-mode override (Chakra v3's
- * class-based color mode), matching `DrawerGlow`.
+ * Global `<style>` tag for the rich-arrival row's tour highlight — the soft blue halo +
+ * outer ring that pulses around the highlighted row.
  */
 const ACTIVE_STAGES = ["auroraLanding", "postArrival", "drawerOverview"] as const;
 
@@ -49,17 +21,9 @@ export const RichRowGlow: React.FC = () => {
       return `${dark}body[data-traces-tour-stage="${stage}"] ${tbody}${hover}${suffix}`;
     }).join(", ");
 
-  // Outer ring split across the tbody's row(s):
-  //   - top stroke on every td of the first row
-  //   - bottom stroke on every td of the last row (same row in compact)
-  //   - left/right side strokes spanning ALL rows' first/last td
-  //
-  // In compact density there's only one row, so :first-child and
-  // :last-child collapse to the same row and the four strokes assemble
-  // into a single outline. In comfortable density the main row carries
-  // the top + sides, the IOPreview row carries the bottom + sides, and
-  // the seam between them is intentionally unstroked so the highlight
-  // reads as one block rather than two stacked boxes.
+  // Outer ring split across the tbody's row(s): - top stroke on every td of the first
+  // row - bottom stroke on every td of the last row (same row in compact) - left/right
+  // side strokes spanning ALL rows' first/last td
   const ROW_FIRST = " > tr:first-child > td";
   const ROW_LAST = " > tr:last-child > td";
   const SIDE_FIRST = " > tr > td:first-child";

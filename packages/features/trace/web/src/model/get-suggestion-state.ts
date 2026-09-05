@@ -11,10 +11,6 @@ export type SuggestionState =
 
 /**
  * What separates the tokens of a line, and a token's field from its value.
- *
- * The traces search bar reads `field:value` tokens split on whitespace and
- * parentheses. A parameter line reads `name=value` pairs split on commas.
- * The state machine is the same; only the characters differ.
  */
 export type SuggestionGrammar = {
   /** The character between a field and its value. */

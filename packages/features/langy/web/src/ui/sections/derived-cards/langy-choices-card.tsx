@@ -1,20 +1,6 @@
 /**
- * The choices card — the one sanctioned UI for the decision that belongs to
- * the user (ADR-060 §6). Options render as real, tappable rows; entity refs
- * arrive hydrated AS THE VIEWER (a dead ref renders disabled — the model
- * cannot make you pick a thing that isn't there); and every state the card
- * can be in is DERIVED from the recorded conversation:
- *
- *   open        the question is the conversation's latest exchange
- *   answered    a recorded selection exists — locked, choice marked, forever
- *   superseded  anything else followed — grayed, readable, unanswerable
- *
- * No client-only flags, no timers: the same derivation replays in time
- * travel, where `onSelect` is simply absent and the card is read-only.
- *
- * Selecting sends the answer as the NEXT USER MESSAGE (structured part +
- * readable text) through the ordinary send path — the turn machinery is
- * untouched by construction.
+ * The choices card — the one sanctioned UI for the decision that belongs to the user
+ * (ADR-060 §6).
  */
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type {

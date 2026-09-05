@@ -1,13 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the "spans" field mapping dropdown in TracesMapping.
- *
- * The dropdown must offer every span name the project produced in the last 30
- * days, not just the span names present on the currently loaded trace(s).
- * A customer reported a span that existed in their project not being offered
- * for mapping because the drawer only listed the open trace's spans. These
- * tests render the real component tree and assert the merged behaviour.
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

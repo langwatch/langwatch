@@ -99,18 +99,9 @@ const CHECKBOX_WIDTH_PX = 40; // Checkbox is fixed pixels
 const DATASET_COL_DEFAULT_PCT = 16;
 const TARGET_COL_DEFAULT_PCT = 20;
 /**
- * A comparison column carries strictly more header content than a prompt/agent
- * column — its name, the "<winner> wins" verdict, latency, cost AND the run
- * button all share one row, where a prompt column has only name + summary + run.
- * An equal 20% share starves it: measured at a 1440px viewport its own name
- * truncated by 40px while every sibling still had slack.
- *
- * 24% was picked by measurement, not taste: it cuts that truncation to ~17px
- * while leaving sibling columns at 0-3px (26% fixed the comparison almost
- * entirely but started truncating the siblings — robbing Peter to pay Paul).
- * This does not promise a name never truncates; a long enough name always will,
- * and the column stays user-resizable. It just stops the column with the most
- * to say from being the one given the least room to say it.
+ * A comparison column carries strictly more header content than a prompt/agent column —
+ * its name, the "<winner> wins" verdict, latency, cost AND the run button all share one
+ * row, where a prompt column has only name + summary + run.
  */
 const COMPARISON_COL_DEFAULT_PCT = 24;
 const COMPARISON_COL_MIN_PCT = 14;
@@ -125,15 +116,9 @@ type EvaluatorDbConfig = {
   settings?: Record<string, unknown>;
 };
 
-// A comparison evaluator is ready to render its own result column once at
-// least two variants are picked and the golden-field requirement is satisfied
-// (see isGoldenFieldSatisfied). Legacy pairwise configs qualify too — they
-// normalize to exactly two variants, though a folded config keeps both
-// variantA/variantB positions even when one is unset (see fromPairwise in
-// normalize-comparison.ts), so an under-filled legacy config can still have
-// variants.length === 2 with one entry "" — filter empty slots, not just
-// array length. Exported so it can be unit-tested directly instead of only
-// through a full table render.
+// A comparison evaluator is ready to render its own result column once at least two
+// variants are picked and the golden-field requirement is satisfied (see
+// isGoldenFieldSatisfied).
 export const isComparisonConfigured = (e: EvaluatorConfig) => {
   const comparison = toComparisonConfig(e);
   return (
@@ -144,15 +129,9 @@ export const isComparisonConfigured = (e: EvaluatorConfig) => {
 };
 
 /**
- * Per-row evaluator results for one target: every per-target evaluator's
- * verdict, plus — for a column-target comparison (target.type === "evaluator"
- * with an embedded comparison config) — the target's own row keyed by its own
- * id, since the target IS the evaluator for this row-shaping purpose. Reads
- * `toComparisonConfig(target)` rather than the raw `target.pairwise` field:
- * normalizeTargets rewrites `pairwise` to `comparison` at load, so a check
- * against the raw legacy field is always false post-normalization and would
- * silently drop every column-target comparison's row data. Exported so it can
- * be unit-tested directly instead of only through a full table render.
+ * Per-row evaluator results for one target: every per-target evaluator's verdict, plus — for a column-target
+ * comparison (target.type === "evaluator" with an embedded comparison config) — the target's own row keyed by its
+ * own id, since the target IS the evaluator for this row-shaping purpose.
  */
 export const buildTargetEvaluatorsForRow = (
   target: TargetConfig,
@@ -386,12 +365,7 @@ export function EvaluationsV3Table({
   const pendingMappingsRef = useRef<Record<string, UIFieldMapping>>({});
 
   // Track variant selections made inside the creation evaluatorEditor so
-  // handleSelectEvaluatorAsTarget can apply them on save instead of empty
-  // defaults. Also acts as the signal that lifts `isComparison` to true in
-  // EvaluatorEditorShared: when the ref-setter is wired via
-  // createEvaluatorEditorCallbacks, the schema-driven `include_metrics`
-  // renderer is suppressed and the inline MetricsSection (with working cost +
-  // duration toggles) renders instead.
+  // handleSelectEvaluatorAsTarget can apply them on save instead of empty defaults.
   const pendingComparisonRef = useRef<ComparisonEvaluatorConfig | null>(null);
 
   // Track target being switched (null when adding new, target ID when switching)
@@ -461,13 +435,8 @@ export function EvaluationsV3Table({
         ];
       }
 
-      // A workflow agent keeps no inputs or outputs on its own config, its
-      // Studio graph does, and the API derives them from that graph. Once that
-      // derivation resolves it is the whole answer, empty lists included:
-      // falling back to the "one field called output" below is what used to
-      // hide every result but the first from the evaluator's variable picker.
-      // Every other kind keeps its fields on its own config, so an empty list
-      // there means nothing was saved and the fallbacks still apply.
+      // A workflow agent keeps no inputs or outputs on its own config, its Studio graph
+      // does, and the API derives them from that graph.
       const { inputFields, outputFields, fieldsResolved } = savedAgent;
       const derivationIsFinal = savedAgent.type === "workflow" && fieldsResolved;
 
@@ -511,12 +480,9 @@ export function EvaluationsV3Table({
         type: field.type as Field["type"],
       }));
 
-      // Comparison column-target: seed an empty comparison config so the column
-      // owns its variants/goldenField selections — this is the discriminator
-      // the Run flow and validation use to render the clean
-      // ComparisonConfigForm instead of the generic per-row mappings UI. Only
-      // set when the underlying evaluator is a comparison judge, so every other
-      // evaluator-as-target keeps its current behavior.
+      // Comparison column-target: seed an empty comparison config so the column owns its variants/goldenField
+      // selections — this is the discriminator the Run flow and validation use to render the clean
+      // ComparisonConfigForm instead of the generic per-row mappings UI.
       const config = (evaluator.config ?? null) as {
         evaluatorType?: string;
         settings?: { has_golden_answer?: boolean };
@@ -525,16 +491,8 @@ export function EvaluationsV3Table({
         config?.evaluatorType === COMPARISON_EVALUATOR_TYPE ||
         config?.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
 
-      // An existing comparison evaluator's saved `has_golden_answer` setting
-      // is the source of truth for whether it needs a golden answer at all.
-      // Hardcoding a fixed value here regardless of what was actually saved
-      // left a "no golden answer" evaluator seeded with the wrong value: the
-      // column target got `hasGoldenAnswer: true, goldenField: ""`, which
-      // `isGoldenFieldSatisfied` reads as unsatisfied, silently skipping the
-      // column at execution (#5528). Only fall back to `false` when the
-      // evaluator has no saved setting at all (a genuinely new/
-      // never-configured comparison) — Golden field defaults to "None", same
-      // as `select_best_compare`'s own `has_golden_answer` schema default.
+      // An existing comparison evaluator's saved `has_golden_answer` setting is the
+      // source of truth for whether it needs a golden answer at all.
       const savedHasGoldenAnswer = config?.settings?.has_golden_answer;
       const comparison = pendingComparisonRef.current ?? {
         variants: [],
@@ -638,12 +596,9 @@ export function EvaluationsV3Table({
   );
 
   /**
-   * Helper to add an evaluator to the workbench from an EvaluatorWithFields.
-   * Used by both onSelect (existing evaluator) and onSave (newly created evaluator).
-   * Fields are pre-computed by the API including type and optional flag.
-   *
-   * Returns the new workbench config id, or null when the evaluator was already
-   * present (so callers can skip the post-add auto-open).
+   * Helper to add an evaluator to the workbench from an EvaluatorWithFields. Used by
+   * both onSelect (existing evaluator) and onSave (newly created evaluator). Fields are
+   * pre-computed by the API including type and optional flag.
    */
   const addEvaluatorToWorkbench = useCallback(
     (evaluator: EvaluatorWithFields): string | null => {
@@ -653,13 +608,7 @@ export function EvaluationsV3Table({
       // Check if this evaluator is already added globally
       const existingEvaluator = evaluators.find((e) => e.dbEvaluatorId === evaluator.id);
 
-      // If already exists, reuse it instead of silently no-op'ing. The
-      // pre-existing behavior (return null) made the drawer close with no
-      // visible feedback, which trained users to fall back to "New Evaluator"
-      // and pile up duplicate rows in the DB (Rogerio dogfood report — the
-      // "why do I have 3 Pairwise Compare evaluators" thread). Returning the
-      // existing config's id lets `guideOrCloseAfterAdd` route to the editor
-      // just like a fresh add would, so the click has an observable effect.
+      // If already exists, reuse it instead of silently no-op'ing.
       if (existingEvaluator) {
         return existingEvaluator.id;
       }
@@ -689,12 +638,8 @@ export function EvaluationsV3Table({
   );
 
   /**
-   * After adding an evaluator, decide whether to close the picker or guide the
-   * user to its mapping drawer. Auto-inference cannot always satisfy every
-   * required input (e.g. the dataset has no column for a required field), so
-   * silently closing would leave a freshly added evaluator with no signpost to
-   * where the missing mapping lives. When fields remain unmapped we open the
-   * evaluator's mapping drawer instead (see Issue A).
+   * After adding an evaluator, decide whether to close the picker or guide the user to
+   * its mapping drawer.
    */
   const guideOrCloseAfterAdd = useCallback(
     (addedId: string | null, isCodeEvaluator: boolean) => {
@@ -934,16 +879,9 @@ export function EvaluationsV3Table({
     setFlowCallbacks("evaluatorList", {
       onSelect: handleSelectEvaluatorAsTarget,
     });
-    // Build comparisonContext so the Comparison flow can pass it to
-    // evaluatorEditor — this makes the creation form show the variant picker
-    // and Golden field immediately, matching the edit-mode experience (#5195).
-    //
-    // No initialComparison: "New Comparison" means a blank one. Reaching an
-    // existing comparison is the list's job now (TargetTypeSelectorDrawer opens
-    // EvaluatorListDrawer filtered to comparison evaluators), and editing the
-    // one already on the table is the column header's job. Pre-filling from the
-    // first comparison in the workbench used to make a second one impossible to
-    // create and quietly turned "add" into "edit".
+    // Build comparisonContext so the Comparison flow can pass it to evaluatorEditor —
+    // this makes the creation form show the variant picker and Golden field
+    // immediately, matching the edit-mode experience (#5195).
     pendingComparisonRef.current = null;
     const state = useEvaluationsV3Store.getState();
     const variantOptions = state.targets.filter((t) => t.type !== "evaluator");
@@ -979,17 +917,6 @@ export function EvaluationsV3Table({
   ]);
 
   // Re-hydrate the comparison editor's flow context after a full page reload.
-  // The URL reopens the evaluatorEditor drawer, but its comparisonContext
-  // (complexProps) and flow callbacks are ephemeral module state wiped by the
-  // reload — so ComparisonConfigForm's `isComparison && comparisonContext &&
-  // onComparisonChange` guard fails and only the generic Name/Model/Prompt
-  // editor shows. Rebuild them from the workbench store and re-attach reactively
-  // via setFlowCallbacks + setComplexProps. Only setComplexProps notifies
-  // CurrentDrawer to re-render (setFlowCallbacks deliberately does not, see
-  // its own comment) — calling it second means that one re-render re-reads
-  // both getters together (no URL change, no flushSync, no flicker).
-  // Loop-safe: setting the callback flips the guard below, so a re-run
-  // bails; the effect's deps don't change from these calls, so it fires once.
   useEffect(() => {
     if (currentDrawer !== "evaluatorEditor") return;
     const evaluatorType = drawerParams.evaluatorType;
@@ -1036,14 +963,8 @@ export function EvaluationsV3Table({
       datasetName: activeDs?.name,
     };
 
-    // targetMatch means this reload resumed editing an EXISTING comparison
-    // column, not the New Comparison add flow. Wire the same target-bound
-    // callbacks openTargetEditor uses (targetId + updateTarget +
-    // updateTargetComparison) so a save updates that target in place. Without
-    // this branch, onSave fell through to handleComparisonEvaluatorSave —
-    // built for the add flow — which always creates a fresh target via
-    // handleSelectEvaluatorAsTarget, duplicating the column on every
-    // reload-then-save.
+    // targetMatch means this reload resumed editing an EXISTING comparison column, not
+    // the New Comparison add flow.
     setFlowCallbacks(
       "evaluatorEditor",
       targetMatch
@@ -1657,12 +1578,9 @@ export function EvaluationsV3Table({
   const resizeStartXRef = useRef<number>(0);
   const resizeStartWidthRef = useRef<number>(0);
 
-  // Single source of truth for a column's default/minimum width, by id and
-  // type — every sizing path (drag start, drag clamp, double-click reset,
-  // total-width sum, rendered width) reads through this instead of each
-  // re-deriving "is this a comparison column" on its own, which is how the
-  // comparison 24%/14% sizing previously only applied to rendering while the
-  // other paths silently fell back to the ordinary target defaults.
+  // Single source of truth for a column's default/minimum width, by id and type — every sizing path (drag start, drag clamp, double-click reset, total-width sum,
+  // rendered width) reads through this instead of each re-deriving "is this a comparison column" on its own, which is how the comparison 24%/14% sizing previously
+  // only applied to rendering while the other paths silently fell back to the ordinary target defaults.
   const getDefaultPctForColumn = useCallback(
     (columnId: string, columnType: string): number => {
       if (columnType === "dataset") return DATASET_COL_DEFAULT_PCT;
@@ -1878,12 +1796,7 @@ export function EvaluationsV3Table({
         return `${storedPct}%`;
       }
 
-      // Use default percentages based on column type. A comparison reaches
-      // here as either a column-style TARGET ("target.<id>") or a dedicated
-      // comparison column; both carry the extra verdict + metrics in their
-      // header and need the wider share — getDefaultPctForColumn is the one
-      // place that knows this, so every sizing path (this render, drag
-      // start/clamp, double-click reset, total-width sum) agrees.
+      // Use default percentages based on column type.
       if (columnType === "dataset" || columnType === "target" || columnType === "comparison") {
         return `${getDefaultPctForColumn(columnId, columnType)}%`;
       }
@@ -1914,12 +1827,6 @@ export function EvaluationsV3Table({
           zIndex: 11,
           backgroundColor: "var(--chakra-colors-bg-panel)",
           // Promotes the sticky cell to its own GPU compositing layer.
-          // Without it the browser can paint the sticky header a frame
-          // behind the scrolling body during fast/inertial scroll (each
-          // row's rich content — long generated text, evaluator chips —
-          // costs real paint time), so body content flashes through the
-          // header for a frame even though both are correctly positioned
-          // once scrolling settles. Standard fix for this class of bug.
           willChange: "transform",
         },
         // Column header row (second row in thead)
@@ -2025,16 +1932,9 @@ export function EvaluationsV3Table({
                     key={header.id}
                     style={{
                       width: getColumnWidth(header.id, columnType, isFixedWidth),
-                      // The highlight is a brief auto-clearing flash (see
-                      // CLICK_HIGHLIGHT_DURATION_MS in ComparisonCell), so it
-                      // needs to fade smoothly rather than snapping off.
-                      // boxShadow always has a value (harmless — headers
-                      // don't normally use one) so it has a "from" and "to"
-                      // to interpolate. background is left unset when not
-                      // highlighted rather than forced to "transparent" —
-                      // this inline style would otherwise override the
-                      // header's own opaque background (needed so scrolled
-                      // rows don't show through the sticky header).
+                      // The highlight is a brief auto-clearing flash (see CLICK_HIGHLIGHT_DURATION_MS in ComparisonCell), so it needs to fade smoothly rather than snapping off. boxShadow always has a value
+                      // (harmless — headers don't normally use one) so it has a "from" and "to" to interpolate. background is left unset when not highlighted rather than forced to "transparent" — this inline
+                      // style would otherwise override the header's own opaque background (needed so scrolled rows don't show through the sticky header).
                       transition: "box-shadow 300ms ease, background-color 300ms ease",
                       boxShadow: isHighlightedColumn
                         ? `inset 0 0 0 2px var(--chakra-colors-${highlightColor}-400)`

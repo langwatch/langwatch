@@ -1,8 +1,7 @@
 /**
- * The panel-side orchestration for a dispatched UI action
- * (specs/langy/langy-ui-actions.feature): dedup before claim, no claim
- * without a handler, schema re-parse before the handler, and a completion for
- * every executed or failed run.
+ * The panel-side orchestration for a dispatched UI action (specs/langy/langy-ui-actions.feature): dedup before
+ * claim, no claim without a handler, schema re-parse before the handler, and a completion for every executed or
+ * failed run.
  */
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";

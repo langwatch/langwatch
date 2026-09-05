@@ -13,17 +13,6 @@ export const DEFAULT_TOPIC_CLUSTERING_MODEL = "openai/gpt-5.2";
 
 /**
  * The credential fields that carry no secret, listed by exact name.
- *
- * Everything a provider stores in `customKeys` is treated as a secret unless
- * it appears here, so a provider that adds a field gets it masked with no
- * further action. The list holds connection configuration the settings form
- * has to render back to be editable: endpoints, API versions, regions, cloud
- * project and location pairs, and the `MANAGED` marker.
- *
- * Add a name here only after checking that its value cannot authenticate
- * anything. `modelProviderHelpers.isSecretCredentialField` is the single
- * reader, and `credentialFieldClassification.unit.test.ts` walks the provider
- * registry to keep this list and the registry in step.
  */
 export const PUBLIC_CREDENTIAL_FIELDS: ReadonlySet<string> = new Set([
   "ANTHROPIC_BASE_URL",
@@ -45,10 +34,7 @@ export const PUBLIC_CREDENTIAL_FIELDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Name fragments that mark a field as a credential whatever else is decided
- * about it. A field matching one of these can never be added to
- * `PUBLIC_CREDENTIAL_FIELDS`; the classification test enforces that, so an
- * allowlist entry cannot re-expose a secret by mistake.
+ * Name fragments that mark a field as a credential whatever else is decided about it.
  */
 export const SECRET_CREDENTIAL_MARKERS = [
   "KEY",
@@ -61,10 +47,9 @@ export const SECRET_CREDENTIAL_MARKERS = [
 export const MASKED_KEY_PLACEHOLDER = "HAS_KEY••••••••••••••••••••••••";
 
 /**
- * Hard cap on a single translate-to-English request, enforced by the
- * router's input schema and pre-applied by clients (slice before send).
- * Keeps a multi-MB trace payload from becoming one prompt — context-limit
- * failure or a surprise bill.
+ * Hard cap on a single translate-to-English request, enforced by the router's input
+ * schema and pre-applied by clients (slice before send). Keeps a multi-MB trace payload
+ * from becoming one prompt — context-limit failure or a surprise bill.
  */
 export const TRANSLATE_TEXT_MAX_CHARS = 100_000;
 

@@ -1,19 +1,5 @@
 /**
- * The table of scenarios of the open suite: the name and the labels, with a
- * Run button and a row menu at the end of every row.
- *
- * The table is a grid inside one card, not a ruled table: the columns line up
- * without a vertical rule between them, so a long list of scenarios reads as a
- * list of names rather than as a spreadsheet.
- *
- * The table carries no last result: authoring stays here and results live on
- * the Results tab. A person who wants the last run of a row reaches it from
- * the row menu.
- *
- * A row carries no Edit button. Clicking the row opens the editor and Edit
- * stays in the row menu, so the editor is reachable two ways without a third
- * control on every line.
- *
+ * The table of scenarios of the open suite: the name and the labels, with a Run button and a row menu at the end of every row.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */

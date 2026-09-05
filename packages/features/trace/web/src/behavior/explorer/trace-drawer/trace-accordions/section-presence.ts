@@ -2,25 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 
 /**
- * Tracks accordion open-state with auto-expand:
- * - On identity change (new trace / new span), reset to all sections that
- *   currently have content.
- * - On content arriving asynchronously within the same identity, open the
- *   newly-populated section (without re-opening sections the user closed).
- * - User toggles inside an identity are preserved.
+ * Tracks accordion open-state with auto-expand: - On identity change (new trace / new span), reset to all sections that currently have
+ * content. - On content arriving asynchronously within the same identity, open the newly-populated section (without re-opening sections the
+ * user closed). - User toggles inside an identity are preserved.
  */
 export function useAutoOpenSections(
   identity: string,
   content: Record<string, boolean>,
 ): [string[], (next: string[]) => void] {
-  // Default to "every section open" instead of only sections whose
-  // content predicate is truthy. Operator feedback was that the
-  // gated-open behaviour made the drawer feel half-empty when a trace
-  // had no I/O or no attributes — the user couldn't tell whether the
-  // section was missing or just collapsed. Opening everything by
-  // default surfaces the empty states (so users learn what fields
-  // exist on a trace) and trades a couple of pixels of scroll for
-  // discoverability.
+  // Default to "every section open" instead of only sections whose content predicate is
+  // truthy.
   const [open, setOpen] = useState<string[]>(() => Object.keys(content));
   const lastIdentityRef = useRef(identity);
   const prevContentRef = useRef(content);
@@ -67,10 +58,9 @@ export interface SectionPresenceState {
 }
 
 /**
- * Holds which trace + tab is currently rendered in the accordion shell so
- * deeply-nested `Section` components can broadcast presence without
- * prop-drilling and without React Context (banned by traces-v2 STANDARDS §2).
- * Only one drawer mounts at a time.
+ * Holds which trace + tab is currently rendered in the accordion shell so deeply-nested
+ * `Section` components can broadcast presence without prop-drilling and without React
+ * Context (banned by traces-v2 STANDARDS §2). Only one drawer mounts at a time.
  */
 export const useSectionPresenceStore = create<SectionPresenceState>((set) => ({
   traceId: null,

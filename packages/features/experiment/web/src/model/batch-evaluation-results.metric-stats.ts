@@ -38,17 +38,8 @@ export const computeMetricStats = (values: number[]): MetricStats | null => {
 };
 
 /**
- * The value at a quantile of an ALREADY SORTED sample, interpolating between
- * the two neighbours when the position falls between them.
- *
- * Both places that draw a confidence interval — the bootstrap CI and the
- * Bradley-Terry leaderboard — read their bounds from this, and they must read
- * them the same way or two intervals over the same data disagree. It had been
- * written out in each, identically.
- *
- * The caller sorts. That is not politeness: these are bootstrap resamples in
- * the thousands, and re-sorting per quantile would be the expensive part of
- * drawing an interval that needs two.
+ * The value at a quantile of an ALREADY SORTED sample, interpolating between the two
+ * neighbours when the position falls between them.
  */
 export function quantile(sorted: number[], q: number): number {
   if (sorted.length === 0) return 0;

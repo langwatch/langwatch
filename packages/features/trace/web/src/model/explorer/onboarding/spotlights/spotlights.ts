@@ -1,15 +1,5 @@
 /**
  * Flat list of spotlight definitions for the trace-explorer tour.
- *
- * A spotlight is one contextual callout anchored to a `data-spotlight`
- * DOM attribute. The overlay walks through this list linearly — no state
- * machine, no branching. Each entry ships a short body (1–2 sentences)
- * and an optional title rendered as a header in the popover.
- *
- * Preconditions (`isApplicable`) let individual spotlights opt out at
- * runtime (e.g. "evaluator drilldown" when no evaluators are visible),
- * but the common case is applicability === true so the default omits the
- * field entirely.
  */
 
 export interface SpotlightContext {
@@ -40,11 +30,6 @@ export interface Spotlight {
   isApplicable?: (ctx: SpotlightContext) => boolean;
   /**
    * Anchor to fall back to when the primary anchor isn't in the DOM.
-   * Conditional surfaces (the evaluator drilldown only exists when a
-   * row is expanded; the viz tabs only exist with the drawer open)
-   * point at an always-present stand-in instead — without one, the
-   * overlay used to silently walk forward past every missing anchor
-   * and end the four-step tour after step two.
    */
   fallbackAnchor?: string;
 }
@@ -52,16 +37,7 @@ export interface Spotlight {
 export const TRACE_EXPLORER_SPOTLIGHTS: Spotlight[] = [
   {
     id: "search-bar",
-    // Anchor on the ask chip rather than the whole search bar. The
-    // chip is the load-bearing piece of this callout (the tour is
-    // selling the natural-language input, not the typed expression
-    // language), and a popover next to a small target reads as "this
-    // thing here" instead of looping the eye around the entire row.
-    // The chip carries its own red "AI" glow, so we anchor outside
-    // the existing visual treatment — orange ring on the chip, copy
-    // floats to the right. The copy names no button on purpose: the
-    // chip reads "Ask AI" or "Ask Langy" depending on the user's
-    // rollout, and the callout is pointing straight at it.
+    // Anchor on the ask chip rather than the whole search bar.
     anchor: "ask-ai-chip",
     title: "Find anything, fast",
     body: 'Type a filter, or press ⌘I and describe what you want — "errors from the checkout agent in the last hour, slowest first". The query language is full-featured; plain English is the fastest path to a useful view.',
@@ -94,12 +70,9 @@ export const TRACE_EXPLORER_SPOTLIGHTS: Spotlight[] = [
 ];
 
 /**
- * Condition-gated, show-once spotlights for the trace drawer. Unlike the
- * page tour above, these aren't a linear walkthrough: each one appears
- * exactly once, the first time the user opens a drawer where the feature
- * is actually present. Presence of the `data-spotlight` anchor in the DOM
- * IS the condition — the anchored components only emit the attribute when
- * the feature has content, so no `isApplicable`/`fallbackAnchor` needed.
+ * Condition-gated, show-once spotlights for the trace drawer. Unlike the page tour
+ * above, these aren't a linear walkthrough: each one appears exactly once, the first
+ * time the user opens a drawer where the feature is actually present.
  */
 export const DRAWER_SPOTLIGHTS: Spotlight[] = [
   {

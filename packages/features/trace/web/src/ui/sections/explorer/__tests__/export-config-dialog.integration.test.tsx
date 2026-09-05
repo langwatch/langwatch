@@ -1,11 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for ExportConfigDialog component.
- *
- * Tests that the export configuration dialog renders mode/format toggles,
- * trace count, and fires onExport with the correct config.
- *
+ * @vitest-environment jsdom
  * @see specs/traces/trace-export.feature — "Export Config Dialog" section
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

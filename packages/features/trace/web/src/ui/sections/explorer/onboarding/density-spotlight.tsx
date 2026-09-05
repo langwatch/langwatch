@@ -48,11 +48,9 @@ const DensityCardButton = chakra("button", {
 
 interface DensitySpotlightProps {
   /**
-   * The density value the user has clicked during the spotlight stage,
-   * or `null` if they haven't engaged yet. Click-to-pick sets this;
-   * clicking the *same* card again triggers `onContinue`. Lifted to
-   * the parent so the spotlight knows which card to render with the
-   * `Continue →` chip.
+   * The density value the user has clicked during the spotlight stage, or `null` if
+   * they haven't engaged yet. Click-to-pick sets this; clicking the *same* card again
+   * triggers `onContinue`.
    */
   pickedValue: Density | null;
   onPick: (value: Density) => void;
@@ -60,11 +58,9 @@ interface DensitySpotlightProps {
 }
 
 /**
- * Side-by-side density preview cards. Each card stacks N bars at its
- * target spacing so the per-row contrast reads at a glance — Compact
- * packs more rows tighter, Comfortable gives each row breathing room.
- * Clicking a card commits the density to the global store; the live
- * table behind reflows in real time.
+ * Side-by-side density preview cards. Each card stacks N bars at its target spacing so
+ * the per-row contrast reads at a glance — Compact packs more rows tighter, Comfortable
+ * gives each row breathing room.
  */
 export function DensitySpotlight({
   pickedValue,

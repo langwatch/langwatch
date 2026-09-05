@@ -1,9 +1,5 @@
 /**
  * The note of a run: one short line, like a commit message or a hypothesis.
- *
- * The field appears when its chip is chosen and can be removed again. A note
- * over the limit blocks the run before anything is sent.
- *
  * @see specs/suites/run-notes.feature
  * @see specs/features/agent-testing/run-dialog.feature
  */

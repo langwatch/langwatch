@@ -12,14 +12,7 @@ import { traceSelectColumnDef } from "./select-column";
 
 const SELECT_COL_MIN_PX = 32;
 /**
- * Floor for the trace-lens min table width. We were pinning a flat 1500px
- * floor here, which forced horizontal scroll whenever the facet sidebar
- * opened on a typical laptop viewport — and within that 1500px the flex
- * Trace column was stuck at the leftover slice (often ~300px) regardless
- * of how much real estate was free. Computing the floor from the visible
- * columns' minSize lets the table fit the viewport when it can, and the
- * Trace column absorbs the slack as the sidebar collapses / expands
- * instead of being capped.
+ * Floor for the trace-lens min table width.
  */
 const MIN_WIDTH_FLOOR_PX = 800;
 const FALLBACK_COL_MIN_SIZE_PX = 100;
@@ -33,12 +26,8 @@ interface TraceLensColumns {
 }
 
 /**
- * Resolve the lens's logical column ids into TanStack column defs +
- * the cell registry, in `logicalColumnIds` order. Static columns come
- * from `getTraceColumnDef`; per-evaluator `eval:<field>:<key>` columns are
- * synthesised here (def + a registry cell), reading evaluator names from
- * `evaluatorNames` for their headers. See
- * dev/docs/adr/029-trace-table-per-evaluator-columns.md.
+ * Resolve the lens's logical column ids into TanStack column defs + the cell registry,
+ * in `logicalColumnIds` order.
  */
 export function useTraceLensColumns({
   logicalColumnIds,
@@ -86,12 +75,7 @@ export function useTraceLensColumns({
     return defs;
   }, [logicalColumnIds, evaluatorNames, timeFormat]);
 
-  // Cell renderers for the active eval columns, merged onto the static
-  // trace registry. Keyed off the eval ids only (not the names — the
-  // name lives in the header, not the cell), so the merged registry keeps
-  // a stable identity across renders unless the eval column set changes.
-  // `RegistryRow` memoises on `registry` identity, so an unstable object
-  // here would re-render every row.
+  // Cell renderers for the active eval columns, merged onto the static trace registry.
   const registry = useMemo<Registry<TraceListItem>>(() => {
     const evalCells: Record<string, CellDef<TraceListItem>> = {};
     for (const id of logicalColumnIds) {
@@ -113,17 +97,9 @@ export function useTraceLensColumns({
 
   const minWidth = useMemo(() => {
     /**
-     * Floor the table at "every fixed column at its declared size + every
-     * flex column at its minSize + the select gutter." Earlier we used
-     * minSize across the board, but that produced a floor *below* what
-     * fixed columns actually claim at render time — `tableLayout: fixed`
-     * gave each fixed col its declared `size`, the flex col absorbed the
-     * deficit, and on narrow viewports the deficit went negative: the
-     * trace column collapsed to ~0px and its content visually bled into
-     * the next column. Floor-by-declared-size keeps the trace col at
-     * least at its minSize while letting it absorb extra space when the
-     * viewport is wider than the floor (sidebar collapsed = wider viewport
-     * = wider trace col).
+     * Floor the table at "every fixed column at its declared size + every flex column at its minSize + the select gutter." Earlier we used minSize across the board, but that produced
+     * a floor *below* what fixed columns actually claim at render time — `tableLayout: fixed` gave each fixed col its declared `size`, the flex col absorbed the deficit, and on narrow
+     * viewports the deficit went negative: the trace column collapsed to ~0px and its content visually bled into the next column.
      */
     const widthFor = (def: {
       id?: string;

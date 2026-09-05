@@ -6,10 +6,9 @@ import type { DatasetReference } from "../../model/experiments-v3/types";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 
 /**
- * Syncs saved dataset record changes from the workbench store to the
- * database. Thin adapter over the shared useDatasetRecordSync: resolves full
- * records out of the store's dataset state and reports status into the
- * store's autosave indicator.
+ * Syncs saved dataset record changes from the workbench store to the database. Thin
+ * adapter over the shared useDatasetRecordSync: resolves full records out of the
+ * store's dataset state and reports status into the store's autosave indicator.
  */
 export const useDatasetSync = () => {
   const { project } = useOrganizationTeamProject();

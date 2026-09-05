@@ -1,17 +1,7 @@
 import { Box } from "@chakra-ui/react";
 
 /**
- * The official Codex provider mark. The root is a bare `<svg>` with only a
- * viewBox, exactly like the sibling provider icons: consumers size these by
- * dropping them into a fixed-size box and letting the svg's default 100%
- * width/height stretch to fill, so any intrinsic size here would render the
- * mark smaller than its peers. Two treatments, toggled by color mode with
- * pure CSS on `<g>` groups (no hook, so it is SSR- and test-safe): the
- * full-color brand tile in light mode, and the monochrome glyph in white for
- * dark mode, where the light tile's white rounded square would otherwise
- * glare. Source SVGs live in
- * public/images/external-icons/codex-{light,dark}theme.svg for the onboarding
- * grid; kept in sync here.
+ * The official Codex provider mark.
  */
 export function Codex() {
   return (

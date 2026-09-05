@@ -5,11 +5,6 @@ import { type Transform, TransformError } from "./types";
 
 /**
  * Point a target's draft prompt at another model.
- *
- * Requires an existing `localPromptConfig`: the rest of a prompt (messages,
- * inputs, outputs) lives in the prompt registry, and a config invented from a
- * model name alone would run an empty prompt. Load the prompt into the draft
- * first (`workbench.setTargetPrompt`), then switch its model.
  */
 export const updateTargetModel: Transform<
   UpdateTargetModelPayload,

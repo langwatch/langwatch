@@ -2,28 +2,8 @@ import "@testing-library/jest-dom/vitest";
 
 // @vitest-environment jsdom
 /**
- * A comparison logged by the code-first SDKs must reach the experiment results
- * page with no server-side and no frontend change.
- *
- * The SDK reports an n-way verdict through the batch protocol the experiment
- * already speaks: a row-level evaluation with NO `target_id`, whose `label` is
- * the winning target's name and whose `inputs.candidates` name everyone who
- * was judged. Nothing about that shape is workbench-specific, so the claim is
- * that `transformBatchEvaluationData` detects it, the table gives it a Winner
- * column, and the win-rate chart tallies it, exactly as it does for a run the
- * platform executed itself.
- *
- * The claim is worth pinning because the failure mode is silent: a comparison
- * that isn't detected does not error, it simply renders as nothing, and the
- * customer is left with verdicts they paid for and cannot see.
- *
- * This is an integration test rather than a unit test because the components
- * are rendered: the proof is what the page shows, not what the detector
- * returns.
- *
- * The last block covers reading a verdict the cell is too small to hold: the
- * Winner cell expands over the table, and the ways back out of that overlay
- * are part of the verdict being readable at all.
+ * A comparison logged by the code-first SDKs must reach the experiment results page
+ * with no server-side and no frontend change.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -71,10 +51,8 @@ afterEach(() => {
 });
 
 /**
- * The SDK registers a target under the name the customer passed and reuses
- * that same string as its id, so a verdict naming the winner by name also
- * names it by id. Type is "custom": the customer's own code produced the
- * output, not a platform prompt or agent.
+ * The SDK registers a target under the name the customer passed and reuses that same
+ * string as its id, so a verdict naming the winner by name also names it by id.
  */
 const TARGET_NAMES = ["gpt-5-mini", "claude-sonnet-5", "gemini-flash"] as const;
 
@@ -105,14 +83,6 @@ const DATASET = ROW_INPUTS.flatMap((input, index) =>
 
 /**
  * The comparison evaluator id and display name the SDK reports under.
- *
- * `detectComparisonColumns` admits a processed evaluation on either of two
- * independent grounds: its `evaluator` or `name` contains "comparison",
- * "pairwise" or "select_best", OR its `label` is "tie" / resolves to a target
- * the run registered. A SKIPPED evaluation has no label to resolve, so it is
- * counted into `rowsWithoutVerdict` on the name grounds alone: rename both
- * fields to something unrecognized and every winner still renders while rows
- * the judge declined stop being counted.
  */
 const COMPARISON_EVALUATOR = "langevals/select_best_compare";
 const COMPARISON_NAME = "comparison";
@@ -125,10 +95,9 @@ const ROW_4_SKIP_REASON =
   "The judge reversed its pick when the candidate order was swapped, so no verdict was recorded.";
 
 /**
- * A row-level comparison verdict, exactly as the SDK reports it: no
- * `target_id` key at all, the winner named by target name in `label`, the
- * judge's reasoning in `details`, and every candidate it saw in
- * `inputs.candidates`.
+ * A row-level comparison verdict, exactly as the SDK reports it: no `target_id` key at
+ * all, the winner named by target name in `label`, the judge's reasoning in `details`,
+ * and every candidate it saw in `inputs.candidates`.
  */
 const verdict = ({
   index,
@@ -156,10 +125,9 @@ const verdict = ({
 });
 
 /**
- * Five rows with a deliberate spread: gpt-5-mini wins twice, claude-sonnet-5
- * once, gemini-flash never, one row is a genuine tie, and one row the judge
- * ran on and declined to call. Candidate order differs per row because the
- * SDK shuffles it seeded on the row index to blunt position bias.
+ * Five rows with a deliberate spread: gpt-5-mini wins twice, claude-sonnet-5 once,
+ * gemini-flash never, one row is a genuine tie, and one row the judge ran on and
+ * declined to call.
  */
 const COMPARISON_VERDICTS: ExperimentRunWithItems["evaluations"] = [
   verdict({

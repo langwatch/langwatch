@@ -1,34 +1,5 @@
 /**
  * The overlay address, as this package writes it.
- *
- * `~/hooks/useDrawer` is the application's drawer navigator: a module-level
- * stack, a complex-props register, a flow-callback registry and a `qs` writer
- * over the browser URL. A feature-web package may own none of that — the
- * registry that turns `drawer.open=…` into a component is composition, and the
- * chrome layout route that mounts it is the application's.
- *
- * What a screen ever needed is the ADDRESS, which is what this writes. The
- * convention is `platform/app`'s unchanged: `drawer.open` names the overlay and
- * `drawer.<key>` carries one serialisable prop each, every stale `drawer.*` key
- * cleared on a fresh open. So a link this package produces is the same link the
- * application produces, and every overlay comes back for free the moment a
- * chrome layout route mounts `CurrentDrawer` above a package-served screen.
- *
- * THE CHROME GAP IS RECORDED RATHER THAN PAPERED OVER. `addDatasetRecord`,
- * `evaluatorEditor`, `onlineEvaluation`, `promptEditor`, `automation` and
- * `scenarioRunDetail` are other features' overlays, registered in
- * `platform/app`. On a screen served from `apps/ui` the address changes and
- * nothing opens — the same gap the me, automations, annotations, analytics and
- * evaluator families each recorded. `traceV2Details` is this family's own and
- * does not have the problem: `GlobalTraceV2DrawerMount` mounts it from the
- * explorer's own store, inside the screen.
- *
- * WHAT DID NOT TRAVEL, and each is deliberate:
- *
- * - COMPLEX PROPS. They were the application's way of handing a function to a
- *   lazily-mounted drawer; nothing addressable survives a reload, and a screen
- *   that needs a callback renders its own overlay inline instead.
- * - FLOW CALLBACKS. Same reason, and no caller in this family registered one.
  */
 
 import { useCallback, useMemo } from "react";
@@ -42,14 +13,6 @@ export type DrawerCallbacks<_T extends DrawerType = DrawerType> = Record<string,
 
 /**
  * The navigation history, module-level exactly as `platform/app` keeps it.
- *
- * It has to outlive any one component: a drawer that opens another drawer is
- * unmounted by the time the second one is closed, so the entry to return to
- * cannot live in either one's state. Its whole hazard is that it is GLOBAL —
- * it can be describing an overlay the reader already dismissed — which is why
- * `getTopDrawer` reads the address bar and the trace drawer checks the two
- * against each other before asking to go back. See
- * specs/traces-v2/drawer-stacking.feature.
  */
 type DrawerStackEntry = { drawer: DrawerType; params: Record<string, unknown> };
 
@@ -65,12 +28,6 @@ export function clearDrawerStack(): void {
 
 /**
  * The overlay on top of the STACK, read outside React.
- *
- * Deliberately not the address bar. The trace drawer mounts from its own store
- * rather than from the URL, so the address can say `traceV2Details` while the
- * stack is describing something the reader has already left — and asking to go
- * back then walks into an overlay they dismissed. Comparing the two is what the
- * scaffold does before it chooses between going back and closing.
  */
 export function getTopDrawer(): DrawerType | undefined {
   return drawerStack[drawerStack.length - 1]?.drawer;
@@ -78,9 +35,6 @@ export function getTopDrawer(): DrawerType | undefined {
 
 /**
  * The overlay the address bar has open right now.
- *
- * `router.query` is a render snapshot and can lag a navigation that already
- * landed, so seeding an empty stack reads the address rather than the snapshot.
  */
 function openDrawerInLocation(): DrawerType | undefined {
   if (typeof window === "undefined") return void 0;

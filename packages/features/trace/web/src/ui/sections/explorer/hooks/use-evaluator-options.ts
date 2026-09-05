@@ -9,12 +9,9 @@ export interface EvaluatorOption {
 }
 
 /**
- * Evaluators observed in the active time range, sourced from the shared
- * `discover` "evaluator" facet (no extra request). `options` drives the
- * eval-column picker; `nameByKey` resolves evaluator ids to names for
- * column headers and picker entries. Evaluators with no runs in range
- * simply don't appear — the user can still type a free-text key, and a
- * key with no matching runs renders an all-dash column.
+ * Evaluators observed in the active time range, sourced from the shared `discover`
+ * "evaluator" facet (no extra request). `options` drives the eval-column picker;
+ * `nameByKey` resolves evaluator ids to names for column headers and picker entries.
  */
 export function useEvaluatorOptions(): {
   options: EvaluatorOption[];

@@ -33,11 +33,6 @@ type PersistedProjectionSource = Pick<
 
 /**
  * The one persisted projection of the workbench.
- *
- * The render-scope value and the out-of-render snapshot are compared against
- * each other through `lastSavedRef`, so they have to be built the same way. A
- * field one of them carried and the other missed would make every render look
- * dirty and autosave a no-op change on every pass.
  */
 const buildPersistedState = ({
   experimentId,
@@ -75,45 +70,24 @@ const buildPersistedState = ({
 const stringifiedInitialState = JSON.stringify(buildPersistedState(createInitialState()));
 
 /**
- * The persisted projection of the store as it is RIGHT NOW, read outside the
- * render cycle. The load paths use it to record the saved baseline in the same
- * effect that loads the state: a render-scope string from the same commit
- * still describes the pre-load state, and capturing that made every page load
- * look dirty and autosave a no-op change.
+ * The persisted projection of the store as it is RIGHT NOW, read outside the render
+ * cycle.
  */
 const readPersistedSnapshot = (): string =>
   JSON.stringify(buildPersistedState(useEvaluationsV3Store.getState()));
 
 /**
- * What one `saveNow` did, for a caller that must not answer before the write
- * landed.
- *
- * An agent's UI action is that caller: it reports back "the document now says
- * this", and its next step reads the SAVED document. `"unchanged"` covers the
- * early returns, where nothing was sent because nothing needed sending, which
- * for that caller is as good as saved. `"refused"` is a newer version on the
- * server, which has its own answer. `"failed"` is everything else.
+ * What one `saveNow` did, for a caller that must not answer before the write landed.
  */
 export type AutosaveOutcome = "saved" | "unchanged" | "refused" | "failed";
 
 /**
  * What a refusal leaves the save loop to do.
- *
- * `adopted` is the one case that is not an ending: the newer version came from
- * a run this page started, so the page takes that version and sends the same
- * edits again at it.
  */
 type RefusalOutcome = AutosaveOutcome | "adopted";
 
 /**
- * What a refusal says about the version the tab has to reload to, and who
- * wrote it.
- *
- * Someone else — another tab, Langy, the API — holds a newer version. Both
- * facts ride in the refusal's meta, and the actor is what lets the banner name
- * Langy instead of telling the reader the change came from "somewhere else"
- * while Langy was driving their own tab. An older server sends neither, so the
- * version falls back to "one past what this tab knows" and the actor to none.
+ * What a refusal says about the version the tab has to reload to, and who wrote it.
  */
 function refusedSaveStaleness({
   meta,
@@ -130,11 +104,8 @@ function refusedSaveStaleness({
 }
 
 /**
- * Manages syncing the evaluations v3 state with the database.
- * Uses workbenchState field in the Experiment model for persistence.
- *
- * This hook expects the experiment to already exist - it only loads and saves.
- * New experiments are created by the index page before redirecting here.
+ * Manages syncing the evaluations v3 state with the database. Uses workbenchState field
+ * in the Experiment model for persistence.
  */
 export const useAutosaveEvaluationsV3 = () => {
   const { project } = useOrganizationTeamProject();
@@ -215,13 +186,8 @@ export const useAutosaveEvaluationsV3 = () => {
     loadedSlugRef.current = null;
   }
 
-  // Determine if we need to load the experiment from the database.
-  // We should load if:
-  // 1. We have a project and a slug in the URL
-  // 2. The store's experimentSlug doesn't match the URL slug
-  //    (this means either: new page, store was reset, or navigated to different experiment)
-  // 3. We haven't already loaded this slug in this component instance
-  //    (prevents duplicate loads during the same mount)
+  // Determine if we need to load the experiment from the database. We should load if:
+  // 1. We have a project and a slug in the URL 2.
   const shouldLoadExisting =
     !!project &&
     !!routerSlug &&
@@ -254,14 +220,8 @@ export const useAutosaveEvaluationsV3 = () => {
   const justLoadedRef = useRef(false);
 
   /**
-   * Record what the store holds after a load as the saved baseline, and decide
-   * whether the autosave pass that follows has to be skipped.
-   *
-   * A load that replaced the projection leaves one pass holding the pre-load
-   * render string, and that pass must not save it back. A load that replaced
-   * nothing produces no pass at all, because the autosave effect only runs when
-   * one of its inputs changed: arming the skip there would make the user's next
-   * edit consume it, and that edit would never be saved.
+   * Record what the store holds after a load as the saved baseline, and decide whether
+   * the autosave pass that follows has to be skipped.
    */
   const recordLoadedBaseline = useCallback(
     ({ snapshotBeforeLoad }: { snapshotBeforeLoad: string }) => {
@@ -345,15 +305,6 @@ export const useAutosaveEvaluationsV3 = () => {
 
   /**
    * What a refused autosave leaves behind.
-   *
-   * A refusal for a newer server version is not a failure to report: nothing
-   * was lost, so autosave stands down and the banner offers the reload.
-   * Everything else is a real error and is reported as one.
-   *
-   * Reads the store rather than the render scope. `saveNow` is memoized on the
-   * project alone, so it keeps the first render's copy of this function for the
-   * life of the hook, and a version or a count taken from that scope describes
-   * the mount instead of the save that just failed.
    */
   const handleAutosaveFailure = ({
     error,
@@ -411,21 +362,6 @@ export const useAutosaveEvaluationsV3 = () => {
 
   /**
    * Save what the store holds RIGHT NOW, and answer when the server has it.
-   *
-   * Reads the store rather than the render-scope projection, because its two
-   * callers both run before React has re-rendered: the debounce timer fires
-   * from a commit that may already be a change behind, and an agent's UI
-   * action calls it in the same tick as the mutation it just applied.
-   *
-   * Saves are chained rather than concurrent. Two overlapping saves send the
-   * same `expectedVersion`, so the second is refused for a version the first
-   * had just created, and the workbench reads as out of date against its own
-   * write.
-   *
-   * Every link is made to settle. `.then` on a rejected promise skips its
-   * callback, so a single throw anywhere in a save would leave the chain
-   * permanently rejected and the page would never send another one, silently,
-   * for the rest of its life.
    */
   const inFlightRef = useRef<Promise<AutosaveOutcome>>(Promise.resolve("unchanged"));
   const saveNow = useCallback((): Promise<AutosaveOutcome> => {
@@ -590,10 +526,9 @@ export const useAutosaveEvaluationsV3 = () => {
   }, [project?.id, routerSlug, trpcUtils]);
 
   /**
-   * Pull the server's current state into the store, discarding local edits.
-   * The reconciliation path: the update listener calls it silently on a clean
-   * workbench, and the stale banner's Reload button calls it on a dirty one.
-   * Clearing `staleWorkbench` is what resumes autosave.
+   * Pull the server's current state into the store, discarding local edits. The
+   * reconciliation path: the update listener calls it silently on a clean workbench,
+   * and the stale banner's Reload button calls it on a dirty one.
    */
   const reloadFromServer = useCallback(async () => {
     if (!project || !routerSlug) return;
@@ -637,10 +572,7 @@ export const useAutosaveEvaluationsV3 = () => {
     isDirty: lastSavedRef.current !== null && stringifiedState !== lastSavedRef.current,
     reloadFromServer,
     /**
-     * Persist the current store immediately instead of waiting out the
-     * debounce. An agent's edit has to be durable before the agent is told it
-     * worked, because the agent's next move is usually a server-side one that
-     * reads or writes the same document.
+     * Persist the current store immediately instead of waiting out the debounce.
      */
     saveNow,
   };

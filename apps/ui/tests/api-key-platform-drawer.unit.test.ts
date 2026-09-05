@@ -1,8 +1,6 @@
 /**
- * `openPlatformDrawer` writes the same address `openDrawer` does, including
- * its clearing of every stale `drawer.*` key — a leftover one opens an editor
- * on the row the reader looked at before this one.
- *
+ * `openPlatformDrawer` writes the same address `openDrawer` does, including its clearing of every stale
+ * `drawer.*` key — a leftover one opens an editor on the row the reader looked at before this one.
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 

@@ -61,10 +61,9 @@ const VIRTUALIZE_AT = 12;
 const ESTIMATED_TURN_HEIGHT = 220;
 
 /**
- * Pre-measure estimate per markdown chunk. Picked to overshoot rather than
- * undershoot — undershooting tells the virtualizer more chunks fit than
- * really do, mounting extra rows on every render. Real heights replace this
- * once `measureElement` runs on the rendered chunk.
+ * Pre-measure estimate per markdown chunk. Picked to overshoot rather than undershoot —
+ * undershooting tells the virtualizer more chunks fit than really do, mounting extra
+ * rows on every render.
  */
 const MARKDOWN_CHUNK_ESTIMATE_PX = 360;
 
@@ -287,11 +286,8 @@ const ConversationTurn: React.FC<{
 );
 
 /**
- * The turn the reviewer was sent to read, when the conversation has one to tell
- * apart from the rest.
- *
- * A conversation of a single turn has not: tinting the only thing on screen
- * says nothing, so it is left plain and read as any other trace would be.
+ * The turn the reviewer was sent to read, when the conversation has one to tell apart
+ * from the rest.
  */
 function turnUnderReview({
   parsedTurns,
@@ -345,12 +341,8 @@ function resolveTurns({
 }
 
 /**
- * What clicking a turn does. Opens that turn in the trace drawer unless the
- * host asked for something else.
- *
- * The callback closes over refs rather than values so its identity survives
- * navigation. Otherwise every row's memo would bail each time the reader moves
- * to another turn, even though only two rows actually changed.
+ * What clicking a turn does. Opens that turn in the trace drawer unless the host asked
+ * for something else.
  */
 function useTurnSelection({
   currentTraceId,
@@ -565,12 +557,6 @@ const ConversationHeader: React.FC<{
 
 /**
  * Where an un-virtualized thread scrolls itself to.
- *
- * On open, the reader is dropped at the turn whose trace the drawer is showing
- * rather than at the top: a long thread otherwise opens scrolled away from the
- * turn the operator clicked in from. That happens once per mount, so later
- * navigation never fights the reader. A turn put under review is scrolled to
- * as well, each time a different one is.
  */
 function useTurnListScrolling(focusTraceId: string | undefined) {
   const activeRef = useRef<HTMLDivElement>(null);
@@ -682,15 +668,7 @@ const PlainTurnsView: React.FC<TurnsViewProps & { systemPrompt: string | null }>
 };
 
 /**
- * One ref for the conversation's scroll container. The code that scrolls it and
- * the virtualizer read the node; the rail has to be told the moment it is
- * attached, since a conversation swaps scrollers as its turn count crosses the
- * virtualization threshold.
- */
-/**
- * Land on the open trace's turn instead of the top of a long thread. Once per
- * mount: the virtualizer settles estimated heights as the reader scrolls, but
- * centering on the index is close enough on open.
+ * One ref for the conversation's scroll container.
  */
 function useCenterActiveTurnInVirtualizer({
   virtualizer,
@@ -714,11 +692,9 @@ function useCenterActiveTurnInVirtualizer({
 }
 
 /**
- * Brings the turn under review onto the screen, through the virtualizer rather
- * than the DOM: a turn that is not on screen has no element to scroll to, and
- * the index is what the virtualizer needs to put one there. It waits out the
- * same rest the un-virtualized path does, so a long thread and a short one
- * carry the reader at the same moment.
+ * Brings the turn under review onto the screen, through the virtualizer rather than the
+ * DOM: a turn that is not on screen has no element to scroll to, and the index is what
+ * the virtualizer needs to put one there.
  */
 function useScrollFocusedTurnInVirtualizer({
   virtualizer,
@@ -847,10 +823,8 @@ function useVirtualizedTurnList({
 }
 
 /**
- * Virtualized rendering path for long conversations. Mirrors the threshold +
- * shape used by `ConversationTurnsList` so we share a mental model across the
- * codebase. The system-prompt banner stays sticky at the top, outside the
- * virtual range, so it doesn't get measured + remeasured every scroll.
+ * Virtualized rendering path for long conversations. Mirrors the threshold + shape used
+ * by `ConversationTurnsList` so we share a mental model across the codebase.
  */
 const VirtualizedTurnsView: React.FC<TurnsViewProps & { systemPrompt: string | null }> = ({
   layout,

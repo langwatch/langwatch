@@ -1,13 +1,7 @@
 /**
+ * The INPUT/OUTPUT panel toolbar: one format selector, the action buttons, and the
+ * overflow behaviour when the row runs out of room.
  * @vitest-environment jsdom
- *
- * The INPUT/OUTPUT panel toolbar: one format selector, the action buttons,
- * and the overflow behaviour when the row runs out of room. Overflow is
- * driven by `useOverflowVisibility`, which measures real rects — jsdom
- * reports zeros, so the tests that need a narrow toolbar stub
- * `getBoundingClientRect` for the scroller and its items.
- *
- * UX contract: specs/traces-v2/io-toolbar.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -95,11 +89,7 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 /**
- * Rects for the overflow measurement. When `itemRights` is set, elements
- * carrying `data-overflow-id` report the mapped right edge and the scroller
- * (the nearest element containing them) reports `containerRight`; without it
- * everything keeps jsdom's zero rects, which the hook reads as a row that is
- * not laid out and leaves alone.
+ * Rects for the overflow measurement.
  */
 let itemRights: Record<string, number> | null = null;
 let containerRight = 0;
@@ -161,13 +151,8 @@ function renderViewer(over: Partial<React.ComponentProps<typeof IOViewer>>) {
 const formatTrigger = () => screen.getByRole("button", { name: "Input view format" });
 
 /**
- * The row `useOverflowVisibility` measures, resolved from the slots it measures
- * rather than by walking a fixed number of parents.
- *
- * The slots are its direct children, so asserting that pins the element down.
- * A walk that quietly landed on an ancestor instead would make "this is inside
- * the measured row" true of anything on the panel, and the tests below would
- * pass whatever the toolbar rendered.
+ * The row `useOverflowVisibility` measures, resolved from the slots it measures rather
+ * than by walking a fixed number of parents.
  */
 function measuredRow(): HTMLElement {
   const slots = [...document.querySelectorAll<HTMLElement>("[data-overflow-id]")];

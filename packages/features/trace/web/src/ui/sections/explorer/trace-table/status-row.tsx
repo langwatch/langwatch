@@ -13,11 +13,7 @@ export interface RowStyle {
   bg: Color;
   hoverBg: Color;
   /**
-   * Per-cell vertical separator + row bottom border. Defaults to
-   * Chakra's subtle border tokens; error/warning variants tint it so
-   * the row separators stay visible against the red/yellow tinted bg
-   * (otherwise the grey separators get washed out and adjacent error
-   * rows visually melt into each other).
+   * Per-cell vertical separator + row bottom border.
    */
   separatorColor: Color;
   /** Slightly stronger separator for the row's bottom border. */
@@ -36,12 +32,9 @@ export const ROW_STYLES: Record<RowVariant, RowStyle> = {
     bottomSeparatorColor: "border.muted",
   },
   error: {
-    // Was `red.fg/3` — invisible at table thumbnail width and indistinguishable
-    // from `default` for most viewers, so an "All" lens with a handful of
-    // failing traces read as healthy. Bumped to `/8` so an error row reads as
-    // "something's wrong here" without crossing into "this row is selected"
-    // territory (selected uses `blue.subtle` ≈ /15 worth of weight). Hover
-    // bumps to `/14` so the row still lifts on cursor-over without saturating.
+    // Was `red.fg/3` — invisible at table thumbnail width and indistinguishable from
+    // `default` for most viewers, so an "All" lens with a handful of failing traces
+    // read as healthy.
     borderColor: "red.fg",
     bg: "red.fg/8",
     hoverBg: "red.fg/14",
@@ -84,30 +77,24 @@ export function rowVariantFor({
 interface StatusRowGroupProps {
   style: RowStyle;
   /**
-   * The resolved row variant. Surfaced as a `data-row-variant` attribute
-   * on the tbody so per-variant CSS (e.g. the sticky-first-column rule
-   * in TraceTableShell) can stay in sync with whatever colour the row
-   * itself is painting.
+   * The resolved row variant. Surfaced as a `data-row-variant` attribute on the tbody
+   * so per-variant CSS (e.g. the sticky-first-column rule in TraceTableShell) can stay
+   * in sync with whatever colour the row itself is painting.
    */
   variant: RowVariant;
   onClick?: (e: React.MouseEvent) => void;
   traceId?: string;
   isNew?: boolean;
   /**
-   * When true, play a brief in-place update pulse animation. Used when
-   * an SSE event arrives for a row that's already visible — the row data
-   * was updated in the cache directly, so we don't need to refetch the
-   * list; just signal that something changed. Distinct from `isNew`
-   * (which fires for rows that just arrived in the viewport after a list
-   * invalidation). Both can be true simultaneously.
+   * When true, play a brief in-place update pulse animation. Used when an SSE event
+   * arrives for a row that's already visible — the row data was updated in the cache
+   * directly, so we don't need to refetch the list; just signal that something changed.
    */
   isPulsing?: boolean;
   /**
-   * Set while the Langy panel is open and this row has registered itself as a
-   * context target (see `useLangyContextTarget`): the shimmer-ring class, the
-   * added-state data attribute, and a capture-phase click handler that takes
-   * the row into Langy's context instead of opening the drawer. Empty — and so
-   * completely inert — whenever Langy is closed.
+   * Set while the Langy panel is open and this row has registered itself as a context target (see
+   * `useLangyContextTarget`): the shimmer-ring class, the added-state data attribute, and a capture-phase click
+   * handler that takes the row into Langy's context instead of opening the drawer.
    */
   langyTargetProps?: LangyContextTargetProps;
   children: React.ReactNode;

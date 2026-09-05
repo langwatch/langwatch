@@ -1,14 +1,6 @@
 /**
- * The body of the run drawer: the conversation, the judge results and the
- * parameters, beside each other when the window gives enough room and stacked
- * under each other when it does not.
- *
- * The results read as a plain list of the criteria the judge scored. They are
- * always open: they are the answer the drawer was opened for.
- *
- * The messages carry no section heading and no line between them and the
- * results, so the drawer reads as one page rather than two panes.
- *
+ * The body of the run drawer: the conversation, the judge results and the parameters, beside each other when the
+ * window gives enough room and stacked under each other when it does not.
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
@@ -72,10 +64,6 @@ function ConversationEmptyState({
 
 /**
  * What stands where the messages will be, on a run that has none.
- *
- * A run waiting for its turn says so, a run that failed before anyone spoke
- * says that instead of reading as one still waiting, and a run whose next
- * speaker is known draws the bubble that message will land in.
  */
 function EmptyConversation({
   detail: _detail,
@@ -176,15 +164,6 @@ const JUDGED_STATUSES = new Set<string>([ScenarioRunStatus.SUCCESS, ScenarioRunS
 
 /**
  * What the run is still doing, while it has no verdict to show.
- *
- * The judge reads the conversation after every turn and is what ends the run,
- * so a run that is still going is one whose turns have not settled a verdict
- * yet, and a run that has settled but carries no verdict is one whose written
- * verdict has not landed.
- *
- * A verdict is a verdict even with no criteria under it: a scripted run, such
- * as the ping an agent test sends, is judged by its script and answers with a
- * verdict and a reasoning alone.
  */
 function pendingMessageFor(scenarioState: RunScenarioState): string | null {
   if (hasVerdict(scenarioState)) return null;

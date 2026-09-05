@@ -1,9 +1,5 @@
 /**
  * The workbench's saved versions, as a list.
- *
- * It is rendered inside the popover the history button anchors
- * (`VersionHistoryButton`). The list owns the query, the current badge and the
- * two-step restore; the popover only gives it a place to sit.
  */
 import { Badge, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
@@ -33,11 +29,6 @@ interface VersionEntry {
 
 /**
  * Who saved a version, in the words the reader knows the writer by.
- *
- * A version written by a person is theirs, so it carries their name when we
- * have one and "You" when we do not. The person reading their own history is
- * by far the common case, and a bare id helps no one. The two automated
- * writers name themselves.
  */
 const authorOf = (entry: VersionEntry): string => {
   if (entry.authorLabel === "langy") return "Langy";
@@ -47,21 +38,12 @@ const authorOf = (entry: VersionEntry): string => {
 
 /**
  * What the row is called.
- *
- * Numbered versions are the ones a person made on purpose, and they run 1, 2,
- * 3 with no gaps. Typing writes one autosave row that every later save
- * rewrites, so its number changes under the reader and means nothing to them.
- * It is named for what it is instead.
  */
 const titleOf = (entry: VersionEntry): string =>
   entry.autoSaved ? "Autosave" : `v${entry.version}`;
 
 /**
  * Restore a saved version and leave the open workbench holding it.
- *
- * The restore is finished only once the page's own query has answered again
- * and the store holds what it returned, so this refetches the same query the
- * page loads by rather than keeping a second copy of the mapping.
  */
 const useVersionRestore = ({
   experimentId,

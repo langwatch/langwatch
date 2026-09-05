@@ -1,15 +1,7 @@
 /**
+ * The panel header rail: one line, the actions cluster, Minimise always last, and history as a PLACE that swaps the panel body for the recents list and hands it back.
  * @vitest-environment jsdom
- *
- * The panel header rail: one line, the actions cluster, Minimise always last,
- * and history as a PLACE that swaps the panel body for the recents list and
- * hands it back.
- *
  * Spec: specs/langy/langy-panel-header.feature
- *
- * Boundary mocks: the project/host context, `@ai-sdk/react`, the model picker
- * (an unrelated dependency chain), and the Langy API surface (an in-memory
- * tRPC-shaped double). The panel, the store and the header are all real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

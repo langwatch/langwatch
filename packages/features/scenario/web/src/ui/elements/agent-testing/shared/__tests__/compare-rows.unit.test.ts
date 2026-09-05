@@ -1,7 +1,5 @@
 /**
- * The rows of a comparison: how they open, grow, and tell two equal targets
- * apart.
- *
+ * The rows of a comparison: how they open, grow, and tell two equal targets apart.
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

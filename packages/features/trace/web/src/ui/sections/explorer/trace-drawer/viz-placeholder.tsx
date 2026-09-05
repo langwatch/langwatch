@@ -46,11 +46,9 @@ interface VizPlaceholderProps {
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
   /**
-   * When true, the viz fills its parent's full height — the internal
-   * height state and the bottom resize handle are skipped because the
-   * parent (`<PanelGroup>` from `react-resizable-panels`) owns sizing.
-   * Used by the new pane layout where every section is its own
-   * independently sized panel.
+   * When true, the viz fills its parent's full height — the internal height state and
+   * the bottom resize handle are skipped because the parent (`<PanelGroup>` from
+   * `react-resizable-panels`) owns sizing.
    */
   fillParent?: boolean;
   /**
@@ -91,11 +89,8 @@ interface VizTabDef {
 }
 
 /**
- * Shared icon + label + shortcut + presence-dot row used by both the
- * in-row tab AND the overflow menu's dropdown entries. Keeping this in
- * one place avoids the dropdown losing the icon / kbd hint when a tab
- * is folded out of sight — the user sees the same affordance either
- * way.
+ * Shared icon + label + shortcut + presence-dot row used by both the in-row tab AND the
+ * overflow menu's dropdown entries.
  */
 function VizTabContent({ tab, traceId }: { tab: VizTabDef; traceId: string | null }) {
   return (
@@ -110,16 +105,9 @@ function VizTabContent({ tab, traceId }: { tab: VizTabDef; traceId: string | nul
   );
 }
 
-// The viz strip ships four tabs as of Round 3. Span List stays retired —
-// it added filter chrome but no fundamentally new data axis, and the
-// waterfall + sidebar filter together cover the same workflow. Flame
-// was retired alongside it but brought back because the time-weighted
-// block layout reads completely differently from the indented waterfall
-// when scanning hot paths: waterfall makes parent/child easy, flame
-// makes "where time goes" obvious. Sequence + Topology cover
-// specialised flows the waterfall can't render natively. Flame sits
-// right after Waterfall so the two timing views read as a pair before
-// the structural views.
+// The viz strip ships four tabs as of Round 3. Span List stays retired — it added
+// filter chrome but no fundamentally new data axis, and the waterfall + sidebar filter
+// together cover the same workflow.
 const TABS: VizTabDef[] = [
   {
     value: "waterfall",
@@ -390,12 +378,9 @@ export function VizPlaceholder({
                     marginY={1}
                     borderRadius="md"
                     cursor="pointer"
-                    // Light mode: inactive tabs render in neutral grey so
-                    // the strip doesn't read as a wall of saturated
-                    // colour against the otherwise muted light surface.
-                    // Dark mode: keep the palette colour — against the
-                    // darker background the palette tones read as a
-                    // helpful colour-coded picker.
+                    // Light mode: inactive tabs render in neutral grey so the strip
+                    // doesn't read as a wall of saturated colour against the otherwise
+                    // muted light surface.
                     color={
                       isActive
                         ? `${tab.palette}.fg`
@@ -489,15 +474,9 @@ export function VizPlaceholder({
                 alignSelf="center"
                 height="26px"
                 flexShrink={0}
-                // When the detail pane is collapsed-to-zero against
-                // the resize handle on this edge, the handle's 6px
-                // hit-zone overlay (`z-index: 2` in PaneResizeBar)
-                // sits on top of this button. Without an explicit
-                // `position` + higher `z-index`, the overlay wins:
-                // cursor reads as col-resize and clicks land on the
-                // (no-op) resize, leaving the operator stuck. The
-                // overlay is intentionally still there so a mid-drag
-                // "oops, too far" can be undone by dragging back.
+                // When the detail pane is collapsed-to-zero against the resize handle
+                // on this edge, the handle's 6px hit-zone overlay (`z-index: 2` in
+                // PaneResizeBar) sits on top of this button.
                 position="relative"
                 zIndex={3}
                 aria-label="Show details"
@@ -606,10 +585,7 @@ export function VizPlaceholder({
 // feel.
 
 /**
- * Loading skeleton dispatched by the active viz tab. Each variant mimics
- * the shape of the real view so the user's eye doesn't have to re-anchor
- * when data lands — waterfall rows stay where waterfall rows will be,
- * flame strips at flame depths, span list as a table.
+ * Loading skeleton dispatched by the active viz tab.
  */
 function VizSkeleton({ vizTab }: { vizTab?: VizTab }) {
   if (vizTab === "topology") return <TopologySkeleton />;

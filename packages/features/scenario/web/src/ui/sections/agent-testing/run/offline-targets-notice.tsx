@@ -1,9 +1,5 @@
 /**
  * What the run dialog says when a chosen agent has no process behind it.
- *
- * The run is refused when it starts, so the dialog says it before the person
- * presses Run rather than after every scenario failed.
- *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 

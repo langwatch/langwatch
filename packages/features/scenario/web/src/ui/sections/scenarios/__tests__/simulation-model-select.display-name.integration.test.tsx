@@ -1,17 +1,6 @@
 /**
+ * SimulationModelSelect is the model picker for the scenario user-simulator / judge roles — specs/model-providers/custom-model-display-name.feature, "Scenario model picker shows the configured display name".
  * @vitest-environment jsdom
- *
- * SimulationModelSelect is the model picker for the scenario
- * user-simulator / judge roles — specs/model-providers/custom-model-display-name.feature,
- * "Scenario model picker shows the configured display name".
- *
- * Regression cover for issue #5759. It wraps ProviderModelSelector but
- * builds `options` itself from the project's providers, so it bypasses
- * `useModelSelectionOptions` entirely and no other test reaches it. It
- * used to forward no `displayNames` map, leaving the dropdown on
- * ProviderModelSelector's raw-id fallback; these tests pin the map
- * forwarding that fixed it.
- *
  * @see specs/model-providers/custom-model-display-name.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

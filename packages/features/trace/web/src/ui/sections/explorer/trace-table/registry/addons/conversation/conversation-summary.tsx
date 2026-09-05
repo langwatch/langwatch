@@ -28,10 +28,7 @@ function pluralise({
 }
 
 /**
- * The trace-count line. `traceCount` is the server rollup over the whole
- * session, while the expanded turn list is a capped preview, so once fewer
- * turns are loaded than the session holds the label says which of the two it
- * is showing rather than letting the list read as complete.
+ * The trace-count line.
  */
 export function traceCountLabel(group: ConversationGroup): string {
   const noun = pluralise({

@@ -4,15 +4,6 @@ import { type Transform, TransformError } from "./types";
 
 /**
  * Write one cell of an inline dataset.
- *
- * The column has to exist on the dataset: writing to an unknown column id would
- * add a record the table never shows, so the value would be invisible and the
- * write would still report success.
- *
- * Every column is padded with empty strings up to the row being written, not
- * only the one that takes the value. The table reads a row across all columns,
- * so padding one column alone would put the new value on a row the other
- * columns do not have, and the run would read the cells beside it as missing.
  */
 export const setCellValue: Transform<
   SetCellValuePayload,

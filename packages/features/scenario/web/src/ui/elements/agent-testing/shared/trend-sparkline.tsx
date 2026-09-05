@@ -1,15 +1,5 @@
 /**
  * How the last runs of a row went, oldest first.
- *
- * One bar per run, or per execution, depending on what the row stands for.
- * Height and colour both come from the same pass rate through the one colour
- * helper, so a short bar and a red bar always say the same thing, and a rate
- * that reads amber in the text beside it cannot read green here.
- *
- * The bars are drawn softer than the text, at the one shared opacity, because
- * they are a glance at history rather than the row's headline: the percentage
- * is, and it stays at full strength.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

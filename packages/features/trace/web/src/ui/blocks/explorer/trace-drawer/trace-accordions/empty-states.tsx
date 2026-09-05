@@ -13,12 +13,8 @@ export function EmptyHint({ children }: { children: ReactNode }) {
 }
 
 /**
- * Compact card for a trace signal that wasn't captured (no evals / no events
- * / no managed prompt). Several of these sit side-by-side in the summary's
- * "Other" section so the empty categories share one row instead of each
- * eating a full-width accordion — same information, a fraction of the
- * vertical space. Carries a short blurb and a single CTA to set the signal
- * up.
+ * Compact card for a trace signal that wasn't captured (no evals / no events / no
+ * managed prompt).
  */
 export function EmptySignalCard({
   icon,

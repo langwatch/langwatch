@@ -50,10 +50,6 @@ const isThePinnedVersion = ({
 
 /**
  * The variables one column's template really consumes.
- *
- * Undefined when the answer is not the template this column runs: the query
- * asks for the pinned version, so a mismatch means describing the column from
- * the wrong template, which is worse than describing nothing.
  */
 const fieldsUsedByTarget = ({
   target,
@@ -71,14 +67,9 @@ const fieldsUsedByTarget = ({
 };
 
 /**
- * Resolves the variables every prompt target's saved template consumes and
- * publishes them to mapping validation, so a column warns about a variable the
- * prompt really uses and stays quiet about one it only declares.
- *
- * The queries reuse the key the column headers already read for the prompt
- * name and the version badge, so they come from the react-query cache. A
- * target pinned to a version other than the one loaded here resolves to
- * nothing, and validation then requires no mapping of it.
+ * Resolves the variables every prompt target's saved template consumes and publishes
+ * them to mapping validation, so a column warns about a variable the prompt really uses
+ * and stays quiet about one it only declares.
  */
 export const PromptTemplateFieldsProvider = ({ children }: { children: ReactNode }) => {
   const { project } = useOrganizationTeamProject();

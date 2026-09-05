@@ -3,13 +3,8 @@ import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOrganizationTeamProject } from "./use-organization-team-project";
 
 /**
- * Returns callbacks that navigate to the simulations page (runs list)
- * when a scenario run completes or fails.
- *
- * Mirrors the navigation behavior already used by ScenarioFormDrawer on
- * its initial Save-and-Run, so "Run Again" from a run-detail drawer
- * lands the user on the runs list with the new batch highlighted
- * instead of stacking another drawer on the same page.
+ * Returns callbacks that navigate to the simulations page (runs list) when a scenario
+ * run completes or fails.
  */
 export function useDrawerRunCallbacks() {
   const router = useRouter();

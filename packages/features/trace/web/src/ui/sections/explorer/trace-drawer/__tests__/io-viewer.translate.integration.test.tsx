@@ -1,10 +1,7 @@
 /**
- * @vitest-environment jsdom
- *
  * Translate action on the Summary tab's input/output panels
- * (specs/traces-v2/message-translation.feature). Renders the real
- * IOViewer with the real useTextTranslation hook; only the tRPC
- * boundary is mocked.
+ * (specs/traces-v2/message-translation.feature).
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

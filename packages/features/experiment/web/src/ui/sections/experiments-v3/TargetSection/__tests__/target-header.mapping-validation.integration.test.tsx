@@ -802,13 +802,9 @@ describe("Target header alert icon integration", () => {
   });
 
   it("shows alert when prompt has variable that cannot be auto-mapped", () => {
-    // This simulates the flow when a prompt is loaded:
-    // 1. Target is created with placeholder inputs
-    // 2. Drawer opens and loads prompt content
-    // 3. onLocalConfigChange is called with the real inputs
-    // 4. Inference runs for new inputs
-    // 5. Variables that CAN be mapped (e.g., user_input → input) are mapped
-    // 6. Variables that CANNOT be mapped show alert icon
+    // This simulates the flow when a prompt is loaded: 1. Target is created with
+    // placeholder inputs 2. Drawer opens and loads prompt content 3.
+    // onLocalConfigChange is called with the real inputs 4.
 
     const targetId = "target-drawer-flow";
 
@@ -867,15 +863,6 @@ describe("Target header alert icon integration", () => {
 
   it("cleared mapping stays cleared after closing and reopening drawer", () => {
     // Test that user-cleared mappings persist across drawer opens.
-    //
-    // Flow:
-    // 1. Add target with inputs (auto-mapping happens in addTarget)
-    // 2. User clears a mapping
-    // 3. User closes and reopens drawer
-    // 4. Mapping should STILL be cleared (no re-auto-mapping)
-    //
-    // FIX: Auto-mapping only happens when target is ADDED to workbench.
-    // The drawer does NOT re-run auto-mapping on open.
 
     const targetId = "target-cleared-mapping";
 
@@ -917,12 +904,8 @@ describe("Target header alert icon integration", () => {
   });
 
   it("auto-maps user_input to input column via semantic equivalents", () => {
-    // This verifies that semantic equivalents work correctly:
-    // user_input: ["input", ...] means user_input field can map to input column
-    //
-    // The flow:
-    // 1. Add target with real inputs (addTarget auto-maps)
-    // 2. user_input gets mapped to input column via semantic equivalents
+    // This verifies that semantic equivalents work correctly: user_input: ["input",
+    // ...] means user_input field can map to input column
 
     const targetId = "target-semantic";
 
@@ -962,14 +945,8 @@ describe("Target header alert icon integration", () => {
   });
 
   it("does not crash when updateTarget is called with inputs on a target that has inputs undefined", () => {
-    // BUG REPRO: This reproduces the exact crash:
-    // "can't access property 'map', existingTarget.inputs is undefined"
-    //
-    // This happens when:
-    // 1. A target exists in the store without inputs (or with inputs: undefined)
-    // 2. updateTarget is called with new inputs
-    // 3. The store tries to do: existingTarget.inputs.map(...)
-    // 4. CRASH because inputs is undefined
+    // BUG REPRO: This reproduces the exact crash: "can't access property 'map',
+    // existingTarget.inputs is undefined"
 
     const targetId = "target-crash-test";
 
@@ -1003,12 +980,8 @@ describe("Target header alert icon integration", () => {
   });
 
   it("handles the exact flow when handleSelectPrompt callback fires", () => {
-    // This reproduces the EXACT flow that causes the crash:
-    // 1. handleSelectPrompt creates target with placeholder inputs
-    // 2. Opens drawer
-    // 3. Drawer's form subscription fires onLocalConfigChange
-    // 4. onLocalConfigChange calls updateTarget with new inputs
-    // 5. CRASH if existingTarget.inputs is undefined
+    // This reproduces the EXACT flow that causes the crash: 1. handleSelectPrompt
+    // creates target with placeholder inputs 2. Opens drawer 3.
 
     const targetId = "target-select-prompt-flow";
 
@@ -1055,13 +1028,7 @@ describe("Target header alert icon integration", () => {
   });
 
   it("shows alert icon when prompt has unmapped variable after drawer loads", () => {
-    // Flow:
-    // 1. User adds prompt "my-first-prompt" to workbench
-    // 2. handleSelectPrompt creates target with REAL inputs from prompt list data
-    // 3. addTarget auto-maps based on real inputs
-    // 4. user_input gets auto-mapped to input column (via semantic equiv)
-    // 5. foobar has NO mapping (no matching column)
-    // 6. Alert icon SHOULD show because foobar is unmapped
+    // Flow: 1.
 
     const targetId = "target-alert-test";
 

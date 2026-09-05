@@ -1,47 +1,6 @@
 /**
- * Developer mode's inspector — a drawer that slides out of the LEFT edge of the
- * Langy panel.
- *
- * Developer mode used to be a scatter: a "show raw JSON" toggle on each tool
- * card, some extra fields on error cards, and a hidden card gallery. Useful, but
- * only where someone had thought to add an expander, and never for the questions
- * that actually come up — did the server send anything? in what order? what does
- * the client believe right now? So the mode grows a place of its own, beside the
- * conversation rather than inside it. The three wire views PARTITION the tape —
- * every entry appears in exactly one of them, so no kind is invisible — and they
- * run in pipeline order, which makes finding the stage that lost something a
- * left-to-right read:
- *
- *   TOKENS   the answer as it arrives, straight off the wire, with the
- *            rendering pipeline taken out of the picture. When the panel shows
- *            different prose from what was streamed, this is the arbiter.
- *   EPHEMERAL the signals that never become message parts — status, progress,
- *            milestones, reasoning, plan snapshots, the terminal frame. They
- *            fork into the store, drive the thinking line and the fold, and are
- *            then gone; nothing persists them, which is what makes them the
- *            hardest part of a turn to debug. Including the ones the transport
- *            swallows, because "the UI showed nothing" and "the server sent
- *            nothing" are different bugs.
- *   EVENTS   tool calls, each FOLDED from its two wire entries (input, output,
- *            error, duration) and shown WITH the card it produced — kind,
- *            surface, tone, body widget. Cards are not on the wire; there is no
- *            "card event". They are derived here by `resolveCliCapability`, so
- *            a call that renders as a plain activity line instead of the rich
- *            card you expected is only visible as such here.
- *   STORE    the client's live belief: turn phase, ids, in-flight signals,
- *            the panel's own flags. Most Langy UI bugs are a disagreement
- *            between this and the tape above, and the fastest way to see one is
- *            to put them on the same screen.
- *
- * IT LIVES OUTSIDE THE PANEL, on purpose. The panel sets `overflow: hidden` (it
- * owns its own scrolling surface and has to clip the fold), so a child sliding
- * left would simply be cut off at the edge. The drawer is therefore a fixed
- * sibling that MIRRORS the panel's exact silhouette per layout — the measured
- * panel height on the same bottom inset when floating, the dock's full
- * header-to-floor span when docked — so the pair always shares both horizontal
- * edges (see resolveInspectorFrame). Its right edge tucks under the panel; the
- * left hairline is its only border, and it wears the panel's own glass
- * (surface at alpha over a blur) so it reads as the same material.
+ * Developer mode's inspector — a drawer that slides out of the LEFT edge of the Langy
+ * panel.
  */
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Eraser, X } from "lucide-react";
@@ -77,13 +36,9 @@ const MotionBox = motion.create(Box);
 
 type DevTab = "log" | "tokens" | "ephemeral" | "events" | "store";
 
-// LOG is the whole tape, every lane interleaved in arrival order — outbound
-// commands, the inbound stream, the durable event log, the freshness signals —
-// because "in what order, across channels?" is the question the partitioned
-// views cannot answer. The three wire views then PARTITION the stream lane —
-// deltas, signals, tool calls — so every stream entry is visible in exactly
-// one of them. Store is the client's own belief, which is what you compare
-// them all against.
+// LOG is the whole tape, every lane interleaved in arrival order — outbound commands,
+// the inbound stream, the durable event log, the freshness signals — because "in what
+// order, across channels?" is the question the partitioned views cannot answer.
 const TABS: { id: DevTab; label: string }[] = [
   { id: "log", label: "Log" },
   { id: "tokens", label: "Tokens" },
@@ -123,13 +78,9 @@ export function LangyDevDrawer({
     setRecording(open);
   }, [open, setRecording]);
 
-  // TIME TRAVEL. `scrubSeq` caps every view at one moment of the tape; null is
-  // LIVE (follow the edge). It lives in the dev-log STORE because the chat
-  // panel time-travels with it (langy-time-travel.ts) — the whole UI, not just
-  // this drawer. Scrubbing costs nothing to be correct: the views are pure
-  // functions of the visible records, and the fold readout is literally re-run
-  // from the recorded durable lane (replayTurnProjection) — the same reducers
-  // the live store uses, exercised on history.
+  // TIME TRAVEL. `scrubSeq` caps every view at one moment of the tape; null is LIVE
+  // (follow the edge). It lives in the dev-log STORE because the chat panel
+  // time-travels with it (langy-time-travel.ts) — the whole UI, not just this drawer.
   const scrubSeq = useLangyDevLog((s) => s.scrubSeq);
   const setScrubSeq = useLangyDevLog((s) => s.setScrub);
   const allRecords = useLangyDevLog((s) => s.records);
@@ -321,12 +272,7 @@ function DrawerHeader({
 }
 
 /**
- * TIME TRAVEL. A bar across the whole recorded tape: drag it and every view
- * caps at that moment — the log, the tokens as they stood, the calls that had
- * settled — and the readout underneath shows the TURN FOLD replayed from the
- * recorded durable lane up to that point, through the same @langwatch/langy
- * reducers the live store runs (ADR-059's replayability, made a control).
- * Snapping to the right edge returns to LIVE, which follows the tape's edge.
+ * TIME TRAVEL.
  */
 function TimeScrubber({
   records,
@@ -425,11 +371,7 @@ const LANE_STYLE: Record<LangyDevLogRecord["lane"], { glyph: string; color: stri
 };
 
 /**
- * LOG: the whole tape, every lane interleaved in arrival order. Outbound
- * commands (→), the inbound stream (←), the durable EVENT LOG the fold is
- * built from (⇐), and the freshness signals (·) — on one timeline, because
- * cross-channel ordering ("did the signal beat the stream? did we send before
- * the terminal?") is the thing no partitioned view can show.
+ * LOG: the whole tape, every lane interleaved in arrival order.
  */
 function LogTab({ records, live }: { records: LangyDevLogRecord[]; live: boolean }) {
   const dropped = useLangyDevLog((s) => s.dropped);
@@ -549,10 +491,7 @@ const LANE_LEGEND: {
 ];
 
 /**
- * The empty tape, put to work. A bare sentence over a void taught nothing and
- * read as a broken pane; the space now carries the one thing worth knowing
- * before the first entry lands — what each lane glyph will mean — plus the
- * tape's own terms (armed, ring-bounded, scoped to the open conversation).
+ * The empty tape, put to work.
  */
 function TapeEmpty() {
   return (
@@ -637,19 +576,8 @@ function TokensTab({ records, live }: { records: LangyDevLogRecord[]; live: bool
 }
 
 /**
- * The EPHEMERAL signals: everything on the wire that is not a token and not a
- * tool call.
- *
- * These are the entries that never become message parts — status lines,
- * progress samples, milestones, the model's reasoning, plan snapshots, and the
- * terminal frame. They fork out of the transport into the store to drive the
- * thinking line, the status row and the fold's motion, and then they are gone;
- * nothing persists them, so after the turn settles there is no record of them
- * anywhere else. That is exactly why they are the hardest part of a turn to
- * debug, and why they get their own view.
- *
- * Together with Tokens (deltas) and Events (tool calls), this accounts for
- * every entry on the tape — no kind is invisible in the inspector.
+ * The EPHEMERAL signals: everything on the wire that is not a token and not a tool
+ * call.
  */
 function EphemeralTab({ records, live }: { records: LangyDevLogRecord[]; live: boolean }) {
   const dropped = useLangyDevLog((s) => s.dropped);
@@ -782,18 +710,6 @@ function SignalRow({ record }: { record: Extract<LangyDevLogRecord, { lane: "str
 
 /**
  * EVENTS: one row per tool call, WITH the card that call produced.
- *
- * Tools and cards were briefly two tabs, and splitting them was wrong — you
- * never want one without the other. The question is always "this call ran, so
- * what did the panel draw for it", and answering it meant holding two lists side
- * by side and matching them up by name.
- *
- * So a row is the whole story: the call folded from its two wire entries (input,
- * output, error, duration), and beneath it what `resolveCliCapability` decided —
- * card kind, surface, tone, body widget. Cards are NOT on the wire; there is no
- * "card event" to record. They are derived here, client-side, from the tool
- * name, which is why a call rendering as a plain activity line instead of a rich
- * card is only ever visible in this view.
  */
 function EventsTab({ records, live }: { records: LangyDevLogRecord[]; live: boolean }) {
   const calls = useMemo(() => toolCallsFrom(records), [records]);

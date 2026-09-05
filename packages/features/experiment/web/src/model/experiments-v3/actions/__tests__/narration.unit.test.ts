@@ -1,13 +1,6 @@
 /**
- * @vitest-environment node
- *
  * Every action the page can be asked to carry out has words for the reader.
- *
- * The status line falls back to a verb that claims nothing when it has no
- * specific truth to tell, so an action with no narration is not a broken
- * screen: it is a silent one, which is exactly the state that made a busy
- * page read as a stalled one for minutes at a time. A new action kind must
- * therefore fail here rather than quietly narrate nothing.
+ * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
 import { WORKBENCH_ACTION_KINDS } from "../manifest";

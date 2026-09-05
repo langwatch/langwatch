@@ -24,15 +24,8 @@ interface ApiKeyIntegrationInfoCardProps {
 }
 
 /**
- * Hardcoded scope for the empty-state API key: project-level MEMBER role —
- * read+write within the active project, nothing else. We don't expose a
- * scope picker here because the goal is one-click provisioning for "send
- * me my first traces"; users who need narrower or broader scopes can mint
- * a custom API key from Settings → API Keys.
- *
- * TODO(traces-v2): When LangWatch ships a tracing-only custom role we
- * should switch this to `customRoleId = TRACING_RW` for least-privilege.
- * MEMBER is the closest preset that grants traces + prompts read/write.
+ * Hardcoded scope for the empty-state API key: project-level MEMBER role — read+write
+ * within the active project, nothing else.
  */
 function buildEmptyStateBindings(projectId: string) {
   return [
@@ -69,12 +62,9 @@ function buildEnvLines({
   endpoint: string;
   showEndpoint: boolean;
 }): EnvLine[] {
-  // Highlight every line so the whole block reads as "this is what you
-  // copy" at a glance — the API key, the project id, and (when self-
-  // hosted) the endpoint all matter to get traces flowing.
-  // `ENDPOINT` is only emitted when self-hosted — on cloud the SDK
-  // falls back to the default URL, so surfacing the line at all would
-  // just be noise.
+  // Highlight every line so the whole block reads as "this is what you copy" at a
+  // glance — the API key, the project id, and (when self- hosted) the endpoint all
+  // matter to get traces flowing.
   const lines: EnvLine[] = [
     { key: "LANGWATCH_API_KEY", value: token, highlight: true },
     { key: "LANGWATCH_PROJECT_ID", value: projectId, highlight: true },
@@ -90,18 +80,9 @@ function renderEnv(lines: EnvLine[]): string {
 }
 
 /**
- * Generate-token card for the traces-v2 empty state. Mints an API key
- * scoped to the caller's role bindings, then renders the
- * `LANGWATCH_API_KEY` / `LANGWATCH_PROJECT_ID` / `LANGWATCH_ENDPOINT`
- * env block exactly once. The parent owns the token so other setup
- * paths (Coding Agent, MCP) can render with the same credential.
- *
- * The env block is rendered through the shared CodePreview so the
- * lines that the user actually needs to act on (`LANGWATCH_API_KEY`,
- * and `LANGWATCH_ENDPOINT` when self-hosted) are highlighted via shiki.
- * `LANGWATCH_ENDPOINT` is omitted entirely when the deployment matches
- * the cloud default — it's a no-op on cloud and adding clutter would
- * obscure the lines that matter.
+ * Generate-token card for the traces-v2 empty state. Mints an API key scoped to the
+ * caller's role bindings, then renders the `LANGWATCH_API_KEY` / `LANGWATCH_PROJECT_ID`
+ * / `LANGWATCH_ENDPOINT` env block exactly once.
  */
 export function ApiKeyIntegrationInfoCard({
   organizationId,
@@ -140,14 +121,7 @@ export function ApiKeyIntegrationInfoCard({
     );
   };
 
-  // `G` triggers Generate when the button is on screen. Skipped when a
-  // token is already minted (button disappears) or while another mutation
-  // is in flight, and suppressed for typing targets so it doesn't fire
-  // when the user is in an input elsewhere on the page.
-  //
-  // Route through a ref so the handler always invokes the latest closure
-  // (organizationId/projectId/onTokenGenerated change → ref updates) without
-  // re-binding the listener on every render.
+  // `G` triggers Generate when the button is on screen.
   const handleGenerateRef = useRef(handleGenerate);
   handleGenerateRef.current = handleGenerate;
   useEffect(() => {
@@ -167,12 +141,9 @@ export function ApiKeyIntegrationInfoCard({
     return () => window.removeEventListener("keydown", handler);
   }, [token, createMutation.isPending]);
 
-  // Pre-generation preview shows the .env shape with a non-secret
-  // placeholder for the API key. The placeholder is hidden behind a
-  // "Generate access token" overlay so the user can't mistakenly
-  // copy `sk-lw-xxxxx...` and wonder why their SDK rejects it. The
-  // project id and endpoint lines stay readable through the scrim so
-  // the shape of the file is still obvious.
+  // Pre-generation preview shows the .env shape with a non-secret placeholder for the
+  // API key. The placeholder is hidden behind a "Generate access token" overlay so the
+  // user can't mistakenly copy `sk-lw-xxxxx...` and wonder why their SDK rejects it.
   const PLACEHOLDER_TOKEN = "sk-lw-xxxxxxxxxxxxxxxxxxxxxxxx";
   const realLines = buildEnvLines({
     token: token ?? PLACEHOLDER_TOKEN,

@@ -1,9 +1,5 @@
 /**
  * The root layout every route renders inside.
- *
- * Router-context providers, the navigation progress bar, the per-page error
- * boundary and the Suspense the lazy routes resolve into — the shape of the
- * page around whatever route matched.
  */
 
 import NProgress from "nprogress";

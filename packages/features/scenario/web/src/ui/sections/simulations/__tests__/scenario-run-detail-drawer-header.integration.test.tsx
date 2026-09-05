@@ -1,10 +1,6 @@
 /**
+ * The run detail drawer's identity band and its criteria summary: who ran, against which target, how it ended and how long it took, and how many of the judge's criteria the run met.
  * @vitest-environment jsdom
- *
- * The run detail drawer's identity band and its criteria summary: who ran,
- * against which target, how it ended and how long it took, and how many of the
- * judge's criteria the run met.
- *
  * @see specs/features/scenarios/run-view-side-by-side-layout.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

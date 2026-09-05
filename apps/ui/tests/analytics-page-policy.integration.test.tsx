@@ -1,27 +1,6 @@
 /**
+ * What the nine analytics addresses are actually behind, proved by mounting them — and which SCREEN each of them is.
  * @vitest-environment jsdom
- *
- * What the nine analytics addresses are actually behind, proved by mounting
- * them — and which SCREEN each of them is.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice
- * a loader that names the wrong grant, which is the failure that refuses a
- * reader the platform page admitted or admits one it refused. Nor would it
- * notice a key mapped to the wrong screen, or the chart builder's two keys
- * handed the same mode — which is this family's own new failure: nine keys are
- * eight screens and the loader is the only place that says which.
- *
- * ALL NINE CARRY THE SAME GRANT, and that is the platform pages' policy one for
- * one: every one of the nine page files was
- * `withPermissionGuard("analytics:view")`. There is no asymmetry to carry here
- * and none to invent, unlike the annotations family — and asserting it in both
- * directions is what keeps a later "tidy-up" from quietly widening or narrowing
- * who can read a chart.
- *
- * The screens themselves are faked, and so is the transport the host provider
- * reads the organization graph over: what is under test is the policy and the
- * mapping the frontend feature wraps the screens in.
- *
  * Spec: specs/analytics/analytics-pages.feature
  */
 

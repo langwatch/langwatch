@@ -1,8 +1,7 @@
 /**
- * Parsing helpers for the `langwatch.prompt.*` span attributes that the
- * LangWatch SDKs emit when a managed prompt is used. Shared between the
- * span-level Prompt accordion and the trace-level prompt aggregation that
- * powers the header chip + Prompts tab.
+ * Parsing helpers for the `langwatch.prompt.*` span attributes that the LangWatch SDKs
+ * emit when a managed prompt is used. Shared between the span-level Prompt accordion
+ * and the trace-level prompt aggregation that powers the header chip + Prompts tab.
  */
 
 const PROMPT_PREFIX = "langwatch.prompt.";
@@ -17,23 +16,16 @@ export interface PromptReference {
   /** Variable values that were filled into the template, sorted-friendly. */
   variables: Record<string, string> | null;
   /**
-   * True when the executed config diverged from the saved version named
-   * by `handle` + `versionNumber` (user edited inline without saving).
-   * The base reference still points at the resume target; consumers
-   * append "(unsaved edits)" to the "Open in Prompts" label so the user
-   * knows the trace's messages won't match the saved version verbatim.
-   * Stamped on Prompt.compile as `langwatch.prompt.draft = true`;
-   * absent in the saved-version case (omission convention).
+   * True when the executed config diverged from the saved version named by `handle` +
+   * `versionNumber` (user edited inline without saving).
    */
   draft: boolean;
 }
 
 /**
- * Reads a span attribute by dotted path from a `params` object that may
- * be flat (`{"langwatch.prompt.id": "..."}`), nested (`{langwatch: {prompt:
- * {id: "..."}}}`), or a mix. The ingestion layer un-flattens dotted OTel
- * attribute keys into nested objects before storing, so a naïve
- * `params["langwatch.prompt.id"]` lookup misses real data.
+ * Reads a span attribute by dotted path from a `params` object that may be flat
+ * (`{"langwatch.prompt.id": "..."}`), nested (`{langwatch: {prompt: {id: "..."}}}`), or
+ * a mix.
  */
 function readAttribute(params: Record<string, unknown> | null | undefined, path: string): unknown {
   if (!params) return void 0;
@@ -149,13 +141,6 @@ export function parseTracePromptIds(
 
 /**
  * Parses prompt reference data from flat span attributes.
- *
- * Supports two formats:
- * 1. Combined: `langwatch.prompt.id = "handle:version_or_tag"`
- * 2. Separate: `langwatch.prompt.handle` + `langwatch.prompt.version.number`
- *
- * Variables use a wrapped JSON format: `{"type":"json","value":{"key":"val"}}`.
- * Returns null when no usable handle is present.
  */
 export function extractPromptReference(
   params: Record<string, unknown> | null | undefined,
@@ -270,12 +255,8 @@ function parseWrappedPromptVariables(wrapped: string): Record<string, string> | 
 }
 
 function parsePromptVariables(params: Record<string, unknown>): Record<string, string> | null {
-  // Two emit shapes seen in the wild:
-  //   1. Wrapped JSON string: `langwatch.prompt.variables = '{"type":"json","value":{...}}'`
-  //   2. Per-key flat attributes: `langwatch.prompt.variables.input = "..."`
-  // The second shape lands as a nested object on the span (`params.langwatch
-  // .prompt.variables = { input: "..." }`) once the ingestion un-flattens
-  // dotted keys. Try both — the first match wins.
+  // Two emit shapes seen in the wild: 1. Wrapped JSON string:
+  // `langwatch.prompt.variables = '{"type":"json","value":{...}}'` 2.
   const wrapped = readAttribute(params, "langwatch.prompt.variables");
   if (typeof wrapped === "string") {
     const parsed = parseWrappedPromptVariables(wrapped);
@@ -297,10 +278,7 @@ function parsePromptVariables(params: Record<string, unknown>): Record<string, s
 }
 
 /**
- * Stable key for grouping spans that share the same prompt + version. The
- * tag is part of the key because two spans calling `prompt:production` may
- * have hit different underlying versions over time, but at the trace level
- * we display the tag the user wrote.
+ * Stable key for grouping spans that share the same prompt + version.
  */
 export function promptReferenceKey(ref: PromptReference): string {
   return `${ref.handle}@${ref.versionNumber ?? ""}#${ref.tag ?? ""}`;

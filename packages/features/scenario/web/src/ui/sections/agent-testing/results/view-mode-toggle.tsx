@@ -1,7 +1,6 @@
 /**
- * Table or the classic grid of live cards. The choice is written to the
- * address, so a shared link opens the results the way they were shared.
- *
+ * Table or the classic grid of live cards. The choice is written to the address, so a
+ * shared link opens the results the way they were shared.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

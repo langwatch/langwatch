@@ -7,11 +7,9 @@ import {
 } from "./facet-constants";
 
 /**
- * Facet sidebar preferences modeled as a "lens" — section ordering plus
- * explicit open/closed overrides. Single global lens for now; the schema
- * carries id/name so this can later become multiple named lenses backed
- * by a server-side store. The exposed actions match the surface a future
- * API client would expose, so the persistence swap stays local to this file.
+ * Facet sidebar preferences modeled as a "lens" — section ordering plus explicit
+ * open/closed overrides. Single global lens for now; the schema carries id/name so this
+ * can later become multiple named lenses backed by a server-side store.
  */
 export interface FacetLens {
   id: string;
@@ -25,21 +23,18 @@ export interface FacetLens {
 interface FacetLensState {
   lens: FacetLens;
   /**
-   * The active facet perspective. Selecting one stamps its order into the
-   * lens above; this id is kept so the manager's switcher can highlight the
-   * active choice and survive reloads. A subsequent drag-reorder edits the
-   * lens order but leaves this id pointing at the perspective the user is
-   * "in" (the same draft-on-a-preset model the toolbar lenses use).
+   * The active facet perspective. Selecting one stamps its order into the lens above;
+   * this id is kept so the manager's switcher can highlight the active choice and
+   * survive reloads.
    */
   activePerspectiveId: FacetPerspectiveId;
   setSectionOrder: (order: string[]) => void;
   setSectionOpen: (key: string, open: boolean) => void;
   setAllSectionsOpen: (keys: string[], open: boolean) => void;
   /**
-   * Switch perspective: stamp the perspective's section order into the lens
-   * (so the sidebar + manager reorder through the existing applyLensOrder
-   * machinery) and remember the choice. Re-selecting a perspective restores
-   * its built-in order even after a custom drag-reorder.
+   * Switch perspective: stamp the perspective's section order into the lens (so the
+   * sidebar + manager reorder through the existing applyLensOrder machinery) and
+   * remember the choice.
    */
   selectPerspective: (id: FacetPerspectiveId) => void;
 }

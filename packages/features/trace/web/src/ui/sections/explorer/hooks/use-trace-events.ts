@@ -11,9 +11,8 @@ export interface TraceEventsResult {
 
 /**
  * Trace-level events for the drawer, fetched as its own query (like
- * `useTraceEvaluations`) rather than riding on the header. The header stays a
- * pure summary read; this reads only the `Events.*` columns from stored_spans.
- * Split off the drawer batch so it doesn't block the other per-trace queries.
+ * `useTraceEvaluations`) rather than riding on the header. The header stays a pure
+ * summary read; this reads only the `Events.*` columns from stored_spans.
  */
 export function useTraceEvents(): TraceEventsResult {
   const shared = useSharedTrace();

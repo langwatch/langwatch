@@ -3,11 +3,9 @@ import type { TraceListItem } from "../types/trace";
 
 interface TraceStatistics {
   /**
-   * 95th-percentile duration across the currently visible page. The
-   * duration column bar scales to this rather than `max(...)` so a
-   * single 30s outlier doesn't compress every normal row into a
-   * thumbnail. Falls back to 1ms when there are no rows to avoid
-   * divide-by-zero downstream.
+   * 95th-percentile duration across the currently visible page. The duration column bar
+   * scales to this rather than `max(...)` so a single 30s outlier doesn't compress
+   * every normal row into a thumbnail.
    */
   p95DurationMs: number;
   /** True when duration stats are computed from real rows (vs the loading placeholder). */

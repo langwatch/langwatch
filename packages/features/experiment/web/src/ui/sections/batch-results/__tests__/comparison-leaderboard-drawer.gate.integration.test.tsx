@@ -2,17 +2,7 @@ import "@testing-library/jest-dom/vitest";
 
 // @vitest-environment jsdom
 /**
- * The expanded leaderboard is addressable: `CurrentDrawer` renders it from a
- * URL, so it is reachable without ever passing the chart's expand affordance.
- * That makes the rollout gate on the chart necessary but not sufficient — a
- * link shared out of an organization that has the leaderboard would otherwise
- * hand the whole thing to one that has not been given it.
- *
- * PORTED WITH THE DRAWER from
- * `platform/app/src/components/__tests__/ComparisonLeaderboardDrawer.gate.integration.test.tsx`.
- * The two mocks that named platform modules now name this package's own
- * rollout hook and `@langwatch/ui-drawer`; every assertion is unchanged.
- *
+ * The expanded leaderboard is addressable: `CurrentDrawer` renders it from a URL, so it is reachable without ever passing the chart's expand affordance.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 

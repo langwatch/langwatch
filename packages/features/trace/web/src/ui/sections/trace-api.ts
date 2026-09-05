@@ -1,30 +1,5 @@
 /**
  * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as `gateway-api.ts`,
- * `governance-api.ts`, `automation-api.ts`, `ops-api.ts`, `annotation-api.ts`,
- * `analytics-api.ts` and `auth-api.ts` say of their own maps: the procedures
- * are mounted by the process out of `@langwatch/trace-server`,
- * `@langwatch/annotation-server`, `@langwatch/share-server`,
- * `@langwatch/user-server` and half a dozen more, which a web package may not
- * import even for a type, and the router type does not exist until a process
- * instantiates it.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `tracesV2`, `traces`, `annotation`,
- * `savedViews`, `share` and the rest are mount points on the root router, and
- * tRPC hashes that path into the React Query cache key; spell one differently
- * and these hooks quietly stop sharing a cache with the `api.*` call sites that
- * have not moved — the annotation queue walker, the analytics overview and the
- * project home all still read entries this package invalidates.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
- * import below is the only one in the package. Recorded here so the finding it
- * raises is a decision rather than a surprise.
- *
- * `api` is the exported name rather than `traceApi` because that is what a
- * hundred moved call sites already write. `traceApi` is the same object under
- * the name the process shell mounts it by.
  */
 
 import type {
@@ -88,9 +63,6 @@ type ProjectScope = { projectId: string };
 
 /**
  * The window a list read covers, in epoch milliseconds.
- *
- * `live` says the window's upper bound is "now" rather than a fixed instant,
- * which is what stops a rolling range from re-keying the cache every second.
  */
 type TimeRange = { from: number; to: number; live?: boolean };
 
@@ -297,10 +269,6 @@ export type TraceApiMap = {
 
     /**
      * The evaluations attached to the traces on a page.
-     *
-     * Only ever INVALIDATED from this package — the list hydrates its own eval
-     * columns off the same entry — so the payload is stated as the router's
-     * rather than restated here.
      */
     evals: {
       query: { input: ProjectScope & Record<string, unknown>; output: unknown };
@@ -336,10 +304,6 @@ export type TraceApiMap = {
 
     /**
      * Whole traces with their spans, by id.
-     *
-     * `withEditOverlay` is what makes "Add to Dataset" store the reviewer's
-     * correction rather than the raw span: a record added from a corrected
-     * trace carries what the reviewer corrected.
      */
     getTracesWithSpans: {
       query: {
@@ -584,16 +548,8 @@ export type TraceApiMap = {
   };
 
   /**
-   * The dataset family's own segment, declared here because the "Add to
-   * Dataset" drawer is this family's and calls it.
-   *
-   * THE SEGMENT NAME IS THE CACHE KEY, which is the whole reason a second
-   * declaration is safe: `dataset.getAll` written here and `dataset.getAll`
-   * written on `@langwatch/dataset-web`'s map hash to the same React Query
-   * entry, so the list this drawer reads is the list the Datasets page reads
-   * and an invalidation from either is seen by both. Declaring the shape twice
-   * is the price of a web package not importing another's procedure map; a
-   * different SPELLING would be a silently split cache.
+   * The dataset family's own segment, declared here because the "Add to Dataset" drawer
+   * is this family's and calls it.
    */
   dataset: {
     /** Every live dataset in the project, newest first. */
@@ -673,12 +629,6 @@ export type TraceApiMap = {
   organization: {
     /**
      * The organization graph, narrowed to what this family needs.
-     *
-     * Read by the frontend feature that mounts these screens rather than by a
-     * screen, and declared here so it lands on the same cache entry as the
-     * application shell's own read of it. `isPersonal`, `ownerUserId` and the
-     * team's members are declared because the personal-workspace gate and the
-     * Langy gate both turn on facts about the TEAM rather than on a grant.
      */
     getAll: {
       query: {
@@ -883,22 +833,12 @@ export type TraceApiMap = {
 };
 
 /**
- * One annotation on a trace, with the person who wrote it and the part of the
- * trace it is anchored to.
- *
- * `@langwatch/annotation-web`'s own row shape rather than a second description
- * of it: the drawer's comment rail, the conversation view and the trace table's
- * annotations column all render that package's components with these rows, so a
- * narrower restatement here would only be a shape they have to be cast into.
+ * One annotation on a trace, with the person who wrote it and the part of the trace it
+ * is anchored to.
  */
 export type TraceAnnotationRead = Omit<Annotation, "anchorKind"> & {
   /**
    * WHAT part of the trace the annotation hangs off.
-   *
-   * Narrower than the contract row's `string`, and it has to be:
-   * `AnnotationAnchorRef` — which the comment rail and the conversation view
-   * both take — enumerates the three kinds, and a widened row cannot be handed
-   * to either without a cast at every call site.
    */
   anchorKind: "field" | "message" | "span" | null;
   /** The reviewer, joined on. Absent on a row read without the join. */
@@ -927,10 +867,6 @@ export type ModelProviderFrontendRead = {
 
 /**
  * What each procedure hands back, addressed the way `RouterOutputs` was.
- *
- * Derived from the map rather than from a router type: `@trpc/server` is
- * rejected in a web package, so `inferRouterOutputs` is not available here and
- * the map is the only description of the wire this package has.
  */
 export type OutputsFrom<TMap> = {
   [K in keyof TMap]: TMap[K] extends { query: { output: infer TOut } }

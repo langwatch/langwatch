@@ -176,13 +176,8 @@ function flattenMixed(content: unknown[], msg: RawMessage): DisplayItem[] {
         role,
         traceId: msg.trace_id,
       }),
-      // OpenAI Realtime API audio shape. Two states:
-      // - Pre-extraction: {data, format} (inline base64). Server-side
-      //   extraction normally rewrites this away, but if the renderer
-      //   sees one it builds a data: URI so the <audio> element can
-      //   still play the bytes.
-      // - Post-extraction: {url, format, mimeType} where url is
-      //   /api/files/<storedObjectId>. Build a url-source MediaPart.
+      // OpenAI Realtime API audio shape. Two states: - Pre-extraction: {data, format}
+      // (inline base64).
       inputAudio: (part) => {
         const mimeType =
           part.mimeType ??

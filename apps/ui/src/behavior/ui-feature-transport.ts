@@ -63,11 +63,6 @@ export type UiFeatureApiClientOptions = {
 
 /**
  * The three lanes, built once and shared by both clients below.
- *
- * Shared rather than restated so the typed client the api-map retirement moves
- * features onto cannot take a different lane from the untyped one it replaces
- * — a subscription that quietly rode the request lane renders once and then
- * looks like a screen with no news.
  */
 function uiFeatureApiLinks({
   url = UI_TRPC_ENDPOINT,
@@ -114,12 +109,6 @@ export function createUiFeatureApiClient(
 
 /**
  * The same three lanes, typed by the router the API process actually mounts.
- *
- * `AppRouter` is read from the api process's `./app-trpc/types` subpath, which
- * is types only — no value crosses from the API into the browser bundle. This
- * is what retires the 38 hand-written `*ApiMap`s: a procedure's input and its
- * answer are inferred from the procedure, so a rename on the server is a
- * compile error in the screen that calls it rather than a 404 a person finds.
  */
 export function createUiAppApiClient(
   options: UiFeatureApiClientOptions = {},

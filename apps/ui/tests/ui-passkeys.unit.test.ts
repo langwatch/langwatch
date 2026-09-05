@@ -1,19 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The passkey ceremonies, and linking an additional sign-in method.
- *
- * THE WIRE, PINNED WHERE THE WIRE IS — the credentials family's lesson, second
- * application. `@langwatch/user-web` decides what the reader is TOLD about an
- * outcome and pins that in its own suite; this file decides what an outcome
- * MEANS, and the distinction it turns on is invisible from a render: better-auth
- * reports a device prompt the person dismissed as an error with STATUS ZERO,
- * and reading that as a failure is telling somebody off for a decision.
- *
- * `linkUiSignInMethod` is the one call here that is a plain REST request, and
- * its body is a compatibility surface with better-auth's own `/link-social`
- * route: the provider id is mapped and the callback is named `callbackURL`.
- *
+ * @vitest-environment jsdom
  * Spec: specs/identity/passkeys.feature
  */
 

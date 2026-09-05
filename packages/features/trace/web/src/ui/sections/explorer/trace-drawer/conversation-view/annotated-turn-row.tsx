@@ -39,14 +39,6 @@ interface AnnotatedTurnRowProps {
 
 /**
  * One turn, with its annotations beside it when the conversation has a rail.
- *
- * The sole child of the virtualizer's measured wrapper, and the same component
- * on the un-virtualized path, so a turn measures the same height either way
- * however tall its annotations make it. With the rail closed this renders the
- * turn and nothing else.
- *
- * The tint marking the turn under review is drawn here rather than around the
- * whole row, because this is where the messages stop and the rail begins.
  */
 export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
   parsed,
@@ -123,11 +115,6 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
 
 /**
  * How much of the row the messages take beside the rail.
- *
- * Thread caps itself at a reading width and the conversation reserves the rail
- * beside it, so the column is that width whether the rail is open or not.
- * Bubbles span whatever the pane gives them, so a fixed column would make the
- * whole conversation jump width the moment the rail opened.
  */
 function messageColumnWidth(layout: TurnLayout): string {
   return layout === "thread" ? `minmax(0, ${THREAD_COLUMN_MAX_WIDTH_PX}px)` : "minmax(0, 1fr)";

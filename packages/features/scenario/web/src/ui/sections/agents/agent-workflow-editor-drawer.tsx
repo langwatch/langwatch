@@ -54,12 +54,6 @@ function getWorkflowConfig(config: AgentComponentConfig): CustomComponentConfig 
 
 /**
  * Extract mapping-surface inputs and end outputs from a workflow's published DSL.
- *
- * Inputs are derived from the entry node's declared outputs via
- * `getMappingSurfaceInputs`, which includes unwired fields. Outputs are read
- * directly from the end node's declared inputs. Both are narrowed into
- * `Variable` (the shape expected by `ScenarioInputMappingSection`), coercing
- * unknown field types to `"str"`.
  */
 function extractVariables(dsl: StudioWorkflow | undefined): {
   inputs: Variable[];
@@ -86,11 +80,6 @@ function extractVariables(dsl: StudioWorkflow | undefined): {
 
 /**
  * Drawer for editing a workflow-based agent's scenario integration.
- *
- * Workflow agents are authored in the optimization studio — this drawer only
- * edits the *agent wrapper*: its name, the linked workflow, and how scenario
- * data maps into the workflow's entry/end nodes. Use WorkflowSelectorDrawer to
- * create new workflow agents.
  */
 export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
@@ -315,13 +304,9 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
                 <Field.Root>
                   <Field.Label>Linked Workflow</Field.Label>
                   {editorHref ? (
-                    // isExternal renders a plain anchor directly, not
-                    // composed through the app router's client-side Link:
-                    // target="_blank" is always a hard navigation into a
-                    // new tab regardless, and composing through NextLink
-                    // previously swallowed data-testid — Chakra's asChild
-                    // slot only forwards style-related props to the
-                    // composed child, not arbitrary data attributes.
+                    // isExternal renders a plain anchor directly, not composed through the app router's client-side Link: target="_blank" is always
+                    // a hard navigation into a new tab regardless, and composing through NextLink previously swallowed data-testid — Chakra's
+                    // asChild slot only forwards style-related props to the composed child, not arbitrary data attributes.
                     <Link href={editorHref} isExternal data-testid="open-workflow-editor-link">
                       <WorkflowCardDisplay
                         name={workflowQuery.data.name}

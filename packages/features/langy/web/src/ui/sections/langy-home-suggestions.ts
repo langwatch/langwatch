@@ -2,10 +2,6 @@ import { type LangySuggestion, SETUP_SUGGESTIONS, SUGGESTIONS } from "./langy-em
 
 /**
  * What the project has reached, as far as choosing an ask is concerned.
- *
- * Deliberately three booleans rather than the raw check counts: this module
- * decides what to OFFER, and the only thing that bears on that is whether the
- * thing an ask needs exists at all.
  */
 export interface ProjectReach {
   hasTraces: boolean;
@@ -15,11 +11,6 @@ export interface ProjectReach {
 
 /**
  * How many asks the home page's capability row shows.
- *
- * Three fits, because the row is asks and nothing else: the onboarding control
- * is an action rather than a prompt and sits on its own line beneath them (see
- * LangyHomeHero). While the two shared a wrapping row this had to be two, or
- * the control orphaned onto a line of its own whenever the labels ran long.
  */
 export const HOME_SUGGESTION_COUNT = 3;
 
@@ -31,20 +22,7 @@ export const HOME_SUGGESTION_COUNT = 3;
 export const PANEL_SUGGESTION_COUNT = 4;
 
 /**
- * The asks a project can actually act on, best first. Shared by the home
- * page's capability row and the panel's empty state, so the two surfaces can
- * never disagree about what is honest to offer.
- *
- * An empty project gets asks about getting started, because every ask about
- * traces, evaluations or runs is a dead end until it has some, and a row of
- * dead ends is the product lying on its own home page. As the project fills up
- * the row escalates: the ranking runs from the most demanding ask downward, so
- * the reader is always offered the most capable thing their data supports —
- * and a setup ask is WITHDRAWN once the gap it names has closed (`until`), so
- * a project with months of runs is never told to onboard its agent.
- *
- * Pure, so the escalation can be tested without a project or a browser.
- *
+ * The asks a project can actually act on, best first.
  * Spec: specs/home/langy-home.feature,
  * specs/langy/langy-empty-state-suggestions.feature
  */

@@ -1,15 +1,5 @@
 /**
  * Drawer for creating and editing suite configurations.
- *
- * Child drawers (scenarioEditor, agentHttpEditor) are rendered via local
- * React state so the parent stays mounted and form state is preserved.
- * The suite editor itself uses URL-based drawer registration for root-level
- * opening.
- *
- * This is a thin orchestrator that composes:
- * - `useSuiteForm` for all form state and logic
- * - `ScenarioPicker` for scenario selection UI
- * - `TargetPicker` for target selection UI
  */
 
 import {
@@ -144,12 +134,9 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const errors = form.formState.errors;
 
   /**
-   * Puts a taken-name rejection under the field the server is complaining
-   * about — the same input the user is looking at — and reports whether it
-   * did, so the caller can skip the toast.
-   *
-   * `applyHandledErrorToForm` claims only `validation_error`; a name clash
-   * arrives as its own 409 code, so it is placed by hand.
+   * Puts a taken-name rejection under the field the server is complaining about — the
+   * same input the user is looking at — and reports whether it did, so the caller can
+   * skip the toast.
    */
   const applyNameTakenToForm = (error: unknown): boolean => {
     if (readHandledError(error)?.code !== "suite_name_taken") return false;

@@ -1,9 +1,7 @@
 /**
- * The "make it the default?" decision: picking a model in the composer earns
- * the ask only when the current Langy default is CONFIGURED at a scope the
- * picker can manage, and a yes writes at that same scope and kind. Everything
- * else — no configured default, picking the default itself, no rights at the
- * holding scope — asks nothing.
+ * The "make it the default?" decision: picking a model in the composer earns the ask
+ * only when the current Langy default is CONFIGURED at a scope the picker can manage,
+ * and a yes writes at that same scope and kind.
  */
 import { describe, expect, it } from "vitest";
 

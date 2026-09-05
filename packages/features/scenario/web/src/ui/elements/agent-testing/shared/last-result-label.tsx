@@ -1,11 +1,5 @@
 /**
  * What the last run of a scenario said, in one line: "Passed (3/3)".
- *
- * The verdict carries its own dot rather than an icon, so a column of rows
- * reads as one line of coloured text and the counts line up.
- *
- * A case that never ran says so, and a case that is running right now shows a
- * spinner instead of a verdict it does not have yet.
  */
 import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../index";

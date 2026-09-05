@@ -1,26 +1,5 @@
 /**
- * The client side of the atom: what the filter row asks for, and how a stored
- * atom becomes a row a person can read.
- *
- * One atom is one scenario, one target, one run. Every view on the Results tab
- * is an aggregation of the same list: the filters cut it, the groupings fold
- * it, the stat strip and the chart derive from it. That is what makes every
- * control move every number on the page.
- *
- * **The fold happens in the database.** The atom count of a project is its
- * scenario-run count, which on a suite-on-merge project reaches tens of
- * thousands over thirty days, so the browser never holds the list the default
- * view aggregates. `scenarios.getResultsOverview` returns the group rows and
- * the totals already folded, and `scenarios.getResultAtoms` returns a bounded
- * page of atoms for a drill-down. The shapes those reads answer with are
- * declared in `server/app-layer/simulations/result-atoms/atom.types.ts` and
- * rendered as they arrive.
- *
- * What is left here is what only the browser knows: the filter state, and the
- * names. A stored atom carries ids, because naming an agent, a prompt, a
- * scenario or a plan belongs in one place on the client, where a rename lands
- * everywhere at once.
- *
+ * The client side of the atom: what the filter row asks for, and how a stored atom becomes a row a person can read.
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/features/agent-testing/results-atoms.feature
  */
@@ -99,10 +78,6 @@ export type ScenarioFacts = {
 
 /**
  * One atom, named.
- *
- * The stored atom carries ids; this is what a row of the flat list or of an
- * opened group actually reads. The names are resolved once here rather than in
- * each cell, so the same run reads the same way wherever it is listed.
  */
 export type ResultRow = {
   runId: string;
@@ -122,11 +97,6 @@ export type ResultRow = {
 
 /**
  * A page of stored atoms, named.
- *
- * An atom whose scenario, plan or target is not in the maps keeps its id as
- * its name rather than being dropped: it still happened, and dropping it would
- * make the list disagree with the totals above it, which are counted in the
- * database and know nothing about what the browser could name.
  */
 export function toResultRows({
   atoms,
@@ -173,11 +143,6 @@ export function toResultRows({
 
 /**
  * The plan of the list an atom belongs to.
- *
- * A stored plan is keyed by its slug on both sides. A set that runs from code
- * has no stored plan: the read keys its atoms by the bare set id, while the
- * list names that set under the external plan slug. Resolving here is what
- * lets a run of such a set open the same row the list draws for it.
  */
 function planOfAtom({
   atom,
@@ -191,17 +156,6 @@ function planOfAtom({
 
 /**
  * How a target key reads.
- *
- * A platform target is named from the project's agents and prompts. A run
- * pushed from code names its own agent instead, and that name arrives with
- * the runs, so it reaches the map the same way. A run from code that named no
- * agent reads under the default target.
- *
- * A target with parameter overrides is keyed by its reference id and a hash
- * of the overrides. It is named from the reference id, and the overrides
- * read after the name, "prod-agent · model=gpt-5-mini", so the same agent on
- * two sets of parameters reads as two targets wherever it is listed.
- *
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 export function targetNameOf({
@@ -227,10 +181,6 @@ export function targetNameOf({
 
 /**
  * The parameter overrides the page knows, keyed by target key.
- *
- * Fed from everything the page already holds: the targets the window lists,
- * the group rows of a target grouping and the atoms of the drill-down. A key
- * with no overrides is left out, so the map only ever adds to a name.
  */
 export function targetParametersOf(
   known: { targetKey: string; targetParameters: RunParameterValues | null }[],
@@ -260,12 +210,6 @@ export function isCodeTargetKey({ targetKey }: { targetKey: string }): boolean {
 
 /**
  * The names a run from code reported, keyed by the target they fold under.
- *
- * Fed from everything the page already holds: the targets the window lists,
- * the group rows and the atoms of the drill-down. A platform target is left
- * out, so a stored agent can never be renamed by what a run reported, and a
- * name that is only the key repeated is left out too, so a run that reported
- * no agent still reads under the default target.
  */
 export function codeTargetNames(
   named: { targetKey: string; targetName: string | null }[],

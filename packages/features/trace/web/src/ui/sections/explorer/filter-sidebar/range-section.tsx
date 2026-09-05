@@ -13,13 +13,7 @@ import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sideba
 
 const COMMIT_DEBOUNCE_MS = 150;
 /**
- * Clamp both thumb values into the facet's current bounds. The slider value
- * lives in local state while min/max stream in from the facet snapshot, so
- * for a frame the two can disagree (stale committed filter, snapshot
- * refresh moving the bounds). zag-js throws synchronously when a thumb sits
- * fully outside [min, max], which used to take the whole filter section
- * down with a "Couldn't render the cost filter" error card until a retry.
- * Exported for unit testing.
+ * Clamp both thumb values into the facet's current bounds.
  */
 export function clampRangeToBounds(
   value: [number, number],
@@ -251,17 +245,9 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
 export const RangeSection = memo(RangeSectionInner);
 
 /**
- * Disabled visual for the `min === max` case. Mimics the SimpleSlider's
- * track + filled segment + thumbs at the same position, drained of
- * colour, with a hover tooltip explaining why interaction is blocked.
- * We can't actually mount a SimpleSlider here — zag-js asserts on
- * `min !== max` and throws synchronously — so this is a CSS-only
- * stand-in that matches the live slider's visual rhythm so the section
- * doesn't read as broken.
- *
- * Rare in practice: typically only fires on sample data or projects
- * that have run a single trace. Keeping the Clear escape hatch in case
- * a URL-driven filter somehow lands here.
+ * Disabled visual for the `min === max` case. Mimics the SimpleSlider's track + filled
+ * segment + thumbs at the same position, drained of colour, with a hover tooltip
+ * explaining why interaction is blocked.
  */
 const DisabledRangeVisual: React.FC<{
   value: number;

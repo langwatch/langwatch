@@ -1,16 +1,7 @@
 /**
- * Full from-scratch UI re-QA walkthrough — rchaves directive after sidebar
- * regroup (a3628655a) + BetaPill purple-fix (99a9ef066). Walks every major
- * governance flow as a real user, capturing the new "GOVERN" sidebar
- * grouping in every frame.
- *
- * Sections:
- *  A. /me portal — admin POV
- *  B. Govern → AI Gateway sub-tree (virtual-keys list, budgets, usage)
- *  C. Govern → Governance bird-eye + Tool Tiles + Anomaly Rules + Catalog + Routing
- *  D. Settings → Members + Teams + Roles + Audit Log
- *  E. Tile install drawer (Claude Code)
- *  F. AI Tools Portal cold visit (workspace switcher, /me/devices, /me/settings)
+ * Full from-scratch UI re-QA walkthrough — rchaves directive after sidebar regroup
+ * (a3628655a) + BetaPill purple-fix (99a9ef066). Walks every major governance flow as a
+ * real user, capturing the new "GOVERN" sidebar grouping in every frame.
  */
 import * as fs from "fs";
 import * as path from "path";

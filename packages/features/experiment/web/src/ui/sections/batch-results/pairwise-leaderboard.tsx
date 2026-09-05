@@ -10,14 +10,9 @@ import {
 } from "../../../behavior/use-pairwise-sort";
 
 /**
- * Bradley-Terry leaderboard panel for the Comparison evaluator (#5103).
- * Purely presentational — caller computes `leaderboard` via
- * `computeBTLeaderboard` and passes it in.
- *
- * Reached only through the mount sites, which carry both gates: the
- * `release_ui_comparison_leaderboard_enabled` rollout flag
- * (useShowComparisonLeaderboard) and the 3+ variant product rule
- * (ComparisonCharts).
+ * Bradley-Terry leaderboard panel for the Comparison evaluator (#5103). Purely
+ * presentational — caller computes `leaderboard` via `computeBTLeaderboard` and passes
+ * it in.
  */
 
 export type PairwiseLeaderboardProps = {
@@ -37,18 +32,12 @@ export type PairwiseLeaderboardProps = {
   onCellClick?: (rowVariantId: string, colVariantId: string) => void;
   /**
    * Whether to render the sample-size / degenerate / convergence banners.
-   * The drawer turns these off because it states the same conditions once,
-   * up front, in its own trust step — repeating them here would train the
-   * reader to scroll past a warning they have already read.
    */
   showWarnings?: boolean;
 };
 
 /**
- * Matchups per variant below which a Bradley-Terry score is treated as
- * unstable. Exported because the drawer gates its own trust panel on the same
- * number — two copies would let the table's warnings and the panel's verdict
- * drift apart inside one view, with nothing enforcing that they agree.
+ * Matchups per variant below which a Bradley-Terry score is treated as unstable.
  */
 export const DEFAULT_WARN_THRESHOLD = 30;
 
@@ -109,10 +98,8 @@ export function PairwiseLeaderboard({
 }
 
 /**
- * The three conditions that make a Bradley-Terry fit less trustworthy than its
- * numbers look. Kept together so the drawer can silence all of them with one
- * flag — it states the same conditions once in its own trust step, and a reader
- * shown the warning twice learns to scroll past it.
+ * The three conditions that make a Bradley-Terry fit less trustworthy than its numbers
+ * look.
  */
 function LeaderboardWarnings({
   leaderboard,
@@ -495,10 +482,8 @@ function WinMatrixHeatmap({
 }
 
 /**
- * Map win rate to a background tint:
- *   rate >= 0.5 → green (dominance)
- *   rate <  0.5 → red   (deficit)
- * Saturation scales with distance from 0.5. null → transparent (no matchups).
+ * Map win rate to a background tint: rate >= 0.5 → green (dominance) rate < 0.5 → red
+ * (deficit) Saturation scales with distance from 0.5. null → transparent (no matchups).
  * Uses Chakra token strings rather than raw hex so dark mode follows.
  */
 function heatmapBg(rate: number | null): string | undefined {

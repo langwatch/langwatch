@@ -6,10 +6,9 @@ import { useColorMode } from "@langwatch/design-system/color-mode";
 import { buildMarkdownComponents } from "./components";
 
 /**
- * Reusable rendered-markdown block. Maps markdown → Chakra components so
- * typography, spacing, colors, links, tables all inherit from the theme.
- * Shiki handles fenced code blocks via the ambient
- * `<CodeBlock.AdapterProvider>` mounted at `TraceV2DrawerShell`.
+ * Reusable rendered-markdown block. Maps markdown → Chakra components so typography,
+ * spacing, colors, links, tables all inherit from the theme. Shiki handles fenced code
+ * blocks via the ambient `<CodeBlock.AdapterProvider>` mounted at `TraceV2DrawerShell`.
  */
 export function RenderedMarkdown({
   markdown,

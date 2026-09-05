@@ -1,8 +1,7 @@
 /**
+ * Unit tests for spotlight URL fragment sync: readSpotlightFragment /
+ * writeSpotlightFragment / useSpotlightURLSync
  * @vitest-environment jsdom
- *
- * Unit tests for spotlight URL fragment sync:
- *   readSpotlightFragment / writeSpotlightFragment / useSpotlightURLSync
  */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

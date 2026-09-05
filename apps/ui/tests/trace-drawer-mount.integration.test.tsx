@@ -1,25 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The trace drawer, opened from a page that is not the Trace Explorer.
- *
- * THE GAP THIS PINS SHUT. `routeTraceDrawerForV2` rewrites every `traceDetails`
- * open into `traceV2Details`, and `traceV2Details` is not — cannot be — a
- * registry entry: the drawer keeps its open trace in a store and syncs the URL
- * onto it, and that sync has to outlive the `?drawer.open=` parameter. So the
- * chrome mounts the drawer itself, beside `CurrentDrawer`. When the shell moved
- * into `@langwatch/navigation-web` the mount did not travel with it, and every
- * "View trace" affordance outside `/:project/traces` wrote an address that
- * opened nothing — silently, because `CurrentDrawer` renders null on a name it
- * does not know.
- *
- * The address, the chrome layout route, the capability ports, the trace host,
- * the URL → store sync and the mount decision are all real. Only the drawer's
- * own shell is stubbed: what is under test is whether anything mounts it at
- * all, and the real one drags the waterfall, the transcript renderer and their
- * syntax highlighters behind it.
- *
- * See specs/traces-v2/default-drawer-routing.feature.
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -59,11 +40,6 @@ vi.mock("../../../packages/features/trace/web/src/ui/sections/explorer/trace-dra
 
 /**
  * The one read the trace host makes for itself, answered without a transport.
- *
- * `organization.getAll` is how the host resolves the project the address is
- * about; everything else this module exports — the host provider, the drawer
- * mount's own loader, the failure singleton — stays real, because those are
- * what the wiring under test is made of.
  */
 vi.mock("@langwatch/trace-web/screens/traces", async () => {
   const actual = await vi.importActual<typeof import("@langwatch/trace-web/screens/traces")>(
@@ -223,11 +199,6 @@ function renderAt(path: string) {
 
 /**
  * The mount's chunk, fetched before any test renders.
- *
- * `lazy()` resolves on a microtask once the module is in the registry, so
- * warming it here is what makes "no drawer on screen" mean the mount decided
- * against one rather than that its chunk had not landed yet. Without it the
- * two negative assertions below would pass against a mount nobody wired.
  */
 beforeAll(async () => {
   const { traceDrawerMount } = await import("@langwatch/trace-web/screens/traces");

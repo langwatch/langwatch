@@ -1,9 +1,7 @@
 /**
+ * The plan fold — a message's `todowrite` tool parts → the checklist the panel renders, plus the other tool calls
+ * attributed to the step that was running when each one appeared.
  * @vitest-environment node
- *
- * The plan fold — a message's `todowrite` tool parts → the checklist the panel
- * renders, plus the other tool calls attributed to the step that was running
- * when each one appeared. Pure; no rendering here (see LangyPlanCard tests).
  */
 import { describe, expect, it } from "vitest";
 import { cleanPlanContent, langyPlan, parseTodoList } from "../langy-plan";

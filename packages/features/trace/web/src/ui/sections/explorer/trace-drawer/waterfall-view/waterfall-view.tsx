@@ -159,15 +159,9 @@ export const WaterfallView = memo(function WaterfallView({
     [tree, collapsedIds, expandedGroups],
   );
 
-  // When SSE delivers a new span for the trace currently in the drawer,
-  // the waterfall used to wash itself with an Aurora gradient — which
-  // forced a layout cascade through the virtualizer every time. Now we
-  // identify which span IDs are genuinely new since the last render and
-  // fire a per-row pulse for each, leaving the visible viewport stable.
-  // Trace switches reset the baseline so opening a different trace does
-  // not pulse every existing row. The root span's id is stable within a
-  // trace and unique across traces, so it doubles as the trace-identity
-  // marker here (SpanTreeNode doesn't carry the traceId field).
+  // When SSE delivers a new span for the trace currently in the drawer, the waterfall
+  // used to wash itself with an Aurora gradient — which forced a layout cascade through
+  // the virtualizer every time.
   const prevSpanIdsRef = useRef<Set<string> | null>(null);
   const prevRootSpanIdRef = useRef<string | null>(null);
   const currentRootSpanId = spans[0]?.spanId ?? null;
@@ -192,15 +186,8 @@ export const WaterfallView = memo(function WaterfallView({
   const { rootStart, rootDuration } = useMemo(() => getTraceRange(filteredSpans), [filteredSpans]);
   const timeMarkers = useMemo(() => getTimeMarkers(rootDuration), [rootDuration]);
 
-  // Drop interior markers when the timeline panel is narrow enough
-  // that adjacent labels would collide. Always keep the first + last
-  // so the trace's bounds stay readable; the rest are decimated by an
-  // integer stride so the remaining marks stay evenly spaced. The
-  // ResizeObserver fires on every drag so the count tracks the user's
-  // resize in real time. A CALLBACK ref, not an effect: the panel is
-  // conditionally rendered (narrow drawers drop it entirely), and a
-  // mount-time effect would never attach the observer when the panel
-  // appears later as the drawer widens.
+  // Drop interior markers when the timeline panel is narrow enough that adjacent labels
+  // would collide.
   const [timelinePanelWidth, setTimelinePanelWidth] = useState(0);
   const timelineObserverRef = useRef<ResizeObserver | null>(null);
   const timelinePanelRef = useCallback((el: HTMLDivElement | null) => {
@@ -228,12 +215,9 @@ export const WaterfallView = memo(function WaterfallView({
     return [timeMarkers[0]!, ...picked, timeMarkers[last]!];
   }, [timeMarkers, timelinePanelWidth]);
 
-  // Below COLLAPSE_TIMELINE_BELOW_PX, drop the timeline/flame-graph panel
-  // entirely and give the span list the full width — a squeezed timeline
-  // (hairline bars, a divider eating space, truncated labels) is less
-  // useful than the list is, at that width. Tracks the DRAWER's width via
-  // the same container the resizable divider already measures against, not
-  // the window's — the drawer can be narrower than the viewport.
+  // Below COLLAPSE_TIMELINE_BELOW_PX, drop the timeline/flame-graph panel entirely and
+  // give the span list the full width — a squeezed timeline (hairline bars, a divider
+  // eating space, truncated labels) is less useful than the list is, at that width.
   const [containerWidth, setContainerWidth] = useState(0);
   useEffect(() => {
     const el = containerRef.current;
@@ -246,13 +230,7 @@ export const WaterfallView = memo(function WaterfallView({
   }, []);
   const showTimeline = shouldShowTimeline(containerWidth);
 
-  // Horizontal-scroll floor for the tree pane. The virtualizer's rows
-  // are absolutely positioned, so their content can't grow the scroll
-  // width on its own — instead we give the inner (relative) block a
-  // min width of "deepest visible indent + a 240px name floor". When
-  // deep indentation would otherwise crush names to nothing, the pane
-  // becomes horizontally scrollable; shallow trees stay at 100% width
-  // with the usual name truncation.
+  // Horizontal-scroll floor for the tree pane.
   const treeContentMinWidthPx = useMemo(() => {
     let maxDepth = 0;
     for (const row of flatRows) {
@@ -640,12 +618,8 @@ export const WaterfallView = memo(function WaterfallView({
               bottom={0}
               left="2px"
               width="1px"
-              // Light mode: lean on the darker `border.emphasized` token so
-              // the divider doesn't vanish against the white-ish surface.
-              // Dark mode: drop to the regular `border` token (and a lower
-              // opacity) — `border.emphasized` reads brighter than the
-              // panel separators around it, which looked off-key in the
-              // dark theme.
+              // Light mode: lean on the darker `border.emphasized` token so the divider
+              // doesn't vanish against the white-ish surface.
               bg={{ base: "border.emphasized", _dark: "border" }}
               opacity={0.5}
               transition="all 0.15s ease"

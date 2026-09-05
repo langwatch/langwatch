@@ -1,18 +1,7 @@
 // @vitest-environment jsdom
 /**
- * A deep link such as Langy's "View in Trace Explorer" button navigates with
- * `router.push(href)` to this page's OWN route — same-route, fragment-only,
- * mediated by React Router's `navigate()`, never by `popstate`. Every other
- * `useURLSync` test file drives the mount path or the native `popstate`
- * listener; this one drives the third trigger, the one a same-route push
- * needs and neither of the other two covers.
- *
- * `BrowserRouter`, not `MemoryRouter`: `useURLSync` reads the fragment via
- * `window.location.hash` directly, and only `BrowserRouter` keeps that in
- * sync with what `navigate()` pushes — a `MemoryRouter`'s history never
- * touches the real `window.location` at all.
- *
- * See specs/langy/langy-trace-explorer-link.feature.
+ * A deep link such as Langy's "View in Trace Explorer" button navigates with `router.push(href)` to this page's
+ * OWN route — same-route, fragment-only, mediated by React Router's `navigate()`, never by `popstate`.
  */
 import { act, render } from "@testing-library/react";
 import { BrowserRouter, useNavigate } from "react-router";

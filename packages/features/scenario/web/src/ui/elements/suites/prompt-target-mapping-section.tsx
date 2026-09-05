@@ -1,14 +1,5 @@
 /**
  * Scenario mappings for the prompt targets in a run plan.
- *
- * Code, HTTP and workflow agents configure their mappings in their own editor,
- * on the agent record. A prompt has no such editor — it is authored in the
- * prompt library and pointed at — so the binding between a simulation and a
- * prompt's declared inputs is configured here, on the run plan that paired
- * them (#6590).
- *
- * Inputs a mapping leaves out are matched to a scenario source by name at run
- * time, so this section is only needed for the ones that cannot be.
  */
 
 import { Box, Text, VStack } from "@chakra-ui/react";

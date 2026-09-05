@@ -1,9 +1,7 @@
 /**
+ * Jumping to what a comment is about: the span selected, and the section of the detail
+ * holding a field opened and briefly highlighted.
  * @vitest-environment jsdom
- *
- * Jumping to what a comment is about: the span selected, and the section of the
- * detail holding a field opened and briefly highlighted.
- * See specs/traces-v2/anchored-comments.feature.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useRef, useState } from "react";

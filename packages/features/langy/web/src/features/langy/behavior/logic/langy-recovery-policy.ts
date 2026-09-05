@@ -2,68 +2,11 @@ import { KNOWN_LANGY_ERROR_KINDS } from "./langy-error-explainer";
 
 /**
  * The CLIENT half of Langy's turn-recovery policy (ADR-045/046 follow-on).
- *
- * Recovery happens on the SERVER first. The turn processor already knows the
- * turn failed and why, so for the failures it can fix by simply trying again it
- * does exactly that, in process, on the same turn — the browser never learns a
- * thing. That is
- * strictly better than bouncing a failure to the browser and asking IT to drive
- * a retry: nothing is re-posted, no permit is re-reserved, the open stream just
- * keeps streaming.
- *
- * So an error that reaches THIS module is one the server could not fix, and the
- * division is deliberate:
- *
- *   langy_worker_restarting  RETRY HERE. The pod was draining — it could not
- *                            sleep and try again, because it was going away.
- *                            The browser is the only thing still standing.
- *   langy_turn_timeout       RETRY HERE. The turn burned the whole timeout, which
- *                            is also the browser's stream-attach budget; a server
- *                            retry would stream into a socket nobody is reading.
- *                            Only a fresh POST buys a fresh budget.
- *
- *   langy_agent_at_capacity  DO NOT RETRY HERE. The server already backed off and
- *   langy_agent_unavailable  retried these — three times, with growing waits. If
- *                            one still reached the browser, the budget is SPENT.
- *                            Retrying again here would silently double it and
- *                            hold the user in a spinner for another minute.
- *
- *   langy_github_not_connected
- *                            AWAITING THE USER. Not a failure, and not a dead
- *                            end: a prerequisite is missing and only a human can
- *                            supply it. No auto-retry (backing off connects
- *                            nobody's account) and NO error card — the panel
- *                            draws the GitHub connect card in the message flow,
- *                            and connecting re-drives the turn.
- *
- *   langy_agent_session_lost TERMINAL. The session is gone; a retry walks into
- *                            the same wall. The user sends again — a fresh turn,
- *                            a fresh session.
- *   unknown                  TERMINAL. We do not retry what we cannot name.
- *
- * Pure. No timers, no React, no UI — `hooks/use-langy-turn-recovery.ts` owns the
- * clock and `components/langy-recovering-line.tsx` owns the pixels.
- *
- * FAIL SAFE. A kind we don't recognise — a new backend kind, a garbled payload —
- * is NOT retried. Guessing at a failure we can't name is how you get a retry
- * loop against a wall. The unit test pins every kind in `KNOWN_LANGY_ERROR_KINDS`
- * to an explicit entry, so adding a backend kind without a deliberate policy
- * fails loudly rather than defaulting into "retry forever".
  */
 
 /**
- * HOW a failure gets out of its hole. "Don't auto-retry" is not one answer, it
- * is two very different ones, and collapsing them is how a setup step ends up
- * painted red:
- *
- *   auto           We fix it ourselves. Back off, re-drive, say nothing alarming.
- *   awaiting-user  Nothing is broken and nothing is lost — a PREREQUISITE is
- *                  missing, and only a human can supply it (connect GitHub).
- *                  Backing off changes nothing, so there is no auto-retry; but
- *                  this is emphatically NOT a dead end, and it must never render
- *                  as an error. The UI offers the fix inline, at the point the
- *                  turn stopped, and re-drives the turn once it's done.
- *   terminal       We are genuinely stuck. Show the card; the user decides.
+ * HOW a failure gets out of its hole. "Don't auto-retry" is not one answer, it is two
+ * very different ones, and collapsing them is how a setup step ends up painted red:
  */
 export type LangyRecoveryDisposition = "auto" | "awaiting-user" | "terminal";
 
@@ -95,14 +38,7 @@ function terminal(kind: string): LangyRecoveryPolicy {
 }
 
 /**
- * Blocked on a human, not on a fault. No auto-retry — no amount of backing off
- * connects someone's GitHub account — but no error card either: the UI renders
- * the prerequisite's own affordance (the connect card) in the message flow, and
- * re-drives the turn once the user supplies what was missing.
- *
- * The re-drive MUST go through the same non-duplicating path every other retry
- * uses (`regenerate()` → `trigger: "regenerate-message"`), or the user's message
- * is posted a second time. See `hooks/use-langy-turn-recovery.ts`.
+ * Blocked on a human, not on a fault.
  */
 function awaitingUser(kind: string): LangyRecoveryPolicy {
   return {
@@ -121,12 +57,9 @@ function schedule(waits: readonly number[]): (attempt: number) => number {
 }
 
 /**
- * The first wait for a worker restart is not "as fast as possible" on purpose.
- * The conversation fold is projected asynchronously off the event log, and the
- * chat route's busy-guard 409s while it still reads `running`. `failTurn` is
- * dispatched a beat before the browser sees the error, so a retry fired
- * instantly would race the projection and bounce off the guard. ~1.5s buys the
- * fold time to terminalize; the second attempt buys a lot more.
+ * The first wait for a worker restart is not "as fast as possible" on purpose. The
+ * conversation fold is projected asynchronously off the event log, and the chat route's
+ * busy-guard 409s while it still reads `running`.
  */
 const WORKER_RESTART_WAITS = [1_500, 4_000] as const;
 
@@ -161,15 +94,9 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
     recoveringMessage: "Taking another run at that…",
   },
 
-  // The worker STOPPED and the control plane already exhausted its own recovery:
-  // the liveness sweep re-dispatched the silent turn across its whole grace budget
-  // (or the manager watched the worker's stream die) and it never came back. This
-  // is the one that USED to auto-retry as `langy_turn_stalled`, and that was the
-  // bug — a client re-drive only walks into the same dead worker, so the user got
-  // a card that flashed, vanished into a silent retry, and reappeared minutes
-  // later. It is TERMINAL now: show the card with a manual "Try again", and let
-  // the user decide. (A DEPLOY drain is different — see langy_worker_restarting —
-  // because a fresh pod really is coming, so that one still auto-retries.)
+  // The worker STOPPED and the control plane already exhausted its own recovery: the
+  // liveness sweep re-dispatched the silent turn across its whole grace budget (or the
+  // manager watched the worker's stream die) and it never came back.
   langy_worker_stopped: terminal("langy_worker_stopped"),
 
   // The agent reported its own failure — deterministic (e.g. the provider
@@ -207,12 +134,8 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   langy_conversation_not_found: terminal("langy_conversation_not_found"),
   langy_conversation_not_owned: terminal("langy_conversation_not_owned"),
 
-  // NOT a failure and NOT a dead end: Langy needs GitHub and the user hasn't
-  // connected it. Nothing broke, nothing was lost, and there is a perfectly good
-  // next action — so no auto-retry (backing off connects nobody's account), and
-  // emphatically no red card. The explainer marks this `render: "suppress"` and
-  // the panel draws the GitHub connect card in the message flow, right where the
-  // turn stopped; connecting re-drives the turn so the user never retypes.
+  // NOT a failure and NOT a dead end: Langy needs GitHub and the user hasn't connected
+  // it.
   langy_github_not_connected: awaitingUser("langy_github_not_connected"),
 
   // GitHub access exists but the app installation doesn't cover the repository
@@ -223,12 +146,7 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
 
   // Turn-START rejections from the control plane (LangyTurnService), not worker
   // failures: they reach the browser as coded TRPCErrors from the create/continue
-  // mutations. None is auto-retryable — the identical request fails the identical
-  // way until a human changes something (pick a model, fix the egress policy,
-  // grant a scope) or waits (a turn is already streaming). So all are TERMINAL:
-  // the explainer already renders each as a card with the right next action
-  // (configure-model, or none), and the card is where the user acts. Explicit
-  // entries rather than the `?? terminal` fallback so the coverage test pins them.
+  // mutations.
   langy_model_not_configured: terminal("langy_model_not_configured"),
   langy_model_not_allowed: terminal("langy_model_not_allowed"),
 
@@ -242,20 +160,11 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   langy_insufficient_scope: terminal("langy_insufficient_scope"),
   langy_turn_in_progress: terminal("langy_turn_in_progress"),
 
-  // Throttled by the per-user message limit. TERMINAL in the sense that matters
-  // here: an automatic re-drive is the single worst response, because it spends
-  // another request against the very limit that refused this one — the client
-  // hammering the wall it was just told to back off from. The explainer renders
-  // it as a composer notice asking for a few seconds' patience, and the user
-  // decides when to send again.
+  // Throttled by the per-user message limit.
   langy_rate_limited: terminal("langy_rate_limited"),
 
-  // Codex (sign-in-with-OpenAI). Both TERMINAL: an auto-retry re-drives the
-  // SAME failure. A dead OAuth session is fixed only by re-authenticating (the
-  // explainer's card carries the "Sign in to Codex" action, which re-drives the
-  // turn once connected), and a ChatGPT plan limit persists until it resets or
-  // the user switches models — so the card offers a manual "Try again" rather
-  // than a spinner that would hit the cap again instantly.
+  // Codex (sign-in-with-OpenAI). Both TERMINAL: an auto-retry re-drives the SAME
+  // failure.
   langy_codex_session_expired: terminal("langy_codex_session_expired"),
   langy_codex_plan_limit: terminal("langy_codex_plan_limit"),
 
@@ -276,14 +185,6 @@ export function langyRecoveryPolicy(kind: string): LangyRecoveryPolicy {
 
 /**
  * Whether THIS failure, in THIS turn, may be re-driven automatically.
- *
- * The kind's policy is necessary but not sufficient. A turn that already ran a
- * tool which CHANGES the project (opened a PR, created a prompt, started a
- * run) cannot be safely replayed: the agent has no idempotency key, so a
- * second pass can open a second PR. The route says as much where it refuses to
- * retry `/chat` internally. When the turn touched something, we stop and hand
- * the decision to the user via the card — replaying a side effect is their call
- * to make, not ours.
  */
 export function canAutoRecover({
   kind,
@@ -302,10 +203,7 @@ export function canAutoRecover({
 }
 
 /**
- * Tool names that CHANGE something. Langy's catalog splits cleanly: reads are
- * `search_*` / `get_*` / `list_*`, writes are `create_*` / `update_*` /
- * `delete_*` / `run_*` (see the system block in `routes/langy.ts`), plus the
- * GitHub PR path and the raw file/shell tools opencode exposes.
+ * Tool names that CHANGE something.
  */
 const MUTATING_TOOL_PREFIXES = ["create_", "update_", "delete_", "run_"] as const;
 const MUTATING_TOOL_NAMES = new Set(["bash", "write", "edit", "patch", "multiedit"]);

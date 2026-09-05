@@ -1,12 +1,6 @@
 /**
- * One filter of the Results tab: a labelled control that opens a list of what
- * can be picked, any number at a time.
- *
- * The options come from the unfiltered list, never from the filtered one. A
- * filter built from what it has already cut away hides its own way back: pick
- * one scenario and every other scenario would vanish from the menu that picked
- * it.
- *
+ * One filter of the Results tab: a labelled control that opens a list of what can be
+ * picked, any number at a time.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

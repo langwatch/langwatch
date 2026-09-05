@@ -1,12 +1,6 @@
 /**
- * The Run plan grouping: one row per plan, with what it covers, how it went
- * and how it has been going.
- *
- * A plan that did not run inside the window still has a row. Someone who opens
- * this page to check on a plan they are worried about is exactly the person
- * whose plan has gone quiet, so a quiet plan must be visible rather than
- * missing.
- *
+ * The Run plan grouping: one row per plan, with what it covers, how it went and how it
+ * has been going.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
@@ -37,10 +31,9 @@ import type {
 } from "../../../../behavior/agent-testing/results/run-plans";
 
 /**
- * The mark beside what a plan covers. A scope is a rule rather than a list, so
- * the mark says which rule it is: every scenario, a suite, a label, or a
- * hand-picked few. It reads next to words that name the same thing, so it
- * carries no label of its own.
+ * The mark beside what a plan covers. A scope is a rule rather than a list, so the mark
+ * says which rule it is: every scenario, a suite, a label, or a hand-picked few. It
+ * reads next to words that name the same thing, so it carries no label of its own.
  */
 const SCOPE_ICONS: Record<RunPlanScopeKind, typeof Layers> = {
   all: Layers,
@@ -52,10 +45,6 @@ const SCOPE_ICONS: Record<RunPlanScopeKind, typeof Layers> = {
 
 /**
  * The targets a plan runs against, behind one mark.
- *
- * A plan that compares carries no one kind, so the row reads the target mark
- * instead of the mark of an agent, the same way the run detail marks a
- * comparison.
  */
 function TargetsCell({
   targetKeys,
@@ -99,11 +88,6 @@ function ScopeCell({ plan }: { plan: RunPlan }) {
 
 /**
  * The columns of the plan table.
- *
- * Cost and duration are not among them. A boxed pill carrying both read as
- * clutter repeated down a column, and the duration was unavailable on most
- * rows anyway; the totals live in the stat strip, where a total states what it
- * covers.
  */
 export const PLAN_COLUMNS =
   "minmax(0,1fr) minmax(140px,170px) minmax(95px,140px) minmax(100px,155px) 60px 100px 32px";
@@ -260,10 +244,8 @@ export type PlanRowsTableProps = {
   /** The window, in days, for the row that says nothing ran inside it. */
   days: number;
   /**
-   * True while the window holds runs that no row of this table accounts for:
-   * a single scenario or a test suite run from the platform belongs to no run
-   * plan. The table then says where those runs are read instead of reporting
-   * a filter that matched nothing.
+   * True while the window holds runs that no row of this table accounts for: a single
+   * scenario or a test suite run from the platform belongs to no run plan.
    */
   hasRunsOutsidePlans?: boolean;
   resolveTargetName: (targetKey: string) => string;

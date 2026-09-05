@@ -10,10 +10,9 @@ import { type LensConfig, setLensSyncBridge, useViewStore } from "../../../../in
 const KIND = "v2-traces-lens";
 
 /**
- * Shape we serialise the LensConfig into when it lives in the SavedView
- * row's `filters` JSON column. Kept as its own concrete type so the
- * decode round-trips and won't silently break if we add fields to
- * LensConfig — TypeScript will warn at the encoder.
+ * Shape we serialise the LensConfig into when it lives in the SavedView row's `filters`
+ * JSON column. Kept as its own concrete type so the decode round-trips and won't
+ * silently break if we add fields to LensConfig — TypeScript will warn at the encoder.
  */
 interface SerializedLens {
   v: 1;
@@ -53,20 +52,8 @@ function decode(id: string, name: string, filters: unknown): LensConfig | null {
 }
 
 /**
- * Wires the lens viewStore to the server-side SavedView table. Call
- * once at the top of TracesPage. The hook:
- *
- *  - Fetches `savedViews.getAll({ kind: "v2-traces-lens" })` and pushes
- *    the result into `viewStore.setUserLenses` so the lens strip
- *    reflects whatever the user / their team has saved on this project.
- *  - Registers a sync bridge so subsequent createLens / renameLens /
- *    deleteLens calls fire-and-forget the matching tRPC mutation —
- *    keeping the local store as a hot cache, the server as the source
- *    of truth.
- *
- * Built-in lenses stay code-defined; they're not persisted server-side.
- * Drafts (per-lens local tweaks) also stay local — they're the
- * "unsaved changes" state by definition.
+ * Wires the lens viewStore to the server-side SavedView table. Call once at the top of
+ * TracesPage. The hook:
  */
 export function useLensSync(): void {
   const { project } = useOrganizationTeamProject();

@@ -19,40 +19,12 @@ import {
 
 /**
  * The composer's command palette — `/` for skills, `#` for context.
- *
- * ── WHY THE COMPOSER BECOMES A COMMAND BAR ─────────────────────────────────
- * A `/` menu inside a textarea is the classic trap: Ark's Combobox owns an
- * `<input>`, a textarea is not one, and driving the machine from the outside
- * means re-implementing highlight navigation, `aria-activedescendant` and roving
- * focus by hand — the exact hand-rolled popup we are trying not to build.
- *
- * So the `/` does not open a popup NEXT TO the text. It turns the top of the
- * composer INTO a real combobox: a genuine `Combobox.Input` with a genuine
- * listbox anchored to it. Focus moves there, Ark provides every keyboard
- * behaviour (type to filter, ↑/↓, Enter, Escape) for free, and the `/` token is
- * never inserted into the message in the first place — so there is nothing to
- * strip afterwards, and no way for a half-typed command to survive into a
- * prompt.
- *
- * Escape returns focus to the textarea with the message exactly as it was.
- *
- * ── WHY IT SAYS WHICH MODE IT IS IN ────────────────────────────────────────
- * Both keys open the same-looking bar, so the bar has to say which one you
- * pressed. It wears a titled badge ("Context" / "Skills") and its rows are
- * grouped under headings; without that the two modes are one ambiguous box and
- * the only way to tell them apart is to read the results and guess.
  */
 
 export type PaletteMode = "context" | "skills";
 
 /**
  * Everything the palette needs to introduce itself.
- *
- * TWO empty states, because there are two ways to end up with no rows and they
- * are not the same question. `nothing` is "there was never anything here" — an
- * index route with no drawer and no page targets offers `#` an empty list
- * before a single key is typed, and answering that with "nothing matches" is a
- * reply to a search the reader never ran. `noMatch` is the real no-match.
  */
 const MODE_CHROME: Record<
   PaletteMode,
@@ -193,20 +165,6 @@ export function LangyComposerPalette({
     const q = query.trim().toLowerCase();
     const filtered = q ? items.filter((item) => item.searchText.includes(q)) : items;
     // `#` is CONTEXT, and only context.
-    //
-    // It used to append "browse"/"reveal" intent rows under a Commands
-    // heading — a way out of a page with nothing pickable on it. But they made
-    // the one palette that is supposed to answer "what can I attach?" answer
-    // with things that attach nothing, and on an empty page they were the
-    // ENTIRE list, so `#` read as a command menu that happened to be filed
-    // under a different key. The real fix for a page with nothing to pick is
-    // for the page to offer its things, not for this list to change subject.
-    // (What such a page shows the reader is `chrome.nothing` — see below.)
-    //
-    // Sorted into group order BEFORE the collection is built, so the order the
-    // eye reads and the order ↑/↓ walks are the same order. Grouped rendering
-    // over an unsorted collection is how a palette ends up jumping between
-    // headings as you arrow through it.
     const order = GROUP_ORDER[mode];
     const sorted = [...filtered].sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
     return createListCollection({

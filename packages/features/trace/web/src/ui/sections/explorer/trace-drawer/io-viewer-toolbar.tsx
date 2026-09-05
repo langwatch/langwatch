@@ -54,15 +54,8 @@ function IOActionSlot({
 }
 
 /**
- * The measured part of the toolbar: the format selector and the actions,
- * right-aligned, and the three-dot menu holding whichever actions no longer
- * fit.
- *
- * A leading spacer holds everything against the right edge, away from the
- * panel label. The format selector is not something a reader watches, so it
- * belongs with the other controls rather than beside the label, and being
- * first in the group means a longer format name grows leftwards instead of
- * pushing the actions around.
+ * The measured part of the toolbar: the format selector and the actions, right-aligned,
+ * and the three-dot menu holding whichever actions no longer fit.
  */
 function IOActionsRow({
   actions,
@@ -171,14 +164,9 @@ interface IOViewerToolbarProps {
 }
 
 /**
- * The controls row of an INPUT / OUTPUT panel: one compact format selector,
- * the actions that operate on the field, and Copy, all grouped on the right
- * so the panel label keeps the left to itself.
- *
- * The row keeps one footprint no matter how many actions a panel offers.
- * Actions that no longer fit collapse into the three-dot overflow menu, the
- * same element the span tab strip uses, and Copy stays outside that menu as
- * the last control in the row.
+ * The controls row of an INPUT / OUTPUT panel: one compact format selector, the actions
+ * that operate on the field, and Copy, all grouped on the right so the panel label
+ * keeps the left to itself.
  */
 export function IOViewerToolbar({
   label,

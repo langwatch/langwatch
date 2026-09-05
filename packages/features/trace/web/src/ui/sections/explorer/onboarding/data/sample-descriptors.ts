@@ -1,25 +1,5 @@
 /**
  * Hardcoded facet descriptors for the sample-preview view.
- *
- * Discover is a server-side query against the user's real
- * `trace_summaries`. For sample mode there's nothing to query — the
- * rows are client-side fixtures with no ClickHouse footprint — so the
- * sidebar normally renders empty and `FilterAside` short-circuits
- * `if (hasAnyTraces === false) return null`. That hides the whole
- * facet experience from the first-time user, which is the worst
- * possible moment to hide it: they're meant to be learning what the
- * sidebar can do.
- *
- * We derive a small set of categorical descriptors directly from
- * `SAMPLE_PREVIEW_TRACES` at module load. The shape matches the live
- * tRPC discover output so `useFilterSidebarData` / FilterSidebar consume
- * them with zero branching — only the source-of-truth differs.
- *
- * Keys mirror `FACET_REGISTRY` (`service`, `model`, `status`,
- * `user`, `conversation`) so the sidebar uses the same labels and
- * row-filtering predicates as in real-trace mode. Counts are real
- * frequencies from the fixtures so the value list ordering is
- * deterministic and matches what the user sees in the table.
  */
 import type { RouterOutputs } from "../../../trace-api";
 import { SAMPLE_PREVIEW_TRACES } from "./sample-preview-traces";

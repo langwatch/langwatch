@@ -1,15 +1,5 @@
 /**
  * Bring a column into view after something off screen happened to it.
- *
- * A column Langy adds lands to the right of every column already there, which
- * on a wide workbench is past the edge of the table. The change was real and
- * saved and the reader saw nothing move, so the work read as nothing
- * happening. Scrolling to it is what makes an agent's edit land the way a
- * person's does: you see the thing that changed.
- *
- * `inline: "center"` rather than the drawer helper's right-edge maths, because
- * the Langy panel is docked over the right of the table and a column parked
- * against that edge sits underneath it.
  */
 
 /**
@@ -21,21 +11,12 @@ const MAX_FRAMES = 10;
 
 /**
  * The column's own attribute selector.
- *
- * A target id is any non-empty string, so a quote or a backslash in one would
- * end the attribute value early and make `querySelector` throw. That throw
- * would travel out of an action that already applied its change, so the caller
- * would read a save as a failure and do it again.
  */
 const targetColumnSelector = (targetId: string): string =>
   `[data-target-column="${CSS.escape(targetId)}"]`;
 
 /**
- * The name this column shows in its own header, or null when it is not on
- * screen. Read rather than derived: every candidate carries the same prompt
- * handle, so only the disambiguated form tells them apart, and computing it a
- * second time is how something ends up naming a different column than the
- * header does.
+ * The name this column shows in its own header, or null when it is not on screen.
  */
 export function targetColumnLabel(targetId: string): string | null {
   if (typeof document === "undefined") return null;

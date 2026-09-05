@@ -5,11 +5,8 @@ import { computeParetoDominance } from "@langwatch/experiment-web";
 import type { BTLeaderboard, BTLeaderboardEntry, VariantMetrics } from "@langwatch/experiment-web";
 
 /**
- * Dominance is the one claim on the trade-off chart a reader acts on
- * directly — "this variant is beaten outright, drop it". It is therefore
- * held to the same standard as the verdict: never asserted from a
- * difference the run cannot actually see.
- *
+ * Dominance is the one claim on the trade-off chart a reader acts on directly — "this
+ * variant is beaten outright, drop it".
  * @see specs/experiments/comparison-leaderboard.feature
  */
 
@@ -62,14 +59,9 @@ const board = (entries: BTLeaderboardEntry[]): BTLeaderboard => ({
 });
 
 /**
- * Paired difference interval standing in for what the bootstrap would produce
- * from well-behaved rows: a clear gap yields an interval on one side of zero,
- * a negligible one yields an interval spanning it.
- *
- * The helper used to omit these entirely, which quietly pointed every test in
- * this file at the mean-comparison fallback — a branch production cannot
- * reach, since `computeVariantMetrics` is the only builder of VariantMetrics
- * and always populates the maps. Ten tests were passing against dead code.
+ * Paired difference interval standing in for what the bootstrap would produce from
+ * well-behaved rows: a clear gap yields an interval on one side of zero, a negligible
+ * one yields an interval spanning it.
  */
 const SYNTHETIC_GAP = 0.1;
 
@@ -535,9 +527,8 @@ describe("computeParetoDominance — a field that broke into groups that never m
     }));
 
   /**
-   * The real fit rather than a hand-built board, because the break is not
-   * visible at that level: every variant won and lost, so the solver's own
-   * degeneracy guard reports the field healthy, and the between-group gap
+   * The real fit rather than a hand-built board, because the break is not visible at that level: every variant
+   * won and lost, so the solver's own degeneracy guard reports the field healthy, and the between-group gap
    * arrives looking like an ordinary score difference.
    */
   const twoIslands = () =>

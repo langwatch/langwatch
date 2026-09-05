@@ -1,8 +1,5 @@
 /**
  * A clipboard write must not claim success for a write the browser refused.
- * A reader told "copied" for a credential that never reached the clipboard
- * finds out when their SDK rejects it.
- *
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 

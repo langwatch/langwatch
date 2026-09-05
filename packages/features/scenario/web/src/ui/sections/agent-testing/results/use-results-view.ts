@@ -1,17 +1,6 @@
 /**
- * What the Results tab is currently showing: how it is grouped, what is
- * filtered out, whether the charts are open, and which rows are expanded.
- *
- * The grouping and the filters live in the address, so the browser back button
- * retraces the steps a person took and a link to "the failures of last week"
- * opens on the failures of last week. The charts toggle and the opened rows do
- * not: they are how someone is looking at the page right now, not what the
- * page is showing.
- *
- * The address is written through `buildAgentTestingPush`, which owns the
- * segments of this page. A plain push of `router.pathname` would leave the
- * catch-all segment unresolved and bounce the address back to the tab root.
- *
+ * What the Results tab is currently showing: how it is grouped, what is filtered out,
+ * whether the charts are open, and which rows are expanded.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
@@ -55,9 +44,6 @@ export type ResultsViewQuery = {
 
 /**
  * What a query says, as view state.
- *
- * Anything unreadable falls back to the default rather than rendering broken,
- * which is what makes a hand-edited or a stale link degrade instead of failing.
  */
 export function readResultsViewQuery(query: ResultsViewQuery): {
   grouping: ResultGrouping;

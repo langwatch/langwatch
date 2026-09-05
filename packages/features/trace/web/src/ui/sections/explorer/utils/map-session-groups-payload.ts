@@ -2,10 +2,9 @@ import type { ConversationGroup } from "../trace-table/conversation-groups";
 import type { TraceStatus } from "../types/trace";
 
 /**
- * One session row as returned by `tracesV2.sessions`, the server-side
- * rollup over every trace sharing a `gen_ai.conversation.id` in range
- * (specs/traces-v2/sessions-lens.feature). Declared structurally here so the
- * mapper stays testable without the tRPC client types.
+ * One session row as returned by `tracesV2.sessions`, the server-side rollup over every
+ * trace sharing a `gen_ai.conversation.id` in range
+ * (specs/traces-v2/sessions-lens.feature).
  */
 export interface SessionGroupPayloadItem {
   conversationId: string;

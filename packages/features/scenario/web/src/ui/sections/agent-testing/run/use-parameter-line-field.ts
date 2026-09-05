@@ -1,10 +1,6 @@
 /**
- * The list under a parameter field: what it offers for the token under the
- * cursor, which row is highlighted, and how a key or a click takes one.
- *
- * The field renders; this holds the state, so the rules that open, move and
- * close the list can be read on their own.
- *
+ * The list under a parameter field: what it offers for the token under the cursor,
+ * which row is highlighted, and how a key or a click takes one.
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 

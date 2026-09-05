@@ -1,14 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Browser Back is the documented gesture for dismissing the trace drawer, and
- * the drawer owns a history entry of its own (its state lives in the query
- * string). `useURLSync` listens on `popstate` for genuine bar-state
- * navigation, so it has to tell the two apart: a Back that only closed the
- * drawer arrives on an unchanged fragment and must leave the table's keyset
- * cursors — and therefore the user's place in the list — alone.
- *
- * See specs/traces-v2/data-layer.feature (URL state) and
- * specs/traces-v2/trace-drawer-shell.feature (drawer dismissal).
+ * Browser Back is the documented gesture for dismissing the trace drawer, and the
+ * drawer owns a history entry of its own (its state lives in the query string).
  */
 import { act, renderHook } from "@testing-library/react";
 // `useURLSync` reads React Router's own `useLocation()` now (see the
@@ -177,12 +170,9 @@ describe("useURLSync pagination across browser history navigation", () => {
 
     describe("when Back lands on an entry from before the time range was changed", () => {
       it("restores the window that entry denotes instead of applying half of it", () => {
-        // The full drawer sequence: open + close the drawer (its entries
-        // carry the empty body), then move the range to Last 7 days — which
-        // only rewrites the CURRENT entry — then page forward and press Back.
-        // The entry we land on denotes the default window, so restoring the
-        // pagination without restoring the window leaves the user on a range
-        // no history entry ever held.
+        // The full drawer sequence: open + close the drawer (its entries carry the
+        // empty body), then move the range to Last 7 days — which only rewrites the
+        // CURRENT entry — then page forward and press Back.
         renderURLSync();
         act(() => {
           window.history.replaceState(null, "", "/#all-traces?preset=7d");

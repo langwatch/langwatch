@@ -1,18 +1,5 @@
 /**
  * The two database rows these screens read, declared where they are read.
- *
- * `~/generated/prisma/client` is the application's generated client and cannot
- * be imported from a feature-web package — the module does not exist until
- * `prisma generate` has run against the application's schema, and a package
- * that named it would make its own typecheck depend on that. The model-config
- * and workflow families answered this the same way: state the ROW as the
- * screens read it, keep the field names and nullability exactly as the schema
- * declares them, and let the day a contract package publishes them retire this
- * file.
- *
- * KEPT IN STEP BY HAND, and that obligation is the price of the move — the same
- * one `@langwatch/enterprise-billing-contract` states about its Prisma enum
- * copies. Both models are in `packages/prisma-client/prisma/schema.prisma`.
  */
 
 /** Anything the schema types as `Json`. */

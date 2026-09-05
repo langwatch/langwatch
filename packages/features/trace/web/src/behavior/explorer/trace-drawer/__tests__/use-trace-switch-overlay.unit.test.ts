@@ -1,10 +1,7 @@
 /**
+ * The trace-switch overlay must fire only on a genuine A→B switch, hold through the new trace's load plus a short
+ * floor (so prefetched/instant switches still flash), and never fire on a same-trace refresh or the first open.
  * @vitest-environment jsdom
- *
- * The trace-switch overlay must fire only on a genuine A→B switch, hold
- * through the new trace's load plus a short floor (so prefetched/instant
- * switches still flash), and never fire on a same-trace refresh or the
- * first open.
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

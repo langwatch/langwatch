@@ -53,10 +53,6 @@ function toSavedDatasetReference(dataset: {
 
 /**
  * New Experiment Workbench Page
- *
- * Creates a new experiment on the server and redirects to the slug page.
- * When a `datasetId` query param is present (e.g. "Run experiment" from a
- * dataset), the new experiment is seeded with that saved dataset.
  */
 export default function NewExperimentWorkbench() {
   const router = useRouter();

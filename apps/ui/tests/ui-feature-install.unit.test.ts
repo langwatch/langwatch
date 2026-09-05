@@ -1,12 +1,6 @@
 /**
- * The one install surface a feature directory gets: `<x>Feature =
- * uiFeature({...})`, composed by `installUiFeatures`.
- *
- * Every feature directory is imported by name (not discovered at runtime)
- * so a directory this suite forgets to list is a compile error here rather
- * than a gap the guard silently misses.
- *
- * Design: dev/docs/plans/ui-install-surface-2026-09-05.md.
+ * The one install surface a feature directory gets: `<x>Feature = uiFeature({...})`,
+ * composed by `installUiFeatures`.
  */
 
 import { describe, expect, it } from "vitest";
@@ -54,10 +48,9 @@ import * as tracesModule from "../src/features/traces";
 import * as workflowsModule from "../src/features/workflows";
 
 /**
- * Every directory under `src/features` with an `index.ts`, except
- * `drawers/` — it holds the trace-drawer funnel and address helpers the
- * chrome imports directly, and never composed a Feature of its own even
- * before this change (see the design's Files table).
+ * Every directory under `src/features` with an `index.ts`, except `drawers/` — it holds
+ * the trace-drawer funnel and address helpers the chrome imports directly, and never
+ * composed a Feature of its own even before this change (see the design's Files table).
  */
 const featureModules: Record<string, Record<string, unknown>> = {
   agent: agentModule,

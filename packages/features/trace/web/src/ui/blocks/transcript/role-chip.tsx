@@ -12,19 +12,9 @@ export const ROLE_LABELS: Record<string, string> = {
 };
 
 /**
- * Canonical per-role palette. Every chrome surface that renders a role
- * (chip, thread-layout avatar, bubble-layout container, system marker,
- * etc.) sources its colours from here so the same role reads the same
- * across the drawer.
- *
- * Keyed by **display role** (the one users see after scenario role-swap
- * has been applied) so a scenario simulator (`displayRole=assistant`)
- * picks up the same purple the bubble layout uses for assistant cards.
- *
- *  - `fg`     — text + icon colour on the page's neutral surface
- *  - `muted`  — small avatar circle background + accent strips
- *  - `solid`  — saturated background for ChatGPT-style filled avatars
- *  - `contrast` — text/icon colour to use on top of a `solid` fill
+ * Canonical per-role palette. Every chrome surface that renders a role (chip,
+ * thread-layout avatar, bubble-layout container, system marker, etc.) sources its
+ * colours from here so the same role reads the same across the drawer.
  */
 export interface RolePalette {
   fg: string;
@@ -76,10 +66,9 @@ export function getRolePalette(role: string): RolePalette {
 }
 
 /**
- * Back-compat shim. New code should consume `ROLE_PALETTES` /
- * `getRolePalette` directly; this object preserves the previous
- * `Record<string, string>` `.fg`-only API for the handful of older
- * sites that aren't worth a full refactor.
+ * Back-compat shim. New code should consume `ROLE_PALETTES` / `getRolePalette`
+ * directly; this object preserves the previous `Record<string, string>` `.fg`-only API
+ * for the handful of older sites that aren't worth a full refactor.
  */
 export const ROLE_COLORS: Record<string, string> = Object.fromEntries(
   Object.entries(ROLE_PALETTES).map(([role, palette]) => [role, palette.fg]),

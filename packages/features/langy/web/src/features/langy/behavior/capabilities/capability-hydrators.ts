@@ -1,27 +1,5 @@
 /**
  * CAPABILITY_HYDRATORS — how each CLI resource's card fetches CURRENT data.
- *
- * A digest is a reference (ids, a query, counts), not the data itself; this
- * registry maps a resource to the EXISTING tRPC procedure that resolves the
- * reference with the viewer's own session — so a card always shows what the
- * viewer is allowed to see today, not what stdout said when the agent ran.
- *
- * The registry is data: one entry per resource, each line pointing at a
- * procedure that already exists. A resource with no entry is not an error —
- * its card renders from the digest/stored output exactly as before. DO NOT
- * add server procedures to feed this file; wire an entry only when the
- * product surface already exposes the read.
- *
- *   byIds    resolves an id-ref digest (fetch these entities).
- *   byQuery  resolves a query — used both for query-ref digests and for the
- *            PROGRESSIVE start-frame path, where the parsed command exists
- *            before any result does (a trace search shows live rows while the
- *            agent is still working).
- *
- * Rows come back in ONE vocabulary (`CapabilityHydratedRow`) so cards render
- * hydrated data generically; an entity the API no longer returns is simply
- * absent from `rows`, and the card reads the gap against the digest's counts
- * ("no longer available") rather than inventing anything.
  */
 
 import type { api } from "../../../../behavior/langy-api";
@@ -30,10 +8,6 @@ import { traceMetaLine, truncateRowText } from "../../../../index";
 
 /**
  * The trace row a card hydrates fresh, as this file reads it.
- *
- * `tracesV2.list` is a placeholder in this family's procedure map — the payload
- * is `@langwatch/trace-contract`'s and this package does not depend on it — so
- * the four fields the card actually renders are stated where they are read.
  */
 type TraceRowPayload = {
   traceId: string;
@@ -108,14 +82,9 @@ const DEFAULT_SEARCH_WINDOW_MS = 24 * 60 * 60 * 1000;
 // ── traces ──────────────────────────────────────────────────────────────────
 
 /**
- * One trace header per id, in id order, via the same `tracesV2.header` read the
- * trace drawer uses (minus full IO resolution — this fetches N traces and
- * immediately truncates each to `ROW_TEXT_MAX`, so it's never worth the extra
- * spans read `full: true` costs). Fetched individually (the v2 surface has no
- * bulk-by-id read), which is also what makes chunked fill natural: each settled
- * header is one more row. A trace the viewer cannot see — deleted, out of
- * retention, hidden by privacy rules — just doesn't come back, and the card
- * says so.
+ * One trace header per id, in id order, via the same `tracesV2.header` read the trace drawer uses (minus full IO
+ * resolution — this fetches N traces and immediately truncates each to `ROW_TEXT_MAX`, so it's never worth the
+ * extra spans read `full: true` costs).
  */
 async function traceByIds({
   utils,
@@ -152,10 +121,8 @@ async function traceByIds({
 }
 
 /**
- * Re-run the agent's trace search through `tracesV2.list` — the Trace
- * Explorer's own read. The CLI's `--query` is free text, so it is carried as a
- * quoted liqe literal (the same fidelity rule the Explorer deep link keeps);
- * absent dates fall back to the last 24h, the CLI's own default window.
+ * Re-run the agent's trace search through `tracesV2.list` — the Trace Explorer's own
+ * read.
  */
 async function traceByQuery({
   utils,

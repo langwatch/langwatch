@@ -1,10 +1,7 @@
 /**
+ * The Input / Output table cells distinguish redacted content from genuinely-absent content: a privacy-redacted side (the server nulled the text but set
+ * `inputRedacted` / `outputRedacted`) renders the shared "Redacted" marker, while a side that is simply empty keeps the em-dash.
  * @vitest-environment jsdom
- *
- * The Input / Output table cells distinguish redacted content from
- * genuinely-absent content: a privacy-redacted side (the server nulled the
- * text but set `inputRedacted` / `outputRedacted`) renders the shared
- * "Redacted" marker, while a side that is simply empty keeps the em-dash.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";

@@ -2,33 +2,15 @@ import { getReasoning, parseContentBlocks } from "./parsing";
 import type { ChatMessage, ContentBlock, ConversationTurn } from "../../model/transcript/types";
 
 /**
- * Group raw chat messages into logical turns. Each message stays as its
- * own turn (two consecutive user messages are two distinct beats — we
- * don't merge them just because they share a role). The one exception:
- *
- *   • Anthropic emits `tool_result` blocks as `role=user` messages — the
- *     API echoing the tool result back to continue the assistant. Those
- *     fold into the preceding assistant turn so the chain reads as one
- *     operation, not as user/assistant/user/assistant ping-pong.
- *
- * Within a single message, *all* its content blocks (thinking + text +
- * tool_use + …) render together inside that message's turn — that's the
- * shape the model emitted, and it should be obvious in the UI.
+ * Group raw chat messages into logical turns. Each message stays as its own turn (two
+ * consecutive user messages are two distinct beats — we don't merge them just because
+ * they share a role). The one exception:
  */
 export function groupMessagesIntoTurns(messages: ChatMessage[]): ConversationTurn[] {
   const turns: ConversationTurn[] = [];
 
-  // Fold a user-role message into the preceding assistant turn when every
-  // block it carries is an assistant operation. That covers:
-  //   - the standard Anthropic tool_result echo pattern (every block is
-  //     a tool_result);
-  //   - mislabeled traces where tool_use / thinking blocks ended up under
-  //     role=user — semantically they're always assistant operations.
-  //
-  // The test asks what the blocks ARE rather than what they are missing.
-  // "No text block" also describes a person sending a picture, a recording or
-  // a document with no caption, which is the opposite of an echo: it is the
-  // user speaking, and folding it relabelled them as the assistant.
+  // Fold a user-role message into the preceding assistant turn when every block it
+  // carries is an assistant operation.
   const isAssistantOperationEcho = (blocks: ContentBlock[]) =>
     blocks.length > 0 &&
     blocks.every((b) => b.kind === "tool_result" || b.kind === "tool_use" || b.kind === "thinking");

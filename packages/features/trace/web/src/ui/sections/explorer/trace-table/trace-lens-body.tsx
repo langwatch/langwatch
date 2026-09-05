@@ -24,14 +24,9 @@ import { RegistryRow } from "./registry";
 import { SELECT_COLUMN_ID } from "./registry/cells/select-cells";
 
 /**
- * Module-level singleton so the `pinnedColumnIds` prop is referentially
- * stable across renders — without it, every render would hand the
- * shell a new Set and the SortableContext would treat its items as
- * having changed, kicking off unnecessary re-mounts of the header row.
- *
- * Holds the two synthetic columns that frame the data columns: the
- * leading row-select checkbox and the trailing "+" add-column affordance.
- * Both are excluded from drag-reorder and sort.
+ * Module-level singleton so the `pinnedColumnIds` prop is referentially stable across renders — without it, every
+ * render would hand the shell a new Set and the SortableContext would treat its items as having changed, kicking
+ * off unnecessary re-mounts of the header row.
  */
 const NON_REORDERABLE_COLUMN_IDS = new Set([SELECT_COLUMN_ID, ADD_COLUMN_ID]);
 
@@ -122,15 +117,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     [sorting, setSortInStore],
   );
 
-  // Surface `columnOrder` as explicit Tanstack state. Without it,
-  // Tanstack falls back to "columns array order" for the header row
-  // but holds onto its INTERNAL leaf column cache (built once per
-  // identity) for cell rendering — which means reordering via the
-  // viewStore showed the new order in headers but kept cells in their
-  // old positions ("the cell doesn't match the col"). Passing the
-  // explicit `columnOrder` state forces Tanstack to recompute the
-  // visible leaf order on every change, keeping headers and cells in
-  // lockstep with the store.
+  // Surface `columnOrder` as explicit Tanstack state.
   const columnOrderState = useMemo<string[]>(
     () => [SELECT_COLUMN_ID, ...lens.columns, ADD_COLUMN_ID],
     [lens.columns],
@@ -163,12 +150,9 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   const rows = table.getRowModel().rows;
   const colSpan = columns.length;
 
-  // Precompute "is this the leading row of a consecutive error run?"
-  // for every row. Done once per render in O(n) instead of having each
-  // RegistryRow probe its neighbour. The flag drives the matching red
-  // top border that closes the run on the upper side — without it,
-  // the first error row's top edge is the previous (non-error) row's
-  // grey bottom border, which looks "open on top".
+  // Precompute "is this the leading row of a consecutive error run?" for every row.
+  // Done once per render in O(n) instead of having each RegistryRow probe its
+  // neighbour.
   const isFirstOfErrorRun = useMemo(() => {
     const flags = new Array<boolean>(rows.length);
     for (let i = 0; i < rows.length; i++) {
@@ -228,18 +212,8 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                 onTogglePeek={isLoading ? undefined : () => togglePeek(row.original.traceId)}
                 isLoading={isLoading}
                 isFirstOfErrorRun={!isLoading && isFirstOfErrorRun[virtualItem.index]}
-                // A trace row IS a trace, so it offers itself to Langy like any
-                // other addressable resource on the page.
-                //
-                // This was null, from when the affordance was held open on
-                // hover and read as noise on a dense table. The arming gate
-                // (`#`, or a held Shift — see useLangyContextArming) settled
-                // that: disarmed, a registered row carries no class, no state
-                // attribute, no handlers and no drag, so the table is exactly
-                // the table. The multi-select route through the selection bar
-                // stays — it is the better way to take twenty — but pointing at
-                // ONE trace should not require checking a box first, and every
-                // other resource on the page already works that way.
+                // A trace row IS a trace, so it offers itself to Langy like any other
+                // addressable resource on the page.
                 langyTarget={
                   isLoading
                     ? null

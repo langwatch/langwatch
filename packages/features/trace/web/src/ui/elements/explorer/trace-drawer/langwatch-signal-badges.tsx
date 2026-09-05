@@ -17,11 +17,9 @@ interface SignalDisplay {
   icon: IconType;
   label: string;
   /**
-   * Chakra colorPalette for the icon. Picking per-bucket colours makes
-   * the strip scannable — operators can spot "this LLM trace has a
-   * scenario" or "this one carries an eval" by the dot colour without
-   * reading the tooltip. All flat across light/dark via the
-   * `colorPalette.fg` token alias.
+   * Chakra colorPalette for the icon. Picking per-bucket colours makes the strip
+   * scannable — operators can spot "this LLM trace has a scenario" or "this one carries
+   * an eval" by the dot colour without reading the tooltip.
    */
   palette: string;
   /** Short label shown beneath / next to the icon when render mode is "labeled". */

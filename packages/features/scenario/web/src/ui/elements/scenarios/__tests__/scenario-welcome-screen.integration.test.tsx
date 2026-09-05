@@ -1,14 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the scenario welcome components.
- *
- * Covers:
- * - Inline welcome screen renders content and triggers onProceed
- * - Modal renders content when open
- * - Modal does not render content when closed
- * - Welcome content (title, description, capabilities, CTA)
- * - Proceed button triggers onProceed callback
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../../../index";

@@ -1,16 +1,6 @@
 /**
+ * Regression test for #3194: the Scenarios index page must NOT explicitly render `<ScenarioFormDrawerFromUrl>` — the drawer is mounted globally by `CurrentDrawer` via the drawer registry.
  * @vitest-environment jsdom
- *
- * Regression test for #3194: the Scenarios index page must NOT explicitly
- * render `<ScenarioFormDrawerFromUrl>` — the drawer is mounted globally
- * by `CurrentDrawer` via the drawer registry. Rendering it both ways
- * puts two `role="dialog"` elements in the DOM and breaks accessible
- * selectors / Playwright targeting.
- *
- * `CurrentDrawer.tsx` already emits a dev console warning when this
- * happens; this test pins the page-side fix into CI so the regression
- * cannot recur.
- *
  * @see specs/features/scenarios/scenarios-editor-ui-regressions.feature
  */
 import { readFileSync } from "node:fs";
@@ -39,11 +29,9 @@ describe("Scenarios index page (regression #3194)", () => {
 
   describe("given what this package publishes for the drawer registry", () => {
     /**
-     * The registry itself is the composing application's now — a feature
-     * publishes its drawer COMPONENTS and the application installs them under
-     * their addresses — so what this package can still guarantee, and what the
-     * regression actually needs, is that the component the `scenarioEditor`
-     * address resolves to is the one the page must not also mount.
+     * The registry itself is the composing application's now — a feature publishes its drawer COMPONENTS and the application installs
+     * them under their addresses — so what this package can still guarantee, and what the regression actually needs, is that the
+     * component the `scenarioEditor` address resolves to is the one the page must not also mount.
      */
     it("still publishes ScenarioFormDrawerFromUrl for the scenarioEditor address", () => {
       const source = readFileSync(join(process.cwd(), "src/screens/drawers.ts"), "utf-8");

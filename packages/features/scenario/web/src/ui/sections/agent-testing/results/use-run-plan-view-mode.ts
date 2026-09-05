@@ -1,7 +1,6 @@
 /**
- * How the results of one run read: a table, or the wall of conversation cards.
- * The choice is kept in the address so a reload holds it.
- *
+ * How the results of one run read: a table, or the wall of conversation cards. The
+ * choice is kept in the address so a reload holds it.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

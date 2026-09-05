@@ -1,29 +1,6 @@
 /**
- * Every page registered under `/settings` renders inside the settings
- * chrome — the top bar, the settings sidebar and the page frame —
- * `platform/app`'s `SettingsLayout` is not, so a page that opens outside a
- * matched apps/ui route renders on an empty background with no menu and no
- * way back, which is how the email suppressions page shipped: it named the
- * layout as `withPermissionGuard`'s `layoutComponent`, which frames only the
- * refusal a reader without the permission sees.
- *
- * THE CHROME IS NO LONGER A PER-PAGE OPT-IN. `platform/app` is deleted, so
- * every `/settings` address is now served by this application's own route
- * table, and `NavigationShell` (mounted once by the chrome route for every
- * matched page) draws the settings sidebar for it unconditionally —
- * `resolveShellRoute`'s `isSettingsRoute` is a path test
- * (`/settings`, `/ops`), not a flag a route sets. A page-level
- * `settingsLayout: true` used to wrap the screen in a second copy of that
- * same sidebar, nested inside the first — see
- * `apps/ui/src/ui/sections/ui-page.tsx`. What is worth pinning now is that
- * every settings page really is a matched apps/ui route (so it gets the
- * shared chrome at all) and that no route file reintroduces the page-level
- * wrapper that duplicated it.
- *
- * The list still comes from the route table rather than a directory listing, so
- * a new settings page is covered the moment it is reachable, and the component
- * files that sit beside the pages are left out.
- *
+ * Every page registered under `/settings` renders inside the settings chrome — the top bar, the settings sidebar and the page frame — `platform/app`'s `SettingsLayout` is not, so a page that opens outside a matched apps/ui route renders on an
+ * empty background with no menu and no way back, which is how the email suppressions page shipped: it named the layout as `withPermissionGuard`'s `layoutComponent`, which frames only the refusal a reader without the permission sees.
  * Spec: specs/settings/settings-page-chrome.feature
  */
 
@@ -44,10 +21,6 @@ const UI_SOURCE_ROOT = resolve(here, "..", "src");
 
 /**
  * Every `/settings` route in the table, as the page key it loads.
- *
- * A retired `/settings` address that forwards elsewhere renders no page and
- * frames nothing, so it is not one of these. A `/settings` route that names a
- * page outside `pages/settings` throws rather than being skipped quietly.
  */
 function registeredSettingsPageModules(): string[] {
   return uiRouteDescriptors(uiRouteTable)
@@ -79,10 +52,6 @@ function servedHere(pageKey: string): boolean {
 
 /**
  * The routes sections of every frontend feature that serves a settings page.
- *
- * Read as source rather than mounted: what is under test is that no route
- * file reintroduces a page-level settings wrapper, and a mount would
- * additionally need a session, a transport and a router to say so.
  */
 function settingsRouteSections(): Map<string, string> {
   const sections = new Map<string, string>();

@@ -1,11 +1,4 @@
 /**
- * The version history of a scenario: every saved version, newest first, with
- * who saved it, when, and which fields changed. An older version can be opened
- * read-only and restored; a restore writes the old content forward as a new
- * version, so nothing in the list is lost.
- *
- * One list, read by the popover the case dialog opens and by the v1 drawer.
- *
  * @see specs/features/agent-testing/case-version-history.feature
  * @see specs/scenarios/scenario-versioning.feature
  * @see specs/scenarios/scenario-version-restore.feature

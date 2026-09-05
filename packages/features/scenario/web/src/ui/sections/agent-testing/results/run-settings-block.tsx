@@ -1,33 +1,5 @@
 /**
  * What the selected run was configured with, under the header line.
- *
- * A run says how it scored. This block says what it was, so a person reading
- * run 2 against run 3 can see which setting moved the number.
- *
- * It reads only what the run itself recorded. When the run started reads here
- * rather than on the header line, with its date, because the header line and
- * the runs rail beside it would otherwise say the same thing three times. Who
- * started it reads on that same row, because when and who are one fact about
- * the start of the run. A run that recorded no person reads the time alone.
- *
- * A parameter reads in a
- * monospace font, because a value like `eu-central` is a literal and a
- * proportional font hides the difference between two of them. The judge reads
- * on every run, even a standard one, because the judge is what decided every
- * verdict on the page. Each model row names the model the run really ran on,
- * which the run recorded when it was queued. The repeat count and the
- * simulator model read only when the run carries them, so a run that recorded
- * neither stays a short block.
- *
- * The targets row names every target the run went against, on a run against
- * one target as much as on a comparison. A comparison has one layer of
- * parameters: each target line carries every value that target received, and
- * there is no parameters row. A run against one target reads the target's
- * own overrides on its line and the run-level values on the parameters row,
- * so no value reads twice.
- *
- * The run note is not here. It reads in the header line and does not move.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/features/agent-testing/comparison-mode.feature
  */
@@ -42,11 +14,6 @@ import type { BatchTarget } from "./use-batch-targets";
 
 /**
  * What a model row says when the run recorded no model at all.
- *
- * Only a run stored before the resolved models were recorded reads this way.
- * Such a run did not go unjudged: it took the default model of the project of
- * that day. The row cannot print that model, because the default of today is
- * not always the one the run took.
  */
 export const PROJECT_DEFAULT_MODEL = "Project default model";
 
@@ -54,13 +21,6 @@ const LABEL_WIDTH = "104px";
 
 /**
  * The line every row of the block stands on.
- *
- * The rows are centred rather than aligned on a baseline. A row whose value is
- * plain text has a text baseline to align to, but a model row holds an icon
- * beside its name, and that value has no line box of its own: CSS then takes
- * the bottom of the value as its baseline and drops the label to the foot of
- * the taller row. One height for every row keeps the label beside its value
- * whatever the value is drawn from.
  */
 const ROW_HEIGHT = "18px";
 
@@ -138,12 +98,8 @@ function overridesOf(target: BatchTarget): RunSettingParameter[] {
 }
 
 /**
- * The targets the run went against, one line each: the mark of the kind of
- * agent behind it, its name, and its parameters as chips.
- *
- * The mark takes the colour of the target only in a comparison, where the
- * colour is what tells one column and one line of the page from another. A
- * run against one target has nothing to tell apart.
+ * The targets the run went against, one line each: the mark of the kind of agent behind
+ * it, its name, and its parameters as chips.
  */
 function TargetsRow({
   targets,

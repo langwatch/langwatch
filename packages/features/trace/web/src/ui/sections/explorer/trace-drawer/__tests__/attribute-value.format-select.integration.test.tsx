@@ -1,11 +1,7 @@
 /**
+ * An attribute value offers the same compact format selector the rest of the drawer uses, and a value detected as
+ * a JSON string reads as JSON in it rather than falling through to the first option.
  * @vitest-environment jsdom
- *
- * An attribute value offers the same compact format selector the rest of the
- * drawer uses, and a value detected as a JSON string reads as JSON in it
- * rather than falling through to the first option.
- *
- * UX contract: specs/traces-v2/io-toolbar.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

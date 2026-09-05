@@ -1,10 +1,5 @@
 /**
  * One turn to an agent, from the drawer that shows it.
- *
- * The same panel sits at the bottom of the connected, HTTP and code agent
- * drawers. It sends one message on the path a simulation turn takes and
- * shows the answer, or the refusal in the words of the error registry.
- *
  * @see specs/agents/agent-test-run.feature
  */
 

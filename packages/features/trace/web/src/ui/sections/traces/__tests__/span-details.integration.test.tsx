@@ -1,9 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the SpanDetails component.
- * Covers the "Open in Prompts" button/menu behavior based on prompt reference presence.
- *
+ * @vitest-environment jsdom
  * @see specs/prompts/open-existing-prompt-from-trace.feature
  */
 

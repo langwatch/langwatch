@@ -11,44 +11,8 @@ import type { LangyStreamEntry } from "@langwatch/langy-contract";
 import { useLangyStore } from "../../../../index";
 
 /**
- * The developer drawer's record of what actually crossed the wire — in BOTH
- * directions, on every channel.
- *
- * Langy's UI is several layers of interpretation stacked on one stream: the
- * transport maps entries to AI-SDK chunks, the chunks become message parts, the
- * parts become cards, and signals fork off into the store to drive status lines
- * and fold motion. When something renders wrong, the question is always the same
- * one — "what did the server actually send?" — and until now the honest answer
- * required a breakpoint.
- *
- * So this is the raw tape, one ring of records across four LANES:
- *
- *   stream    INBOUND. Every `LangyStreamEntry` off the live turn stream, in
- *             arrival order — tokens, tool frames, signals, terminals.
- *   outbound  OUTBOUND. What this client asked the server to do — the sent
- *             message, the stop request — so "did we even send it?" and "in
- *             what order relative to the stream?" are on the same tape.
- *   durable   INBOUND. The EVENT LOG itself (ADR-059): the recorded events the
- *             tail fetch returns and the snapshot seeds, i.e. the durable truth
- *             the local fold is built from. This lane is REPLAYABLE — see
- *             {@link replayTurnProjection}.
- *   signal    INBOUND. The freshness signals, with their cursors — the "you
- *             may be behind" pokes that trigger the tail fetches.
- *
- * No interpretation, no filtering.
- *
- * ── COSTS NOTHING WHEN OFF ─────────────────────────────────────────────────
- * Every `record*()` returns immediately unless recording is armed, and arming
- * is done by the drawer itself (developer mode). A user who never opens it pays
- * one boolean check per wire entry — on a stream that is already doing a React
- * render per token.
- *
- * ── BOUNDED ────────────────────────────────────────────────────────────────
- * A long agentic turn emits thousands of deltas. The tape is a RING BUFFER
- * capped at {@link DEV_LOG_CAPACITY}: past the cap the oldest entries drop and
- * `dropped` counts them, so the drawer can say so rather than quietly implying
- * it has the whole story. Unbounded, this would be a memory leak with a
- * debugging feature bolted to it.
+ * The developer drawer's record of what actually crossed the wire — in BOTH directions,
+ * on every channel.
  */
 
 /** Entries kept on the tape. Past this the oldest fall off the front. */
@@ -60,17 +24,6 @@ interface TapeBase {
   atMs: number;
   /**
    * The conversation this entry belongs to, stamped AT RECORD TIME.
-   *
-   * Some lanes carry their own attribution (a freshness signal, a durable
-   * event, an outbound command's detail); everything else — chiefly stream
-   * deltas — is tagged with the store's active conversation, because the
-   * stream IS the active conversation's turn. Null only when nothing carried
-   * an id and no conversation was active yet (the first moments of a brand-new
-   * conversation, before the server adopts an id).
-   *
-   * The RECORDING stays global — switching conversations must never lose the
-   * tape — but the drawer's views and the chat panel's time travel are scoped
-   * to the open conversation via {@link tapeForConversation}.
    */
   conversationId: string | null;
 }
@@ -155,12 +108,8 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
     });
   };
   /**
-   * The conversation an entry belongs to, resolved AT RECORD TIME: the entry's
-   * own attribution when it has one, otherwise the store's active
-   * conversation. The fallback is what tags stream deltas — the stream IS the
-   * active conversation's turn — and it reads getState() rather than
-   * subscribing, so a normal (unarmed) session still pays only the recording
-   * boolean.
+   * The conversation an entry belongs to, resolved AT RECORD TIME: the entry's own
+   * attribution when it has one, otherwise the store's active conversation.
    */
   const attributed = (explicit?: string | null): string | null =>
     explicit ?? useLangyStore.getState().activeConversationId;
@@ -233,14 +182,8 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
 });
 
 /**
- * The tape, scoped to one conversation — what the drawer's views and the chat
- * panel's time travel render.
- *
- * Unattributed records (conversationId null) stay VISIBLE: they can only be
- * recorded in the first moments of a brand-new conversation, before the server
- * adopts an id, and dropping them would blank the tape at exactly the moment a
- * fresh conversation is being debugged. They cannot be proven foreign; a
- * record that names ANOTHER conversation can, and is hidden.
+ * The tape, scoped to one conversation — what the drawer's views and the chat panel's
+ * time travel render.
  */
 export function tapeForConversation(
   records: LangyDevLogRecord[],
@@ -261,11 +204,8 @@ export function tapeUpTo(
 }
 
 /**
- * REPLAY the durable lane through the SAME reducers the live store uses
- * (ADR-059): seed from the recorded snapshot, fold the recorded tail. Because
- * the fold is pure and cursor-gated, replaying any prefix of the tape is safe
- * and deterministic — this is what the scrubber shows as "the fold at that
- * moment", recomputed from scratch on every call, never cached state.
+ * REPLAY the durable lane through the SAME reducers the live store uses (ADR-059): seed
+ * from the recorded snapshot, fold the recorded tail.
  */
 export function replayTurnProjection(records: LangyDevLogRecord[]): LangyTurnProjectionState {
   let projection = initialLangyTurnProjection;
@@ -293,15 +233,8 @@ export function streamRecords(
 }
 
 /**
- * The tape is scoped too, and more sharply than most of the panel: it holds the
- * raw wire — prompt text, tool inputs, tool outputs — for the project it was
- * recorded in. Left alone it survives a project, organization or account change
- * (the store is a module singleton, and only a manual Clear ever emptied it), so
- * one project's traffic stayed readable from inside another.
- *
- * It follows `langyStore`'s scope for the same reason the target registry does,
- * and in the same direction: this module knows about the panel's store, never
- * the other way round.
+ * The tape is scoped too, and more sharply than most of the panel: it holds the raw
+ * wire — prompt text, tool inputs, tool outputs — for the project it was recorded in.
  */
 useLangyStore.subscribe((state, previous) => {
   if (state.activeConversationScope !== previous.activeConversationScope) {
@@ -311,9 +244,7 @@ useLangyStore.subscribe((state, previous) => {
 
 /**
  * The live answer as the user is receiving it — every `delta` on the tape,
- * concatenated. This is the token stream with the rendering pipeline taken out
- * of the picture, which is exactly what you want when the prose on screen and
- * the prose on the wire disagree.
+ * concatenated.
  */
 export function tokenStreamText(records: LangyDevLogRecord[]): string {
   let text = "";
@@ -350,11 +281,6 @@ export interface DevToolCall {
 
 /**
  * Fold the tape's `tool` entries into one row per call.
- *
- * A tool call arrives as TWO entries — `phase: "start"` carrying the input, then
- * a settle carrying the output — so a flat event list shows every call twice and
- * neither half on its own tells you whether it worked or how long it took. This
- * pairs them by id, in first-seen order.
  */
 export function toolCallsFrom(records: LangyDevLogRecord[]): DevToolCall[] {
   const byId = new Map<string, DevToolCall>();

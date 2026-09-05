@@ -1,12 +1,6 @@
 /**
- * The Scenario and Target groupings: one row per scenario, or per target, that
- * opens to show every run behind it.
- *
- * Scenario answers "when did this scenario last fail", which needs every run
- * of it across every plan, not the runs of one plan. Target answers "how is
- * dev doing against prod", which needs the same list cut the other way. Both
- * read the same rows, so the two answers can never disagree.
- *
+ * The Scenario and Target groupings: one row per scenario, or per target, that opens to
+ * show every run behind it.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
@@ -237,9 +231,6 @@ export type GroupedRowsTableProps = {
   onToggleOpen: (key: string) => void;
   /**
    * The runs behind each opened row, keyed by that row's key.
-   *
-   * A folded row carries no runs of its own: opening it is what asks for
-   * them, so a row that is open and not yet answered holds no entry here.
    */
   rowsByGroupKey: Map<string, ResultRow[]>;
   resolveTargetName: (targetKey: string) => string;
@@ -323,10 +314,6 @@ export type FlatRowsTableProps = {
 
 /**
  * The None grouping: one row per scenario, target and run.
- *
- * The flat list is for when a filter has already narrowed the question, so it
- * is capped and says when it has been. A list that quietly stops at its cap
- * reads as the whole answer.
  */
 export function FlatRowsTable({ rows, resolveTargetName, onOpenRun, hasMore }: FlatRowsTableProps) {
   const now = useNow();

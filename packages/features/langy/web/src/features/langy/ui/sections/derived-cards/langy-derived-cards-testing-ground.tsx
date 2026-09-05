@@ -1,22 +1,7 @@
 /**
- * The blocks testing ground — every ADR-060 variant, in every state, from
- * fixtures, INTERACTIVE. Rendered by the developer-mode card gallery so the
- * whole channel can be exercised by eye without waiting for a live turn to
- * produce each condition:
- *
- *   - a streaming playground that feeds a real fence through the REAL
- *     preview reducer chunk by chunk (play/step/replay), so the
- *     no-preview-until-validating and grows-as-points-arrive behaviours are
- *     visible, not asserted;
- *   - every derived kind settled (timeseries with comparison + hints, table
- *     with a ragged row, numeric and mixed stats);
- *   - the failed-block disclosure (expand it);
- *   - every choices state, live: an OPEN question you can actually answer
- *     (it locks, exactly as the fold would render it), multi-select,
- *     free-text Other, hydrated live/dead refs, superseded, forming.
- *
- * These are the real components fed real-shaped data — the same rule the
- * rest of the gallery holds itself to.
+ * The blocks testing ground — every ADR-060 variant, in every state, from fixtures,
+ * INTERACTIVE. Rendered by the developer-mode card gallery so the whole channel can be
+ * exercised by eye without waiting for a live turn to produce each condition:
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import {

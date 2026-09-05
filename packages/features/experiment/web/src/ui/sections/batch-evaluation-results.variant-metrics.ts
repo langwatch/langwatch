@@ -1,11 +1,7 @@
 /**
- * Per-variant cost/duration aggregation for the Comparison leaderboard's
- * cost/duration tradeoff chart (#5103) — how much a candidate typically
- * costs and how long it takes, across the rows it participated in.
- *
- * Cost and duration are kept as full distributions (via the same
- * `computeMetricStats` used elsewhere for latency/cost) rather than a single
- * mean, so a "cheaper" claim isn't hiding its own spread.
+ * Per-variant cost/duration aggregation for the Comparison leaderboard's cost/duration
+ * tradeoff chart (#5103) — how much a candidate typically costs and how long it takes,
+ * across the rows it participated in.
  */
 import {
   computeMetricStats,
@@ -20,27 +16,14 @@ export type VariantMetrics = {
   durationStats: MetricStats | null;
   /**
    * 95% CI for the MEAN cost, not the spread of the rows.
-   *
-   * `costStats` already describes the distribution, which answers "what does
-   * a row typically cost". This answers the different question the trade-off
-   * chart actually asks — "how well do we know this variant's cost" — and it
-   * is the one that belongs next to a confidence interval on the other axis.
-   * Null when too few rows carried a price to resample.
    */
   costMeanCI: [number, number] | null;
   /** 95% CI for the mean duration, on the same terms as `costMeanCI`. */
   durationMeanCI: [number, number] | null;
   /**
-   * 95% CI for the mean per-row cost difference against each other variant,
-   * keyed by that variant's id. `costDifferenceCI[other]` is this variant's
-   * cost minus that one's, so an interval entirely below zero means this one
-   * is genuinely cheaper.
-   *
-   * This is what "meaningfully cheaper" should mean, and it replaces a flat
-   * 5% relative threshold that was a guess dressed as a rule. Paired within a
-   * row, because the rows are what vary — an expensive input is expensive for
-   * every variant, and comparing two independent means leaves all of that
-   * noise in the comparison.
+   * 95% CI for the mean per-row cost difference against each other variant, keyed by
+   * that variant's id. `costDifferenceCI[other]` is this variant's cost minus that
+   * one's, so an interval entirely below zero means this one is genuinely cheaper.
    */
   costDifferenceCI: Record<string, [number, number]>;
   /** The same for duration. */
@@ -63,12 +46,6 @@ const seedFor = (variantId: string): number => {
 
 /**
  * Rows a metric needs before it may carry a claim.
- *
- * Lives here rather than with the verdict because it is a statement about
- * when a measurement is usable, and three different consumers need the same
- * answer: the cost recommendation, the dominance check, and the paired
- * intervals below. Low on purpose — a floor against "one row happened to
- * record a cost", not a sample-size calculation.
  */
 export const MIN_PRICED_ROWS = 5;
 
@@ -89,16 +66,8 @@ const readByRow = ({
   });
 
 /**
- * Interval for the mean per-row DIFFERENCE between two variants, over the
- * rows where both recorded a value.
- *
- * Paired for the same reason the score difference is: both variants answered
- * the SAME row, and rows differ from each other far more than variants do —
- * one long input is expensive for everybody. Comparing two independent means
- * leaves all of that row-to-row variance in the comparison; differencing
- * within a row removes it, which is the whole reason a paired design is worth
- * having. It is also the only version that is correct when the two variants
- * did not answer the same set of rows.
+ * Interval for the mean per-row DIFFERENCE between two variants, over the rows where
+ * both recorded a value.
  */
 const pairedDifferenceCI = ({
   a,
@@ -117,25 +86,15 @@ const pairedDifferenceCI = ({
     if (left === void 0 || right === void 0) continue;
     differences.push(left - right);
   }
-  // The per-variant floor is not enough on its own. Two variants can each
-  // clear it comfortably and still SHARE almost no rows — priced on
-  // different halves of the run — and the paired sample is what this
-  // interval is actually built from. Without this a pair overlapping on two
-  // rows produced a zero-width interval that excluded zero, which is a
-  // confident claim that one is cheaper drawn from two observations.
+  // The per-variant floor is not enough on its own. Two variants can each clear it
+  // comfortably and still SHARE almost no rows — priced on different halves of the run
+  // — and the paired sample is what this interval is actually built from.
   if (differences.length < MIN_PRICED_ROWS) return null;
   return bootstrapMeanCI({ values: differences, seed });
 };
 
 /**
  * Every pair's interval, computed once per UNORDERED pair and mirrored exactly.
- *
- * Computing each direction separately seeded them differently, so the two came
- * from different resample draws and were not exact negations. Near zero that
- * let one run answer "is a cheaper than b" and "is b cheaper than a"
- * inconsistently — dominance is a property of a pair, and it stopped being one.
- * Doing it once is also half the work, which matters because this is
- * O(variants squared) bootstraps on the render thread.
  */
 const pairedDifferenceCIs = ({
   variantIds,
@@ -209,15 +168,9 @@ export function computeVariantMetrics({
       variantId,
       costStats: computeMetricStats(costs),
       durationStats: computeMetricStats(durations),
-      // Seeded per variant so a variant's interval is stable across renders
-      // and across which other variants happen to be in the run, but two
-      // variants do not share a resampling pattern.
-      //
-      // The two metrics are salted apart for the same reason. Sharing a seed
-      // meant a variant's cost and duration intervals were drawn from the
-      // identical sequence of resampled row indices, so on the trade-off
-      // glyph its x and y error bars moved together by construction — a
-      // correlation the data never showed.
+      // Seeded per variant so a variant's interval is stable across renders and across
+      // which other variants happen to be in the run, but two variants do not share a
+      // resampling pattern.
       costMeanCI: bootstrapMeanCI({ values: costs, seed: seedFor(variantId) }),
       durationMeanCI: bootstrapMeanCI({
         values: durations,

@@ -16,38 +16,9 @@ import { useLangySelectionContext } from "../../behavior/use-langy-selection-con
 import { useLangyTraceViewContext } from "../../behavior/use-langy-trace-view-context";
 
 /**
- * Captures what the user is currently DOING and turns it into composer context
- * chips, so Langy resolves "this trace / these traces / this evaluation"
- * against real state instead of guessing.
- *
- * Sources, most-specific first:
- *   1. The open drawer — the URL-routed drawer (`drawer.open=<name>`) names the
- *      exact resource the user opened (a trace / prompt / evaluation / scenario
- *      drawer). The highest-value signal; see `useLangyDrawerContext`.
- *   2. The route the user is on — `/traces/<trace>`, `/experiments/<slug>`,
- *      `/datasets/<id>` — parsed from the URL. No page edits needed.
- *   3. The Trace Explorer's live table state, when the user is on it: the bulk
- *      row selection ("N traces selected") and the active filter query
- *      ("filtered: <summary>"). Route-gated so their singleton stores can't
- *      leak stale state onto other pages.
- *   4. The experiment the workbench registered via `useRegisterLangyHandlers`.
- *   5. Any precise context a page declared via `useRegisterLangyPageContext`
- *      (a selected prompt / dashboard the URL can't express).
- *   6. Targets the user POINTED AT — the trace rows / evaluation cards / drawer
- *      they clicked while the panel was open (see `useLangyContextTarget`).
- *      Last, so a chip Langy already derived for itself keeps its richer label
- *      and the two collapse into one instead of stacking.
- *
- * Everything above is an OFFER, not context. `chips` is the subset the user has
- * actually chosen — by arming the page and clicking a target, or from the
- * composer's "+ context" control, which is what `addableChips` fills. Merely
- * being on a page, or having a drawer open, adds nothing: the agent is handed
- * what someone decided to hand it, and the chips in the composer are the whole
- * truth about what that is.
- *
- * Also PUBLISHES the resulting chip ids back to the target store, which is what
- * lets a target on the page know it is already in context and render as added
- * rather than offering itself again.
+ * Captures what the user is currently DOING and turns it into composer context chips,
+ * so Langy resolves "this trace / these traces / this evaluation" against real state
+ * instead of guessing.
  */
 export function useLangyPageContext(): {
   chips: LangyContextChip[];
@@ -85,12 +56,7 @@ export function useLangyPageContext(): {
   const candidates = useMemo<LangyContextChip[]>(
     () =>
       // Most-specific first; `mergeContextChips` keeps the first claim on an id.
-      // Deliberately NO project chip. Langy always operates in the current
-      // project, so pinning "project: X" as context is noise — it tells the user
-      // nothing they don't already know and crowds the composer. Context chips
-      // only earn their place when they name a SPECIFIC resource the user is
-      // looking at (an experiment, a trace, a dataset) that the agent should
-      // resolve "this" against.
+      // Deliberately NO project chip.
       mergeContextChips([
         // Open drawer first — the most specific "what am I looking at" signal.
         ...drawerChips,
@@ -201,13 +167,9 @@ function routeChips(pathname: string): LangyContextChip[] {
 }
 
 /**
- * Surfaces whose `/<surface>/<id>` route names exactly one resource, so the
- * chip is a mechanical `kind:id`. The ones with shapes of their own — traces,
- * experiments (`/workbench/<slug>`), datasets — are handled above.
- *
- * This is the list of things Langy can be pointed at, and it is meant to grow:
- * a resource the agent can act on but that never appears here is a resource the
- * user has to describe in prose instead of naming.
+ * Surfaces whose `/<surface>/<id>` route names exactly one resource, so the chip is a
+ * mechanical `kind:id`. The ones with shapes of their own — traces, experiments
+ * (`/workbench/<slug>`), datasets — are handled above.
  */
 const SIMPLE_ROUTE_CHIPS: Record<string, { kind: LangyContextChip["kind"]; noun: string }> = {
   prompts: { kind: "prompt", noun: "prompt" },

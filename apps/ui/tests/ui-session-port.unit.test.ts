@@ -1,12 +1,5 @@
 /**
  * The port itself, over one render's worth of answers.
- *
- * Two properties are load-bearing beyond "it returns the right value". It
- * FAILS CLOSED on everything it has no answer for, so a screen never renders
- * open and then closes. And it answers from what was resolved for the scope
- * rather than deriving it per question: a page asking about a dozen
- * permissions on every render is ordinary, and paying for it a dozen times a
- * render is not.
  */
 
 import { describe, expect, it } from "vitest";

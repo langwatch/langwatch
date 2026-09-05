@@ -1,9 +1,5 @@
 /**
  * Analytics capability card (`get_analytics`).
- *
- * Reuses the streaming slice's StreamingStatCard (rolling NumberTicker) so a
- * queried metric lands as a headline figure that springs up from zero, matching
- * the reference's metrics statcard. Reads only — the deep link opens Analytics.
  */
 
 import { Text, VStack } from "@chakra-ui/react";
@@ -79,23 +75,17 @@ function parseAnalytics(output: unknown): ParsedAnalytics {
 }
 
 /**
- * Nothing recognisable at all: no analytics header, no data rows, and no
- * explicit "No data available" either. That is UNREADABLE output (e.g.
- * truncated upstream), and it must never render as the confident "No data for
- * this period" — a wrong definitive answer manufactured out of garbage.
+ * Nothing recognisable at all: no analytics header, no data rows, and no explicit "No
+ * data available" either.
  */
 function isUnreadable(parsed: ParsedAnalytics): boolean {
   return !parsed.empty && parsed.metric == null && parsed.points === 0;
 }
 
 /**
- * A metric key as a person would say it: `performance.total_cost` → "Total
- * cost". The API's dotted key is a lookup path, not a title, and printing it as
- * the card's heading made the card read like a stack trace.
- *
- * The namespace is dropped rather than shown — `performance.`, `metadata.` and
- * friends group metrics in a picker, and repeating that grouping in a heading
- * tells the reader nothing they asked about.
+ * A metric key as a person would say it: `performance.total_cost` → "Total cost". The
+ * API's dotted key is a lookup path, not a title, and printing it as the card's heading
+ * made the card read like a stack trace.
  */
 function humanMetric(key: string | undefined): string {
   if (!key) return "Metric";
@@ -106,11 +96,9 @@ function humanMetric(key: string | undefined): string {
 }
 
 /**
- * Is this metric money? Read off the metric KEY the query names, not guessed
- * from the payload — `performance.total_cost` declares what it measures, and
- * rendering it as a bare `0.433` drops the one fact that makes the number
- * legible. (Sniffing which response field holds a cost would be the other
- * thing, and this is not that.)
+ * Is this metric money? Read off the metric KEY the query names, not guessed from the
+ * payload — `performance.total_cost` declares what it measures, and rendering it as a
+ * bare `0.433` drops the one fact that makes the number legible.
  */
 function isMoneyMetric(key: string | undefined): boolean {
   return !!key && /cost|spend|price/i.test(key);

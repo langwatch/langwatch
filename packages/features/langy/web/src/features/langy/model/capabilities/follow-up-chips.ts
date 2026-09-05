@@ -1,41 +1,5 @@
 /**
  * Turning a settled tool call into the follow-up chips to draw beneath its card.
- *
- * This is the JOIN of the two halves of the feature, kept JSX-free so it stays
- * unit-testable on its own:
- *   - `cli-follow-ups.ts` answers WHICH offers a result earns (from the feature
- *     map's produces/consumes relation).
- *   - `@langwatch/langy-web` answers WHERE a carried offer lands. It is
- *     the SAME reader the card's own "View in Trace Explorer" button uses
- *     (`readTraceSearchQuery`), so the chips and the card can never disagree
- *     about what the agent actually searched. The live transport hands us
- *     opencode's shell payload (`{ command: "langwatch trace search …" }` —
- *     the envelope retypes the NAME only), and that reader is the one that
- *     knows how to open it.
- *
- * ── TWO GRADES OF DESTINATION ──────────────────────────────────────────────
- *
- * An offer resolves at one of two grades, and its COPY tells you which:
- *
- *   CARRIED    a builder recompiled the search's own text into the destination,
- *              so the data goes with you. Keeps the offer's own verb —
- *              "Alert me on this" means THIS search.
- *   PLAIN      the destination cannot hold what this search expressed, but the
- *              consuming feature has a surface. Reads "Open in Analytics" — an
- *              invitation to go and look, never a promise that the query
- *              travelled.
- *
- * That distinction is the whole honesty of the feature, and it is why the
- * analytics offer is ALWAYS plain today: the graph builder filters on FIELDS
- * only (its API call has no free-text input), and the CLI's `trace search` has
- * no field flags — so there is nothing a graph could faithfully carry. A chip
- * saying "Graph these" that lands on an unfiltered builder is worse than no
- * chip. The one destination that CAN hold the search today is the automation
- * drawer, whose subject is a liqe query (`buildAutomationHref`).
- *
- * Carried chips sort first, and the list is capped — the point is a next step,
- * not a menu.
- *
  * @see specs/langy/langy-followup-suggestions.feature
  */
 import { buildAutomationHref, readTraceSearchQuery } from "../../../../index";
@@ -74,12 +38,8 @@ export interface SettledCall {
 }
 
 /**
- * Route a target feature to the builder that compiles the search into its
- * surface. Only offers present here can be carried; every other offer resolves
- * at the plain grade. One entry today: the automation drawer already accepts a
- * liqe subject through its existing `initialFilterQuery` seed, so alerting
- * needs no new backend. Analytics is deliberately absent — see the module
- * header for why a carried graph would be a lie.
+ * Route a target feature to the builder that compiles the search into its surface. Only
+ * offers present here can be carried; every other offer resolves at the plain grade.
  */
 const DESTINATION_BY_FEATURE: Record<
   string,
@@ -93,23 +53,15 @@ const DESTINATION_BY_FEATURE: Record<
 };
 
 /**
- * Result kinds whose offers never resolve at the PLAIN grade. A plain chip is
- * "go and look" — honest only when the destination shows the thing that earned
- * the offer. An evaluator's consumers (Experiments, Online Evaluations) open
- * on pages that neither show the evaluator nor pick it up, so "Open in
- * Experiments" under a just-created evaluator was navigation noise pretending
- * to be a next step. Prompts have the same consumers problem: Experiments and
- * Scenarios cannot receive a specific prompt, so a prompt listing wore the
- * same two bare chips. A CARRIED offer (a builder that takes the resource
- * along) would still be welcome — none exists today.
+ * Result kinds whose offers never resolve at the PLAIN grade. A plain chip is "go and
+ * look" — honest only when the destination shows the thing that earned the offer.
  */
 const PLAIN_INELIGIBLE_KINDS = new Set(["evaluators", "prompts"]);
 
 /**
- * The follow-up chips a settled call earns: the offers `cliFollowUps` derives,
- * routed to a destination and kept only when one exists. Choosing a chip only
- * NAVIGATES — the href carries the search across, it never acts on the user's
- * behalf.
+ * The follow-up chips a settled call earns: the offers `cliFollowUps` derives, routed
+ * to a destination and kept only when one exists. Choosing a chip only NAVIGATES — the
+ * href carries the search across, it never acts on the user's behalf.
  */
 export function deriveFollowUpChips({
   call,

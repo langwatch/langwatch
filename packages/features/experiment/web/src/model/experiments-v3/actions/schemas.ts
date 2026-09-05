@@ -15,16 +15,6 @@ import {
 
 /**
  * Payload and result schemas for every workbench action.
- *
- * Every piece here is reused from `../types` — the workbench state schemas are
- * the source of truth for what a mapping, a column, a prompt config or a target
- * looks like, and an action payload is only ever a slice of them.
- *
- * The `.describe()` prose is not decoration. `GET /api/langy/ui/actions`
- * renders these schemas as JSON Schema, and that listing is the ONLY
- * documentation a caller has for this surface: what an action does to the page,
- * when to reach for it, and what each field means. An undescribed field is a
- * field the caller has to guess at.
  */
 
 // ============================================================================
@@ -58,9 +48,8 @@ export const addTargetPayloadSchema = targetConfigObjectSchema
   );
 /**
  * Field lists are typed as the domain `Field`, the way `TargetConfig` and
- * `EvaluatorConfig` are in `../types`: the inferred zod shape spells
- * `json_schema` as a passthrough object and stops accepting a target read
- * straight out of the store. The schema is still what validates at runtime.
+ * `EvaluatorConfig` are in `../types`: the inferred zod shape spells `json_schema` as a
+ * passthrough object and stops accepting a target read straight out of the store.
  */
 export type AddTargetPayload = Omit<
   z.input<typeof addTargetPayloadSchema>,
@@ -78,10 +67,9 @@ export const duplicateTargetPayloadSchema = z
   .object({
     targetId: z.string().describe("Id of the column to copy."),
     /**
-     * Only evaluator targets carry a name in workbench state
-     * (`localEvaluatorConfig.name`); for prompt, agent and workflow targets the
-     * displayed name comes from the referenced entity, so the override is
-     * reported back as unapplied rather than invented.
+     * Only evaluator targets carry a name in workbench state (`localEvaluatorConfig.name`); for prompt, agent
+     * and workflow targets the displayed name comes from the referenced entity, so the override is reported
+     * back as unapplied rather than invented.
      */
     name: z
       .string()
@@ -228,13 +216,9 @@ export type SetEvaluatorMappingPayload = z.infer<typeof setEvaluatorMappingPaylo
 // ============================================================================
 
 /**
- * A project's own evaluators are stored under one of these prefixes, followed
- * by the row id, so their types cannot be checked against a fixed list. The
- * whole-workflow evaluator has no id in its type at all.
- *
- * Same set `mappingValidation` treats as defined outside the built-in catalog,
- * which is what keeps a type accepted here from failing mapping validation
- * later for not being in the catalog.
+ * A project's own evaluators are stored under one of these prefixes, followed by the
+ * row id, so their types cannot be checked against a fixed list. The whole-workflow
+ * evaluator has no id in its type at all.
  */
 const DB_EVALUATOR_TYPE_PREFIXES = ["custom/", "code/"];
 const WORKFLOW_EVALUATOR_TYPE = "workflow";

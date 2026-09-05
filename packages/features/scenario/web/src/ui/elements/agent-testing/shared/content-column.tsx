@@ -1,12 +1,5 @@
 /**
  * The scrolling content column of an Agent Testing surface.
- *
- * The rail is glued to the left edge of the page, so a column that fills only
- * the space beside it reads off centre, and it moves when a tab has a rail of
- * another width. The column is held to a readable width and centred, and once
- * the window is wide enough it takes a right padding the size of the rail, so
- * it centres on the whole page instead of on the space left of the rail.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 
@@ -17,10 +10,6 @@ export const CONTENT_COLUMN_MAX_WIDTH = "1100px";
 
 /**
  * How wide the column is allowed to grow with no rail beside it.
- *
- * The run plan list is the widest thing the page draws: seven columns, one of
- * them a name and two of them free text. It reads on its own, so it takes the
- * width the rail would have used instead of leaving it empty.
  */
 export const CONTENT_COLUMN_WIDE_MAX_WIDTH = "1280px";
 

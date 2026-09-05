@@ -1,17 +1,5 @@
 /**
  * Decides which recovery a failed scenario generation offers — and nothing else.
- *
- * It used to decide the words too, by running a regex ladder over the error's
- * message (`/no default model/i`, `/rate limit/i`, …). That stopped working the
- * moment #5984 collapsed the wire message of a handled error to its code slug:
- * the ladder matched nothing, so every named failure the gateway reported
- * landed in the "unknown" tier and the modal printed the slug back at the
- * customer. The code was in our hands the whole time.
- *
- * So: the handled `code` picks the tier and the CTA, and the copy comes from
- * the code-keyed registry (`@langwatch/handled-error/presentation`). No copy is
- * authored here — a sentence written in this file is a sentence the registry
- * cannot keep consistent with the twenty other places the same code surfaces.
  */
 import {
   type ErrorExplanation,
@@ -52,9 +40,6 @@ export interface GenerationErrorClass {
 
 /**
  * The recovery a handled code deserves.
- *
- * Anything not listed falls to the unknown tier, whose "try again, or write it
- * yourself" is the honest offer when we can't say what would fix it.
  */
 function recoveryFor(code: string | undefined): {
   tier: GenerationErrorTier;
@@ -96,12 +81,6 @@ function recoveryFor(code: string | undefined): {
 
 /**
  * The words for a generation failure.
- *
- * `ScenarioGenerationError` is the endpoint's handled payload with the envelope
- * stripped off — `generateScenarioWithAI` parses `code` and `meta` out of
- * `domainError` and hangs them on a plain `Error` — so `readHandledError` can't
- * recognise it. Hand the registry the shape it does read rather than
- * re-deriving the copy here.
  */
 function explain(error: unknown): ErrorExplanation {
   if (error instanceof ScenarioGenerationError) {
@@ -122,15 +101,6 @@ function explain(error: unknown): ErrorExplanation {
 
 /**
  * The failure in the shape the APPLICATION's registry can read.
- *
- * `generateScenarioWithAI` calls a REST route and throws away the envelope:
- * `{ error: "<code>", ...meta }` becomes a plain `ScenarioGenerationError`
- * carrying `kind` and `meta`, which no boundary reader recognises. Handing that
- * to `ScenarioHostPort.failed` would resolve to the generic unknown line even
- * though the server named the failure. This puts the body back the way the
- * route sent it — a reconstruction, not an invention — so the registry answers.
- *
- * Anything else travels untouched: a tRPC failure already carries its envelope.
  */
 export function reportableGenerationFailure(error: unknown): unknown {
   if (!(error instanceof ScenarioGenerationError)) return error;

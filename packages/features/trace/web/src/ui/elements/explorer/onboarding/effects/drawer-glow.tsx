@@ -1,22 +1,8 @@
 import type React from "react";
 
 /**
- * Global `<style>` tag that injects the drawer + sidebar tour-glow
- * keyframes and stage-gated selectors. The actual targets
- * (`[data-tour-target="drawer"]`, `[data-tour-target="sidebar"]`)
- * live deep in the page tree — the drawer is even portaled to body —
- * so a Chakra-scoped `css` prop can't reach them. A document-level
- * stylesheet is the simplest hook.
- *
- * Mounted only when `OnboardingHost` decides onboarding is active, so
- * users not in the journey don't get an extra `<style>` tag, and the
- * @keyframes don't sit in their stylesheet for the lifetime of the
- * tab.
- *
- * Light/dark variants live in the same sheet — the dark-mode
- * overrides use `html.dark` (Chakra v3's class-based color mode),
- * not `prefers-color-scheme`, so the glow follows the user's *theme*
- * choice rather than their OS preference.
+ * Global `<style>` tag that injects the drawer + sidebar tour-glow keyframes and
+ * stage-gated selectors.
  */
 export const DrawerGlow: React.FC = () => (
   <style>{`

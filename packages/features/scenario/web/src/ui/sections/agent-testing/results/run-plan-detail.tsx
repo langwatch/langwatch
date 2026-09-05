@@ -1,10 +1,5 @@
 /**
- * One run plan: its runs in a rail on the left, the results of the selected
- * run filling the rest of the page.
- *
- * The results read as a table by default. The grid is the classic wall of
- * live conversation cards, the same component the v1 page draws.
- *
+ * One run plan: its runs in a rail on the left, the results of the selected run filling the rest of the page.
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */

@@ -1,13 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The in-progress capability shell, and what it says once the turn is over.
- *
- * A tool part is only ever closed by its own output, so a turn the user stopped
- * leaves its open call in the running state for good. The card that drew that
- * call kept saying "Searching traces…" with a live pulse for the rest of the
- * conversation, which claimed work that nothing was doing. Interrupted, it
- * keeps the rows it did find and states what happened to it.
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

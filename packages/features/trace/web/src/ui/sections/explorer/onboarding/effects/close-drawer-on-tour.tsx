@@ -2,16 +2,7 @@ import { useEffect } from "react";
 import { useDrawer } from "../../../../../behavior/use-drawer";
 
 /**
- * Closes any open trace drawer the moment onboarding mounts. Without this
- * an existing user who triggers the Tour from the toolbar (or a new user
- * who hard-reloads onto a `?traceId=` URL) ends up with the live drawer
- * sitting next to mock preview rows — the drawer queries fire against a
- * trace ID that the table is no longer surfacing, leaving the drawer in
- * a confusing stale state and blocking the tour's drawer-glow stage from
- * pointing at a clean target.
- *
- * Mounts only inside `OnboardingHost` (gated by `useOnboardingActive`),
- * so users not in the journey never see this effect run.
+ * Closes any open trace drawer the moment onboarding mounts.
  */
 export function CloseDrawerOnTour(): null {
   const { currentDrawer, closeDrawer } = useDrawer();

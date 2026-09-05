@@ -19,14 +19,6 @@ interface UsePresenceOptions {
 
 /**
  * Wires the current browser tab into the project's multiplayer presence.
- *
- * - Generates a stable per-tab `sessionId` and announces it to peers.
- * - Re-publishes the supplied `location` whenever it changes (debounced).
- * - Sends a heartbeat every {@link HEARTBEAT_INTERVAL_MS} ms so the server-side
- *   TTL never expires while the tab is open.
- * - Subscribes to peer updates and feeds them into {@link usePresenceStore}.
- * - Sends a `leave` on unmount and on `pagehide` so peers see drop-offs
- *   immediately rather than waiting for TTL.
  */
 export function usePresence({ projectId, location, enabled = true }: UsePresenceOptions): void {
   const sessionId = useTabSessionId();

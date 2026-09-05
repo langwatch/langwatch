@@ -1,9 +1,6 @@
 /**
+ * The "Test agent" panel at the bottom of the HTTP and code agent editor drawers: shown for a saved agent, absent for a draft, and sending one turn.
  * @vitest-environment jsdom
- *
- * The "Test agent" panel at the bottom of the HTTP and code agent editor
- * drawers: shown for a saved agent, absent for a draft, and sending one turn.
- *
  * @see specs/agents/agent-test-run.feature
  */
 

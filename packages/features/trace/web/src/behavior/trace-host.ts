@@ -1,24 +1,5 @@
 /**
  * What the trace screens ask of the application they are mounted in.
- *
- * ONE PORT FOR THE WHOLE FAMILY — the twentieth of the shape governance,
- * gateway, me, automations, ops, agents, datasets, model-config, RBAC,
- * annotations, organization, analytics, evaluators, monitors, workflows and
- * the auth front door each wrote before it. Everything the explorer used to
- * read off `useOrganizationTeamProject`, `useRouter`, `useDrawer`,
- * `useRequiredSession`, `usePublicEnv` and the toaster arrives through these
- * methods, which is what lets a hundred thousand lines of trace explorer move
- * with their `api.tracesV2.x.useQuery` call sites unchanged.
- *
- * `setQuery` MERGES rather than replacing. The explorer writes one key at a
- * time — a drawer address, a span selection, a lens — while the filter rail,
- * the time range and the saved view all keep their own keys in the same query
- * string, and a replacing write would drop whichever half did not do the
- * writing. Removing a key is `undefined`, which merge honours.
- *
- * `route()` carries a `pathname` because two readings need it: the shared
- * trace page decides it is public from the address, and the explorer's own
- * `?span=` clearing has to know it is still on the traces page.
  */
 
 import { createContext, createElement, useContext, useMemo } from "react";
@@ -41,20 +22,12 @@ export type TraceHostProject = {
   apiKey?: string;
   /**
    * Whether live cursors and presence dots are on for this project.
-   *
-   * A tri-state on purpose: `undefined` is "not answered yet" and the surfaces
-   * read it as ENABLED, so a first paint never flashes the feature off.
    */
   presenceEnabled?: boolean;
 };
 
 /**
- * The team the project belongs to, and the two facts that decide a personal
- * workspace.
- *
- * `isPersonal` plus `ownerUserId` is how every surface in the product asks "is
- * this the reader's own scratch project", and `members` is what the Langy gate
- * checks before offering an assistant that would 403.
+ * The team the project belongs to, and the two facts that decide a personal workspace.
  */
 export type TraceHostTeam = {
   id: string;
@@ -104,19 +77,6 @@ export type TraceSuccessNotice = {
 
 /**
  * A failure, as a screen knows it.
- *
- * The raw `error` travels, never a sentence the screen composed: the words a
- * customer reads are resolved from the error's `code` by the presentation
- * registry, and a screen that wrote its own would print the code slug instead
- * (#5984). `fallbackTitle` names the action that failed, so an unrecognised
- * code still says what the reader was doing.
- */
-/**
- * The one way out a failure offers.
- *
- * `run` rather than `onClick`: a port says what happens, and the application's
- * toaster is what turns it into a click. Rare by design — a button that only
- * re-runs what just failed is noise.
  */
 export type TraceFailureAction = {
   label: string;
@@ -128,12 +88,6 @@ export type TraceFailureNotice = {
   fallbackTitle: string;
   /**
    * A sentence for a refusal the SCREEN can say more about than the registry.
-   *
-   * Ignored the moment the error carries a code the composition has copy for,
-   * so it can never talk over registered copy. It is the channel for the
-   * failures that have no code at all — a guard decided in the browser — and
-   * for the ones whose registered copy is generic where the screen holds the
-   * server's own numbers.
    */
   description?: string;
   /** The single fix this failure offers, rendered as a button on the notice. */
@@ -182,12 +136,6 @@ const TraceHostContext = createContext<TraceHostPort | undefined>(void 0);
 
 /**
  * Publishes the host, and the CANONICAL SCOPE READING alongside it.
- *
- * A component this family owns can be rendered by another family — the trace
- * hover preview inside the simulations timeline is the case that broke — and
- * `useOrganizationTeamProject` may not be gated on which family's provider is
- * mounted. The scope this host already resolved is republished on the shared
- * port so any screen above it reads the same answer.
  */
 export function TraceHostProvider({
   value,

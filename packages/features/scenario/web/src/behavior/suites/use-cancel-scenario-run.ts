@@ -1,9 +1,5 @@
 /**
  * Hook for cancelling scenario runs via event-sourcing.
- *
- * Dispatches cancel_requested events. The pipeline subscriber broadcasts
- * to workers, and the worker owning the scenario kills its child process.
- *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
@@ -31,9 +27,6 @@ export interface CancelBatchParams {
 
 /**
  * Hook providing cancel mutations for scenario runs.
- *
- * Callers should invalidate queries in the success callbacks to trigger
- * an immediate refetch of server-confirmed status.
  */
 export function useCancelScenarioRun({
   onCancelJobSuccess,

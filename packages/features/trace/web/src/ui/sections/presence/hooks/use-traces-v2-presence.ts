@@ -8,11 +8,6 @@ import { usePresenceFeatureEnabled } from "../../../../behavior/presence/use-pre
 
 /**
  * Drives the multiplayer presence channel from traces-v2 page state.
- *
- * Mounted as a sibling component inside the traces page so it can listen to
- * the drawer/store transitions without forcing the page itself to know about
- * presence. The derived {@link PresenceLocation} captures the lens, the
- * currently-open trace/conversation/span, and the active drawer view/panel/tab.
  */
 export function useTracesV2Presence(): void {
   const { project } = useOrganizationTeamProject();
@@ -34,14 +29,8 @@ export function useTracesV2Presence(): void {
     if (!isOpen) {
       return { lens: "traces", route };
     }
-    // PresenceLocation's shared schema only knows about the pre-redesign
-    // modes ("trace" | "conversation" | "scenario"). The new "summary"
-    // viewMode collapses back to "trace" at the wire so peers running
-    // older code still see the user as "on the trace" — losing only the
-    // distinction between the trace surface and the standalone summary
-    // mode (which is a UI affordance, not a separate location). `tab`
-    // is dropped now that SpanTabBar carries only span-scope tabs; the
-    // selected span is already captured via `route.spanId`.
+    // PresenceLocation's shared schema only knows about the pre-redesign modes ("trace"
+    // | "conversation" | "scenario").
     const wireMode: "trace" | "conversation" =
       viewMode === "conversation" ? "conversation" : "trace";
     const view: NonNullable<PresenceLocation["view"]> = {

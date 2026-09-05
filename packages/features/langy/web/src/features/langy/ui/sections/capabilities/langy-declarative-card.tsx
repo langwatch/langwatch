@@ -1,20 +1,6 @@
 /**
- * The declarative capability card — one component that draws every result the
- * catalog describes, from the body widget its descriptor names.
- *
- * The bespoke cards (traces, metrics, eval runs, datasets, scenarios) stay
- * hand-built; everything else lands here: the write fall-throughs (created /
- * updated / removed), the generic reads, the prompt diff, and the version-skew
- * fallback for a command this UI has never heard of. The widget vocabulary is
- * the catalog's (`stats` / `rows` / `facts` / `diff` / `text` / `chart`), and
- * each widget reads the already-parsed card payload from the shared
- * `@langwatch/langy` contract — parsed against the card the result was
- * DECIDED to be, not one re-derived from the command's name here.
- *
- * Honesty rule (same as the trace cards): output that cannot be read renders
- * as "couldn't read this result" with the deep link kept — never as a
- * confident empty state manufactured out of garbage. An EMPTY parsed result is
- * a real answer and says so in real words.
+ * The declarative capability card — one component that draws every result the catalog
+ * describes, from the body widget its descriptor names.
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 import { type CliResultDigest, parseCardResult } from "@langwatch/langy-contract";
@@ -436,11 +422,9 @@ function writeSentence(tone: CapabilityDescriptor["tone"]): string {
 }
 
 /**
- * (`isUnconfirmedCreate` lived here. It is gone, and so is the "Couldn't
- * confirm the resource was created" card it drew: a create whose result names
- * nothing now renders no card at all, decided once at the selection boundary in
- * `hasCapabilityCard`. Owning the doubt in a card was still a card about
- * nothing, and it appeared beside the error card for the same operation.)
+ * (`isUnconfirmedCreate` lived here. It is gone, and so is the "Couldn't confirm the resource was created" card it drew: a create whose
+ * result names nothing now renders no card at all, decided once at the selection boundary in `hasCapabilityCard`. Owning the doubt in a
+ * card was still a card about nothing, and it appeared beside the error card for the same operation.)
  */
 
 export function LangyDeclarativeCard({
@@ -533,11 +517,8 @@ export function LangyDeclarativeCard({
 }
 
 /**
- * A collection read rendered from its REFERENCES: rows hydrated fresh through
- * the product's own API, titled by the digest's honest counts. Skeleton rows
- * hold the known count while the fetch is in flight; entities the API no
- * longer returns render as an honest sentence with the counts and the way
- * into the surface preserved — never as a fabricated empty result.
+ * A collection read rendered from its REFERENCES: rows hydrated fresh through the
+ * product's own API, titled by the digest's honest counts.
  */
 function HydratedRowsCard({
   descriptor,
@@ -709,15 +690,6 @@ function readTitle({
 
 /**
  * A page action is titled by the action it carried out.
- *
- * `ui call` answers with a dispatch outcome: which action, where it ran, and
- * what it changed. None of that is a resource with a name, so the resource
- * noun titled every one of them "UI action" and a reader watching Langy
- * duplicate a column, rewrite its prompt and run it saw the same three words
- * three times. The kind is the one field that says what happened, so it
- * becomes the title, in words: `workbench.duplicateTarget` reads as "Duplicate
- * target". `executedVia` is what marks the payload as a dispatch outcome
- * rather than some other document that happens to carry a `kind`.
  */
 function dispatchedActionTitle(document: unknown): string | null {
   if (!document || typeof document !== "object") return null;

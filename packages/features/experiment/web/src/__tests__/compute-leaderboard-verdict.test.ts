@@ -226,12 +226,8 @@ describe("findCheaperTiedAlternative", () => {
   });
 
   describe("when the leader is already the cheapest", () => {
-    // This used to return null, on the reasoning that there was no
-    // "alternative" to switch to. But the reader is not asking what to
-    // switch to, they are asking what to ship — and "tops the ranking AND
-    // costs 78% less than the variant it ties with" is the single clearest
-    // answer this chart can give. Returning null threw it away and left the
-    // headline reading "too close to call".
+    // This used to return null, on the reasoning that there was no "alternative" to
+    // switch to.
     it("still recommends it, flagged as the leader", () => {
       const result = findCheaperTiedAlternative({
         verdict: { kind: "tie-at-top", leaderId: "a", tiedIds: ["a", "b"] },

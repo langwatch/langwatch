@@ -1,20 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for SuiteFormDrawer component.
- *
- * Tests validation behavior, edit mode pre-population,
- * and scenario search filtering.
- *
- * The drawer uses the registry pattern: open state comes from
- * `useDrawer().drawerOpen("suiteEditor")` and edit mode is
- * determined by `useDrawerParams().suiteId`.
- *
- * Form state and validation now live in `useSuiteForm` /
- * `ScenarioPicker` / `TargetPicker` (`@langwatch/suite-web`) — the drawer is
- * a thin orchestrator over them, so the checkbox and error copy this test
- * reads come from that package now, unmocked.
- *
  * @see specs/suites/suite-workflow.feature - "Create / Edit Run Plan"
  * @see specs/suites/suite-model-selection.feature
  */

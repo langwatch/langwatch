@@ -26,13 +26,11 @@ interface PromptsPanelProps {
   trace: TraceHeader;
   spans: SpanTreeNode[];
   onSelectSpan: (spanId: string) => void;
-  /** Suppress the panel's own count header + helper line. Set when the
-   *  panel is embedded under a section that already titles it (the trace
-   *  summary's "Prompts" accordion), so the heading isn't doubled.
-   *
-   *  When embedded, the panel renders with no horizontal padding of its
-   *  own — the host `Section` already pads content to `paddingX={4}`, so
-   *  the cards align flush with every other drawer section. */
+  /**
+   * Suppress the panel's own count header + helper line. Set when the panel is embedded
+   * under a section that already titles it (the trace summary's "Prompts" accordion),
+   * so the heading isn't doubled.
+   */
   hideHeader?: boolean;
 }
 
@@ -46,9 +44,8 @@ interface PromptUsage {
 
 /**
  * Aggregates spans by their prompt reference. Falls back to the trace-level
- * `langwatch.prompt_ids` summary when full span data hasn't loaded yet so
- * the panel always shows *which* prompts ran, even before variables stream
- * in.
+ * `langwatch.prompt_ids` summary when full span data hasn't loaded yet so the panel
+ * always shows *which* prompts ran, even before variables stream in.
  */
 function aggregatePromptUsage(
   spansFull: SpanDetail[] | undefined,
@@ -174,12 +171,9 @@ export function PromptsPanel({
     !!trace.lastUsedPromptId &&
     trace.selectedPromptId !== trace.lastUsedPromptId;
 
-  // Only disambiguate which prompt was pinned vs. last ran when there's
-  // more than one card — a single prompt is obviously the one that ran, so
-  // a "last used" chip there is just noise. The selected/last-used identity
-  // used to render as its own callout block above the cards, which simply
-  // duplicated whichever card it pointed at; folding it into an inline chip
-  // removes that repetition.
+  // Only disambiguate which prompt was pinned vs. last ran when there's more than one
+  // card — a single prompt is obviously the one that ran, so a "last used" chip there
+  // is just noise.
   const showRoleChips = usages.length > 1;
   const roleFor = (handle: string): PromptRole | null => {
     if (!showRoleChips) return null;
@@ -226,10 +220,9 @@ export function PromptsPanel({
 }
 
 /**
- * Renders only when something is actually wrong: the pinned prompt drifted
- * from what ran, the trace ran an out-of-date version, or the managed prompt
- * has since been deleted. Returns null in the common healthy case so the
- * panel leads straight with the prompt cards.
+ * Renders only when something is actually wrong: the pinned prompt drifted from what
+ * ran, the trace ran an out-of-date version, or the managed prompt has since been
+ * deleted.
  */
 function PromptDriftBanner({ trace, hasDrift }: { trace: TraceHeader; hasDrift: boolean }) {
   // Look up the latest version of the last-used prompt to detect
@@ -361,12 +354,9 @@ function PromptUsageCard({
             </Badge>
           )}
           {ref.draft && (
-            // Executed config diverged from the saved version (user
-            // edited inline without saving). Amber chip so operators
-            // know "Open prompt" lands on the base version, not the
-            // diverged messages in the trace. Mirrors the same chip
-            // in PromptAccordion.tsx — kept in sync for parity across
-            // the two prompt-surfacing components in the drawer.
+            // Executed config diverged from the saved version (user edited inline
+            // without saving). Amber chip so operators know "Open prompt" lands on the
+            // base version, not the diverged messages in the trace.
             <Badge size="sm" variant="subtle" colorPalette="orange">
               unsaved edits
             </Badge>

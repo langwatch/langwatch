@@ -1,35 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The addresses the product writes, driven through the real registry.
- *
- * THE FAILURE THIS FILE EXISTS FOR IS SILENT. `CurrentDrawer` looks
- * `?drawer.open=<name>` up in the composed registry, misses, and renders null —
- * no error, no toast, no log line. The reader clicks and the page does not
- * move. That is how twenty-two names ended up addressed and unregistered after
- * `platform/app` was deleted, and it is why `installed-ui-drawers.unit.test.ts`
- * (which counts the composition) cannot be the whole guard: a name can be in
- * the registry and still open nothing, because the module path is wrong, the
- * export key is misspelled, or the component is handed props it cannot use.
- *
- * SO THIS DRIVES THE WHOLE PATH A CALL SITE DOES: the exact query string some
- * screen, command-bar entry or outbound EMAIL writes, into the real
- * `installedUiDrawers`, through the lazy import and the application's own
- * adapter, and asserts the component on the other side was mounted with what
- * the address carried.
- *
- * WHAT IS MOCKED IS EACH FAMILY'S PACKAGE ENTRY AND ITS HOST PROVIDER, in the
- * shape `chrome-drawer.integration.test.tsx` mocks the registry: a stub in the
- * package's place keeps the assertion on the wiring rather than on one
- * family's tRPC provider, and a pass-through host keeps it out of eight
- * different transports. A stub only answers to the export name the registry
- * asks for, so a misspelled `key` still fails here — which is the point.
- *
- * `open` IS ASSERTED AS A BOOLEAN wherever the drawer hands it to Chakra.
- * `CurrentDrawer` spreads the PARSED ADDRESS, so `open` arrives as the drawer
- * NAME; a control that takes only a boolean renders closed against an address
- * that says it is open, which is the defect `agent-drawers.tsx` recorded when
- * the type selector moved.
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -41,11 +12,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
  * One stub module, from the export names the registry asks it for.
- *
- * Each component prints its own name and its props, so an assertion can read
- * both what was mounted and what the address handed it. Functions are printed
- * by name rather than by body: what matters about `onClose` is that one
- * arrived.
  */
 const stub = vi.hoisted(() => {
   const drawers = async (names: readonly string[]): Promise<Record<string, unknown>> => {
@@ -136,11 +102,6 @@ vi.mock("@langwatch/ops-web/drawers", async () => {
 
 /**
  * Every family's host wrapper, as an identity.
- *
- * One factory rather than seven, because a module only takes the names it
- * imports and the extras are ignored. What this stubs out is eight tRPC
- * providers and eight organization-graph reads; what each page-policy suite
- * already proves for its own family is that the real wrapper mounts.
  */
 const passThroughHost = vi.hoisted(
   () => () =>
@@ -214,11 +175,6 @@ async function openAddress(address: string, component: string): Promise<string> 
 
 /**
  * The addresses, as the product writes them.
- *
- * Every one is copied from a live call site rather than invented: the two email
- * links are the strings `template-context.ts` and `monitor.api.ts` mint, and the
- * rest are what a screen, a host adapter or the command palette passes to
- * `openDrawer`.
  */
 const OPENINGS: ReadonlyArray<{
   what: string;
@@ -376,16 +332,8 @@ describe("given an address the product writes", () => {
 });
 
 /**
- * The two addresses that are minted OUTSIDE the application and cannot be
- * corrected once sent.
- *
- * `packages/features/automation/contract/src/templating/template-context.ts`
- * puts the first into every alert email as `trigger.editUrl`, and
- * `packages/features/monitor/server/src/transport/api-rest/monitor.api.ts` puts
- * the second into every monitor the REST API answers with, as `platformUrl`.
- * Both are copied here literally: what is under test is that the name each
- * already writes resolves, which is the only side of this that can still be
- * fixed.
+ * The two addresses that are minted OUTSIDE the application and cannot be corrected
+ * once sent.
  */
 describe("given a link the product already sent out", () => {
   describe("when it is an alert email's Edit automation link", () => {
@@ -441,11 +389,8 @@ describe("given a drawer that hands `open` straight to a Chakra control", () => 
 
 describe("given a drawer the framework may not let close itself", () => {
   /**
-   * A target that calls `closeDrawer` clears the whole navigation stack, which
-   * drops the caller with it — `dev/docs/best_practices/drawers.md`. These
-   * three take the close as a prop for that reason, so the application's
-   * adapter is what has to supply one; without it the drawer opens and cannot
-   * be shut.
+   * A target that calls `closeDrawer` clears the whole navigation stack, which drops
+   * the caller with it — `dev/docs/best_practices/drawers.md`.
    */
   const CLOSED_BY_THE_ADAPTER = [
     { drawer: "automation", component: "AutomationDrawer", address: "?drawer.open=automation" },
@@ -478,12 +423,6 @@ describe("given a drawer the framework may not let close itself", () => {
 
 /**
  * The one drawer that leads to another drawer.
- *
- * "Edit" on the read-only panel is a drawer NAVIGATING to a drawer, which the
- * drawers doc says goes through `openDrawer` rather than through a second
- * mount. The panel cannot make that call itself — it is a package component and
- * the registry is composition — so the adapter hands it the hand-over, and a
- * missing one is a dead button rather than an error.
  */
 describe("given the automation viewer's hand-over to the editor", () => {
   describe("when the address opens viewAutomation", () => {

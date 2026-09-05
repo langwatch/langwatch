@@ -2,17 +2,9 @@ import { Box, Portal } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 
 /**
- * One-shot blue pulse painted as a Portal-rendered fixed-position overlay
- * over a target accordion section. The overlay measures the target's
- * bounding rect on mount and tracks it through scroll / resize for the
- * duration of the animation. Because the overlay lives at the document
- * body (via Portal) it sits outside every `overflow: hidden|auto`
- * ancestor in the drawer chrome, so the full halo renders without
- * getting cropped by the pane scroll viewport or the sticky section
- * header. The target itself is left visually untouched — the glow
- * doesn't paint border/shadow onto the section's own box, which avoided
- * the prior split-look where the sticky header bg occluded the top
- * edge of an inset shadow inside the body.
+ * One-shot blue pulse painted as a Portal-rendered fixed-position overlay over a target
+ * accordion section. The overlay measures the target's bounding rect on mount and
+ * tracks it through scroll / resize for the duration of the animation.
  */
 const GLOW_DURATION_MS = 1500;
 const RECT_TRACK_FPS_INTERVAL_MS = 16;

@@ -1,17 +1,5 @@
 /**
  * Coerces a message's `content` field to an array we can walk.
- *
- * Some SDK callers (notably the langwatch python-sdk) used to send
- * `content` as a stringified Python-repr of a list
- * (`"[{'type': 'input_audio', ...}]"`) instead of a JSON-encoded array.
- * Newer SDK versions emit JSON directly; this function keeps the
- * Python-repr fallback for older clients in flight.
- *
- * Returns:
- *  - The array verbatim when content is already an array.
- *  - A parsed array when content is a string that decodes (JSON or
- *    Python-repr) to an array of objects.
- *  - null otherwise (caller should pass through unchanged).
  */
 export function coerceContentToArray(content: unknown): unknown[] | null {
   if (Array.isArray(content)) return content;
@@ -40,29 +28,6 @@ export function coerceContentToArray(content: unknown): unknown[] | null {
 
 /**
  * Convert a Python-repr-like string to a best-effort JSON string.
- *
- * Walks character-by-character with a tiny quote state machine so that
- * single-to-double quote flipping only happens outside string literals.
- * The naive `replace(/'/g, '"')` approach broke on payloads like
- * `"i'm at a cafe"` (Python switches to outer double quotes when the
- * string contains an apostrophe), turning `i'm` into `i"m` and breaking
- * JSON.parse.
- *
- * Bare-identifier replacements (`None` -> `null`, `True` -> `true`,
- * `False` -> `false`) likewise only fire outside strings.
- *
- * This is a recovery fallback for legacy SDK output. New senders should
- * JSON-encode their content directly; do not lean on this function as
- * an excuse to keep emitting Python repr.
- */
-/**
- * If ``input`` at ``offset`` begins with a Python ``\xHH`` byte escape,
- * return its JSON ``\u00HH`` equivalent and the number of source chars
- * consumed (always 4). Returns ``null`` otherwise.
- *
- * JSON.parse rejects ``\xHH`` outright; without this translation the
- * recovery path returns null on any Python repr that contains a control
- * byte (rare in chat content but well within spec).
  */
 function readPythonHexEscape(
   input: string,

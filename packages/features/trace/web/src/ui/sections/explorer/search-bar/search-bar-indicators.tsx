@@ -5,11 +5,8 @@ import { Popover } from "@langwatch/design-system/popover";
 import { useUIStore } from "../../../../index";
 
 /**
- * Severity of a query-state issue — drives the SearchBar's border tint and
- * the matching badge. The previous design rendered a tiny yellow triangle
- * for warnings and a red "Syntax" pill for errors, which were visually so
- * different the user often missed the warning entirely. One indicator
- * component, one colour palette per severity.
+ * Severity of a query-state issue — drives the SearchBar's border tint and the matching
+ * badge.
  */
 export type SearchBarStatus = { kind: "ok" } | { kind: "error"; message: string };
 
@@ -37,11 +34,7 @@ export function statusBackgroundColor(status: SearchBarStatus): string {
 }
 
 /**
- * Single badge shown when the bar is in a warning or error state. Replaces
- * the old `CrossFacetWarning` triangle and `ParseErrorIndicator` pill —
- * they used to live next to each other with completely different shapes
- * and weights, making it easy to miss that anything was wrong. Now both
- * paths render the same badge shape, just tinted differently.
+ * Single badge shown when the bar is in a warning or error state.
  */
 export const StatusBadge: React.FC<{
   status: SearchBarStatus;

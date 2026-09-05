@@ -1,11 +1,6 @@
 /**
- * The Results tab: the list of run plans, and inside one plan its runs and
- * the results of the selected run.
- *
- * The whole tab reads one window. When the last run of the plan being opened
- * is older than that window, the window widens until the run is inside it, so
- * a plan is never opened on an empty page while its runs exist.
- *
+ * The Results tab: the list of run plans, and inside one plan its runs and the results
+ * of the selected run.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

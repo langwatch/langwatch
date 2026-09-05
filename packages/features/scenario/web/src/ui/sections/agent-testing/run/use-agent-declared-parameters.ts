@@ -1,8 +1,6 @@
 /**
- * The parameters the agents of the project declare, for a field that has no
- * run to read them from: the scenario editor offers them so a scenario can
- * name an agent's parameter and one of its options.
- *
+ * The parameters the agents of the project declare, for a field that has no run to read them from: the scenario
+ * editor offers them so a scenario can name an agent's parameter and one of its options.
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 

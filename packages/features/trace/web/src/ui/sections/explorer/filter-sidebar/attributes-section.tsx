@@ -19,10 +19,8 @@ interface AttributesSectionProps {
   keys: AttributeKey[];
   icon?: React.ElementType;
   /**
-   * Prefix this section's filters are written with (`attribute`,
-   * `event.attribute`, `span.attribute`). Threaded to each key row so the
-   * lazy value lookup queries the SAME facet key the filter click writes —
-   * the server routes the prefix to the matching attribute store.
+   * Prefix this section's filters are written with (`attribute`, `event.attribute`,
+   * `span.attribute`).
    */
   filterPrefix?: string;
   /** Active filter state per `<prefix>.<key>:<value>` */
@@ -36,10 +34,9 @@ interface AttributesSectionProps {
   /** Remove this section from the sidebar (per-user). */
   onHide?: () => void;
   /**
-   * Cosmetic prefix stripped from each key's DISPLAYED label (e.g.
-   * `metadata.`). The full `key.value` still drives filtering, value loading,
-   * and active-state lookups — only the label and the local key-filter match
-   * against the stripped form. Absent on the trace/span/event sections.
+   * Cosmetic prefix stripped from each key's DISPLAYED label (e.g. `metadata.`). The
+   * full `key.value` still drives filtering, value loading, and active-state lookups —
+   * only the label and the local key-filter match against the stripped form.
    */
   displayStripPrefix?: string;
   /**
@@ -72,11 +69,8 @@ const AttributesSectionInner: React.FC<AttributesSectionProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   // The key filter is hidden by default; the SidebarSection header renders a
-  // list-filter funnel toggle (the SAME affordance categorical sections get)
-  // that reveals and auto-focuses the input. Previously attribute sections
-  // showed an inline input only once the key count crossed a threshold and had
-  // no header icon, so a short list had no filter affordance and read as broken
-  // next to the categorical sections (#18a).
+  // list-filter funnel toggle (the SAME affordance categorical sections get) that
+  // reveals and auto-focuses the input.
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {

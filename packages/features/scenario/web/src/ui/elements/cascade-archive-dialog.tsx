@@ -17,11 +17,6 @@ export type RelatedEntities = {
 
 /**
  * Cascade archive confirmation dialog.
- *
- * Shows a warning when archiving an entity that has related entities
- * that will also be affected (archived or deleted).
- *
- * Note: All interactive elements use stopPropagation() to prevent event bubbling.
  */
 export function CascadeArchiveDialog({
   open,

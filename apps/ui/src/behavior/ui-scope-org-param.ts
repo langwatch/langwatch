@@ -1,15 +1,5 @@
 /**
  * The one-shot `?org=<slug>` organization switch for org-scoped pages.
- *
- * `/me`, `/settings/*` and the gateway pages resolve their organization from
- * the remembered selection, never from the address, so a multi-organization
- * reader has no way to say "show me THIS organization's page" in a link. An
- * `?org=<slug>` naming an organization they belong to selects it — the write
- * the remembered selection broadcasts, which every reader re-resolves on — and
- * the parameter is then stripped, applied or ignored alike, so a stale or
- * hostile slug neither lingers in the address bar nor re-triggers the switch.
- * The path and every other parameter are preserved.
- *
  * Spec: specs/ai-gateway/governance/org-query-param-switch.feature
  */
 

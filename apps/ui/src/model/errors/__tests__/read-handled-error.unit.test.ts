@@ -1,8 +1,7 @@
 /**
- * `readHandledError` sits on untrusted input: a rolling deploy, an older
- * server, or a Go service can all hand it a payload it wasn't written for, and
- * none of those may take a render down with them. `null` (→ generic unknown
- * treatment) is always an acceptable answer; throwing never is.
+ * `readHandledError` sits on untrusted input: a rolling deploy, an older server, or a
+ * Go service can all hand it a payload it wasn't written for, and none of those may
+ * take a render down with them.
  */
 import { describe, expect, it } from "vitest";
 
@@ -118,10 +117,9 @@ describe("readHandledError", () => {
     });
 
     /**
-     * Tips ride the same relay path `meta.message` is clamped for — a Go
-     * service parses them off an upstream response body — so an upstream that
-     * answers with an essay must not get to render an essay inside our own
-     * error chrome. The alert lists every one of them.
+     * Tips ride the same relay path `meta.message` is clamped for — a Go service parses
+     * them off an upstream response body — so an upstream that answers with an essay
+     * must not get to render an essay inside our own error chrome.
      */
     it("caps how many tips an upstream can put on screen", () => {
       const result = readHandledError(
@@ -167,11 +165,7 @@ describe("readHandledError", () => {
     });
 
     /**
-     * https alone was not enough. `docs_url` is parsed off an upstream
-     * response body with a bare `z.string()` (`nlpgo/goHandledError.ts`,
-     * `langy/streaming/langyRelayFrame.ts`), and `ErrorActions` turns it into
-     * the href behind "Read the docs" — so any-https meant a customer-
-     * configured endpoint could put its own link inside LangWatch's chrome.
+     * https alone was not enough.
      */
     it.each([
       ["another origin entirely", "https://docs.evil.example/langwatch"],
@@ -204,12 +198,9 @@ describe("readHandledError", () => {
 
   describe("given a handled error from a REST route", () => {
     /**
-     * Hono routes send the handled error FLAT — the code in `error`, `meta`
-     * spread at the top level, the trace under `trace` (see
-     * `src/app/api/middleware/error-handler.ts`). Reading only the tRPC
-     * envelope meant every one of them reached the UI as an unhandled error:
-     * no registry copy, no docs link, no trace id, for a failure the server
-     * had named precisely.
+     * Hono routes send the handled error FLAT — the code in `error`, `meta` spread at
+     * the top level, the trace under `trace` (see
+     * `src/app/api/middleware/error-handler.ts`).
      */
     it("lifts the code, meta and trace id off the flat body", () => {
       const result = readHandledError({
@@ -321,9 +312,8 @@ describe("handledShapeFromSerialized", () => {
   });
 
   /**
-   * This path skips `readHandledError` entirely, so it needs the same
-   * narrowing rather than inheriting it by luck: a relayed Go error's
-   * `docs_url` is parsed off an upstream body with a bare `z.string()`, and
+   * This path skips `readHandledError` entirely, so it needs the same narrowing rather than inheriting it by
+   * luck: a relayed Go error's `docs_url` is parsed off an upstream body with a bare `z.string()`, and
    * `ErrorActions` turns it into the href behind "Read the docs".
    */
   describe("given a docs link on an event payload", () => {
@@ -530,10 +520,8 @@ describe("readAuthoredMessage", () => {
 });
 
 /**
- * The canonical envelope both planes answer with — nested under `error` as an
- * object, lower_snake_case throughout. The AI gateway's failures arrive in it,
- * and until it was read here they reached the UI as unhandled: generic
- * "Something went wrong" copy for an error the server had explained in full.
+ * The canonical envelope both planes answer with — nested under `error` as an object,
+ * lower_snake_case throughout.
  */
 describe("given the canonical nested error envelope", () => {
   /** The exact body the gateway writes for the Vertex credential failure. */
@@ -631,11 +619,7 @@ describe("given the canonical nested error envelope", () => {
   });
 
   /**
-   * Slug shape is not provenance. `insufficient_quota` and `overloaded_error`
-   * are OpenAI's and Anthropic's own codes, and a body of theirs nesting one
-   * under `error` clears the shape guard — so the remediation fields beside it
-   * are somebody else's text, and rendering them as LangWatch's advice is the
-   * one thing this reading must not do.
+   * Slug shape is not provenance.
    */
   describe("when the nested code is slug-shaped but not one of ours", () => {
     const foreign = {

@@ -24,10 +24,9 @@ export interface ConversationTurn {
   inputVisibleTo?: string | null;
   outputVisibleTo?: string | null;
   /**
-   * The turn's own totals, so the terminal view can count the session's turns
-   * above its loaded window without reading their transcripts. Optional
-   * because a cached response from before the fields existed may not carry
-   * them.
+   * The turn's own totals, so the terminal view can count the session's turns above its
+   * loaded window without reading their transcripts. Optional because a cached response
+   * from before the fields existed may not carry them.
    */
   totalTokens?: number | null;
   totalCost?: number | null;
@@ -55,13 +54,8 @@ const NULL_RESULT: ConversationContextResult = {
 
 /**
  * Conversation context for a trace. Backed by the dedicated
- * `tracesV2.conversationContext` endpoint, which builds a typed WHERE
- * fragment server-side (no liqe parsing fragility around weird
- * conversationId chars).
- *
- * The query is keyed only on (projectId, conversationId) so arrow-key
- * navigation between sibling traces doesn't churn the cache — `position`,
- * `previous`, and `next` are derived locally from the active `traceId`.
+ * `tracesV2.conversationContext` endpoint, which builds a typed WHERE fragment
+ * server-side (no liqe parsing fragility around weird conversationId chars).
  */
 export function useConversationContext(
   conversationId: string | null | undefined,
@@ -70,15 +64,8 @@ export function useConversationContext(
   const projectId = useDrawerProjectId();
   const shared = useSharedTrace();
 
-  // Conversation context for preview-mode traces is seeded
-  // directly into the cache by `useOpenTraceDrawer`. We disable
-  // the *fetch* (so a real network call doesn't clobber the seed
-  // with an empty result) but still consume cached data through
-  // the same `useQuery` instance — `enabled: false` doesn't blank
-  // the cache; we just have to be careful not to short-circuit
-  // *before* reading `query.data` below.
-  // The read-only share page carries no conversation payload (thread sharing
-  // is a follow-up), so it never fetches the surrounding conversation.
+  // Conversation context for preview-mode traces is seeded directly into the cache by
+  // `useOpenTraceDrawer`.
   const isPreview = !!traceId && isPreviewTraceId(traceId);
   const fetchEnabled = !!projectId && !!conversationId && !isPreview && !shared;
 

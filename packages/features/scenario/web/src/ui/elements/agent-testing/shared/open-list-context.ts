@@ -1,10 +1,5 @@
 /**
  * How a field tells the dialog around it that its list is open.
- *
- * A dialog closes on Escape from a listener on the document, which runs
- * before any field inside it sees the key. A field with an open list reports
- * it here, and the dialog turns its own Escape handling off until every list
- * is closed again, so Escape closes the list alone.
  */
 
 import { createContext, useContext, useEffect, useId } from "react";

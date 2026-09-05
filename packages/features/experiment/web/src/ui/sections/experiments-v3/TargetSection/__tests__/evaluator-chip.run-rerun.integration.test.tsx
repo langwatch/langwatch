@@ -1,16 +1,6 @@
 // @vitest-environment jsdom
 /**
  * What the evaluator chip's menu offers, per evaluator state.
- *
- * The three items are not independent: a pending evaluator offers "Run", one
- * that already has a result offers "Rerun" instead, and one that is mid-flight
- * offers neither — plus "Run on all rows", which is available whenever the
- * evaluator is not running and at least one row has a target output.
- *
- * "Run" and "Run on all rows" are rendered DISABLED rather than removed when
- * there is no target output to run against, so that the tooltip can say why;
- * the assertion below is that the item cannot be actioned.
- *
  * @see specs/features/evaluations-v3/evaluator-run-rerun-enhancements.feature
  */
 import "@testing-library/jest-dom/vitest";

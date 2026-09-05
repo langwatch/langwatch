@@ -1,9 +1,7 @@
 /**
+ * The comment action on a field panel, where there is room to say what it is in words,
+ * and the field that is hidden from the reader, which offers none.
  * @vitest-environment jsdom
- *
- * The comment action on a field panel, where there is room to say what it is in
- * words, and the field that is hidden from the reader, which offers none.
- * See specs/traces-v2/anchored-comments.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

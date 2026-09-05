@@ -1,14 +1,5 @@
 /**
  * Which projects the replication picker offers, and which of them it greys.
- *
- * `platform/app/src/hooks/useProjectsForCopy.ts` answered this by importing
- * `~/server/api/rbac` into a browser hook. `apps/ui` may not reach `~/server`,
- * so the answer is rebuilt over `@langwatch/authz-contract`, whose roles module
- * states in its own docblock that it is parity-tested against the rbac pair this
- * replaces. These assertions pin the four decisions that hook made, so a
- * divergence shows up as a red test rather than as a reader silently gaining or
- * losing a replication target.
- *
  * Spec: specs/agents/agent-management.feature
  */
 

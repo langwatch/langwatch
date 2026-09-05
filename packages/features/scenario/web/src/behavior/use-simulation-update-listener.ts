@@ -83,11 +83,6 @@ export function useSimulationUpdateListener({
   const lastFireRef = useRef<number>(0);
   /**
    * At least one update arrived while the tab was hidden.
-   *
-   * A boolean is enough because the flush refetches current state rather than
-   * replaying events: whether one update or fifty were missed, the work to
-   * catch up is the same single refresh, so there is nothing to count or
-   * queue.
    */
   const missedWhileHiddenRef = useRef(false);
   const isVisible = usePageVisibility();
@@ -133,16 +128,6 @@ export function useSimulationUpdateListener({
 
   /**
    * Refetch the run, then apply the status the event carried.
-   *
-   * The refetch alone is not enough for a terminal event. The broadcast can
-   * beat the fold commit, so the refetch can read back the pre-terminal row —
-   * and `finished` is the last event, so no later broadcast arrives to correct
-   * it. That is what left cards sitting on "running" until a manual reload.
-   *
-   * The event is authoritative here: it carries the terminal status as
-   * event-carried state, which is exactly why the broadcast includes it. So
-   * the status is stamped AFTER the refetch settles, and only over a
-   * non-terminal cached value, so a settled read is never downgraded.
    */
   const applyRunUpdate = useCallback(
     async ({ scenarioRunId, status }: { scenarioRunId: string; status: string | undefined }) => {

@@ -1,22 +1,5 @@
 /**
  * The in-progress half of a capability card.
- *
- * A capability used to appear only once it had SETTLED — while it ran, the call
- * fell through to the generic activity collapser and rendered as a bare word
- * ("Coding") over a line of naked text. So the richest moment of a turn, the
- * part where you want to know what Langy is doing to your data, was its ugliest.
- *
- * Now a capability is a card for its whole life: this shell while it runs
- * (surface overline + a present-tense headline naming the thing being done +
- * an indeterminate bar), swapped for the settled card the moment output lands.
- * Same shell, same overline, same border — the card doesn't jump, it fills in.
- *
- * PROGRESSIVE: when the call is a CLI read whose query the panel can already
- * run (`command`), rows start appearing UNDER the running headline while the
- * agent is still working — fetched fresh through the product's own API with
- * the viewer's session (see `useCapabilityData`). The settled card then
- * reconciles against the result's own references. A resource with no query
- * hydrator shows the plain pending shell, exactly as before.
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";

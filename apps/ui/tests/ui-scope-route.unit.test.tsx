@@ -1,12 +1,5 @@
 /**
  * What the address bar says about the scope, read through the real router.
- *
- * The one rule that had to be restated rather than copied is the
- * personal-workspace test. The application asks whether the MATCHED PATTERN
- * starts with `/me`, which this package answers as "the router matched no
- * project segment, and the first one is `me`". The cases that separate the two
- * readings are the ones that matter: `/me/traces` is a project named `me` in
- * both, and `/mentions` is nobody's personal workspace in either.
  */
 
 import { render } from "@testing-library/react";

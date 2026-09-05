@@ -13,32 +13,14 @@ import { useVisibleTraceIds } from "./use-visible-trace-ids";
 // doesn't keep the sidebar permanently refetching.
 const DISCOVER_INVALIDATE_DEBOUNCE_MS = 30_000;
 
-// A busy coding-agent trace fires `trace_summary_updated` on nearly every
-// span (its summary/metrics change each time), which otherwise refetches
-// `newCount` every couple of seconds for a pill that didn't actually change
-// count. Coalesce into a shorter window than discover's — the pill still
-// needs to feel live — but long enough that a stream of span updates to
-// EXISTING traces doesn't keep re-querying it.
+// A busy coding-agent trace fires `trace_summary_updated` on nearly every span (its
+// summary/metrics change each time), which otherwise refetches `newCount` every couple
+// of seconds for a pill that didn't actually change count.
 const NEWCOUNT_INVALIDATE_DEBOUNCE_MS = 10_000;
 
 /**
- * Coordinator hook that bridges SSE trace events into TanStack Query
- * cache invalidation. Mounted once in TracesPage.
- *
- * On trace_summary_updated:
- *   - Visible rows: pulse in-place via rowPulseStore; no list invalidation.
- *   - New trace on page 1: cancel + invalidate list.
- *   - Off-screen / wrong page: no list invalidation.
- *   - In all cases: invalidate newCount so the pill stays accurate — coalesced
- *     into a short window (see NEWCOUNT_INVALIDATE_DEBOUNCE_MS) rather than
- *     re-queried on every event, since most events are span updates to a trace
- *     already counted, not a new row.
- *
- * If the drawer is open for an affected trace, also invalidates
- * header, spanSummary, and evals.
- *
- * On span_stored: if the drawer is open for an affected trace,
- * invalidates spanSummary and spanDetail.
+ * Coordinator hook that bridges SSE trace events into TanStack Query cache
+ * invalidation. Mounted once in TracesPage.
  */
 export function useTraceFreshness() {
   const { project } = useOrganizationTeamProject();
@@ -66,12 +48,9 @@ export function useTraceFreshness() {
     (traceIds: string[]) => {
       const mode = useSseStatusStore.getState().liveUpdatesMode;
 
-      // newCount is always kept current so the "(N new)" pill stays in
-      // sync across all modes (live, ask, paused) — but coalesced the same
-      // way discover is: a busy coding-agent trace fires this handler on
-      // nearly every span, and re-querying the pill's count on each one is
-      // pure waste when the count usually hasn't even changed (an existing
-      // trace being updated doesn't add a new row to count).
+      // newCount is always kept current so the "(N new)" pill stays in sync across all modes (live, ask, paused) — but coalesced the same way discover is: a
+      // busy coding-agent trace fires this handler on nearly every span, and re-querying the pill's count on each one is pure waste when the count usually
+      // hasn't even changed (an existing trace being updated doesn't add a new row to count).
       if (!newCountInvalidateTimer.current) {
         newCountInvalidateTimer.current = setTimeout(() => {
           newCountInvalidateTimer.current = null;
@@ -90,12 +69,9 @@ export function useTraceFreshness() {
       let hasNewTrace = false;
       for (const traceId of traceIds) {
         if (visibleIds.has(traceId)) {
-          // In-place update — animate the row, skip network round-trip.
-          // The pulse fires in every mode (live / ask / paused): `ask`
-          // gates *new trace prepends*, not updates to rows the user is
-          // already looking at. Suppressing the pulse in ask mode would
-          // mean a row visibly changes its underlying data without any
-          // signal — worse UX than the pulse itself.
+          // In-place update — animate the row, skip network round-trip. The pulse fires
+          // in every mode (live / ask / paused): `ask` gates *new trace prepends*, not
+          // updates to rows the user is already looking at.
           pulse(traceId);
         } else if (page === 1) {
           // New trace that belongs on page 1 (highest priority view).
@@ -133,12 +109,9 @@ export function useTraceFreshness() {
       // Reset adaptive polling to fast interval
       requestFastPoll();
 
-      // Targeted drawer invalidation. Project-scoped explicitly so the
-      // partial-input filter matches the project queries are keyed under,
-      // not just every header/spanTree/evals query in the cache.
-      // The drawer is what the user explicitly opened, so even in `ask`
-      // mode we still keep its contents fresh — `ask` only suppresses
-      // the implicit list refetch.
+      // Targeted drawer invalidation. Project-scoped explicitly so the partial-input
+      // filter matches the project queries are keyed under, not just every
+      // header/spanTree/evals query in the cache.
       const { traceId: openTraceId } = useDrawerStore.getState();
       const projectId = project?.id;
       if (openTraceId && projectId && traceIds.includes(openTraceId)) {
@@ -165,20 +138,9 @@ export function useTraceFreshness() {
       const projectId = project?.id;
       if (!openTraceId || !projectId || !traceIds.includes(openTraceId)) return;
 
-      // Invalidate every per-trace query that changes shape when a new
-      // span lands — keeps the cache push-fresh so the per-hook
-      // refetchInterval can stay off while SSE is connected. The key
-      // is scoped to `projectId` + `traceId` so only the open trace
-      // is invalidated, not the entire CSR cache.
-      //
-      // The span tree is refreshed through `spanTreeDelta`, NOT by
-      // invalidating `spanTree` itself: the tree is assembled by walking
-      // `spanTreePaginated`, so invalidating it re-runs `ceil(N/500)`
-      // sequential page requests — ~200 on a 100k-span trace, which cannot
-      // finish inside the 2s debounce window, and `invalidateQueries`
-      // defaults to `cancelRefetch: true` so the next batch would abort and
-      // restart it before it ever landed. `useSpanTree` merges the delta into
-      // the same cache entry in place.
+      // Invalidate every per-trace query that changes shape when a new span lands —
+      // keeps the cache push-fresh so the per-hook refetchInterval can stay off while
+      // SSE is connected.
       const key = { projectId, traceId: openTraceId };
       void trpcUtils.tracesV2.spanTreeDelta.invalidate(key);
       void trpcUtils.tracesV2.spanDetail.invalidate(key);
@@ -204,16 +166,8 @@ export function useTraceFreshness() {
   });
 
   // `discover` (facets) freshness. The server fires `discover_updated` when a
-  // background refresh in TraceListService lands a fresher facets payload in
-  // the shared cache; on receipt we invalidate, which refetches against the
-  // now-warm cache. This lives in the page-level coordinator rather than inside
-  // useTraceFacets because that hook is consumed by several sidebar components
-  // (SearchBar, FilterSidebar, TokenValuePicker) and tRPC subscriptions are not
-  // deduplicated across hook instances the way queries are: one subscription
-  // per consumer opened a duplicate SSE connection each, and on HTTP/1.1 (dev)
-  // those persistent connections starve the 6-per-origin pool, leaving query
-  // bursts (the drawer opening) stuck pending. One coordinator subscription
-  // invalidates the shared query, refreshing every consumer.
+  // background refresh in TraceListService lands a fresher facets payload in the shared
+  // cache; on receipt we invalidate, which refetches against the now-warm cache.
   useSSESubscription<{ tenantId: string; timestamp: number }, { projectId: string }>(
     // @ts-expect-error - tRPC subscription type isn't perfectly inferred for the
     // hook's generic; the underlying procedure shape matches.

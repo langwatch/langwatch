@@ -1,12 +1,8 @@
 import { type Dispatch, type RefObject, type SetStateAction, useEffect, useState } from "react";
 import { EASTER_EGG_IMAGE_URL } from "../use-konami-easter-egg";
 
-// Mermaid is loaded via a true `await import()` inside the effect so it
-// stays in its own chunk. A top-level `import mermaid from "mermaid"`
-// collapses mermaid into whatever chunk the parent module ends up in,
-// which in turn rewires mermaid's internal dynamic diagram loaders and
-// breaks its `__name` helper at top-level evaluation. Keeping the import
-// dynamic preserves the chunk boundary mermaid expects.
+// Mermaid is loaded via a true `await import()` inside the effect so it stays in its
+// own chunk.
 
 const MINIMAP_W = 200;
 const MINIMAP_H = 72;
@@ -79,9 +75,8 @@ function tagNodeWithKindAndClick({
 
 /**
  * Renders the Mermaid SVG into `stageRef`, mirrors a scaled-down copy into
- * `minimapStageRef`, wires actor/node click handlers to `onSelectSpan`, and
- * applies the easter-egg avatar swap when active. Owns the per-render token
- * so each render uses a unique DOM id.
+ * `minimapStageRef`, wires actor/node click handlers to `onSelectSpan`, and applies the
+ * easter-egg avatar swap when active.
  */
 export function useMermaidRenderer({
   result,

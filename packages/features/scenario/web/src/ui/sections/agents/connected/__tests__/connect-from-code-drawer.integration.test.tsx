@@ -1,9 +1,6 @@
 /**
+ * The drawer that connects an agent from code, opened from the new agent flow.
  * @vitest-environment jsdom
- *
- * The drawer that connects an agent from code, opened from the new
- * agent flow.
- *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 

@@ -1,35 +1,6 @@
 /**
+ * What the two identity settings addresses this application now serves are actually behind, proved by mounting them.
  * @vitest-environment jsdom
- *
- * What the two identity settings addresses this application now serves are
- * actually behind, proved by mounting them.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice
- * a loader that names the wrong grant — the failure that refuses a reader the
- * platform page admitted, or admits one it refused. So this file loads the real
- * loaders, mounts what they hand back under a session that answers precisely,
- * and reads the result.
- *
- * THE TWO KEYS HAVE OPPOSITE POLICIES, one for one with the platform pages, and
- * asserting them together is the point:
- *
- * - `/settings/audit-log` was `withPermissionGuard("organization:manage")`. The
- *   audit trail names who did what from every address in the organization, so
- *   it is an administrator's surface.
- * - `/settings/authentication` carried NO guard of any kind. Everything on it
- *   is keyed on the reader's own account, so there is no scope to hold a grant
- *   over — and refusing a member their own sign-in methods would lock them out
- *   of changing their own password.
- *
- * The PLAN gate on the audit trail is deliberately not a guard: a reader below
- * Enterprise gets the page and a straight answer about what it would show,
- * which is asserted in `@langwatch/organization-web`'s own suite.
- *
- * THE CHROME IS `NavigationShell` NOW, MOUNTED HERE — see
- * `settings-family-page-policy.integration.test.tsx` for why: this
- * application's own settings layout, which drew a duplicate of
- * `NavigationShell`'s own sidebar, is deleted.
- *
  * Spec: specs/audit-log/audit-log.feature
  */
 

@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration test for issue #3363: Quick Run no-navigation invariant.
- *
- * Pins that SimulationsPage's useRunSuite({ onRunScheduled }) callback does
- * NOT navigate after a run is scheduled — the user stays wherever they were
- * (All Runs, a different suite's detail, or the same suite's detail).
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/quick-run-stay-in-place.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -75,11 +69,6 @@ const routerQueryPath = vi.hoisted(() => ({
 
 /**
  * Hoisted spy on the suites.getSummaries cache invalidator.
- *
- * Pins the *trigger* AC4 depends on: dropping the navigation must not also drop
- * the invalidation, or the sidebar row would never refresh. AC4's rendered
- * outcome (status icon + last-run timestamp) is not asserted here — the sidebar
- * is not rendered from live summaries in this test. Tracked in #5602.
  */
 const mockGetSummariesInvalidate = vi.hoisted(() => vi.fn());
 
@@ -368,11 +357,6 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
 
   /**
    * AC6 regression guard — positive invariant.
-   *
-   * The Save-and-Run flow (handleRunRequested registered via setFlowCallbacks)
-   * MUST still navigate to the suite detail page. This is the OPPOSITE of the
-   * no-nav invariant above: we are guarding against a future change that
-   * accidentally widens the no-nav fix to cover this drawer flow too.
    */
   describe("given the suite editor drawer is open", () => {
     describe("when Save and Run fires for a saved suite (AC6 regression guard)", () => {
@@ -426,11 +410,6 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
 
   /**
    * AC8 — opt-in "View run" navigation.
-   *
-   * The page must wire useRunSuite's onViewRun option to navigation so the
-   * success toast's "View run" action lands the user on the run plan detail
-   * page. This is the explicit, user-initiated counterpart to the no-auto-nav
-   * invariant above: navigation only happens when onViewRun is invoked.
    */
   describe("given a scheduled run for the suite with slug 'target-suite-slug'", () => {
     describe("when the View run toast action fires for a scheduled run", () => {

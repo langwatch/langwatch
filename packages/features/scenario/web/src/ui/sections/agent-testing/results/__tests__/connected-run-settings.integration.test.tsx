@@ -1,9 +1,6 @@
 /**
+ * What the run settings say about a connected agent target: the environment it ran in, and the instance that served it.
  * @vitest-environment jsdom
- *
- * What the run settings say about a connected agent target: the environment
- * it ran in, and the instance that served it.
- *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 

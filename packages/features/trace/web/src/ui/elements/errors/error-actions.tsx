@@ -7,10 +7,6 @@ export interface ErrorActionsProps {
   docsUrl?: string;
   /**
    * The trace id, offered as a copyable support handle.
-   *
-   * This is the ONLY technical detail a customer sees. Raw `meta` and the
-   * reason chain stay server-side — they're for agents and logs, not people
-   * (ADR-045).
    */
   traceId?: string;
   /**
@@ -24,10 +20,6 @@ export interface ErrorActionsProps {
 
 /**
  * The footer of an error: read the docs, copy the id to hand to support.
- *
- * Shared by the error toast and the inline alert so both offer the same
- * affordances — the only difference between the two surfaces should be where
- * they sit, not what they let you do.
  */
 export function ErrorActions({
   docsUrl,

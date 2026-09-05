@@ -1,10 +1,5 @@
 /**
  * Which projects a dataset may be replicated into.
- *
- * The rules the platform dialog reached `~/server/api/rbac` for, rebuilt over
- * `@langwatch/authz-contract`. What is pinned here is the FALLTHROUGH ORDER a
- * membership row is read in — a custom role's own list, then the built-in team
- * role — and the two shapes that decide whether a project is offered at all.
  */
 
 import { describe, expect, it } from "vitest";

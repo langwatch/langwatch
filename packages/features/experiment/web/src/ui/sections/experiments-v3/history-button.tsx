@@ -1,12 +1,5 @@
 /**
  * HistoryButton - Navigate to evaluation results
- *
- * Shows a button in the V3 workbench header that links to the experiment
- * results page showing all stored past runs.
- *
- * Enabled when:
- * - User has run an evaluation this session, OR
- * - There are existing runs from a previous session (checked on page load)
  */
 import { Button } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";

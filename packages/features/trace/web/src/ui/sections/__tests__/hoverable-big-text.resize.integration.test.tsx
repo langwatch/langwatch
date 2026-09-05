@@ -1,12 +1,6 @@
 /**
+ * HoverableBigText only offers its tooltip and its expand dialog once it has measured itself as clipped.
  * @vitest-environment jsdom
- *
- * HoverableBigText only offers its tooltip and its expand dialog once it has
- * measured itself as clipped. The measurement runs after a render, and a
- * browser window resize causes no render, so a box that narrows underneath the
- * component keeps whatever answer the last render left behind: text clamps but
- * the tooltip stays disabled, and the hidden half becomes unreachable.
- *
  * Spec: specs/components/hoverable-big-text-overflow.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -119,12 +113,6 @@ describe("HoverableBigText overflow measurement", () => {
         resizeBox({ box });
 
         // The scenario asks for the full text on hover as well as on click.
-        // Hover is the tooltip, and the tooltip is disabled until the component
-        // measures itself as clipped — disabled means the wrapper renders the
-        // bare text with no trigger wiring at all, so becoming a trigger IS the
-        // affordance appearing. Asserted on the wiring rather than by hovering
-        // because the tooltip opens on a 420ms delay through a portal that
-        // jsdom cannot position.
         const clipped = screen.getByText(TEXT);
         expect(clipped).toHaveAttribute("data-scope", "tooltip");
         expect(clipped).toHaveAttribute("data-part", "trigger");

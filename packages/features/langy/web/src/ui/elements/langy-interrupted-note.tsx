@@ -1,11 +1,6 @@
 /**
- * The note an activity card wears when the turn ended while the call was still
- * open — Stop was pressed, or the turn died.
- *
- * Without it such a card kept the running shell forever: a stopped trace search
- * still said "Searching traces…" with a live pulse and a shimmer, hours after
- * the turn ended, so the panel claimed work that nothing was doing. The card
- * keeps everything it had already found and states what happened to it.
+ * The note an activity card wears when the turn ended while the call was still open —
+ * Stop was pressed, or the turn died.
  */
 import { Text } from "@chakra-ui/react";
 

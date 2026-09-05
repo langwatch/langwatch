@@ -1,11 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for full-width borderless run history tables.
- *
- * Tests that RunRow and GroupRow headers have sticky positioning
- * and that the structure enables sticky to work within the scroll container.
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/grid-view-and-borderless-tables.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

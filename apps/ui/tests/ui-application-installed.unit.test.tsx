@@ -1,14 +1,5 @@
 /**
  * The application a composing host actually gets from `@langwatch/ui`.
- *
- * `ui/sections/ui-application` composes whatever it is handed; the package
- * entry installs what this package serves itself first. The distinction is the
- * whole point of the governance move: `platform/app`'s shell adapter registers
- * no governance loader any more, and must not have to, because the eleven keys
- * the route table names are answered from here.
- *
- * A host registry that does not cover the table would otherwise throw at boot
- * by name — which is the failure this file proves does not happen.
  */
 
 import type { ReactNode } from "react";

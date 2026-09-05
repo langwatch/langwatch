@@ -1,17 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * A rejected mutation, from the wire to the words on screen.
- *
- * The unit tests pin the resolution rules; this one pins that they are what a
- * reader actually gets. A screen's `onError` hands the raw error to the
- * feedback capability and names the action, and what appears is the client
- * presentation registry's copy for that CODE — not the screen's fallback, and
- * emphatically not the wire message, which since #5984 is the slug
- * `service_unavailable` (ADR-045, amendment 2026-07-21).
- *
- * It renders the real toaster, so the copy is asserted where a customer reads
- * it rather than on the object handed to it.
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

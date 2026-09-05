@@ -1,10 +1,6 @@
 /**
- * Warms the run detail drawer's getRunState query on hover/focus so the
- * drawer opens with data already in the cache instead of a loading state.
- *
- * The short staleTime stops the drawer from immediately re-fetching what the
- * prefetch just loaded within the hover→click window; after that the drawer's
- * own status-gated polling takes over.
+ * Warms the run detail drawer's getRunState query on hover/focus so the drawer opens
+ * with data already in the cache instead of a loading state.
  */
 
 import { useCallback } from "react";

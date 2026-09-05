@@ -1,16 +1,6 @@
 /**
- * Flatten the rendered conversation into the ordered timeline the choices
- * lock derivation reads (ADR-060 §6) — event order and NOTHING else. Because
- * it derives from whatever message list is being displayed, time travel gets
- * the right answer for free: scrub before the selection and the question is
- * open, scrub past it and the card is locked.
- *
- * Per message, in conversation order:
- *   - an assistant message contributes a `question` entry per choices block
- *     it carries (its OWN prose never supersedes its own question);
- *   - a user message carrying selection parts contributes those selections
- *     (its "Chose: X" text is part of the answer, not a second exchange);
- *   - any other message contributes one `message` entry.
+ * Flatten the rendered conversation into the ordered timeline the choices lock
+ * derivation reads (ADR-060 §6) — event order and NOTHING else.
  */
 import {
   type LangyChoicesTimelineEntry,
@@ -29,17 +19,7 @@ interface MessageLike {
 }
 
 /**
- * The choices blocks an UNSTAMPED assistant message renders — the copy this
- * browser streamed, whose fences the relay never got to stamp for it (see
- * `langyAnswerSegmentsFromText`). The timeline has to see exactly what the
- * renderer draws: a question the reader can see but that never reached the
- * timeline derives as "never recorded", so the card renders permanently
- * closed and the reader watches Langy ask a question it will not accept an
- * answer to.
- */
-/**
- * Pushes one timeline entry per question-tool card in `part` (see
- * `langyQuestionTool.ts`) and reports whether it pushed at least one.
+ * The choices blocks an UNSTAMPED assistant message renders — the copy this browser streamed, whose fences the relay never got to stamp for it (see `langyAnswerSegmentsFromText`).
  */
 function pushQuestionToolCards(part: unknown, timeline: LangyChoicesTimelineEntry[]): boolean {
   let pushedAny = false;

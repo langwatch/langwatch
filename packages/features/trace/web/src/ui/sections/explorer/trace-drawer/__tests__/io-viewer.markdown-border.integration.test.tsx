@@ -1,11 +1,7 @@
 /**
+ * Round 5: the rendered-Markdown view in the I/O viewer must sit in the same bordered
+ * "bg.subtle + border" container that Pretty uses for plain text and JSON.
  * @vitest-environment jsdom
- *
- * Round 5: the rendered-Markdown view in the I/O viewer must sit in the same
- * bordered "bg.subtle + border" container that Pretty uses for plain text and
- * JSON. Previously it painted flush — bare prose floating in the pane next to
- * Pretty's tidy box. This test toggles into Markdown and asserts the body is
- * wrapped in a bordered container, by executing the real render path.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

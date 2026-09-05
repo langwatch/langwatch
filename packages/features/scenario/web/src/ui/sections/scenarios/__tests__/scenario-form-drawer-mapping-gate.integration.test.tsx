@@ -1,15 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the mapping gate in ScenarioFormDrawer.
- *
- * Verifies that:
- * - Clicking Save & Run with a workflow agent that has no mappings opens the
- *   AgentWorkflowEditorDrawer instead of starting the run.
- * - Clicking Save & Run with a workflow agent that has incomplete (invalid)
- *   mappings also opens the drawer.
- * - Clicking Save & Run with a non-workflow agent (code) proceeds normally.
- *
+ * @vitest-environment jsdom
  * @see specs/features/scenarios/workflow-agent-mapping-layer.feature
  */
 

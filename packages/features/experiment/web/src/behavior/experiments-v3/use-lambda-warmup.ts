@@ -8,17 +8,6 @@ const WARMUP_INTERVAL_MS = 30_000; // Send warmup every 30 seconds
 
 /**
  * Hook that silently warms up AWS Lambda instances used by langwatch_nlp.
- *
- * In production, langwatch_nlp runs in per-user AWS Lambdas that need to be warmed up.
- * This hook sends periodic health check requests to keep lambdas warm, improving
- * response times when the user runs evaluations.
- *
- * The number of parallel warmup requests is based on the concurrency setting:
- * - Sends half of the concurrency setting (rounded down)
- * - Minimum of 1 request
- * - This helps keep multiple lambda instances warm for parallel execution
- *
- * The actual parallel requests are sent by the backend, not the frontend.
  */
 export const useLambdaWarmup = () => {
   const { project } = useOrganizationTeamProject();

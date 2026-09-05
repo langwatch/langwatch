@@ -23,59 +23,25 @@ export type BrowserQAOptions = Partial<BrowserQACheck>;
  */
 export type RunOptions = BrowserQAOptions & {
   /**
-   * Runs after a transient infrastructure failure and before the replay,
-   * so a scenario can rebuild the world state its script consumes.
-   *
-   * The motivating case is deletion: the first attempt can delete its target
-   * and THEN hit a dead worker, leaving the replay asking Langy to delete
-   * something that no longer exists — a judge failure for work that actually
-   * succeeded. Such a scenario re-seeds here and returns the new target.
+   * Runs after a transient infrastructure failure and before the replay, so a scenario
+   * can rebuild the world state its script consumes.
    */
   beforeRetry?: () => Promise<void>;
 };
 
 /**
- * Drop-in wrapper around `scenario.run` that, after the run completes:
- *  1. Runs a browser-QA pass (see browser-qa.ts) — a third, independent check
- *     against the real product surface, on top of the judge's verdict on the
- *     conversation. Every scenario gets one, even with no `browserQA` arg:
- *     that default is a pure evidence screenshot of the project home.
- *  2. Writes the full conversation transcript + judge reasoning + verdict +
- *     browser-QA result to `scenario-logs/<vitest-test-name-slug>.md`. The
- *     slug comes from `expect.getState().currentTestName` so each it() lands
- *     in its own file regardless of how the run is named internally.
- *
- * Neither the browser-QA pass nor the log write can crash the scenario
- * result itself — the judge verdict is what the suite asserts on, and a
- * verification aid or a disk write should never mask a real pass/fail.
- *
- * Takes named parameters (`{ config, ... }`) per the house rule in CLAUDE.md.
- * `config` is passed straight through to `scenario.run`, so it stays a single
- * nested object rather than being spread into loose fields.
+ * Drop-in wrapper around `scenario.run` that, after the run completes: 1. Runs a
+ * browser-QA pass (see browser-qa.ts) — a third, independent check against the real
+ * product surface, on top of the judge's verdict on the conversation.
  */
 export async function runScenarioAndLog({
   config,
   beforeRetry,
   ...browserQAOptions
 }: { config: RunConfig } & RunOptions): Promise<Result> {
-  // Two transients get one retry, both infrastructure rather than agent
-  // behaviour: langy_worker_stopped (the worker died mid-reply, server-side
-  // recovery already exhausted — the panel offers the user a retry too), and a
-  // turn that never settled because the conversation lock was still held or the
-  // machine was too loaded to answer inside the adapter's retry budget.
-  // Judge verdicts never come through here — a scenario that FAILS its criteria
-  // returns normally and is not retried.
-  //
-  // The retry replays the WHOLE scenario, and the worker can die after Langy
-  // finished a create. So every scenario reaching this helper has to tolerate
-  // its writes happening twice: the platform accepts a repeated name and gives
-  // it a fresh id, and each Layer 2 check reads back the resource it asked for
-  // rather than counting how many appeared. A scenario whose write cannot be
-  // repeated must not run through here WITHOUT a `beforeRetry` that rebuilds
-  // the state the script consumes — that hook is what makes a deletion
-  // scenario replay-safe, by re-seeding the victim the first attempt removed.
-  // The adapter marks both on the error it throws, so this reads a flag rather
-  // than looking for a code inside prose that is free to be reworded.
+  // Two transients get one retry, both infrastructure rather than agent behaviour: langy_worker_stopped (the worker died mid-reply,
+  // server-side recovery already exhausted — the panel offers the user a retry too), and a turn that never settled because the
+  // conversation lock was still held or the machine was too loaded to answer inside the adapter's retry budget.
   let result: Result;
   try {
     result = await scenario.run(config);

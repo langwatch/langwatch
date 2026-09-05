@@ -39,13 +39,8 @@ export interface TraceDrawerContentProps {
 }
 
 /**
- * Everything inside the trace drawer that is actually *about the trace* —
- * header, panes, conversation, switch overlay. Deliberately free of drawer
- * chrome (Drawer.Root/Content/Body, resize rail, width, close), so the same
- * surface renders both in the drawer and full-page on `/share/<token>`.
- *
- * The host supplies the container: a `position: relative`, non-scrolling flex
- * column. Every section inside owns its own scroll viewport.
+ * Everything inside the trace drawer that is actually *about the trace* — header,
+ * panes, conversation, switch overlay.
  */
 export function TraceDrawerContent({
   traceId,
@@ -69,19 +64,8 @@ export function TraceDrawerContent({
   // same-trace live update leaves this false so the surface doesn't flash.
   const showSwitchOverlay = useTraceSwitchOverlay({ traceId, isLoading });
 
-  // The open trace offers itself to Langy — the HEADER is the target,
-  // deliberately not the whole surface. A surface-wide target would swallow
-  // every click inside it while Langy was open (tabs, spans, the waterfall),
-  // turning a working surface into one big button. The header strip is the
-  // trace's name plate: a small, safe place to point at, and it leaves the body
-  // untouched.
-  //
-  // Langy already derives a `trace:<id>` chip from `drawer.traceId` in the URL,
-  // and this target mints the SAME chip id — so it renders as already-in-context
-  // the moment the drawer opens, and clicking it takes the trace back out.
-  //
-  // `null` for share viewers: Langy is an authenticated in-app affordance, and
-  // the read-only share surface carries no session to act on it. See ADR-057.
+  // The open trace offers itself to Langy — the HEADER is the target, deliberately not
+  // the whole surface.
   const langyTrace = useLangyContextTarget(
     trace && !readOnly ? traceContextChip(trace.traceId, trace.traceName || trace.name) : null,
   );
@@ -111,12 +95,7 @@ export function TraceDrawerContent({
             // white, so only the header strip is translucent.
             bg="bg.panel/70"
             backdropFilter="blur(20px) saturate(150%)"
-            // An `outline` follows the element's OWN border-radius. This strip
-            // had none — it's the surface body (radius `lg`, overflow hidden)
-            // that rounds it — so Langy's outline drew square corners straight
-            // across the rounded chrome. Matching the radius here is a visual
-            // no-op when Langy is closed (the parent already clips to exactly
-            // this shape) and makes the outline hug the corner when it's open.
+            // An `outline` follows the element's OWN border-radius.
             borderTopRadius="lg"
             {...langyTrace.targetProps}
           >
@@ -200,10 +179,9 @@ export function TraceDrawerContent({
 }
 
 /**
- * Trace-switch refresh overlay: a translucent blurred scrim with a spinner that
- * covers the whole body while moving from one trace to another. The caller only
- * renders it on a genuine A→B switch (never on a same-trace live update).
- * `pointerEvents="none"` so it never traps clicks.
+ * Trace-switch refresh overlay: a translucent blurred scrim with a spinner that covers
+ * the whole body while moving from one trace to another. The caller only renders it on
+ * a genuine A→B switch (never on a same-trace live update).
  */
 function TraceSwitchOverlay() {
   return (
@@ -232,13 +210,9 @@ function TraceSwitchOverlay() {
 }
 
 /**
- * Conversation-view branch. In-app only — the caller gates it behind
- * `!readOnly` (it fetches session-backed reads); this component owns just its
- * error boundary and the room the conversation fills.
- *
- * The scroll belongs to the turns list inside the conversation, which is also
- * what the annotation rail measures itself against. A second scroller here
- * would trap one inside the other and leave that measurement ambiguous.
+ * Conversation-view branch. In-app only — the caller gates it behind `!readOnly` (it
+ * fetches session-backed reads); this component owns just its error boundary and the
+ * room the conversation fills.
  */
 function ConversationModePane({
   conversationId,
@@ -260,10 +234,9 @@ function ConversationModePane({
 }
 
 /**
- * Summary-view branch: the same conversation-context strip the Trace view
- * renders (via PaneLayout) so multi-turn context isn't lost when reading the
- * summary, above the summary accordions. Shares the store-backed collapse
- * state, so collapsing the strip in one view collapses it in both.
+ * Summary-view branch: the same conversation-context strip the Trace view renders (via
+ * PaneLayout) so multi-turn context isn't lost when reading the summary, above the
+ * summary accordions.
  */
 function SummaryModePane({ trace, spanTree }: { trace: TraceHeader; spanTree: SpanTreeNode[] }) {
   const ctxPaneState = useDrawerStore((s) => s.paneState.conversationContext);
@@ -309,10 +282,9 @@ function SummaryModePane({ trace, spanTree }: { trace: TraceHeader; spanTree: Sp
 }
 
 /**
- * Session-usage branch (coding-agent traces): counters, cost, and outcome for
- * the agent session this trace belongs to. In-app only — the caller gates it
- * behind `!readOnly`, and the project hook lives here so the share page never
- * mounts it.
+ * Session-usage branch (coding-agent traces): counters, cost, and outcome for the agent
+ * session this trace belongs to. In-app only — the caller gates it behind `!readOnly`,
+ * and the project hook lives here so the share page never mounts it.
  */
 function SessionModePane({ trace }: { trace: TraceHeader }) {
   const { projectId } = useTraceQueryArgs();

@@ -1,11 +1,5 @@
 /**
- * Drift guard between the CLI's real command surface and the capability
- * catalog. The CLI's `program.ts` is the ground truth for which resources
- * exist; the catalog is the panel's view binding for them. This test fails —
- * with a readable list, not a count — when either side has something the
- * other doesn't, so a new CLI resource cannot ship without a card and a dead
- * catalog row cannot linger.
- *
+ * Drift guard between the CLI's real command surface and the capability catalog.
  * @see specs/langy/langy-capability-cards.feature
  */
 import { DIGEST_STRATEGIES } from "@langwatch/langy-contract";
@@ -20,12 +14,9 @@ const CLI_PROGRAM_PATH = fileURLToPath(
 );
 
 /**
- * Top-level commands that deliberately have NO catalog entry. Each is a CLI
- * utility a result card would be meaningless for — none of them read or write
- * a platform resource a user could open a surface on.
- *
- * Keep it in sync with PLUMBING_COMMANDS in the SDK's
- * `cli/utils/commandCatalog.ts` (the mirror of this list).
+ * Top-level commands that deliberately have NO catalog entry. Each is a CLI utility a
+ * result card would be meaningless for — none of them read or write a platform resource
+ * a user could open a surface on.
  */
 const EXCLUDED_COMMANDS = new Set([
   // Auth/session plumbing: acts on the CLI's own credentials, not on a
@@ -82,10 +73,9 @@ const EXCLUDED_COMMANDS = new Set([
 ]);
 
 /**
- * The top-level resource words the CLI registers: every
- * `program.command("<word> …")`, whether registered inline or via
- * `const xCmd = program\n  .command(…)`. Sub-commands are registered on the
- * sub-command objects and deliberately not matched.
+ * The top-level resource words the CLI registers: every `program.command("<word> …")`,
+ * whether registered inline or via `const xCmd = program\n .command(…)`. Sub-commands
+ * are registered on the sub-command objects and deliberately not matched.
  */
 function cliTopLevelCommands(): Set<string> {
   const source = readFileSync(CLI_PROGRAM_PATH, "utf-8");

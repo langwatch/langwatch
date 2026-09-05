@@ -6,17 +6,9 @@ import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
 const MotionText = motion.create(Box);
 
 /**
- * The calm line Langy shows while it is RECOVERING a failed turn — a deploy
- * interrupted it, the manager was busy, the connection dropped — and is about
- * to re-drive the turn on its own.
- *
- * Deliberately the SAME visual language as the thinking indicator (13px,
- * shimmering, no avatar, no chrome): recovering is Langy still working, not
- * Langy failing. A red card here would tell the user something is broken and
- * ask them to act, when nothing is broken and they need do nothing. The card is
- * held back until the recovery policy has actually run out of attempts.
- *
- * Reduced motion: drop the sweep, keep the static gradient and the text swap.
+ * The calm line Langy shows while it is RECOVERING a failed turn — a deploy interrupted
+ * it, the manager was busy, the connection dropped — and is about to re-drive the turn
+ * on its own.
  */
 export function LangyRecoveringLine({ message }: { message: string }) {
   const reduceMotion = useReducedMotion();

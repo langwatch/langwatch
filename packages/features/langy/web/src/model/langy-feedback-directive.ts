@@ -1,19 +1,5 @@
 /**
  * Structured, hidden directive channel for Langy (ADR-046 frontend).
- *
- * Langy emits hidden in-stream directives the client parses and strips from the
- * displayed text — the same pattern the codebase already uses for
- * `[langy:connect-github]` and `[langy:progress:...]`. This one lets a cheap
- * model on the agent side decide the *moment* to ask for feedback and signal it
- * as `[langy:feedback:<sentiment>]`, so we ask at high-signal times (a clearly
- * great answer, or an obviously rough one) instead of nagging under every reply.
- *
- * WHEN to ask on the default (non-directive) path is the backend's call: the
- * `langy.messages` read carries an `shouldAskFeedback` flag computed by
- * `LangyService.shouldAskFeedback` (conversation depth + a per-user quiet period),
- * and the panel reports the card being shown back through
- * `langy.feedbackPromptShown` so the cadence holds across tabs and devices.
- * Nothing here keeps client-side timing state.
  */
 
 export type LangyFeedbackSentiment = "frustrated" | "delighted" | "neutral";
@@ -62,13 +48,6 @@ export function parseLangyFeedbackDirective(text: string): LangyFeedbackDirectiv
 
 /**
  * Substance floor for the DEFAULT (non-directive) feedback ask.
- *
- * The real "when to ask" decision belongs to Langy's agent-side cheap model,
- * which emits `[langy:feedback]` at a high-signal moment. This is not that — it
- * is only a floor for the throttled backstop path, so we never rate a bare
- * one-word ack ("done", "dev server works") when no directive arrived. It is a
- * content check, deliberately NOT a message-count or turn-index rule. ~55 chars
- * is roughly a full sentence — below that it reads as an ack, not an answer.
  */
 const SUBSTANTIVE_ANSWER_MIN_CHARS = 55;
 

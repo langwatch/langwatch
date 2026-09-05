@@ -9,27 +9,15 @@ const BETA_TOOLTIP =
   "Save the current columns, sort, and filter as a lens. Lenses sync to your account; team-shared lenses are coming.";
 
 /**
- * Lens creation entry point — single path: type a name, snapshot the
- * current table state. Shares the `LensNamePopover` name-entry UI with
- * every other save-as-new site (Toolbar Save Lens, lens-tab menus), so
- * the input + trim + Enter/Escape behaviour lives in exactly one place.
- * The "Configure columns, sort, and more…" link (and its
- * LensConfigDialog) were retired in Round 3 — columns are managed
- * inline on the sidebar tab, sort is the column-header click everyone
- * already knows. Lens-creation lands in `viewStore.createLens`, which
- * persists the new lens to localStorage and switches the active tab.
+ * Lens creation entry point — single path: type a name, snapshot the current table
+ * state.
  */
 export const CreateLensButton: React.FC = () => {
   const createLens = useViewStore((s) => s.createLens);
 
   return (
-    // Tooltip wraps a Box that *contains* the Popover instead of
-    // wrapping the PopoverTrigger directly. Both the tooltip and popover
-    // forwarding refs through the same `asChild` slot made Zag's
-    // positioner lose the anchor (popover rendered top-left, or not at
-    // all). Separating the ref chains via a Box host means Tooltip gets
-    // the Box and the LensNamePopover trigger gets the Button, so each
-    // finds its anchor cleanly.
+    // Tooltip wraps a Box that *contains* the Popover instead of wrapping the
+    // PopoverTrigger directly.
     <Tooltip
       content={BETA_TOOLTIP}
       positioning={{ placement: "bottom" }}

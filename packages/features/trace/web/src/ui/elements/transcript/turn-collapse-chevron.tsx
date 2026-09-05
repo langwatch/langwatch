@@ -2,13 +2,9 @@ import { chakra, Icon } from "@chakra-ui/react";
 import { LuChevronUp } from "react-icons/lu";
 
 /**
- * Caret used by expanded turn rows to collapse the turn back to its
- * one-line summary. Sits inline with the role chip inside the turn's
- * own header so we don't need to render a duplicate header row above
- * the body just to host a collapse affordance.
- *
- * Points ↑ per operator spec — collapsed rows render ↓ ("click to open
- * downward"), expanded rows render ↑ ("click to close upward").
+ * Caret used by expanded turn rows to collapse the turn back to its one-line summary.
+ * Sits inline with the role chip inside the turn's own header so we don't need to
+ * render a duplicate header row above the body just to host a collapse affordance.
  */
 export function TurnCollapseChevron({ onClick }: { onClick: () => void }) {
   return (

@@ -1,14 +1,5 @@
 /**
  * Integration tests for stalled scenario run visual treatment.
- *
- * Verifies that STALLED status maps to warning-colored visual treatment
- * across the status->visual mapping functions used by ScenarioRunStatusIcon,
- * StatusDisplay, and SimulationStatusOverlay.
- *
- * These tests verify the exported helper functions that drive component rendering.
- * Component rendering tests are blocked by a missing @testing-library/dom peer
- * dependency (pre-existing environment issue, not introduced by this feature).
- *
  * @see specs/scenarios/stalled-scenario-runs.feature - UI Display integration scenarios
  */
 import { describe, expect, it } from "vitest";
@@ -21,9 +12,6 @@ import { STATUS_DISPLAY_TEXT_MAP } from "../../../../index";
 // @see specs/scenarios/stalled-scenario-runs.feature lines 84-89
 // ============================================================================
 // Note: getIconAndColor() is tested indirectly via ScenarioRunStatusIcon.
-// The exhaustive switch in that file guarantees compile-time safety.
-// Direct function testing would require exporting a private function.
-// The exhaustive switch pattern IS the compile-time guarantee.
 
 // ============================================================================
 // StatusDisplay - STALLED text with warning color

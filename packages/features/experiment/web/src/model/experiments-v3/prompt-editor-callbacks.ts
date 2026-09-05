@@ -1,9 +1,5 @@
 /**
  * Helper to create type-safe prompt editor callbacks for experiments-v3.
- *
- * This ensures we never forget a required callback when opening the prompt editor
- * for a target. If we add a new callback that all experiments-v3 flows need,
- * we add it here and TypeScript will enforce it everywhere.
  */
 
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
@@ -85,23 +81,6 @@ export type PromptEditorCallbacksForTarget = {
 
 /**
  * Creates the standard set of prompt editor callbacks for a target in experiments-v3.
- *
- * This helper ensures we always set up all required callbacks consistently.
- * If you need to add a new callback that all experiments-v3 flows need,
- * add it here and TypeScript will enforce it everywhere.
- *
- * @example
- * ```ts
- * const callbacks = createPromptEditorCallbacks({
- *   targetId,
- *   updateTarget,
- *   setTargetMapping,
- *   removeTargetMapping,
- *   getActiveDatasetId: () => useEvaluationsV3Store.getState().activeDatasetId,
- *   getDatasets: () => useEvaluationsV3Store.getState().datasets,
- * });
- * setFlowCallbacks("promptEditor", callbacks);
- * ```
  */
 export const createPromptEditorCallbacks = ({
   targetId,

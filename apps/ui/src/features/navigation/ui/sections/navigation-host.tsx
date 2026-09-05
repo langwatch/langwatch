@@ -348,12 +348,7 @@ export function NavigationHostSection({
       // this application does not carry it, so the Support menu offers the
       // community and documentation entries and no "Chat with a human".
       supportChat: () => null,
-      // NOTHING ADDED TO THE ACCOUNT DROPDOWN YET. The three things the
-      // platform menu put there are all other halves' property: the
-      // experiments dialog is `@langwatch/feature-flag-web`, the
-      // impersonation banner and switch-back entry are `@langwatch/ops-web`,
-      // and the reduced-graphics override is a `platform/app` store. Each
-      // becomes a node here when its family is composed on this side.
+      // NOTHING ADDED TO THE ACCOUNT DROPDOWN YET.
       accountMenu: () => null,
     }),
     [

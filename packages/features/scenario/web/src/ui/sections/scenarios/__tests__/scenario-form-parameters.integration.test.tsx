@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The scenario editor declares parameters: the footer names them and opens
- * their editor, rows round-trip through the scenario being saved, an existing
- * scenario's declarations prefill them, and a name outside the identifier
- * grammar is refused where it was typed instead of failing silently on save.
- *
  * @see specs/scenarios/scenario-run-parameters.feature
  * @see specs/scenarios/secret-run-parameters.feature
  */

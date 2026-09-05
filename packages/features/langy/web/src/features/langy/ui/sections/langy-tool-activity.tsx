@@ -1,29 +1,5 @@
 /**
  * Tool-call activity for an assistant turn. Everything here is a CARD.
- *
- * The Langy worker streams its CLI/tool calls into the assistant message as
- * AI-SDK tool parts (`tool-<name>` / `dynamic-tool`, each with a `state`). A
- * call takes one of three routes, and the routes are exclusive:
- *
- *   1. A call that IS a LangWatch capability is a card for its whole life —
- *      {@link LangyCapabilityPendingCard} while it runs, the bespoke settled
- *      card once its output lands. Note "IS", not "is named": a bare `bash`
- *      running `langwatch trace search` counts, because `partToolName`
- *      normalises it first. Before that normalisation existed, no CLI call ever
- *      reached a capability card at all — they all fell through to (2).
- *   2. Anything else collapses into an ACTIVITY CARD, labelled by what it is
- *      DOING (`describeToolCall`, read off the call's input) rather than by the
- *      tool it happens to be. That is the difference between "Searching traces"
- *      and "Coding", and between "Using the GitHub skill" and "Skill".
- *   3. A call whose output is a staged proposal belongs to ProposalCard, and
- *      GitHub git/gh milestones ride LangyGitHubProgressCard — both are
- *      surfaced elsewhere and skipped here.
- *
- * The raw JSON is DEVELOPER MODE ONLY (`useLangyDevMode`) — a normal user never
- * sees a `{}` affordance, whatever the tool.
- *
- * Kept in its own component (not inside MessageContent) so the shared turn
- * renderer stays a single insertion point.
  */
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
@@ -77,16 +53,6 @@ const dotPulse = keyframes`
 
 /**
  * The old label table lived here. It is gone.
- *
- * It mapped a tool's NAME to a word — `bash` → "Coding", and anything unmapped
- * to a humanised version of its own name, which is how opencode's `skill` tool
- * produced a card reading "SKILL / Skill". Both were the same mistake: naming
- * the mechanism where the act belongs. A `bash` running `langwatch trace search`
- * is not "Coding"; it is searching traces, and the command said so all along.
- *
- * Every label now comes from `describeToolCall` (logic/langy-tool-label.ts), which
- * reads the tool's INPUT — the command, the skill, the path. One mapping, no
- * per-tool branches in this file.
  */
 
 type ToolPartLike = {
@@ -118,10 +84,6 @@ const FAILED_STATES = new Set(["output-error", "output-denied"]);
 
 /**
  * The concrete thing a call is acting on, pulled off its input.
- *
- * (The old `detailForInput` lived here. It is gone: reading the input is now
- * `describeToolCall`'s job, alongside deciding what the call is CALLED, because
- * the two answers come from the same field and drifted apart when they didn't.)
  */
 
 /** A single tool call, kept for the raw / developer-mode JSON view. */
@@ -145,10 +107,7 @@ export type ActivityGroup = {
   /** @see Sequenced */
   order: number;
   /**
-   * The part index of the group's LATEST call. `order` anchors the group where
-   * its first call ran; this says how recently it was active — which is what
-   * decides whether it is the turn's freshest settled work (see the held card
-   * in {@link LangyActivityParts}).
+   * The part index of the group's LATEST call.
    */
   lastOrder: number;
 };
@@ -162,16 +121,8 @@ export type FailedToolCall = {
 };
 
 /**
- * WHERE in the turn a rendered block belongs — the index of the earliest tool
- * part that feeds it.
- *
- * Every reader below walks the parts in order, so each block already knows the
- * first part it came from; what was missing was anything that USED that. The
- * render grouped by kind instead — every failure, then every running group, then
- * the completed receipt, then the capability cards — so a failure on the last
- * call of a turn drew ABOVE the summary of the three calls that preceded it, and
- * the transcript said the turn broke before it said anything ran. A turn is a
- * sequence of events; the panel has to read like one.
+ * WHERE in the turn a rendered block belongs — the index of the earliest tool part that
+ * feeds it.
  */
 export type Sequenced = { order: number };
 
@@ -185,18 +136,7 @@ function rawToolName(part: ToolPartLike): string | undefined {
 }
 
 /**
- * The name a part should be TREATED as — the single entry point for every
- * reader below.
- *
- * The server's CLI envelope types `bash("langwatch trace search")` as
- * `langwatch.trace.search`, but only on the durable event; the tool part the
- * BROWSER receives is still a bare `bash`. So the capability registry never saw
- * a capability, no capability card ever rendered for a CLI call, and the frame
- * fell through to a generic activity card labelled "Coding".
- *
- * Normalising here fixes all of it at once: a shell call carrying a LangWatch
- * command becomes the command it is, and every mapping downstream — settled
- * card, pending card, activity label — lights up on its own.
+ * The name a part should be TREATED as — the single entry point for every reader below.
  */
 function partToolName(part: ToolPartLike): string | undefined {
   const raw = rawToolName(part);
@@ -218,17 +158,6 @@ function partToCall(part: ToolPartLike, name: string): CapabilityToolCall {
 
 /**
  * A line that ANNOUNCES a failure — anchored to the start of one on purpose.
- *
- * The markers used to be matched anywhere in the payload, which made the phrase
- * enough: a SUCCESSFUL `bash` whose stdout merely mentioned it — `grep -rn
- * "failed to" src/`, a tailed log, a test-runner summary — drew a red error
- * card AND was dropped from the activity groups, so a step that worked was
- * reported broken and never appeared in the completed receipt. The CLI prints
- * its own failures at the head of a line; a line that only QUOTES one does not.
- *
- * Anchoring narrowed that; it did not close it, because a tailed log prints its
- * own lines at the head of a line too. So this only ever runs against the CLI's
- * own console — see {@link cliConsoleTextOf}.
  */
 const CLI_FAILURE_LINE = /^[\s>]*(?:✖|failed to\b|request failed\b|self_signed_cert_in_chain\b)/im;
 
@@ -243,29 +172,8 @@ function outputText(output: unknown): string | undefined {
 }
 
 /**
- * The CONSOLE of a call that came through the CLI ENVELOPE — the
- * `{ kind: "text", text }` result. `null` for anything else, and that is the
- * whole point of the function.
- *
- * Takes the ALREADY-PARSED document rather than the part: the envelope travels
- * as a JSON string, and the caller has to parse that string anyway to look for
- * a handled-failure document. Re-parsing it here meant a second full
- * balanced-brace scan of every multi-KB CLI result, per failing part, on every
- * uncached read.
- *
- * Unwrapping is what makes line anchoring mean anything: inside that JSON
- * string every newline is an escaped `\n`, so the whole console reads as one
- * line and no marker is ever at the start of it.
- *
- * Returning `null` rather than the raw string is what keeps prose sniffing off
- * an ordinary shell call. `bash("tail -n 20 /var/log/app.log")` exits 0, its
- * stdout is not JSON, and the server's envelope passes a non-LangWatch command
- * through untouched (`langy-cli-envelope.service.ts` — it only wraps output as
- * `{kind:"text"}` for a parsed `langwatch …` invocation). So the only thing
- * behind that call is a wall of somebody else's log lines, and "failed to
- * connect to redis, retrying" in it is a fact ABOUT the log, never a report
- * about the command. Reading it drew a red error card for a step that worked
- * and dropped that step from the completed receipt.
+ * The CONSOLE of a call that came through the CLI ENVELOPE — the `{ kind: "text", text
+ * }` result. `null` for anything else, and that is the whole point of the function.
  */
 function cliConsoleTextOf(document: unknown): string | null {
   if (!document || typeof document !== "object" || Array.isArray(document)) {
@@ -276,17 +184,9 @@ function cliConsoleTextOf(document: unknown): string | null {
 }
 
 /**
- * Some CLI adapters finish a call with `output-available` even when the command
- * itself reported a handled failure. Treat the rendered CLI failure as the
- * source of truth: it must never receive the green capability receipt.
- *
- * Structure first, prose second, and prose ONLY inside the CLI envelope.
- * `ok: false` is the CLI contract's own discriminant (see
- * `readCliErrorDocument`), so a handled failure document settles the question
- * whatever the console noise around it says. When there is no such document we
- * read the console a line at a time — but only for a call whose console the CLI
- * actually wrote (see {@link cliConsoleTextOf}); a bare shell call's stdout
- * belongs to whatever it ran, and gets no vote on whether it succeeded.
+ * Some CLI adapters finish a call with `output-available` even when the command itself
+ * reported a handled failure. Treat the rendered CLI failure as the source of truth: it
+ * must never receive the green capability receipt.
  */
 function renderedToolFailure(part: ToolPartLike): boolean {
   if (FAILED_STATES.has(part.state ?? "")) return true;
@@ -309,37 +209,6 @@ function renderedToolFailure(part: ToolPartLike): boolean {
 
 /**
  * Memoise a parts reader on the array it read.
- *
- * The four readers below are most of the cost of drawing a turn, and every one
- * of them walks the SAME parts at least twice per render: MessageContent asks
- * `hasLangyActivity` whether there is anything to draw, then LangyActivityParts
- * asks each reader again to draw it. Per walk, `hasCapabilityCard` JSON-parses
- * and schema-validates each CLI document, so a turn carrying a dozen multi-KB
- * results paid for dozens of parse-and-validate cycles per render — at streaming
- * rates, dozens per token.
- *
- * Keyed by IDENTITY, which is exactly right here: @ai-sdk/react snapshots the
- * message (`structuredClone`) on every update, so a parts array never changes
- * after we have seen it — a new token is a new array, and a new array is a fresh
- * read. A WeakMap so a conversation's arrays are collected with the messages
- * that own them.
- *
- * INVARIANT: no parts array may be mutated in place. Every producer builds a new
- * one — the engine's history hydration, the time-travel view, and LangyPlanCard's
- * per-step subsets alike.
- *
- * That invariant is only PARTLY enforceable, and it is worth being honest about
- * which part. `PartsView.parts` is `readonly unknown[]`, so nothing reached
- * through this seam — these readers, the components they feed — can push into an
- * array it has already answered for. What the type cannot reach is a producer
- * still holding the array as a mutable `unknown[]` before it hands it over; if
- * one ever pushed there, the WeakMap would keep serving the pre-push answer for
- * as long as the array lives. The risk is accepted rather than designed away
- * because the producer set is small, closed and listed above, and because the
- * one that generates the churn — @ai-sdk/react — cannot mutate by construction:
- * it `structuredClone`s the message on every update, so each token arrives as a
- * fresh array. A cache keyed on a deep hash instead would re-walk and re-parse
- * every CLI document per render, which is the exact cost this exists to remove.
  */
 function memoizeOnParts<T>(read: (message: PartsView) => T): (message: PartsView) => T {
   const cache = new WeakMap<readonly unknown[], T>();
@@ -392,18 +261,9 @@ function traceRowCount(output: unknown): number {
 }
 
 /**
- * A trace-sample card is a fact about the TURN — the traces it surfaced — not
- * about one tool call. But the Analytics skill probes with several
- * `trace search` calls, most of which legitimately match nothing, and one that
- * actually answers. Rendered per-call, each empty probe drew its own full
- * "No traces matched" card, stacked beside (and burying) the search that found
- * the traces the turn reported.
- *
- * So the trace cards collapse to the searches that carry traces: every search
- * that surfaced rows keeps its card; the empty probes are dropped when any
- * search answered, and deduped to a single card when none did — a genuine
- * "nothing matched" still earns one clear answer, never a wall of four. Only
- * trace searches multiply this way, so every other capability card is untouched.
+ * A trace-sample card is a fact about the TURN — the traces it surfaced — not about one
+ * tool call. But the Analytics skill probes with several `trace search` calls, most of
+ * which legitimately match nothing, and one that actually answers.
  */
 function selectTraceCards<T extends { id: string; call: CapabilityToolCall }>(entries: T[]): T[] {
   const isTrace = (call: CapabilityToolCall) => resolveCapability(call.name)?.render === "traces";
@@ -446,10 +306,6 @@ export type PendingCapability = {
 
 /**
  * The capability calls that are still RUNNING, in first-seen order.
- *
- * The complement of {@link toCapabilityCalls}: a capability is a card for its
- * whole life — pending shell while it runs, settled card once output lands —
- * so it is never demoted to a generic activity line on the way.
  */
 export const toPendingCapabilities = memoizeOnParts(readPendingCapabilities);
 
@@ -474,10 +330,8 @@ function readPendingCapabilities(message: PartsView): PendingCapability[] {
 }
 
 /**
- * True when a message has anything for LangyToolActivity to render — an
- * activity card, an in-flight capability, or a settled capability card.
- * MessageContent uses this in its "is there anything to show?" guard so a turn
- * whose only output is a card (no prose, no proposal) still renders.
+ * True when a message has anything for LangyToolActivity to render — an activity card,
+ * an in-flight capability, or a settled capability card.
  */
 export function hasLangyActivity(message: PartsView): boolean {
   return (
@@ -613,10 +467,8 @@ export function LangyToolActivity({
 }: {
   message: UIMessage;
   /**
-   * The turn's folded reasoning-summary headlines (logic/langyReasoningTitles):
-   * the model's thinking steps between tool calls. They ride the completed
-   * receipt — never the transcript — so a settled turn's process record is one
-   * collapsed card, not a stack of loose bold lines above the answer.
+   * The turn's folded reasoning-summary headlines (logic/langyReasoningTitles): the
+   * model's thinking steps between tool calls.
    */
   reasoningTitles?: string[];
   /** @see LangyActivityParts */
@@ -626,17 +478,8 @@ export function LangyToolActivity({
 }
 
 /**
- * Render a set of tool parts as activity — the reusable spine shared by a whole
- * message (LangyToolActivity) and one plan step's attributed calls
- * (LangyPlanCard). Renders nothing when the parts carry no activity, so a bucket
- * with only prose collapses to nothing.
- *
- * `live` says whether the turn these parts belong to is still running. It is
- * what tells an unfinished call apart from an INTERRUPTED one: a tool part is
- * only ever closed by its own output, so a turn that the user stopped (or that
- * died) leaves its open calls in the running state for good. On a settled turn
- * those calls are drawn as interrupted, with no pulse and no shimmer, instead
- * of a card that says "Searching traces…" for the rest of the conversation.
+ * Render a set of tool parts as activity — the reusable spine shared by a whole message
+ * (LangyToolActivity) and one plan step's attributed calls (LangyPlanCard).
  */
 export function LangyActivityParts({
   parts,
@@ -664,12 +507,9 @@ export function LangyActivityParts({
     return null;
   }
 
-  // While the turn is streaming, the action that finished LAST holds its
-  // ground as a settled card instead of folding into the receipt the instant
-  // its output lands — the reader is watching the model think about what that
-  // call returned. It folds when anything takes its place: the next call
-  // starting (running or pending below), answer text streaming in after it, a
-  // failure or capability card landing after it, or the turn settling.
+  // While the turn is streaming, the action that finished LAST holds its ground as a
+  // settled card instead of folding into the receipt the instant its output lands — the
+  // reader is watching the model think about what that call returned.
   const heldGroup = (() => {
     if (turnPhase === "idle") return null;
     if (runningGroups.length > 0 || pending.length > 0) return null;
@@ -707,13 +547,7 @@ export function LangyActivityParts({
         </VStack>
       ),
     })),
-    // Finished work has ONE shape, whatever the count. It used to render as a
-    // bare activity card while there was exactly one of it and as the receipt
-    // from two onward — so the moment a second action finished, the block the
-    // reader was looking at was torn down and replaced by a differently-shaped
-    // one. Within a single turn that read as the answer flickering between
-    // three unrelated card designs. The key is fixed for the same reason: it
-    // is the same receipt gaining a line, not a new element each time.
+    // Finished work has ONE shape, whatever the count.
     ...(completedGroups.length > 0
       ? [
           {
@@ -767,27 +601,7 @@ export function LangyActivityParts({
   ].sort((left, right) => left.order - right.order);
 
   return (
-    // `role="log"` is what makes this column readable to assistive tech. A
-    // VStack is a plain div, whose implicit role is `generic` — and `aria-label`
-    // is prohibited there, so without a role the name is dropped and the column
-    // is an anonymous stack: a reader who lands on the running indicator or on
-    // the red failure card gets the line but nothing saying what region it came
-    // from, and appended entries go unannounced. `log` (polite by default) is
-    // the right role for a running record whose entries are appended at the
-    // end, which is exactly what a turn's activity is.
-    //
-    // The settled rows below — CompletedActivityBatch, CapabilityBatchRow,
-    // FailedToolCallRow — deliberately carry no live-region attributes: `log`
-    // already announces an appended entry politely, and a nested `role="status"`
-    // on a row that only ever arrives by being appended would make some screen
-    // readers say it twice. So the rule for anything nested in here is: add a
-    // live region only when it earns one independently — because it updates IN
-    // PLACE rather than being appended (LangyCapabilityPendingCard's running
-    // headline, which is also rendered outside this column), or because it is
-    // assertive and announces wherever it sits (LangyToolErrorCard's
-    // `role="alert"`). The status lines beside this column
-    // (StreamingStatusLine, LangyThinkingLine, LangyRecoveringLine) sit OUTSIDE
-    // it, which is why each of those owns its own `role="status"`.
+    // `role="log"` is what makes this column readable to assistive tech.
     <VStack align="stretch" gap={2} role="log" aria-label="Langy activity">
       {rows.map((row) => (
         <Fragment key={row.key}>{row.node}</Fragment>
@@ -907,12 +721,6 @@ function CompletedActivityBatch({
 
 /**
  * One finished step inside the receipt.
- *
- * It carries dev mode's raw-payload toggle, which used to live on the
- * standalone card that a lone completed group rendered as. Routing every count
- * through the receipt — so finished work has one shape instead of changing
- * design the moment a second action lands — would otherwise have quietly taken
- * away the only way to read a call's JSON.
  */
 function CompletedActivityRow({ group, devMode }: { group: ActivityGroup; devMode: boolean }) {
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -1065,21 +873,9 @@ function RawDataToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => 
 }
 
 /**
- * What one finished call returned, as the model read it. A failed call's
- * result IS its error text. Null when the record kept no result at all —
- * the caller uses that to withhold the disclosure, not to render "nothing".
- *
- * The DATA, not the transport. A CLI result travels as a JSON string holding
- * the `{ kind, payload }` envelope (see `cliToolResultSchema`), so printing
- * `call.output` verbatim showed the reader `{"kind":"json","payload":[]}` on
- * one unindented line: the envelope quoted at them, with the answer they came
- * for as a fragment inside it. Unwrap to the payload and indent it.
- *
- * Only an output that is JSON *whole* is reformatted, which is why this parses
- * strictly instead of reaching for `parseCliJson`. That reader lifts the first
- * balanced document out of surrounding console noise, which is right for a card
- * (it wants the document) and wrong here (the noise is part of what the model
- * read). A shell call that logs a line and then prints JSON keeps both.
+ * What one finished call returned, as the model read it. A failed call's result IS its
+ * error text. Null when the record kept no result at all — the caller uses that to
+ * withhold the disclosure, not to render "nothing".
  */
 function toolResultText(call: ToolCall): string | null {
   if (call.errorText) return call.errorText;
@@ -1119,13 +915,6 @@ function parseWholeJson(text: string): { value: unknown } | undefined {
 
 /**
  * One finished call, opened: what ran, and then what came back.
- *
- * The command is shown again here rather than left to the row's label, because
- * a row groups calls by what they DID: two `langwatch trace search` calls that
- * differ only in their flags share the single label "Searched traces", and the
- * command is then the only thing that says which result belongs to which. That
- * is not a corner case. Asking for one day and then for everything is how the
- * agent answers a question about a time range.
  */
 function OpenedToolCall({ call }: { call: ToolCall }) {
   const command = commandOf(call.input);
@@ -1229,12 +1018,6 @@ function CapabilityBatchRow({ batch, devMode }: { batch: CapabilityBatch; devMod
   const [open, setOpen] = useState(true);
   const userToggled = useRef(false);
   // Only arm the auto-collapse once this row actually renders the batch UI.
-  // Running it unconditionally drove `open` to false while the row was still a
-  // single card, so the moment a second entry arrived the batch rendered
-  // ALREADY collapsed — hiding both cards the reader was looking at behind a
-  // summary header they never clicked. Keying on `isBatched` also restarts the
-  // timer at the instant the batch appears, which is when the 2.2s reading
-  // window is supposed to begin.
   useEffect(() => {
     if (!isBatched) return;
     const timer = window.setTimeout(() => {
@@ -1394,10 +1177,6 @@ function groupToolNames(group: ActivityGroup): string {
 
 /**
  * The card's overline: a CATEGORY, not a tool name.
- *
- * It used to print the raw tool names — which is how a card came to be headed
- * "SKILL" with a body that also just said "Skill". The category comes off the
- * group key, which `describeToolCall` already derived from the call's intent.
  */
 function groupCategory(group: ActivityGroup): string {
   const [head] = group.key.split(":");
@@ -1424,31 +1203,6 @@ function groupCategory(group: ActivityGroup): string {
 
 /**
  * One RUNNING activity group, as a CARD.
- *
- * It used to be naked text — a bare word ("Coding") floating in the message
- * column with a `{}` blob of raw tool JSON hanging off it, shown to everyone.
- * Now it speaks the same card language as every capability: the tool/skill NAME
- * on the overline, the activity as the title, and the concrete thing being done
- * (the command, the path, the pattern) underneath in mono.
- *
- * IN-FLIGHT ONLY, and the type cannot say so: its one call site renders it from
- * `groups.filter((group) => !group.done)`, and the instant a group settles it
- * moves to the completed receipt under a different key, so this card unmounts.
- * It used to carry a whole second life as its own settled/collapsed card —
- * `useState(group.done)`, a 2.2s auto-collapse, a collapsed summary button —
- * none of which any mounted instance could ever reach, because `group.done` is
- * false for every group that gets here. Finished work has exactly one shape
- * ({@link CompletedActivityBatch}); that is the whole point of the receipt.
- *
- * The raw payload is DEVELOPER MODE ONLY — there is no `{}` affordance at all
- * for a normal user, whichever tool it is. An unmapped tool is not a licence to
- * dump JSON in someone's chat; its name and its input are the honest answer.
- */
-/**
- * The part index of the last streamed answer text — a settled action older than
- * the answer's own words has been read past, so it has no claim to stay out of
- * the receipt. Reasoning parts deliberately do NOT count: thinking after a call
- * is exactly the window the held card exists for.
  */
 function lastAnswerTextIndex(view: PartsView): number {
   let last = -1;
@@ -1467,13 +1221,6 @@ function lastAnswerTextIndex(view: PartsView): number {
 
 /**
  * The action that just finished, still on the table.
- *
- * Rendered for the turn's latest settled activity group while the turn is live
- * and nothing has taken its place — the reader is watching the model think
- * about what this call returned, so the card holds its ground instead of
- * folding into the receipt the instant the output lands. Same geometry as
- * {@link RunningActivityCard}: a green check for the pulse, the past-tense
- * label for the shimmer.
  */
 function LatestSettledActivityCard({ group, devMode }: { group: ActivityGroup; devMode: boolean }) {
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -1552,9 +1299,6 @@ function LatestSettledActivityCard({ group, devMode }: { group: ActivityGroup; d
 
 /**
  * The held card's headline and its mono detail line, as one block.
- *
- * Spans throughout, because the disclosure wraps this in a native `<button>`,
- * which may hold phrasing content only.
  */
 function SettledActivityLabel({ label, detail }: { label: string; detail?: string }) {
   return (

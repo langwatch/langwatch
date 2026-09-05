@@ -1,7 +1,5 @@
 /**
- * The dialogs the Scenarios tab keeps mounted: the run dialog, the archive
- * confirmation of a scenario, and the one dialog that names a test suite.
- *
+ * The dialogs the Scenarios tab keeps mounted: the run dialog, the archive confirmation of a scenario, and the one dialog that names a test suite.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/suites-rail.feature
  */

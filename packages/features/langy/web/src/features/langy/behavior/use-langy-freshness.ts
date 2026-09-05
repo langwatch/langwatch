@@ -8,27 +8,6 @@ import { useLangyConversationUpdateListener } from "./use-langy-conversation-upd
 
 /**
  * Page-level real-time coordinator for Langy, mirroring `useTraceFreshness`.
- * Mounted ONCE by the panel so exactly one SSE subscription serves every list
- * / detail consumer (tRPC subscriptions aren't deduped across hook instances —
- * one-per-consumer would starve the browser's connection pool).
- *
- * Contract: the freshness signal is ID-ONLY. The broadcast subscriber
- * (`langy-conversation-update-broadcast.subscriber.ts`) deliberately lets "no
- * folded conversation state cross" its port — no status, no counts, no content
- * ride the wire, only the `conversationId`. So this coordinator is pure
- * signal-then-refetch (`specs/langy/langy-frontend-realtime.feature`): a signal
- * says "conversation X changed", and we invalidate the queries it affects and
- * let the server re-decide visibility. We never try to apply pushed state in
- * place — there is none to apply.
- *
- * Two queries are affected by a signal:
- *   - the recents LIST (title / counts / ordering) — always refetched, once per
- *     debounced batch, through the server visibility gate;
- *   - the OPEN conversation's MESSAGES, when a signal names it — refetched so a
- *     turn it did not itself initiate (another tab, a recovered/again-driven
- *     turn, a programmatic caller) still lands. Without this the open thread has
- *     no live turn stream to attach to and stays stale until a remount. The
- *     panel re-hydrates its engine from this query when it is not mid-stream.
  */
 export function useLangyFreshness(activeConversationId: string | null): void {
   const { project } = useOrganizationTeamProject();
@@ -45,14 +24,9 @@ export function useLangyFreshness(activeConversationId: string | null): void {
           cursor: signal.cursor ?? null,
         });
         if (signal.conversationId === activeConversationId) {
-          // The OPEN conversation's live path (ADR-059): the signal carries
-          // the projection's CURSOR; `catchUpConversationFold` compares it
-          // with the local fold's and, when behind, fetches the durable event
-          // tail and folds it in place — turn state lands event-by-event
-          // without re-downloading the projection. The same helper is also
-          // driven by the polled history snapshot (LangyPanel's seed effect),
-          // so a dropped SSE connection is a latency problem, not a frozen
-          // panel.
+          // The OPEN conversation's live path (ADR-059): the signal carries the projection's CURSOR; `catchUpConversationFold`
+          // compares it with the local fold's and, when behind, fetches the durable event tail and folds it in place — turn state
+          // lands event-by-event without re-downloading the projection.
           catchUpConversationFold({
             utils: trpcUtils,
             projectId,

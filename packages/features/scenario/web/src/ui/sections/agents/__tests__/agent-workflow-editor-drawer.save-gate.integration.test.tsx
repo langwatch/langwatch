@@ -1,30 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for AgentWorkflowEditorDrawer Save gate — Issue #3412
- *
- * The ONLY source change is in isScenarioMappingValid: the `&& hasOutputMapping`
- * conjunction is dropped so the function returns true whenever a valid input
- * mapping is present, regardless of whether an output mapping has been selected.
- *
- * The structural guards `workflowInputs.length > 0` and
- * `workflowOutputs.length > 0` in AgentWorkflowEditorDrawer STAY.
- * `workflowOutputs` derives from the published workflow's end-node inputs
- * (extractVariables). Length === 0 means the workflow structurally emits
- * nothing; enabling Save there would start a run judged on "{}". That gate is
- * load-bearing and must remain.
- *
- * Test matrix:
- *   (a) RED→GREEN  — workflow WITH end outputs + input mapping + outputField
- *                    explicitly cleared ("") → Save ENABLED after fix
- *   (b) REGRESSION — workflow WITHOUT end outputs + input mapping → Save stays
- *                    DISABLED (structural guard must not be relaxed)
- *   (c) FAIL-CLOSED — workflow WITH outputs + no input/messages mapping
- *                    → Save stays DISABLED (fail-closed preserved)
- *
- * Uses the real isScenarioMappingValid / hasScenarioInputMapping via
- * importOriginal so the tests actually exercise the predicate change.
- *
+ * @vitest-environment jsdom
  * @see specs/features/scenarios/minimal-input-mapping.feature
  */
 
@@ -212,12 +188,8 @@ const DSL_INPUTS_NO_OUTPUTS = {
 // ── Agent fixtures ────────────────────────────────────────────────────────────
 
 /**
- * Valid input mapping (userMessage → input) but scenarioOutputField is
- * explicitly cleared (""). The structural guard passes (workflow HAS outputs).
- *
- * RED case: isScenarioMappingValid returns false now because
- *   hasOutputMapping = (outputs.length > 0) && "" !== "" = false
- * After fix: returns hasScenarioInputMapping(mappings) = true → Save enabled.
+ * Valid input mapping (userMessage → input) but scenarioOutputField is explicitly
+ * cleared (""). The structural guard passes (workflow HAS outputs).
  */
 const AGENT_INPUT_MAPPING_CLEARED_OUTPUT = {
   id: "agent-cleared-output",

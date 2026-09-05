@@ -1,12 +1,6 @@
 /**
- * Parse the raw `sdk.name` / `sdk.version` / `sdk.language` resource attributes
- * into a friendlier shape for display in the trace drawer.
- *
- * The chip in the header was just dumping `${name} ${version}` — useful for an
- * engineer who already knows what `langwatch-python` means, opaque for anyone
- * else. This helper detects the SDK family (LangWatch / OpenTelemetry /
- * OpenLLMetry) and the language so the UI can show "Python SDK · 0.5.13" with
- * a one-liner explaining what an SDK is and where it ran.
+ * Parse the raw `sdk.name` / `sdk.version` / `sdk.language` resource attributes into a
+ * friendlier shape for display in the trace drawer.
  */
 
 export interface SdkInfo {
@@ -29,10 +23,8 @@ export interface SdkInfo {
 
 /**
  * The Scenario SDK wraps a language SDK to drive simulated user/assistant
- * conversations. Until it emits its own `scenario.sdk.*` resource attributes,
- * we know it's active only via the trace-level scenarioRunId. Once the
- * downstream SDK starts setting `scenario.sdk.name` / `scenario.sdk.version`,
- * those flow through automatically.
+ * conversations. Until it emits its own `scenario.sdk.*` resource attributes, we know
+ * it's active only via the trace-level scenarioRunId.
  */
 export interface ScenarioSdkInfo {
   /** Raw `scenario.sdk.name` value, if the SDK emitted one. */

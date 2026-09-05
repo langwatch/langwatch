@@ -13,11 +13,7 @@ import {
 } from "./types";
 
 /**
- * Folded "N duplicated siblings" row. Deliberately styled apart from
- * TreeRow's plain parent/child collapse: a stacked-layers leading icon
- * (instead of chevron + type icon), a "×N repeated" pill, and a DASHED
- * left border (TreeRow's selection border is solid) — so the two
- * collapse kinds can't be mistaken for each other.
+ * Folded "N duplicated siblings" row.
  */
 export const GroupRow = memo(function GroupRow({
   group,

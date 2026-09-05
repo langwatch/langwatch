@@ -1,14 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Covers specs/scenarios/scenario-tab-handoff.feature — the tab-identity half.
- *
- * Renders the hook inside a real react-router wrapped in a ScenarioHostPort
- * test double (mirrors runs-filter-url-sync.integration.test.tsx), so the
- * query-param lift and the URL scrub are the behaviours a browser would
- * actually produce. `useRouter` in this package reads through the host port
- * (ADR-004 seals react-router off from the package proper), so the host here
- * is the router.
+ * @vitest-environment jsdom
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useMemo, type ReactNode } from "react";

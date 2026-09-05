@@ -1,20 +1,7 @@
 /**
+ * The trace table's pagination adapter: how the filter store's page state is translated
+ * for the shared bar, and what each lens is allowed to reach.
  * @vitest-environment jsdom
- *
- * The trace table's pagination adapter: how the filter store's page state is
- * translated for the shared bar, and what each lens is allowed to reach.
- *
- * Keyset paging has no page numbers of its own: the batch the user sees next
- * is whatever `pageCursors[page]` addresses. So the one thing a step forward
- * must get right is WHICH page it files the returned cursor under — the page
- * it is opening, not the one it is leaving. File it under the current page and
- * every batch is fetched with the cursor of the batch before it.
- *
- * The pager dispatches on a microtask, so clicks are awaited rather than fired
- * and asserted in the same tick.
- *
- * See specs/traces-v2/data-layer.feature (keyset pagination) and
- * specs/components/pagination.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

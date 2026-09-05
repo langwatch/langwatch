@@ -1,9 +1,6 @@
 /**
+ * specs/prompts/prompt-list-copy-counts.feature, the transport rule.
  * @vitest-environment node
- *
- * specs/prompts/prompt-list-copy-counts.feature, the transport rule. The
- * catalog is regularly the slowest query on a screen; batched, every sibling
- * call in the same request waits for it.
  */
 
 import { describe, expect, it, vi } from "vitest";

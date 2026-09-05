@@ -1,12 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The table of scenarios of the open suite: which suite that is, what a row
- * says, and what its Run button and row menu do.
- *
- * @see specs/features/agent-testing/cases-table.feature
- * @see specs/features/agent-testing/suites-rail.feature
- * @see specs/scenarios/scenario-test-suite-assignment.feature
+ * @see specs/features/agent-testing/cases-table.feature, specs/features/agent-testing/suites-rail.feature,
+ *   specs/scenarios/scenario-test-suite-assignment.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, renderHook, screen, within } from "@testing-library/react";

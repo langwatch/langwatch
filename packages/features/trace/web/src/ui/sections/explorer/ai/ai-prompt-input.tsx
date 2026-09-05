@@ -133,15 +133,8 @@ const DEFAULT_PLACEHOLDER_EXAMPLES = [
 ];
 
 /**
- * Stateless AI prompt input — handles the typewriter placeholder, the
- * shimmering "thinking" state, the error badge, and the submit/escape
- * keystrokes. The actual request dispatch is the caller's job (so the
- * same UI can drive different actions: applying a filter, creating a
- * lens, generating a chart, etc.).
- *
- * Lives in `traces-v2/components/ai` so any traces-v2 surface can drop
- * it in. Pair with a thin dispatcher hook (e.g. `useAiTraceAction`) for
- * the most common flow.
+ * Stateless AI prompt input — handles the typewriter placeholder, the shimmering
+ * "thinking" state, the error badge, and the submit/escape keystrokes.
  */
 export const AiPromptInput: React.FC<AiPromptInputProps> = ({
   prompt,
@@ -163,12 +156,8 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
     ? { ...thinkingShimmerStyles, animation: "none" }
     : thinkingShimmerStyles;
 
-  // Pending mode swaps the Input for a shimmer Box that has no key
-  // handlers — without a global listener the user couldn't cancel an
-  // in-flight AI request with Esc. The mutation itself can't be aborted
-  // mid-flight (tRPC mutate has no native cancel), but `onClose` tears
-  // down the composer, which flips the host hook's `cancelledRef` so
-  // any late response is dropped on the floor and the user gets out.
+  // Pending mode swaps the Input for a shimmer Box that has no key handlers — without a
+  // global listener the user couldn't cancel an in-flight AI request with Esc.
   useEffect(() => {
     if (!isPending) return;
     const handler = (e: KeyboardEvent) => {

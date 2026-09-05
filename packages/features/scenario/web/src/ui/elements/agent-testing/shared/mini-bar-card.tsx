@@ -1,13 +1,6 @@
 /**
- * One small chart: a title, and groups of bars with the value above each bar
- * and a label under each group.
- *
- * A comparison draws one bar per target in the colour of that target, so the
- * card carries no scale of its own: the value above the bar is the number,
- * and the bar is the glance. A bar with no value is drawn as a gap rather
- * than as a bar of zero, because a zero-height bar reads as a target that
- * scored nothing.
- *
+ * One small chart: a title, and groups of bars with the value above each bar and a
+ * label under each group.
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

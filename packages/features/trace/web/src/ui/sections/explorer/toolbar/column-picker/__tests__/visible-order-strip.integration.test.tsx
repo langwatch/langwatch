@@ -1,14 +1,7 @@
 /**
+ * VisibleOrderStrip translates visible-subset indices (the row's position in the displayed list) into
+ * `columnOrder` indices (the position in the full lens order, which may include hidden columns).
  * @vitest-environment jsdom
- *
- * VisibleOrderStrip translates visible-subset indices (the row's position in
- * the displayed list) into `columnOrder` indices (the position in the
- * full lens order, which may include hidden columns). The translation is
- * `columnOrder.indexOf(column.id)` — a thin layer that's been the most
- * bug-prone part of the picker. These tests pin the translation by feeding
- * a sparse `columnOrder` (with hidden ids interleaved) and asserting that
- * the move-up / move-down buttons fire `reorderColumns` with the correct
- * full-order indices.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render } from "@testing-library/react";

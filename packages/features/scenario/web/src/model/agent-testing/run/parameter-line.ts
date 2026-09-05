@@ -1,15 +1,5 @@
 /**
  * The parameter overrides of a run, as one line.
- *
- * The line reads `name=value, name=value`. It is what a person writes fastest
- * when they only want to change one value, and it is what the run dialog
- * offers first. A secret cannot ride on it, because the line shows what it
- * holds, so a block with a secret in it turns into rows instead
- * (`parameter-rows.ts`).
- *
- * Everything here is pure, so the line rules can be read and tested on their
- * own.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -34,10 +24,6 @@ export function parameterTypes(
 
 /**
  * The pairs a line holds, in the order they were written.
- *
- * A pair is split on its first "=", so a value may hold one. A fragment with
- * no "=" and a pair with an empty name are dropped: there is nothing to send
- * them under.
  */
 export function parseParameterLine(line: string): [string, string][] {
   const pairs: [string, string][] = [];
@@ -53,10 +39,6 @@ export function parseParameterLine(line: string): [string, string][] {
 
 /**
  * The line a set of remembered values reads as.
- *
- * The values come back from the suite the run was started on, so the dialog
- * opens on the overrides the last run used rather than on the declared
- * defaults.
  */
 export function formatStoredParameterLine(values: RunParameterValues): string {
   return Object.entries(values)
@@ -79,14 +61,7 @@ export function formatParameterLine(definitions: readonly ScenarioParameterDefin
 }
 
 /**
- * What the run sends: the line, plus whatever was typed into the secret
- * fields.
- *
- * A name is sent as it was written, declared or not, so a name no case
- * declares is refused by the server by name rather than dropped in silence.
- * A name left with an empty value is omitted, so the run falls back to the
- * default each case declares for it. A value is read as the type its
- * declaration names, so "007" stays text for a string parameter.
+ * What the run sends: the line, plus whatever was typed into the secret fields.
  */
 export function toLineRunParameters({
   line,
@@ -121,12 +96,7 @@ export function toLineRunParameters({
 }
 
 /**
- * The declarations a line stands for, keeping every secret the case already
- * declares.
- *
- * A secret carries no default and never rides on the line, so it would be
- * dropped by a save that read the line alone. Every other declaration is
- * rewritten from the line, so removing a pair removes the parameter.
+ * The declarations a line stands for, keeping every secret the case already declares.
  */
 export function toParameterDefinitions({
   line,

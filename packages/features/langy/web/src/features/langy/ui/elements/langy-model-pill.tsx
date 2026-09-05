@@ -93,28 +93,7 @@ function groupModelsByGroup<T extends { profile: { group: LangyModelGroup } }>(
 }
 
 /**
- * The composer's per-send model picker, as a compact rail pill (reference
- * `.mpick`): a provider glyph + the model name + a chevron, sized to its label
- * and no bigger. It replaces the full shared `ModelSelector` trigger, which —
- * at the narrow composer width — rendered oversized and had to be wrestled into
- * shape with overflow overrides. Same options (`useModelSelectionOptions`,
- * scoped to the project's enabled providers) and the same provider glyphs; only
- * the trigger is bespoke.
- *
- * Built on Chakra's `Combobox` (Ark) so the dropdown is a real, accessible
- * listbox: type to filter, arrow keys to move, Enter to pick, Escape to close —
- * roving focus and aria wiring included (a hand-rolled Menu+input had none of
- * that). The search input inside the popover auto-focuses on open.
- */
-/**
- * `triggerRef` exposes the pill's button so `/model` in the composer palette can
- * open THIS picker rather than the palette growing a second, divergent copy of
- * the model list.
- *
- * Memoized: the pill drags the whole Ark combobox (portal, positioner, every
- * row) through a render even while closed, and its props are stable strings,
- * arrays and panel-level callbacks — so a composer render for a palette or
- * turn-phase change stops here.
+ * The composer's per-send model picker, as a compact rail pill (reference `.mpick`): a provider glyph + the model name + a chevron, sized to its label and no bigger.
  */
 export const LangyModelPill = memo(function LangyModelPill({
   ref: triggerRef,

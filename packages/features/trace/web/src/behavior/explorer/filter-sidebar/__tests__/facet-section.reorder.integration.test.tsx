@@ -1,11 +1,6 @@
 /**
+ * Facet rows must not reorder under the cursor.
  * @vitest-environment jsdom
- *
- * Facet rows must not reorder under the cursor. Clicking a value used to yank
- * it up to the pinned/active area (and the post-filter count re-sort shuffled
- * the rest), which was jarring mid-interaction. FacetSection freezes the
- * rendered order while the pointer is inside the section and only re-flows
- * once the pointer leaves.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render } from "@testing-library/react";
@@ -115,12 +110,9 @@ describe("<FacetSection /> row ordering", () => {
     });
   });
 
-  // The search input lives inside the same hover-Box that triggers the
-  // freeze, so naive freeze-on-hover would mask the typed-search narrow:
-  // searchQuery → filtered → facetWindow would update live, but rendered
-  // rows would still come from the frozen pre-search snapshot. The list
-  // must narrow as the user types, even though the pointer is inside the
-  // section (i.e. layout is otherwise frozen).
+  // The search input lives inside the same hover-Box that triggers the freeze, so naive freeze-on-hover would
+  // mask the typed-search narrow: searchQuery → filtered → facetWindow would update live, but rendered rows
+  // would still come from the frozen pre-search snapshot.
   describe("when search is active while the pointer is inside the section", () => {
     /** @scenario "Value search narrows the list live even while the layout would otherwise be frozen" */
     it("bypasses freeze and narrows rows as the user types", () => {

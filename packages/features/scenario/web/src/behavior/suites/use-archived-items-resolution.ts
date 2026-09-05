@@ -1,8 +1,5 @@
 /**
  * Resolves human-readable names for archived scenarios and targets.
- *
- * Queries `api.suites.resolveArchivedNames` and memoizes the result
- * into arrays with `{ id, name }` or `{ ...target, name }` shape.
  */
 
 import { useMemo } from "react";

@@ -41,13 +41,9 @@ interface SectionRendererProps {
    * the affordance in their headers. */
   onHide?: () => void;
   /**
-   * Drag handle props from the surrounding sortable wrapper. With the
-   * group-of-groups removed, individual sections are now the unit
-   * users drag to reorder the sidebar — every section becomes its own
-   * sortable. The SidebarSection header renders a GripVertical handle
-   * the moment this prop is set; without it the handle stays hidden
-   * so non-sortable consumers (popover preview, etc.) don't render a
-   * dead affordance.
+   * Drag handle props from the surrounding sortable wrapper. With the group-of-groups
+   * removed, individual sections are now the unit users drag to reorder the sidebar —
+   * every section becomes its own sortable.
    */
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   /** Effective presentation mode per discrete-eligible numeric facet. A
@@ -58,10 +54,8 @@ interface SectionRendererProps {
 }
 
 /**
- * The trailing chevron that expands an INACTIVE row's inline drilldown
- * (evaluator breakdown, event metric breakdown). Rendered as a sibling of
- * the row button so a click here never toggles the facet — stopPropagation
- * guards against any outer container handler too.
+ * The trailing chevron that expands an INACTIVE row's inline drilldown (evaluator
+ * breakdown, event metric breakdown).
  */
 const ExpandChevron: React.FC<{
   isExpanded: boolean;
@@ -127,14 +121,9 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
         }
       : undefined;
 
-    // Evaluator section gets an inline drilldown rendered under each
-    // ACTIVE evaluator row — verdict pills, score range, label flag —
-    // sourced from the `aggregates` the discover endpoint already
-    // attached to each evaluator value. No second query.
-    // Event section mirrors the evaluator pattern with its own payload:
-    // per-event metric values (thumbs_up_down → vote 1 / -1) ride the
-    // discover response as `eventMetrics`; the drilldown emits plain
-    // top-level `event.attribute.<key>` toggles. No second query.
+    // Evaluator section gets an inline drilldown rendered under each ACTIVE evaluator
+    // row — verdict pills, score range, label flag — sourced from the `aggregates` the
+    // discover endpoint already attached to each evaluator value. No second query.
     const renderActiveRowExtras =
       section.key === "event"
         ? (item: FacetItem) =>
@@ -166,13 +155,8 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
               ) : null
           : undefined;
 
-    // INACTIVE evaluator rows also get a drilldown affordance: a small
-    // chevron expand toggle. It renders inline at the row's trailing edge
-    // (via the `trailing` slot) rather than as a full-width strip beneath
-    // the row — clicking it browses verdict/score options before
-    // committing to the evaluator filter. When the user then picks a
-    // verdict or score range, the evaluator toggle fires first so the
-    // selected criteria applies correctly.
+    // INACTIVE evaluator rows also get a drilldown affordance: a small chevron expand
+    // toggle.
     const renderInactiveRowExtras =
       section.key === "event"
         ? (
@@ -339,13 +323,9 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
     );
   }
 
-  // Attributes section: same component for trace, span, event, and metadata —
-  // the section data carries its own filter prefix (`attribute.` vs
-  // `span.attribute.` vs `event.attribute.`) and key list, so the renderer
-  // doesn't need to know which flavour it's drawing. `displayStripPrefix` (set
-  // only on the Metadata section) trims the redundant `metadata.` from the
-  // rendered label; the FULL key still drives `fieldFor`, so the filter
-  // resolves to the same trace-attribute predicate.
+  // Attributes section: same component for trace, span, event, and metadata — the section data carries its own
+  // filter prefix (`attribute.` vs `span.attribute.` vs `event.attribute.`) and key list, so the renderer
+  // doesn't need to know which flavour it's drawing.
   const { filterPrefix, keys, label, displayStripPrefix, emptyDocsHref } = section;
   const fieldFor = (attrKey: string) => `${filterPrefix}.${attrKey}`;
   return (

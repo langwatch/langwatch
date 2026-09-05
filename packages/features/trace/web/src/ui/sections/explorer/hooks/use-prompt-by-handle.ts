@@ -4,10 +4,6 @@ import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-vie
 
 /**
  * Live lookup of a prompt's *current* version by id-or-handle.
- *
- * NOT_FOUND is mapped to an error rather than a typed "missing" payload by
- * the underlying procedure — callers treat `isError` as "prompt was deleted
- * (or never existed)" via the `missing` derived flag.
  */
 export function usePromptByHandle(handle: string | null | undefined) {
   const { project } = useOrganizationTeamProject();

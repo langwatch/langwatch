@@ -1,11 +1,6 @@
 /**
- * The filter row of the Results tab: how the list is grouped, what is cut from
- * it, and the window it all sits in.
- *
- * It reads above the numbers it drives. Filters first, then the stat strip and
- * the chart, then the table, so a person sets the question before reading the
- * answer rather than the other way round.
- *
+ * The filter row of the Results tab: how the list is grouped, what is cut from it, and
+ * the window it all sits in.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

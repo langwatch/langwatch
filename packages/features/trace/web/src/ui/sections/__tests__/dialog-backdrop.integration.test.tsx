@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the Dialog backdrop styling.
- *
- * The base Dialog wrapper at src/components/ui/dialog.tsx must keep the
- * backdrop transparent (blur-only). Chakra's default backdrop ships with
- * `bg: blackAlpha.500` — the dark grey overlay we explicitly do not want.
- *
+ * @vitest-environment jsdom
  * @see specs/features/dialog-backdrop-transparency-blur.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -45,15 +39,9 @@ describe("Dialog backdrop", () => {
       renderOpenDialog();
       const backdrop = getBackdrop();
 
-      // The wrapper marks the backdrop with this data-attribute exactly
-      // when the `bg="transparent"` hard-override is in place (see
-      // src/components/ui/dialog.tsx). It is the only stable signal jsdom
-      // can observe — Chakra resolves the `bg` prop through a CSS class
-      // which jsdom cannot compute, so any inline-style assertion passes
-      // vacuously even when a class-driven dark backdrop comes back. If
-      // anyone removes the transparency override, this attribute is
-      // removed alongside it and the test fails. The visual contract
-      // itself is verified in the browser-QA pr-screenshots.
+      // The wrapper marks the backdrop with this data-attribute exactly when the
+      // `bg="transparent"` hard-override is in place (see
+      // src/components/ui/dialog.tsx).
       expect(backdrop.getAttribute("data-lw-transparent-backdrop")).toBe("true");
     });
   });
@@ -101,13 +89,9 @@ describe("Dialog backdrop", () => {
     it("references the shared --lw-backdrop-blur CSS variable instead of a hardcoded value", () => {
       renderOpenDialog();
 
-      // This backdrop covers the full viewport behind every dialog in the
-      // app (see src/components/ui/dialog.tsx) -- if its blur is ever
-      // hardcoded again instead of routed through --lw-backdrop-blur,
-      // reduced-graphics mode would still pay for a full-screen blur on
-      // every dialog open, silently defeating the fix everywhere dialogs
-      // are used. Scope the assertion to the backdrop's OWN generated class
-      // so an unrelated rule referencing the variable can't keep it green.
+      // This backdrop covers the full viewport behind every dialog in the app (see src/components/ui/dialog.tsx) -- if its blur is ever
+      // hardcoded again instead of routed through --lw-backdrop-blur, reduced-graphics mode would still pay for a full-screen blur on
+      // every dialog open, silently defeating the fix everywhere dialogs are used.
       const backdrop = getBackdrop();
       expect(cssRulesForElement(backdrop)).toContain("--lw-backdrop-blur");
     });

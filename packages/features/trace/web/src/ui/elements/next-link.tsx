@@ -1,11 +1,5 @@
 /**
  * A link, as this package renders one.
- *
- * `~/utils/compat/next-link` wraps react-router's `Link`, which ADR-004 seals
- * off from a feature package — the same substitution the auth front door made,
- * and for the same reason: nothing this package links to is inside its own
- * screen, so a full navigation is what the reader wants anyway. The prop shape,
- * object `href` included, is unchanged.
  */
 
 import type { AnchorHTMLAttributes, ReactNode } from "react";

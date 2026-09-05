@@ -1,8 +1,5 @@
 /**
  * Which of the reader's organizations the governance section is scoped to.
- *
- * What is worth pinning is the one decision this makes: which of the
- * organizations the reader can reach is the one this page is about.
  */
 
 import { describe, expect, it } from "vitest";

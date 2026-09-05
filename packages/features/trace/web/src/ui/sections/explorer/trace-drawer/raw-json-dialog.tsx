@@ -18,24 +18,9 @@ interface RawJsonDialogProps {
 }
 
 /**
- * Raw JSON inspector. Used by the `\` shortcut to drop into the
- * unprocessed trace + spans payload — escape hatch when something looks
- * off in the rendered surfaces and the user wants to see exactly what
- * the server sent.
- *
- * Operators previously got a single pretty-printed dump in a modal —
- * useful but coarse. This version adds:
- *
- *   - pretty/minify toggle, with byte + line counts so payload size is
- *     visible at a glance (some traces dump 100KB+ of attributes)
- *   - line-wrap toggle for long string values (chat payloads, base64
- *     attachments, full JSON arrays in a single line, …)
- *   - in-payload search that filters to lines containing the query so
- *     finding `metadata.tenant` in a 5K-line payload doesn't require
- *     scrolling
- *   - copy button still copies the *full* payload (search is for
- *     viewing only; users grabbing the JSON for a bug report want
- *     everything)
+ * Raw JSON inspector. Used by the `\` shortcut to drop into the unprocessed trace +
+ * spans payload — escape hatch when something looks off in the rendered surfaces and
+ * the user wants to see exactly what the server sent.
  */
 export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
   const [tab, setTab] = useState<RawTab>("trace");
@@ -73,11 +58,6 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
   }, [fullPayload, search]);
 
   // `charCount` is the JavaScript string length (UTF-16 code units).
-  // The repo uses "bytes" elsewhere for `string.length * 2` so we
-  // deliberately avoid the word here — the value rendered in the
-  // SizeBadge is character count, which is honest about what JS
-  // measures without an encoder, and doesn't collide with other
-  // "bytes" readings elsewhere on the page.
   const charCount = useMemo(() => fullPayload.length, [fullPayload]);
   const lineCount = useMemo(() => fullPayload.split("\n").length, [fullPayload]);
   const matchedLines = useMemo(

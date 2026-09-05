@@ -19,11 +19,9 @@ const INGESTION_VISIBILITY_TIMEOUT_MS = 60_000;
 class LwHttpError extends Error {}
 
 /**
- * Retried fetch for the verification helpers: on a loaded machine a single
- * request has stalled in front of the app past any sane one-shot budget while
- * a fresh attempt answered instantly, so three short attempts beat one long
- * wait. Only timeouts and network errors retry — an HTTP error status is a
- * real answer and throws straight away.
+ * Retried fetch for the verification helpers: on a loaded machine a single request has
+ * stalled in front of the app past any sane one-shot budget while a fresh attempt
+ * answered instantly, so three short attempts beat one long wait.
  */
 async function lwFetch({ path, init }: { path: string; init: RequestInit }): Promise<any> {
   let lastError: unknown;
@@ -111,12 +109,7 @@ export async function ensureEvaluator({
   evaluatorType: string;
 }): Promise<void> {
   const existing = (await listEvaluators()).find((evaluator) => evaluator.name === name);
-  // The name alone does not make it the right fixture. A retained evaluator of
-  // a DIFFERENT type leaves the scenario asserting against the wrong resource
-  // while the premise reads as satisfied, so the type is checked too, and a
-  // mismatch is replaced rather than reused. The type is what the API keeps
-  // under config.evaluatorType; the top-level `type` is the record kind
-  // ("evaluator" for everything created here) and cannot tell them apart.
+  // The name alone does not make it the right fixture.
   if (existing) {
     if (existing.config?.evaluatorType === evaluatorType) return;
     await deleteEvaluator(existing.id);
@@ -128,10 +121,9 @@ export async function ensureEvaluator({
 }
 
 /**
- * Deletes an evaluator by id. Already-gone (404) is the desired end state, not
- * a failure — the callers are cleanup paths that run precisely when a run went
- * wrong, so the resource being absent already is success. Everything else
- * throws; swallowing the error would hide the leak this exists to prevent.
+ * Deletes an evaluator by id. Already-gone (404) is the desired end state, not a
+ * failure — the callers are cleanup paths that run precisely when a run went wrong, so
+ * the resource being absent already is success.
  */
 export async function deleteEvaluator(id: string): Promise<void> {
   const response = await fetch(`${LW_BASE}/api/evaluators/${id}`, {
@@ -150,14 +142,9 @@ export async function deleteEvaluator(id: string): Promise<void> {
 const SEEDED_EVALUATOR_NAMES = new Set(["e2e-offtopic"]);
 
 /**
- * Restores the project's designed evaluation state: zero monitors, and no
- * evaluators beyond the seeded fixtures. Scenarios that create monitors or
- * evaluators call this before AND after the conversation. Before, because a
- * leftover from a crashed earlier run changes the model's behavior (finding a
- * monitor matching the request, it correctly asks reuse-versus-create instead
- * of creating, and the judge grades a branch the criteria do not describe).
- * After, because a leaked live monitor evaluates every ingested trace and
- * spends real money until someone notices.
+ * Restores the project's designed evaluation state: zero monitors, and no evaluators
+ * beyond the seeded fixtures. Scenarios that create monitors or evaluators call this
+ * before AND after the conversation.
  */
 export async function resetEvaluationResources(): Promise<void> {
   // allSettled, not all: every deletion must be ATTEMPTED even when an earlier
@@ -200,10 +187,8 @@ export async function listMonitors(): Promise<Array<{ id: string; name?: string 
 }
 
 /**
- * Seeds an evaluator for the delete scenario, so the deletion has a known,
- * suite-owned target rather than gambling on whatever the project contains.
- * The `evaluatorType` must be one the platform validates
- * (`langevals/exact_match` costs nothing and needs no model config).
+ * Seeds an evaluator for the delete scenario, so the deletion has a known, suite-owned
+ * target rather than gambling on whatever the project contains.
  */
 export async function createEvaluator(name: string): Promise<{ id: string; name: string }> {
   return lwPost({
@@ -213,14 +198,8 @@ export async function createEvaluator(name: string): Promise<{ id: string; name:
 }
 
 /**
- * Cleanup for the monitor scenario. The suite runs with a full project key,
- * so it can tidy up regardless of what the scenario under test managed to do.
- *
- * A monitor that is already gone (404) is the desired end state, not a failure.
- * Everything else throws. Swallowing the error would be worse than a noisy
- * teardown: the monitor stays live on the project's traffic, evaluating every
- * ingested trace and spending real money, and the run that leaked it reports
- * success. A failed cleanup has to be visible to be fixed.
+ * Cleanup for the monitor scenario. The suite runs with a full project key, so it can
+ * tidy up regardless of what the scenario under test managed to do.
  */
 export async function deleteMonitor(id: string): Promise<void> {
   const response = await fetch(`${LW_BASE}/api/monitors/${id}`, {
@@ -244,11 +223,9 @@ export async function listWorkflows(): Promise<Array<{ id: string; name?: string
 }
 
 /**
- * A real, currently-existing trace id, for scenarios that need to give Langy
- * something concrete to act on (e.g. annotate a trace) without depending on
- * Langy's own trace-search tool finding it first — see the "Langy's own
- * trace search returns 0 hits" follow-up finding for why that isn't reliable
- * yet. Wide date range (2020 -> now+1yr) so this never itself goes empty.
+ * A real, currently-existing trace id, for scenarios that need to give Langy something concrete to act on (e.g.
+ * annotate a trace) without depending on Langy's own trace-search tool finding it first — see the "Langy's own
+ * trace search returns 0 hits" follow-up finding for why that isn't reliable yet.
  */
 export async function mostRecentTraceId(): Promise<string | null> {
   const result = await lwPost({
@@ -265,10 +242,7 @@ export async function mostRecentTraceId(): Promise<string | null> {
 }
 
 /**
- * Whether a trace with this exact id exists in the project. Layer-2 grounding
- * check: a scenario that saw Langy report trace ids asserts they are real
- * through the same REST surface any integration would use, instead of asking
- * the LLM judge to verify ids it has no evidence for.
+ * Whether a trace with this exact id exists in the project.
  */
 export async function traceExists(traceId: string): Promise<boolean> {
   const result = await lwPost({
@@ -298,21 +272,8 @@ export async function listTriggers(): Promise<
 }
 
 /**
- * Seeds application-origin traffic into the project so data questions
- * ("how much traffic", "what's my p95") have a true answer.
- *
- * Without this, a fresh local project only contains Langy's own mirrored
- * runs (origin: langy), which rule 27 makes Langy exclude — so "no traces
- * in the last 24h" is CORRECT, and any judge that expects a non-zero count
- * is grading against data that does not exist. Spans carry no
- * langwatch.origin, which the platform coalesces to "application".
- *
- * Returns only once the seeded traces are QUERYABLE, not merely accepted. The
- * collector acks before indexing completes, so returning on the ack raced the
- * first data scenario against ingestion: the ground truth was still zero, Langy
- * correctly answered "no traffic", and the suite recorded a Langy defect that
- * was really a timing artifact. A false red here is the one failure this suite
- * must never produce, because it is read as evidence about the agent.
+ * Seeds application-origin traffic into the project so data questions ("how much
+ * traffic", "what's my p95") have a true answer.
  */
 export async function seedApplicationTraces(count = 8): Promise<void> {
   const now = Date.now();

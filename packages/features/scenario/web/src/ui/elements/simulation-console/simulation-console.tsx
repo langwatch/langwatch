@@ -19,8 +19,6 @@ export const DEFAULT_CONSOLE_FILE_NAME = "simulation-results.log";
 /**
  * macOS-style terminal title bar. Traffic lights render greyscale — the
  * unfocused-window treatment — since they're decoration, not controls.
- * The right slot hosts actions (e.g. copy results) at the same width as
- * the light cluster so the filename stays centered.
  */
 function ConsoleTitleBar({ actions, fileName }: { actions?: ReactNode; fileName: string }) {
   return (

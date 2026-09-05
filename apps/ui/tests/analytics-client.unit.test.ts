@@ -1,8 +1,7 @@
 /**
+ * react-contextual-analytics' createAnalyticsClient no-ops (empty providers) without a
+ * `window` global, so this needs a browser-like environment.
  * @vitest-environment jsdom
- *
- * react-contextual-analytics' createAnalyticsClient no-ops (empty providers)
- * without a `window` global, so this needs a browser-like environment.
  */
 import type { PostHog } from "posthog-js";
 import type { Provider } from "react-contextual-analytics";

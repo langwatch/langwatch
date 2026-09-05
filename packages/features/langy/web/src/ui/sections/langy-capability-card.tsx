@@ -1,15 +1,5 @@
 /**
  * Shared shell for every domain-capability card (task #12).
- *
- * This is the reference's `.card` idiom rendered once, in semantic tokens: a
- * raised surface with a hairline border, a mono icon-overline, a title, an
- * optional body, and an optional actions row plus an "Open in <surface>" deep
- * link. The overline colour is driven by `tone` — neutral for a read, green
- * for a created/updated result, red for a removed one — so a card's intent is
- * legible before you read a word of it.
- *
- * Every bespoke card (Traces, Metrics, EvalRun, Dataset, Scenario, resource
- * results) composes THIS shell so the whole kit stays one visual system.
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import {
@@ -184,10 +174,9 @@ export function LangyCapabilityCard({
 }
 
 /**
- * Placeholder rows while a card hydrates its references — the count is already
- * known from the result's digest, so the card holds the right amount of space
- * and fills in instead of jumping. Same shimmer idiom as the pending card;
- * still, not animated, for people who prefer reduced motion.
+ * Placeholder rows while a card hydrates its references — the count is already known
+ * from the result's digest, so the card holds the right amount of space and fills in
+ * instead of jumping.
  */
 export function CapabilityRowSkeletons({ count }: { count: number }) {
   const reduce = useReducedMotion();

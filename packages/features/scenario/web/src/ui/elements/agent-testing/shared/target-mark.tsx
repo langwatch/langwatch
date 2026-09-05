@@ -1,17 +1,6 @@
 /**
- * The mark of a target: the kind of agent behind it, in a square small enough
- * to sit in front of a name on one line.
- *
- * It is the icon the agents page draws for the same agent, so a target reads
- * as the agent a person knows from that page. A row that stands for several
- * targets at once carries the target mark instead, because no one kind is
- * behind it.
- *
- * The square takes the colour of the target only in a comparison, where the
- * colour is what tells one column, one bar and one line from another. A run
- * against one target has nothing to tell apart, and a coloured mark there
- * reads as a state the target is in.
- *
+ * The mark of a target: the kind of agent behind it, in a square small enough to sit in
+ * front of a name on one line.
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

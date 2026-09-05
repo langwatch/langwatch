@@ -3,10 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACTIVE_LENS_KEY } from "../view.store";
 
 /**
- * The viewStore computes its initial active lens at module-load time from
- * localStorage, and latches custom-lens hydration with module-level flags.
- * So each case seeds storage first, then imports a FRESH module via
- * resetModules — mirroring a real page load with that stored preference.
+ * The viewStore computes its initial active lens at module-load time from localStorage,
+ * and latches custom-lens hydration with module-level flags.
  */
 async function freshStore() {
   vi.resetModules();

@@ -1,11 +1,7 @@
 /**
- * Direct-SDK setup body: the platform and framework picker, and the
- * code for whatever the reader picks. The access token and project id
- * are already in the env block above it, so this body carries no
- * credentials of its own.
- *
- * Both surfaces render it: the integrate pane opens it from "See SDK
- * instructions", and the integrate drawer holds it on its SDK tab.
+ * Direct-SDK setup body: the platform and framework picker, and the code for whatever
+ * the reader picks. The access token and project id are already in the env block above
+ * it, so this body carries no credentials of its own.
  */
 import { Box, Grid, VStack } from "@chakra-ui/react";
 import type React from "react";

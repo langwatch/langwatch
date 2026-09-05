@@ -1,9 +1,7 @@
 /**
- * Removes leading process narration when durable activity already renders it.
- * It never decides which cards exist or changes text without an activity card.
- * Only leading narration is eligible, and the original survives if stripping
- * would empty the answer. False matches therefore affect redundant prose, not
- * application state or evidence of work.
+ * Removes leading process narration when durable activity already renders it. It never
+ * decides which cards exist or changes text without an activity card. Only leading
+ * narration is eligible, and the original survives if stripping would empty the answer.
  */
 
 /**
@@ -17,10 +15,6 @@ const GERUND_OPENER =
 
 /**
  * Words that mark a gerund opener as being about OUR work.
- *
- * The guard that keeps "Running total is $45." — a genuine answer — out of the
- * shredder while "Running the trace search…" goes in. A bare gerund is not
- * enough evidence on its own.
  */
 const WORK_NOUN =
   /\b(?:trace|traces|span|spans|dataset|datasets|analytic|analytics|evaluator|evaluators|monitor|scenario|prompt|dashboard|workflow|skill|recipe|tool|command|cli|search|query|workflow)\b/i;
@@ -49,12 +43,9 @@ function sentencesOf(block: string): string[] {
 }
 
 /**
- * Drop leading narration lines from an assistant reply.
- *
  * @param text        the reply, already cleaned of hidden directives
- * @param hasActivity the turn rendered tool activity (a card is on screen, so
- *                    narration about it is duplication). With no activity the
- *                    text is returned untouched.
+ * @param hasActivity whether a tool-activity card is already on screen (its
+ *                    narration would be duplication)
  */
 export function stripToolNarration({
   text,

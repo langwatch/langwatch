@@ -1,11 +1,5 @@
 /**
  * The page-level bridge for the Agent Testing scenario editor drawer.
- *
- * The drawer itself is URL routed and lives in `drawerRegistry`. This shell
- * registers the flow callback the drawer calls on save, and mounts the run
- * dialog that Save & Run opens on the same page. It renders no chrome of its
- * own; the drawer is drawn by `<CurrentDrawer />`.
- *
  * @see specs/features/agent-testing/cases-table.feature
  * @see dev/docs/best_practices/drawers.md
  */

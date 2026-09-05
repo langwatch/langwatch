@@ -1,17 +1,5 @@
 /**
  * "Run via API" dialog for the evaluations-v3 workbench.
- *
- * Opened from the workbench settings menu ("Run in CI/CD"). Targets the
- * experiment run endpoint via the SDK (`langwatch.experiment.run` /
- * `experiments.runWithResults` / `POST /api/experiments/{slug}/run`). Offers a
- * language picker (Python, TypeScript, Shell) and a data-source picker (attached
- * dataset, inline data, dataset id), and always shows how to read the per-row
- * results back.
- *
- * Controlled: the caller owns the open state so the dialog can be triggered from
- * a menu item that closes its popover as it opens. Presentational: it reads
- * nothing from the execution path. The container feeds it slug + columns from
- * the evaluations-v3 store.
  */
 import { useShallow } from "zustand/react/shallow";
 
@@ -73,11 +61,9 @@ export function RunViaApiDialog({
 }
 
 /**
- * Page-level wrapper: reads the experiment slug and the active dataset (name +
- * columns) from the evaluations-v3 store, then renders the presentational
- * dialog controlled by the caller. The active dataset's columns are the
- * experiment's inputs, so they serve as both the entry fields and the dataset
- * columns.
+ * Page-level wrapper: reads the experiment slug and the active dataset (name + columns)
+ * from the evaluations-v3 store, then renders the presentational dialog controlled by
+ * the caller.
  */
 export function RunViaApiDialogContainer({
   open,

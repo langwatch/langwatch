@@ -6,14 +6,7 @@ import { api } from "./trace-api";
 const OPS_SCOPE_STALE_TIME_MS = 5 * 60_000;
 
 /**
- * Reports the calling user's ops access. The underlying `api.ops.getScope`
- * is now a status probe — it always succeeds with `scope.kind === "none"`
- * for non-ops users instead of throwing FORBIDDEN, so this hook no longer
- * spams the console on every page load (lw#3584).
- *
- * Consumers should keep using `hasAccess` to gate ops UI; the discriminator
- * is exposed via `scope.kind` for callers that want to branch on tier
- * later (e.g. ops:view vs ops:manage if that ever lands).
+ * Reports the calling user's ops access.
  */
 export function useOpsPermission({
   enabled = true,

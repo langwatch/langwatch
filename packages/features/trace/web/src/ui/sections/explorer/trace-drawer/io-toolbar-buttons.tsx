@@ -8,9 +8,6 @@ import { AnnotationPopover } from "./conversation-view/annotation-popover";
 
 /**
  * The shape every toolbar action wears: icon, label, and the row's height.
- *
- * It stops the click from travelling, because the panel header behind it
- * toggles the panel collapsed.
  */
 const ActionButton = forwardRef<
   HTMLButtonElement,

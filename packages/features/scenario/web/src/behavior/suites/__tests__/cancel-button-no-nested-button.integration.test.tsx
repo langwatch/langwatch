@@ -1,15 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Structural regression tests for the per-row Cancel button (#3192).
- *
- * Browsers parse nested <button> elements by closing the outer button
- * prematurely. The visible cancel button — positioned `absolute` inside
- * the card's clickable surface — then receives clicks that don't reach
- * its handler, producing a no-op. The fix is to render the inner control
- * as a non-button element (span/div) with role="button" so the outer
- * card button remains the only real <button> in the tree.
- *
+ * @vitest-environment jsdom
  * @see specs/features/scenarios/scenarios-editor-ui-regressions.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

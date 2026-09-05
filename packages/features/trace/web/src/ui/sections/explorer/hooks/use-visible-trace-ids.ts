@@ -15,13 +15,8 @@ export interface VisibleTraceIds {
 }
 
 /**
- * Reads the current `tracesV2.list` cache entry and returns the set of
- * visible traceIds plus the top-of-page timestamp and current page number.
- *
- * This is a pure cache-read — no network requests are fired. The data
- * comes from whatever TanStack has in memory for the current list query
- * key. Returns an empty set when no cached data exists yet (e.g. on
- * initial load or between pages).
+ * Reads the current `tracesV2.list` cache entry and returns the set of visible traceIds
+ * plus the top-of-page timestamp and current page number.
  */
 export function useVisibleTraceIds(): VisibleTraceIds {
   const { project } = useOrganizationTeamProject();

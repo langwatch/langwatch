@@ -8,26 +8,15 @@ const PREFETCH_DELAY_MS = 600;
 /** Maximum sibling distance to prefetch in either direction. */
 const RADIUS = 5;
 /**
- * Sibling distance that gets the full (untruncated) prefetch instead of the
- * cheap preview. The immediate next/previous turn is by far the most common
- * click in a conversation view, so it's worth paying the extra spans read for
- * just those two — unlike the farther siblings, which are rarely opened and
- * stay cheap.
+ * Sibling distance that gets the full (untruncated) prefetch instead of the cheap
+ * preview.
  */
 const NEAR_RADIUS = 1;
 
 /**
- * Eagerly prefetch sibling trace headers in the same conversation, expanding
- * outward from the current turn. Spans are intentionally NOT prefetched —
- * they're heavy and only needed once the user actually navigates there.
- *
- * The immediate next/previous turn (`NEAR_RADIUS`) is prefetched with
- * `full: true` so clicking it opens instantly, matching the drawer's own
- * cache key; every farther sibling stays `full: false` since it's rarely
- * clicked and not worth the extra spans read.
- *
- * Runs after `PREFETCH_DELAY_MS` so the active trace's own queries finish
- * first; cancels if the user navigates away before the timer fires.
+ * Eagerly prefetch sibling trace headers in the same conversation, expanding outward
+ * from the current turn. Spans are intentionally NOT prefetched — they're heavy and
+ * only needed once the user actually navigates there.
  */
 export function useConversationPrefetch(
   conversationId: string | null | undefined,
@@ -50,13 +39,8 @@ export function useConversationPrefetch(
       for (const i of order) {
         const turn = turns[i];
         if (!turn) continue;
-        // Fire and forget. tRPC's prefetch is a no-op when the entry is
-        // already fresh in cache, so subsequent passes don't re-hit the
-        // server. Only the immediate next/previous turn pays for full
-        // resolution — farther siblings are rarely opened, so they stay a
-        // cheap read, same philosophy as not prefetching spans: the full IO
-        // resolution one spans read costs is only worth paying for the
-        // click that's actually likely to happen.
+        // Fire and forget. tRPC's prefetch is a no-op when the entry is already fresh
+        // in cache, so subsequent passes don't re-hit the server.
         void utils.tracesV2.header.prefetch({
           projectId,
           traceId: turn.traceId,

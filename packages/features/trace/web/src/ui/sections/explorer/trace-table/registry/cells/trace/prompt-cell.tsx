@@ -10,11 +10,9 @@ import { FilterChip } from "../../../../../../blocks/explorer/trace-table/regist
 type Density = "compact" | "comfortable";
 
 /**
- * The managed prompt last used in the trace. The trace summary only
- * carries the prompt *id* + version number, so the human handle is
- * resolved client-side from the project's prompt list (one shared,
- * cached query regardless of how many rows render this cell). Clicking
- * the chip filters by `lastUsedPrompt`; the ↗ opens the prompts page.
+ * The managed prompt last used in the trace. The trace summary only carries the prompt
+ * *id* + version number, so the human handle is resolved client-side from the project's
+ * prompt list (one shared, cached query regardless of how many rows render this cell).
  */
 const PromptCellView: React.FC<{ row: TraceListItem; density: Density }> = ({ row, density }) => {
   const promptId = row.promptId ?? null;

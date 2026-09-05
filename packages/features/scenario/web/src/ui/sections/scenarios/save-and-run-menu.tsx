@@ -274,13 +274,9 @@ export function SaveAndRunMenu({
 }
 
 /**
- * One agent of the menu. A development agent of another person is drawn
- * disabled and says why on hover: the menu saves and runs in one click, and
- * a run against it would be refused.
- *
- * It is a button, so the keyboard reaches it and Enter or Space picks it. A
- * row that cannot be run keeps its focus, so the reason in its tooltip is
- * still readable, and only drops the handler.
+ * One agent of the menu. A development agent of another person is drawn disabled and
+ * says why on hover: the menu saves and runs in one click, and a run against it would
+ * be refused.
  */
 function AgentRow({
   agent,

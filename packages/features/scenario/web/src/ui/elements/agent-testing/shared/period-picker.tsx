@@ -1,14 +1,5 @@
 /**
  * The window the Results tab reads, in the two forms the surface uses.
- *
- * The full form heads the Test Runs list. The compact form sits at the foot of
- * the runs rail and opens upwards, so the window stays reachable without
- * taking a line of the rail.
- *
- * Both forms are the shared {@link PeriodSelector}: the same presets and the
- * same free start and end dates as everywhere else in the app, so any window
- * can be read, not only the short ones.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

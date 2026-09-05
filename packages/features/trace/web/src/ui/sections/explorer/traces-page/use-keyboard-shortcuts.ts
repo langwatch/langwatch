@@ -28,13 +28,9 @@ export const useSidebarShortcut = (): void => {
 };
 
 /**
- * Cmd/Ctrl+F: 1st press opens our in-page find over loaded trace data;
- * 2nd press (while open) closes our overlay and lets the browser's native
- * find take over — no preventDefault on the second press.
- *
- * Registered at capture phase so we beat any TipTap / editor handler that
- * might preventDefault first, and `key.toLowerCase()` because Caps Lock
- * produces "F" without shiftKey.
+ * Cmd/Ctrl+F: 1st press opens our in-page find over loaded trace data; 2nd press (while
+ * open) closes our overlay and lets the browser's native find take over — no
+ * preventDefault on the second press.
  */
 export const useFindShortcut = (): void => {
   useEffect(() => {
@@ -44,14 +40,7 @@ export const useFindShortcut = (): void => {
         return;
       }
 
-      // Our in-page find is a table-only affordance. Surrender the
-      // shortcut to the browser's native find whenever the trace
-      // drawer is open or the user's focus is inside an interactive
-      // control (an input, contentEditable, button or link inside the
-      // drawer's span tree, etc.). Without this gate, pressing ⌘F
-      // while reading a span panel would hijack the keystroke and
-      // pop our table-overlay find — which can't even see the text
-      // the user was trying to search.
+      // Our in-page find is a table-only affordance.
       if (useDrawerStore.getState().isOpen) return;
       if (isInteractiveTarget(e.target)) return;
 
@@ -73,13 +62,7 @@ export const useFindShortcut = (): void => {
 };
 
 /**
- * Same idea as `isTextInput`, broadened. Treats anything obviously
- * "the user is interacting with this" as a reason to surrender a
- * page-global shortcut — inputs, contentEditable, ARIA roles that
- * imply text or selection interaction, plus elements inside an open
- * dialog or drawer. We don't enumerate every interactive role
- * because the drawer-open guard at the call site catches the
- * common case; this helper is the belt to that suspenders.
+ * Same idea as `isTextInput`, broadened.
  */
 const isInteractiveTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
@@ -112,11 +95,8 @@ export const useShortcutsHelpShortcut = (): void => {
 
 /**
  * Escape clears the bulk selection when one is active. We claim the event
- * (stopPropagation + preventDefault) so the drawer's Escape handler doesn't
- * also fire and close it — clearing selection should be the smaller undo.
- *
- * When no selection is active the handler bails early and other Escape
- * listeners (drawer close, modal dismiss) handle the key as usual.
+ * (stopPropagation + preventDefault) so the drawer's Escape handler doesn't also fire
+ * and close it — clearing selection should be the smaller undo.
  */
 export const useClearSelectionShortcut = (): void => {
   useEffect(() => {

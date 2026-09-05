@@ -1,8 +1,5 @@
 /**
  * Types for Batch Evaluation Results visualization
- *
- * These types support both V2 evaluations (single target, tab-based evaluators)
- * and V3 evaluations (multiple targets, inline evaluators per target).
  */
 
 import {
@@ -99,10 +96,9 @@ export type BatchTargetColumn = {
   id: string;
   name: string;
   /**
-   * The name to show the reader. Two targets on one board can carry the
-   * identical stored `name`, so this adds the same "(1)" / "(2)" suffix the
-   * workbench adds, over the columns this run renders. Optional, so callers
-   * that build a column literal fall back to `name`.
+   * The name to show the reader. Two targets on one board can carry the identical
+   * stored `name`, so this adds the same "(1)" / "(2)" suffix the workbench adds, over
+   * the columns this run renders.
    */
   displayName?: string;
   type: "prompt" | "agent" | "evaluator" | "custom" | "legacy";
@@ -146,42 +142,25 @@ export type BatchComparisonVerdict = {
   winnerId: string | null;
   reasoning?: string | null;
   /**
-   * Text of the winning variant's actual output for this row, so the row
-   * cell can surface "what was right" alongside "why". Empty for a tie
-   * (nothing definitively won) or when the variant's row output can't be
-   * looked up (missing target / unresolved variant).
+   * Text of the winning variant's actual output for this row, so the row cell can
+   * surface "what was right" alongside "why".
    */
   winnerOutput?: string | null;
   /**
-   * Candidate ids the judge actually compared on THIS row (from the judge's
-   * own `inputs.candidates`), which can be a strict subset of the column's
-   * full `variants` — select_best_compare drops any candidate with no output
-   * for that row. Empty when the row's evaluation carried no candidate
-   * inputs (very old runs). Leaderboard aggregation must use this, not the
-   * column-wide variant list, or it fabricates matchups that never happened.
+   * Candidate ids the judge actually compared on THIS row (from the judge's own
+   * `inputs.candidates`), which can be a strict subset of the column's full `variants`
+   * — select_best_compare drops any candidate with no output for that row.
    */
   candidateIds?: string[];
   /**
-   * True when `winnerId === null` because the judge's label failed to
-   * resolve to any known variant (a stale/unrecognized slot), as opposed to
-   * a genuine tie verdict. Both currently collapse to `winnerId: null` for
-   * every existing consumer (a bar chart doesn't need the distinction), but
-   * Bradley-Terry aggregation does: a real tie is 0.5/0.5 evidence, an
-   * unresolved label is no evidence and the row must be skipped entirely.
+   * True when `winnerId === null` because the judge's label failed to resolve to any
+   * known variant (a stale/unrecognized slot), as opposed to a genuine tie verdict.
    */
   isUnresolved?: boolean;
   /**
-   * True when the row produced no verdict at all: the judge's two
-   * swap-and-reconcile passes named different winners, it answered with no
-   * winner in it, or it declined before calling because the row had fewer
-   * than two candidate outputs. A third reason for `winnerId === null`, and
-   * the one the reader most often paid for: `reasoning` holds the judge's own
-   * account of it, and showing that is the whole point of carrying these rows.
-   *
-   * Every consumer that reads `winnerId === null` as "tie" has to exclude
-   * these first. An unsettled row is not 0.5/0.5 evidence and not half a win;
-   * it is a row the run declined to draw a conclusion from, so it belongs in
-   * neither the win-rate chart's Tie bar nor the ranking.
+   * True when the row produced no verdict at all: the judge's two swap-and-reconcile
+   * passes named different winners, it answered with no winner in it, or it declined
+   * before calling because the row had fewer than two candidate outputs.
    */
   isUnsettled?: boolean;
 };
@@ -210,18 +189,6 @@ export type BatchComparisonColumn = {
   verdictsByRow: Record<number, BatchComparisonVerdict>;
   /**
    * Rows the judge ran on and declined to call, rather than rows it never saw.
-   *
-   * Counted because the leading cause is now swap-and-reconcile: the judge is
-   * asked twice with the candidate order reversed, and a disagreement between
-   * the two is recorded as no verdict. That is the right call — a flip under
-   * order is not a tie — but the row's evidence leaves the win graph with it,
-   * and enough of them will fragment the graph into groups the fit is not
-   * entitled to rank across. Without this count the reader is told the run
-   * "does not have enough overlap to rank these" with the reason discarded.
-   *
-   * Optional so an absent count states nothing rather than asserting zero —
-   * `detectComparisonColumns` always sets it, but a column built any other
-   * way should make no claim about rows it never counted.
    */
   rowsWithoutVerdict?: number;
 };
@@ -249,10 +216,9 @@ export type BatchEvaluationData = {
   /** Map of evaluator ID to display name */
   evaluatorNames: Record<string, string>;
   /**
-   * Comparison evaluator columns detected in this run. Empty when no
-   * evaluator emitted a tie or winning-variant label. Rendered as an
-   * extra "Winner" column per comparison evaluator after target columns.
-   * Optional so pre-existing test literals don't have to spell it out.
+   * Comparison evaluator columns detected in this run. Empty when no evaluator emitted
+   * a tie or winning-variant label. Rendered as an extra "Winner" column per comparison
+   * evaluator after target columns.
    */
   comparisonColumns?: BatchComparisonColumn[];
   /** Row data */
@@ -260,12 +226,7 @@ export type BatchEvaluationData = {
 };
 
 /**
- * Transforms raw ExperimentRunWithItems data into the row-based format
- * needed for TanStack Table display.
- */
-/**
- * Resolves a V2-style predicted output for the "output"/"end"/flat target
- * id, which may be flat (the output itself) or nested by node.
+ * Transforms raw ExperimentRunWithItems data into the row-based format needed for TanStack Table display.
  */
 const resolveV2OutputTargetPredicted = (
   predicted: Record<string, unknown>,
@@ -338,13 +299,6 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
 
   if (targets && targets.length > 0) {
     // V3 style with explicit targets.
-    //
-    // The run's Targets snapshot lists the whole board, so a run scoped to one
-    // column still declares its siblings. Render only the targets this run
-    // holds data for; a target with no rows shows an empty column with no
-    // output, no latency and no score. When the run holds data for none of
-    // them (it has just started, or its rows carry no target id), keep the
-    // declared list so the table is not empty.
     const targetIdsWithData = new Set<string>();
     for (const entry of dataset) {
       if (entry.targetId) targetIdsWithData.add(entry.targetId);
@@ -566,16 +520,9 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
 };
 
 /**
- * Peel the winning target's stored output to a display string. Handles the
- * three shapes we see in the wild:
- *   1. A plain string (single-output-field target unwrapped at storage).
- *   2. `{ output: "..." }` — the conventional flat-key shape.
- *   3. `{ output: { output: "...", confidence: "high" } }` — the double-
- *      wrap that happens when structured outputs get stored under an outer
- *      `output` key too.
- * Recurses into `.output` / `.answer` until it hits a scalar. Anything more
- * exotic than that gets JSON-stringified so the cell still shows *something*
- * instead of "[object Object]".
+ * Peel the winning target's stored output to a display string. Handles the three shapes
+ * we see in the wild: 1. A plain string (single-output-field target unwrapped at
+ * storage). 2. `{ output: "..." }` — the conventional flat-key shape. 3.
  */
 export const extractOutputText = (raw: unknown): string | null => {
   if (raw === null || raw === void 0) return null;
@@ -621,20 +568,6 @@ const readCandidateIds = (inputs: Record<string, unknown>): string[] => {
 
 /**
  * Detect comparison evaluators by observing their per-row label shapes.
- *
- * A comparison evaluator's label is either the winning candidate's target id
- * or prompt handle — the current contract — or a slot letter ("A" / "B" /
- * "tie") on runs stored before pairwise and N-way were merged.
- *
- * Variant identity comes from the judge's own inputs (`candidates`, or the
- * legacy `candidate_a_id` / `candidate_b_id`), which is authoritative: it
- * names every candidate even in a run where only one of them ever won.
- * Observed winning labels are the fallback when inputs aren't populated.
- *
- * Any non-tie label that names no known target still becomes a variant of its
- * own, keyed by the raw label. Dropping it would silently under-count a
- * winner — which is exactly what the old two-slot detection did to every
- * third-and-beyond variant.
  */
 const detectComparisonColumns = (
   evaluations: ExperimentRunWithItems["evaluations"],
@@ -655,35 +588,21 @@ const detectComparisonColumns = (
   const resolveToTargetId = (identifier: string): string | undefined =>
     targetIdByAnyKey.get(identifier);
 
-  // Every target column with `type: "evaluator"` is treated as a comparison
-  // column-target — the synthetic evaluator generated for it stores
-  // evaluator id == target id, and no scalar evaluator ever ends up as a
-  // top-level target column in this UI. Pre-populating buckets from these
-  // means chip suppression + win-rate chart wire up even when the run's
-  // evaluations echo an unusual label shape (dogfood: label sometimes echoes
-  // an identifier we don't have in `targetColumns` — the strict shape check
-  // dropped whole evaluators on the floor and both fixes silently no-op'd).
+  // Every target column with `type: "evaluator"` is treated as a comparison column-target — the synthetic
+  // evaluator generated for it stores evaluator id == target id, and no scalar evaluator ever ends up as a
+  // top-level target column in this UI.
   const forcedComparisonEvaluatorIds = new Set(
     targetColumns.filter((t) => t.type === "evaluator").map((t) => t.id),
   );
 
   const isSlotLabel = (v: string): v is "A" | "B" | "tie" => v === "A" || v === "B" || v === "tie";
 
-  // "tie" is valid vocabulary under BOTH the legacy 2-slot and current N-way
-  // contract, so seeing it alone is not evidence of the legacy shape — only
-  // "A"/"B" are. Treating "tie" as slot evidence (as `isSlotLabel` does for
-  // the label-shape filter below) made an all-tie bucket with no resolvable
-  // candidate ids wrongly fall back to a hardcoded 2-variant slice, silently
-  // dropping any 3rd+ variant.
+  // "tie" is valid vocabulary under BOTH the legacy 2-slot and current N-way contract,
+  // so seeing it alone is not evidence of the legacy shape — only "A"/"B" are.
   const isLegacySlotLabel = (v: string): v is "A" | "B" => v === "A" || v === "B";
 
-  // Also treat any evaluator whose type or display name looks like a
-  // comparison judge as one, even if this row's label doesn't match a known
-  // target id or slot letter. Real-world dogfood found the label sometimes
-  // echoes an identifier we don't have in `targetColumns` (e.g. a prompt
-  // handle resolved by langevals but not reflected in the run's targets
-  // snapshot), and the strict shape check silently dropped the whole
-  // evaluator on the floor — chip suppression + win-rate chart both no-op'd.
+  // Also treat any evaluator whose type or display name looks like a comparison judge
+  // as one, even if this row's label doesn't match a known target id or slot letter.
   const isComparisonEvaluator = (ev: ExperimentRunWithItems["evaluations"][number]) => {
     const fields = [ev.evaluator ?? "", ev.name ?? ""].map((f) => f.toLowerCase());
     return fields.some(
@@ -733,13 +652,8 @@ const detectComparisonColumns = (
       continue;
     }
     if (isSkippedComparison) {
-      // A comparison that reached no verdict: the row had too few outputs to
-      // judge, or it was judged and the answer could not be used. Counted for
-      // `rowsWithoutVerdict`, which is the explanation for a win graph that
-      // later fails to connect, AND carried through as a verdict of its own so
-      // the row can say which of those happened instead of showing a bare
-      // dash. Every one of them carries that explanation, and the ones that
-      // reached the judge were paid for.
+      // A comparison that reached no verdict: the row had too few outputs to judge, or
+      // it was judged and the answer could not be used.
       const skippedKey = ev.name ? `${ev.evaluator}::${ev.name}` : ev.evaluator;
       skippedByKey.set(skippedKey, (skippedByKey.get(skippedKey) ?? 0) + 1);
     }
@@ -776,14 +690,8 @@ const detectComparisonColumns = (
       buckets.set(key, bucket);
     }
 
-    // Snapshot the judge's own view of who it compared. Authoritative: it
-    // names every candidate even when only one of them ever wins.
-    //
-    // Resolved fresh per row (not just merged into the column-wide
-    // `bucket.candidateIds` union below) — select_best_compare drops any
-    // candidate with no output for a given row, so row 7 may have compared
-    // only 2 of the column's 3 variants while row 8 compared all 3. Only the
-    // per-row set is truthful evidence for leaderboard aggregation.
+    // Snapshot the judge's own view of who it compared. Authoritative: it names every
+    // candidate even when only one of them ever wins.
     const rowCandidateIds = readCandidateIds(ev.inputs ?? {}).map(
       (id) => resolveToTargetId(id) ?? id,
     );
@@ -878,12 +786,7 @@ const detectComparisonColumns = (
         winnerId = null;
       } else {
         // Reuse the same A/B-position mapping every other surface uses
-        // (resolveVerdictLabel) instead of re-deriving it here, so the two
-        // never drift. `variants` can carry a null-id padding slot (see
-        // above) — map those to "" so resolveVerdictLabel's `?? label`
-        // fallback (meant for "position doesn't exist") isn't triggered by
-        // "position exists but has no real id"; both cases are handled the
-        // same way just below (treated as no resolvable winner).
+        // (resolveVerdictLabel) instead of re-deriving it here, so the two never drift.
         const resolved = resolveExperimentVerdictLabel({
           label: rawLabel,
           variants: variants.map((v) => v.id ?? ""),

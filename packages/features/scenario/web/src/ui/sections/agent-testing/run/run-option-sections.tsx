@@ -1,10 +1,6 @@
 /**
- * The blocks the chips add beyond the note and the parameters: the simulation
- * models, and the repeat count.
- *
- * Each block carries the control that takes it away again, and removing one
- * puts its value back to what the run would carry without it.
- *
+ * The blocks the chips add beyond the note and the parameters: the simulation models,
+ * and the repeat count.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

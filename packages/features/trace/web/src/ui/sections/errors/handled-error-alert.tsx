@@ -43,13 +43,8 @@ export interface HandledErrorAlertProps {
 }
 
 /**
- * The inline counterpart to `showErrorToast` — same copy, same affordances,
- * rendered in place instead of over the top.
- *
- * Use this wherever the error belongs to a region of the page rather than to a
- * moment: a panel that failed to load, a form that was rejected, a step that
- * can't proceed. A toast is for something that just happened; an alert is for
- * something that is still true.
+ * The inline counterpart to `showErrorToast` — same copy, same affordances, rendered in
+ * place instead of over the top.
  */
 export function HandledErrorAlert({
   error,

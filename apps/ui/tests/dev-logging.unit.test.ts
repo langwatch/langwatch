@@ -1,10 +1,7 @@
 /**
- * @vitest-environment node
- *
  * The dev server's own lane format, and the one place the proxy's failures are
  * collapsed.
- *
- * Corresponds to specs/setup/dev-stack-log-format.feature.
+ * @vitest-environment node
  */
 
 import { describe, expect, it } from "vitest";

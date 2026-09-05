@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration coverage for specs/traces-v2/media-rendering.feature.
- *
- * Renders both trace UIs with image / attachment / audio message content and
- * asserts real media widgets appear (inline image, attachment chip, player)
- * instead of a raw JSON dump — including when the media hides inside a
- * typed-raw envelope whose value is a JSON string.
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

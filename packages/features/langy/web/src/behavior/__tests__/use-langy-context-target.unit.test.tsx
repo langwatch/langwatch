@@ -1,18 +1,7 @@
 /**
+ * The claims this feature stands or falls on: 1. ZERO cost while disarmed — with the
+ * panel closed AND with it open.
  * @vitest-environment jsdom
- *
- * The claims this feature stands or falls on:
- *   1. ZERO cost while disarmed — with the panel closed AND with it open. No
- *      class, no visual state, no inline style, not draggable, and the page's
- *      own click behaviour untouched. The one thing a registered target does
- *      carry is its locating id, which paints nothing and listens to nothing:
- *      the panel → page spotlight has to be able to find the card a chip names
- *      without the user first arming anything.
- *   2. Offered — armed, or briefly revealed — a target lights up and a click
- *      means "give this to Langy" instead of whatever the surface's click meant.
- *   3. A `#trace` reveal makes the same offer the armed page does. It used to
- *      light rows up and answer to nothing, which made the palette's own promise
- *      ("anything that lights up can be added as context") untrue.
  */
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -57,12 +46,6 @@ describe("useLangyContextTarget", () => {
   beforeEach(reset);
 
   // Registration does NOT wait for the panel to open.
-  //
-  // It used to, and that made the arming gesture a lie: the page armed, told
-  // the reader to "click anything highlighted", and registered nothing — so
-  // there was nothing to highlight and nothing to click. Pointing at something
-  // before opening Langy is the ordinary way to use this, and with the peek
-  // shipped a closed panel is how Langy sits most of the time.
   describe("given the Langy panel is closed", () => {
     describe("when a target renders unarmed", () => {
       it("registers itself, so the page knows what it has", () => {

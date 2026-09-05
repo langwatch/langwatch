@@ -1,10 +1,5 @@
 // @vitest-environment jsdom
 /**
- * The conversation column's scroll-shadow source of truth: the top mask fade
- * may only dim content that is actually scrolled off above, never the first
- * message at rest. jsdom has no layout, so `scrollTop` is set directly and the
- * scroll event dispatched by hand; the listener and state are the real thing.
- *
  * Spec: specs/langy/langy-panel-layout.feature
  * ("The conversation fades at the top only once messages are scrolled off above")
  */

@@ -39,16 +39,7 @@ export function getEffectiveLens(state: {
 }): LensConfig | null {
   const lens = state.allLenses.find((l) => l.id === state.activeLensId) ?? state.allLenses[0];
   if (!lens) return null;
-  // Reconcile addons against the LIVE grouping's capability — not the
-  // saved lens's. The saved lens stores whatever addons matched its
-  // original grouping (e.g. `io-preview` + `expanded-peek` for a flat
-  // trace lens), but switching the active grouping to a grouped or
-  // conversation mode swaps the RowKind under the table. Without this
-  // filter, getEffectiveLens hands the renderer addons the new RowKind
-  // doesn't know how to mount, which renders as either nothing or, on
-  // a flat→group switch, the wrong second-row decoration on every
-  // group row. `reconcileAddons` drops the unknowns and returns the
-  // valid subset.
+  // Reconcile addons against the LIVE grouping's capability — not the saved lens's.
   const capability = LENS_CAPABILITIES[state.grouping];
   return {
     ...lens,
@@ -98,10 +89,8 @@ interface DraftLensState {
 }
 
 /**
- * Fields the rich create dialog can supply when materialising a brand-new lens
- * instead of snapshotting the active table state. Anything omitted falls back
- * to the live `viewStore` values (so the existing fast-path popover can keep
- * calling `createLens(name)` without changes).
+ * Fields the rich create dialog can supply when materialising a brand-new lens instead
+ * of snapshotting the active table state.
  */
 export interface LensDraftInput {
   columns: string[];
@@ -134,20 +123,17 @@ interface ViewState {
   duplicateLens: (lensId: string) => string;
   deleteLens: (lensId: string) => void;
   /**
-   * Replace all non-built-in lenses with the supplied list, sourced from
-   * the server (kind=v2-traces-lens). Built-in lenses are preserved in
-   * place, dismissed built-ins stay dismissed. Used by `useLensSync` to
-   * keep the store in lockstep with the SavedView table.
+   * Replace all non-built-in lenses with the supplied list, sourced from the server
+   * (kind=v2-traces-lens). Built-in lenses are preserved in place, dismissed built-ins
+   * stay dismissed.
    */
   setUserLenses: (lenses: LensConfig[]) => void;
 }
 
 /**
- * Optional bridge for mirroring lens mutations to the server. When set
- * (typically by `useLensSync`), the store calls these alongside its
- * local writes so localStorage stays a hot cache and the server stays
- * the source of truth. Mutations are fire-and-forget — the hook owns
- * refetch + error reporting.
+ * Optional bridge for mirroring lens mutations to the server. When set (typically by
+ * `useLensSync`), the store calls these alongside its local writes so localStorage
+ * stays a hot cache and the server stays the source of truth.
  */
 export interface LensSyncBridge {
   create: (lens: LensConfig & { /** Optional client-suggested id. */ id: string }) => void;
@@ -163,15 +149,9 @@ export function setLensSyncBridge(bridge: LensSyncBridge | null): void {
 
 const DISMISSED_BUILTINS_KEY = "langwatch:traces-v2:dismissed-builtins:v1";
 const DRAFTS_KEY = "langwatch:traces-v2:drafts:v1";
-// Last-used lens id. Deliberately NOT project-scoped: built-in lens ids
-// (all-traces / simplified / conversations / …) are identical across every
-// project, so a single global key restores the user's preferred view
-// cross-project. A custom lens id only exists in its own project, so on a
-// different project it simply won't be found and the store falls back to
-// the default — the desired behaviour. The lens is otherwise URL-fragment
-// driven (`useURLSync`); this key is the fallback the fragment reader
-// consults when a bare URL carries no lens, so returning to a lensless URL
-// restores the last-used view instead of snapping back to All.
+// Last-used lens id. Deliberately NOT project-scoped: built-in lens ids (all-traces /
+// simplified / conversations / …) are identical across every project, so a single
+// global key restores the user's preferred view cross-project.
 export const ACTIVE_LENS_KEY = "langwatch:traces-v2:active-lens:v1";
 
 /**
@@ -218,13 +198,9 @@ function migrateGrouping(value: unknown): GroupingMode | undefined {
   return isGroupingMode(value) ? value : undefined;
 }
 
-// Custom lenses no longer round-trip through localStorage. They live on
-// the server (SavedView table, kind="v2-traces-lens") and `useLensSync`
-// pushes them into the store via `setUserLenses` whenever the tRPC
-// query resolves. Drift between tabs is handled by React Query's
-// `refetchOnWindowFocus`; failed mutations roll back via the same
-// invalidate-on-error path. Keeping a localStorage shadow would just
-// be another source of inconsistency.
+// Custom lenses no longer round-trip through localStorage. They live on the server
+// (SavedView table, kind="v2-traces-lens") and `useLensSync` pushes them into the store
+// via `setUserLenses` whenever the tRPC query resolves.
 
 function isSortConfig(value: unknown): value is SortConfig {
   if (!value || typeof value !== "object") return false;
@@ -317,19 +293,9 @@ const builtInLenses: LensConfig[] = [
     filterText: "",
   },
   {
-    // Low-density alternative to the All lens: input / output split into
-    // their own columns instead of smashed into the composite
-    // `trace (summary)` cell + the `io-preview` second-row addon. Built
-    // for non-engineering users who want to scan messages without the
-    // engineering chrome.
-    //
-    // Deliberately does NOT include the `io-preview` addon. The whole
-    // point of this lens is that I/O lives in regular table columns, not
-    // a wrap-prone second row beneath every trace. Engineers who want the
-    // dense composite view stay on the All lens.
-    //
-    // Named "Simplified" rather than "Basic" — "Basic" reads as
-    // diminished/insufficient; "Simplified" reads as a deliberate choice.
+    // Low-density alternative to the All lens: input / output split into their own
+    // columns instead of smashed into the composite `trace (summary)` cell + the
+    // `io-preview` second-row addon.
     id: "simplified",
     name: "Simplified",
     isBuiltIn: true,
@@ -524,37 +490,13 @@ function clearDraftFor(
 /**
  * Push a lens's saved filter into the filter store. Imperative one-way write —
  * viewStore never subscribes to filterStore.
- *
- * Corrupt saved text does not surface a parse error to the user, but that
- * fallback belongs to `setFilterFromLens`, which returns an empty AST when
- * `safeParseAndSerialize` reports a parse error. It does not throw, so there is
- * nothing here to catch: a `try`/`catch` around this call would only swallow a
- * real, unexpected failure to install the lens's filter — leaving the user on
- * the previous lens's filter with no indication anything went wrong.
  */
 function applyFilterTextFromLens(text: string): void {
   useFilterStore.getState().setFilterFromLens(text);
 }
 
 /**
- * Drop the trace list's keyset cursors whenever the sort that minted them
- * changes.
- *
- * The list is keyset-paged: a cursor carries the `sortValue` of the last row
- * of the previous batch, and the server compares it against whatever the
- * CURRENT sort expression is. So a cursor minted while sorting by Cost
- * (`sortValue: 0.0042`) carried into a time-ordered query becomes
- * `toUnixTimestamp64Milli(OccurredAt) < 0.0042` — a batch that matches
- * nothing. `totalHits` is computed without the cursor and keeps reporting the
- * full count, and `Pagination` derives its row range from the page number
- * rather than from the rows that came back, so the empty state never shows:
- * the user is left staring at a blank table still captioned with the whole
- * count and a live-looking range ("… traces · showing 101–101" on page 3),
- * and switching back doesn't recover because the stale cursor is still in the
- * store. Direction flips the comparison operator, so it invalidates cursors
- * for the same reason.
- *
- * Imperative one-way write — viewStore never subscribes to filterStore.
+ * Drop the trace list's keyset cursors whenever the sort that minted them changes.
  */
 function dropKeysetCursorsIfSortChanged({
   previous,
@@ -618,33 +560,9 @@ export const useViewStore = create<ViewState>((set, get) => ({
     });
   },
 
-  // Every per-view tweak goes through `draftState` regardless of whether
-  // the active lens is built-in or custom. The "unsaved" dot on the lens
-  // tab keys off `isDraft(lensId)`, so showing it for built-ins requires
-  // tracking those drafts too. Built-in lenses can't be saved into
-  // localStorage (the menu's Save item stays disabled), but the user can
-  // duplicate to keep the changes.
-  //
-  // Pagination invalidation: a new sort is reachable from many actions, and
-  // the cursors it invalidates are dropped on two different axes.
-  //
-  // `setSort` (here) and `setGrouping` (below) install a sort WITHOUT touching
-  // the filter, so they are the only paths that call
-  // `dropKeysetCursorsIfSortChanged` explicitly — the guard lives here rather
-  // than at the UI call sites because a new sort is reachable both by clicking
-  // a header AND by switching grouping, and the grouping path is the one that
-  // shipped without it.
-  //
-  // Every OTHER path that installs a sort — `selectLens`, `createLens` (with
-  // overrides), `revertLens`, `duplicateLens`, `deleteLens` and
-  // `setUserLenses` — is applying a lens, and so also calls
-  // `applyFilterTextFromLens`. That resets `page`/`pageCursors` inside
-  // `setFilterFromLens`, which is why those paths are safe today. That safety
-  // is INCIDENTAL: they are covered on the filter axis, not the sort axis. If
-  // `setFilterFromLens` ever stops resetting pagination, or a lens-applying
-  // path stops pushing the lens's filter text, every one of them starts
-  // carrying stale cursors into a new sort — add the explicit guard there
-  // rather than assuming the side effect still holds.
+  // Every per-view tweak goes through `draftState` regardless of whether the active
+  // lens is built-in or custom. The "unsaved" dot on the lens tab keys off
+  // `isDraft(lensId)`, so showing it for built-ins requires tracking those drafts too.
   setSort: (sort) => {
     dropKeysetCursorsIfSortChanged({ previous: get().sort, next: sort });
     set((s) => ({
@@ -654,17 +572,8 @@ export const useViewStore = create<ViewState>((set, get) => ({
   },
 
   setGrouping: (mode) => {
-    // Each grouping mode renders a different RowKind with its own column
-    // registry — e.g. flat knows `time/trace/service`, group knows
-    // `group/count/duration`. Without reconciling, the old columnOrder
-    // is carried over and the renderer silently drops every id the new
-    // registry doesn't recognise, leaving the user with a table missing
-    // its group-label column (or any meaningful headers at all).
-    //
-    // reconcileColumns drops invalid ids (keeping eval:* for the trace
-    // capability) and falls back to the capability's defaults when nothing
-    // survives — matching what LensConfigDialog does when the user picks a
-    // new grouping in the rich editor.
+    // Each grouping mode renders a different RowKind with its own column registry —
+    // e.g. flat knows `time/trace/service`, group knows `group/count/duration`.
     const s = get();
     const capability = LENS_CAPABILITIES[mode];
     const columns = reconcileColumns({ ids: s.columnOrder, capability });
@@ -757,12 +666,9 @@ export const useViewStore = create<ViewState>((set, get) => ({
 
   isDraft: (lensId) => get().draftState.has(lensId),
 
-  // Snapshot the current view (columns, grouping, sort, filter text) into a
-  // new persisted lens. Both "Create lens" (from scratch) and "Save as new
-  // lens" (fork from current) flows go through here — the only difference
-  // is the supplied name. The rich Configure dialog passes `overrides` so
-  // every field is explicit; the popover fast-path omits them and we
-  // snapshot live `viewStore` state.
+  // Snapshot the current view (columns, grouping, sort, filter text) into a new
+  // persisted lens. Both "Create lens" (from scratch) and "Save as new lens" (fork from
+  // current) flows go through here — the only difference is the supplied name.
   createLens: (name, overrides) => {
     const id = generateId();
     const state = get();
@@ -891,14 +797,8 @@ export const useViewStore = create<ViewState>((set, get) => ({
       const userLenses = lenses.map((l) => ({ ...l, isBuiltIn: false }));
       const allLenses = [...builtIns, ...userLenses];
 
-      // The persisted last-used lens may be a CUSTOM lens that only becomes
-      // available once its project's lenses hydrate (possibly across several
-      // partial payloads). Restore it whenever we're still on the default
-      // lens — no one-shot latch, so a late/partial first payload can't
-      // permanently block the restore. The `activeLensId === "all-traces"`
-      // guard is self-limiting: once restored (or once the user picks
-      // anything), the active lens is no longer the default, so subsequent
-      // hydrations skip and an explicit choice is never clobbered.
+      // The persisted last-used lens may be a CUSTOM lens that only becomes available
+      // once its project's lenses hydrate (possibly across several partial payloads).
       const persisted = getPersistedActiveLensId();
       if (s.activeLensId === "all-traces" && persisted && persisted !== s.activeLensId) {
         const target = allLenses.find((l) => l.id === persisted);

@@ -1,11 +1,5 @@
 /**
  * The failure surfaces this package renders INTO a page.
- *
- * Reporting a failure OVER the page is `showErrorToast` in
- * `@langwatch/ui-host/errors`, and the words for a code come from the one
- * code-keyed registry, `@langwatch/handled-error/presentation`. What is left
- * here is the rendering: an inline alert and a whole-page dead end, which have
- * no counterpart on the feedback port because they are layout, not a report.
  */
 
 import { Alert, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
@@ -41,11 +35,6 @@ export function FormServerError({ form }: { form: MinimalForm }) {
 
 /**
  * The two ways out a failed panel offers.
- *
- * `~/features/errors/components/ErrorActions` rendered a retry and a "contact
- * support" that reached the application's support widget. The retry travels;
- * the support link does not, because a feature package has no support channel
- * of its own — a caller that wants one passes `children`.
  */
 export function ErrorActions({
   onRetry,

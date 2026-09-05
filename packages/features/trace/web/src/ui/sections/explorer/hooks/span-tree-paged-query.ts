@@ -6,20 +6,14 @@ import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { api, type RouterOutputs } from "../../trace-api";
 
 /*
- * Traces can carry 20k–100k+ spans, so the span tree is never fetched as a
- * single response. The tRPC `spanTree` procedure remains the cache-key anchor
- * — preview-mode seeding, SSE invalidation, refresh, and close-time cancel all
- * go through `utils.tracesV2.spanTree` — but nothing fetches through it any
- * more: the query function built here pages through `spanTreePaginated` and
- * assembles the tree client-side, publishing pages progressively so the
- * waterfall starts painting after the first page.
+ * Traces can carry 20k–100k+ spans, so the span tree is never fetched as a single
+ * response.
  */
 
 /**
- * Rows per `spanTreePaginated` page: large enough that the common trace
- * (p999 ≈ 312 spans) still loads in one round trip, small enough that a
- * 100k-span trace streams into the waterfall instead of stalling on one
- * giant response.
+ * Rows per `spanTreePaginated` page: large enough that the common trace (p999 ≈ 312
+ * spans) still loads in one round trip, small enough that a 100k-span trace streams
+ * into the waterfall instead of stalling on one giant response.
  */
 export const SPAN_TREE_PAGE_SIZE = 500;
 
@@ -75,23 +69,9 @@ export async function fetchSpanTreePages({
     const nodes = [...nodesById.values()];
     return needsSort ? nodes.sort(bySpanTreeOrder) : nodes;
   };
-  // Vanilla-client queries, not `utils.….fetch`: the abort signal reaches
-  // the in-flight HTTP request (closing the drawer cancels mid-page, not
-  // just between pages), and no throwaway per-page React Query cache
-  // entries are created — the assembled tree lives under the spanTree key.
-  //
-  // `utils.client` is not the vanilla client — `useUtils()` hands back
-  // `createTRPCClientProxy(client)`, and that proxy only resolves a key to the
-  // real client when the client *owns* it. `query` lives on
-  // `TRPCUntypedClient.prototype`, so `utils.client.query` is a recursive path
-  // proxy instead; binding it yields a function that throws on call
-  // (`clientCallTypeToProcedureType("bind")` is `undefined`). `getUntypedClient`
-  // unwraps the proxy back to the client the provider was built with.
-  //
-  // Dot-path form with a pinned signature: the typed proxy cannot wrap this
-  // router (its `subscription` procedure collides with the proxy's reserved
-  // method names), and `query`'s own generic is keyed to the empty v10 legacy
-  // `_def.queries` interop shape, so neither types this call natively.
+  // Vanilla-client queries, not `utils.….fetch`: the abort signal reaches the in-flight HTTP request (closing
+  // the drawer cancels mid-page, not just between pages), and no throwaway per-page React Query cache entries
+  // are created — the assembled tree lives under the spanTree key.
   const client = getUntypedClient(
     utils.client as unknown as Parameters<typeof getUntypedClient>[0],
   );
@@ -125,11 +105,7 @@ export async function fetchSpanTreePages({
 }
 
 /**
- * Query function for the span-tree cache entry. Progressive publishing only
- * kicks in while the entry is smaller than what has been fetched — during a
- * refetch (SSE invalidation, refresh) the cache still holds the full previous
- * tree, and publishing a smaller partial would collapse the waterfall and
- * re-grow it page by page.
+ * Query function for the span-tree cache entry.
  */
 export function spanTreeQueryFn({
   utils,
@@ -155,24 +131,8 @@ export function spanTreeQueryFn({
 }
 
 /**
- * Lower bound for the live-delta poll over a loaded tree: 1ms before the
- * newest ROW VERSION it holds.
- *
- * Keyed on `updatedAtMs`, not `startTimeMs`. A span updated in place — end
- * time, duration, status, cost, all re-projected as it closes — keeps its
- * start time, so a start-keyed mark can only ever surface brand-new spans.
- * The root span is the worst case: it starts first and ends last, so its
- * duration (and with it the waterfall's whole time scale) stayed frozen at
- * first projection for as long as SSE was down.
- *
- * Both bounds are ms-truncated from `DateTime64(3)`, so a row written later
- * within the same millisecond as the mark would be missed by a strict `>`;
- * backing off 1ms re-fetches the boundary rows and
- * {@link mergeSpanTreeDelta} dedupes them.
- *
- * 0 for an empty tree, so a live trace whose spans haven't been ingested yet
- * still picks them up — and likewise for preview fixtures carrying no
- * version, where the mark corrects itself on the first server-sourced row.
+ * Lower bound for the live-delta poll over a loaded tree: 1ms before the newest ROW
+ * VERSION it holds.
  */
 export function spanTreeDeltaSinceMs(nodes: SpanTreeNode[]): number {
   let highWaterMs = 0;
@@ -193,12 +153,9 @@ function sameNode(a: SpanTreeNode, b: SpanTreeNode): boolean {
 }
 
 /**
- * Merges a `spanTreeDelta` result into the assembled tree: dedupes by spanId
- * (a delta row is the span's latest version, so it wins), keeps the tree in
- * `(startTimeMs, spanId)` order, and returns the SAME array reference when
- * nothing actually changed — the delta poll re-fetches boundary rows every
- * cycle, and an unchanged reference keeps React Query consumers from
- * re-rendering on quiet polls.
+ * Merges a `spanTreeDelta` result into the assembled tree: dedupes by spanId (a delta row is the span's latest version, so it wins), keeps
+ * the tree in `(startTimeMs, spanId)` order, and returns the SAME array reference when nothing actually changed — the delta poll re-fetches
+ * boundary rows every cycle, and an unchanged reference keeps React Query consumers from re-rendering on quiet polls.
  */
 export function mergeSpanTreeDelta(
   existing: SpanTreeNode[],

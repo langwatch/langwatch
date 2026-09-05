@@ -67,16 +67,8 @@ interface IntegrateDrawerProps {
 }
 
 /**
- * Side drawer that hosts the integration journey: mint a token, then
- * pick a path. Triggered from the empty state's "Integrate" CTA.
- *
- * Token generation lives *inside* the drawer (not in the empty-state
- * hero) so the empty state stays a quiet, atmospheric preview while
- * the drawer becomes the focused "I'm doing real setup now" surface.
- *
- * Once minted, the freshly-scoped PAT is plumbed through every path
- * via `ActiveProjectProvider` — every lifted onboarding screen reads
- * `project.apiKey` unmodified and gets the right credential.
+ * Side drawer that hosts the integration journey: mint a token, then pick a path.
+ * Triggered from the empty state's "Integrate" CTA.
  */
 export function IntegrateDrawer({
   open,
@@ -129,14 +121,9 @@ export function IntegrateDrawer({
 }
 
 /**
- * Body of the integration journey — extracted from the drawer so the
- * full-screen `IntegratePane` (no-traces page) can render the same
- * content inline without re-implementing the API-key-then-tab pattern.
- * The drawer wraps this in `Drawer.Body` chrome; the pane wraps it in
- * its own focused layout.
- *
- * State is hoisted out (token, segment, active description) so the
- * parent owns persistence across keyboard shortcut listeners etc.
+ * Body of the integration journey — extracted from the drawer so the full-screen
+ * `IntegratePane` (no-traces page) can render the same content inline without
+ * re-implementing the API-key-then-tab pattern.
  */
 interface IntegrationContentProps {
   organizationId: string;
@@ -147,10 +134,8 @@ interface IntegrationContentProps {
   onSegmentChange: (segment: Segment) => void;
   activeSegmentDescription: string;
   /**
-   * When false, the S/M/P/I keyboard shortcuts are suppressed. The
-   * drawer passes `enabled={open}` so shortcuts only fire while the
-   * drawer is open. `IntegratePane` omits this prop — it defaults to
-   * `true`, so shortcuts are always active when the pane is mounted.
+   * When false, the S/M/P/I keyboard shortcuts are suppressed. The drawer passes
+   * `enabled={open}` so shortcuts only fire while the drawer is open.
    */
   enabled?: boolean;
 }

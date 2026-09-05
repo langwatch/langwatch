@@ -1,9 +1,7 @@
 /**
- * The failed-block disclosure (ADR-060 §8) — a block that could not be
- * salvaged or did not validate, rendered as a collapsed one-line note that
- * expands to the raw fenced text. Never a guessed card, never silent
- * removal: a failure may never be quieter than a success, and the raw text
- * is the reader's evidence of what the model actually wrote.
+ * The failed-block disclosure (ADR-060 §8) — a block that could not be salvaged or did
+ * not validate, rendered as a collapsed one-line note that expands to the raw fenced
+ * text.
  */
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import type { LangyCardFailedPart } from "@langwatch/langy-contract";

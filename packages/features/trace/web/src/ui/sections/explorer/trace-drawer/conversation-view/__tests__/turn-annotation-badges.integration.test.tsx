@@ -1,11 +1,7 @@
 /**
+ * The badge on a turn that already carries annotations, and the way from that list into
+ * editing one.
  * @vitest-environment jsdom
- *
- * The badge on a turn that already carries annotations, and the way from that
- * list into editing one. The line the reviewer picks is the control: it is the
- * popover's anchor, it answers the keyboard, and a reviewer who may not edit
- * annotations is offered no control at all.
- * See specs/traces-v2/annotations.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

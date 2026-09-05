@@ -1,12 +1,5 @@
 /**
- * Langy mounts once per layout route; every route below a layout gets the
- * panel. Special-purpose screens (the CLI device approval) must sit outside
- * it, or the panel draws itself over a screen whose only job is one
- * confirmation.
- *
- * Asserted against the DESCRIPTOR table rather than a built router: the table
- * is where the nesting is decided, and reading it needs no document.
- *
+ * Langy mounts once per layout route; every route below a layout gets the panel.
  * Spec: specs/langy/langy-mount-scope.feature
  */
 import { describe, expect, it } from "vitest";

@@ -1,19 +1,5 @@
 /**
  * The configuration a run dialog opens on.
- *
- * "Last used for that suite" is the newest configuration of the scope, which
- * the run plans hold. A test suite carries no run option of its own, so this
- * read is what preselects the target, the comparison, the parameter overrides,
- * the repeat count and the simulation models.
- *
- * A subject that brought its own remembered configuration takes only one fact
- * from the read: whether the plan takes a note. A suite row holds no note, and
- * the words of a note belong to one run.
- *
- * The seed never pins the run name: the name keeps following the agent and the
- * scope until the person types one or picks an entry from the list. A stored
- * run plan opens on its own name, which the name field does for itself.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -57,10 +43,6 @@ function broughtOwnConfiguration(subject: RunDialogSubject): boolean {
 
 /**
  * What opening the dialog on this subject does to the fields.
- *
- * "wait" is not a decision: the fields have not been reset for this subject
- * yet, or the read has not answered, so nothing is settled and the next render
- * asks again.
  */
 type Seed =
   | { kind: "wait" }
@@ -70,9 +52,6 @@ type Seed =
 
 /**
  * The newest configuration this plan itself ran, whatever the scope ran since.
- *
- * A scope can hold several plans, so the newest entry of the scope may belong
- * to another one.
  */
 function ownEntryOf({
   subject,
@@ -87,12 +66,6 @@ function ownEntryOf({
 
 /**
  * What the dialog opens on.
- *
- * A subject that brought its own remembered configuration opens on that one,
- * whatever the scope ran with since. Only the note is missing from it: a suite
- * row holds no note, so whether the plan takes one is read off the plan's own
- * runs. Opening the note block adds an empty field and takes nothing away, so
- * it needs no guard on what the dialog already holds.
  */
 function seedFor({
   subject,

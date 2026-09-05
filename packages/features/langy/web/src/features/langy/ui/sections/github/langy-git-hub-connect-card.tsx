@@ -1,12 +1,6 @@
 /**
- * In-chat "Install the LangWatch GitHub App" card. Rendered by LangySidebar
- * when the assistant needs GitHub access it doesn't have yet, or proactively in
- * onboarding.
- *
- * Clicking the button opens the install popup; on success it resolves with the
- * installed account and the caller can refetch / replay the user's last prompt
- * so the conversation continues seamlessly.
- *
+ * In-chat "Install the LangWatch GitHub App" card. Rendered by LangySidebar when the
+ * assistant needs GitHub access it doesn't have yet, or proactively in onboarding.
  * Spec: specs/integrations/github-connection.feature.
  */
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";

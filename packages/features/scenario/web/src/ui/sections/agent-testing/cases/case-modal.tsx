@@ -1,15 +1,4 @@
 /**
- * Write or edit one scenario, in a right-side drawer.
- *
- * The drawer asks four questions: what the scenario is called, which suite it
- * belongs to, what the user is trying to do, and what the judge must check.
- * Everything else, the parameters, the turn limits and the model overrides,
- * waits behind a chip, so the four questions stay the whole form.
- *
- * The drawer is URL routed. Save & Run leaves the drawer through the
- * standard drawer navigation, and the page opens the run flow with the
- * saved scenario.
- *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/case-version-history.feature
  * @see dev/docs/best_practices/drawers.md

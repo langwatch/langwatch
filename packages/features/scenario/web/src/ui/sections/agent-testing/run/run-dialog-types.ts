@@ -1,7 +1,6 @@
 /**
- * What the run dialog is asked to run, and what its caller learns the moment
- * a run is queued.
- *
+ * What the run dialog is asked to run, and what its caller learns the moment a run is
+ * queued.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -20,11 +19,6 @@ export type RunTarget = NonNullable<TargetValue> & {
 
 /**
  * What the dialog is about to run.
- *
- * The first three arms fix the scope, so the dialog says nothing about what
- * runs. "plan" is the New run plan entry point, the one place the scope is
- * still being chosen. "case" fixes the scope to one scenario, and a run of it
- * goes out as an ordinary run plan named after that scenario and its agent.
  */
 export type RunDialogSubject =
   | { kind: "plan"; initialTarget: TargetValue }
@@ -43,14 +37,6 @@ export type RunDialogSubject =
       scope?: RunScope;
       /**
        * The name the row already answers to as a run plan.
-       *
-       * The dialog opens on it unchanged. A plan is identified by its name,
-       * and that name already ends with the target the plan runs against, so a
-       * name derived again would end with the target twice and the run would
-       * go out under a name no plan answers to, forking the plan.
-       *
-       * A test suite names none: it answers to no plan name, so a run of it
-       * derives one from the scope and the target.
        */
       planName?: string;
       /**

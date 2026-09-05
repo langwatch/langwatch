@@ -10,23 +10,9 @@ interface UseFirstTraceSpotlightTriggerArgs {
 }
 
 /**
- * One-shot automatic effect: the moment `hasAnyTraces` flips to true in
- * any project where we have not auto-fired the spotlight tour, start the
- * contextual walkthrough of the user's data.
- *
- * The server-backed user preference is the authoritative cross-project,
- * cross-browser dismissal. `firstTraceSpotlightFired` also prevents a
- * duplicate automatic start in the current browser before dismissal. See
- * specs/traces-v2/tour-visibility-and-persistence.feature
- *
- * Skipped silently when:
- *   - the project hasn't been resolved yet (projectId === null)
- *   - hasAnyTraces is still undefined (we don't know yet — don't fire)
- *   - the user already has spotlights running (don't yank them onto
- *     the first spotlight mid-flow)
- *   - the user is mid-legacy-tour (`tourActive` is true) — the legacy
- *     journey is dormant for new users but defensive in case it's
- *     somehow on
+ * One-shot automatic effect: the moment `hasAnyTraces` flips to true in any project
+ * where we have not auto-fired the spotlight tour, start the contextual walkthrough of
+ * the user's data.
  */
 export function useFirstTraceSpotlightTrigger({
   projectId,

@@ -1,13 +1,7 @@
 /**
+ * A suggested output is stored as a correction to the trace, so writing one has to make
+ * the drawer's copy of that correction stale.
  * @vitest-environment jsdom
- *
- * A suggested output is stored as a correction to the trace, so writing one has
- * to make the drawer's copy of that correction stale. Left cached, an edit
- * session started minutes later would build on the old one and undo the
- * suggestion when it saves. The same write also has to refresh the batched
- * annotation feed the conversation counts its turns from.
- * See specs/traces-v2/trace-edit-mode.feature and
- * specs/traces-v2/annotations.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";

@@ -1,9 +1,5 @@
 /**
  * Detection of comparison columns from a stored run.
- *
- * Exercised through `transformBatchEvaluationData` rather than the private
- * detector, because the winner-output lookup depends on rows the transformer
- * builds. These are the shapes that actually live in the database.
  */
 import { describe, expect, it } from "vitest";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
@@ -187,12 +183,9 @@ describe("detecting comparison columns", () => {
     });
 
     describe("when every row ties and inputs carry no candidate ids", () => {
-      // "tie" is valid vocabulary under both the legacy 2-slot and current
-      // N-way contract, so seeing it alone must NOT be treated as evidence
-      // of the legacy shape — only "A"/"B" are. A prior bug treated "tie"
-      // as slot evidence, so a genuinely-3-way bucket with no other signal
-      // wrongly fell back to a hardcoded 2-variant slice, silently dropping
-      // the third variant.
+      // "tie" is valid vocabulary under both the legacy 2-slot and current N-way
+      // contract, so seeing it alone must NOT be treated as evidence of the legacy
+      // shape — only "A"/"B" are.
       it("does not collapse to a hardcoded 2 variants", () => {
         const run = createRun([
           {
@@ -369,12 +362,8 @@ describe("detecting comparison columns", () => {
 
 describe("rows the judge declined to call", () => {
   /**
-   * Counted rather than discarded, because it is the explanation for a fit
-   * that later fails to connect. Swap-and-reconcile records no verdict when
-   * the judge's pick flips with the candidate order, and those rows take
-   * their evidence out of the win graph with them — enough of them and the
-   * leaderboard reports "not enough overlap to rank these" for a reason the
-   * reader would otherwise have no way to see.
+   * Counted rather than discarded, because it is the explanation for a fit that later
+   * fails to connect.
    */
   it("counts a skipped comparison instead of dropping it silently", () => {
     const run = createRun([

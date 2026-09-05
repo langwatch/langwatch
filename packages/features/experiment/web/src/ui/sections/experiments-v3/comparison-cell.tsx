@@ -14,23 +14,12 @@ import {
 import { labelNamesVariant, resolveVerdictLabel } from "@langwatch/experiment-contract";
 
 /**
- * How long a clicked winner's column stays highlighted before it
- * auto-clears. Click-only (not hover) — scrolling/highlighting on mere
- * hover was too eager as you read down the rows, so this is a deliberate
- * "look here" flash the user asks for explicitly, not a passive preview.
+ * How long a clicked winner's column stays highlighted before it auto-clears.
  */
 const CLICK_HIGHLIGHT_DURATION_MS = 2000;
 
 /**
- * Pending auto-clear for the click-triggered highlight. Module-scoped, not
- * a per-`ComparisonCell`-instance ref: the highlight itself
- * (highlightedVariantTargetId) is a single, global piece of store state, but
- * every row renders its own ComparisonCell. If the same variant wins two
- * different rows and both winners are clicked within the highlight window,
- * a per-instance ref can't see the OTHER row's pending timer — the earlier
- * row's timer fires on schedule and clears a highlight the later click
- * expected to still be showing, up to CLICK_HIGHLIGHT_DURATION_MS early.
- * A shared timer means the latest click always wins.
+ * Pending auto-clear for the click-triggered highlight.
  */
 let clickHighlightClearTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -42,10 +31,9 @@ type ComparisonCellProps = {
 };
 
 /**
- * Judge emits per-call debug markers like
- *   "Call 1 (candidates in order X, Y, Z): ..."
- * Useful for bias-correction debugging but noisy in the cell preview.
- * Strip when present, preserve everything else.
+ * Judge emits per-call debug markers like "Call 1 (candidates in order X, Y, Z): ..."
+ * Useful for bias-correction debugging but noisy in the cell preview. Strip when
+ * present, preserve everything else.
  */
 function stripBiasPreamble(details: string | undefined): string | undefined {
   if (!details) return details;
@@ -119,16 +107,9 @@ function friendlyError(details: string | undefined): {
 }
 
 /**
- * Renders one variant's name, but only when the judge named it the winner.
- * The cell states the winner alone rather than a "A vs B vs C" chain — with
- * ten candidates the chain buries the one name the reader is looking for.
- *
- * The judge returns the winner's candidate id, which for prompt-typed
- * variants is the prompt HANDLE (e.g. "concise-support-v2"), not the
- * variant's internal target id. Resolving that handle needs `useTargetName`,
- * a hook — so every variant renders this component (keeping hook order
- * stable) and each decides for itself whether it is the winner, rather than
- * the parent resolving names inside a `.map()`.
+ * Renders one variant's name, but only when the judge named it the winner. The cell
+ * states the winner alone rather than a "A vs B vs C" chain — with ten candidates the
+ * chain buries the one name the reader is looking for.
  */
 function WinnerLabel({
   target,
@@ -185,13 +166,9 @@ export function ComparisonCell({
     (state) => state.setHighlightedVariantTargetId,
   );
 
-  // Clicking a winner's name highlights its column and scrolls it into
-  // view (it's often off-screen to the right of the Comparison column),
-  // then auto-clears after a brief flash rather than requiring a second
-  // click to dismiss. Uses the module-level clickHighlightClearTimer (not a
-  // per-instance ref) so a click in one row correctly cancels a pending
-  // clear scheduled by a click in a DIFFERENT row — see that variable's
-  // comment for the cross-row race this avoids.
+  // Clicking a winner's name highlights its column and scrolls it into view (it's often
+  // off-screen to the right of the Comparison column), then auto-clears after a brief
+  // flash rather than requiring a second click to dismiss.
   const highlightVariantFromClick = (targetId: string) => {
     if (clickHighlightClearTimer) clearTimeout(clickHighlightClearTimer);
     setHighlightedVariantTargetId(targetId, "won");

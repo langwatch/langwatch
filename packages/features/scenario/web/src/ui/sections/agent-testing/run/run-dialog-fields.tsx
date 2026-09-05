@@ -1,11 +1,6 @@
 /**
- * The body of the run dialog: the name of the run, the agent it goes against,
- * what it covers when that is still being chosen, whatever the chips added,
- * and then the chips themselves.
- *
- * An entry point that already fixed the scope says nothing about it, so there
- * is no scope block and no line counting what it holds.
- *
+ * The body of the run dialog: the name of the run, the agent it goes against, what it covers when that is still
+ * being chosen, whatever the chips added, and then the chips themselves.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -72,13 +67,8 @@ function AddedBlocks({ form, isBusy }: { form: RunDialogForm; isBusy: boolean })
 }
 
 /**
- * The targets of a comparison, and under them the secrets the scope declares:
- * a secret is run-level, so one block serves every target.
- *
- * The block stands even while it holds nothing. A comparison replaces the
- * parameter section, so its "Add secret parameter" control is the only way
- * into an ad hoc secret, and hiding the block on an empty one would make a
- * person leave the comparison to type a secret.
+ * The targets of a comparison, and under them the secrets the scope declares: a secret
+ * is run-level, so one block serves every target.
  */
 function ComparisonBlocks({ form, isBusy }: { form: RunDialogForm; isBusy: boolean }) {
   return (
@@ -119,10 +109,6 @@ function ComparisonBlocks({ form, isBusy }: { form: RunDialogForm; isBusy: boole
 
 /**
  * What the dialog says when the run cannot start, or did not.
- *
- * The alert stands at the foot of a body that scrolls, so a refusal on a
- * dialog with several blocks open lands out of view and the run reads as one
- * that did nothing at all. It is brought into view the moment it appears.
  */
 function RunDialogNotices({ form }: { form: RunDialogForm }) {
   const alert = useRef<HTMLDivElement>(null);

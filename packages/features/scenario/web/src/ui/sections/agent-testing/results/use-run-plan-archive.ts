@@ -1,13 +1,5 @@
 /**
  * Archiving a run plan from the Results tab.
- *
- * A run plan is made by typing its name in the run dialog, so a typo or an
- * abandoned experiment leaves a plan behind. Archiving takes the row out of
- * the list and keeps every run it already holds.
- *
- * A test suite is not a row of this list, so archiving here never takes
- * scenarios with it.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

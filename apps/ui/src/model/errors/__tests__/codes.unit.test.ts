@@ -1,21 +1,6 @@
 /**
- * @vitest-environment node
- *
  * Keeps `APP_ERROR_CODES` honest against the code actually raising errors.
- *
- * The presentation registry is exhaustive over `AppErrorCode`, so that union is
- * what forces every error code to have customer-facing copy. A hand-maintained
- * list only holds that line if something notices when it drifts — TypeScript
- * can't, because there is no way to reflect over "every subclass of
- * HandledError in the program".
- *
- * So: scan the source for every code a `HandledError` subclass declares, and
- * fail on a mismatch in EITHER direction.
- *
- *   - a code raised but not listed  → an error with no copy would reach a user
- *   - a code listed but not raised  → dead copy, which is how the automations
- *     explainer ended up with a `recipient_not_in_team` branch for a code
- *     nothing throws
+ * @vitest-environment node
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -28,16 +13,6 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
 /**
  * Every tree that raises a handled error.
- *
- * One root more than the raw-toast guard walks: `noRawErrorToasts.unit.test.ts`
- * looks for *renders*, so it covers the application source only. Codes are
- * declared in the workspace packages too, which is why this walk takes both.
- *
- * `src` alone was a hole with no symptom: the Ops admin implementation
- * declares three codes and `packages/api` another, so none of the four entered
- * `APP_ERROR_CODES`, none was required to have copy, and the exhaustive
- * `satisfies` in `presentation.ts` had nothing to complain about. A guard that
- * only looks where the codes already are is a guard that passes forever.
  */
 const ROOTS = [
   join(PACKAGE_ROOT, "src"),
@@ -48,14 +23,7 @@ const ROOTS = [
   join(PACKAGE_ROOT, "../api/src"),
   join(PACKAGE_ROOT, "../worker/src"),
   // `ee` was a root until `4faa77c658` moved governance and SCIM into
-  // `packages/enterprise`, which the packages root below already walks. The
-  // stale entry did not narrow the scan, it aborted it: `walk` threw ENOENT
-  // and took all six scanning cases with it, so the guard that exists to catch
-  // an unregistered code stopped catching anything at all.
-  // The workspace packages sit at the REPO root, not under the app — they were
-  // lifted out of `platform/app/packages/` when the nine were consolidated into
-  // one tree. Pointing this at the app-local path again would make the walk
-  // silently skip them, which is the failure mode the docblock above describes.
+  // `packages/enterprise`, which the packages root below already walks.
   join(PACKAGE_ROOT, "../../packages"),
 ].filter((root) => existsSync(root));
 
@@ -68,37 +36,11 @@ const PACKAGE_OWNED_CODES = new Set(["validation_error"]);
 
 /**
  * Codes MINTED at a relay boundary rather than declared by a subclass.
- *
- * `src/server/nlpgo/goHandledError.ts` promotes a relayed Go error's
- * `meta.reason` to the code when there is one, so a value written as `meta` in
- * Go (`{"reason": "missing_provider"}` in
- * `services/nlpgo/adapters/httpapi/playground_proxy.go`) arrives in the browser
- * as a first-class code. Nothing in these trees declares it, so no scan will
- * ever find it — but a customer reads it, so it still needs copy, and the
- * orphan check below must not call that copy dead.
- *
- * Keep this set small and each entry traceable to the `meta.reason` that mints
- * it. A code that only exists because of this promotion is a code no `herr.Code`
- * declares, which means `cmd/herrgen` cannot generate it either.
  */
 const RELAYED_META_CODES = new Set(["missing_provider"]);
 
 /**
  * Codes MINTED IN THE BROWSER, by narrowing a code we were already given.
- *
- * `promoteCodexAgentError` (`src/features/langy/logic/langyErrorExplainer.ts`)
- * takes the gateway's own code and re-keys it so Langy can say something the
- * generic entry cannot — a plan limit hit *through Langy* wants "start a new
- * conversation", where the gateway's version wants "upgrade". The server never
- * throws this code, so there is no `super("…")` to find; the declaration is a
- * spread on the client (`{ ...domain, code: "…" }`).
- *
- * It still reaches a customer and it still needs copy, so the orphan check must
- * not call that copy dead. The bar for adding one: the customer reads it, and
- * the narrowing genuinely changes the remediation. If the copy would be the
- * same as the code you narrowed from, alias it in `REGISTRY_CODE_ALIASES`
- * instead and do not enumerate it — which is exactly why the sibling
- * `langy_codex_session_expired` is absent from `APP_ERROR_CODES`.
  */
 const CLIENT_MINTED_CODES = new Set([
   "langy_codex_plan_limit",
@@ -120,22 +62,9 @@ const CLIENT_MINTED_CODES = new Set([
 ]);
 
 /**
- * Codes passed as a constructor PARAMETER — the shape the docblock above names
- * as the one this scanner cannot see, because there is no string literal at the
- * declaration to match.
- *
- * `LangyApiIdentityDeniedError` (the Langy contract errors) is one
- * class over three codes on purpose: all three are the same 403 with the same
- * body, and only the remediation differs (mint a personal key / ask an admin
- * for Langy access / the owner is gone). Its caller picks the code, so the
- * declaration is a union in the signature and every CODE_PATTERNS entry misses
- * it.
- *
- * These therefore enter `APP_ERROR_CODES` by hand, and the "raised but not
- * listed" assertion will NOT notice if a fourth is added to that union and left
- * off the list. That is the cost of the shape; the entry below is the record of
- * it. Adding a code here is a decision to hand-maintain it — prefer a subclass
- * with a literal unless the family genuinely shares one body.
+ * Codes passed as a constructor PARAMETER — the shape the docblock above names as the
+ * one this scanner cannot see, because there is no string literal at the declaration to
+ * match.
  */
 const PARAMETERIZED_CODES = new Set([
   "langy_api_key_unowned",
@@ -152,29 +81,6 @@ const MINIMUM_SCANNED_FILES = 500;
 
 /**
  * The shapes a code is declared in, and the one this scanner CANNOT see.
- *
- *   `super("some_code", …)`                    — the common case
- *   `declare readonly code: "some_code"`        — subclass narrowing
- *   `code: "some_code"`                         — an options-object property
- *   `const { code = "some_code" } = options`    — a base class's default
- *   `new HandledError("some_code", …)`          — a one-off with no subclass
- *   `new NotFoundError("some_code", …)`         — the same, for the 404 base
- *
- * The last two are worth scanning even though subclasses are the norm: a
- * single permission denial doesn't earn a class, and a shape the scanner can't
- * see is a code that reaches a customer with no copy written for it. Adding
- * the `NotFoundError` shape found six live codes at once — `team_not_found`,
- * `workflow_not_found` and four more — none of which had any copy.
- *
- * **What it still cannot see: a code passed as a constructor PARAMETER.** A
- * class whose caller supplies the code (`new SomeError(code, …)`, or a factory
- * taking one) declares nothing this file can match, because there is no string
- * literal at the declaration at all. Those codes enter `APP_ERROR_CODES` only
- * by hand, and nothing here will notice if they don't. Prefer a subclass with
- * a literal, precisely so this guard can see it.
- *
- * `code: "…"` is a superset of the `declare readonly code:` pattern above; the
- * narrower one is kept because it names the shape a reader is looking for.
  */
 const CODE_PATTERNS = [
   /super\(\s*"([a-z][a-z0-9_]*)"/g,
@@ -187,25 +93,12 @@ const CODE_PATTERNS = [
 
 /**
  * Strings that match a pattern above without being a raisable code.
- *
- * `unknown` is the sentinel a MASKED reason serialises as — `{ code:
- * "unknown" }` is how a non-handled link in the cause chain crosses the wire
- * (ADR-045). It is the absence of a code, so there is nothing to write copy
- * for and nothing to list.
  */
 const NON_CODE_LITERALS = new Set(["unknown"]);
 
 /**
- * One code per declaration shape, each chosen because the pattern for that
- * shape is the ONLY one that finds it.
- *
- * Without this, the "raised but not listed" assertion below gets *easier* to
- * pass as the patterns rot: a typo in one regex simply finds fewer codes, and
- * an empty `missing` list reads as a pass. These fail loudly instead.
- *
- * `declare readonly code:` has no witness of its own — every code written that
- * way is also found by the plain `code: "…"` pattern, so breaking the narrow
- * one cannot be detected from the outside.
+ * One code per declaration shape, each chosen because the pattern for that shape is the
+ * ONLY one that finds it.
  */
 const SHAPE_WITNESSES: Record<string, string> = {
   'super("…", …)': "agent_report_rate_limited",
@@ -251,19 +144,8 @@ function declaredCodes(): Set<string> {
 }
 
 /**
- * Codes that were already raised without customer copy when this guard was
- * repaired, and the three whose copy was already dead.
- *
- * This walk aborted rather than narrowed for as long as `ROOTS` named the
- * deleted `ee` directory: `walk` threw ENOENT, every scanning case errored,
- * and nothing checked a single code. The 62 below are what accumulated behind
- * that, and they are debt, not exemptions — each is a real code a customer can
- * reach today as a bare slug.
- *
- * The list is FROZEN. A code may leave it, by gaining an `APP_ERROR_CODES`
- * entry and copy in `presentation.ts`; nothing may join it, because the
- * assertions below only tolerate a code that is already named here. So a new
- * code without copy still fails, which is the whole point of the guard.
+ * Codes that were already raised without customer copy when this guard was repaired,
+ * and the three whose copy was already dead.
  */
 const UNCOPIED_CODES_BACKLOG = new Set<string>([
   "annotation_annotator_invalid",
@@ -334,11 +216,7 @@ const UNCOPIED_CODES_BACKLOG = new Set<string>([
 const DEAD_COPY_BACKLOG = new Set<string>([
   "model_default_user_key_required",
   /**
-   * Its declaring class went with `subscription/errors.ts` in 8a32e35208. The
-   * copy stays on purpose, and so does the retry rule: a rolling deploy can
-   * still have an older process emitting the code, and a client that meets it
-   * should read the sentence rather than the slug. Listed here because the
-   * orphan check is what that commit's reasoning missed.
+   * Its declaring class went with `subscription/errors.ts` in 8a32e35208.
    */
   "subscription_service_unavailable",
   "system_prompt_conflict",

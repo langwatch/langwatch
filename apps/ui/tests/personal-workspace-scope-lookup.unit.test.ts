@@ -1,10 +1,5 @@
 /**
  * Which organization and project the personal-workspace address is about.
- *
- * The organization graph is already in hand, so what is worth pinning is the
- * two decisions this makes rather than a fetch: which organization the page is
- * about, and which project the address is standing in, both resolved out of
- * the graph.
  */
 
 import { describe, expect, it } from "vitest";

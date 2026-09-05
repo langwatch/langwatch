@@ -1,11 +1,6 @@
 /**
+ * `useConversationTurnEvents` merges each turn's events in from their own read.
  * @vitest-environment jsdom
- *
- * `useConversationTurnEvents` merges each turn's events in from their own
- * read. A turn arrives without them, so the thread asks for the whole set at
- * once and every turn carries only its own answer.
- *
- * See specs/traces-v2/conversation-turn-ledger.feature.
  */
 
 import { renderHook } from "@testing-library/react";

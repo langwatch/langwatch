@@ -6,11 +6,7 @@ import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-c
 import type { CellDef } from "../../types";
 
 /**
- * How full the context window already was when the trace's first model call
- * ran. It answers a different question from Tokens: an agent turn re-sends its
- * whole conversation on every call, so the Tokens column's cache reads sum
- * into the millions, while a reader asking "how big was my context" means this
- * single number.
+ * How full the context window already was when the trace's first model call ran.
  */
 const EXPLANATION = "Context carried into this trace's first model call.";
 

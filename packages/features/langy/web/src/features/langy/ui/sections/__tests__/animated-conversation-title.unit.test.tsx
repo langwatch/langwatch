@@ -1,10 +1,6 @@
 /**
+ * The panel header title truncates instead of shoving the header controls off-panel, keeps the full text reachable on hover, and degrades to plain static text under reduced motion — still truncating.
  * @vitest-environment jsdom
- *
- * The panel header title truncates instead of shoving the header controls
- * off-panel, keeps the full text reachable on hover, and degrades to plain
- * static text under reduced motion — still truncating.
- *
  * Spec: specs/langy/langy-panel-header.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

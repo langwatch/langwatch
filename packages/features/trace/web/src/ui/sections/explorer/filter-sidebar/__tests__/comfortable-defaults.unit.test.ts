@@ -1,9 +1,7 @@
 /**
- * Comfortable density is the default a fresh profile lands on — its section
- * set decides what's filterable with zero configuration. Feedback events
- * (thumbs_up_down and friends) must be in that set. See
- * specs/traces-v2/search.feature, Rule "Event filtering is reachable on the
- * default sidebar".
+ * Comfortable density is the default a fresh profile lands on — its section set decides
+ * what's filterable with zero configuration. Feedback events (thumbs_up_down and
+ * friends) must be in that set.
  */
 
 import { describe, expect, it } from "vitest";

@@ -5,10 +5,6 @@ import { type Transform, TransformError } from "./types";
 
 /**
  * Add a column to an inline dataset.
- *
- * The column lands on both the dataset reference and the inline block (the
- * table reads the first, execution reads the second), pre-filled with empty
- * values for every existing row so the column is never shorter than the others.
  */
 export const addColumn: Transform<AddColumnPayload, { datasetId: string; columnId: string }> = ({
   state,

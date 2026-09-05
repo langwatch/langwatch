@@ -59,13 +59,6 @@ export const useTargetName = (target: TargetConfig): string => {
 
 /**
  * Batch-fetch display names for several targets at once, in the order given.
- *
- * A comparison column needs every variant's name to pick the winner and to
- * disambiguate same-name variants, and `useTargetName` cannot be called once
- * per variant from a loop. These queries use the same cache keys as the
- * variants' own column headers, so they resolve from cache without refetching.
- *
- * Undefined slots (a variant whose target was removed) resolve to "".
  */
 export const useTargetNames = (targets: (TargetConfig | undefined)[]): string[] => {
   const { project } = useOrganizationTeamProject();

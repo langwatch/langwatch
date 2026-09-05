@@ -1,13 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the unified error banner in SearchBar.
- *
- * Feature: Unified error banner
- *   - Parse errors render in the banner with a dismiss X
- *   - AI errors render in the banner, with an expand chevron when details exist
- *   - AI errors persist after closing AI mode (no unmount cleanup)
- *   - Dismiss clears the underlying store state
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

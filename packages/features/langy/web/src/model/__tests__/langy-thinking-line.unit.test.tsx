@@ -1,11 +1,6 @@
 /**
+ * The thinking line is a plain, non-interactive status line.
  * @vitest-environment jsdom
- *
- * The thinking line is a plain, non-interactive status line. Reasoning reaches
- * it as a BOOLEAN and nothing more: it changes the words ("Thinking…" instead of
- * a false escalation toward "stuck") and never becomes a surface. The model's
- * private thinking is not shown to the user — no glimpse, no expander, no
- * scrollback.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen } from "@testing-library/react";

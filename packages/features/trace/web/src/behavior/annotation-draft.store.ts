@@ -46,12 +46,6 @@ interface AnnotationDraftState {
 
 /**
  * The one annotation being written, wherever it is being written from.
- *
- * Two reasons this lives outside the component tree. A long conversation only
- * renders the turns on screen, so the composer is unmounted the moment the
- * reviewer scrolls past its turn, and local state would take the typed text
- * with it. And only one composer should ever be open, which a store states
- * directly instead of leaving every turn to coordinate with its siblings.
  */
 export const useAnnotationDraftStore = create<AnnotationDraftState>((set) => ({
   draft: null,
@@ -80,13 +74,6 @@ export const useAnnotationDraftStore = create<AnnotationDraftState>((set) => ({
 
 /**
  * Whether a draft belongs in the rail beside a conversation turn.
- *
- * A turn is a trace, so a comment about the turn as a whole and a comment about
- * one of its two sides are both read in the same column: the sides are the
- * trace's own input and output, and there is nowhere else in the conversation
- * for them to go. Everything narrower is read where it lives — a span and its
- * fields in the trace view, a message inside the transcript holding it — so
- * those composers open there instead.
  */
 export function isTurnRailDraft(
   draft: Pick<AnnotationDraftTarget, "traceId" | "anchorKind" | "anchorId">,
@@ -97,11 +84,6 @@ export function isTurnRailDraft(
 
 /**
  * Whether two comments are about the same part of the trace.
- *
- * A draft is identified by everything it points at rather than by its trace
- * alone: one trace holds a span, its output, an attribute of it and a message
- * inside it, and a reviewer writing about one of them must not find their words
- * under another.
  */
 export function isSameAnnotationTarget(
   a: AnnotationDraftTarget,

@@ -6,27 +6,15 @@ const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
 
 /**
- * Lower bound on the next-tick interval. A trace whose timestamp is in
- * the future (clock skew) would compute a negative `untilNext`; clamp
- * to one second so the timer still fires and recovers once the wall
- * clock crosses the timestamp.
+ * Lower bound on the next-tick interval. A trace whose timestamp is in the future
+ * (clock skew) would compute a negative `untilNext`; clamp to one second so the timer
+ * still fires and recovers once the wall clock crosses the timestamp.
  */
 const MIN_TICK_MS = 1000;
 
 /**
- * Time until the label produced by `formatRelativeTime` /
- * `formatVerboseRelative` next changes, given the trace's timestamp.
- *
- * Boundaries:
- *   - 0..59s ago        → "now" / "just now"        → next change: at the 1-minute mark
- *   - 1..59m ago        → "3m" / "3 minutes ago"    → next change: at the next minute mark
- *   - 1..23h ago        → "5h" / "5 hours ago"      → next change: at the next hour mark
- *   - 1d+ ago           → "Nd" / "N days ago"       → next change: at the next day mark
- *
- * For traces older than a day this naturally schedules infrequent
- * timers (one per day). For traces in the last minute it ticks at the
- * sub-minute boundary instead of every second — a label of "now" never
- * needs to refresh until the trace crosses 60 seconds old.
+ * Time until the label produced by `formatRelativeTime` / `formatVerboseRelative` next
+ * changes, given the trace's timestamp.
  */
 function msUntilNextLabelChange(timestamp: number): number {
   const diffMs = Math.max(0, Date.now() - timestamp);
@@ -51,14 +39,8 @@ function msUntilNextLabelChange(timestamp: number): number {
 }
 
 /**
- * Compact relative-time label that recomputes itself precisely at the
- * next boundary (the moment "3m" should become "4m", or "5h" should
- * become "6h"). No 1Hz polling — at most one timer per cell, and most
- * cells in a long list reschedule sparsely (older traces tick once an
- * hour, then once a day).
- *
- * Visible label is identical to the static `formatRelativeTime` so the
- * cell layout / width stays unchanged.
+ * Compact relative-time label that recomputes itself precisely at the next boundary
+ * (the moment "3m" should become "4m", or "5h" should become "6h").
  */
 export function useRelativeTime(timestamp: number): string {
   const [label, setLabel] = useState(() => formatRelativeTime(timestamp));

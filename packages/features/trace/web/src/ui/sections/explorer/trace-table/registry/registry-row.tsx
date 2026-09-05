@@ -36,42 +36,25 @@ interface RegistryRowProps<TRow> {
   onTogglePeek?: () => void;
   onToggleExpand?: () => void;
   /**
-   * When set and the row is expanded, paint the main row with this recessed
-   * surface so it reads as part of the same block as its expanded addon
-   * rows (conversation turns) instead of staying transparent and only
-   * colouring on hover. `surface` is the Chakra token for the normal cells;
-   * `firstCell` is the same colour as a raw CSS var, applied inline to the
-   * sticky first column whose background the table shell otherwise forces.
-   * Split hover scope only.
+   * When set and the row is expanded, paint the main row with this recessed surface so
+   * it reads as part of the same block as its expanded addon rows (conversation turns)
+   * instead of staying transparent and only colouring on hover.
    */
   expandedBg?: { surface: string; firstCell: string };
   /**
-   * When true, render the same row + addon tree but swap every cell's
-   * content for skeleton bars. The real cells / addons are bypassed
-   * because the underlying row data is a synthetic placeholder. This
-   * keeps the loading skeleton perfectly aligned with the eventual
-   * data layout — column widths, paddings, addon rows all match.
+   * When true, render the same row + addon tree but swap every cell's content for
+   * skeleton bars. The real cells / addons are bypassed because the underlying row data
+   * is a synthetic placeholder.
    */
   isLoading?: boolean;
   /**
-   * Set on the first error row in a consecutive run of error rows so
-   * we can paint a matching top border. Without it, the leading row of
-   * a run is "open on top" — the row above it paints a grey bottom
-   * border, and the error row only paints a red bottom border, so the
-   * red bracket only closes the run on the underside.
-   *
-   * Computed once at the parent level (cheap O(n) pass over the visible
-   * rows) instead of having each row look at its neighbours.
+   * Set on the first error row in a consecutive run of error rows so we can paint a
+   * matching top border.
    */
   isFirstOfErrorRun?: boolean;
   /**
    * The context chip this row would become if the user pointed Langy at it (see
-   * `useLangyContextTarget`). Set by the trace lens, where a row IS a trace;
-   * left null by the conversation / group lenses (whose rows are aggregates,
-   * not a single addressable resource) and while skeletons are rendering.
-   *
-   * Everything downstream of it is inert unless the Langy panel is open, so a
-   * row that declares itself a target costs nothing on a page without Langy.
+   * `useLangyContextTarget`).
    */
   langyTarget?: LangyContextTargetDescriptor | null;
   /** Forwarded to the outer <tbody> so the virtualizer can measure each row. */
@@ -135,28 +118,16 @@ function RegistryRowComponent<TRow>({
   // is the common-case addon and dominates the row's height).
   const hasAddons = isLoading || renderedAddons.length > 0;
 
-  // The evals column tends to grow tall when many evaluators ran (chips
-  // wrap to multiple lines), while the IO preview addon directly below
-  // wastes the bottom-right corner with empty space under the same
-  // column. Letting evals `rowSpan=2` over the addon row absorbs that
-  // dead area: the table gets shorter and the chips have more vertical
-  // room. We only do this when an IO preview addon actually renders
-  // below — the only addon today that always reserves a sibling row
-  // and is the dominant height-contributor. Other addons (error-detail,
-  // expanded-peek) don't visually compete with the evals column for
-  // the same screen real estate, so leaving them on the original
-  // single-row addon layout keeps their borders / styling intact.
+  // The evals column tends to grow tall when many evaluators ran (chips wrap to
+  // multiple lines), while the IO preview addon directly below wastes the bottom-right
+  // corner with empty space under the same column.
   const evalsCellIdx = useMemo(
     () => visibleCells.findIndex((c) => c.column.id === "evaluations"),
     [visibleCells],
   );
-  // `rowSpan=2` spans the immediately-following row only. If another
-  // addon (e.g. error-detail) is registered before io-preview, the
-  // claim would land on that row instead and the eval cell would punch
-  // through the wrong section of the table. Gating on "io-preview is
-  // the first rendered addon" keeps the geometry trustworthy for any
-  // saved lens addon order, even ones the built-in lenses don't use
-  // today.
+  // `rowSpan=2` spans the immediately-following row only. If another addon (e.g.
+  // error-detail) is registered before io-preview, the claim would land on that row
+  // instead and the eval cell would punch through the wrong section of the table.
   const ioPreviewWillRender = useMemo(
     () => renderedAddons[0]?.id === "io-preview",
     [renderedAddons],
@@ -219,21 +190,9 @@ function RegistryRowComponent<TRow>({
             // never gets a chance to render a TD here.
             rowSpan={isEvalsRowSpanCell ? 2 : undefined}
             verticalAlign={isEvalsRowSpanCell ? "top" : undefined}
-            // Borders go on each TD instead of the Tr because the table
-            // runs under `border-collapse: separate` — under that mode
-            // browsers ignore TR-level borders, only TD borders render.
-            //
-            // The bottom border is skipped when an addon row (e.g. the
-            // IO preview) sits directly below — the main row + addon
-            // belong to the same row group visually, so a divider
-            // between them reads as the group being broken in two. The
-            // addon's own bottom border closes the group against the
-            // next trace. Exception: a rowspan cell owns its bottom
-            // border because no addon TD will paint one beneath it.
-            //
-            // Top border only paints when this row leads a consecutive
-            // error run, so the red bracket closes the run on both
-            // sides instead of being open on top.
+            // Borders go on each TD instead of the Tr because the table runs under
+            // `border-collapse: separate` — under that mode browsers ignore TR-level
+            // borders, only TD borders render.
             borderBottomWidth={isEvalsRowSpanCell ? "1px" : hasAddons ? undefined : "1px"}
             borderBottomColor={
               isEvalsRowSpanCell
@@ -244,15 +203,8 @@ function RegistryRowComponent<TRow>({
             }
             borderTopWidth={isFirstOfErrorRun ? "1px" : undefined}
             borderTopColor={isFirstOfErrorRun ? style.bottomSeparatorColor : undefined}
-            // Select cells own their full padding so clicks anywhere inside
-            // the cell (including the edge padding) hit the checkbox Box,
-            // not the Td. The Box stops propagation so the row's
-            // drawer-open / expand handler does not also fire.
-            // While loading, bump the row's vertical padding by 2px so
-            // the skeleton row matches the height the real row settles
-            // into once data lands (text + icon ascenders make the real
-            // row a hair taller than the bare skeleton bars). Reduces
-            // the visible "row grows" jump when the request resolves.
+            // Select cells own their full padding so clicks anywhere inside the cell
+            // (including the edge padding) hit the checkbox Box, not the Td.
             padding={
               isSelectCell
                 ? 0
@@ -261,13 +213,9 @@ function RegistryRowComponent<TRow>({
                   : `${tokens.rowPaddingY} 8px`
             }
             cursor={isSelectCell ? "pointer" : undefined}
-            // Clip whatever the cell renders at the column boundary —
-            // long unbreakable strings (trace IDs, model slugs, error
-            // messages) will otherwise visually bleed across the right
-            // border and overlap the next cell's content. Cell
-            // children that need ellipsis behaviour set `truncate` /
-            // `whiteSpace=nowrap` themselves; the Td-level clip is the
-            // belt-and-suspenders that catches anything that doesn't.
+            // Clip whatever the cell renders at the column boundary — long unbreakable
+            // strings (trace IDs, model slugs, error messages) will otherwise visually
+            // bleed across the right border and overlap the next cell's content.
             overflow="hidden"
             {...cellPropsFor(cell, style.borderColor, i)}
           >
@@ -326,12 +274,9 @@ function RegistryRowComponent<TRow>({
           isSelected,
           tanstackRow,
           actions,
-          // Only the IO preview addon participates in the rowspan
-          // dance — every other addon row is a stylistically distinct
-          // visual block (error detail, expanded peek) that doesn't
-          // share its row with rowspan-claimed main-row cells. Passing
-          // an empty list keeps those addons on their existing
-          // single-TD layout.
+          // Only the IO preview addon participates in the rowspan dance — every other
+          // addon row is a stylistically distinct visual block (error detail, expanded
+          // peek) that doesn't share its row with rowspan-claimed main-row cells.
           rowSpanClaimedIndices: addon.id === "io-preview" ? rowSpanClaimedIndices : [],
         })}
       </React.Fragment>
@@ -369,15 +314,9 @@ function areRegistryRowPropsEqual<TRow>(
   prev: RegistryRowProps<TRow>,
   next: RegistryRowProps<TRow>,
 ): boolean {
-  // Skip the three callback props on purpose: parents pass inline closures
-  // that are recreated each render but call into stable handlers, so their
-  // identity doesn't affect what the row paints. Everything that does affect
-  // paint is explicitly compared.
-  //
-  // NOTE: `isPulsing` is intentionally excluded here — it is derived
-  // inside the component via `useRowPulseStore` so changes to the store
-  // already trigger a re-render through React's subscription machinery.
-  // Including it in the props equality check would be redundant.
+  // Skip the three callback props on purpose: parents pass inline closures that are
+  // recreated each render but call into stable handlers, so their identity doesn't
+  // affect what the row paints.
   return (
     prev.tanstackRow.original === next.tanstackRow.original &&
     prev.tanstackRow.id === next.tanstackRow.id &&

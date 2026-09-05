@@ -231,11 +231,7 @@ describe("deriveFollowUpChips", () => {
 
   describe("given a result that is not a trace search", () => {
     /**
-     * The regression this exists to prevent. `deriveFollowUpChips` used to bail
-     * unless the input parsed as a TRACE query, so an analytics answer — the
-     * single most likely thing a user asks a follow-up about — earned no
-     * guidance whatsoever, even though the feature map had already derived the
-     * offer.
+     * The regression this exists to prevent.
      */
     it("still guides the user somewhere, rather than offering nothing at all", () => {
       const chips = deriveFollowUpChips({

@@ -1,29 +1,5 @@
 /**
  * Whimsical status verbs for Langy's "thinking" indicator.
- *
- * These render standalone (`${verb}…`), so they get to be short, daft and
- * grin-worthy. The first entry is deliberately calm (it's also what
- * reduced-motion users see, frozen), then it gets weirder as it cycles.
- *
- * ── ONE HARD RULE: A VERB MAY NOT CLAIM WORK ───────────────────────────────
- *
- * Every verb here is shown while the model is genuinely generating, so it must
- * be a joke about Langy's CHARACTER, never a statement about what it is DOING.
- * "Bribing the GPUs" is a joke. "Reading the whole file" is a false statement —
- * and it was one we told for ninety-seven seconds, on a turn whose worker never
- * spawned, while nothing whatsoever was being read.
- *
- * That is why the following are GONE:
- *   "Writing a TODO list", "Calling one more tool", "Reading the whole file"
- *   "Chasing a span", "Untangling a trace", "Tailing the spans",
- *   "Counting the tokens", "Evaluating the eval"
- * Each names a specific act. Shown at the wrong moment — which is most moments,
- * because they were cycled on a timer — each is a lie, and together they made a
- * dead turn read as a healthy one.
- *
- * What Langy is ACTUALLY doing, when it is doing anything, is on the tool stream
- * and is said truthfully by `logic/langyThinkingLine.ts`. This list is only ever
- * reached when the model is thinking and there is nothing specific to report.
  */
 
 const PLAIN = ["Thinking", "Pondering", "Cooking", "Brewing", "Percolating"];

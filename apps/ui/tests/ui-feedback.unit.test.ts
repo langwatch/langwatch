@@ -1,13 +1,5 @@
 /**
  * How a failure reaches a reader, and which words it arrives in.
- *
- * The one thing that must not happen is the wire message reaching the page: for
- * a handled error that message IS the code slug, so a composition that toasted
- * it would show a customer `validation_error`. These pin that the copy comes
- * from the code-keyed presentation registry — for EVERY code the platform can
- * emit, not a handful — and that a failure the registry cannot name degrades to
- * the action the reader was taking plus ADR-045's one calm generic line and a
- * trace id.
  */
 
 import { goErrorCodes, nodeErrorCodes } from "@langwatch/handled-error";
@@ -76,10 +68,8 @@ describe("given a failure a screen hands over", () => {
     });
 
     /**
-     * The property the four-entry copy table this module used to carry could
-     * never have: EVERY enumerated code resolves to copy written for it. A
-     * miss shows up as the screen's own sentinel headline surviving, which is
-     * exactly what a customer would have seen.
+     * The property the four-entry copy table this module used to carry could never
+     * have: EVERY enumerated code resolves to copy written for it.
      */
     it("answers for every code the platform can emit, not a hand-picked few", () => {
       expect(ALL_CODES.length).toBeGreaterThan(100);

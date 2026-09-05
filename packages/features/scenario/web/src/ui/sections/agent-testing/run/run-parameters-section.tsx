@@ -1,11 +1,6 @@
 /**
- * The parameter overrides of a run: one line for the plain values, or one row
- * per parameter once a value must stay hidden.
- *
- * The line is the simple case and stays the default. The "Secret parameters"
- * toggle turns it into rows, where every row carries a lock, and the secrets
- * the scenarios declare join the same list.
- *
+ * The parameter overrides of a run: one line for the plain values, or one row per
+ * parameter once a value must stay hidden.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

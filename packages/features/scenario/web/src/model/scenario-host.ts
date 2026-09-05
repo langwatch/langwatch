@@ -1,23 +1,6 @@
 /**
  * What the simulations, scenario-library and Agent Testing screens ask of the
  * application they are mounted in.
- *
- * ONE PORT FOR THE WHOLE FAMILY — the shape governance, gateway, me,
- * automations, ops, agents, datasets, model-config, RBAC, annotations,
- * organization, analytics, evaluators, monitors, workflows, the auth front door
- * and traces each wrote before it. Everything these screens used to read off
- * `useOrganizationTeamProject`, `useRouter`, `useRequiredSession` and the
- * toaster arrives through these methods, which is what let twenty-two thousand
- * lines move with their `api.scenarios.x.useQuery` call sites unchanged.
- *
- * `setQuery` MERGES, for the reason the trace family recorded: the suite rail,
- * the batch highlight, the run drawer and the tab follower each write their own
- * keys from different components in the same tick, and a replacing write would
- * drop whichever half did not do the writing. Removing a key is `undefined`.
- *
- * `route()` carries a `pathname` because the simulations catch-all decides
- * which of five addresses it is serving from the path, and `params.path` is the
- * splat the route table hands it.
  */
 
 import { createContext, createElement, useContext, useMemo } from "react";
@@ -79,13 +62,6 @@ export type ScenarioSuccessNotice = { title: string; description?: string };
 
 /**
  * The one way out a failure offers.
- *
- * `run` rather than `onClick`: a port says what happens, and the application's
- * toaster is what turns it into a click. Rare by design — a button that only
- * re-runs what just failed is noise — but the four scenario failures that have
- * a real fix (open the run plan with nothing runnable in it, configure the
- * model provider a run needs) would otherwise have to choose between the
- * registry's words and the button that acts on them.
  */
 export type ScenarioFailureAction = {
   label: string;
@@ -107,10 +83,6 @@ export type ScenarioFailureNotice = {
 
 /**
  * The questions this family asks its host.
- *
- * An abstract class rather than an interface so the package can define it
- * without importing anything of ours, and so an adapter's answers are checked
- * against it.
  */
 export abstract class ScenarioHostPort {
   abstract project(): ScenarioHostProject | undefined;
@@ -147,12 +119,6 @@ const ScenarioHostContext = createContext<ScenarioHostPort | undefined>(void 0);
 
 /**
  * Publishes the host, and the CANONICAL SCOPE READING alongside it.
- *
- * A component this family owns can be rendered by another family — the trace
- * hover preview inside the simulations timeline is the case that broke — and
- * `useOrganizationTeamProject` may not be gated on which family's provider is
- * mounted. The scope this host already resolved is republished on the shared
- * port so any screen above it reads the same answer.
  */
 export function ScenarioHostProvider({
   value,

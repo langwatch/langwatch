@@ -1,11 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for single loading indicator on suites page (Issue #1904).
- *
- * Verifies skeleton placeholders replace the double spinner, main panel is
- * suppressed during sidebar load, and RunHistoryPanel spinner works independently.
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/single-loading-indicator.feature
  */
 import { ChakraProvider, defaultSystem, Spinner } from "@chakra-ui/react";

@@ -1,11 +1,9 @@
 import type { LangyModelGroup } from "./langy-model-profile";
 
 /**
- * Splits the model catalogue into a short front door and the complete list.
- * The shortlist contains the resolved default, the current selection, then
- * one quick, balanced and reasoning model. It is deduplicated, capped and
- * ordered. Names are never hard-coded because provider catalogues vary by
- * project. Multimodal and custom models remain deliberate choices in “More”.
+ * Splits the model catalogue into a short front door and the complete list. The
+ * shortlist contains the resolved default, the current selection, then one quick,
+ * balanced and reasoning model. It is deduplicated, capped and ordered.
  */
 
 /** The shortlist stays scannable. Past this it is a list again, not a shortlist. */
@@ -30,11 +28,6 @@ export interface LangyModelSplit<T> {
 
 /**
  * Split a model list into the shortlist and the rest.
- *
- * `searching` collapses the split entirely: a user who has typed a query is
- * looking for a specific model, and a search that hides half its own matches
- * behind a disclosure is a search that lies. Everything matching goes into
- * `more` (the grouped view), and the shortlist is empty.
  */
 export function splitLangyModels<T extends SplittableModel>({
   items,

@@ -33,14 +33,6 @@ type Color = NonNullable<SystemStyleObject["color"]>;
 
 /**
  * What this table reads off a column's `meta`.
- *
- * Declared as a module augmentation because that is how TanStack intends the
- * field to be typed: `ColumnMeta` ships as an empty interface for consumers to
- * merge into, and `ColumnDef.meta` is typed as it. A separate interface of the
- * same shape does not satisfy that — assigning one gives "has no properties in
- * common with type 'ColumnMeta<…>'", which is what every `meta:` in
- * `columns.ts` was doing. `packages/features/dataset/web` augments the same
- * interface for its own fields; declaration merging combines them.
  */
 declare module "@tanstack/react-table" {
   interface ColumnMeta<TData extends RowData, TValue> {
@@ -60,12 +52,9 @@ interface TraceTableShellProps<T> {
   children: React.ReactNode;
   stickyFirstColumn?: boolean;
   /**
-   * Fired when the user drags a column header to reorder. Receives the
-   * full ordered list of column ids (excluding any pinned-first
-   * select-checkbox column). Callers persist this to the active lens.
-   * When omitted, column headers render without a drag handle and the
-   * row is not wrapped in a DndContext — preserving the previous
-   * behaviour for tables that don't yet support reorder.
+   * Fired when the user drags a column header to reorder. Receives the full ordered
+   * list of column ids (excluding any pinned-first select-checkbox column). Callers
+   * persist this to the active lens.
    */
   onColumnReorder?: (orderedIds: string[]) => void;
   /**
@@ -98,14 +87,9 @@ export function TraceTableShell<T>({
       activationConstraint: { distance: 5 },
     }),
   );
-  // After a drag, the browser fires a synthetic click on pointerup —
-  // dnd-kit's PointerSensor doesn't suppress it. Because the drag zone
-  // lives inside the sort <Button onClick>, finishing a reorder would
-  // also toggle the column's sort. Flip this ref on drag start and
-  // clear it on the NEXT tick after drag end/cancel (the synthetic
-  // click fires synchronously before timers run), so the button's
-  // onClick can swallow exactly that one click. Plain clicks never
-  // start a drag, so the ref stays false and sorting works as normal.
+  // After a drag, the browser fires a synthetic click on pointerup — dnd-kit's
+  // PointerSensor doesn't suppress it. Because the drag zone lives inside the sort
+  // <Button onClick>, finishing a reorder would also toggle the column's sort.
   const suppressSortClickRef = useRef(false);
   const sortableHeaderIds =
     table
@@ -141,21 +125,13 @@ export function TraceTableShell<T>({
   const tableElement = (
     <TableEl
       width="full"
-      // Anchor the table's underlying surface so alpha-blended row tints
-      // (red.fg/8, yellow.fg/8) composite over a known base. Without
-      // this, transparent body cells inherit from whichever ancestor
-      // paints next (page bg, drawer bg) and the sticky-first-cell
-      // color-mix below ends up mixing against a different base than
-      // the body cells — the row reads as two horizontal bands.
+      // Anchor the table's underlying surface so alpha-blended row tints (red.fg/8,
+      // yellow.fg/8) composite over a known base.
       bg="bg.surface"
       css={{
-        // `separate` + `border-spacing: 0` keeps the visual look of a
-        // single-pixel grid (no gaps between cells) while letting each
-        // TH/TD render its OWN borders — under `collapse` adjacent
-        // borders are merged and the head's vertical separators were
-        // being absorbed by the body cells below, so the head looked
-        // borderless even though we set borderRight on every TH. With
-        // `separate` each TH paints its own right edge cleanly.
+        // `separate` + `border-spacing: 0` keeps the visual look of a single-pixel grid (no gaps between cells) while letting each
+        // TH/TD render its OWN borders — under `collapse` adjacent borders are merged and the head's vertical separators were being
+        // absorbed by the body cells below, so the head looked borderless even though we set borderRight on every TH.
         borderCollapse: "separate",
         borderSpacing: 0,
         tableLayout: "fixed",
@@ -163,30 +139,16 @@ export function TraceTableShell<T>({
         position: "relative",
         zIndex: 1,
         ...(stickyFirstColumn && {
-          // Pin every body row's leftmost cell during horizontal scroll
-          // so the row-select checkbox stays reachable. The TH side is
-          // handled in HeaderCell via `isStickyFirst`; this rule covers
-          // the corresponding body cells. The bg is scoped by the
-          // tbody's `data-row-variant` attribute (set on every
-          // StatusRowGroup) so error / warning rows still paint their
-          // tint on the sticky cell — without the variant scoping the
-          // checkbox column read as a permanently-neutral strip on
-          // erroring rows, hiding the status colour the rest of the
-          // row was carrying.
+          // Pin every body row's leftmost cell during horizontal scroll so the
+          // row-select checkbox stays reachable. The TH side is handled in HeaderCell
+          // via `isStickyFirst`; this rule covers the corresponding body cells.
           "& tbody > tr > td:first-of-type": {
             position: "sticky",
             left: 0,
             zIndex: 1,
           },
-          // Default rows: the sticky checkbox cell was painting
-          // `bg-panel` while the row body is `transparent` (showing
-          // the parent's `bg.surface`). In dark mode those two tokens
-          // resolve to two distinct shades, which gave each row three
-          // visually-distinct horizontal bands (sticky cell / main
-          // row body / IO-preview addon). Use `bg.surface` so the
-          // sticky cell paints the SAME surface that's behind the
-          // transparent row body. Still opaque, still covers any
-          // horizontally-scrolled content underneath it.
+          // Default rows: the sticky checkbox cell was painting `bg-panel` while the
+          // row body is `transparent` (showing the parent's `bg.surface`).
           "& tbody[data-row-variant='default'] > tr > td:first-of-type, & tbody:not([data-row-variant]) > tr > td:first-of-type":
             {
               backgroundColor: "var(--chakra-colors-bg-surface)",
@@ -291,18 +253,12 @@ interface HeaderCellProps<T> {
   header: Header<T, unknown>;
   isStickyFirst: boolean;
   /**
-   * When true, the header cell is a sortable item — it picks up a
-   * drag-handle icon at the left of the title and registers with the
-   * surrounding SortableContext. False (the default) means the
-   * column is pinned in its current position (the row-select
-   * checkbox column uses this).
+   * When true, the header cell is a sortable item — it picks up a drag-handle icon at
+   * the left of the title and registers with the surrounding SortableContext.
    */
   reorderable?: boolean;
   /**
-   * Shared flag set by the surrounding DndContext while a column drag
-   * is in flight. The sort button checks it to swallow the synthetic
-   * click the browser fires right after a drag's pointerup — without
-   * it, dropping a column onto a sortable header also toggled sort.
+   * Shared flag set by the surrounding DndContext while a column drag is in flight.
    */
   suppressSortClickRef?: React.RefObject<boolean>;
 }
@@ -330,14 +286,9 @@ function HeaderCell<T>({
     reorderable ? { ...listeners } : {}
   ) as React.HTMLAttributes<HTMLElement>;
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
-  // Open the one-off education dialog the first time the user tries
-  // to drag a header to reorder it. v2 doesn't support native drag-
-  // reorder (yet), so without the dialog the drag attempt silently
-  // does nothing and operators walk away thinking "you can't change
-  // the columns" — they can, just from the Columns dropdown / floating
-  // Configure CTA, which the dialog points at. After the user
-  // dismisses with "Don't show again", `hasDismissed` in
-  // `columnEducationStore` flips true and the handler short-circuits.
+  // Open the one-off education dialog the first time the user tries to drag a header to reorder it. v2 doesn't support native drag-
+  // reorder (yet), so without the dialog the drag attempt silently does nothing and operators walk away thinking "you can't change the
+  // columns" — they can, just from the Columns dropdown / floating Configure CTA, which the dialog points at.
   const openEducation = useColumnEducationStore((s) => s.open);
   const educationDismissed = useColumnEducationStore((s) => s.hasDismissed);
   // Pinned headers (the row-select column) have no drag handle and no
@@ -390,24 +341,14 @@ function HeaderCell<T>({
   };
   const size = header.column.getSize();
   const declaredSize = header.column.columnDef.size;
-  // Flex columns declare a sentinel `size` (9999) to absorb leftover
-  // space — those normally render with `width: undefined` so the
-  // browser flexes them to fill the table. Once the user manually
-  // resizes one (TanStack writes the resolved px width into
-  // columnSizing → `getSize()` no longer matches the sentinel) we
-  // switch to a fixed `${size}px` so the resize actually sticks.
-  // Without this, dragging the trace column's grip updated state but
-  // visually nothing happened because `width` stayed undefined.
+  // Flex columns declare a sentinel `size` (9999) to absorb leftover space — those
+  // normally render with `width: undefined` so the browser flexes them to fill the
+  // table.
   const isFlex = meta?.flex;
   const wasResized = isFlex && declaredSize !== undefined && size !== declaredSize;
   const useFixedWidth = !isFlex || wasResized;
-  // Every column *title* is left-aligned for a consistent header row —
-  // the previous mix (numeric columns right-aligned their headers via
-  // `meta.align`) read as ragged. Numeric cell *values* still
-  // right-align in the body; that alignment comes from the body cell
-  // renderers, not this header, so it's unaffected. The select-checkbox
-  // column is the one exception: its body checkbox is centred, so the
-  // header checkbox centres too (left-aligning it sat ~2px off the rows).
+  // Every column *title* is left-aligned for a consistent header row — the previous mix
+  // (numeric columns right-aligned their headers via `meta.align`) read as ragged.
   const align: "left" | "center" = header.column.id === SELECT_COLUMN_ID ? "center" : "left";
   const canSort = header.column.getCanSort();
   const sortDirection = header.column.getIsSorted();
@@ -428,14 +369,9 @@ function HeaderCell<T>({
               : undefined
       }
       ref={reorderable ? setNodeRef : undefined}
-      // Apply ONLY the translation from the sortable transform —
-      // `CSS.Translate.toString` skips the scaleX/scaleY that
-      // horizontalListSortingStrategy bakes in to fit the source's
-      // visual box to the target slot's width. With variable-width
-      // columns (Time = 60px vs Trace = 400px), the scale was producing
-      // grotesque stretches as the user dragged a narrow column over a
-      // wide one. Translation alone keeps the source at its natural
-      // width while still tracking the pointer.
+      // Apply ONLY the translation from the sortable transform — `CSS.Translate.toString` skips the
+      // scaleX/scaleY that horizontalListSortingStrategy bakes in to fit the source's visual box to the target
+      // slot's width.
       style={
         reorderable
           ? {
@@ -470,14 +406,9 @@ function HeaderCell<T>({
             ? { base: "bg.subtle", _dark: "bg.surface" }
             : undefined
       }
-      // Vertical separator between TH cells + bottom border to
-      // separate the head from the body rows. Under
-      // `border-collapse: separate` both edges paint cleanly per cell
-      // (the TR-level border was being swallowed). One step lighter
-      // than `gray.300/gray.700` since `separate` mode renders the
-      // border at full strength without sharing pixels with the body
-      // cell below — the previous step looked too heavy once the
-      // collapse merging stopped.
+      // Vertical separator between TH cells + bottom border to separate the head from
+      // the body rows. Under `border-collapse: separate` both edges paint cleanly per
+      // cell (the TR-level border was being swallowed).
       borderRightWidth="1px"
       borderRightColor={{ base: "gray.200", _dark: "gray.800" }}
       borderBottomWidth="1px"
@@ -534,12 +465,9 @@ interface SortableHeaderButtonProps {
   onToggle: ((event: unknown) => void) | undefined;
   children: React.ReactNode;
   /**
-   * dnd-kit sortable pointer listeners. When set, the label text
-   * becomes the drag-to-reorder zone (grab cursor); the sort chevron
-   * stays outside it so sorting keeps priority — hovering the chevron
-   * shows a pointer, not a grab. The PointerSensor's 5px activation
-   * distance means a plain click on the label still falls through to
-   * the button's sort toggle.
+   * dnd-kit sortable pointer listeners. When set, the label text becomes the
+   * drag-to-reorder zone (grab cursor); the sort chevron stays outside it so sorting
+   * keeps priority — hovering the chevron shows a pointer, not a grab.
    */
   dragZoneProps?: React.HTMLAttributes<HTMLElement>;
   /** See HeaderCellProps — true while a drag's synthetic click is pending. */
@@ -611,12 +539,9 @@ function SortableHeaderButton({
             {sortDirection === "desc" ? <ChevronDown /> : <ChevronUp />}
           </Icon>
         ) : (
-          // Inactive sortable columns show a faint chevron at all times so
-          // users can tell at a glance which columns are sortable without
-          // having to hover each one. Hover lifts it to make the click
-          // target obvious. Previously the chevron only appeared on hover,
-          // which made sortable and non-sortable headers visually
-          // identical and led to surprise no-ops on click.
+          // Inactive sortable columns show a faint chevron at all times so users can
+          // tell at a glance which columns are sortable without having to hover each
+          // one. Hover lifts it to make the click target obvious.
           <Icon
             boxSize="12px"
             color="fg.muted"
@@ -668,12 +593,9 @@ export function cellPropsFor(
     textAlign: meta?.align ?? "left",
     width: useFixedWidth ? `${size}px` : undefined,
     minWidth: `${cell.column.columnDef.minSize ?? 0}px`,
-    // No vertical separators on body cells — the table head owns the
-    // column boundaries via its own TH borders. Operator feedback:
-    // body-row verticals added visual noise on the white surface and
-    // made error rows even busier than they needed to be. Caller can
-    // pass `rightBorderColor` to opt a specific cell back into a
-    // separator if needed.
+    // No vertical separators on body cells — the table head owns the column boundaries
+    // via its own TH borders. Operator feedback: body-row verticals added visual noise
+    // on the white surface and made error rows even busier than they needed to be.
     borderRightWidth: rightBorderColor ? "1px" : "0",
     borderRightColor: rightBorderColor ?? undefined,
     ...(index === 0 && leftBorderColor

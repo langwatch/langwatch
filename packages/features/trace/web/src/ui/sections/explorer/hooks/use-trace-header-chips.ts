@@ -72,11 +72,6 @@ interface UseTraceHeaderChipsOptions {
 
 /**
  * Pure data hook for the trace-drawer header chip strip.
- *
- * Returns structured chip data plus the click/filter handlers it needs to
- * close over. JSX rendering lives in `<TraceHeaderChips>` — this hook never
- * returns React nodes (CLAUDE.md: "Hooks return state and callbacks, never
- * JSX"). Use `.ts` here, not `.tsx`.
  */
 export function useTraceHeaderChips(
   trace: TraceHeader,

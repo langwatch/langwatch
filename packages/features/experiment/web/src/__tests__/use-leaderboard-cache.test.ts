@@ -5,16 +5,7 @@ import { leaderboardFor } from "@langwatch/experiment-web";
 import { variantMetricsFor } from "@langwatch/experiment-web";
 
 /**
- * The caches exist so the fit runs once per answer rather than once per
- * render. Keyed on object identity they did the opposite while a run was
- * live: the results page polls every second and rebuilds its transformed data
- * from each response, so every poll handed the cache a brand-new object and
- * missed — running the full bootstrap synchronously on the render thread once
- * a second, for as long as anyone watched.
- *
- * These assert on REFERENCE equality, because that is the only thing that
- * distinguishes a cache hit from a recomputation that happened to agree.
- *
+ * The caches exist so the fit runs once per answer rather than once per render.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 

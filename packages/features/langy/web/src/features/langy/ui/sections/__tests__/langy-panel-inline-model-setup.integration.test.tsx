@@ -1,12 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
  * Spec: specs/langy/langy-inline-model-setup.feature — the panel's
  * `langyNeedsModel` gate over `api.modelProvider.getResolvedDefault`.
- *
- * Boundary mocks mirror `langy-panel.docked-companion-header.integration.test.tsx`:
- * the Langy host, `@ai-sdk/react` and the Langy API surface (the shared
- * in-memory tRPC-shaped double). The panel itself is real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

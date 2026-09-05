@@ -21,31 +21,10 @@ import type { LangyProgressSample } from "../model/values/langy-turn";
 
 /**
  * Single client/UI-state store for the Langy panel (ADR-046 frontend).
- *
- * Everything the panel needs to *decide what to render* lives here — panel
- * visibility, which conversation is active, the composer draft + model
- * override, the dismissed page-context chips, the per-proposal apply/discard
- * lifecycle, and the persisted developer mode. SERVER state (the recents list, a conversation's message history) is
- * NOT here — that is React Query (`data/useLangyConversationList`,
- * `data/useLangyMessages`) keyed by conversation id, kept fresh by the
- * `useLangyFreshness` SSE coordinator. This store holds only the pointer
- * (`activeConversationId`) into that server state, never a copy of it.
- *
- * The store is a module singleton (survives the per-project panel remount that
- * `LangyProvider key={projectSlug}` forces), so scoped state is reset explicitly
- * whenever the SCOPE changes — see `resetForScope`.
  */
 
 /**
  * Who and where the panel's state belongs to.
- *
- * Not just the project, and that is the correction: a conversation, a draft, a
- * picked trace row and a model override all belong to one signed-in user, in one
- * organization, working on one project. Any of the three changing makes the
- * state stale, and two of them used to change with nothing happening at all —
- * most sharply when the SAME project is open and the account changes underneath
- * it (a shared machine, an impersonation session), where the project id alone
- * says nothing has moved.
  */
 export interface LangyScope {
   userId: string | null;
@@ -61,11 +40,6 @@ const UNKNOWN_SCOPE: LangyScope = {
 
 /**
  * Fill in what a caller knows over what the store already knows.
- *
- * Callers see different amounts: the panel only has the project, the layout has
- * all three. Merging rather than replacing is what keeps the partial caller from
- * looking like a scope CHANGE (which would wipe the very conversation a refresh
- * is meant to restore).
  */
 function mergeScope(current: LangyScope | null, update: Partial<LangyScope>): LangyScope {
   return { ...(current ?? UNKNOWN_SCOPE), ...update };
@@ -80,10 +54,7 @@ function isSameScope(a: LangyScope | null, b: LangyScope | null): boolean {
 
 /**
  * A removable page-context chip that rides INSIDE the composer surface (e.g.
- * "Experiment: my-slug", "Trace: abc123", "Project: web-app"). Page context is
- * derived from the current route / LangyContext (see `useLangyPageContext`);
- * this store only tracks which of those the user CHOSE. Derivation is an offer,
- * not context — nothing reaches the agent until someone picks it.
+ * "Experiment: my-slug", "Trace: abc123", "Project: web-app").
  */
 export interface LangyContextChip {
   /** Stable id, e.g. `experiment:my-slug`. Selection is keyed on this. */
@@ -99,18 +70,6 @@ export interface LangyContextChip {
 
 /**
  * A capability the user has explicitly asked Langy to use on the next turn.
- *
- * `targetChipId` is the ASSOCIATION: the id of a `LangyContextChip` this skill
- * is aimed at, expressing "use the GitHub skill, on this trace" as one thought
- * rather than two chips sitting next to each other hoping the agent guesses.
- * Null means the skill has no specific target — a perfectly good state, and the
- * default until the user says otherwise.
- *
- * It stores the chip's ID, not its label: labels change (a title subscriber lands,
- * a filter is edited) and a binding that silently pointed at a stale string
- * would be worse than no binding. The label is resolved at send time, from the
- * chip that is actually present — and if that chip has since been removed, the
- * binding resolves to nothing rather than to a lie.
  */
 export interface LangySkillChip {
   /** Feature-map feature id, or agent skill name. See ~/shared/langy/langy-skills.ts. */
@@ -127,17 +86,8 @@ export interface LangyAppliedOutcome {
 }
 
 /**
- * A piece of context a SURFACE explicitly hands to Langy — the home briefing's
- * "look at this receipt", a card's "work from this", anything off the current
- * route. Distinct from the page-derived chips (which Langy infers from the URL /
- * open drawer) and from the picked page targets (which follow the DOM): this is
- * an intentional, surface-driven attach that outlives the element it came from.
- *
- * `type` reuses the context-chip kind vocabulary so an attached item forwards to
- * the agent as page context with no translation, and so the sidebar can pick the
- * right icon. `id` is the resource ref that rides to the agent; `label` is the
- * human name shown in the sidebar; `meta` carries anything a surface wants to
- * keep for display (a value, a severity) without widening the wire shape.
+ * A piece of context a SURFACE explicitly hands to Langy — the home briefing's "look at
+ * this receipt", a card's "work from this", anything off the current route.
  */
 export type LangyAttachedContextType = LangyContextChip["kind"];
 
@@ -152,37 +102,24 @@ export interface LangyAttachedContext {
 }
 
 /**
- * How the panel is laid out (Notion-style). `floating` = a rounded card that
- * overlays the page (and floats above a drawer); `sidebar` = a full-height right
- * dock that pushes page content left (a drawer nests to its left). User-picked,
- * persisted.
+ * How the panel is laid out (Notion-style). `floating` = a rounded card that overlays
+ * the page (and floats above a drawer); `sidebar` = a full-height right dock that
+ * pushes page content left (a drawer nests to its left). User-picked, persisted.
  */
 export type LangyPanelMode = "floating" | "sidebar";
 
 /**
- * Which decorative treatment the panel wears — an interim design-comparison
- * switch (see LangyWave). `fold` is the two-tone brand fold whose seam moves
- * with Langy's own activity (never the cursor); `plain` is no effect, just the
- * themed surface. Both layouts (floating card and sidebar dock) share the one
- * effect and motion driver. Defaults to `fold`; user-picked, persisted.
+ * Which decorative treatment the panel wears — an interim design-comparison switch (see
+ * LangyWave). `fold` is the two-tone brand fold whose seam moves with Langy's own
+ * activity (never the cursor); `plain` is no effect, just the themed surface.
  */
 export type LangyPanelEffect = "fold" | "plain";
 
 /**
- * One measured batch-progress observation from the worker. `receivedAtMs` is
- * stamped by the browser when the frame arrives; together with the observed
- * batch size/duration it lets the status line interpolate between real X/Y
- * samples without making timing part of durable conversation state.
+ * One measured batch-progress observation from the worker.
  */
 interface LangyState extends TurnPhaseState {
-  // Panel visibility. `false` is MINIMISED, not gone: the panel sinks to its
-  // edge peek (the panel itself slides down — a sliver of its header at the bottom in
-  // floating mode, of the dock's spine on the right edge in sidebar mode)
-  // with the conversation, draft and layout choice untouched underneath.
-  // `openPanel` — the peek's click/Enter, the Cmd/Ctrl+I toggle, an askLangy
-  // handoff — brings the same surface back. Exactly ONE minimised affordance
-  // renders at a time: the peek behind release_ui_langy_peek_dock_enabled,
-  // the classic launcher orb while that flag is off (see LangySidecar).
+  // Panel visibility.
   // Spec: specs/langy/langy-peek-dock.feature
   isOpen: boolean;
   openPanel: () => void;
@@ -199,14 +136,7 @@ interface LangyState extends TurnPhaseState {
   consumePendingPrompt: () => void;
 
   /**
-   * The panel's composer is asked to take focus. Three producers: an
-   * `askLangy` handoff (the reader just handed a question over and expects to
-   * keep typing), a new chat (the one gesture whose whole point is to write
-   * the next message), and a dialog that took the cursor away and gives it
-   * back on close. A flag rather than an imperative call because the composer
-   * may not be mounted yet when the request fires — it honors the request on
-   * mount or on change, then consumes it so focus is taken exactly once.
-   * Ephemeral, like `pendingPrompt`.
+   * The panel's composer is asked to take focus.
    */
   composerFocusRequested: boolean;
   /** Ask the composer to take focus. */
@@ -224,59 +154,28 @@ interface LangyState extends TurnPhaseState {
 
   /**
    * How many mounted app shells have claimed the docked panel's placement.
-   *
-   * The app shell (DashboardLayout) draws the page as a rounded content card
-   * on the gray page ground. When such a shell is mounted it CLAIMS the dock:
-   * it reserves the panel's room inside its own content row (keeping the
-   * header full-width) and the docked panel renders as a second rounded card
-   * below the header. Pages without a shell (full-screen tools like the
-   * studio) leave the count at zero and keep the flush full-height dock with
-   * the page-level width reservation. A count, not a boolean, so nested or
-   * twin mounts (StrictMode) stay correct. Never persisted: it mirrors what
-   * is mounted right now. Spec: specs/langy/langy-panel-layout.feature
    */
   dockShellClaims: number;
   claimDockShell: () => void;
   releaseDockShell: () => void;
 
   /**
-   * The docked panel is open and reserving room right now, the one truth the
-   * page wrapper computes (visibility gate + open + sidebar mode, see
-   * LangyShiftedRoot) and the app shell consumes to reserve the dock's room
-   * inside its content row. Kept in the store so the shell never re-derives
-   * Langy's visibility gating (which needs session hooks a public shell must
-   * not run). Never persisted.
+   * The docked panel is open and reserving room right now, the one truth the page
+   * wrapper computes (visibility gate + open + sidebar mode, see LangyShiftedRoot) and
+   * the app shell consumes to reserve the dock's room inside its content row.
    */
   dockShifted: boolean;
   setDockShifted: (shifted: boolean) => void;
 
   /**
    * The home page's ask field is in use right now.
-   *
-   * The field and Langy's panel are two ways to say the same thing, so a
-   * minimised Langy stands down while someone is typing into the field rather
-   * than peeking out from under its results. Never persisted: it mirrors what
-   * the reader is doing this second, and a page that reloaded into "the field
-   * is focused" when it is not would leave Langy hidden with nothing to
-   * un-hide it.
    */
   homeAskOpen: boolean;
   setHomeAskOpen: (open: boolean) => void;
 
   /**
-   * What the page Langy is driving is doing this second, in the page's own
-   * words, or null when it is doing nothing.
-   *
-   * The status line may only say true things, so with no tool running and no
-   * tokens arriving it falls back to a verb that claims nothing ("Cooking…").
-   * That was honest and useless: while Langy runs a column the page knows
-   * which one and how many rows are back, and nothing carried that the few
-   * feet from the table to the panel. This is that channel, and the page that
-   * writes it is the page that is doing the work, so the line stays true.
-   *
-   * Session-only, never persisted: it describes this second. A page that
-   * reloaded into "running 12 of 20 rows" would be claiming work no one is
-   * doing, which is the whole failure this exists to avoid.
+   * What the page Langy is driving is doing this second, in the page's own words, or
+   * null when it is doing nothing.
    */
   pageActivity: string | null;
   setPageActivity: (activity: string | null) => void;
@@ -285,35 +184,21 @@ interface LangyState extends TurnPhaseState {
   activeConversationId: string | null;
   /**
    * The conversation id a panel-open warm minted ahead of the first message
-   * (specs/langy/langy-worker-prewarm.feature). NOT the active conversation,
-   * nothing durable exists under it yet; the first send adopts it (the
-   * transport passes it to `createConversation`) so the turn lands on the
-   * worker the warm already booted. Cleared whenever the panel points at a
-   * different chat (new conversation, ask handoff, selection, scope change).
+   * (specs/langy/langy-worker-prewarm.feature).
    */
   pendingConversationId: string | null;
   /** The warm hook stores the id its mutation returned; null clears it. */
   setPendingConversationId: (id: string | null) => void;
   /**
-   * The conversation whose worker the last warm PROVED alive (`warmed: true`
-   * from `langy.warmWorker`). The thinking line reads it: a first message to a
-   * warmed worker skips the cold-boot ladder and says "Thinking…" from the
-   * first frame, because the workspace it would claim to be preparing already
-   * exists. Only ever compared against the ids on screen, so a stale value is
-   * inert; if the worker was reaped since, the manager's own readiness status
-   * corrects the line moments later, exactly as it does on a follow-up.
-   * Session-only, never persisted.
+   * The conversation whose worker the last warm PROVED alive (`warmed: true` from
+   * `langy.warmWorker`).
    */
   warmedConversationId: string | null;
   /** A warm answered `warmed: true` for this conversation's worker. */
   markConversationWarmed: (id: string) => void;
   /**
-   * The conversation whose durable server history should hydrate the chat
-   * engine. Set only when the USER selects a conversation; cleared once the
-   * panel has applied it. Deliberately NOT set on `adoptConversation`: a turn
-   * that just created a conversation already holds its live messages in the
-   * chat engine, so re-hydrating from the (possibly lagging) server projection
-   * would clobber the in-flight stream.
+   * The conversation whose durable server history should hydrate the chat engine. Set
+   * only when the USER selects a conversation; cleared once the panel has applied it.
    */
   historyLoadConversationId: string | null;
   /** User picked a conversation from recents — load its history. */
@@ -324,12 +209,7 @@ interface LangyState extends TurnPhaseState {
    */
   adoptConversation: (id: string) => void;
   /**
-   * Conversations THIS tab created whose read-side projection has not yet
-   * been seen. The create command is accepted before the projection lands, so
-   * a not-found from the history read is "not yet", never an error, until a
-   * durable confirmation arrives — a successful read, or a freshness signal
-   * naming the conversation. Session-scoped on purpose: never persisted (a
-   * refreshed tab reads before it writes, so the window doesn't exist there).
+   * Conversations THIS tab created whose read-side projection has not yet been seen.
    */
   unconfirmedConversations: Record<string, true>;
   /** A durable read or signal proved the conversation's projection exists. */
@@ -345,23 +225,16 @@ interface LangyState extends TurnPhaseState {
   /** Per-session model override for the next send. "" = use the project default. */
   modelOverride: string;
   /**
-   * Seeding: the panel writing the resolved default, or an allowlist snap.
-   * Either way the model is not the user's choice, so this clears the pick
-   * flag. An allowlist snap in particular OVERRULES a pick, and a pick the
-   * panel has taken away must not go on holding the pill off the default.
+   * Seeding: the panel writing the resolved default, or an allowlist snap. Either way
+   * the model is not the user's choice, so this clears the pick flag.
    */
   setModelOverride: (model: string) => void;
   /** The user choosing a model in the picker. Their pick, not a seed. */
   pickModel: (model: string) => void;
   /**
-   * Whether the model in the picker is the user's own choice rather than a
-   * seeded value. Session-only, never persisted, and cleared with the
-   * conversation it was made in.
-   *
-   * The flag exists because the two are otherwise indistinguishable at the
-   * one moment it matters: accept "make it the default" and the pick BECOMES
-   * the default, so every "is this still the default?" test reads an explicit
-   * choice as untouched and the follow rules below overwrite it.
+   * Whether the model in the picker is the user's own choice rather than a seeded
+   * value. Session-only, never persisted, and cleared with the conversation it was made
+   * in.
    */
   isModelPickedByUser: boolean;
   /**
@@ -377,24 +250,13 @@ interface LangyState extends TurnPhaseState {
    */
   followConversationModel: (args: { conversationId: string; model: string }) => void;
   /**
-   * The project's coding default changed server-side (a codex connect flow
-   * wrote the LANGY role default). Follow it with the composer's pill ONLY
-   * while the pill still holds a seeded value: the user's own pick is never
-   * hijacked, including when they picked the model that just became the
-   * default.
+   * The project's coding default changed server-side (a codex connect flow wrote the
+   * LANGY role default).
    */
   followCodingDefaultChange: (change: { nextDefault: string }) => void;
 
   /**
    * Page-context chips the user has CHOSEN, by id.
-   *
-   * Opt-IN, and the direction is the whole point. This used to be a dismissed
-   * set: everything Langy could derive from the page rode along automatically
-   * and you removed what you didn't want. That is backwards — it meant simply
-   * having the panel open on a busy page silently handed the agent a pile of
-   * context nobody asked it to consider, and the only way to find out was to
-   * read the chips. Now the page merely OFFERS; nothing is context until it is
-   * picked.
    */
   chosenChipIds: Set<string>;
   /** Take a candidate chip into context. */
@@ -404,10 +266,9 @@ interface LangyState extends TurnPhaseState {
   resetChosenChips: () => void;
 
   /**
-   * Context handed to Langy by a SURFACE (a home card, a briefing receipt, any
-   * "attach this" affordance). The clean, typed entry point every surface uses;
-   * read `attachedContext` to LIST it. Deduped by `id` (a second attach of the
-   * same id refreshes its label/meta rather than stacking a duplicate).
+   * Context handed to Langy by a SURFACE (a home card, a briefing receipt, any "attach
+   * this" affordance). The clean, typed entry point every surface uses; read
+   * `attachedContext` to LIST it.
    */
   attachedContext: LangyAttachedContext[];
   attachContext: (item: LangyAttachedContext) => void;
@@ -416,11 +277,6 @@ interface LangyState extends TurnPhaseState {
 
   /**
    * Skill chips the user has attached to the next turn.
-   *
-   * A resource chip says "look at this"; a skill chip says "DO this". They are
-   * separate state because they are separate grammar — nouns and verbs — and
-   * because a skill is chosen deliberately, where page context arrives on its
-   * own from the route.
    */
   skillChips: LangySkillChip[];
   addSkillChip: (skill: { id: string; label: string }) => void;
@@ -445,40 +301,20 @@ interface LangyState extends TurnPhaseState {
   dismissedFeedbackMessageIds: Set<string>;
   dismissFeedback: (messageId: string) => void;
   /**
-   * The assistant message whose feedback card must stay rendered regardless of
-   * the server cadence flag. Two producers: a shown card pins itself (so the
-   * refetch that follows `feedbackPromptShown` cannot unmount it mid-look), and
-   * the `/feedback` composer command pins on demand. Conversation-scoped.
+   * The assistant message whose feedback card must stay rendered regardless of the
+   * server cadence flag.
    */
   pinnedFeedbackMessageId: string | null;
   pinFeedback: (messageId: string) => void;
 
   // The turn phase — the SINGLE, event-driven source for the composer's send/stop
-  // affordance and every "is a turn in flight" read (ADR-078). It replaces the
-  // old scatter of isBusy / serverTurnInFlight / isStopping / settled-marker
-  // booleans derived per-render across the panel: components read `turnPhase`,
-  // and it changes ONLY through the four actions below.
-  //   idle     — no turn in flight; the composer can send.
-  //   active   — a turn is in flight (this tab's send OR the durable fold — incl.
-  //              another tab / a resume after refresh); sending is disabled and
-  //              Stop is offered.
-  //   stopping — Stop was clicked; awaiting the backend's confirmed terminal.
-  // Conversation-scoped (reset on switch / new chat), never persisted. The
-  // ChatTransport adopts the turn id and pushes live signals off the
-  // `langy.onTurnStream` subscription; `useLangyTurnSignals` reads those.
-  //
-  // The phase STATE fields (turnPhase, activeTurnId, settledTurnId,
-  // backendSawTurnInFlight) come from `TurnPhaseState`; the machine's pure
-  // transitions live in @langwatch/langy's turnPhase.ts. The store exposes them as events:
-  /** A turn was dispatched (transport adopted its ids): adopt it, go `active`. */
+  // affordance and every "is a turn in flight" read (ADR-078).
   beginTurn: (args: { conversationId: string; turnId: string }) => void;
   /** The user hit Stop: `active` → `stopping` (a no-op in any other phase). */
   requestStop: () => void;
   /**
-   * The conversation whose last turn THIS browser stopped (ADR-078). What lets
-   * an empty stopped reply read "Interrupted" instead of "No content". Session
-   * truth only: set when the stop dispatches, cleared by the next send and by
-   * the scope reset — a reloaded page falls back to the plain empty state.
+   * The conversation whose last turn THIS browser stopped (ADR-078). What lets an empty
+   * stopped reply read "Interrupted" instead of "No content".
    */
   interruptedConversationId: string | null;
   /**
@@ -488,29 +324,21 @@ interface LangyState extends TurnPhaseState {
    */
   abandonStop: () => void;
   /**
-   * Reconcile with the DURABLE fold — the tab-independent truth of whether a
-   * turn is in flight. Feeds `active` for a turn this tab did not start (another
-   * tab, a resume after refresh) and settles to `idle` once the fold that
-   * CONFIRMED the turn goes idle. Never keyed on the client stream's flaky
-   * isBusy — which is exactly how a premature second send used to slip through
-   * the moment the first token arrived and 409 the in-flight turn.
+   * Reconcile with the DURABLE fold — the tab-independent truth of whether a turn is in
+   * flight.
    */
   observeBackendTurn: (inFlight: boolean) => void;
   /** A genuine end-of-turn frame settled the turn: go `idle` immediately. */
   settleTurn: (turnId: string | null) => void;
   /**
-   * The LOCAL turn projection (ADR-059): the durable event tail folded through
-   * the same reducer the server projection runs. Seeded from the conversation
-   * snapshot, advanced by `applyTurnEvents`, and composed with the phase
-   * machine — a folded terminal settles the phase, a folded running turn
-   * confirms it, both replayable from the recorded events.
+   * The LOCAL turn projection (ADR-059): the durable event tail folded through the same
+   * reducer the server projection runs.
    */
   turnProjection: LangyTurnProjectionState;
   /**
-   * Adopt a conversation snapshot's position (cursor + in-flight turn id).
-   * When the snapshot names a turn in flight and this tab tracks none, the tab
-   * adopts it — which is what makes Stop (and the live stream) work after a
-   * refresh. Never rewinds a fresher local fold.
+   * Adopt a conversation snapshot's position (cursor + in-flight turn id). When the
+   * snapshot names a turn in flight and this tab tracks none, the tab adopts it — which
+   * is what makes Stop (and the live stream) work after a refresh.
    */
   seedTurnProjection: (snapshot: {
     cursor: LangyEventCursor | null;
@@ -521,12 +349,8 @@ interface LangyState extends TurnPhaseState {
   /** Latest coarse status line for the turn (e.g. "Searching traces…"). */
   turnStatus: string | null;
   /**
-   * The current turnStatus is the manager's pre-first-frame readiness line
-   * ("Starting Langy…", "Thinking…") — a placeholder for silence. The panel
-   * must never render it under an answer that is already visible: a stream
-   * replay can re-deliver it after text is on screen, and "Thinking…" below
-   * the reply reads as a contradiction. Statuses the agent reports mid-turn
-   * keep rendering regardless.
+   * The current turnStatus is the manager's pre-first-frame readiness line ("Starting
+   * Langy…", "Thinking…") — a placeholder for silence.
    */
   turnStatusIsReadiness: boolean;
   /** Latest progress fraction/percentage for the turn (0..1 or 0..100). */
@@ -541,9 +365,7 @@ interface LangyState extends TurnPhaseState {
   turnReasoning: string | null;
   /**
    * The manager's typed plan snapshot for the live turn (its whole todo list),
-   * last-snapshot-wins. Ephemeral — the plan card prefers it over parsing the
-   * raw `todowrite` tool part while the turn streams; the durable fold is
-   * canonical on reload. Null until the turn reports a plan.
+   * last-snapshot-wins.
    */
   turnPlan: Array<{ content: string; status: string }> | null;
   setTurnStatus: (status: string | null) => void;
@@ -563,10 +385,9 @@ interface LangyState extends TurnPhaseState {
   setDevMode: (devMode: boolean) => void;
 
   /**
-   * Developer-mode card gallery: renders every card Langy can produce, with
-   * fixture data, in place of the conversation. Deliberately NOT persisted — it
-   * is a debugging lens you open, look through, and close, not a mode you leave
-   * a browser in.
+   * Developer-mode card gallery: renders every card Langy can produce, with fixture
+   * data, in place of the conversation. Deliberately NOT persisted — it is a debugging
+   * lens you open, look through, and close, not a mode you leave a browser in.
    */
   cardGalleryOpen: boolean;
   toggleCardGallery: () => void;
@@ -580,36 +401,16 @@ interface LangyState extends TurnPhaseState {
 
   /**
    * True once `resetForScope` has run in THIS page load. Never persisted.
-   *
-   * It is what tells the two kinds of same-scope announcement apart: the FIRST
-   * one after a load is the refresh-restore (rehydrated conversation, arm the
-   * history load, sweep the previous session's ephemera), and every one after
-   * it is a heartbeat — `useOrganizationTeamProject` momentarily reports no
-   * project while it refetches, so its effect re-fires with the same three ids
-   * every time the window regains focus. Without this flag each of those
-   * re-announcements re-ran the sweep, and the user's grabbed context chips,
-   * draft and live turn signals vanished mid-conversation for no visible
-   * reason.
    */
   scopeAnnounced: boolean;
 
   /**
-   * Bumped whenever the panel starts over: a new chat, an `askLangy` handoff, or
-   * a scope change. It is the one signal the sibling stores follow, so "what
-   * else has to be forgotten" is answered in one place instead of every store
-   * growing its own copy of the project/org/user wiring. See the subscription in
-   * `langyContextTargetStore`.
+   * Bumped whenever the panel starts over: a new chat, an `askLangy` handoff, or a
+   * scope change.
    */
   conversationEpoch: number;
 
   // Resets
-  /**
-   * Entering a scope — a signed-in user, in an organization, on a project.
-   * Restores the conversation that was open in THIS scope, and clears everything
-   * else the previous one left behind.
-   *
-   * Takes a PARTIAL scope: callers know different amounts (see `mergeScope`).
-   */
   resetForScope: (scope: Partial<LangyScope>) => void;
   /** `resetForScope` for a caller that only knows the project. */
   resetForProject: (projectId: string) => void;
@@ -642,27 +443,6 @@ const emptyConversationState = () => ({
 
 /**
  * The ONLY state allowed to cross a change of user, organization or project.
- *
- * The reset below is deliberately inverted: it walks the store's own initial
- * state and clears everything it finds, except what is named here. A list of
- * things to CLEAR is a list somebody has to remember to extend, and the cost of
- * forgetting is invisible — one project's trace ids quietly offered as context
- * in another. A list of things to KEEP fails the other way: a new field is
- * forgotten INTO the reset, which is the harmless direction.
- *
- * Each entry earns its place:
- *   isOpen, panelMode, panelEffect, devMode
- *     — browser-level preferences. They describe how this person likes the panel,
- *       not what they were looking at. Closing the panel every time somebody
- *       changes project would be a bug of its own.
- *   dockShellClaims, dockShifted
- *     — not preferences and not data: a live count of what is mounted RIGHT NOW.
- *       Zeroing them would tell the app shell the dock is free while it is still
- *       holding it, and the page would jump.
- *
- * Everything else — conversation pointer, draft, chosen chips, attached context,
- * model override, proposal lifecycle, feedback dismissals, live turn signals,
- * the developer card gallery — is scoped, and goes.
  */
 const SCOPE_INDEPENDENT_KEYS: ReadonlySet<string> = new Set<keyof LangyState>([
   "isOpen",
@@ -675,12 +455,6 @@ const SCOPE_INDEPENDENT_KEYS: ReadonlySet<string> = new Set<keyof LangyState>([
 
 /**
  * Every scoped field, back at its initial value.
- *
- * Read off `getInitialState()` rather than a hand-written literal, so the store's
- * shape IS the reset's shape: a field added tomorrow is cleared tomorrow, with
- * nobody having to notice. Actions are skipped by type (they are the only
- * functions in here); collections are copied so two resets can never hand out
- * the same mutable instance.
  */
 function scopedInitialState(): Partial<LangyState> {
   const patch: Record<string, unknown> = {};
@@ -713,17 +487,9 @@ export const useLangyStore = create<LangyState>()(
       askLangy: (prompt) =>
         set(() => ({
           isOpen: true,
-          // A fresh ask starts a clean conversation, mirroring
-          // startNewConversation (the chat engine is reset panel-side when the
-          // queued prompt is consumed) — with ONE deliberate difference: the
-          // context the user just grabbed RIDES ALONG. `chosenChipIds` is kept
-          // and the epoch is NOT bumped (the bump is what tells the target
-          // store to drop its picks), because pointing at a thing on the page
-          // and then asking about it is the ordinary order of the gesture —
-          // arm, absorb, ask. Wiping the picks here made the whole grabbing
-          // flow look dead: the chip appeared, the ask opened the panel, and
-          // the turn went out knowing nothing. The chips stay visible in the
-          // composer, so what rides along is still exactly what the user sees.
+          // A fresh ask starts a clean conversation, mirroring startNewConversation (the chat engine is reset
+          // panel-side when the queued prompt is consumed) — with ONE deliberate difference: the context the
+          // user just grabbed RIDES ALONG.
           activeConversationId: null,
           historyLoadConversationId: null,
           draft: "",
@@ -751,14 +517,9 @@ export const useLangyStore = create<LangyState>()(
       // the overflow menu (user-picked, persisted).
       panelMode: "sidebar",
       setPanelMode: (panelMode) => set({ panelMode }),
-      // `fold` is the default: the two-tone brand fold IS the panel's design,
-      // and shipping the undecorated surface as the default meant nobody saw
-      // it unless they went looking in a menu. `plain` stays one toggle away.
-      //
-      // This is the default for state that has never been set. `panelEffect`
-      // is persisted, so anyone who already chose an effect keeps their choice
-      // — the change reaches new sessions and untouched installs, not people
-      // who have already decided.
+      // `fold` is the default: the two-tone brand fold IS the panel's design, and
+      // shipping the undecorated surface as the default meant nobody saw it unless they
+      // went looking in a menu. `plain` stays one toggle away.
       panelEffect: "fold",
       setPanelEffect: (panelEffect) => set({ panelEffect }),
 
@@ -1032,14 +793,8 @@ export const useLangyStore = create<LangyState>()(
       seedTurnProjection: (snapshot) =>
         set((s) => {
           const turnProjection = seedLangyTurnProjection(s.turnProjection, snapshot);
-          // Refresh-resume: the durable record names a turn in flight and this
-          // tab tracks none — adopt it so Stop targets it and live signals
-          // route to it. `activeTurnId === null` keeps a mid-send tab from
-          // being clobbered; requiring the seed to have ADVANCED the fold
-          // (the reducer returns the same reference for a stale snapshot)
-          // keeps a lagging refetch from resurrecting a finished turn. Never
-          // guard on the phase: the observeBackendTurn effect flips it to
-          // `active` in this same commit, before this reducer runs.
+          // Refresh-resume: the durable record names a turn in flight and this tab
+          // tracks none — adopt it so Stop targets it and live signals route to it.
           const adoptTurnId =
             snapshot.currentTurnId && s.activeTurnId === null && turnProjection !== s.turnProjection
               ? snapshot.currentTurnId
@@ -1071,12 +826,8 @@ export const useLangyStore = create<LangyState>()(
             };
           }
           if (turnProjection.turn?.Status === "running") {
-            // The settle marker exists to gag the fold RE-ASSERTING the turn
-            // whose end frame already landed (its projection lags). A running
-            // turn with a DIFFERENT id is not that — it is a genuinely new
-            // turn (another tab's send, a re-driven turn), and the stale
-            // marker must not demote it to idle. Clear it, and drop the
-            // settled turn's id with it so the new turn is adopted.
+            // The settle marker exists to gag the fold RE-ASSERTING the turn whose end
+            // frame already landed (its projection lags).
             const base =
               s.settledTurnId !== null && turnProjection.turnId !== s.settledTurnId
                 ? {
@@ -1128,37 +879,16 @@ export const useLangyStore = create<LangyState>()(
       closeCardGallery: () => set({ cardGalleryOpen: false }),
 
       /**
-       * Called when the panel enters a scope — a user, an organization, a
-       * project.
-       *
-       * It has to serve two cases that look identical from in here — a page
-       * REFRESH (rehydrated from localStorage; the user expects to come back to
-       * exactly what they left) and a SCOPE CHANGE (the store is a module
-       * singleton that survives the per-project remount, so the last scope's
-       * conversation is still sitting in it and must not follow them across).
-       *
-       * The persisted scope is what tells them apart. A conversation is restored
-       * only when it provably belongs to the scope being entered; anything else
-       * clears, and clears COMPLETELY — see `scopedInitialState`, which is
-       * derived from the store's own shape rather than from a list of fields
-       * somebody has to keep in step.
-       *
-       * Restoring also ARMS the history load, because `activeConversationId`
-       * alone is just a pointer — the chat engine hydrates off
-       * `historyLoadConversationId`, so without it the panel would show the
-       * right title over an empty thread.
+       * Called when the panel enters a scope — a user, an organization, a project.
        */
       resetForScope: (scope) =>
         set((state) => {
           const current = state.activeConversationScope;
           const merged = mergeScope(current, scope);
           const unchanged = !!current && isSameScope(current, merged);
-          // A re-announcement of the scope we are already in is a heartbeat,
-          // not a move — the org/project hook re-fires on every refetch (window
-          // focus included) with the same three ids. Only the FIRST unchanged
-          // announcement per page load does the refresh-restore below; after
-          // that, sweeping again would wipe the user's grabbed context chips,
-          // draft and live turn state mid-conversation. See `scopeAnnounced`.
+          // A re-announcement of the scope we are already in is a heartbeat, not a move
+          // — the org/project hook re-fires on every refetch (window focus included)
+          // with the same three ids.
           if (unchanged && state.scopeAnnounced) return state;
           // Keep the SAME object when nothing moved. Two callers announce the
           // scope — the layout, which knows all three ids, and the panel, which
@@ -1184,23 +914,9 @@ export const useLangyStore = create<LangyState>()(
     }),
     {
       name: "langy:store",
-      // Durable across sessions, so a refresh puts the user back exactly where
-      // they were: the panel's open/closed state, its layout (floating or
-      // docked), developer mode, and WHICH CONVERSATION was open.
-      //
-      // `isOpen` persisting never forces the panel onto a surface that has no
-      // Langy — the visibility gate (useShowLangy) still decides whether it
-      // renders at all.
-      //
-      // The conversation persists as a PAIR: the id and the SCOPE it belongs to
-      // — user, organization, project. On its own the id is unsafe, because the
-      // store is a module singleton (and localStorage is shared by everyone who
-      // uses this browser), so a switch would carry it somewhere it does not
-      // exist, or worse, somewhere it exists and does not belong.
-      // `resetForScope` compares the two and restores only on a match.
-      //
-      // Everything else — the draft, the live turn, chosen chips, proposal
-      // lifecycle — is per-session state that must start clean.
+      // Durable across sessions, so a refresh puts the user back exactly where they
+      // were: the panel's open/closed state, its layout (floating or docked), developer
+      // mode, and WHICH CONVERSATION was open.
       partialize: (state) => ({
         isOpen: state.isOpen,
         devMode: state.devMode,
@@ -1233,9 +949,8 @@ export function selectAddableChips(
 
 /**
  * Adapt surface-attached context into the chip shape the sidebar and the agent's
- * page-context both speak — so an attached item renders and forwards exactly like
- * a derived chip. The chip id namespaces on kind + ref so an attached trace and a
- * route-derived one for the same trace collapse into one instead of stacking.
+ * page-context both speak — so an attached item renders and forwards exactly like a
+ * derived chip.
  */
 export function attachedContextToChip(item: LangyAttachedContext): LangyContextChip {
   return {

@@ -1,6 +1,5 @@
 /**
  * The small x that takes a block the chips added back out of a dialog.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/features/agent-testing/cases-table.feature
  */

@@ -1,15 +1,7 @@
 /**
- * Captures the current state of the workspace switcher as the admin
- * (rogerio) and asserts:
- *   1. No personal team belonging to another user appears in the dropdown
- *   2. No "+ New Project" affordance is rendered against another user's
- *      personal workspace
- *
- * Verifies task #43: "Investigate workspace switcher: admin sees +
- * New Project under another user's Personal Workspace". The fixes at
- * useWorkspaceData (filter personal teams by ownerUserId) + alexis
- * 0614a16c6 (RBAC drift) should have closed this. This script is the
- * dogfood lock against regression.
+ * Captures the current state of the workspace switcher as the admin (rogerio) and
+ * asserts: 1. No personal team belonging to another user appears in the dropdown 2. No
+ * "+ New Project" affordance is rendered against another user's personal workspace
  */
 import * as fs from "fs";
 import * as path from "path";

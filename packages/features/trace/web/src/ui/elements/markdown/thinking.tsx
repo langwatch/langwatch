@@ -9,10 +9,8 @@ const thinkingShimmer = keyframes`
 `;
 
 /**
- * Inline span that renders a "thinking" run with a slow shimmer animation
- * sweeping across the text and a "Thinking" tooltip on hover. Lives at the
- * markdown component layer (driven by the `em` override) so it can use real
- * Chakra primitives rather than fighting Shiki's inline-styled spans.
+ * Inline span that renders a "thinking" run with a slow shimmer animation sweeping
+ * across the text and a "Thinking" tooltip on hover.
  */
 export function ThinkingText({ children }: { children: React.ReactNode }) {
   return (

@@ -1,10 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for ErrorDetails — the run drawer's error block.
- * Verifies infra failures render as a clean, actionable handled error and
- * never leak a raw stack trace, whatever shape the stored error takes.
- *
+ * @vitest-environment jsdom
  * @see specs/scenarios/scenario-infra-error-surfacing.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

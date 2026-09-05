@@ -1,18 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Handing the reader a file the browser never fetched.
- *
- * The other half of a report a feature package decided the contents of. It is
- * four browser globals in a sequence, and every one of the three ways to get
- * the sequence wrong is silent: a detached anchor's click does nothing, a URL
- * revoked before the click cancels the save it was racing, and a URL never
- * revoked leaks a blob for the life of a document whose whole purpose is
- * repeated exports.
- *
- * `@langwatch/organization-web`'s own suite asserts WHAT the file says; this one
- * asserts that it arrives.
- *
+ * @vitest-environment jsdom
  * Spec: specs/audit-log/audit-log.feature
  */
 

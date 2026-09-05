@@ -6,14 +6,8 @@ import {
 } from "../../../../model/explorer/search-bar/suggestion-items";
 
 /**
- * Single row in the dropdown. `value` is what lands in the editor;
- * `label` is what renders (the human field name in field mode, e.g.
- * "Origin"). `field` is the raw query field (`origin`) — rendered as a
- * mono syntax hint and used to look up the field's value-type / icon.
- * `group` drives section headers in field mode (null in value mode).
- * `isPrefix` flags namespaced prefix entries (`trace.attribute.<key>`) so
- * the accept handler knows to drop the user back into field-mode for
- * key-completion instead of auto-appending `:`.
+ * Single row in the dropdown. `value` is what lands in the editor; `label` is what
+ * renders (the human field name in field mode, e.g. "Origin").
  */
 export interface SuggestionRow {
   value: string;

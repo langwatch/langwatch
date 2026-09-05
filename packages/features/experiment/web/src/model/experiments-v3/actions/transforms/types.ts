@@ -2,13 +2,6 @@ import type { EvaluationsV3State } from "../../types";
 
 /**
  * The slice of workbench state every transform reads and writes.
- *
- * Structurally the persisted projection (`PersistedEvaluationsV3State` minus
- * `results` and the persisted UI settings): the same `name` / `datasets` /
- * `activeDatasetId` / `evaluators` / `targets` fields the autosave writes and
- * `zundo` partializes for undo. Transforms never see execution results, drawer
- * state, selections or column widths, so the same function runs unchanged in
- * the browser store and on the server.
  */
 export type WorkbenchState = Pick<
   EvaluationsV3State,
@@ -85,11 +78,6 @@ export type Transform<Payload, Result = undefined> = (args: {
 
 /**
  * A transform with its payload type erased, for the manifest.
- *
- * `payload: never` is what makes every concrete `Transform<P, R>` assignable
- * here: function parameters are contravariant, and `never` is assignable to
- * every `P`. The executor parses the payload with the kind's schema before it
- * calls through, which is where the real type is checked.
  */
 export type AnyTransform = (args: { state: WorkbenchState; payload: never }) => {
   state: WorkbenchState;

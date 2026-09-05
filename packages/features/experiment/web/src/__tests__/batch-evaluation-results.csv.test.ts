@@ -826,10 +826,8 @@ describe("csvExport", () => {
   });
 
   /**
-   * A comparison grades the whole row rather than any one target, so it has no
-   * target block to hang under. Without a block of its own, a customer who runs
-   * an n-way comparison, reads the Winner column on the results page and then
-   * exports gets a file with no trace of the comparison at all.
+   * A comparison grades the whole row rather than any one target, so it has no target
+   * block to hang under.
    */
   describe("given a run that recorded comparison verdicts", () => {
     const VARIANTS = [
@@ -1313,17 +1311,8 @@ describe("given two targets stored under the same name", () => {
 });
 
 /**
- * A batch evaluation exports the dataset a person uploaded and the reasoning a
- * model wrote, into a file whose whole purpose is to be opened in a
- * spreadsheet. A cell opening with `=` is a formula Excel and Sheets execute,
- * and RFC 4180 quoting does not prevent that — quoting protects the CSV
- * grammar, not the reader. The guard belongs where the string is serialized,
- * not in every builder above it.
- *
- * `buildCsvData` is deliberately left uncovered here: it returns the values as
- * they are, and its callers assert on content. The apostrophe appears when the
- * file is written.
- *
+ * A batch evaluation exports the dataset a person uploaded and the reasoning a model
+ * wrote, into a file whose whole purpose is to be opened in a spreadsheet.
  * @see src/utils/csvFormulaGuard.ts
  */
 describe("spreadsheet formula injection", () => {

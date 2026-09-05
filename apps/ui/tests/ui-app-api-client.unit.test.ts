@@ -3,15 +3,6 @@ import { createUiAppApiClient, UI_TRPC_ENDPOINT } from "../src/behavior/ui-featu
 
 /**
  * The browser's typed door onto the API process's own router.
- *
- * `createUiAppApiClient` is built from `AppRouter`, read type-only from the
- * api process, rather than from a hand-written `*ApiMap`. Two things are
- * pinned. At runtime: a call still leaves on the request lane, addressed to
- * the procedure by the name the server mounts it under — the typed client must
- * not be a second transport with lanes of its own. At type level: the answer
- * comes back as the procedure's answer rather than `any`, which is the whole
- * reason to retire the maps. The type assertions run as no-ops here (neither
- * vitest config enables `typecheck`); they fail `pnpm typecheck`.
  */
 
 /** A transport whose request lane records where every call went. */

@@ -3,11 +3,9 @@ import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { SimulationModelSelect } from "./simulation-model-select";
 
 /**
- * Shown after the user picks a target in the scenario "Save and run" flow.
- * Lets them choose the user-simulator and judge models for the run; both
- * default to the project's Default model (the scenarios.user_simulator /
- * scenarios.judge resolution). Confirming saves the scenario with these
- * choices and runs it.
+ * Shown after the user picks a target in the scenario "Save and run" flow. Lets them
+ * choose the user-simulator and judge models for the run; both default to the project's
+ * Default model (the scenarios.user_simulator / scenarios.judge resolution).
  */
 export function ScenarioRunModelDialog({
   open,

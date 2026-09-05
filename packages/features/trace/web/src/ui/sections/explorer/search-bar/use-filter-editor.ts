@@ -43,11 +43,9 @@ const PASTE_MAX_CHARS = 2000;
 const COMMIT_SETTLE_MS = 250;
 
 /**
- * Remove the chars at `[start, end)` from `text` and clean up any operator
- * glue we left behind. Used by the X widget when the parser is currently
- * failing — a normal `removeNodeAtLocation` would no-op there and the X
- * would feel broken. Strips a trailing or leading `AND`/`OR` so we don't
- * end up with `model:gpt AND ` orphaned at the end of the query.
+ * Remove the chars at `[start, end)` from `text` and clean up any operator glue we left behind. Used by the X widget when the parser is
+ * currently failing — a normal `removeNodeAtLocation` would no-op there and the X would feel broken. Strips a trailing or leading
+ * `AND`/`OR` so we don't end up with `model:gpt AND ` orphaned at the end of the query.
  */
 function sliceFallbackTokenRange(text: string, start: number, end: number): string {
   if (start < 0 || end > text.length || start >= end) return text;
@@ -96,10 +94,9 @@ function suggestionUIEqual(a: SuggestionUIState, b: SuggestionUIState): boolean 
 }
 
 /**
- * When a trigger anchor is set (`@` was intercepted at this position),
- * derive the suggestion state from the segment after the anchor instead of
- * scanning the whole text. This lets us drive the dropdown without ever
- * inserting a literal `@` into the editor.
+ * When a trigger anchor is set (`@` was intercepted at this position), derive the
+ * suggestion state from the segment after the anchor instead of scanning the whole
+ * text.
  */
 function suggestionFromTrigger(
   text: string,
@@ -124,11 +121,7 @@ export interface DynamicSuggestionItems {
   items: string[];
   counts?: Record<string, number>;
   /**
-   * Optional human-readable labels keyed by value id. When set, the
-   * suggestion dropdown renders the label as the primary text and the
-   * id muted underneath; the inserted token is still the raw `value`
-   * so the query language stays ID-only (search-by-name is not a goal —
-   * the value is the canonical identifier).
+   * Optional human-readable labels keyed by value id.
    */
   labels?: Record<string, string>;
 }
@@ -139,25 +132,20 @@ interface UseFilterEditorParams {
   queryText: string;
   applyQueryText: (text: string) => void;
   /**
-   * Notifies the parent when the editor's empty/non-empty state flips. Wired
-   * through directly instead of via a return value + parent effect so the
-   * parent's setState doesn't cause an extra re-render of the editor each
-   * keystroke.
+   * Notifies the parent when the editor's empty/non-empty state flips. Wired through
+   * directly instead of via a return value + parent effect so the parent's setState
+   * doesn't cause an extra re-render of the editor each keystroke.
    */
   onHasContentChange?: (hasContent: boolean) => void;
   /**
-   * Synchronously resolves dynamic value suggestions for `field:` autocomplete
-   * (e.g. `model:`, `service:`). Called inline by `refreshSuggestion` so the
-   * dropdown emits a single state update per keystroke — pulling this out of
-   * a `useEffect`-based override eliminated a second render per keystroke.
-   * Return `null` to fall back to the static `FIELD_VALUES` enum.
+   * Synchronously resolves dynamic value suggestions for `field:` autocomplete (e.g.
+   * `model:`, `service:`).
    */
   valueResolver?: ValueResolver;
   /**
-   * Fired when the user clicks an existing categorical chip in the
-   * search bar. Caller decides whether to render a value-picker
-   * popover; if undefined, chip clicks behave like normal text clicks
-   * (cursor placement).
+   * Fired when the user clicks an existing categorical chip in the search bar. Caller
+   * decides whether to render a value-picker popover; if undefined, chip clicks behave
+   * like normal text clicks (cursor placement).
    */
   onTokenClick?: (payload: {
     rect: DOMRect;
@@ -166,18 +154,12 @@ interface UseFilterEditorParams {
     location: { start: number; end: number };
   }) => void;
   /**
-   * Fired when the user presses ⌘+⏎ / Ctrl+⏎ while typing. The caller
-   * routes the captured text to the ask affordance — asked to Langy
-   * outright, or auto-submitted into AI mode — so a typed free-text query
-   * becomes an ask in one keystroke instead of requiring a separate click
-   * on the ask button.
+   * Fired when the user presses ⌘+⏎ / Ctrl+⏎ while typing.
    */
   onAiShortcut?: (currentText: string) => void;
   /**
-   * Placeholder shown while the editor is empty. Defaults to the Ask AI
-   * wording; the SearchBar passes the Ask Langy variant when Langy owns
-   * the ask affordance. Read through a ref by the Placeholder extension,
-   * so the current value applies without re-initialising the editor.
+   * Placeholder shown while the editor is empty. Defaults to the Ask AI wording; the
+   * SearchBar passes the Ask Langy variant when Langy owns the ask affordance.
    */
   placeholder?: string;
 }
@@ -195,10 +177,6 @@ interface FilterEditorApi {
   cursorAnchorX: number;
   /**
    * Pixel offset to the right edge of the rendered document content.
-   * Independent of the cursor — drives the inline "Press ⏎ to search,
-   * ⌘+⏎ to Ask AI" hint so the hint stays pinned to the end of the
-   * typed text even when the caret is mid-line or `⌘+A` selected
-   * everything.
    */
   endAnchorX: number;
   /** Whether the editor currently holds focus. */
@@ -242,17 +220,9 @@ export function useFilterEditor({
   // Tracks last reported hasContent so we only fire onHasContentChange when
   // it actually flips (not on every keystroke that keeps the state).
   const lastHasContentRef = useRef<boolean>(queryText.length > 0);
-  // Committing the typed text into the GLOBAL filter store (`applyQueryText`)
-  // re-parses + re-serialises AND re-renders every store subscriber — the
-  // whole facet sidebar, the query-breakdown chips, the page title, the URL
-  // sync. Doing that on every keystroke is what made typing lag. So we keep
-  // the ProseMirror editor as the source of truth while typing and DEBOUNCE
-  // the global commit to a short settle window: during fluent typing the
-  // store (and therefore the sidebar + network) stays put; it catches up once
-  // the user pauses. The sync-back effect below already no-ops while the
-  // editor is focused, so a stale store value never clobbers in-flight typing.
-  // Blur, Enter, and facet/chip mutations still commit immediately (they call
-  // `applyQueryText` directly), so nothing waits on this timer to settle.
+  // Committing the typed text into the GLOBAL filter store (`applyQueryText`) re-parses
+  // + re-serialises AND re-renders every store subscriber — the whole facet sidebar,
+  // the query-breakdown chips, the page title, the URL sync.
   const pendingCommitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastCommittedTextRef = useRef<string>("");
   const scheduleCommit = useCallback(
@@ -317,12 +287,9 @@ export function useFilterEditor({
         }
       }
 
-      // End-of-content anchor for the inline submit hint. Independent
-      // of the cursor — a ⌘+A or click-back-to-middle puts the caret
-      // anywhere, but the hint should stay pinned right after whatever
-      // the user has typed. Measure the rightmost edge of the document
-      // by asking PM for coords at the document's *end* position
-      // (PARAGRAPH_OFFSET + text length).
+      // End-of-content anchor for the inline submit hint. Independent of the cursor — a
+      // ⌘+A or click-back-to-middle puts the caret anywhere, but the hint should stay
+      // pinned right after whatever the user has typed.
       try {
         const view = editor.view;
         const editorRect = view.dom.getBoundingClientRect();
@@ -357,15 +324,9 @@ export function useFilterEditor({
           const dynamic = valueResolverRef.current(valueField, base.state.query);
           if (dynamic && dynamic.items.length > 0) {
             const selectedIndex = Math.min(base.selectedIndex, dynamic.items.length - 1);
-            // Dynamic value-mode rows have no group (values aren't grouped)
-            // and aren't prefix entries — wrap the bare strings into the
-            // SuggestionRow shape that the dropdown renderer expects.
-            // `label` carries the human-readable name when the resolver
-            // emitted one (evaluator: "Faithfulness" for the id
-            // "ragas/faithfulness"); the dropdown renders the label as
-            // the primary row and the raw id as a muted secondary line.
-            // Without this the dropdown only ever showed ids, which is
-            // what the operator was complaining about for evaluators.
+            // Dynamic value-mode rows have no group (values aren't grouped) and aren't
+            // prefix entries — wrap the bare strings into the SuggestionRow shape that
+            // the dropdown renderer expects.
             next = {
               state: base.state,
               items: dynamic.items.map((value) => ({
@@ -438,13 +399,9 @@ export function useFilterEditor({
     },
     editorProps: {
       attributes: { spellcheck: "false" },
-      // Coerce paste into one flat line. The editor's schema technically
-      // allows multiple Paragraph nodes, so pasting a multi-line error
-      // creates 10+ `<p>`s and balloons the bar to push the rest of the
-      // page off-screen. Strip control chars, collapse newlines + tabs
-      // to spaces, and cap the inserted text at PASTE_MAX_CHARS so a
-      // megabyte paste can't lock the parser up. The editor's
-      // overflow-x scroll still handles wide content.
+      // Coerce paste into one flat line. The editor's schema technically allows
+      // multiple Paragraph nodes, so pasting a multi-line error creates 10+ `<p>`s and
+      // balloons the bar to push the rest of the page off-screen.
       handlePaste: (view, event) => {
         const text = event.clipboardData?.getData("text/plain");
         if (!text) return false;
@@ -457,13 +414,8 @@ export function useFilterEditor({
         view.dispatch(view.state.tr.insertText(flattened));
         return true;
       },
-      // Suppress PM's default cursor placement when the user clicks on a
-      // chip pill or its X widget. PM otherwise drops the caret into the
-      // text node *inside* the chip (between "value" and the widget), so
-      // typing the next clause read as if it were extending the chip's
-      // value (`status:errorx`). Returning `true` here keeps PM out of
-      // the click — the addEventListener-based handler below still runs
-      // and opens the value picker / deletes the chip.
+      // Suppress PM's default cursor placement when the user clicks on a chip pill or
+      // its X widget.
       handleDOMEvents: {
         mousedown: (_view, event) => {
           const target = event.target as HTMLElement | null;
@@ -478,13 +430,9 @@ export function useFilterEditor({
           return false;
         },
       },
-      // Clicking in the editor's empty trailing area (the big blank space to
-      // the right of the last chip) used to drop the caret INSIDE the final
-      // chip's text node — so the next character glued onto the chip's value
-      // (`status:okx`). Snap the caret to the very end of the doc instead, so
-      // a click in the blank space always starts a fresh clause. Only fires
-      // when the click is genuinely past the content's right edge; clicks
-      // landing on real text/chips fall through to ProseMirror's default.
+      // Clicking in the editor's empty trailing area (the big blank space to the right
+      // of the last chip) used to drop the caret INSIDE the final chip's text node — so
+      // the next character glued onto the chip's value (`status:okx`).
       handleClick: (view, _pos, event) => {
         const endPos = view.state.doc.content.size;
         let endCoords: { left: number; right: number };
@@ -573,20 +521,9 @@ export function useFilterEditor({
             const committed = action.text.trim();
             lastCommittedTextRef.current = committed;
             applyQueryTextRef.current(committed);
-            // Open a fresh clause so the next keystroke starts a NEW token
-            // instead of gluing onto the just-completed one (`status:ok` + `x`
-            // → `status:okx`, the "cursor stuck inside the chip" report). This
-            // mirrors the dropdown-accept path; the submit path (Enter with no
-            // highlighted suggestion) previously left the caret flush against
-            // the last token with no boundary. Park the caret at the end and
-            // append a boundary char unless the text already ends in
-            // whitespace. The char is a NBSP (U+00A0), NOT a regular space:
-            // contenteditable/PM eat a trailing regular space the instant the
-            // next character arrives (which re-glues the tokens), whereas NBSP
-            // survives — the parser normalises it back to a space. Flagged
-            // programmatic so onUpdate doesn't re-commit the suffixed text; the
-            // editor keeps focus, so the store→editor sync (skipped while
-            // focused, trim-normalised anyway) won't clobber the boundary.
+            // Open a fresh clause so the next keystroke starts a NEW token instead of
+            // gluing onto the just-completed one (`status:ok` + `x` → `status:okx`, the
+            // "cursor stuck inside the chip" report).
             isProgrammaticRef.current = true;
             let submitTr = view.state.tr.setSelection(TextSelection.atEnd(view.state.doc));
             if (!/\s$/.test(view.state.doc.textContent)) {
@@ -721,12 +658,9 @@ export function useFilterEditor({
     return () => dom.removeEventListener("mousedown", handler);
   }, [editor, applyQueryTextRef, onTokenClick]);
 
-  // Sync external query changes back into the editor. Only runs while the
-  // editor is NOT focused — while focused, the editor is the source of
-  // truth and clobbering its content (via setContent) would race with
-  // in-flight typing and drop characters. When the store changes from
-  // outside (URL load, clear button, X-widget delete), the editor is
-  // unfocused or the call is paired with a re-mount.
+  // Sync external query changes back into the editor. Only runs while the editor is NOT
+  // focused — while focused, the editor is the source of truth and clobbering its
+  // content (via setContent) would race with in-flight typing and drop characters.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
     if (editor.isFocused) return;

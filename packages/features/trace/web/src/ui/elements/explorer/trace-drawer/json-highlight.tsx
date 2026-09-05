@@ -67,10 +67,8 @@ export function safePrettyJson(content: string): string {
 }
 
 /**
- * Walk pretty-printed JSON lines once to compute the 1-indexed line numbers
- * that should be highlighted given a set of pinned dot-paths. A line is
- * marked when its own key matches a pinned path *or* any of its object
- * ancestors does — pinning a parent visually hits the whole subtree.
+ * Walk pretty-printed JSON lines once to compute the 1-indexed line numbers that should
+ * be highlighted given a set of pinned dot-paths.
  */
 function computeHighlightLines(lines: string[], pinnedKeys: ReadonlySet<string>): number[] {
   const path: string[] = [];
@@ -98,15 +96,9 @@ function computeHighlightLines(lines: string[], pinnedKeys: ReadonlySet<string>)
 }
 
 /**
- * JSON viewer with a left-rail accent on lines whose key matches one of
- * `pinnedKeys`. We hand Shiki the highlight line numbers via Chakra's
- * `meta.highlightLines` and let the adapter mark them with `.highlighted`
- * / `data-highlight=""`. CSS below recolours the default highlight to our
- * blue tracing accent — same approach the empty-state card uses for its
- * orange highlight on env-block lines.
- *
- * Tokenisation goes through the ambient `<CodeBlock.AdapterProvider>` at
- * `TraceV2DrawerShell` (one shared Highlighter for the whole drawer).
+ * JSON viewer with a left-rail accent on lines whose key matches one of `pinnedKeys`.
+ * We hand Shiki the highlight line numbers via Chakra's `meta.highlightLines` and let
+ * the adapter mark them with `.highlighted` / `data-highlight=""`.
  */
 export function PinnedAwareJsonView({
   content,

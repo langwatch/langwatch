@@ -171,12 +171,8 @@ describe("pollForScenarioRun", () => {
 
     describe("when its status is one this build does not recognise", () => {
       it("hands the caller the run rather than claiming it errored", async () => {
-        // tRPC does not runtime-validate its output, so a status added to the
-        // server after this client shipped arrives here unclassified. Unknown
-        // means unknown: it could be a new active state or a new failure state,
-        // and we cannot tell which. Handing back the run lets the run page show
-        // the truth; asserting "it errored" would be a claim we cannot back —
-        // and a red toast on a healthy run is the bug this module was fixed for.
+        // tRPC does not runtime-validate its output, so a status added to the server
+        // after this client shipped arrives here unclassified.
         fetchBatchRunData.mockResolvedValue(
           batchWith({
             runs: [makeRun({ status: "SOME_FUTURE_STATUS" as ScenarioRunStatus })],

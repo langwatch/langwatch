@@ -1,9 +1,6 @@
 /**
+ * What `drawer.edit` means to the store-to-URL effect.
  * @vitest-environment jsdom
- *
- * What `drawer.edit` means to the store-to-URL effect. One parser answers it
- * for both directions, so a URL the store will never enter edit mode from is
- * not treated as edit mode here either.
  */
 
 import { renderHook } from "@testing-library/react";

@@ -1,20 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for the MediaPart component.
- * Verifies that AG-UI media content parts render as native HTML5 elements,
- * fall back to data: URIs for legacy inline-data parts, and show a missing
- * placeholder when the caller's stored-object existence probe indicates the
- * object is gone.
- *
- * The existence probe moved out of this component: `MediaPart` no longer
- * calls `api.storedObjects.headById.useQuery` itself — it takes `probe` (the
- * probe's answer) and `onProbeRequired` (fired once on a failed element) as
- * props, and the caller (ScenarioMessageRenderer) owns the tRPC query. This
- * harness plays the caller's role: it holds the probe state and answers
- * `onProbeRequired` synchronously with the fixture for each test, which is
- * the same shape a resolved tRPC query would have handed down.
- *
  * @see specs/traces-v2/media-rendering.feature
  * @see specs/features/scenarios/externalize-event-byte-content.feature
  */
@@ -36,10 +21,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 const TEST_PROJECT_ID = "proj_test";
 
 /**
- * Plays the caller's role: holds the probe answer in state and, once
- * `onProbeRequired` fires, applies `answer` (if given) as the caller's
- * resolved probe result. Leaving `answer` undefined models a probe that
- * never comes back (still "in flight").
+ * Plays the caller's role: holds the probe answer in state and, once `onProbeRequired`
+ * fires, applies `answer` (if given) as the caller's resolved probe result. Leaving
+ * `answer` undefined models a probe that never comes back (still "in flight").
  */
 function ProbeHarness({
   part,

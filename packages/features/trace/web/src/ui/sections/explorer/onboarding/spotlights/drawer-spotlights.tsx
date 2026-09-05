@@ -1,20 +1,5 @@
 /**
- * DrawerSpotlights — condition-gated, show-once spotlights inside the
- * trace drawer.
- *
- * Unlike the page tour (SpotlightOverlay), there's no linear walkthrough:
- * each DRAWER_SPOTLIGHTS entry fires exactly once in the current browser,
- * the first time a drawer opens where the feature is actually present.
- * The server-backed preference suppresses the entire automatic queue for
- * a user after any tour dismissal, including on other projects or devices.
- * Anchored components only emit their `data-spotlight` attribute when the
- * feature has content, so anchor presence is the display condition.
- *
- * Show-once semantics: a spotlight is marked seen the moment it is
- * DISPLAYED (not when acknowledged), so it never repeats — even if the
- * user dismisses the queue. Dismissing (✕ / Esc / Done) closes the queue
- * for this drawer open; entries that were queued but never displayed stay
- * unseen and can fire on a future drawer.
+ * DrawerSpotlights — condition-gated, show-once spotlights inside the trace drawer.
  */
 import { Portal } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
@@ -87,13 +72,9 @@ export function DrawerSpotlights({ traceId }: { traceId: string }): React.ReactE
     setAnchorRect(current ? measureAnchor(current.anchor) : null);
   }, [current]);
 
-  // Place the ring only once the anchor has SETTLED. On open the drawer
-  // slides in, and when Langy rides alongside as the companion the drawer
-  // is parked fully off-screen during the ride's entrance delay. A single
-  // rAF-after-mount can catch the anchor mid-slide (or parked off-screen)
-  // and the fixed ring plus its full-viewport scrim would stick there. So
-  // poll each frame until the anchor is on-screen and holds still for two
-  // consecutive frames, capped — robust against any entrance animation.
+  // Place the ring only once the anchor has SETTLED. On open the drawer slides in, and
+  // when Langy rides alongside as the companion the drawer is parked fully off-screen
+  // during the ride's entrance delay.
   useEffect(() => {
     if (!current) {
       setAnchorRect(null);

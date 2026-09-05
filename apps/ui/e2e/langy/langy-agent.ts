@@ -1,13 +1,6 @@
-// AgentAdapter that drives Langy through the REAL product surface: the same
-// `langy.createConversation` / `langy.continueConversation` tRPC mutations and
-// `langy.onTurnStream` SSE subscription the browser panel uses (see
-// src/features/langy/logic/langyChatTransport.ts). Authenticates once as the
-// seeded local-dev admin and reuses the session cookie for every call.
-//
-// Wire format below (POST body `{"json": input}`, response
-// `{"result":{"data":{"json": output}}}`, SSE frames `data: {"json": entry}`)
-// was confirmed directly against a live haven stack before writing this file
-// — see e2e/langy/README.md for how to point this at a different stack.
+// AgentAdapter that drives Langy through the REAL product surface: the same `langy.createConversation` /
+// `langy.continueConversation` tRPC mutations and `langy.onTurnStream` SSE subscription the browser panel uses
+// (see src/features/langy/logic/langyChatTransport.ts).
 
 import type { AgentAdapter, AgentInput, AgentReturnTypes } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
@@ -61,10 +54,6 @@ let cachedCookie: Promise<string> | null = null;
 
 /**
  * Sign in once (per test process) and cache the better-auth session cookie.
- * Clears the cache on rejection — otherwise a single transient sign-in
- * failure (a momentary network blip, the app mid-restart) would permanently
- * poison every remaining test in the run, since `??=` only checks for
- * null/undefined at assignment time and a rejected promise is neither.
  */
 function getSessionCookie(): Promise<string> {
   cachedCookie ??= (async () => {
@@ -141,12 +130,9 @@ async function trpcMutate<T>({
       Origin: APP_BASE,
     },
     body: JSON.stringify({ json: input }),
-    // Generous on purpose: under a queue backlog the turn mutation has been
-    // measured completing server-side at 135s, and a full failure-analysis
-    // turn on the opencode harness has been measured working past 180s.
-    // Aborting a still-working turn destroys the run (the judge grades a
-    // one-token reply), and retrying is worse — the retry races the accepted
-    // first attempt into langy_turn_in_progress.
+    // Generous on purpose: under a queue backlog the turn mutation has been measured
+    // completing server-side at 135s, and a full failure-analysis turn on the opencode
+    // harness has been measured working past 180s.
     signal: AbortSignal.timeout(300_000),
   });
   const body: any = await res.json().catch(() => null);
@@ -167,28 +153,9 @@ async function trpcMutate<T>({
 }
 
 /**
- * `langy_turn_in_progress` fires from two different checks in
- * langy-turn.service.ts: the authoritative Postgres admission claim
- * (`admission.kind === "busy"`), and a conversation-status PROJECTION read
- * that its own comment calls "only a rollout/back-compat hint... the
- * Postgres admission claim above is the concurrency authority" — i.e. it can
- * go stale.
- *
- * Two confirmed causes, both server-side and neither fixable by retrying
- * around them forever:
- *  1. A permanently-abandoned COMMITTED admission row (worker died without
- *     ever publishing a terminal event) — fixed server-side via
- *     COMMITTED_ABANDON_MS in langy-turn-admission.prisma.repository.ts (a
- *     10-minute reclaim backstop); no client-side retry budget should be
- *     sized to paper over that case, it's now a real self-heal on the server.
- *  2. A worker crashing mid-reply (`langy_worker_stopped`) — confirmed live
- *     via the DB: the projection correctly resolves to `status: "failed"`
- *     with that error, and the admission row is correctly released, but
- *     agent-turn-liveness.subscriber.ts's own stall detection can take up to
- *     MAX_STALL_MS (90s) to notice and fail the turn. A 15s retry budget
- *     (the old 3×5s) gives up on the server's OWN documented recovery window
- *     before it has even elapsed, turning a self-healing 90s hiccup into a
- *     hard test failure. Retry comfortably past that window instead.
+ * `langy_turn_in_progress` fires from two different checks in langy-turn.service.ts: the authoritative Postgres admission claim
+ * (`admission.kind === "busy"`), and a conversation-status PROJECTION read that its own comment calls "only a rollout/back-compat hint...
+ * the Postgres admission claim above is the concurrency authority" — i.e. it can go stale.
  */
 async function trpcMutateWithTurnLockRetry<T>({
   cookie,
@@ -216,16 +183,9 @@ async function trpcMutateWithTurnLockRetry<T>({
 }
 
 /**
- * The turn failed for a reason that says nothing about how Langy behaves: the
- * worker died mid-reply, or the stream closed without the turn ever settling.
- * The scenario logger retries one of these once instead of grading it.
- *
- * A property rather than a message match. The two markers used to be found by
- * substring on `String(error)`, which reads a code out of prose and breaks the
- * moment the wording moves.
- *
- * Walks the cause chain: the scenario library rethrows adapter errors as
- * `new Error(..., { cause: error })`, so the marker arrives one level down.
+ * The turn failed for a reason that says nothing about how Langy behaves: the worker
+ * died mid-reply, or the stream closed without the turn ever settling. The scenario
+ * logger retries one of these once instead of grading it.
  */
 export function isTransientInfrastructureError(error: unknown): boolean {
   let current: unknown = error;
@@ -247,15 +207,9 @@ function transientInfrastructureError(message: string): Error {
 }
 
 /**
- * The stream's error entry carries the handled-error JSON as a string in
- * `error` (and human text in `errorText`). Returns its code and tips when it
- * parses as one, null for anything else.
- *
- * The app parses the same shape in `readLangyStreamError`, and this stays a
- * separate reader on purpose: the suite drives a live stack over HTTP and
- * imports nothing from `src/`, so it cannot drift with a refactor it never
- * compiled against. What it must not do is trust the shape, since `tips[0]`
- * goes into the text a judge grades — every field is checked here.
+ * The stream's error entry carries the handled-error JSON as a string in `error` (and
+ * human text in `errorText`). Returns its code and tips when it parses as one, null for
+ * anything else.
  */
 function parseHandledStreamError(entry: {
   error?: unknown;
@@ -277,15 +231,9 @@ function parseHandledStreamError(entry: {
 }
 
 /**
- * The judge grades from these frames while the AGENT read the full payload,
- * so any cut between the two must be stated or the judge reads a missing item
- * as a nonexistent one and fails a genuinely grounded reply as fabrication
- * (it did, twice: real seeded trace ids cited from an elided array tail, and
- * a result count that sat past this adapter's own byte cap). Two cuts exist:
- * the manager's structural reduction for the panel (toolmap.TruncateToolOutput
- * elides array tails behind an "… N more items truncated" marker), and the
- * byte cap this adapter applies when building the judge's tool message. The
- * note states that a cut happened; it adds no evidence.
+ * The judge grades from these frames while the AGENT read the full payload, so any cut between the two must be stated or the judge reads a
+ * missing item as a nonexistent one and fails a genuinely grounded reply as fabrication (it did, twice: real seeded trace ids cited from an
+ * elided array tail, and a result count that sat past this adapter's own byte cap).
  */
 function boundOutputForJudge(output: string): string {
   const capped = output.slice(0, 8192);
@@ -309,12 +257,6 @@ interface TurnText {
   text: string;
   /**
    * Whether `text` is the passage the turn ENDED on.
-   *
-   * False when the turn ran tools and then went quiet: there `text` is the
-   * whole narration, which `onNarration` has already reported passage by
-   * passage, so a caller that recorded those must not record it twice. This is
-   * the same distinction `orderedParts` draws server-side when it assembles the
-   * durable parts (`langy-final-parts.ts`).
    */
   hasEndedOnText: boolean;
 }
@@ -333,22 +275,14 @@ async function streamTurnText({
   /** Called for each navigate entry on the stream (live-only, never durable). */
   onNavigate?: (href: string) => void;
   /**
-   * Called for each passage Langy writes BETWEEN its tool calls, in order,
-   * as the following call starts.
-   *
-   * The passage the turn ends on is not reported here: it is the reply, and it
-   * comes back as `text`.
+   * Called for each passage Langy writes BETWEEN its tool calls, in order, as the
+   * following call starts.
    */
   onNarration?: (text: string) => void;
   /** Called for each settled tool card on the stream, in order. */
   onSettledTool?: (call: SettledToolCall) => void;
   /**
    * Called for each dispatched UI action on the stream, in order.
-   *
-   * This is the whole browser leg's entry point: the entry arrives with no
-   * extra network hop, which is what buys a listener the 3 second claim
-   * window. Fired synchronously from the frame reader, so a listener must
-   * start its work and return rather than blocking the read loop.
    */
   onUiAction?: (entry: UiActionEntry) => void;
 }): Promise<TurnText> {
@@ -410,15 +344,9 @@ async function streamTurnText({
           });
         }
       } else if (entry.type === "error") {
-        // The server emits errorText (see langyChatTransport.ts's onEntry
-        // "error" case), not message — checking the wrong field silently
-        // swallowed every real error message behind a generic placeholder.
-        //
-        // One handled code is a conversation outcome, not a failure:
-        // langy_github_not_connected stops the turn and the panel renders an
-        // Install prompt from the error's tips. Grade that visible outcome
-        // instead of erroring the scenario — locally no GitHub App exists, so
-        // this is the product's expected answer to any PR request.
+        // The server emits errorText (see langyChatTransport.ts's onEntry "error"
+        // case), not message — checking the wrong field silently swallowed every real
+        // error message behind a generic placeholder.
         const parsed = parseHandledStreamError(entry);
         if (parsed?.code === "langy_github_not_connected") {
           // The gate stops the turn after the tripping command card (already
@@ -498,19 +426,9 @@ async function streamTurnText({
   // otherwise be handed to the judge as a reply the user cannot see.
   if (assistantText.trim()) return { text: assistantText, hasEndedOnText: !sawTool };
 
-  // No text. WHICH no-text this is decides whether a judge should ever see it,
-  // and the two used to be indistinguishable behind a literal "(no response)"
-  // that the judge then graded as a terrible reply.
-  //
-  // Terminal marker present: the turn really did finish silently. That is a
-  // product regression now, because the token buffer emits a fallback line for
-  // any turn that reaches its terminal marker (LANGY_EMPTY_TURN_FALLBACK).
-  //
-  // No terminal marker: the stream closed without the turn ever settling — the
-  // harness never observed a turn, typically because the conversation lock was
-  // still held (the adapter's own retry budget is ~120s) or the machine was
-  // loaded. That is infrastructure, not agent behaviour, so it fails loudly
-  // here rather than being scored as a bad answer.
+  // No text. WHICH no-text this is decides whether a judge should ever see it, and the
+  // two used to be indistinguishable behind a literal "(no response)" that the judge
+  // then graded as a terrible reply.
   if (sawTerminal) {
     throw new Error(
       "Langy turn ended with a terminal marker but no visible text — the empty-turn fallback did not fire",
@@ -525,22 +443,8 @@ async function streamTurnText({
 type TurnSegment = { kind: "text"; narration: string } | { kind: "tool"; call: SettledToolCall };
 
 /**
- * The turn as the scenario framework receives it: what Langy wrote and what it
- * ran, interleaved the way it happened.
- *
- * The product's tool cards ride as real tool traffic, so the judge sees a
- * native tool-call/tool-result exchange (the retrieval that grounds the reply's
- * claims) and the user simulator sees the framework's compact summaries of it.
- *
- * The passages Langy writes between those calls ride WITH them, in the same
- * assistant message as the calls they introduce. They have to: a turn folds
- * down to the passage it ended on (`turnfold.Result`), so a transcript built
- * from that alone drops every line written before a call, and a rubric that
- * grades the loop's narration then reads a turn that narrated well as silent.
- * Keeping them beside their calls, rather than as replies of their own, also
- * keeps them plainly part of the turn's WORK: the single trailing message with
- * string content is the reply, exactly as it was, and no criterion that grades
- * the reply starts grading a status line instead.
+ * The turn as the scenario framework receives it: what Langy wrote and what it ran,
+ * interleaved the way it happened.
  */
 function turnMessages({
   segments,
@@ -617,23 +521,10 @@ export type LangyAdapter = AgentAdapter & {
   state: LangySessionState;
   /**
    * Where a fake workbench tab attaches itself.
-   *
-   * Mutable rather than a constructor argument, because a tab opens and closes
-   * around the conversation rather than around the adapter: the live suite
-   * closes its tab between two turns and the same adapter carries on with the
-   * backend leg.
    */
   onUiAction?: (entry: UiActionEntry) => void;
   /**
    * Forget the conversation, so the next turn opens a new one.
-   *
-   * A replayed scenario has to start a NEW conversation. Carrying the old id
-   * over means the replay's first message arrives as `continueConversation` on
-   * a conversation whose turn is often still running, so the server answers
-   * `conversation_busy`, the replay burns its budget on 409s, and whatever it
-   * does record is grafted onto the transcript of the attempt that failed.
-   * `runScenarioAndLog` calls this on every agent that has it before it
-   * replays.
    */
   resetSession: () => void;
 };
@@ -642,10 +533,6 @@ export function makeLangyAdapter(
   options: {
     /**
      * The resource chips a real composer would carry.
-     *
-     * A turn with an `experiment` chip is what tells the agent the page it is
-     * looking at accepts live UI actions, so a suite that opens a fake tab
-     * sends one and a suite that does not leaves this out.
      */
     pageContext?: PageContextChip[];
   } = {},

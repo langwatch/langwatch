@@ -1,11 +1,5 @@
 /**
  * The two actions of the run dialog: leave it, or queue the run.
- *
- * Only the run is solid: it is the one thing the dialog is open for, and it
- * names how many scenarios it starts. A run plan is a name and a
- * configuration, and running is what writes both down, so there is nothing to
- * save on its own.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

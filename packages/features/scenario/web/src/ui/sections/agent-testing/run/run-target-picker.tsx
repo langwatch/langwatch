@@ -1,9 +1,5 @@
 /**
  * The agent side of the run dialog's target area: the agents as cards.
- *
- * A project with nothing to run against shows one dotted "Setup agent" box
- * that opens the agent setup.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -25,9 +21,6 @@ const AGENT_ICONS = {
 
 /**
  * What an agent card stands at: its icon row, its name and the line under it.
- *
- * Stated rather than left to the content so the "Setup agent" box, which holds
- * different words, is exactly one card and not a taller one.
  */
 const AGENT_CARD_HEIGHT = "95px";
 
@@ -94,10 +87,8 @@ function cardHoverBackground({
 }
 
 /**
- * The line under the name of an agent: the presence of a connected agent, or
- * the local tunnel of the other kinds.
- *
- * The row keeps its height with or without the line, so the cards line up.
+ * The line under the name of an agent: the presence of a connected agent, or the local
+ * tunnel of the other kinds.
  */
 function AgentReachLine({ agent }: { agent: RunDialogAgent }) {
   const hasDevTunnel = agentHasDevTunnel(agent);
@@ -209,9 +200,6 @@ function AgentBlock({
 
 /**
  * The dotted box a project with nothing to test shows in place of the list.
- *
- * It takes one cell of the same grid the agent cards sit in, so it reads as
- * the first card of a list that is still empty rather than as a banner.
  */
 export function SetupAgentBox({ onSetup }: { onSetup: () => void }) {
   return (

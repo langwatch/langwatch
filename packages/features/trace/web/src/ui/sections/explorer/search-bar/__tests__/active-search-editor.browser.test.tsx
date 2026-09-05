@@ -1,12 +1,5 @@
 /**
  * Real-browser end-to-end tests for the SearchBar editor.
- *
- * Run inside Chromium via Vitest's browser mode + Playwright provider, so
- * ProseMirror's selection / layout / clipboard APIs all behave properly. We
- * type real keys, click real elements, and assert on the rendered DOM.
- *
- * Run with `pnpm test:browser`. Files matching `*.browser.test.tsx` are
- * excluded from `pnpm test:unit`.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -23,10 +16,8 @@ interface AppliedQuery {
 }
 
 /**
- * Stateful wrapper that mirrors the real store contract: `applyQueryText` is
- * the only path back into the editor's `queryText` prop. Lets us exercise
- * the X-widget deletion (which calls `applyQueryText` with the result of
- * `removeNodeAtLocation`) and observe the resulting render.
+ * Stateful wrapper that mirrors the real store contract: `applyQueryText` is the only
+ * path back into the editor's `queryText` prop.
  */
 const StatefulEditor: React.FC<{
   initialText?: string;
@@ -63,10 +54,9 @@ function getEditor(): HTMLElement {
 }
 
 /**
- * Extract the user-visible text content, excluding the per-token X widget
- * buttons that ProseMirror inserts as sibling DOM nodes. Walks the text
- * node tree directly and skips anything inside a `[data-filter-delete]`
- * element.
+ * Extract the user-visible text content, excluding the per-token X widget buttons that
+ * ProseMirror inserts as sibling DOM nodes. Walks the text node tree directly and skips
+ * anything inside a `[data-filter-delete]` element.
  */
 function plainText(el: HTMLElement): string {
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);

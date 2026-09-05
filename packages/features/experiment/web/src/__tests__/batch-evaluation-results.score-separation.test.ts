@@ -10,10 +10,8 @@ import {
 import { areDistinguishable } from "@langwatch/experiment-web";
 
 /**
- * The separation test is the root of every claim this feature makes, so it
- * gets its own tests rather than being covered incidentally through the
- * verdict.
- *
+ * The separation test is the root of every claim this feature makes, so it gets its own
+ * tests rather than being covered incidentally through the verdict.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 

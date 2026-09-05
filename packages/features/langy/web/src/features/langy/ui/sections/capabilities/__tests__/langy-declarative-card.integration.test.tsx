@@ -1,14 +1,6 @@
 /**
+ * The declarative card renders every catalog-described result from its body widget — rows, facts, stats, diff, text — plus the honest failure state: output that cannot be read renders as "couldn't read this result", never as a confident wrong empty state.
  * @vitest-environment jsdom
- *
- * The declarative card renders every catalog-described result from its body
- * widget — rows, facts, stats, diff, text — plus the honest failure state:
- * output that cannot be read renders as "couldn't read this result", never as
- * a confident wrong empty state.
- *
- * Descriptors come from `resolveCapability` on real tool names, so these tests
- * exercise the same resolution path the panel does, with real-shaped payloads.
- *
  * @see specs/langy/langy-capability-cards.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -524,10 +516,8 @@ describe("LangyDeclarativeCard", () => {
 });
 
 /**
- * The body widget the catalog names, when that widget is not one this card had
- * a branch for. `chart` was registered in the catalog's vocabulary and had no
- * case and no default, so the switch fell off the end and the card rendered
- * `undefined` — a shell with nothing in it.
+ * The body widget the catalog names, when that widget is not one this card had a branch
+ * for.
  */
 describe("given a body widget the catalog names", () => {
   /** The same descriptor the call resolves to, re-seated on one widget. */

@@ -1,11 +1,7 @@
 /**
+ * A prompt is authored in the prompt library and pointed at by a run plan, so the binding between a simulation
+ * and the prompt's declared inputs is configured on the run plan form (#6590).
  * @vitest-environment jsdom
- *
- * A prompt is authored in the prompt library and pointed at by a run plan, so
- * the binding between a simulation and the prompt's declared inputs is
- * configured on the run plan form (#6590). This section renders one mapping
- * block per selected prompt target that declares inputs, and nothing at all
- * when none do.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

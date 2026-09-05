@@ -10,10 +10,9 @@ interface ScopeChipProps {
 }
 
 /**
- * Quiet inline indicator for the OTel instrumentation scope (the library
- * that produced the spans). Renders as a single subtle mono line — no
- * badge chrome — so it reads like a footer attribution rather than a
- * loud chip.
+ * Quiet inline indicator for the OTel instrumentation scope (the library that produced
+ * the spans). Renders as a single subtle mono line — no badge chrome — so it reads like
+ * a footer attribution rather than a loud chip.
  */
 export function ScopeChip({ scope }: ScopeChipProps) {
   if (!scope?.name) return null;

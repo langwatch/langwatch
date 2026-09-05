@@ -16,15 +16,9 @@ export const API_KEY_ID_ATTRIBUTE = "langwatch.api_key.id";
 export const API_KEY_ATTRIBUTE_LABEL = "langwatch.api_key";
 
 /**
- * Value cell for `langwatch.api_key.id`. The stored value is an ApiKey row id,
- * which tells an operator nothing, so the cell resolves it to the key's name
- * and links to that key on the API keys settings page.
- *
- * The name comes from `apiKey.nameById`, which answers for any member of the
- * organization. A deleted key, a key from another organization, or a shared
- * read-only view resolves to nothing and the cell falls back to the raw id
- * rather than rendering a dead link. A revoked key still resolves by name: the
- * trace it authorized is still readable, so naming it is still useful.
+ * Value cell for `langwatch.api_key.id`. The stored value is an ApiKey row id, which
+ * tells an operator nothing, so the cell resolves it to the key's name and links to
+ * that key on the API keys settings page.
  */
 export function ApiKeyAttributeValue({ apiKeyId }: { apiKeyId: string }) {
   const { organization } = useOrganizationTeamProject();

@@ -8,10 +8,9 @@ import {
 } from "../langy-panel-layout";
 
 /**
- * The floating card's resting floor. The interesting case is the one the panel
- * used to get wrong: a conversation the panel REMEMBERED but has not loaded
- * yet is not an empty one, and sizing it as empty made it open small and step
- * up as its history landed.
+ * The floating card's resting floor. The interesting case is the one the panel used to
+ * get wrong: a conversation the panel REMEMBERED but has not loaded yet is not an empty
+ * one, and sizing it as empty made it open small and step up as its history landed.
  */
 describe("langyRestingFloorPx", () => {
   describe("given a genuinely empty, settled thread", () => {

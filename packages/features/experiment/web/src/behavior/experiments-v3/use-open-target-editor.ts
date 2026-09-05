@@ -1,14 +1,5 @@
 /**
  * Hook to open the target editor drawer with proper flow callbacks.
- *
- * This centralizes the logic for:
- * 1. Building available sources for variable mapping
- * 2. Converting mappings to UI format
- * 3. Setting up flow callbacks (onLocalConfigChange, onSave, onInputMappingsChange)
- * 4. Opening the drawer
- * 5. Auto-scrolling to make the target column visible next to the drawer
- *
- * Used by both EvaluationsV3Table (header click) and RunEvaluationButton (validation).
  */
 
 import { useCallback } from "react";
@@ -205,23 +196,16 @@ export const useOpenTargetEditor = () => {
           });
 
           if (agent?.type === "workflow") {
-            // A workflow-type agent has no code of its own to edit inline —
-            // it's a pointer to a Studio graph, which can't be edited
-            // meaningfully inside a narrow sidebar. The drawer shows the
-            // linked workflow as a card with a link to open the real editor
-            // in a new tab, plus the same input-mapping UI every other
-            // agent target type gets.
+            // A workflow-type agent has no code of its own to edit inline — it's a
+            // pointer to a Studio graph, which can't be edited meaningfully inside a
+            // narrow sidebar.
             const availableSources = buildAvailableSources();
             const uiMappings = buildUIMappings(target, activeDatasetId);
 
             setFlowCallbacks("agentWorkflowTargetEditor", {
-              // Capture activeDatasetId (and isDatasetSource, which already
-              // derives from this render's datasets) rather than re-reading
-              // the store live at edit time — this drawer isn't modal, so
-              // the user can switch the active dataset while it's still
-              // open, and a live read would then write the mapping into the
-              // wrong dataset's bucket instead of the one this drawer opened
-              // against.
+              // Capture activeDatasetId (and isDatasetSource, which already derives from this render's datasets) rather than re-reading the store live
+              // at edit time — this drawer isn't modal, so the user can switch the active dataset while it's still open, and a live read would then
+              // write the mapping into the wrong dataset's bucket instead of the one this drawer opened against.
               onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
                 if (mapping) {
                   setTargetMapping(
@@ -365,12 +349,9 @@ export const useOpenTargetEditor = () => {
           console.error("Failed to fetch agent:", error);
         }
       } else if (target.type === "evaluator" && target.targetEvaluatorId) {
-        // Pairwise column-target (#5100): when the target carries a `pairwise`
-        // config, render the clean ComparisonConfigForm (Variant A / Variant B /
-        // Golden) instead of the per-row mappings UI. Derived field mappings
-        // are written into target.mappings on every change so the orchestrator
-        // sees a normal mapped target at run time. Strictly additive: every
-        // other evaluator-target falls through to the original branch below.
+        // Pairwise column-target (#5100): when the target carries a `pairwise` config,
+        // render the clean ComparisonConfigForm (Variant A / Variant B / Golden)
+        // instead of the per-row mappings UI.
         const targetComparison = toComparisonConfig(target);
         if (targetComparison) {
           const activeDataset = datasets.find((d) => d.id === activeDatasetId);

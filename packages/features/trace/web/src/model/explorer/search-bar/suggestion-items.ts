@@ -30,10 +30,8 @@ export interface SuggestionItem {
 }
 
 /**
- * Rank candidates by how well `query` matches ANY of their search keys
- * (human label + raw field). Prefix matches sort ahead of contains
- * matches; ties keep input order. Matching the raw field too means typing
- * `cost` still surfaces "Cost" even though the label is what renders.
+ * Rank candidates by how well `query` matches ANY of their search keys (human label +
+ * raw field). Prefix matches sort ahead of contains matches; ties keep input order.
  */
 export function rankByMatch<T extends { keys: string[] }>(
   candidates: readonly T[],
@@ -54,11 +52,8 @@ export function rankByMatch<T extends { keys: string[] }>(
 }
 
 /**
- * Build the field-mode suggestion list as a flat array — sectioning is a
- * concern of the renderer (`SuggestionDropdown`). Returning a flat list
- * keeps keyboard navigation simple (one index, no per-section maths) and
- * lets the ranking pass operate over every candidate at once so a tight
- * prefix match in one group still wins over a contains match in another.
+ * Build the field-mode suggestion list as a flat array — sectioning is a concern of the
+ * renderer (`SuggestionDropdown`).
  */
 export function getFieldSuggestions(query: string): SuggestionItem[] {
   const fieldItems = FIELD_NAMES.map((name) => {

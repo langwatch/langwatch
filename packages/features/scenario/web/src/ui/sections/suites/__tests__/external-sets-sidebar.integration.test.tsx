@@ -1,8 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for External Sets in the SuiteSidebar component.
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/external-sdk-ci-sets-in-sidebar.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

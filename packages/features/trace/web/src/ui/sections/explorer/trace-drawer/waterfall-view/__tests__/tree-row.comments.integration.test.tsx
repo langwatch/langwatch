@@ -1,10 +1,7 @@
 /**
+ * The comment action on a waterfall row: what it says when there is no room to write it down, what a commented
+ * span shows at rest, and what a reader who may not write annotations is offered.
  * @vitest-environment jsdom
- *
- * The comment action on a waterfall row: what it says when there is no room to
- * write it down, what a commented span shows at rest, and what a reader who may
- * not write annotations is offered.
- * See specs/traces-v2/anchored-comments.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

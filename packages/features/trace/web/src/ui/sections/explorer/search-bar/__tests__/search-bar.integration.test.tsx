@@ -1,18 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Smoke-level integration tests for the SearchBar.
- *
- * The keyboard contract is exhaustively covered by handleKey.unit.test.ts and
- * getSuggestionState.unit.test.ts. This file only verifies that the SearchBar
- * mounts without crashing and exposes the right surface area to the store.
- *
- * Why so thin? TipTap/ProseMirror requires DOM APIs that jsdom does not
- * implement (elementFromPoint, getClientRects), so any test that types,
- * clicks, or selects inside the editor crashes. End-to-end keyboard
- * verification lives in the browser-pair task. Cold mount goes through the
- * lightweight placeholder so jsdom-incompatible TipTap code never runs in
- * these tests.
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

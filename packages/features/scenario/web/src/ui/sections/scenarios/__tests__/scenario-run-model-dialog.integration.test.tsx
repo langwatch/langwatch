@@ -1,9 +1,6 @@
 /**
+ * Integration tests for ScenarioRunModelDialog — the model picker shown after a target is chosen in the scenario "Save and run" flow.
  * @vitest-environment jsdom
- *
- * Integration tests for ScenarioRunModelDialog — the model picker shown
- * after a target is chosen in the scenario "Save and run" flow.
- *
  * @see specs/scenarios/scenario-model-selection.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -11,10 +11,6 @@ const SELECT_COLUMN_SIZE = 36;
 
 /**
  * What the trace table hands every header beyond the rows themselves.
- *
- * While the first page is in flight the table is fed placeholder rows, and the
- * header has no other way to tell them from real traces once they are inside
- * Tanstack's row model.
  */
 export interface TraceTableMeta {
   isLoading?: boolean;

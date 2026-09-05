@@ -21,10 +21,6 @@ export function scenarioTargetStorageKey({
 
 /**
  * The last target of one scenario, read outside React.
- *
- * A table has one row per scenario and a hook cannot be called per row, so the
- * rows read the same store through this function. The key and the shape are
- * defined once, here.
  */
 export function readScenarioTarget({
   projectId,

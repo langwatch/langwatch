@@ -36,11 +36,7 @@ export interface FacetItem {
    */
   dimmed?: boolean;
   /**
-   * Synthesised from FACET_DEFAULTS while real descriptors are still
-   * loading. The row is fully interactive (toggles still apply against
-   * the AST) but count + value-bar are hidden — the count would be `0`
-   * and the bar would render empty until real data lands, which read
-   * as "no matches" rather than "loading."
+   * Synthesised from FACET_DEFAULTS while real descriptors are still loading.
    */
   synthetic?: boolean;
   /** Set only for the evaluator facet — see {@link FacetItemAggregates}. */
@@ -51,9 +47,8 @@ export interface FacetItem {
 
 /**
  * Per-metric-key value tallies the event facet attaches so its drilldown
- * (thumbs_up_down → vote values) renders from the discover payload without
- * a second query. Values are the stored strings, verbatim — a click filters
- * on `event.attribute.<key>:<value>` and must round-trip exactly.
+ * (thumbs_up_down → vote values) renders from the discover payload without a second
+ * query.
  */
 export interface EventMetricValues {
   /** Full storage key, e.g. `event.metrics.vote` — display strips the
@@ -89,11 +84,8 @@ export interface CategoricalSection extends SectionBase {
     label?: string;
     count: number;
     /**
-     * Forwarded from the discover response. Only set on the evaluator
-     * facet (its query builder emits the matching SQL aggregates) —
-     * other facets leave it absent. Surfaced here so the sidebar's
-     * drilldown can read per-evaluator pass/fail / score range
-     * without firing a second query.
+     * Forwarded from the discover response. Only set on the evaluator facet (its query
+     * builder emits the matching SQL aggregates) — other facets leave it absent.
      */
     aggregates?: FacetItemAggregates;
     /** Forwarded from the discover response. Only set on the event facet —
@@ -113,21 +105,18 @@ export interface RangeSectionData extends SectionBase {
   min: number;
   max: number;
   /**
-   * Present only for `discrete`-flagged integer facets (e.g. prompt version,
-   * span count): the distinct values + counts that back the "Discrete"
-   * tick-list, plus the true distinct count. The sidebar offers Discrete only
-   * when `distinctCount` is within `DISCRETE_MODE_MAX_VALUES`; otherwise the
-   * facet stays a slider.
+   * Present only for `discrete`-flagged integer facets (e.g. prompt version, span
+   * count): the distinct values + counts that back the "Discrete" tick-list, plus the
+   * true distinct count.
    */
   discrete?: {
     values: { value: number; count: number }[];
     distinctCount: number;
   };
   /**
-   * True when this descriptor was synthesised from RANGE_DEFAULTS before
-   * discover responded. The range section renders a placeholder caption
-   * instead of an interactive slider so the user knows the filter will
-   * populate once traces arrive.
+   * True when this descriptor was synthesised from RANGE_DEFAULTS before discover
+   * responded. The range section renders a placeholder caption instead of an
+   * interactive slider so the user knows the filter will populate once traces arrive.
    */
   synthetic?: boolean;
 }
@@ -135,22 +124,17 @@ export interface RangeSectionData extends SectionBase {
 export interface AttributesSectionData extends SectionBase {
   kind: "attributes";
   /**
-   * Filter-language prefix used to dispatch toggles for this section.
-   * `attribute` → `attribute.<key>:<value>` (legacy / trace.attribute alias).
-   * `span.attribute` → `span.attribute.<key>:<value>` (any-span match).
-   * `event.attribute` → `event.attribute.<key>:<value>` (any span event match).
-   * Keeping it on the section, not the consumer, lets one render path
-   * serve trace, span, and event attribute lists.
+   * Filter-language prefix used to dispatch toggles for this section. `attribute` →
+   * `attribute.<key>:<value>` (legacy / trace.attribute alias). `span.attribute` →
+   * `span.attribute.<key>:<value>` (any-span match).
    */
   filterPrefix: "attribute" | "span.attribute" | "event.attribute";
   /** The discovered attribute keys for this section (with counts). */
   keys: AttributeKey[];
   /**
-   * Cosmetic prefix stripped from each key's DISPLAYED label only (e.g.
-   * `metadata.` → "environment" instead of "metadata.environment"). The full
-   * key is still used to build the filter, so it resolves to the same
-   * underlying trace-attribute predicate. Absent on the trace/span/event
-   * attribute sections, which display keys verbatim.
+   * Cosmetic prefix stripped from each key's DISPLAYED label only (e.g. `metadata.` →
+   * "environment" instead of "metadata.environment"). The full key is still used to
+   * build the filter, so it resolves to the same underlying trace-attribute predicate.
    */
   displayStripPrefix?: string;
   /**

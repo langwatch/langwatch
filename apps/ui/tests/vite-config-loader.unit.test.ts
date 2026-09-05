@@ -1,12 +1,5 @@
 /**
  * The Vite config, loaded the way `vite` itself loads it.
- *
- * Vitest resolves `vite.config.ts` through its own transform, which hides the
- * failure that matters: Vite's default config loader bundles the file and
- * externalises every bare import, so Node loads `@langwatch/config` natively
- * and refuses its extensionless relative imports. The package scripts name
- * the runner loader for that reason, and this test loads the config through
- * the loader those scripts name.
  */
 
 import { readFileSync } from "fs";

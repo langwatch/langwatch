@@ -541,18 +541,7 @@ export function TraceSummaryAccordions({
 }
 
 /**
- * Single dim row used in place of an IOViewer when the trace has the
- * other side captured but this one is missing. Lets the user see at a
- * glance that "this trace had an input but no output" rather than us
- * silently hiding the OUTPUT label and leaving them to infer the gap.
- *
- * Kept structurally similar to the IOViewer header (uppercase 2xs label
- * on the left) so the two read as siblings — same hierarchy, just with
- * the body replaced by a muted placeholder.
- */
-/**
- * Drops the reserved media-refs entries from a summary attribute map so the
- * metadata table shows real attributes, not the strips' plumbing JSON.
+ * Single dim row used in place of an IOViewer when the trace has the other side captured but this one is missing.
  */
 export function filterReservedMediaRefAttributes(
   attributes: Record<string, string>,
@@ -563,18 +552,9 @@ export function filterReservedMediaRefAttributes(
 }
 
 /**
- * Media widgets (players, images, attachment chips) for the fold-derived
- * media refs riding the summary's reserved attributes — the trace-level
- * input/output are flattened text, so this strip is how the summary panel
- * surfaces the recording/image/attachment the winning span IO carried.
- * Renders nothing for media-free traces. Rendered below its IOViewer like
- * attachments below an email body; items keep their natural size
- * (align="flex-start" — stretching would blow a small image up to panel
- * width).
- *
- * `side` splits a voice turn: one span payload carries the caller's recording
- * and the agent's reply, so without it both players stack under INPUT. Refs
- * with no role recorded render on both sides, as they did before roles.
+ * Media widgets (players, images, attachment chips) for the fold-derived media refs riding the summary's reserved
+ * attributes — the trace-level input/output are flattened text, so this strip is how the summary panel surfaces
+ * the recording/image/attachment the winning span IO carried.
  */
 export function SummaryMediaStrip({
   refsJson,

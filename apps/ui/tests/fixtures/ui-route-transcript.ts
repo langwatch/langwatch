@@ -1,34 +1,7 @@
 /**
- * The URL surface of the application, transcribed from `platform/app`'s
- * `routes.tsx` as it stood before the route table moved into this package —
- * every path in match order, every layout nesting, every retired prefix and
- * where it forwards to.
- *
- * This is the parity bar for the move. It is derived from the old file, not
- * from the new table, so it fails the moment the packaged table renames a
- * path, reorders a family, drops a redirect or changes what a page key points
- * at. Update it only when a URL is deliberately changed, and say so in the
- * change that does it.
- *
- * Amended a second time, deliberately: everything behind a session now sits
- * one level deeper, under a `features/chrome/UiAppChrome` layout route. That
- * route has no path of its own, so not one address, not one match order and
- * not one destination changes — only the indentation, which is what a layout
- * nesting looks like in this transcript.
- *
- * Amended once, deliberately: thirteen addresses whose page component did
- * nothing but forward now carry the forward as a redirect row instead of a
- * page key. Every path, its position in match order and its destination are
- * unchanged; the line changes from `route ... -> <page>` to
- * `redirect ... -> <destination>` because the table now says where the reader
- * goes rather than which module says it.
- *
- * One behavioural difference comes with it, uniformly: a redirect row carries
- * the incoming query string and hash to the destination, and eleven of the
- * thirteen pages dropped both by rebuilding their target from a literal
- * (`/admin` and the legacy `/messages` index already forwarded them). A
- * pinned param still overrides the key it names. Nothing about which address
- * a reader ends on changes.
+ * The URL surface of the application, transcribed from `platform/app`'s `routes.tsx` as
+ * it stood before the route table moved into this package — every path in match order,
+ * every layout nesting, every retired prefix and where it forwards to.
  */
 
 export const expectedUiRouteTranscript: readonly string[] = [

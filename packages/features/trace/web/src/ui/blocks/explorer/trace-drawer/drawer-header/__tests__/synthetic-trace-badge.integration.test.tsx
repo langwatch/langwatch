@@ -1,14 +1,7 @@
 /**
+ * Renders the "Grouped by LangWatch" badge against a real Chip + Tooltip (only the
+ * Chakra system is provided) so the test exercises the actual render, not a mock.
  * @vitest-environment jsdom
- *
- * Renders the "Grouped by LangWatch" badge against a real Chip + Tooltip
- * (only the Chakra system is provided) so the test exercises the actual
- * render, not a mock. The badge must:
- *   - appear only when the TRACE-level marker `langwatch.trace.synthetic`
- *     is "true", naming the grouping key,
- *   - stay hidden for ordinary traces, and
- *   - stay hidden when only the per-record SPAN marker is present (a real
- *     trace with one context-less record whose span id we minted).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

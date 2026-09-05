@@ -1,27 +1,6 @@
 /**
  * useCapabilityData — the ONE hydration seam between a capability card and the
  * product's own API.
- *
- * A card hands this hook what it knows and gets back current rows fetched with
- * the viewer's session. What it knows grows over the call's life, and the hook
- * is PROGRESSIVE across that growth:
- *
- *   START frame   only the parsed command exists (`command`). Where the
- *                 resource's hydrator supports query-fetch (traces), rows are
- *                 fetched immediately — on screen while the agent still works.
- *   END frame     the digest arrives (ids + counts). An id-ref digest refines
- *                 the fetch to exactly the surfaced ids; the previous query
- *                 rows stay visible while the refined fetch is in flight
- *                 (keepPreviousData), so the card fills in, never blinks.
- *
- * The return shape is built for CHUNKED fill: `rows` grows, and
- * `loadedCount` / `totalCount` give the card a real progress fraction. Today
- * ids resolve in a single batch (capped at the rows the card draws); batching
- * into smaller requests changes only this hook, never card code.
- *
- * Never JSX, never a render decision — state only. A resource with no
- * hydrator, a call with nothing to fetch by, or a missing project all resolve
- * to `idle`, and the card falls back to its stored-output path.
  */
 
 import { CLI_SUBRESOURCE_VERBS, type CliResultDigest } from "@langwatch/langy-contract";

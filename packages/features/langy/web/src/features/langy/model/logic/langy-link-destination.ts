@@ -2,20 +2,6 @@ import { isInternalHref } from "@langwatch/workflow-web/components/Markdown";
 
 /**
  * Where a link inside the Langy panel actually goes.
- *
- * Langy renders model output, so the WORDS on a link are shaped by whatever the
- * agent read — a trace label, a tool result, a page it fetched. The address is
- * the only thing that decides where the browser lands, so it is the only thing
- * this reads. Every question is answered off a parsed `URL` (`.hostname` in
- * particular), never off a prefix test on the raw string: `startsWith` cannot
- * tell `https://langwatch.ai@evil.example` from `https://langwatch.ai`.
- *
- *   internal    LangWatch's own: open it, no interruption.
- *   external    somewhere else: show the customer where before opening it.
- *   ignored     not a web destination (mail, phone, an in-page anchor, nothing
- *               at all): none of our business, let the browser handle it.
- *   unsupported not a place to go at all (a script, an inline document, an
- *               address that does not parse): never opened.
  */
 export type LangyLinkDestination =
   | { kind: "internal" }
@@ -25,12 +11,6 @@ export type LangyLinkDestination =
 
 /**
  * LangWatch's own registrable domain, and every host under it.
- *
- * The documentation site is deliberately in here rather than treated as a
- * foreign destination. It is ours — the same circle of trust as the app — and
- * it is the single most common legitimate link Langy produces. Interrupting it
- * would train people to dismiss the dialog without reading it, which is how a
- * warning stops working on the one day it matters.
  */
 export const LANGWATCH_LINK_DOMAINS = ["langwatch.ai"] as const;
 
@@ -40,10 +20,6 @@ const HANDOFF_PROTOCOLS = new Set(["mailto:", "tel:", "sms:"]);
 
 /**
  * `host` is exactly `domain`, or a subdomain of it.
- *
- * The dot is load-bearing in both directions: without it `langwatch.ai` matches
- * `evillangwatch.ai`, and matching a bare suffix the other way round accepts
- * `langwatch.ai.evil.com`.
  */
 function isHostWithin({ host, domain }: { host: string; domain: string }) {
   return host === domain || host.endsWith(`.${domain}`);
@@ -60,11 +36,6 @@ function hostOfOrigin(origin: string): string | null {
 
 /**
  * Classify a link's destination relative to the app the customer is using.
- *
- * `appOrigin` is the origin the app itself is served from (`location.origin` in
- * the browser), so a self-hosted install treats its own domain as home without
- * any configuration. Compared by host only: which port a local dev server sits
- * on is not a trust boundary.
  */
 export function classifyLangyLinkDestination({
   href,

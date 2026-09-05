@@ -13,10 +13,9 @@ import { dash } from "../../../../../../elements/explorer/trace-table/registry/c
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip";
 
 /**
- * Origin badge that doubles as a facet filter — clicking it toggles the
- * `origin` facet (FilterChip stops propagation so the row's drawer doesn't
- * open). Mirrors the model / label cells. See
- * specs/traces-v2/origin-badge-filter.feature
+ * Origin badge that doubles as a facet filter — clicking it toggles the `origin` facet
+ * (FilterChip stops propagation so the row's drawer doesn't open). Mirrors the model /
+ * label cells. See specs/traces-v2/origin-badge-filter.feature
  */
 function renderOrigin(row: TraceListItem, size: "sm" | "xs") {
   const label = originLabel(row.origin);

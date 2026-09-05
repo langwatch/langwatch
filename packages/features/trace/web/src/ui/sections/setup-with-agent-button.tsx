@@ -12,20 +12,8 @@ import { useOrganizationTeamProject } from "../../behavior/use-organization-team
 import { api } from "./trace-api";
 
 /**
- * The set-up-with-AI control every feature page's empty state carries
- * (spec: specs/skills/empty-state-skill-setup.feature).
- *
- * One menu, three routes, all fed by the surface's own docs skill: copy
- * the skill for the reader's own coding agent, hand the job to Langy
- * (who has the skills loaded), or read that feature's docs. It lives on
- * the empty states rather than the home because that is where the gap
- * it fills actually is.
- *
- * The copied text is the skill itself rather than a line telling the
- * agent to fetch it, so the paste carries every instruction and works
- * on an agent with no network. The server holds the bodies and the menu
- * asks for one when it opens; the install line is what a reader gets if
- * that request has not answered yet.
+ * The set-up-with-AI control every feature page's empty state carries (spec:
+ * specs/skills/empty-state-skill-setup.feature).
  */
 
 const SKILLS_DIRECTORY_URL = "https://langwatch.ai/docs/skills/directory";
@@ -175,12 +163,9 @@ export function SetupWithAgentButton({
 }
 
 /**
- * The one agent-actions menu shell: a trigger, the copy-a-prompt entry with
- * its confirmation toast, the Langy entry (shown only when the viewer can
- * ask Langy), and the docs link. `SetupWithAgentButton`, the home
- * `OnboardAgentPill` and the /me `ConnectYourAgentButton` are all thin
- * configurations of this, so the controls can never drift apart in anatomy
- * or behavior.
+ * The one agent-actions menu shell: a trigger, the copy-a-prompt entry with its
+ * confirmation toast, the Langy entry (shown only when the viewer can ask Langy), and
+ * the docs link.
  */
 export function AgentActionsMenu({
   triggerLabel,
@@ -304,14 +289,9 @@ export function AgentActionsMenu({
 }
 
 /**
- * The skill's own instructions for this project, fetched once the menu
- * opens so the reader is not waiting on 94 kB of markdown they may
- * never copy. Null until it answers, which is what falls the copy back
- * to the install line.
- *
- * The token goes above the body here rather than being sent along with
- * the request: the query travels as a GET, so a token in its input
- * would be written into every log that records a URL.
+ * The skill's own instructions for this project, fetched once the menu opens so the
+ * reader is not waiting on 94 kB of markdown they may never copy. Null until it
+ * answers, which is what falls the copy back to the install line.
  */
 function useSetupSkillPrompt({
   skill,

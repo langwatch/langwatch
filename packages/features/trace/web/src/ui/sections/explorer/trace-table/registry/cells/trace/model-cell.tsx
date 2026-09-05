@@ -23,11 +23,9 @@ type Density = "compact" | "comfortable";
 type ProviderKey = keyof typeof modelProviderIcons;
 
 /**
- * Map a model string to one of the known provider icons. Handles both
- * the prefixed form ("openai/gpt-5") and bare model names (the trace
- * collector frequently records just the model id without a provider
- * prefix) via prefix sniffing on the model name itself. Returns null
- * when we can't tell — the cell falls back to the plain text label.
+ * Map a model string to one of the known provider icons. Handles both the prefixed form
+ * ("openai/gpt-5") and bare model names (the trace collector frequently records just
+ * the model id without a provider prefix) via prefix sniffing on the model name itself.
  */
 function inferProvider(model: string): ProviderKey | null {
   if (!model) return null;
@@ -67,15 +65,6 @@ function inferProvider(model: string): ProviderKey | null {
 
 /**
  * Tiny provider mark rendered before the model name in the table cell.
- * Smaller than the model selector's `MODEL_ICON_SIZE` (which targets a
- * touch-friendly dropdown row) — the trace table row is dense, so the
- * icon stays at 12px / 14px so it complements the mono label without
- * dominating it.
- *
- * Dark-mode legibility (monochrome marks inverted, brand-coloured marks
- * left alone) is handled by the shared `ProviderIconGlyph` wrapper — see
- * its doc comment in iconsMap.tsx for why this is a wrapper-level fix
- * rather than one baked into the SVGs themselves.
  */
 export function ProviderIcon({ model, size }: { model: string; size: "compact" | "comfortable" }) {
   const provider = inferProvider(model);
@@ -85,15 +74,8 @@ export function ProviderIcon({ model, size }: { model: string; size: "compact" |
 }
 
 /**
- * Rich card listing every model a trace touched — provider-icon + full
- * name rows under a count header. A HoverCard (not a Tooltip) so the
- * interactive model rows are keyboard-accessible: it opens on hover AND
- * on trigger focus, and the card content is focusable/tabbable (a tooltip
- * is neither). The chip is the trigger via `asChild`, which preserves the
- * chip's own click-to-filter + ↗ provider link rather than swallowing
- * them. Hover stays forgiving (open/close delays) so the pointer can
- * travel onto the card and click a row. See
- * specs/traces-v2/model-chip-interactive-card.feature
+ * Rich card listing every model a trace touched — provider-icon + full name rows under
+ * a count header.
  */
 export function ModelsTooltip({
   models,

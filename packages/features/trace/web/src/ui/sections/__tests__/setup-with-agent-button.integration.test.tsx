@@ -1,10 +1,7 @@
 /**
- * @vitest-environment jsdom
- *
  * The set-up-with-AI control every empty state carries (spec:
- * specs/skills/empty-state-skill-setup.feature). The config pins guard the
- * surface-to-skill mapping and the repo-connect rule; the rendered cases
- * cover the menu's three routes and the Langy gate.
+ * specs/skills/empty-state-skill-setup.feature).
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -61,10 +58,9 @@ vi.mock("../trace-api", () => ({
 }));
 
 /**
- * `generate-setup-skill-bodies.ts` (the source of truth for this list) lives
- * in `@langwatch/langy-server` and touches `node:fs` — a browser-web package
- * may not import it (frontend-boundary lint). Mirrored here rather than
- * imported; keep this list in sync with `SETUP_SKILL_IDS` by hand.
+ * `generate-setup-skill-bodies.ts` (the source of truth for this list) lives in
+ * `@langwatch/langy-server` and touches `node:fs` — a browser-web package may not
+ * import it (frontend-boundary lint).
  */
 const KNOWN_SKILLS: readonly string[] = [
   "connect-agent",

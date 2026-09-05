@@ -170,11 +170,8 @@ describe("buildTrustChecks", () => {
 
   describe("when the judge declined to call some rows", () => {
     /**
-     * Swap-and-reconcile records no verdict when the judge's pick flips with
-     * the candidate order. Right call — a flip is not a tie — but the row's
-     * evidence leaves the win graph with it, which is how a field comes apart
-     * into groups the fit may not rank across. The reader who is told "not
-     * enough overlap to rank these" needs to be able to see why.
+     * Swap-and-reconcile records no verdict when the judge's pick flips with the
+     * candidate order.
      */
     it("reports the count and says those rows carry no weight", () => {
       const checks = build({ rowsWithoutVerdict: 4 });
@@ -210,10 +207,9 @@ describe("buildTrustChecks", () => {
 
   describe("when the judge's model id does not name a provider", () => {
     /**
-     * `modelFamily` returns null for an id with no `provider/` prefix, which
-     * leaves `sharedFamilyVariantIds` empty for the same reason a genuinely
-     * independent judge does. Reporting "shares a family with none of the
-     * candidates" off that is green because nothing was checked.
+     * `modelFamily` returns null for an id with no `provider/` prefix, which leaves
+     * `sharedFamilyVariantIds` empty for the same reason a genuinely independent judge
+     * does.
      */
     it("says the check could not be made rather than passing it", () => {
       const checks = build({
@@ -440,15 +436,8 @@ describe("buildTrustChecks — reasons that must be the actual reason", () => {
 });
 
 describe("buildTrustChecks — the sample-size threshold the product actually ships", () => {
-  // Every test above passes `warnThreshold: 30` into the fixture, so none of
-  // them touches DEFAULT_WARN_THRESHOLD — the value the drawer really uses in
-  // three places. Zeroing it meant no run ever warned about a thin sample,
-  // and the whole suite stayed green.
-  //
-  // The thin fixture below is a fixed 5 matchups rather than one derived from
-  // the constant. Deriving it would move the fixture along with the constant
-  // and quietly stop testing anything, which is how the noise-floor test
-  // managed to pass against a build with no floor at all.
+  // Every test above passes `warnThreshold: 30` into the fixture, so none of them
+  // touches DEFAULT_WARN_THRESHOLD — the value the drawer really uses in three places.
   const THIN = 5;
 
   describe("given a variant with far fewer matchups than the shipped threshold", () => {
@@ -486,15 +475,9 @@ describe("buildTrustChecks — the sample-size threshold the product actually sh
 });
 
 /**
- * The step-2 badge is derived from these checks rather than re-listing their
- * conditions, because the parallel boolean it replaced had drifted from the
- * panel TWICE — it knew about neither a graph broken into groups nor a
- * bootstrap whose resamples failed to settle. Both render an amber line inside
- * a step whose border and badge stayed neutral, which is the one thing a
- * "look here" affordance must not do.
- *
- * These pin the derivation, so a check added later cannot go unnoticed by the
- * badge again.
+ * The step-2 badge is derived from these checks rather than re-listing their conditions, because the parallel
+ * boolean it replaced had drifted from the panel TWICE — it knew about neither a graph broken into groups nor a
+ * bootstrap whose resamples failed to settle.
  */
 describe("the step badge, derived from the checks", () => {
   const hasProblem = (overrides: Partial<LeaderboardTrustPanelProps> = {}) =>

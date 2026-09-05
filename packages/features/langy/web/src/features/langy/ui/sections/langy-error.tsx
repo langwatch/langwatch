@@ -15,20 +15,9 @@ const CALM_ACCENT_BORDER =
   "color-mix(in srgb, var(--chakra-colors-orange-solid) 30%, var(--chakra-colors-border-emphasized))";
 
 /**
- * Renders a Langy domain error according to its presentation `render` mode
- * (ADR-045):
- *   - `suppress` → renders nothing here; the caller shows the connect card /
- *     empty state / model setup instead of an error. This component returns
- *     null so a not-connected/no-data condition never reads as a failure.
- *   - `inline`   → a compact, low-chrome one-liner beside the failed message.
- *   - `card`     → a calm, actionable card in Langy's own skin.
- *
- * These are NOT loud alert boxes. An error still reads in the interface's voice:
- * it states what happened and offers the way forward (the retry) as a clear
- * action, with the trouble carried by a calm rust tone and the accent spent only
- * on the action itself — the langy card material (asaplangy CARD_TAXONOMY), not a
- * red-bordered warning. Copy comes pre-shaped by the explainer; the retry
- * callback wiring is unchanged.
+ * Renders a Langy domain error according to its presentation `render` mode (ADR-045): -
+ * `suppress` → renders nothing here; the caller shows the connect card / empty state /
+ * model setup instead of an error.
  */
 export function LangyError({
   presentation,
@@ -117,21 +106,6 @@ export function LangyError({
 
 /**
  * The debug drawer under an error: the domain `meta` and the `reasons` chain.
- *
- * ── DEVELOPER MODE ONLY ────────────────────────────────────────────────────
- * This used to render for everyone, which is how a timeout card — whose copy is
- * otherwise good ("That took too long… ask for a narrower slice") — ended up
- * with `timeoutMs: 120000` printed underneath it. That is our plumbing, in the
- * user's face, and `dev/docs/best_practices/copywriting.md` forbids exactly it:
- * copy says what happened to the customer, never how we implemented it. Nobody
- * outside this repo knows what a `timeoutMs` is, and nobody should have to.
- *
- * The information is genuinely useful — to US. So it lives where our tools live:
- * behind developer mode, with the rest of the machinery.
- *
- * The TRACE ID is the exception and stays. It is not an internal detail; it is
- * the one thing a user can hand to support, and the copy explicitly asks them to
- * ("share the id below with support").
  */
 function ErrorDetails({
   meta,

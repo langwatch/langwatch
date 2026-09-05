@@ -22,15 +22,6 @@ const pulseAnimation = keyframes`
 
 /**
  * Header for a chip-style comparison evaluator's dedicated result column.
- *
- * Swords identifies a comparison; a Trophy is reserved for declaring a winner,
- * which happens per row in `ComparisonCell`. The overall outcome sits on the
- * right, matching where every other column puts its summary.
- *
- * The title opens the config form. Every other evaluator is edited by clicking
- * its chip, but comparisons are filtered out of the chip lists (they grade no
- * single target), so without this the column could be created and never
- * changed.
  */
 export function ComparisonColumnHeader({
   evaluatorId,
@@ -77,12 +68,9 @@ export function ComparisonColumnHeader({
 
   const openComparisonEditor = useOpenComparisonEditor();
 
-  // Unlike a per-target chip, this is the ONLY surface that can carry a
-  // missing-config cue for a chip-style comparison — it has no column of its
-  // own elsewhere, and Run's validation redirect only surfaces the problem
-  // after the user already hit Run. targetId is unused by the comparison
-  // branch of getEvaluatorMissingMappings (it validates comparison.variants
-  // directly), so "" is fine here.
+  // Unlike a per-target chip, this is the ONLY surface that can carry a missing-config cue for a chip-style comparison — it has no column
+  // of its own elsewhere, and Run's validation redirect only surfaces the problem after the user already hit Run. targetId is unused by
+  // the comparison branch of getEvaluatorMissingMappings (it validates comparison.variants directly), so "" is fine here.
   const hasMissingMappings =
     !!evaluator && !getEvaluatorMissingMappings(evaluator, activeDatasetId, "").isValid;
 

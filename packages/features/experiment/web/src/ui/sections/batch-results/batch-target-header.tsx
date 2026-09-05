@@ -208,11 +208,6 @@ const SummaryTooltipContent = ({ aggregates }: { aggregates: BatchTargetAggregat
 
 /**
  * Compact summary badge shown in header.
- *
- * NOTE: We manually control tooltip open/close state with useInteractiveTooltip
- * because this tooltip contains nested tooltips (for latency/cost stats).
- * Chakra's built-in interactive behavior conflicts with nested tooltips,
- * so we handle the hover logic ourselves via contentProps mouse handlers.
  */
 const SummaryBadge = memo(function SummaryBadge({
   aggregates,

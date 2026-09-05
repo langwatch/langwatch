@@ -47,10 +47,6 @@ import { TargetSummary } from "./target-summary";
 
 /**
  * The icon a column header shows per agent type.
- *
- * The map is keyed by the whole enum, so a new agent type does not compile
- * until it names its icon here. A fallback would take its place in silence,
- * which is how a connected agent first read as code.
  */
 const AGENT_TYPE_ICONS: Record<
   AgentTypeEnum,
@@ -92,17 +88,8 @@ function resolveVariantTargets<T extends { id: string }>(
 }
 
 /**
- * Header component for target columns in the evaluations table.
- * Shows target name with icon, a play button, and a dropdown menu on click.
- *
- * Menu options:
- * - For prompts: "Edit Prompt", "Remove from Workbench"
- * - For agents: "Edit Agent", "Remove from Workbench"
- *
- * Note: For workflow agents, clicking "Edit Agent" opens the workflow in a new tab.
- * This is determined at runtime by fetching the agent data via tRPC.
- *
- * Memoized to prevent unnecessary re-renders when other targets' config changes.
+ * Header component for target columns in the evaluations table. Shows target name with
+ * icon, a play button, and a dropdown menu on click.
  */
 export const TargetHeader = memo(function TargetHeader({
   target,
@@ -183,15 +170,9 @@ export const TargetHeader = memo(function TargetHeader({
     [variantNames, variantIds],
   );
 
-  // Two columns can resolve to the same name — duplicating a prompt is the
-  // usual way there — leaving the user with two identical headers and no way to
-  // tell which is which. Number them "(1)" / "(2)" the same way the comparison
-  // config's variant cards do.
-  //
-  // The ordinal is taken over the canonical column order, NOT over any one
-  // comparison's variant order: the same target can be a variant of several
-  // comparisons, each with its own ordering, so a column header has no single
-  // comparison to inherit a number from.
+  // Two columns can resolve to the same name — duplicating a prompt is the usual way
+  // there — leaving the user with two identical headers and no way to tell which is
+  // which.
   const allTargetNames = useTargetNames(allTargets);
   const headerName = useMemo(() => {
     const index = allTargets.findIndex((t) => t.id === target.id);
@@ -252,14 +233,7 @@ export const TargetHeader = memo(function TargetHeader({
     return nonEmptyRowCount;
   }, [results.executingCells, isRunning, target.id, nonEmptyRowCount]);
 
-  // Compute aggregate statistics using effective row count. Pairwise
-  // column-targets hit the orchestrator's `skipTarget: true` branch — no
-  // target execution → target_result fires with undefined cost/duration →
-  // targetMetadata for the pairwise id carries no metrics. Route those
-  // through the pairwise-aware helper that reconstructs cost/duration
-  // from the two variants' metadata + judge cost, the same "cost of the
-  // whole comparison" the results-page popover surfaces (dogfood: "I want
-  // the same in the workbench").
+  // Compute aggregate statistics using effective row count.
   const aggregates = useMemo(
     () =>
       target.type === "evaluator" && targetComparison
@@ -299,12 +273,9 @@ export const TargetHeader = memo(function TargetHeader({
     target.type === "prompt" &&
     (target.promptVersionNumber === undefined || target.promptVersionNumber === latestVersion);
 
-  // Show version badge if:
-  // - Has version number defined AND is NOT at latest version
-  // Simple rule: if you're pinned to an older version, show the version badge (gray, no upgrade arrow)
-  // This helps users see they're working with an older version at a glance
-  // Note: We intentionally don't show drift/upgrade on the table. Users pin old versions
-  // for comparison. Drift detection is handled in the drawer.
+  // Show version badge if: - Has version number defined AND is NOT at latest version Simple rule: if you're
+  // pinned to an older version, show the version badge (gray, no upgrade arrow) This helps users see they're
+  // working with an older version at a glance Note: We intentionally don't show drift/upgrade on the table.
   const showVersionBadge =
     target.type === "prompt" && target.promptVersionNumber !== undefined && !isAtLatestVersion;
 
@@ -394,19 +365,9 @@ export const TargetHeader = memo(function TargetHeader({
     <HStack
       gap={2}
       width="full"
-      // A flex item defaults to min-width:auto, so the name and the
-      // "<winner> wins" summary refuse to shrink below their text and the row
-      // grows past the column — pushing the play button under the next column.
-      // minWidth=0 here (and on the name button) lets the name truncate first,
-      // while the play button stays pinned via flexShrink={0}.
-      //
-      // Deliberately NOT overflow:hidden. Flex overflow spills at the END of
-      // the row, which is exactly where the play button lives — so clipping
-      // would hide the run button entirely rather than let it poke into the
-      // neighbouring column. Unreachable beats ugly only if it's never
-      // reachable, and badges (Won / version / missing-mapping) are themselves
-      // unshrinkable, so a narrow enough column can still overflow. Visible is
-      // the safer failure.
+      // A flex item defaults to min-width:auto, so the name and the "<winner> wins" summary refuse to shrink below their text and the
+      // row grows past the column — pushing the play button under the next column. minWidth=0 here (and on the name button) lets the
+      // name truncate first, while the play button stays pinned via flexShrink={0}.
       minWidth={0}
       marginY={-2}
       // Glow lives on the <th> itself (evaluations-v3-table.tsx) so the whole

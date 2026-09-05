@@ -1,10 +1,5 @@
 /**
  * The providers that wrap the router, in the order they have always nested.
- *
- * Session, transport and graphics quality still belong to the composing
- * application, so they arrive as components; the Design System shell is this
- * package's own. The order lives here and only here — a host supplies what it
- * still owns and never decides where it sits.
  */
 
 import type { ComponentType, ReactNode } from "react";

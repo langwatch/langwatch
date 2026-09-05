@@ -1,39 +1,6 @@
 /**
- * @vitest-environment node
- *
  * Stops raw-message error toasts from growing back.
- *
- * `toaster.create({ description: error.message })` is the obvious thing to
- * write and it is wrong: since #5984 the wire message for a handled error is
- * its code, so this renders `validation_error` at a customer, and for an
- * unhandled error the message can carry internals. `showErrorToast` exists to
- * be the one correct way to do this.
- *
- * A type can't catch it — `error.message` is a perfectly good string — so it
- * is caught here instead, the same way `codes.unit.test.ts` catches an
- * unregistered code.
- *
- * The guard is deliberately structural rather than name-driven. Three earlier
- * versions matched on the *shape of the value only*, and every one of them was
- * defeated by writing the same leak slightly differently:
- *
- *  - hoist it into a local (`const message = e instanceof Error ? …`) and the
- *    slot holds a bare identifier, which reads as innocent;
- *  - rename the catch binding (`catch (problem)`, `const { error: saveError }`)
- *    and a closed `error|err|e|…` alternation can never match it;
- *  - write it as a JSX attribute (`fallbackTitle={error.message}`) and a
- *    pattern anchored on `key:` never sees it;
- *  - destructure it (`const { message } = error`) and the declaration reader,
- *    which anchors on an identifier straight after `const`, has nothing to
- *    bind;
- *  - put it in the children (`<Alert.Description>{error.message}</…>`) and
- *    every attribute-anchored pattern walks past it, because children are not
- *    attributes.
- *
- * So this file reads the file the way a reader does: it tracks which locals
- * hold an error, which identifiers were *bound* to one (catch clauses,
- * `onError` callbacks, `{ error: x }` destructures), and which call a copy
- * slot actually sits inside. Names are one signal of six, not the test.
+ * @vitest-environment node
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -44,18 +11,6 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
 /**
  * Every tree that ships UI.
- *
- * The corpus is the whole point: `ee/` was outside the original walk, so
- * fourteen raw-message toasts in the governance and backoffice dashboards were
- * never caught, and when `ee` later moved the stale root threw rather than
- * narrowing and silenced the guard entirely. It has to cover everywhere the
- * pattern can appear, not just where the migration happened to look.
- *
- * The workspace packages DO carry UI now — every `packages/**\/web` family
- * renders its own toasts — so they are a root alongside this app. `existsSync`
- * filters rather than throws, so a tree that goes away narrows the walk
- * instead of taking every case down with it; the file floor below is what
- * turns a narrowing nobody intended into a failure.
  */
 const ROOTS = [join(PACKAGE_ROOT, "src"), join(PACKAGE_ROOT, "../../packages")].filter((root) =>
   existsSync(root),
@@ -63,52 +18,24 @@ const ROOTS = [join(PACKAGE_ROOT, "src"), join(PACKAGE_ROOT, "../../packages")].
 
 /**
  * Cheap substring test that decides whether a file is worth parsing.
- *
- * `setError` is in here because the form bridge is a second way to put copy in
- * front of a user: `FormServerError` renders `errors.root.serverError.message`
- * verbatim, so a hand-written `form.setError(FORM_SERVER_ERROR, { message:
- * error.message })` renders the code slug with nothing between it and the
- * customer — and such a file need never mention `toaster`.
- *
- * The bare `Alert.Description` / `Toast.Description` spellings are here for the
- * same reason: a component that renders `{error.message}` as a *child* of a
- * Chakra alert need mention none of the other four, so widening the detector to
- * read JSX children without widening this would have been inert.
- *
- * This prefilter is also the guard's single largest failure mode, which is why
- * {@link SCANNED_FILE_FLOOR} exists: rename the toaster module and this matches
- * nothing, the scan reports no offenders, and the guard stays green forever.
  */
 const WORTH_SCANNING =
   /toaster|showErrorToast|HandledErrorAlert|setError|(?:Alert|Toast)\.(?:Description|Title)/;
 
 /**
- * Below this many scanned files, assume the prefilter has stopped matching
- * rather than that the codebase stopped toasting. Roughly 270 files match
- * today; the floor sits far enough below that normal churn doesn't trip it and
- * a rename does.
+ * Below this many scanned files, assume the prefilter has stopped matching rather than
+ * that the codebase stopped toasting. Roughly 270 files match today; the floor sits far
+ * enough below that normal churn doesn't trip it and a rename does.
  */
 const SCANNED_FILE_FLOOR = 200;
 
 /**
  * The same floor, for the feature-web rule below.
- *
- * Roughly two dozen `packages/features/*\/web` files still import the Design
- * System toaster — all for success, info and warning notices now — and that
- * count only falls as families keep moving. The floor is low enough to survive
- * that and high enough to catch the real failure mode: the path shape or the
- * module specifier changing, which would silently reduce the rule to nothing.
  */
 const FEATURE_WEB_TOASTER_FILE_FLOOR = 10;
 
 /**
  * The floor for the package-local toaster rule below.
- *
- * That rule scans EVERY file in a `packages/features/*\/web` package rather
- * than only the ones importing the Design System, because the shape it looks
- * for is a package that built a toaster of its own and therefore imports
- * nothing. Thousands of files match today; a floor in the hundreds catches the
- * one failure mode — the path shape changing — without tracking churn.
  */
 const FEATURE_WEB_SCANNED_FILE_FLOOR = 500;
 
@@ -117,29 +44,12 @@ const COPY_KEYS = new Set(["title", "description", "fallbackTitle"]);
 
 /**
  * The calls whose arguments a customer reads.
- *
- * Requiring an enclosing call is what stops the guard firing on a table column
- * or a chart config that happens to live in a file which also toasts. Without
- * it the only fix available to an author is a file-level exemption, which
- * blinds the guard to that entire file — a worse outcome than the false
- * positive it was added to silence.
- *
- * `toaster` re-spreads `createToaster(...)` (see `components/ui/toaster.tsx`),
- * so `.error/.warning/.info/.success/.loading/.promise/.update` are all
- * first-class and all already used. A rule that knows only about `.create` is
- * one autocomplete away from being bypassed.
  */
 const TOAST_CALL =
   /(?:^|[^\w$])toaster\s*\??\.\s*(?:create|error|warning|info|success|loading|promise|update)$|(?:^|[^\w$])showErrorToast$/;
 
 /**
  * `form.setError(...)` — the form bridge renders its `message` verbatim.
- *
- * A bare `setError(…)` is far more often a `useState` setter, and one of those
- * holding a caught error's message (`setError(err instanceof Error ? …)`) is
- * not a toast at all. So a bare call only counts in a file that actually uses
- * react-hook-form; a member call (`form.setError`, `methods.setError`) always
- * does.
  */
 const FORM_SET_ERROR_METHOD = /[\w$)\]]\s*\??\.\s*setError$/;
 const BARE_SET_ERROR = /(?:^|[^\w$.])setError$/;
@@ -148,77 +58,37 @@ const USES_REACT_HOOK_FORM = /FORM_SERVER_ERROR|\buseForm\b|UseFormReturn|react-
 /**
  * JSX elements that present an error, whether the copy arrives as a prop or as
  * children.
- *
- * `Toast.Description` and `Alert.Description` are here because Chakra's
- * compositional spelling puts the copy in the children:
- * `<Alert.Description>{error.message}</Alert.Description>` reads the same slug
- * to the same customer as `description: error.message` does, and every
- * attribute-anchored pattern walked straight past it.
  */
 const ERROR_COMPONENT =
   /(?:^|\.)(?:HandledErrorAlert|ErrorAlert|ErrorCard)$|^(?:Toast|Alert)\.(?:Title|Description)$/;
 
 /**
  * Receivers whose `.message` is customer *data* we render on purpose.
- *
- * An ingested trace carries the error the customer's own system raised;
- * showing it is the entire point of the traces UI (`MessagesTable.tsx`,
- * `MessageCard.tsx`, `TraceMessages.tsx`, `SpanAccordions.tsx`). That has
- * nothing to do with the message of an error *we* threw, which is the thing
- * this guard is about.
  */
 const SAFE_MESSAGE_RECEIVERS = new Set(["trace", "span"]);
 
 /**
  * The form bridge's *output* side.
- *
- * `applyHandledErrorToForm` writes registry copy into react-hook-form's
- * `errors.root.serverError`, and `FormServerError` reads it straight back out
- * to render it — that is the whole point of the bridge. So a read of
- * `errors.root….message` is the correct thing, not a leak, and without this
- * the guard flags the one component in the repo whose job is to show that
- * copy. The *write* side (`form.setError(FORM_SERVER_ERROR, { message })`) is
- * still guarded; that is where a raw message would get in.
  */
 const FORM_ERROR_TREE = /\berrors\s*\??\s*\.\s*root\b/;
 
 /**
  * Names that mean "this holds an error", written open rather than closed.
- *
- * The previous closed alternation (`error|err|e|exception|cause|reason`) could
- * not match `saveError`, `apiError`, `failure`, `problem` or `ex`, all of
- * which appear in real catch clauses. This matches any name *ending* in an
- * error-ish word too, so the next invented spelling is covered by default.
- *
- * It is only ever the last signal consulted — see {@link isErrorExpression}.
  */
 const ERROR_NAME =
   /^(?:e|ex|err|errs|error|errors|exception|exceptions|cause|reason|problem|failure|rejection|fault|[\w$]*(?:Error|Err|Exception|Failure|Problem|Rejection|Cause)s?)$/;
 
 /**
  * Files allowed to reference an error message directly.
- *
- * Keep this list empty-ish and justified. It is not a place to park a
- * migration you didn't finish — and since a file-level exemption blinds the
- * guard to every future line in that file, prefer the per-line
- * `// no-raw-error-toast-ok` marker.
  */
 const ALLOWED = new Set<string>([
-  // This file. Its fixtures are deliberately written leaks — the detector's
-  // own tests below assert each one is caught — so scanning itself would
-  // always fail. Nothing else belongs here: `showErrorToast.ts` used to, but
-  // its only `description: error.message` is inside a docblock, which
-  // `stripComments` blanks, and an allowlist entry that isn't holding
-  // anything back reads as permission to add more.
+  // This file. Its fixtures are deliberately written leaks — the detector's own tests
+  // below assert each one is caught — so scanning itself would always fail.
   "src/features/errors/logic/__tests__/noRawErrorToasts.unit.test.ts",
 ]);
 
 /**
  * Per-line opt-out, for the rare line the guard is wrong about.
- *
- * One line is the right size for an exemption. A file-level entry in
- * {@link ALLOWED} silences every line the file will ever grow, which is how a
- * guard ends up scanning a large file and finding nothing by design.
  */
 const SUPPRESSION_MARKER = "no-raw-error-toast-ok";
 
@@ -240,21 +110,8 @@ function skipString(source: string, at: number): number {
 }
 
 /**
- * Reads one property value, starting just after its `:` (or after the `{` of a
- * JSX expression container).
- *
- * A regex cannot do this correctly and two earlier versions of this guard
- * proved it. Bounding the value with `[^,;]` under-matched — it stopped at the
- * first comma, so `description: fmt("Couldn't save", error.message)` was
- * invisible — and over-matched, because with no comma or semicolon in the way
- * it ran off the end of the call into the next statement, so
- * `toast={{ title: "x" }}` followed by `onClick={() => log(error.message)}`
- * read as one value and would have been flagged.
- *
- * So: scan, tracking nesting and string state. The value ends at a `,` or `;`
- * at depth zero, or at the `}` that closes the object literal (or the JSX
- * expression container) it lives in. Strings and template literals are skipped
- * whole, so a brace or comma inside copy can't end the value early.
+ * Reads one property value, starting just after its `:` (or after the `{` of a JSX
+ * expression container).
  */
 function readValue(source: string, from: number): string {
   let depth = 0;
@@ -283,21 +140,9 @@ function readValue(source: string, from: number): string {
 }
 
 /**
- * Blanks out comments so prose about the pattern isn't mistaken for a call
- * site, without moving anything: every stripped character becomes a space and
- * every newline survives, so match offsets still map to real line numbers.
- *
- * Trailing `//` comments are stripped too, which the line-oriented version
- * couldn't do. That version only blanked lines that were *entirely* a comment,
- * so writing about the antipattern at the end of a line of code fired the
- * guard, and the only way out was a file-level exemption. It avoided trailing
- * comments because a naive strip eats the `//` in a `https://` inside a
- * string; this scanner tracks quote state, so it doesn't have to.
- *
- * Two deliberate blind spots remain, both erring towards reading one comment
- * too many rather than blinding the guard: a `//` immediately after `:` or a
- * backslash is left alone, because those are how a URL and a regex's escaped
- * slash (`/https?:\/\//`) end up looking like a comment opener.
+ * Blanks out comments so prose about the pattern isn't mistaken for a call site,
+ * without moving anything: every stripped character becomes a space and every newline
+ * survives, so match offsets still map to real line numbers.
  */
 function stripComments(source: string): string {
   const out = source.split("");
@@ -372,13 +217,6 @@ function suppressedLines(raw: string): Set<number> {
 
 /**
  * Is the marker anywhere in the slot's own lines — key through end of value?
- *
- * Checking only the key's line made the opt-out depend on where the formatter
- * happened to break the line. `description: err.message, // marker` was not
- * suppressed, and the only spelling that worked was pushing the value onto its
- * own line so the comment could sit above it — which is exactly how two of the
- * three suppressions in this repo came to be written. The marker belongs
- * wherever the leak is legible.
  */
 function markerCovers(suppressed: Set<number>, firstLine: number, lastLine: number): boolean {
   for (let line = firstLine; line <= lastLine; line++) {
@@ -406,13 +244,7 @@ function matchOpenBackwards(text: string, closeAt: number): number {
 }
 
 /**
- * The member expression immediately left of `at` — the receiver of whatever
- * comes next.
- *
- * Walks over identifiers, dots, optional chaining and balanced `(…)`/`[…]`
- * groups, so `(error as Error)`, `errors[0]?` and `result.error` all come back
- * whole. That matters because the cast and the index are exactly where the
- * error name stops being adjacent to `.message`.
+ * The member expression immediately left of `at` — the receiver of whatever comes next.
  */
 function pathBefore(text: string, at: number): string {
   let end = at;
@@ -453,10 +285,6 @@ interface FileFacts {
 
 /**
  * Does this expression evaluate to an error we threw?
- *
- * Six signals, checked in order of how much they actually prove. The name is
- * last on purpose: `catch (problem)` and `onError: (failure) => …` are caught
- * by the binding, not by guessing what people call things.
  */
 function isErrorExpression(path: string, facts: FileFacts): boolean {
   const root = rootOf(path);
@@ -479,10 +307,6 @@ function readsErrorMessage(value: string, facts: FileFacts): boolean {
 
 /**
  * The other spellings of the same leak.
- *
- * `String(error)` was the only one the previous version knew, so
- * `JSON.stringify(err)`, `err.toString()` and `String(err.cause)` all shipped
- * a raw error to a customer while the guard reported a clean tree.
  */
 function stringifiesError(value: string, facts: FileFacts): boolean {
   for (const match of value.matchAll(/\b(?:String|JSON\s*\.\s*stringify)\s*\(/g)) {
@@ -533,11 +357,6 @@ const DECLARATION = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=;\n]*?)?\
 
 /**
  * `const { message } = error` — the same leak, written as a destructure.
- *
- * {@link DECLARATION} anchors on an identifier directly after `const`, so this
- * shape had no reader at all: the initialiser never contains `.message`, and
- * the bound name is a bare `message` that reads as innocent at the toast. Two
- * lines, neither of which any signal in this file could see.
  */
 const DESTRUCTURED_DECLARATION =
   /\b(?:const|let|var)\s*\{([^{}]*)\}\s*(?::[^=;\n]*?)?\s*=(?!=)\s*/g;
@@ -547,17 +366,6 @@ const MESSAGE_BINDING = /\bmessage\b\s*(?::\s*([A-Za-z_$][\w$]*))?/;
 
 /**
  * Locals holding an error's message.
- *
- * This is the shape the guard missed most often, and the one people reach for
- * without thinking:
- *
- * ```ts
- * const message = e instanceof Error ? e.message : "Failed to save";
- * toaster.create({ title: message, type: "error" });
- * ```
- *
- * Both halves read as innocent on their own. Run to a fixpoint so a message
- * laundered through a second local (`const shown = message;`) is caught too.
  */
 function collectTaint(source: string, facts: FileFacts): Set<string> {
   const { tainted } = facts;
@@ -614,11 +422,6 @@ interface Slot {
 
 /**
  * `key: value`, `"key": value` and `key={value}`.
- *
- * The JSX form is why `[:=]` is here. Anchoring on `key:` alone meant
- * `<HandledErrorAlert fallbackTitle={error.message} />` was caught by neither
- * guard — while `HandledErrorAlert` sat in the file prefilter, which reads as
- * coverage that did not exist.
  */
 const SLOT_AT = /["']?(title|description|fallbackTitle|message)["']?\s*[:=](?!=)\s*(\{)?/y;
 
@@ -654,13 +457,7 @@ function nearestNamedFrame(stack: Frame[]): Frame | null {
 }
 
 /**
- * Walks a file once, recording every copy slot together with the call it sits
- * inside.
- *
- * The stack is the point. Without it a `title:` in a table column definition,
- * a chart option or a `useQuery` config counts the moment the file mentions
- * `toaster` anywhere — and the cheapest way for an author to silence that is a
- * file-level exemption, which turns the guard off for the whole file.
+ * Walks a file once, recording every copy slot together with the call it sits inside.
  */
 function scanSlots(source: string): Slot[] {
   const slots: Slot[] = [];
@@ -825,12 +622,6 @@ const leaksIn = (source: string): boolean => findLeaks(source).length > 0;
 
 /**
  * A file inside a `packages/features/<family>/web` package.
- *
- * These are the browser halves of the moved families, and the grammar they are
- * held to is stricter than the application's: a screen reaches the application
- * through its host port and the feedback capability the host injects, never
- * through a singleton of its own. Everything else in this file is about WHAT a
- * toast says; this rule is about WHO is allowed to raise a failure at all.
  */
 const FEATURE_WEB_FILE = /[/\\]packages[/\\]features[/\\][^/\\]+[/\\]web[/\\]/;
 
@@ -839,9 +630,6 @@ const DESIGN_SYSTEM_TOASTER_IMPORT = /\bfrom\s*["']@langwatch\/design-system\/to
 
 /**
  * The names this file bound the Design System toaster to.
- *
- * Read from the import clause rather than assumed to be `toaster`, so an alias
- * (`import { toaster as appToaster }`) does not walk past the rule.
  */
 const TOASTER_IMPORT_CLAUSE =
   /import\s*\{([^}]*)\}\s*from\s*["']@langwatch\/design-system\/toaster["']/g;
@@ -862,21 +650,7 @@ function designSystemToasterBindings(source: string): Set<string> {
 }
 
 /**
- * Every line where a feature-web file shapes a FAILURE for the Design System
- * toaster.
- *
- * Two spellings, because the toaster offers both: `toaster.error(...)` names
- * the severity in the method, and `toaster.create({ type: "error" })` names it
- * in the argument. A success, an info notice or a warning is none of the
- * guard's business — those may stay, and the families that raise them are not
- * bypassing anything.
- *
- * The `type: "error"` test is not scoped to an enclosing `toaster` call on
- * purpose. `use-run-scenario.ts` builds its toast config in a named function
- * and passes it (`toaster.create(buildRunOutcomeToast(...))`), so a rule that
- * only read the arguments of the call would have been blind to exactly the
- * file that took the trouble to hoist. In a file whose only reason to import
- * the toaster is to raise toasts, an error-shaped literal IS an error toast.
+ * Every line where a feature-web file shapes a FAILURE for the Design System toaster.
  */
 function findToastedFailures(raw: string): number[] {
   if (!DESIGN_SYSTEM_TOASTER_IMPORT.test(raw)) return [];
@@ -910,25 +684,12 @@ function findToastedFailures(raw: string): number[] {
 
 /**
  * A module that publishes a toast API of its own.
- *
- * Read as an EXPORT rather than as a call, because the thing that matters is
- * that other modules in the package can reach it: `@langwatch/trace-web`
- * carried `ui/blocks/toaster.tsx`, and thirty files imported `toaster` from it
- * without ever naming the Design System — so the rule above, which keys on that
- * import, was blind to every one of them. Roughly forty error toasts sat behind
- * two such modules.
  */
 const LOCAL_TOASTER_EXPORT =
   /export\s+(?:const|function|let)\s+toaster\b|export\s*\{[^}]*\btoaster\b[^}]*\}/;
 
 /**
  * A toast renderer the composing application never sees.
- *
- * `createToaster` builds its own store, and only a `<Toaster toaster={...}>`
- * bound to THAT store renders it. A second one inside a package is a second
- * toast surface: its toasts carry none of the application's copy rules, and —
- * as the trace family found — nothing in `apps/ui` mounted the renderer at all,
- * so every toast raised on it was invisible.
  */
 const OWN_TOAST_RENDERER = /\bcreateToaster\s*\(/;
 
@@ -940,17 +701,6 @@ const ROUTES_THROUGH_HOST = /\.\s*failed\s*\(/;
 
 /**
  * Every line that makes a package-local toaster module a finding.
- *
- * The module is one of two things, and both are named by their export or their
- * renderer rather than by what they import — an offender imports nothing.
- *
- * A local toaster is allowed exactly one shape: it may ROUTE. `@langwatch/ui-host`'s
- * `toaster.ts` is that shape — it renders nothing, owns no store, and turns
- * every `type: "error"` call into `UiFeedbackPort.failed`, which is how the
- * feature packages reach the application's registry without importing a
- * renderer. So a module that hands its failures to a port
- * and builds no renderer is clean; anything else that can emit a failure is a
- * finding, and a success-or-info-only toaster is never one.
  */
 function findLocalToasterFailures(raw: string): number[] {
   const source = stripComments(raw);
@@ -997,10 +747,6 @@ function walk(dir: string, out: string[] = []): string[] {
 
 /**
  * The detector's own tests.
- *
- * Without these, "no offenders" is indistinguishable from "detects nothing" —
- * and this guard has twice shipped in the second state while reporting the
- * first. Every LEAKS case is a shape that reached a customer, or would have.
  */
 describe("the raw-message detector", () => {
   describe("given a leak", () => {

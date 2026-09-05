@@ -1,8 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The content column: one readable width, centred on the whole page.
- *
+ * @vitest-environment jsdom
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

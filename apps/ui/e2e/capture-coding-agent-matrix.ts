@@ -62,13 +62,9 @@ void (async () => {
     }
     console.log("logged in ->", page.url());
 
-    // Every shot waits for rendered CONTENT (the banner name, a counters row,
-    // or the contentless note) before its short settle delay — waiting on time
-    // alone would screenshot the loading skeleton on cold caches. Local
-    // ClickHouse shares its query-concurrency budget with every other
-    // worktree's stack, so a page load can starve and stick on skeletons; a
-    // reload re-fires the queries, so each shot retries with reloads instead
-    // of trusting one navigation.
+    // Every shot waits for rendered CONTENT (the banner name, a counters row, or the
+    // contentless note) before its short settle delay — waiting on time alone would
+    // screenshot the loading skeleton on cold caches.
     const TERMINAL_READY =
       "text=/reported tokens|Claude Code v|Gemini CLI v|opencode v|Codex v|Copilot v/";
     const SESSION_READY = "text=/model calls|no usage summary/i";

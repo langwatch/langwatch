@@ -1,9 +1,7 @@
 /**
+ * The dataset header's add and edit-columns controls carry text labels rather than
+ * being icon-only, so they are easy to find.
  * @vitest-environment jsdom
- *
- * The dataset header's add and edit-columns controls carry text labels rather
- * than being icon-only, so they are easy to find. See
- * dev/docs/best_practices/icon-button-labels.md.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -12,34 +12,20 @@ import type {
 import { parse as cachedParse, SCENARIO_FIELDS, SEARCH_FIELDS } from "@langwatch/trace-contract";
 
 /**
- * The grammar's actual operator vocabulary — anything else uppercase-shaped
- * in implicit-field position is a typo, not a deliberate free-text term.
- * `TO` is the range delimiter inside `[N TO M]` and only valid there, but
- * we accept it bare so users typing a partial range mid-edit don't get
- * flagged on every keystroke.
+ * The grammar's actual operator vocabulary — anything else uppercase-shaped in
+ * implicit-field position is a typo, not a deliberate free-text term.
  */
 const GRAMMAR_OPERATOR_WORDS: ReadonlySet<string> = new Set(["AND", "OR", "NOT", "TO"]);
 /**
- * Operator-shaped lexeme: 2–5 uppercase letters, surrounded by word
- * boundaries. Tightened from a generic ALL-CAPS pattern so all-caps
- * proper nouns in free text (`JSON`, `ASCII`, `OPENAI`, `GPT`) don't
- * get false-flagged as operator typos. Real operators are short.
+ * Operator-shaped lexeme: 2–5 uppercase letters, surrounded by word boundaries.
+ * Tightened from a generic ALL-CAPS pattern so all-caps proper nouns in free text
+ * (`JSON`, `ASCII`, `OPENAI`, `GPT`) don't get false-flagged as operator typos.
  */
 const OPERATOR_SHAPED_WORD_REGEX = /\b([A-Z]{2,5})\b/g;
 
-// Tolerant fallback for queries that don't yet parse (mid-typing, unmatched
-// quotes, trailing operator). Decorates anything shaped like `field:value`
-// so users still get visual feedback while editing.
-//
-// Value alternatives (in match-precedence order):
-//   - "..."             quoted literal
-//   - [...]             bracketed range, e.g. duration:[100 TO 1000]
-//   - (>=|<=|>|<)NUM    comparison range, e.g. duration:>1000 / cost:<=5
-//   - ...               bare token (catch-all for everything else)
-//
-// The comparison-range alternative was missing originally — without it,
-// typing `duration:>1000` left the token unhighlighted, so users saw the
-// numeric facet "stop working" mid-edit.
+// Tolerant fallback for queries that don't yet parse (mid-typing, unmatched quotes,
+// trailing operator). Decorates anything shaped like `field:value` so users still get
+// visual feedback while editing.
 const FILTER_TOKEN_REGEX =
   /(?<prefix>NOT\s+|-)?(?<field>[a-zA-Z][a-zA-Z0-9_.]*):(?:"[^"]*"|\[[^\]]*\]|(?:>=|<=|>|<)[^\s()]+|[^\s()]+)/g;
 
@@ -48,18 +34,13 @@ export interface DecorationSlot {
   to: number;
   className: string;
   /**
-   * Optional liqe-text-coordinate range for click-to-cycle on the
-   * AND/OR keyword. Set when the slot wraps a BooleanOperator; the
-   * editor's mousedown handler reads `data-filter-op-start` /
-   * `data-filter-op-end` off the inline span to invoke
-   * `swapOperatorAtLocation`. Other slots leave this undefined.
+   * Optional liqe-text-coordinate range for click-to-cycle on the AND/OR keyword.
    */
   opLoc?: { start: number; end: number };
   /**
-   * Optional field+value+location reference for click-to-edit on the
-   * value chip. Set on Tag slots; the editor's mousedown handler reads
-   * `data-filter-chip-start` etc. off the inline span to open the
-   * value picker popover.
+   * Optional field+value+location reference for click-to-edit on the value chip. Set on
+   * Tag slots; the editor's mousedown handler reads `data-filter-chip-start` etc. off
+   * the inline span to open the value picker popover.
    */
   chipToken?: {
     start: number;
@@ -70,18 +51,8 @@ export interface DecorationSlot {
 }
 
 /**
- * Identifies a Tag in the query — used by the per-token X button so the
- * delete handler knows which liqe node to drop. Locations are absolute
- * positions in the query text (not the @-stripped form, since the editor
- * never holds `@` characters in the new flow).
- *
- * `kind` distinguishes the AST-derived path (where `start/end` are in
- * liqe's *trimmed-string* coordinate space and feed `removeNodeAtLocation`)
- * from the regex-fallback path (where the parser failed and `start/end`
- * are absolute editor-text positions, used for a direct string-slice
- * removal). Without the regex-fallback path the X widgets would vanish
- * the moment the user typed something that broke the parse — which felt
- * like the chips themselves were disappearing.
+ * Identifies a Tag in the query — used by the per-token X button so the delete handler
+ * knows which liqe node to drop.
  */
 export interface TokenRef {
   start: number;
@@ -150,17 +121,9 @@ function tagClassName({ fieldName, negated }: { fieldName: string; negated: bool
 }
 
 /**
- * Flag operator-shaped uppercase words that aren't part of the grammar's
- * actual operator vocabulary (`AND`, `OR`, `NOT`, `TO`). Driven entirely
- * by `GRAMMAR_OPERATOR_WORDS` — no curated list of typos. Anything 2–5
- * uppercase letters that *isn't* one of those four is highlighted as a
- * suspect operator-typo (AMD, BUT, NAND, XOR, etc.).
- *
- * We walk the *covered* text only — slots already produced by `walkAst`
- * mark `field:value` tokens and the canonical operator keywords. Skipping
- * positions inside those slots avoids double-decorating the value side
- * of `name:OK` (where `OK` is legitimate free text inside a quoted/literal
- * value) or the inside of an `[N TO M]` range.
+ * Flag operator-shaped uppercase words that aren't part of the grammar's actual
+ * operator vocabulary (`AND`, `OR`, `NOT`, `TO`). Driven entirely by
+ * `GRAMMAR_OPERATOR_WORDS` — no curated list of typos.
  */
 function flagOperatorShapedTypos(text: string, baseOffset: number, plan: DecorationPlan): void {
   OPERATOR_SHAPED_WORD_REGEX.lastIndex = 0;
@@ -334,12 +297,8 @@ function regexFallback(
 }
 
 export function buildDecorationPlan(text: string, baseOffset = 0): DecorationPlan {
-  // The editor stores U+00A0 NBSP (we insert it after a value-accept so the
-  // browser doesn't collapse the trailing space). Normalise to regular space
-  // before parsing so liqe sees a token boundary — otherwise the `AND`
-  // typed after the accept glues into the previous Tag's value. Locations
-  // returned from liqe are still character indices in the normalised
-  // string, which has the same length as the original (1:1 substitution).
+  // The editor stores U+00A0 NBSP (we insert it after a value-accept so the browser
+  // doesn't collapse the trailing space).
   const normalized = text.replace(/\u00A0/g, " ");
   const trimmed = normalized.trim();
   if (!trimmed) return { slots: [], tokens: [], leadingWs: 0 };
@@ -418,26 +377,12 @@ function createDeleteWidget(token: TokenRef): HTMLElement {
 }
 
 /**
- * Module-level lookup table: `field → value → human-readable label`. The
- * editor doesn't own this data (the facet sidebar does) and we don't
- * want to thread it through every render of the SearchBar, so the
- * SearchBar republishes the current map via `setFilterChipLabels`
- * whenever facets change. `computeDecorations` reads it at recompute
- * time; the plugin's `state.apply` triggers a recompute on the
- * `LABEL_REFRESH` meta so a labels update with no doc change still
- * rerenders the chips.
- *
- * Defaults to an empty map so a chip rendered before facets land
- * gracefully falls back to ID-only (the prior behaviour).
+ * Module-level lookup table: `field → value → human-readable label`.
  */
 let chipLabelLookup: Record<string, Record<string, string>> = {};
 
 /**
- * Editor views the plugin is currently mounted in. Tracked so the
- * label-refresh side of `setFilterChipLabels` can poke each one with a
- * `LABEL_REFRESH_META` transaction — there's typically just one search
- * bar, but rendering two in a single page (test harness, side-by-side
- * design experiments) shouldn't drop refreshes on the second one.
+ * Editor views the plugin is currently mounted in.
  */
 const subscribedViews = new Set<EditorView>();
 
@@ -451,17 +396,9 @@ export function setFilterChipLabels(next: Record<string, Record<string, string>>
 }
 
 /**
- * The text the chip overlay paints at rest. Always field-qualified
- * (`evaluator:Policy Check`) so the field prefix stays put — only the value
- * tail swaps to the raw id on hover. Painting the bare label dropped the
- * `evaluator:` prefix at rest and snapped it back on hover, which read as a
- * jarring jump; keeping the field anchored fixes that.
- *
- * Returns undefined when there's no human label, or it equals the raw value
- * (overlaying `status:error` on `status:error` is pointless and would just
- * flicker on hover) — the CSS overlay only fires when the attr is set, so
- * omission keeps the chip in its raw text-render mode. Shared with the
- * placeholder editor so both renderers paint an identical overlay.
+ * The text the chip overlay paints at rest. Always field-qualified (`evaluator:Policy
+ * Check`) so the field prefix stays put — only the value tail swaps to the raw id on
+ * hover.
  */
 export function chipOverlayLabel({
   field,
@@ -503,26 +440,16 @@ function computeDecorations(doc: ProseMirrorNode): DecorationSet {
       decorations.push(Decoration.inline(slot.from, slot.to, attrs));
     }
     for (const token of plan.tokens) {
-      // AST tokens carry liqe's trimmed-text coords, so we translate by
-      // `leadingWs` to get a normalised-text offset. Fallback tokens were
-      // already collected against the normalised text, so they need only
-      // the text-node base position. Two conventions because the AST path
-      // wants positions that round-trip through `removeNodeAtLocation`,
-      // whereas the fallback path slices directly out of the editor text.
+      // AST tokens carry liqe's trimmed-text coords, so we translate by `leadingWs` to
+      // get a normalised-text offset. Fallback tokens were already collected against
+      // the normalised text, so they need only the text-node base position.
       const widgetPos = token.kind === "ast" ? pos + plan.leadingWs + token.end : pos + token.end;
       decorations.push(
         Decoration.widget(widgetPos, () => createDeleteWidget(token), {
           side: 1,
           ignoreSelection: true,
-          // Without an explicit key, ProseMirror's DecorationSet diff
-          // compared widget specs by render-function reference equality.
-          // Each `computeDecorations` pass creates a fresh closure → every
-          // recompute looked like "all widgets are different" to PM, and
-          // its reconciliation could end up removing the old DOM without
-          // attaching the new one in some focus/blur transitions — the X
-          // appeared on first render and never returned. Keying by token
-          // identity lets PM pin DOM continuity to the *logical* widget,
-          // not the closure identity.
+          // Without an explicit key, ProseMirror's DecorationSet diff compared widget
+          // specs by render-function reference equality.
           key: `del:${token.kind}:${token.field}:${token.start}:${token.end}:${token.value ?? ""}`,
         }),
       );

@@ -60,39 +60,17 @@ function readUrlState(): DrawerUrlState {
 }
 
 /**
- * Single source of truth = `drawerStore`. The URL is a serialization for
- * persistence (hard reload, deep links) and browser navigation.
- *
- * Two listeners only:
- *  1. Store → URL: when URL-relevant state diverges from URL params, REPLACE
- *     the diff (no new history entry — these params are view-state inside an
- *     already-open drawer). The diff check makes the loop self-terminating —
- *     async router writes can't clobber newer store values, because by the
- *     time a stale write lands, the store and URL re-converge before the next
- *     write fires.
- *  2. `popstate` → store: browser back/forward re-hydrates the store from
- *     the URL. Subsequent re-render sees store == URL → no echo push.
- *
- * No bidirectional `useEffect`s, no `eslint-disable`. The flip-back bug
- * (Trace → Conversation → Trace landing back on Conversation) cannot
- * happen here because nothing reads the URL into the store except popstate
- * and mount, neither of which fires on our own pushes.
+ * Single source of truth = `drawerStore`. The URL is a serialization for persistence
+ * (hard reload, deep links) and browser navigation.
  */
 export function useDrawerUrlSync() {
   const params = useDrawerParams();
   const updateDrawerParams = useUpdateDrawerParams();
   const router = useRouter();
 
-  // Only mirror view-state into the URL once the drawer is actually open in the
-  // URL. openDrawer's `?drawer.open=traceV2Details&drawer.traceId=…` push is an
-  // async shallow navigation; if the persisted view-mode differs from the URL
-  // (e.g. the operator's last mode was Trace but a freshly opened URL has no
-  // drawer.mode yet), the store→URL effect below would fire mid-transition and
-  // push `drawer.mode` off a stale asPath that has no drawer.open/traceId yet —
-  // clobbering them, so the resulting URL is just `?drawer.mode=trace` and a
-  // refresh loses the drawer. Gating on drawer.open closes that window: the
-  // effect re-fires once the open lands, and then updateDrawerParams reads an
-  // asPath that carries drawer.open + drawer.traceId and preserves them.
+  // Only mirror view-state into the URL once the drawer is actually open in the URL. openDrawer's `?drawer.open=traceV2Details&drawer.traceId=…` push is an async shallow navigation; if the persisted view-mode
+  // differs from the URL (e.g. the operator's last mode was Trace but a freshly opened URL has no drawer.mode yet), the store→URL effect below would fire mid-transition and push `drawer.mode` off a stale asPath
+  // that has no drawer.open/traceId yet — clobbering them, so the resulting URL is just `?drawer.mode=trace` and a refresh loses the drawer.
   const drawerOpenInUrl = router.query["drawer.open"] === "traceV2Details";
 
   const viewMode = useDrawerStore((s) => s.viewMode);
@@ -143,11 +121,7 @@ export function useDrawerUrlSync() {
     }
     if (Object.keys(updates).length === 0) return;
     // Replace, don't push: mode / viz / span / pinned are view-state WITHIN an
-    // already-open drawer, not separate destinations. Pushing a history entry
-    // per pane switch let Back land on the same drawer URL minus drawer.mode,
-    // which this effect then immediately re-synced (re-adding drawer.mode) -
-    // an infinite back-button trap. Replacing folds the open + its view-state
-    // into one entry, so Back closes the drawer instead of cycling panes.
+    // already-open drawer, not separate destinations.
     updateDrawerParams(updates, { push: false });
   }, [
     drawerOpenInUrl,

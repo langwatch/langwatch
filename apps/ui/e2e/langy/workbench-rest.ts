@@ -1,8 +1,7 @@
 /**
- * The REST calls the prompt-optimization suites make on their own behalf: the
- * seed writes and the Layer-2 reads. Everything goes through the same public
- * surface any integration uses, so a passing seed also proves the endpoints it
- * touches work.
+ * The REST calls the prompt-optimization suites make on their own behalf: the seed
+ * writes and the Layer-2 reads. Everything goes through the same public surface any
+ * integration uses, so a passing seed also proves the endpoints it touches work.
  */
 
 import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
@@ -17,10 +16,8 @@ function describeError(error: unknown): string {
 }
 
 /**
- * Fetch that retries a stack which is not answering yet, and hands back
- * whatever answer arrives. An HTTP error status is a real answer, so the
- * caller decides what to do with it: a 409 on a handle that already exists is
- * a normal outcome for a repeated seed, everything else is a failure.
+ * Fetch that retries a stack which is not answering yet, and hands back whatever answer
+ * arrives.
  */
 export async function request({
   method,
@@ -78,10 +75,6 @@ export async function api({
 
 /**
  * The prompt id behind a handle, creating the prompt when the handle is free.
- *
- * Handles carry a minute stamp, so a suite re-run inside the same minute asks
- * for a handle that already exists and the create answers 409. That is the
- * documented reuse, not a failure: read the id back and seed on top of it.
  */
 export async function ensurePromptId({
   handle,

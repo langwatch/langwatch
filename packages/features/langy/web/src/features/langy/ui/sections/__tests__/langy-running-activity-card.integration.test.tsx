@@ -1,22 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The activity card is the RUNNING card, and nothing else.
- *
- * Its one call site renders it from `groups.filter((group) => !group.done)`, so
- * a group that settles moves to the completed receipt under a different key and
- * the card unmounts. The card nevertheless carried a whole second life for a
- * settled group — an auto-collapse timer, a collapsed summary button, a green
- * checkmark — that no mounted instance could ever reach, because `group.done` is
- * false for every group that gets there. That branch is gone.
- *
- * This file pins the invariant the deletion rests on: a settled group is drawn
- * by the receipt, and only by the receipt — with ONE deliberate exception. While
- * the turn is still streaming, the action that finished LAST holds its ground as
- * a settled card of its own until something takes its place (the next call, the
- * answer's text, or the turn ending). Folding it the instant its output landed
- * meant the card the reader was looking at vanished into the accordion in a
- * blink while the model went back to thinking.
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

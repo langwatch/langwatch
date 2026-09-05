@@ -1,10 +1,7 @@
 /**
+ * Editing does not fight privacy: a field the reader is not allowed to see carries the redaction marker where the
+ * editor would have been, because there is nothing on screen to correct.
  * @vitest-environment jsdom
- *
- * Editing does not fight privacy: a field the reader is not allowed to see
- * carries the redaction marker where the editor would have been, because there
- * is nothing on screen to correct.
- * See specs/traces-v2/trace-edit-mode.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

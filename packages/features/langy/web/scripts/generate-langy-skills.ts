@@ -1,43 +1,5 @@
 /**
  * Generate the Langy skill catalogue from the skills the WORKER ACTUALLY GETS.
- *
- * ── WHY THIS SCRIPT EXISTS ─────────────────────────────────────────────────
- * Twice now the catalogue has been wrong, in both directions:
- *
- *   - it once advertised 13 tools that did not exist. The agent believed the
- *     list, tried to call them, and the cost was days.
- *   - it then listed exactly ONE skill (`github`) when the image ships FOURTEEN,
- *     because the derivation was pointed at `services/langyagent/skills/` — a
- *     directory that is real, but is only half of what the worker installs. The
- *     `/` palette silently under-offered by 13 real capabilities.
- *
- * Same root cause both times: the catalogue did not come from the thing the
- * worker actually runs. So this script derives it from the ONE artefact that
- * defines that — the root-compiled skills directory the Dockerfile COPYs into
- * its //go:embed tree:
- *
- *     COPY skills/_compiled/native/ ./services/langyagent/internal/assets/skills/
- *
- * The worker embeds `services/langyagent/internal/assets/skills/` into its
- * binary, and the Dockerfile overlays the complete root-compiled native set
- * before `go build`. Langy-only skills such as `github` also have their
- * canonical source under root `skills/`, so the compiled overlay is the whole
- * production skill set. The checked-in embed copy merely keeps local Go builds
- * honest and is verified separately to match the root source.
- *
- * The overlay source directories are not hardcoded here. They are READ OUT of
- * `Dockerfile.langyagent` by matching every COPY whose destination is the embed
- * skills dir. Add a second overlay COPY and this picks it up with no edit;
- * change the destination and it stops matching loudly.
- *
- * The name and description come from each skill's own `SKILL.md` front-matter —
- * the same source behind the public skill directory, so the copy in the palette
- * is the copy on the website, and a skill cannot describe itself as something it
- * is not.
- *
- * Run:  pnpm generate:langy-skills
- * Pinned by: src/model/shared/langy/__tests__/langy-skills.unit.test.ts, which re-derives
- * from disk and fails if the committed catalogue has drifted from the image.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -95,10 +57,6 @@ export function skillSourceDirs(dockerfile: string): string[] {
 
 /**
  * `generate-rag-dataset` -> `Generate RAG dataset`. TYPOGRAPHY ONLY.
- *
- * Nothing here can invent a capability — a label is how a real skill's name is
- * spelled, never a claim about what it does. That is why a small casing table is
- * safe here when a hand-written description would not be.
  */
 const CASING: Record<string, string> = {
   rag: "RAG",

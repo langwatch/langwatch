@@ -1,15 +1,6 @@
 /**
+ * HoverableBigText measures its own box on a timer, because the measurement is only meaningful once the browser has laid the box out.
  * @vitest-environment jsdom
- *
- * HoverableBigText measures its own box on a timer, because the measurement is
- * only meaningful once the browser has laid the box out. A measurement left
- * scheduled after the component is gone is not a leak that costs memory, it is
- * a test-suite failure with no signal: the callback lands after the jsdom
- * environment has been torn down, throws `window is not defined` outside any
- * test's stack, and the shard exits non-zero while its own summary reports
- * every test as passing. Whichever file happens to be running at that moment
- * wears the blame.
- *
  * Spec: specs/components/hoverable-big-text-overflow.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

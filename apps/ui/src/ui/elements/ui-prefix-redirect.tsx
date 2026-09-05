@@ -5,11 +5,6 @@ const ROUTE_PARAM = /:([A-Za-z_$][\w$]*)/g;
 
 /**
  * Fills `:name` placeholders from the matched route params.
- *
- * A retired address inside a parameterised family — `/:project/messages/:trace`
- * — has to name its destination in terms of the same params, and a table of
- * data cannot call `useParams` itself. A name the match did not bind is left
- * verbatim rather than blanked, so a literal colon in copy survives.
  */
 function fillParams(
   template: string,
@@ -19,11 +14,9 @@ function fillParams(
 }
 
 /**
- * Permanent client-side redirect for a URL prefix that moved. A route
- * element instead of a `loader` redirect because loaders do not run on a
- * cold load of the SPA, which is exactly how a stale bookmark or emailed
- * link arrives. Keeps the sub-path, query string and hash, and replaces the
- * history entry so the back button never returns to the retired address.
+ * Permanent client-side redirect for a URL prefix that moved. A route element instead
+ * of a `loader` redirect because loaders do not run on a cold load of the SPA, which is
+ * exactly how a stale bookmark or emailed link arrives.
  */
 export function UiPrefixRedirect({
   from,
@@ -34,27 +27,13 @@ export function UiPrefixRedirect({
   from: string;
   to: string;
   /**
-   * Query params forced onto the destination, overriding whatever the old
-   * address carried under those keys. Every other key keeps its value and
-   * position, though the query is re-serialized, so an encoding variant
-   * may normalize (`%20` arrives as `+`); the decoded value is unchanged.
-   * Used when the old address's meaning is not expressible on the new one
-   * by default — `/governance/catalog` served exactly one pane, so every
-   * `?tab=` value it ever carried rendered the sources list, and the
-   * redirect has to pin `?tab=sources` rather than honour a stale value
-   * that now names a different pane. A value may name a route param
-   * (`:trace`), which is how a retired deep link hands its own id to the
-   * drawer that replaced the page.
+   * Query params forced onto the destination, overriding whatever the old address
+   * carried under those keys.
    */
   pinParams?: Record<string, string>;
   /**
-   * A rename table for the FIRST segment of the sub-path, applied before it
-   * is appended to the destination. `/admin/user/u_1` became
-   * `/ops/backoffice/users/u_1` when the resources were pluralised, and the
-   * segment names are the only thing that varies, so they travel as data
-   * rather than as a page. Lookup is case-insensitive. A first segment the
-   * table does not name is a resource that did not move: the reader lands on
-   * the destination's own home rather than on a fabricated address under it.
+   * A rename table for the FIRST segment of the sub-path, applied before it is appended
+   * to the destination.
    */
   mapSegment?: Record<string, string>;
 }) {

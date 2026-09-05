@@ -1,15 +1,7 @@
 /**
+ * An `askLangy` handoff ends with the reader about to type, so it hands the cursor to
+ * the panel's composer. Focus is taken once, without being asked twice.
  * @vitest-environment jsdom
- *
- * An `askLangy` handoff ends with the reader about to type, so it hands the
- * cursor to the panel's composer. Focus is taken once, without being asked
- * twice. The hero composer on the home page is the origin of a handoff, never
- * the destination, so it must leave the request alone.
- *
- * The new-chat and dialog-close focus gestures are pinned by the sibling
- * `composer.integration.test.tsx`.
- *
- * Specs: specs/langy/langy-command-bar-activation.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";

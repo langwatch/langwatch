@@ -1,11 +1,6 @@
 /**
+ * The boxed action cluster each message of a turn carries.
  * @vitest-environment jsdom
- *
- * The boxed action cluster each message of a turn carries. A turn is a trace,
- * so its two messages are the trace's own input and output, and a comment or a
- * correction left on one records which of them it was about. Both message
- * layouts offer it the same way. See specs/traces-v2/annotations.feature and
- * specs/traces-v2/anchored-comments.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";

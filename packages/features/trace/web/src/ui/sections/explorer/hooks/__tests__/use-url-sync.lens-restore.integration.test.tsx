@@ -1,18 +1,7 @@
 /**
+ * The lens lives in the URL fragment, and the *stored* last-used lens is a separate
+ * preference that only a resolved lens may overwrite.
  * @vitest-environment jsdom
- *
- * The lens lives in the URL fragment, and the *stored* last-used lens is a
- * separate preference that only a resolved lens may overwrite. Both entry
- * points into `useURLSync` — a bare URL and a fragment naming a lens — can
- * land on a lens that hasn't hydrated yet (custom lenses arrive from
- * `useLensSync` well after the first apply), and both have to show the default
- * WITHOUT persisting it, or `setUserLenses` loses the id it was waiting to
- * restore.
- *
- * Showing the default is only half the answer for a fragment, though: the lens
- * it names is the address someone shared, so the apply is replayed once the
- * list can actually hold it. See specs/traces-v2/view-system.feature and
- * specs/traces-v2/data-layer.feature ("Shared URL restores full state").
  */
 import { render } from "@testing-library/react";
 // `useURLSync` reads React Router's own `useLocation()` now (see the
@@ -159,12 +148,7 @@ describe("useURLSync lens selection from a fragment", () => {
 
     describe("when the lens list arrives carrying that lens", () => {
       it("applies the lens the link named", () => {
-        // The other half of the reload/shared-link case above. The recipient
-        // of a shared link has their own last-used lens, which `setUserLenses`
-        // restores in the same write that hydrates the list — so without a
-        // replay the link is applied as All, then quietly swapped for the
-        // viewer's own view, and the address is rewritten out of the URL bar
-        // 150ms later. Nothing about it ever loaded.
+        // The other half of the reload/shared-link case above.
         persistedLens = "simplified";
         window.history.replaceState(null, "", "/#custom-abc");
         const { rerender } = render(<Harness />);

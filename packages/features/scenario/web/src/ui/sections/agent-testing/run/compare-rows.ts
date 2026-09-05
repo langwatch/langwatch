@@ -1,10 +1,5 @@
 /**
  * The rows of a comparison: one agent and one parameter line each.
- *
- * The rules that open the rows, add one, and tell two equal targets apart are
- * pure, so they can be read and tested on their own. The rows carry the line
- * as typed; what a target sends is the line parsed by `parameter-line.ts`.
- *
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
@@ -37,12 +32,6 @@ function targetOfAgent(agent: RunDialogAgent): NonNullable<TargetValue> {
 
 /**
  * The rows the section opens on.
- *
- * Both rows start with the parameter line the Parameters section held, so a
- * comparison has one layer of parameters: the one on its rows. Row one is the
- * agent that was chosen. Row two is the next agent in picker order that is
- * not row one's agent; when the project has no other agent, it is the same
- * agent, which is the "one connection, two models" case.
  */
 export function initialCompareRows({
   target,
@@ -91,10 +80,6 @@ type RowContext = {
 
 /**
  * What a row sends as its own overrides, or nothing for an empty line.
- *
- * A value typed equal to the declared default is no override and is left
- * out, the way the server reads it, so the dialog's duplicate check, its sort
- * order and its derived name match the server's.
  */
 export function compareRowParameters({
   row,
@@ -130,12 +115,6 @@ export function compareRowKey({
 
 /**
  * The colour position of every row, by row index.
- *
- * The run detail colours a target by its place in the sorted target list, so a
- * row must take the colour of its place in that same order. Colouring by row
- * position instead would give one target two colours, the dot in the dialog
- * and the column of the results, whenever the rows were not added in sorted
- * order.
  */
 export function compareRowColorIndexes({
   rows,

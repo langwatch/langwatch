@@ -1,7 +1,6 @@
 /**
- * The prompts of the project, grouped under their handle test suites the way the
- * prompt list shows them.
- *
+ * The prompts of the project, grouped under their handle test suites the way the prompt
+ * list shows them.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

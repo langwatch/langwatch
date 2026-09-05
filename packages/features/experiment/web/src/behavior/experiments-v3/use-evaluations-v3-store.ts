@@ -93,13 +93,7 @@ const sliceOf = (next: WorkbenchState): PartializedState => ({
 });
 
 /**
- * Run a pure transform over the current state and hand zustand the slice to
- * merge back.
- *
- * Every store action that has a transform twin goes through here, so the two
- * can never drift: the browser and the action executor run the same function.
- * One `set` per action keeps undo granularity exactly as it was — `zundo`
- * records a history entry per `set`.
+ * Run a pure transform over the current state and hand zustand the slice to merge back.
  */
 const runTransform = <Payload, Result>({
   state,
@@ -714,28 +708,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   updateTargetComparison: (targetId, comparison) => {
     set((state) => {
       const existingTarget = state.targets.find((r) => r.id === targetId);
-      // Silently skip non-comparison targets so we never perturb the prompt /
-      // agent / plain-evaluator code paths.
-      //
-      // A comparison column is always an evaluator target. The target itself
-      // carries no evaluator type (it names a DB evaluator row instead), so the
-      // kind of the target is the type check this seam can make: it stops a
-      // prompt or agent target that somehow holds a stale comparison config
-      // from having derived comparison mappings written onto it.
+      // Silently skip non-comparison targets so we never perturb the prompt / agent /
+      // plain-evaluator code paths.
       if (existingTarget?.type !== "evaluator" || !isComparisonEvaluator(existingTarget)) {
         return state;
       }
 
-      // Derive the per-row field mappings the orchestrator expects from the
-      // high-level picks — this is what lets ComparisonConfigForm be a clean
-      // variants + golden UI while keeping the orchestrator unchanged.
-      //
-      // Keys we own must be stripped from prior mappings BEFORE spreading the
-      // derived ones on top. Otherwise clearing the golden field just leaves
-      // the previously-derived mapping in place and the orchestrator
-      // dispatches against a stale column. `candidate_*` are legacy pairwise
-      // keys: a target being edited may still carry them from before the
-      // merge, and they must not survive into the comparison payload.
+      // Derive the per-row field mappings the orchestrator expects from the high-level
+      // picks — this is what lets ComparisonConfigForm be a clean variants + golden UI
+      // while keeping the orchestrator unchanged.
       const DERIVED_KEYS = [
         "candidate_a_id",
         "candidate_a_output",
@@ -815,11 +796,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   /**
-   * A shallow merge, refused when the result would be an evaluator that cannot
-   * be what it now claims to be. `comparison` is the field that decides whether
-   * an evaluator is a column of its own or a chip on every column, so a merge
-   * that writes it onto a plain evaluator changes the kind of the thing, not
-   * one of its settings.
+   * A shallow merge, refused when the result would be an evaluator that cannot be what
+   * it now claims to be.
    */
   updateEvaluator: (evaluatorId, updates) => {
     set((state) =>
@@ -1315,12 +1293,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 // ============================================================================
 
 /**
- * State subset used for equality comparison to determine if a new history entry should be created.
- *
- * IMPORTANT: We intentionally EXCLUDE selectedCell from equality comparison.
- * This means navigation-only changes won't create new undo entries.
- * However, when a content change DOES happen, the full state (including selectedCell)
- * is saved, so undo will restore both the content AND the selection at that point.
+ * State subset used for equality comparison to determine if a new history entry should
+ * be created.
  */
 type PartializedState = Pick<
   EvaluationsV3State,

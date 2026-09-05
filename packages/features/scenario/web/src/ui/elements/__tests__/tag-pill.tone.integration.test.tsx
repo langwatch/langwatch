@@ -1,10 +1,6 @@
 /**
+ * A tag pill is one muted grey by default.
  * @vitest-environment jsdom
- *
- * A tag pill is one muted grey by default. Agent Testing asks for a soft
- * colour per label, so the tone is a choice the caller makes and the default
- * draws exactly what it drew before.
- *
  * @see specs/features/tag-management.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

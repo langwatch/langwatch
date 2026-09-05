@@ -1,7 +1,6 @@
 /**
- * The foot of the suites rail: the period every read of the tab is scoped to,
- * and the control that folds the rail away.
- *
+ * The foot of the suites rail: the period every read of the tab is scoped to, and the
+ * control that folds the rail away.
  * @see specs/features/agent-testing/suites-rail.feature
  */
 

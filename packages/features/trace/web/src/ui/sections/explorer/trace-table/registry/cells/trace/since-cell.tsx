@@ -6,10 +6,9 @@ import type { CellDef } from "../../types";
 import { TimeHoverCard } from "./time-hover-card";
 
 /**
- * Verbose relative-time column ("1 minute ago", "3 hours ago", "7 days
- * ago"). Sibling to the compact TIME column — the user picks one or the
- * other from the column dropdown. The hover surfaces the full date /
- * tz / ISO breakdown via the shared TimeHoverCard.
+ * Verbose relative-time column ("1 minute ago", "3 hours ago", "7 days ago"). Sibling
+ * to the compact TIME column — the user picks one or the other from the column
+ * dropdown.
  */
 const SinceText: React.FC<{ timestamp: number; comfortable?: boolean }> = ({
   timestamp,

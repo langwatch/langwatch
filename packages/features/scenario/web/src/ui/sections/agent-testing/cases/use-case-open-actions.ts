@@ -1,9 +1,5 @@
 /**
- * Every way the Scenarios tab opens one scenario: the editor drawer, whether it
- * is reached from the row menu or from the row itself. The versions of a
- * scenario read inside the editor drawer, and its runs hang off the row menu as
- * a submenu of their own.
- *
+ * Every way the Scenarios tab opens one scenario: the editor drawer, whether it is reached from the row menu or from the row itself.
  * @see specs/features/agent-testing/cases-table.feature
  * @see dev/docs/best_practices/drawers.md
  */

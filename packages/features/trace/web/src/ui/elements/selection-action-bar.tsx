@@ -3,12 +3,9 @@ import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
 /**
- * Floating selection action bar: pinned to the bottom-center of the viewport
- * while rows are selected, holding the selection count, the actions for that
- * selection, and a clear-selection button. One shared shell so every
- * bulk-selection surface (traces, datasets, ...) looks and sits the same:
- * white surface, never a gray one.
- * UX contract: dev/docs/best_practices/selection-action-bar.md.
+ * Floating selection action bar: pinned to the bottom-center of the viewport while rows
+ * are selected, holding the selection count, the actions for that selection, and a
+ * clear-selection button.
  */
 export function SelectionActionBar({
   label,

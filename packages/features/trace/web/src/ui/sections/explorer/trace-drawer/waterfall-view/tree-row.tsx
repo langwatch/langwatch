@@ -302,15 +302,9 @@ export const TreeRow = memo(function TreeRow({
           gap={0}
           paddingLeft={`${depth * INDENT_PX + 4}px`}
           paddingRight={2}
-          // Light mode picks up a neutral grey for selection (`bg.emphasized`)
-          // rather than a blue tint — keeps the row visually distinct from
-          // the hover state without competing with the bar's own colour.
-          // Dark mode keeps the existing blue tint, which reads well against
-          // the dark panel.
-          // Hover paints a faint wash of the span's own palette rather
-          // than flat `bg.muted` — the full-width grey rectangle read as
-          // an unloaded skeleton row in light mode. The /40 alpha keeps
-          // it clearly a hover tint, not a fill.
+          // Light mode picks up a neutral grey for selection (`bg.emphasized`) rather
+          // than a blue tint — keeps the row visually distinct from the hover state
+          // without competing with the bar's own colour.
           colorPalette={isError ? "red" : palette}
           bg={
             isSelected
@@ -326,14 +320,9 @@ export const TreeRow = memo(function TreeRow({
           boxShadow={
             showsCorrectedTint ? "inset 2px 0 0 var(--chakra-colors-green-solid)" : undefined
           }
-          // Dark mode keeps the pre-PR behaviour of fading non-selected
-          // rows when one is picked — the dark theme depends on that
-          // contrast to keep the focus row "popping". Light mode stays
-          // at full opacity (the neutral grey selection bg already
-          // pulls the eye there without help).
-          // A span the correction removes stays visible but reads as gone, so
-          // the reviewer can see the shape of what they are cutting (and undo
-          // it) rather than watching rows disappear one at a time.
+          // Dark mode keeps the pre-PR behaviour of fading non-selected rows when one
+          // is picked — the dark theme depends on that contrast to keep the focus row
+          // "popping".
           opacity={
             isDraftDeleted
               ? 0.45
@@ -596,10 +585,9 @@ export const TreeRow = memo(function TreeRow({
 });
 
 /**
- * What a row says about itself with the pointer elsewhere: how many comments the
- * span carries, and whether the correction removes it. Both stay in flow, so a
- * mark is roomed rather than laid over the name, and the figures to its right
- * never move.
+ * What a row says about itself with the pointer elsewhere: how many comments the span
+ * carries, and whether the correction removes it. Both stay in flow, so a mark is
+ * roomed rather than laid over the name, and the figures to its right never move.
  */
 function RowMarks({
   spanId,
@@ -655,14 +643,8 @@ function RowMarks({
 }
 
 /**
- * The actions the pointer asks a row for: removing the span while the trace is
- * being corrected, and saying something about it.
- *
- * They hang under the span's name and model rather than over them. Laid over the
- * row they covered the name they belong to and the marks beside it, and taking
- * room in it shortened every name to make space for icons nobody had asked for.
- * Below it, the row reads whole either way, and an action the row already shows
- * at rest is not repeated here.
+ * The actions the pointer asks a row for: removing the span while the trace is being
+ * corrected, and saying something about it.
  */
 function RowHoverActions({
   spanId,

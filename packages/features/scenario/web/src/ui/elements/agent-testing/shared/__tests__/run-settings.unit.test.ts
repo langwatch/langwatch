@@ -1,8 +1,5 @@
 /**
- * Which model the run settings name. A run records the model it resolved and
- * the model its plan was configured with, and the settings block reads the one
- * the run really ran on.
- *
+ * Which model the run settings name.
  * @see specs/scenarios/resolved-run-models-on-runs.feature
  */
 

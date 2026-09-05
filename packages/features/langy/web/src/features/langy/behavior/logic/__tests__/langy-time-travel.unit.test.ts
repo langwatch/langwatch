@@ -6,11 +6,8 @@ import { buildTimeTravelView } from "../langy-time-travel";
 import type { LangyDevLogRecord } from "../../stores/langy-dev-log";
 
 /**
- * Time travel is a pure view: (tape prefix, durable history) → the
- * conversation as it stood at that moment. These pin the reconstruction rules
- * — settled answers come from the recorded event log deduped by messageId,
- * the live edge comes from the outbound + stream lanes, and LIVE (null scrub)
- * builds nothing at all.
+ * Time travel is a pure view: (tape prefix, durable history) → the conversation as it
+ * stood at that moment.
  */
 
 let seq = 0;

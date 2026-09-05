@@ -25,14 +25,9 @@ interface Curtain {
 }
 
 /**
- * Curtains are packed tighter than their radii so they overlap, and
- * mix-blend-mode "screen" (below) brightens those overlaps additively —
- * making the row read as one continuous wash instead of discrete blobs.
- * Mismatched durations with negative delays keep them out of phase so
- * there's no perceptible resync beat. Cycle times sit in the 4–7s range
- * so the ribbon reads as something happening *now*, not as a slow
- * background loop. Delays are scaled in proportion so each curtain
- * still enters its cycle at a different phase.
+ * Curtains are packed tighter than their radii so they overlap, and mix-blend-mode
+ * "screen" (below) brightens those overlaps additively — making the row read as one
+ * continuous wash instead of discrete blobs.
  */
 const CURTAINS: Curtain[] = [
   {

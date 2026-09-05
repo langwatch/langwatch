@@ -1,24 +1,6 @@
 /**
- * computeJudgeBiasChecks — the two documented ways an LLM judge's ranking
- * can be wrong that the ranking itself cannot show.
- *
- * Pairwise LLM judging has three well-documented failure modes: position
- * bias (the response shown first wins), verbosity bias (the longer answer
- * wins), and self-preference (a judge scores its own model family higher).
- * Position bias is already handled — the comparison evaluator shuffles
- * candidate order per row. The other two leave no trace in a leaderboard:
- * a variant that won because it wrote three paragraphs looks exactly like
- * a variant that won because it was right.
- *
- * Both are computable from data the run already holds, with no extra model
- * call, so they are reported next to the ranking rather than left for the
- * reader to suspect.
- *
- * Deliberately measurements, not verdicts. A support assistant's longer
- * answer often IS the better one, and a judge sharing a family with a
- * candidate does not invalidate a run. Presenting either as an error would
- * fire on legitimate results often enough to train people to skip the whole
- * panel — which costs more than the bias it was meant to catch.
+ * computeJudgeBiasChecks — the two documented ways an LLM judge's ranking can be wrong
+ * that the ranking itself cannot show.
  */
 
 import { type BatchResultRow, extractOutputText } from "./batch-evaluation-results.types";
@@ -33,13 +15,7 @@ export type VerbosityProfile = {
   /** Mean length across every variant except the leader. */
   fieldMeanLength: number | null;
   /**
-   * The leader the ratio was measured against, or null when the run produced
-   * none.
-   *
-   * Carried so a caller can tell the two reasons for a missing ratio apart.
-   * Both "no leader to compare against" and "no output text was captured"
-   * leave `leaderRatio` null, and reporting the second for both told readers
-   * their outputs were missing when they were on screen in front of them.
+   * The leader the ratio was measured against, or null when the run produced none.
    */
   leaderId: string | null;
 };
@@ -54,10 +30,9 @@ export type JudgeIndependence = {
 };
 
 /**
- * Above this, the leader's answers are long enough relative to the field
- * that verbosity is a plausible part of why it won. Chosen as "noticeably
- * longer to a reader", not as a significance threshold — there is no test
- * being run here.
+ * Above this, the leader's answers are long enough relative to the field that verbosity
+ * is a plausible part of why it won. Chosen as "noticeably longer to a reader", not as
+ * a significance threshold — there is no test being run here.
  */
 export const VERBOSITY_NOTABLE_RATIO = 1.5;
 
@@ -85,10 +60,6 @@ const meanOutputLength = ({
 
 /**
  * Mean answer length per variant, and how the leader compares to the rest.
- *
- * Length is measured in characters rather than tokens: tokens would need a
- * tokenizer per model family to be honest, and the question here is "did
- * this one write a lot more", which characters answer just as well.
  */
 export const computeVerbosityProfile = ({
   variantIds,
@@ -130,12 +101,6 @@ export const computeVerbosityProfile = ({
 
 /**
  * Provider segment of a model id ("openai/gpt-5-mini" → "openai").
- *
- * Family, not exact model, is the right granularity: self-preference is
- * documented as a preference for one's own *family's* style, and
- * gpt-5-mini judging gpt-5 output is the same concern as gpt-5 judging
- * itself. A bare id with no provider prefix yields null — better to report
- * the judge as unknown than to guess a family from a name.
  */
 export const modelFamily = (model: string | null | undefined): string | null => {
   if (!model) return null;

@@ -1,30 +1,6 @@
 /**
- * Follow-up suggestion chips — the "what do I do with this" row beneath a
- * capability card.
- *
- * A capability card answers "what did Langy find"; these chips answer "what is
- * that result worth doing next". WHICH offers to make is `cli-follow-ups.ts`'s job
- * (driven by the feature map's produces/consumes relation); WHERE each offer
- * lands is `follow-up-chips.ts`'s (via the shared `traceExplorerLink` reader, so
- * a carried chip means the destination really holds the search).
- * `LangyCapabilityRenderer` joins the two and hands the
- * already-resolved chips here — this component only draws them.
- *
- * Two rules it holds to, both from the spec:
- *
- *   THEY READ AS OFFERS, NOT AS DONE THINGS. The chips are deliberately quiet —
- *   a hairline pill in muted foreground — so they sit UNDER the card and never
- *   compete with the card's own bright "Open in <surface>" link. A suggestion is
- *   subordinate to the result it hangs off.
- *
- *   CHOOSING ONE ONLY NAVIGATES. Every chip is a plain link to a destination
- *   that arrives pre-filtered; following one creates, mutates or persists
- *   nothing. The offer becomes an action only once the user lands on the surface
- *   and acts there, which keeps the catalogue's propose-then-apply rule intact.
- *
- * Renders NOTHING when there are no offers, so a card with no worthwhile next
- * step shows no empty chip row.
- *
+ * Follow-up suggestion chips — the "what do I do with this" row beneath a capability
+ * card.
  * @see specs/langy/langy-followup-suggestions.feature
  */
 import { HStack } from "@chakra-ui/react";

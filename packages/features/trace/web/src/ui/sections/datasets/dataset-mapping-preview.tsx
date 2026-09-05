@@ -1,11 +1,6 @@
 /**
- * The mapping half of the "Add to Dataset" drawer: which trace field fills
- * which dataset column, and what the rows will look like once it does.
- *
- * Recovered from `platform/app/src/components/datasets/DatasetMappingPreview.tsx`,
- * deleted in `cc91631cd8`. `TracesMapping` and `ThreadMapping` were already
- * this package's; the preview table is `@langwatch/dataset-web`'s and is read
- * through its own export rather than copied.
+ * The mapping half of the "Add to Dataset" drawer: which trace field fills which
+ * dataset column, and what the rows will look like once it does.
  */
 
 import {

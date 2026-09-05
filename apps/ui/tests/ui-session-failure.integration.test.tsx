@@ -1,14 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * What the application does when it cannot find out who is here.
- *
- * The walk of 2026-09-03 found a 404 on `GET /api/auth/session` leaving every
- * page empty, with nothing in the console to say why (F4, F5, F7). The rule
- * restored here is `platform/app`'s: a read that failed is signed out, the
- * refusal is told once through the handled-error path, and a visitor with no
- * session lands on the sign-in screen rather than on onboarding.
- *
+ * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */
 

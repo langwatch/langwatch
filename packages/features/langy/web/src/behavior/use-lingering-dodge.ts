@@ -2,13 +2,6 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * Dodge state that engages instantly but releases on a delay.
- *
- * The floating Langy surfaces hop LEFT while a drawer holds the right edge.
- * Engaging must be immediate, the drawer is already on its way in. Releasing
- * is sequenced: the drawer leaves first, a beat passes, and only then does
- * the surface glide back to its corner. Releasing in lockstep with the
- * drawer's exit read as two cards fighting over the same edge.
- *
  * Spec: specs/langy/langy-panel-layout.feature
  */
 export function useLingeringDodge({

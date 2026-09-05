@@ -32,10 +32,7 @@ function clampLabelWidth(value: number): number {
 }
 
 /**
- * Persisted width of the attribute-name column. Operators told us the
- * truncated `langwatch.prompt.variab\u2026` lines on prompt-heavy traces were
- * unreadable; the column is now dragable per-device so they can size it
- * to whatever fits their attribute namespace.
+ * Persisted width of the attribute-name column.
  */
 function useLabelColumnWidth() {
   const [width, setWidth] = useState<number>(() => {
@@ -67,20 +64,7 @@ function useLabelColumnWidth() {
 }
 
 /**
- * 4px-wide drag handle that sits flush with the right border of the
- * label cell. Idle state shows the existing 1px border; on hover/drag
- * the bar turns blue, mirroring the resize affordance of the drawer's
- * pane separator (`PaneLayout`). State is tracked via a
- * `data-resize-handle-state` attribute so styling matches the rest of
- * the v2 surface without a custom theme.
- */
-/**
- * Per-row 4px resize handle that sits flush with the right border of
- * the label cell. Idle state is invisible; hover/drag lights up the
- * blue stripe. Resize state lives on the shared `useLabelColumnWidth`
- * hook so dragging any row's handle resizes the whole column in
- * lockstep — visually scoped to the row the operator grabbed, but
- * functionally global.
+ * 4px-wide drag handle that sits flush with the right border of the label cell.
  */
 function LabelResizeHandle({ onResize }: { onResize: (deltaPx: number) => void }) {
   const [state, setState] = useState<"idle" | "hover" | "drag">("idle");
@@ -165,13 +149,8 @@ export interface AttributeEditing {
 }
 
 /**
- * Reads an attribute value out of a text field. Numbers, booleans and JSON keep
- * their shape; anything else stays the string the reviewer typed.
- *
- * A value the trace recorded as text stays text however JSON-shaped it looks.
- * Reading it back as a structure would rewrite what the trace says into
- * something it never carried, and every leaf of that structure would then read
- * as an attribute the correction added.
+ * Reads an attribute value out of a text field. Numbers, booleans and JSON keep their
+ * shape; anything else stays the string the reviewer typed.
  */
 export function parseAttributeInput({
   text,
@@ -193,10 +172,6 @@ export function parseAttributeInput({
 
 /**
  * What a reader can comment on in this table, and what they already said.
- *
- * Only the element's own attributes take comments. Resource attributes describe
- * the process that emitted the span rather than what the span did, which is the
- * same reason a correction never touches them.
  */
 export interface AttributeComments {
   traceId: string;
@@ -218,10 +193,8 @@ interface AttributeTableProps {
   restrictedAttributes?: RestrictedAttribute[] | null;
   title?: string;
   /**
-   * When set, the span's id is injected as a synthetic leading `span_id` row
-   * in the attributes table. It isn't a real OTel attribute, but operators
-   * want a one-click copy of the span id straight from the table; it sorts
-   * first regardless of search / pinning and can't be pinned to the header.
+   * When set, the span's id is injected as a synthetic leading `span_id` row in the
+   * attributes table.
    */
   spanId?: string;
   /** Present while the reviewer is correcting this span's attributes. */
@@ -249,10 +222,8 @@ interface AttributeCorrection {
 }
 
 /**
- * How one row differs from what the trace captured, or null when it says the
- * same thing. A key the correction took away is marked removed rather than
- * dropped; one the capture never had at all was added, unless it is a leaf of a
- * value the capture held as one string.
+ * How one row differs from what the trace captured, or null when it says the same
+ * thing.
  */
 function correctionForKey({
   key,
@@ -414,10 +385,8 @@ function PinToggle({
 }
 
 /**
- * Pin affordance for synthetic rows (span_id) that can't actually be pinned
- * to the trace header. Rendered disabled and extra-faded rather than as a
- * blank gap so the column reads consistently top-to-bottom — every row shows
- * a pin, this one is just clearly inert. A tooltip explains why.
+ * Pin affordance for synthetic rows (span_id) that can't actually be pinned to the
+ * trace header.
  */
 function DisabledPin({ attrKey }: { attrKey: string }) {
   return (
@@ -450,10 +419,7 @@ function DisabledPin({ attrKey }: { attrKey: string }) {
 type AttributeRestriction = { visibleTo: string; canSee: boolean };
 
 /**
- * Per-row marker for a custom attribute under a `restrict` privacy rule. An
- * in-audience viewer (`canSee`) sees the value with an eye marker telling them
- * the audience it is limited to; otherwise the value is already redacted and a
- * lock marker names who can read it.
+ * Per-row marker for a custom attribute under a `restrict` privacy rule.
  */
 function RestrictionMarker({ visibleTo, canSee }: AttributeRestriction) {
   return (
@@ -572,9 +538,7 @@ function CopyAllButton({ payload }: { payload: string }) {
 
 /**
  * Per-key seam for the handful of attributes whose raw key/value pair reads as
- * plumbing. A special-cased key can trim its label here and swap the generic
- * `AttributeValue` cell for one that resolves the stored value into something
- * an operator can act on; everything else falls through untouched.
+ * plumbing.
  */
 function attributeRowLabel(attrKey: string): string {
   return attrKey === API_KEY_ID_ATTRIBUTE ? API_KEY_ATTRIBUTE_LABEL : attrKey;
@@ -727,14 +691,8 @@ function RowLabelCell({
 }
 
 /**
- * The value column: what is restricted or corrected about this attribute, and
- * then the value itself, editable or read-only.
- *
- * Pretty-print column. Heuristic format detection picks chat / json / text /
- * leaf; non-leaf values render a `📋 format` pill that opens a popover with the
- * prettified payload + an override row. The same component is wired into
- * table-cell expanders so the same payload reads identically wherever it
- * surfaces.
+ * The value column: what is restricted or corrected about this attribute, and then the
+ * value itself, editable or read-only.
  */
 function RowValueCell({
   attrKey,
@@ -913,10 +871,9 @@ function rowEditingFor({
 }
 
 /**
- * What one row shows on top of its value: whether the viewer's restrict rules
- * cover it, what a stored correction replaced there, and what it offers a
- * reviewer who is correcting the span. Each comes from a resolver the section
- * may not have been given, in which case the row carries none of that marker.
+ * What one row shows on top of its value: whether the viewer's restrict rules cover it,
+ * what a stored correction replaced there, and what it offers a reviewer who is
+ * correcting the span.
  */
 function rowMarkersFor({
   key,
@@ -1102,10 +1059,6 @@ function AttrSection({
 
 /**
  * The attribute a new key would collide with in the nested tree, if any.
- *
- * Keys are dotted paths, so `gen_ai.operation` and `gen_ai.operation.name`
- * cannot both hold a value: one is a branch of the other, and rebuilding the
- * tree keeps whichever came last. Exact duplicates are caught before this.
  */
 function findNestedKeyConflict({
   key,

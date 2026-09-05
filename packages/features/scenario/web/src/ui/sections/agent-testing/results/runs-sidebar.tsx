@@ -1,11 +1,5 @@
 /**
- * The runs of one run plan, newest first: the number of the run, the note the
- * person left with it, how long ago it started and how it went.
- *
- * The way back and the run list, and nothing else. The name of the plan reads
- * as the page title while the plan is open, so repeating it here would say the
- * same thing twice on one screen.
- *
+ * The runs of one run plan, newest first: the number of the run, the note the person left with it, how long ago it started and how it went.
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */

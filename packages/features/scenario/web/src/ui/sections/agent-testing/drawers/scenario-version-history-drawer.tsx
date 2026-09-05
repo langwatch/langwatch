@@ -1,9 +1,4 @@
 /**
- * The version history of a scenario, as a drawer.
- *
- * The Agent Testing case dialog reads the same history in a popover anchored
- * to its version chip; this drawer is what the v1 scenario form opens.
- *
  * @see specs/features/agent-testing/case-version-history.feature
  * @see specs/scenarios/scenario-versioning.feature
  * @see specs/scenarios/scenario-version-restore.feature

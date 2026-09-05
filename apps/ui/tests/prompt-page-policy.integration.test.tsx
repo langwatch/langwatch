@@ -1,23 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * What the Prompt Studio address is actually behind, proved by mounting it.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice a
- * loader that names the wrong grant — which is the failure that refuses a reader
- * the platform page admitted, or admits one it refused. So this file loads the
- * real loader, mounts what it hands back under a session that answers precisely,
- * and reads the result.
- *
- * The screen itself is faked, and so is the transport the host provider reads
- * the organization graph over. What is under test is the policy the frontend
- * feature wraps the screen in, and loading a whole studio over a live tRPC
- * client to assert a refusal would test the screen instead.
- *
- * ONE KEY, ONE GRANT: `platform/app`'s page was
- * `withPermissionGuard("prompts:view", { layoutComponent: DashboardLayout })`,
- * and only the grant travels.
- *
+ * @vitest-environment jsdom
  * Spec: specs/prompts/prompt-studio-page.feature
  */
 

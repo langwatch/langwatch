@@ -2,15 +2,7 @@ import "@testing-library/jest-dom/vitest";
 
 // @vitest-environment jsdom
 /**
- * The two gates that decide whether the Bradley-Terry leaderboard (#5103)
- * appears at all — the per-organization rollout flag, and the 3+ variant
- * product rule.
- *
- * Both are asserted on the CHART and on the METRICS MENU together. Gating one
- * without the other is the failure mode worth a test: a hidden chart behind a
- * live menu entry is a switch that turns nothing on, and a live chart under a
- * hidden entry cannot be turned off.
- *
+ * The two gates that decide whether the Bradley-Terry leaderboard (#5103) appears at all — the per-organization rollout flag, and the 3+ variant product rule.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 

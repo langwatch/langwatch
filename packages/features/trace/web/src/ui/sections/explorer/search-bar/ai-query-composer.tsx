@@ -14,10 +14,9 @@ interface AiQueryComposerProps {
    */
   initialPrompt?: string;
   /**
-   * When true, submit the `initialPrompt` automatically on mount. Wired
-   * to the ⌘+⏎ shortcut in the search bar so a typed free-text query
-   * can be punted to Ask AI in one keystroke instead of "enter AI mode,
-   * then press Enter again".
+   * When true, submit the `initialPrompt` automatically on mount. Wired to the ⌘+⏎
+   * shortcut in the search bar so a typed free-text query can be punted to Ask AI in
+   * one keystroke instead of "enter AI mode, then press Enter again".
    */
   autoSubmit?: boolean;
 }

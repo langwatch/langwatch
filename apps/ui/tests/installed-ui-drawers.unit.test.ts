@@ -1,14 +1,5 @@
 /**
  * The composed drawer registry, and the one way composing it can go wrong.
- *
- * `installed-ui-features.ts` merges one map per feature into a single
- * object, which is what makes a feature able to own its own drawers. A
- * silent spread would leave two features that both register `promptList`
- * with ONE of them in the registry and no error anywhere, and the reader
- * gets whichever module happened to be spread last. `platform/app` could
- * not have this bug — one file named every drawer, so a duplicate key was a
- * duplicate key in the same object literal — so it arrives with the
- * composition and is worth pinning.
  */
 
 import { describe, expect, it } from "vitest";

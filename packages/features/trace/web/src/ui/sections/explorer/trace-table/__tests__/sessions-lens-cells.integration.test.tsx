@@ -1,10 +1,6 @@
 /**
+ * The sessions lens row shows TRUE rollup totals: the cells read the server-computed per-session aggregates off the mapped group, never the page-local `traces` array (which is empty until the row expands).
  * @vitest-environment jsdom
- *
- * The sessions lens row shows TRUE rollup totals: the cells read the
- * server-computed per-session aggregates off the mapped group, never the
- * page-local `traces` array (which is empty until the row expands).
- *
  * @see specs/traces-v2/sessions-lens.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

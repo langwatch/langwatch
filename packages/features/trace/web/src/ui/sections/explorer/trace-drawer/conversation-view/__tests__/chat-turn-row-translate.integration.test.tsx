@@ -1,10 +1,7 @@
 /**
- * @vitest-environment jsdom
- *
  * Per-message translate-to-English in the conversation view
- * (specs/traces-v2/message-translation.feature). Renders the real
- * ChatTurnRow → message → MessageAnnotateCluster chain with the real
- * useTextTranslation hook; only the tRPC boundary is mocked.
+ * (specs/traces-v2/message-translation.feature).
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";

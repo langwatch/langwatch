@@ -1,11 +1,5 @@
 /**
  * The browser entry, checked without building it.
- *
- * A Vite build takes minutes and needs the whole workspace installed; what
- * breaks the entry is smaller than that and always the same three things — the
- * HTML shell pointing at a module that is not there, the public directory not
- * being where Vite looks for it, and a path alias reaching back out of this
- * package. Each is one assertion here.
  */
 
 import { existsSync, readFileSync } from "fs";

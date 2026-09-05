@@ -1,19 +1,6 @@
 /**
+ * Integration test for AgentWorkflowEditorDrawer — specifically the bug where an entry node output with no downstream edge is silently dropped from the scenario-mapping section.
  * @vitest-environment jsdom
- *
- * Integration test for AgentWorkflowEditorDrawer — specifically the bug where
- * an entry node output with no downstream edge is silently dropped from the
- * scenario-mapping section.
- *
- * Bug path:
- *   getMappingSurfaceInputs(edges, nodes) → derives inputs from edges only →
- *   if entry has outputs but no edge, inputs = [] →
- *   drawer falls back to synthetic [{identifier:"input"}] →
- *   ScenarioInputMappingSection receives no "unwired_field" input
- *
- * Fixed: getMappingSurfaceInputs also seeds inputs from the entry node's
- * declared outputs when no edge covers them.
- *
  * @see specs/features/scenarios/workflow-agent-mapping-unwired-fields.feature
  */
 
@@ -54,19 +41,6 @@ vi.mock("@langwatch/ui-drawer", () => ({
 
 // ---------------------------------------------------------------------------
 // ScenarioInputMappingSection mock
-//
-// The real section renders SCENARIO_FIELDS (input/messages/threadId) as rows
-// and places workflow inputs in an "Agent Inputs" dropdown — not as visible
-// row labels.  That makes direct assertion on "unwired_field" impossible
-// without user interaction.
-//
-// We mock the section to render each `inputs` prop identifier as a visible
-// <div>, making the contract clear: "the drawer must pass unwired_field to
-// the section."  When the bug is present, workflowInputs is [] and the
-// drawer substitutes the fallback [{identifier:"input"}] — so unwired_field
-// never appears.  When the bug is fixed, workflowInputs is
-// [{identifier:"unwired_field"}] and it IS passed and rendered.
-// ---------------------------------------------------------------------------
 
 vi.mock("../../../elements/suites/scenario-input-mapping-section", () => ({
   ScenarioInputMappingSection: ({ inputs }: ScenarioInputMappingSectionProps) => (
@@ -82,15 +56,8 @@ vi.mock("../../../elements/suites/scenario-input-mapping-section", () => ({
   hasScenarioInputMapping: () => true,
 }));
 
-// ---------------------------------------------------------------------------
-// tRPC mocks
-//
-// The drawer calls:
-//   api.agents.getById.useQuery         — load agent (with workflowId + config)
-//   workflowApi.workflow.getById.useQuery — load workflow (with currentVersion.dsl)
-//   api.agents.update.useMutation       — save (not exercised here)
-//   api.useUtils()                      — for cache invalidation after save
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- tRPC
+// mocks
 
 /** A minimal workflow DSL that has an entry node with one declared output
  *  ("unwired_field") but NO edges — this is the bug trigger. */
@@ -230,17 +197,8 @@ describe("AgentWorkflowEditorDrawer", () => {
     it("lists the unwired field as a mappable input in the scenario-mapping section", async () => {
       renderDrawer({ agentId: "agent-1" });
 
-      // The mocked ScenarioInputMappingSection renders each item in its `inputs`
-      // prop as a visible div with the identifier text.
-      //
-      // BUG (failing): getMappingSurfaceInputs reads only edges — since there
-      // are none, workflowInputs is [], the drawer falls back to
-      // [{identifier:"input"}], and ScenarioInputMappingSection never
-      // receives "unwired_field".
-      //
-      // FIXED: getMappingSurfaceInputs also reads entryNode.data.outputs when
-      // no edge covers it, so workflowInputs = [{identifier:"unwired_field"}],
-      // and the section receives and renders it.
+      // The mocked ScenarioInputMappingSection renders each item in its `inputs` prop
+      // as a visible div with the identifier text.
       await waitFor(() => {
         expect(screen.getByTestId("scenario-mapping-input-unwired_field")).toBeInTheDocument();
       });

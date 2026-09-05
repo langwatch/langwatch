@@ -1,9 +1,7 @@
 /**
- * One install surface per feature. A feature directory exports exactly one
- * `<x>Feature = uiFeature({...})` value; `installUiFeatures` composes the
- * whole list into what `createUiApplication` mounts.
- *
- * Design: dev/docs/plans/ui-install-surface-2026-09-05.md.
+ * One install surface per feature. A feature directory exports exactly one `<x>Feature
+ * = uiFeature({...})` value; `installUiFeatures` composes the whole list into what
+ * `createUiApplication` mounts.
  */
 
 import type { ComponentType, ReactNode } from "react";
@@ -28,10 +26,7 @@ export type UiFeature = {
 };
 
 /**
- * Builds a feature's install value. Erases the client Provider type the same
- * way `uiFeatureApi` used to — the one place allowed to erase either client
- * shape — and defaults `loaders`/`drawers` to `{}` rather than leaving them
- * undefined, so a feature with none still composes like every other one.
+ * Builds a feature's install value.
  */
 export function uiFeature<TClient, const D extends UiDrawerRegistry = Record<string, never>>({
   name,
@@ -65,10 +60,7 @@ export type UiFeatureInstallResult<F extends readonly UiFeature[]> = UiFeatureIn
 };
 
 /**
- * Merges a feature list into one install. A page key or drawer name served
- * by two features is a programming fault, not a runtime condition either
- * feature's caller can act on, so it throws a plain `Error` naming both
- * features rather than letting the later one win silently.
+ * Merges a feature list into one install.
  */
 export function installUiFeatures<const F extends readonly UiFeature[]>({
   features,

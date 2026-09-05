@@ -1,10 +1,7 @@
 /**
+ * The name and type editors seed from the correction the trace already carries, so a second reviewer reads what
+ * the first one wrote instead of reverting it the moment they touch the field.
  * @vitest-environment jsdom
- *
- * The name and type editors seed from the correction the trace already carries,
- * so a second reviewer reads what the first one wrote instead of reverting it
- * the moment they touch the field.
- * See specs/traces-v2/trace-edit-mode.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

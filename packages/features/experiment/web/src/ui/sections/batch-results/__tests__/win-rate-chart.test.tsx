@@ -3,19 +3,6 @@ import "@testing-library/jest-dom/vitest";
 // @vitest-environment jsdom
 /**
  * Tests for WinRateChart.
- *
- * Focused regression coverage for #5528's win-rate-chart follow-up: two
- * variants sharing a display name (e.g. the same prompt handle run twice with
- * different configs) must render as two distinguishable bars, not two bars
- * with the identical label.
- *
- * recharts renders its axis tick text via internal layout (not as React
- * children), so asserting on rendered SVG text is brittle under jsdom and
- * the project's global recharts mock (test-setup.ts) doesn't reproduce it.
- * Instead, this locally mocks `BarChart` to surface the `data` prop it
- * receives — the same prop the real chart derives its bars and axis labels
- * from — so the test verifies WinRateChart's actual labeling logic without
- * depending on recharts' rendering internals.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

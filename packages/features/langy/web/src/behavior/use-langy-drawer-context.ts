@@ -2,31 +2,16 @@ import { useMemo } from "react";
 import type { LangyContextChip } from "./langy.store";
 
 /**
- * Derives a page-context chip from the app's URL-routed drawer (task: richer
- * Langy context). Drawers serialize as `drawer.open=<name>` plus flat
- * `drawer.<param>` query params (see `dev/docs/best_practices/drawers.md` and
- * `useDrawer`), so when a drawer is open the URL already names the exact
- * resource the user is looking at — the highest-value "what am I doing" signal
- * Langy can pick up without any page-level registration.
- *
- * This reads the drawer straight off the query string (the same source
- * `drawerStore.readInitialFromURL` reads) and maps the drawer name → a chip
- * kind + the param that carries its resource id. Only drawers whose id lands in
- * the URL as a flat scalar are mapped; drawers that carry their target in a
- * nested / in-memory prop (e.g. the dataset editor's `datasetToSave` object,
- * the automation drawer's complex props) are deliberately skipped rather than
- * guessed — see the TODO below.
+ * Derives a page-context chip from the app's URL-routed drawer (task: richer Langy
+ * context).
  */
 export function useLangyDrawerContext(search: string): LangyContextChip[] {
   return useMemo(() => drawerContextChips(search), [search]);
 }
 
 /**
- * How a drawer name maps to a context chip: which flat `drawer.<param>` carries
- * its resource id, what chip kind it becomes, and how the label reads. Kinds
- * reuse the existing resource vocabulary (`trace` / `prompt` / `scenario`) so a
- * drawer-derived chip dedups against the same route-derived chip, plus the new
- * `evaluation` kind for evaluator / monitor drawers.
+ * How a drawer name maps to a context chip: which flat `drawer.<param>` carries its
+ * resource id, what chip kind it becomes, and how the label reads.
  */
 const DRAWER_CHIP_SPECS: Record<
   string,

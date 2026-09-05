@@ -1,11 +1,5 @@
 /**
  * The name of the open test suite, and the control that renames it.
- *
- * A test suite carries only a name, so renaming is the whole of editing one.
- * The control stays out of the way until the pointer is over the name, and it
- * is an ordinary button, so it takes keyboard focus and a person who uses no
- * pointer reaches it the same way.
- *
  * @see specs/features/agent-testing/cases-table.feature
  */
 

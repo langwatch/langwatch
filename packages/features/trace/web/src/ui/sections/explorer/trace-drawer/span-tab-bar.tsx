@@ -35,20 +35,14 @@ export function spanTabLabel(span: {
 }
 
 /**
- * When more than this many spans are pinned, collapse the tail into a
- * "+N more" dropdown so the tab strip doesn't run away into a horizontal
- * scrollbar swamp. We always keep the first three inline so the user has a
- * stable anchor on the left, then the menu picks up the rest.
+ * When more than this many spans are pinned, collapse the tail into a "+N more"
+ * dropdown so the tab strip doesn't run away into a horizontal scrollbar swamp.
  */
 const MAX_INLINE_PINNED = 4;
 const INLINE_KEEP_WHEN_OVERFLOW = 3;
 
 /**
  * `data-overflow-id` for the right-aligned instrumentation scope chip.
- * The chip lives inside the scroller (right-aligned via `marginLeft:
- * auto` on its wrapper) so the SAME `useOverflowVisibility` pass that
- * decides which tabs hide also decides whether the chip fits. Module
- * scope dodges TDZ for the `tabIds` useMemo factory that references it.
  */
 const RIGHT_SLOT_OVERFLOW_ID = "right-slot:instrumentation";
 
@@ -74,11 +68,9 @@ interface SpanTabBarProps {
    */
   rightSlot?: React.ReactNode;
   /**
-   * Position of the Details pane in its `<PanelGroup>`. Drives where
-   * the collapse toggle sits — leftmost for a right-side pane (the
-   * horizontal split), rightmost for a bottom-stacked pane (vertical
-   * layout). Mirrors how Chrome DevTools' panel-position chooser
-   * decides which edge of the tab row gets the disclosure icon.
+   * Position of the Details pane in its `<PanelGroup>`. Drives where the collapse
+   * toggle sits — leftmost for a right-side pane (the horizontal split), rightmost for
+   * a bottom-stacked pane (vertical layout).
    */
   collapsePosition?: "leading" | "trailing";
 }
@@ -122,16 +114,9 @@ export const SpanTabBar = memo(function SpanTabBar({
   // Chrome DevTools' "Headers / Cookies / Request / Response" row).
   const detailCollapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
-  // Icon orientation tracks the pane's edge: horizontal layout puts the
-  // detail pane on the right, so the collapse chevron points
-  // right (LuPanelRight*); vertical stacks the detail pane on the
-  // *bottom*, so the icon shows a bottom-docked panel (LuPanelBottom*).
-  // The previous LuPanelTop* set was inverted — it depicted the panel
-  // docked at the top, which read backwards for a bottom-docked pane:
-  // collapsed showed the "panel popping down from above" arrow, expanded
-  // showed "panel sliding up". With LuPanelBottom*: collapsed (panel
-  // hidden) shows the bottom panel ready to spring up; expanded shows
-  // the bottom panel ready to collapse down.
+  // Icon orientation tracks the pane's edge: horizontal layout puts the detail pane on the right, so the
+  // collapse chevron points right (LuPanelRight*); vertical stacks the detail pane on the *bottom*, so the icon
+  // shows a bottom-docked panel (LuPanelBottom*).
   const isHorizontalSplit = collapsePosition === "leading";
   const CollapseToggleIcon = isHorizontalSplit
     ? detailCollapsed
@@ -183,14 +168,8 @@ export const SpanTabBar = memo(function SpanTabBar({
   const overflowing = pinnedSpans.length > MAX_INLINE_PINNED;
   const inlineCount = overflowing ? INLINE_KEEP_WHEN_OVERFLOW : pinnedSpans.length;
   // Both slices are memoized: they feed `tabDescriptors` → `tabIds` →
-  // `useOverflowVisibility`, whose effect resets state whenever the
-  // items array changes by reference. Before this memo each render
-  // produced a fresh slice, churning the dep, resetting the hidden
-  // set, triggering another render — infinite loop that the error
-  // boundary swallowed silently. The visible symptom was that closing
-  // the drawer didn't tear down its DOM, because the boundary kept
-  // re-mounting the subtree faster than the URL change could unmount
-  // the parent.
+  // `useOverflowVisibility`, whose effect resets state whenever the items array changes
+  // by reference.
   const inlinePinned = useMemo(() => pinnedSpans.slice(0, inlineCount), [pinnedSpans, inlineCount]);
   const overflowPinned = useMemo(
     () => (overflowing ? pinnedSpans.slice(inlineCount) : []),
@@ -198,11 +177,8 @@ export const SpanTabBar = memo(function SpanTabBar({
   );
 
   // Build a unified descriptor list (static tabs + dynamic span tabs) so
-  // `useOverflowVisibility` can collapse anything that doesn't fit on
-  // the strip into a single kebab menu — same pattern the viz tab row
-  // uses. Without this the strip just falls back to horizontal scroll,
-  // which on a narrow drawer hid Summary and LLM-Optimized behind a
-  // hidden-scrollbar overflow the user couldn't see.
+  // `useOverflowVisibility` can collapse anything that doesn't fit on the strip into a
+  // single kebab menu — same pattern the viz tab row uses.
   type TabDescriptor = {
     id: string;
     activeId?: string;
@@ -212,14 +188,9 @@ export const SpanTabBar = memo(function SpanTabBar({
     /** Dropdown-row contents when this tab is folded into the menu. */
     menuContent: React.ReactNode;
   };
-  // After the trace-view redesign the SpanTabBar carries only
-  // span-scope tabs: pinned spans (rendered first, in pin order) and
-  // the currently-selected ephemeral span (rendered at the trailing
-  // edge if it isn't already pinned). Summary / LLM-Optimized / Prompts
-  // moved out — Summary is its own DrawerViewMode in ModeSwitch; LLM
-  // and prompt views are auto-selected inside SpanDetailPane based on
-  // the selected span's kind, so there's nothing for the user to pick
-  // here.
+  // After the trace-view redesign the SpanTabBar carries only span-scope tabs: pinned
+  // spans (rendered first, in pin order) and the currently-selected ephemeral span
+  // (rendered at the trailing edge if it isn't already pinned).
   const tabDescriptors: TabDescriptor[] = useMemo(() => {
     const list: TabDescriptor[] = [];
     inlinePinned.forEach((span) => {
@@ -313,13 +284,9 @@ export const SpanTabBar = memo(function SpanTabBar({
   }, [tabDescriptors, rightSlot]);
   const activeOverflowId = tabDescriptors.find((d) => d.activeId)?.id ?? null;
   const scrollerRef = useRef<HTMLDivElement>(null);
-  // Reserve room for kebab trigger + optional rightSlot + the
-  // pinned-span overflow menu + the trailing collapse toggle. 96px gives
-  // enough headroom that the last visible tab doesn't bleed under those
-  // controls on a narrow drawer.
-  // No reservePx — the kebab + rightSlot wrapper is a natural-flow
-  // child of the scroller (pushed right via `marginLeft: auto`), so
-  // there's no fixed-position chrome to reserve space for.
+  // Reserve room for kebab trigger + optional rightSlot + the pinned-span overflow menu
+  // + the trailing collapse toggle. 96px gives enough headroom that the last visible
+  // tab doesn't bleed under those controls on a narrow drawer.
   const hiddenTabIds = useOverflowVisibility({
     scrollerRef,
     items: tabIds,
@@ -541,15 +508,8 @@ function SpanTab({
 }
 
 function SpanTypeBadge({ type }: { type: string }) {
-  // Span types in the catalog (llm / tool / agent / …) keep the
-  // `subtle` colour-tinted look so they read as the curated palette
-  // the rest of the drawer uses. Anything outside the catalog (the
-  // raw OTel SpanKind values "CLIENT", "SERVER", "INTERNAL",
-  // "PRODUCER", "CONSUMER" that come through unmapped, plus future
-  // custom types) falls through to a bordered `outline` variant on
-  // the gray palette so it stays readable in dark mode — the prior
-  // `subtle` + `gray` combination painted gray.fg on top of
-  // gray.subtle which collapsed to a dark-on-dark blob in dark theme.
+  // Span types in the catalog (llm / tool / agent / …) keep the `subtle` colour-tinted
+  // look so they read as the curated palette the rest of the drawer uses.
   const mappedPalette = SPAN_TYPE_PALETTE[type];
   const label = type === "llm" || type === "rag" ? type.toUpperCase() : type;
   return (

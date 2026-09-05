@@ -10,36 +10,18 @@ import type { LangyMessageDto } from "@langwatch/langy-contract";
 export interface LangyMessagesResult {
   messages: LangyMessageDto[];
   /**
-   * The last turn's failure, serialized (a domain-error kind + safe meta, never
-   * raw text) — or null if it didn't fail.
-   *
-   * Turn errors used to live ONLY in `useChat`'s state, so a refresh after a
-   * failed turn left the user's question sitting there with no answer and no
-   * explanation. The failure was durable on the conversation fold the whole
-   * time; nobody read it back. Now the history load carries it, and the panel
-   * renders the same card it would have shown live.
+   * The last turn's failure, serialized (a domain-error kind + safe meta, never raw
+   * text) — or null if it didn't fail.
    */
   lastError: string | null;
   /**
-   * Whether a turn is in flight right now, read off the conversation fold — the
-   * DURABLE truth, not the browser stream. Covers the whole span from
-   * message-sent (`active`) through the agent responding (`running`), so it
-   * includes the worker cold-start window (the fold only reaches `running` at
-   * `agent_turn_accepted`, after opencode has forked + npm-installed). The
-   * live `useChat` transport only knows a turn is running while its
-   * `onTurnStream` subscription is open, and that closes the moment a silent
-   * worker stops pushing frames — long before the turn ends. This lets the panel
-   * hold a working state through that gap instead of going blank.
+   * Whether a turn is in flight right now, read off the conversation fold — the DURABLE
+   * truth, not the browser stream.
    */
   isTurnInFlight: boolean;
   /**
-   * WHICH turn is in flight, straight off the durable record — null when none
-   * is, and null in the brief window between a send and the turn being accepted.
-   *
-   * This is what makes Stop work in a tab that did not start the turn. A tab
-   * only learns a turn id from its own send, so a turn adopted from
-   * `isTurnInFlight` alone had a Stop button with nothing behind it (see
-   * `logic/langyStopTarget.ts`).
+   * WHICH turn is in flight, straight off the durable record — null when none is, and
+   * null in the brief window between a send and the turn being accepted.
    */
   inFlightTurnId: string | null;
   /**
@@ -57,10 +39,9 @@ export interface LangyMessagesResult {
   /** The turn in flight per the durable fold — what a refresh reattaches to. */
   currentTurnId: string | null;
   /**
-   * The model the conversation's latest turn ran on, off the durable fold —
-   * null before any turn recorded one. The panel seeds the composer's picker
-   * from it on open, so a conversation keeps the model it was last used with
-   * across tabs and reloads.
+   * The model the conversation's latest turn ran on, off the durable fold — null before
+   * any turn recorded one. The panel seeds the composer's picker from it on open, so a
+   * conversation keeps the model it was last used with across tabs and reloads.
    */
   lastModel: string | null;
   isLoading: boolean;
@@ -76,11 +57,9 @@ export interface LangyMessagesResult {
 const TURN_IN_FLIGHT_POLL_MS = 3_000;
 
 /**
- * Self-stopping poll (see dev/docs/best_practices/async-processing-ui.md):
- * while the fold says a turn is in flight, re-check on a short interval so the
- * settled state lands even when the freshness signal is delayed or lost —
- * without it a stale `isTurnInFlight: true` sits in the cache and the working
- * indicator outlives the answer. Stops itself the moment the turn settles.
+ * Self-stopping poll (see dev/docs/best_practices/async-processing-ui.md): while the fold says a turn is in flight, re-check on a short
+ * interval so the settled state lands even when the freshness signal is delayed or lost — without it a stale `isTurnInFlight: true` sits in
+ * the cache and the working indicator outlives the answer.
  */
 export function langyMessagesPollInterval(
   data: { isTurnInFlight: boolean } | undefined,
@@ -90,9 +69,6 @@ export function langyMessagesPollInterval(
 
 /**
  * HEAVY, on-demand message history for one conversation (`langy.messages`).
- * Deliberately split from the slim list: opening a conversation reads its
- * messages here, and the recents list is never re-fetched to obtain them (and
- * never carries content). Disabled until a conversation is selected.
  */
 export function useLangyMessages(conversationId: string | null): LangyMessagesResult {
   const { project } = useOrganizationTeamProject();

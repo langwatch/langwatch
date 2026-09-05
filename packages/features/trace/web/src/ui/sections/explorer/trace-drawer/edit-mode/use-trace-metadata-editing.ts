@@ -8,12 +8,6 @@ import type { AttributeEditing } from "../attribute-table";
 
 /**
  * Connects the summary's metadata table to the draft.
- *
- * The table shows the attribute rows the trace was ingested with, while a
- * correction is written in the bare keys the canonical trace metadata uses, so
- * the two spellings are translated here and nowhere else. Rows the correction
- * may not touch carry no editor: the platform's own namespace, and the keys a
- * conversation, a user, a customer or a scenario run is grouped by.
  */
 export function useTraceMetadataEditing({
   capturedAttributes,

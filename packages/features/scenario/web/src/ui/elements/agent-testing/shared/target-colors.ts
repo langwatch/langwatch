@@ -1,10 +1,5 @@
 /**
  * The colour of a target in a comparison.
- *
- * A target is coloured by its position in the sorted target list, so the dot
- * beside a row of the run dialog and the column of the run detail read the
- * same colour for the same target.
- *
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

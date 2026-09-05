@@ -17,12 +17,8 @@ export function useTraceFacets() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  // Sample-preview rows are a client-side fixture with no ClickHouse
-  // footprint, so the real `discover` query returns nothing useful.
-  // Hand the sidebar a hardcoded descriptor set derived from the
-  // fixtures themselves so users get real facets to play with on
-  // first visit. The shape matches the live discover output so the
-  // rest of `useFilterSidebarData` is identical regardless of source.
+  // Sample-preview rows are a client-side fixture with no ClickHouse footprint, so the
+  // real `discover` query returns nothing useful.
   const isSamplePreview = usePreviewTracesActive();
 
   // Backoff counter for the cold-miss polling fallback below. Ref because
@@ -41,12 +37,8 @@ export function useTraceFacets() {
     },
     {
       enabled: !!projectId,
-      // Discover used to carry a 10-min staleTime because SSE
-      // invalidation didn't exist. Dropped to 0: the server's
-      // SWR cache + the new `discover_updated` SSE push are the
-      // freshness mechanism now, so we always read through to the
-      // server-side cache (which is warm) instead of trusting a stale
-      // client-side payload.
+      // Discover used to carry a 10-min staleTime because SSE invalidation didn't
+      // exist.
       staleTime: 0,
       // Keep prior facets visible across time-range / filter refetches so
       // the sidebar doesn't flicker. Project switches are gated below by
@@ -56,13 +48,8 @@ export function useTraceFacets() {
       // on heavy projects (10–30s) and batching makes the sidebar wait the
       // full duration even though discover itself returns in ~2s.
       trpc: { context: { skipBatch: true } },
-      // Polling fallback for cold misses: the server returns `pending: true`
-      // and kicks an async compute that broadcasts `discover_updated` over
-      // SSE when it lands. SSE is the primary settlement path, but if it's
-      // missed/delayed/rate-limited or the subscription isn't connected,
-      // we'd sit on the synthetic skeleton forever. Poll while pending with
-      // 2s/4s/8s/15s backoff so the first warm response always settles.
-      // Cleared as soon as a non-pending payload arrives.
+      // Polling fallback for cold misses: the server returns `pending: true` and kicks
+      // an async compute that broadcasts `discover_updated` over SSE when it lands.
       refetchInterval: (query) => {
         const data = query.state.data;
         if (!data?.pending) {
@@ -76,12 +63,9 @@ export function useTraceFacets() {
     },
   );
 
-  // Live `discover_updated` freshness is owned by the single page-level
-  // coordinator (useTraceFreshness), not here: useTraceFacets is consumed by
-  // several sidebar components and a per-consumer subscription would open a
-  // duplicate SSE connection each. The coordinator's one subscription
-  // invalidates this shared query, so the cold-miss `refetchInterval` poll
-  // below is the only freshness path this hook needs to own.
+  // Live `discover_updated` freshness is owned by the single page-level coordinator (useTraceFreshness), not
+  // here: useTraceFacets is consumed by several sidebar components and a per-consumer subscription would open a
+  // duplicate SSE connection each.
 
   // keepPreviousData is project-blind — without this guard it would surface
   // project A's facets while project B's discover request is in flight.
@@ -113,29 +97,17 @@ export function useTraceFacets() {
     setCachedDiscover({ projectId, facets: query.data.facets });
   }, [projectId, query.isSuccess, query.isPlaceholderData, query.data]);
 
-  // Warm-start: hand the sidebar the previous session's descriptors so
-  // it renders something USEFUL (real keys + real labels, not a
-  // count-less synthesised stub) on first paint. The live query still
-  // runs in the background and replaces this once it lands, with the
-  // same row identities so the swap is invisible when the shape hasn't
-  // drifted.
+  // Warm-start: hand the sidebar the previous session's descriptors so it renders
+  // something USEFUL (real keys + real labels, not a count-less synthesised stub) on
+  // first paint.
   const cachedFacets = useMemo<DiscoverDescriptors | null>(
     () => (projectId ? getCachedDiscover(projectId) : null),
     [projectId],
   );
 
-  // Resolution order:
-  //   1. Stale-project guard with no cache for the new project — show
-  //      the skeleton (EMPTY_RESULT) so we don't bleed project A's
-  //      payload into project B's render. If the new project HAS a
-  //      cache hit we keep the warm start; the cache lookup above is
-  //      already scoped to the new project id.
-  //   2. Fresh, settled (non-pending) live data wins next.
-  //   3. Warm cache from a previous session bridges the gap while the
-  //      live request is in flight.
-  //   4. Fall through to the live response (which may still be
-  //      `pending: true` and empty) so the existing skeleton / pending
-  //      branch keeps firing for genuinely first-time users.
+  // Resolution order: 1. Stale-project guard with no cache for the new project — show
+  // the skeleton (EMPTY_RESULT) so we don't bleed project A's payload into project B's
+  // render.
   const liveSettled = query.data && !query.data.pending ? query.data : undefined;
   const result =
     isFromOtherProject && !cachedFacets

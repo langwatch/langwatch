@@ -1,10 +1,6 @@
 /**
+ * `AuthorizeHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the hand-off screens with no project and no error — same gap `TraceHost` and `OrganizationHost` had.
  * @vitest-environment jsdom
- *
- * `AuthorizeHost` read the organization graph without checking for a
- * refusal, so a failed `organization.getAll` left the hand-off screens with
- * no project and no error — same gap `TraceHost` and `OrganizationHost` had.
- *
  * Spec: specs/auth/session-failure.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

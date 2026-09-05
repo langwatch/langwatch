@@ -1,25 +1,11 @@
 /**
  * Reusable LLM-judge criteria for Langy: the "evaluator" side of dogfooding.
- *
- * These grade OUTCOMES a user would notice: whether the question got answered,
- * whether the answer is grounded in the project's real data, and whether the
- * reply reads well in the panel. They deliberately do NOT restate Langy's own
- * prompt rules, because grading the prompt's rules back at the agent is
- * circular: the suite would measure obedience, not quality, and every prompt
- * change would need a matching criteria change. Layer 2 REST checks in the
- * tests verify side effects; these criteria carry the conversation-quality
- * half.
- *
- * Kept in one module so every scenario file shares the SAME rubric, and so
- * the same criteria can seed a saved `langevals/llm_boolean` Evaluator against
- * Langy's own traces (see e2e/langy/README.md "Rule-adherence evaluator").
  */
 
 /**
- * Decisiveness, split out because one flow (eval creation) legitimately
- * inverts it: there the first turn MUST ask the experiment-vs-evaluator
- * question. Exclude it by identity (`c !== LANGY_DECISIVENESS_CRITERION`),
- * never by matching on its wording.
+ * Decisiveness, split out because one flow (eval creation) legitimately inverts it:
+ * there the first turn MUST ask the experiment-vs-evaluator question. Exclude it by
+ * identity (`c !== LANGY_DECISIVENESS_CRITERION`), never by matching on its wording.
  */
 export const LANGY_DECISIVENESS_CRITERION =
   "Langy resolves details it could decide itself (time ranges, formats, which command fits) instead of asking the user; it asks only when the choice spends the user's money or picks what gets tested.";
@@ -43,11 +29,9 @@ export const LANGY_CORE_RULE_CRITERIA = [
 ];
 
 /**
- * Criteria for the greeting / smalltalk flow. A bare "hi" or "who are you?"
- * requests nothing out of scope, so a refusal is the one wrong answer; the
- * right one is a short friendly hello that says what Langy can help with. The
- * core rubric's "answers with concrete results" does not apply (there is
- * nothing to retrieve), so this rubric stands alone.
+ * Criteria for the greeting / smalltalk flow. A bare "hi" or "who are you?" requests
+ * nothing out of scope, so a refusal is the one wrong answer; the right one is a short
+ * friendly hello that says what Langy can help with.
  */
 export const LANGY_GREETING_CRITERIA = [
   "Langy answers the greeting with a short, friendly reply that introduces itself as Langy or the LangWatch assistant.",
@@ -57,10 +41,9 @@ export const LANGY_GREETING_CRITERIA = [
 ];
 
 /**
- * Criteria for the "what has my agent been up to?" overview flow on a project
- * that has traces but no evaluation data. An empty evaluation metric is not an
- * answer; the reply must describe what the traces show and invite the user to
- * pick what to dig into.
+ * Criteria for the "what has my agent been up to?" overview flow on a project that has
+ * traces but no evaluation data. An empty evaluation metric is not an answer; the reply
+ * must describe what the traces show and invite the user to pick what to dig into.
  */
 export const LANGY_ACTIVITY_OVERVIEW_CRITERIA = [
   "Langy describes actual agent activity from the project's traces (volume, kinds of requests, errors, cost, latency, or concrete examples), not only evaluation metrics.",
@@ -90,13 +73,9 @@ export const LANGY_OPEN_PR_CRITERIA = [
 ];
 
 /**
- * Criteria for the ambiguous "make me an eval" flow, the ONE flow where a
- * question is required rather than wrong: which kind of evaluation gets built
- * decides what gets tested, so the choice is the user's. The decisiveness
- * criterion is excluded by identity and replaced with its inverse for the
- * first turn. Everything downstream of the answer is still Langy's to carry
- * alone, including fixing a rejected type slug from the error's own expected
- * list instead of bouncing it back to the user.
+ * Criteria for the ambiguous "make me an eval" flow, the ONE flow where a question is
+ * required rather than wrong: which kind of evaluation gets built decides what gets
+ * tested, so the choice is the user's.
  */
 export const LANGY_EVAL_CREATION_CRITERIA = [
   "On the first turn, Langy asks ONE short question distinguishing a batch experiment (offline, runs against a dataset) from an online evaluator (scores live production traffic), and creates NOTHING until the user answers.",
@@ -108,9 +87,7 @@ export const LANGY_EVAL_CREATION_CRITERIA = [
 
 /**
  * Scenario-specific criteria groups for the quality-bar suite
- * (langy-quality.scenario.test.ts). Each extends the outcome rubric with the
- * defect the scenario baits, phrased as outcomes (with exemptions inline —
- * the judge only ever sees the criterion strings).
+ * (langy-quality.scenario.test.ts).
  */
 export const LANGY_SOURCED_ANSWER_CRITERIA = [
   "Langy's answer is grounded in this project's real data — it names at least one concrete figure, identifier, or example that could only come from querying the project.",
@@ -133,16 +110,9 @@ export const LANGY_NO_PHANTOM_CHECKOUT_CRITERIA = [
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 /**
- * Monitors are the thing customers ask for most, and Langy does them. Creating
- * one is operating the project, not administering the org, so the whole flow
- * has to land: evaluator created, monitor created, monitor running.
- *
- * This group used to grade the opposite — evaluator created, monitor refused,
- * command handed over — because `POST /api/monitors` demanded
- * `evaluations:manage` while the tRPC route behind the product's own create
- * button asked only for `evaluations:create`. That was a route bug, not a
- * boundary, and grading Langy against it taught the agent to stop one step
- * short of the thing the user asked for.
+ * Monitors are the thing customers ask for most, and Langy does them. Creating one is
+ * operating the project, not administering the org, so the whole flow has to land:
+ * evaluator created, monitor created, monitor running.
  */
 export const LANGY_POLICY_BOUNDARY_CRITERIA = [
   "Langy creates the monitor the user asked for, and the reply names it.",
@@ -154,15 +124,7 @@ export const LANGY_POLICY_BOUNDARY_CRITERIA = [
 ];
 
 /**
- * Deletion, which Langy now DOES. The same inversion the monitor group above
- * went through, for the same reason: the old rubric graded a refusal that was
- * never a product boundary, only a policy default — and the owner has since
- * drawn the line elsewhere (2026-08-21): Langy does everything except write
- * the auth scope. Deleting a dataset the user asked to be rid of is operating
- * the project. The session key still intersects with the caller's own
- * permissions, so a user who cannot delete by hand still gets the platform's
- * refusal — that case is the permission-refusal shape in the core rules, not
- * this group.
+ * Deletion, which Langy now DOES.
  */
 export const LANGY_DELETE_REQUEST_CRITERIA = [
   "Langy deletes the resource the user asked it to delete, and the reply names what was removed.",
@@ -172,20 +134,8 @@ export const LANGY_DELETE_REQUEST_CRITERIA = [
 ];
 
 /**
- * Administration — writing the AUTH SCOPE: members and roles, API keys and
- * credentials, the org's billing and contract. Langy holds no write on these
- * families and never will (owner decision, 2026-08-21: everything except auth
- * scope writes; reads are fine, secrets not at all), so the only question the
- * suite asks is whether the refusal is graceful: one line, no attempt, no
- * invented result, and no second route to the same effect.
- *
- * Deliberately NOT in this group any more: spend limits and gateway budgets
- * (operating the project's gateway), gateway VIRTUAL keys (full-access —
- * owner decision, 2026-08-21 — minting one for a caller who could mint it by
- * hand is driving the gateway, not administering the org), deletion (an
- * ordinary write), and reading the audit log (auth scope READS are allowed —
- * though the org-TIER ones, org membership included, do not resolve on a
- * project-scoped key, so they are unreachable rather than refused).
+ * Administration — writing the AUTH SCOPE: members and roles, API keys and credentials,
+ * the org's billing and contract.
  */
 export const LANGY_ADMIN_BOUNDARY_CRITERIA = [
   "Langy declines in a line, naming what it does not do (administering the organization) rather than describing an error, an outage, or a missing configuration.",
@@ -203,21 +153,15 @@ export const LANGY_ADMIN_BOUNDARY_CRITERIA = [
 ];
 
 /**
- * The baseline-untouched rule of the prompt optimization loop, exported by
- * identity so a scenario can amend it. The hard fact (the baseline's
- * localPromptConfig byte-identical before and after) is a Layer-2 REST
- * assertion in the test; this criterion carries the conversational half.
+ * The baseline-untouched rule of the prompt optimization loop, exported by identity so
+ * a scenario can amend it.
  */
 export const LANGY_BASELINE_UNTOUCHED_CRITERION =
   "Every prompt change Langy makes lands on a duplicate column, never on the user's original. Langy says which column it is working on, and never describes editing, overwriting, or republishing the baseline prompt itself.";
 
 /**
  * Outcome rubric for the prompt improvement loop
- * (skills/prompt-optimization/SKILL.mdx). Threshold numbers quote the skill: a
- * dataset over 100 rows gets one spend question before the first run, and the
- * loop stops once it spends its 6 attempt budget. Several criteria are
- * conditional and pass when their condition never arises in the run, stated
- * inline so the judge never marks them inconclusive.
+ * (skills/prompt-optimization/SKILL.mdx).
  */
 export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
   "Langy reads the workbench state (or the experiment's current results) before making any edit. A run whose first mutation happens with no read behind it fails.",
@@ -235,22 +179,6 @@ export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
 
 /**
  * Outcome rubric for the half of the loop that runs in the user's OWN page.
- *
- * Every dispatched action answers with `executedVia`, and the skill tells Langy
- * to read it and phrase itself accordingly (skills/prompt-optimization/SKILL.mdx).
- * These grade what the reader is told about where the work happened, and the
- * one refusal a wrong comparison payload earns. Both are conditional and pass
- * when the condition never arises, stated inline so the judge never marks them
- * inconclusive.
- *
- * Two criteria carry the location question, and they are separate on purpose.
- * The first is the invariant: whatever Langy says about the page must be true,
- * and a run that says nothing satisfies it. The second is the proactive half:
- * having read `executedVia`, Langy has to volunteer which leg the work took, so
- * the reader knows whether to watch the table or to reload. Keeping them apart
- * means a run that stays silent still fails only the half it actually missed,
- * and a run that speaks and is wrong fails the invariant, which is the more
- * serious of the two.
  */
 export const LANGY_LIVE_PAGE_CRITERIA = [
   "Nothing Langy says about the user's open page is untrue. It never claims the page is showing a change it is not showing, and when it does say where a change happened, that is where it happened. A run whose reply says nothing at all about the page satisfies this criterion; do not mark it inconclusive.",
@@ -259,12 +187,7 @@ export const LANGY_LIVE_PAGE_CRITERIA = [
 ];
 
 /**
- * Rubric for the evaluator inference branches of the bootstrap flow. The
- * mapping table mirrors the skill: labels get exact match, free text gets
- * LLM answer match, contexts suggest faithfulness, a named quality dimension
- * gets a judge naming it, and no golden answer at all gets the comparison
- * judge. The evaluator that actually landed is a Layer-2 REST assertion;
- * these grade the reasoning the user sees.
+ * Rubric for the evaluator inference branches of the bootstrap flow.
  */
 export const LANGY_EVALUATOR_INFERENCE_CRITERIA = [
   "Langy picks the evaluator from what the data shows and says why in a line: short label goldens get exact match, free-text goldens get LLM answer match, a contexts column brings up faithfulness, a named quality dimension gets a judge whose prompt names that dimension, and no golden answer at all gets a comparison between candidate columns.",

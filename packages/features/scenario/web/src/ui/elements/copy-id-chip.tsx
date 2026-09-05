@@ -1,9 +1,5 @@
 /**
  * Click-to-copy ID chip for the run detail drawer header.
- *
- * Matches the Traces V2 drawer chip language: the chip body itself is the
- * copy affordance and the value swaps to "copied" as confirmation — no
- * separate copy-icon chrome.
  */
 
 import { useCallback, useState } from "react";

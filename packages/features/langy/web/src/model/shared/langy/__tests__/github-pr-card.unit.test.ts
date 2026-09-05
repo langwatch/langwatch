@@ -1,13 +1,6 @@
 /**
- * @vitest-environment node
- *
  * The PR card's data contract — and the death of the last prose dependency.
- *
- * The card used to be scraped from the assistant's reply: any
- * `github.com/owner/repo/pull/N` URL in the text drew one. So the model could
- * mangle the URL, omit it, or merely MENTION a PR it never opened and get a card
- * for it. It is now read from a `github.open_pr` TOOL PART the control plane
- * wrote from `gh pr create`'s own stdout.
+ * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
 import { githubPrsFromToolParts, LANGY_OPEN_PR_TOOL, parseGithubPrCard } from "../github-pr-card";

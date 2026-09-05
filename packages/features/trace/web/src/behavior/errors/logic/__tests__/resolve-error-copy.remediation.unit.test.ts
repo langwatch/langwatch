@@ -1,8 +1,6 @@
 /**
- * An inline failure surface has room the toast does not: it lists every tip
- * that still adds something and offers the docs link beside them. What it must
- * never do is repeat itself — a tip saying what the description already said is
- * a second authoring of one remediation, not a second remediation.
+ * An inline failure surface has room the toast does not: it lists every tip that still
+ * adds something and offers the docs link beside them.
  */
 import { describe, expect, it } from "vitest";
 

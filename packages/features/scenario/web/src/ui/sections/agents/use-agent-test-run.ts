@@ -1,10 +1,6 @@
 /**
- * "Test agent" from an agent card: schedule the one-off run and open the run
- * drawer on it right away, so the person follows the ping live.
- *
- * The drawer opens in its Agent Testing variant, the one with the judge
- * results beside the conversation, the same one the Agent Testing pages open.
- *
+ * "Test agent" from an agent card: schedule the one-off run and open the run drawer on
+ * it right away, so the person follows the ping live.
  * @see specs/agents/agent-test-run.feature
  */
 

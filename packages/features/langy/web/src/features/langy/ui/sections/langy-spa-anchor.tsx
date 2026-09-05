@@ -5,22 +5,6 @@ import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**
  * The one anchor every Langy card links through.
- *
- * A bare `<a href="/…">` is a REAL browser navigation: it tears the app down and
- * boots it again, which takes the panel, the conversation and any turn still
- * streaming with it. Clicking "Open in Scenarios" on a card reloaded the whole
- * product. Langy must never navigate by anything but in-app routing.
- *
- * It stays a real anchor with a real `href`, deliberately. A `<div onClick>`
- * loses middle-click, ⌘-click, "copy link address", the status-bar preview and
- * keyboard focus — the whole affordance of a link — in exchange for nothing. So
- * only the PLAIN left-click is intercepted; every modified click is left to the
- * browser, which is exactly what those gestures mean.
- *
- * External destinations are left completely alone — not prevented, not stopped
- * from propagating — so the panel's own external-link guard still sees them.
- * `isInternalHref` is the shared notion of internal (Markdown links use the same
- * one); a second definition here would eventually disagree with it.
  */
 export function LangySpaAnchor({
   href,

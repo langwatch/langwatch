@@ -1,11 +1,5 @@
 /**
- * The card, the header line and the row separators every results table is
- * drawn with.
- *
- * The four groupings show different columns, but they are one table to the
- * reader: same card, same header weight, same row rhythm. Stating that once
- * here is what stops the four drifting apart.
- *
+ * The card, the header line and the row separators every results table is drawn with.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
@@ -135,10 +129,6 @@ export function ResultsTableEmptyLine({ text }: { text: string }) {
 
 /**
  * The line under a table that has more rows than it drew.
- *
- * Always drawn when a list is cut short. A page that silently shows the first
- * N of many reads as the whole set, and every total beside it reads as a total
- * of everything.
  */
 export function ResultsTableTruncationLine({ text }: { text: string }) {
   return (

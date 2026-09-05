@@ -1,47 +1,6 @@
 /**
- * Quality regression set for Langy — one scenario per measured production
- * defect, so each one fails today and turns green only when the underlying
- * issue is fixed.
- *
- * Every scenario here was derived from prod Postgres
- * (`LangyConversationTurnProjection`, all-time: 260 completed, 140 failed, 8
- * stopped turns) rather than from a hunch. The mapping is one-to-one:
- *
- *   #1097  10% of successful turns render no answer at all       -> "never ends a turn blank"
- *   #1098  40% zero-tool, 58% under 120 characters               -> "answers from the project, not from memory"
- *   #1099  AGENTS.md:149 calls the working langwatch.* tools     -> "owns the tools it actually has"
- *          hallucinations
- *   #1100  opencode coding-agent persona bleeding through        -> "does not narrate a checkout it never obtained"
- *   #1101  langwatch.monitor.create fails on 48% of calls        -> "a monitor it says it made really exists"
- *   #1102  p90 380s, p99 31min                                   -> "answers a simple question inside the budget"
- *
- * These complement langy-dogfood.scenario.test.ts (named user flows) and
- * langy.scenario.test.ts (broad surface coverage). Kept separate so the
- * quality bar can be run on its own and watched over time.
- *
- * RUN (local haven — all LANGY_* vars already default to the seed identity):
- *
- *   cd apps/ui/e2e/langy
- *   npx vitest run langy-quality.scenario.test.ts --reporter=verbose
- *
- * RUN (against Langy's own production project — the measurements above came
- * from prod, so this is where the set is meant to live):
- *
- *   LANGY_APP_URL=https://app.langwatch.ai \
- *   LANGY_PROJECT_ID=<Langy's prod project id> \
- *   LANGY_ADMIN_EMAIL=<a real user on that project> \
- *   LANGY_ADMIN_PASSWORD=<that user's password> \
- *   LW_BASE_URL=https://app.langwatch.ai \
- *   LANGWATCH_API_KEY=<that project's API key> \
- *   OPENAI_API_KEY=<key or gateway virtual key> \
- *   npx vitest run langy-quality.scenario.test.ts --reporter=verbose
- *
- * SIDE EFFECTS: the monitor scenario performs a real create against whichever
- * project is configured, and expects it to SUCCEED — a monitor and an evaluator
- * both appear. Everything this suite creates is named with an `e2e-quality-`
- * prefix. Monitors are deleted afterwards, because a monitor that survives the
- * run keeps evaluating the project's live traffic and costs real money; the
- * evaluator it hangs off is inert and is left behind as the evidence trail.
+ * Quality regression set for Langy — one scenario per measured production defect, so
+ * each one fails today and turns green only when the underlying issue is fixed.
  */
 
 import { randomUUID } from "node:crypto";
@@ -70,11 +29,6 @@ const SIMPLE_QUESTION_BUDGET_MS = 120_000;
 
 /**
  * The name the monitor scenario asks for, and looks for afterwards.
- *
- * Unique per run. Teardown deletes what this scenario created, and the only
- * handle it has is the name — so without the suffix, a suite running against a
- * shared project (staging, or Langy's own prod project) would sweep up a
- * monitor another run had just created and is still asserting on.
  */
 const MONITOR_SCENARIO_NAME = `e2e-quality-offtopic-${randomUUID().slice(0, 8)}`;
 
@@ -87,12 +41,6 @@ const createdMonitorIds: string[] = [];
 
 /**
  * Wraps the Langy adapter so each turn's own wall-clock is recorded.
- *
- * Timing the whole `runScenarioAndLog` call would be wrong: it also runs the
- * user simulator, the LLM judge, and a full Playwright browser-QA pass before
- * it returns. Only the adapter's `call` is Langy, and turn duration is exactly
- * what `LangyConversationTurnProjection` measures — so this is the same clock
- * the p90 of 380s came off.
  */
 function withTurnTimings(adapter: ReturnType<typeof makeLangyAdapter>): {
   adapter: AgentAdapter;
@@ -114,14 +62,9 @@ function withTurnTimings(adapter: ReturnType<typeof makeLangyAdapter>): {
 }
 
 describe("Langy quality bar", () => {
-  // A fresh local project holds only Langy's own mirrored runs (origin:
-  // langy), which rule 27 makes Langy exclude — so every data question would
-  // truthfully answer "no traces". Seed real application-origin traffic so
-  // the data scenarios have a non-zero ground truth to find.
-  // The seed waits for the traces to become QUERYABLE, which can take most of a
-  // minute on a cold index — so this timeout has to sit above the seed's own
-  // 60s visibility deadline, or vitest kills the hook before it can report the
-  // clearer "this is ingestion lag, not a Langy defect" error.
+  // A fresh local project holds only Langy's own mirrored runs (origin: langy), which
+  // rule 27 makes Langy exclude — so every data question would truthfully answer "no
+  // traces".
   beforeAll(async () => {
     await seedApplicationTraces();
   }, 90_000);
@@ -145,13 +88,9 @@ describe("Langy quality bar", () => {
   }, 60_000);
 
   /**
-   * #1097 — 27 of 260 completed turns have no answer text and made no tool
-   * call. The turn is written as `completed`, so it carries no error and never
-   * reaches remediation: from every dashboard the platform has, a blank reply
-   * looks healthy. AGENTS.md rule 28 forbids it outright.
-   *
-   * Asserted structurally, not by the judge. A judge grading an empty string
-   * can rationalise it as terse; `length === 0` cannot.
+   * #1097 — 27 of 260 completed turns have no answer text and made no tool call. The
+   * turn is written as `completed`, so it carries no error and never reaches
+   * remediation: from every dashboard the platform has, a blank reply looks healthy.
    */
   describe("when the user opens with something vague", () => {
     it("never ends a turn with nothing rendered", async () => {
@@ -191,10 +130,8 @@ describe("Langy quality bar", () => {
   });
 
   /**
-   * #1098 — 40% of completed turns make zero tool calls and 58% answer in
-   * under 120 characters. The question below cannot be answered without
-   * querying the project, so an answer that arrives without one is fabricated
-   * regardless of how confident it reads.
+   * #1098 — 40% of completed turns make zero tool calls and 58% answer in under 120
+   * characters.
    */
   describe("when the user asks something only the project data can answer", () => {
     it("answers from the project rather than from the model's memory", async () => {
@@ -233,10 +170,8 @@ describe("Langy quality bar", () => {
   });
 
   /**
-   * #1099 — AGENTS.md line 149 tells the model that its own working
-   * `langwatch.*` tools are hallucinations. This scenario asks for exactly
-   * what `langwatch.trace.search` and `langwatch.analytics.query` serve, and
-   * fails if Langy talks itself out of the capability.
+   * #1099 — AGENTS.md line 149 tells the model that its own working `langwatch.*` tools
+   * are hallucinations.
    */
   describe("when the answer needs one of the langwatch.* tools", () => {
     it("owns the tools it actually has instead of declaring them unavailable", async () => {
@@ -271,15 +206,8 @@ describe("Langy quality bar", () => {
   });
 
   /**
-   * #1100 — the base system prompt is opencode's coding agent with one word
-   * rewritten, while AGENTS.md rule 24 restricts bash to the `langwatch` CLI.
-   * Prod shows the coding persona winning sometimes: 144 `read` calls across 7
-   * projects, 68 `edit` calls — against a workspace that was never cloned.
-   *
-   * Source work itself is in scope: AGENTS.md routes "open a PR"/"fix and
-   * submit" to the `github` skill, which clones the repository and works there.
-   * What must not happen is the narration without the clone — reading a file
-   * Langy never obtained, or asking the user to paste it.
+   * #1100 — the base system prompt is opencode's coding agent with one word rewritten,
+   * while AGENTS.md rule 24 restricts bash to the `langwatch` CLI.
    */
   describe("when the user asks Langy to edit source it has not cloned", () => {
     it("does not narrate a checkout it never obtained", async () => {
@@ -319,17 +247,7 @@ describe("Langy quality bar", () => {
   });
 
   /**
-   * #1101 — `langwatch.monitor.create` errored on 48% of Langy's calls. Not a
-   * flake, and not a boundary either: `POST /api/monitors` demanded
-   * `evaluations:manage`, while the tRPC route behind the product's own create
-   * button asked for `evaluations:create` and wrote the same `enabled: true`
-   * monitor. Langy holds `:create`, so the identical action succeeded in the UI
-   * and 403'd for the assistant.
-   *
-   * Monitors are what customers ask about most, so this scenario is the one
-   * that proves the whole flow lands. Layer 2 reads the monitor list back: the
-   * judge can be talked into accepting a confident description of a monitor
-   * that does not exist, a list diff cannot.
+   * #1101 — `langwatch.monitor.create` errored on 48% of Langy's calls.
    */
   describe("when the user asks for a monitor", () => {
     it("creates the monitor, not just the evaluator", async () => {
@@ -362,12 +280,8 @@ describe("Langy quality bar", () => {
       });
 
       // `>= 1`, not `=== 1`: runScenarioAndLog retries once on a transient
-      // infrastructure failure and replays the whole script, so a legitimate
-      // pass can leave two monitors behind. What matters is that the thing the
-      // user asked for exists.
-      // Matched on the run-unique name, not merely on "new since `before`":
-      // against a shared project another run's monitor is also new, and
-      // teardown would delete it out from under the run still asserting on it.
+      // infrastructure failure and replays the whole script, so a legitimate pass can
+      // leave two monitors behind.
       const after = await listMonitors();
       const created = after.filter(
         (m) => !beforeIds.has(m.id) && m.name?.includes(MONITOR_SCENARIO_NAME),
@@ -384,13 +298,8 @@ describe("Langy quality bar", () => {
   });
 
   /**
-   * #1102 — completed turns run p50 24.6s, p90 380.5s, p99 1,868s; 15% take
-   * over five minutes. `langwatch/tasks#102` covers the ~23s cold start and
-   * states the remainder is inherent agentic time, which is consistent with
-   * the p50 but says nothing about the tail.
-   *
-   * The question below needs one lookup and no reasoning chain. If that cannot
-   * land inside two minutes, the tail is not explained by task complexity.
+   * #1102 — completed turns run p50 24.6s, p90 380.5s, p99 1,868s; 15% take over five
+   * minutes.
    */
   describe("when the question needs a single lookup", () => {
     it("answers inside the latency budget", async () => {

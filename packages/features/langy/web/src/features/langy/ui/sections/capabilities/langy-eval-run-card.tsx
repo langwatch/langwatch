@@ -1,9 +1,6 @@
 /**
  * Evaluation-run capability card (`platform_run_experiment`, `platform_run_plan`,
  * `platform_experiment_results`, `platform_experiment_status`).
- *
- * Surfaces the outcome of a run — a status line plus any pass-rate / score the
- * result reports — and links through to the run. Read-only.
  */
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
@@ -18,16 +15,6 @@ import { LangyCapabilityCard } from "./langy-capability-card";
 
 /**
  * A run reports its own state in fields; the rest of the payload is DATA.
- *
- * This used to read the badge out of the payload text with a word match, so
- * `experiment results --filter failed` — which prints the failing rows, with
- * the word "failed" in every one of them — wore a red "failed" badge on a call
- * that succeeded. The same text pass sliced the card's body off the top of the
- * pretty-printed JSON, so the reader got `{` and `"dataset": [`.
- *
- * A document that reports a run is read structurally: the status is a field or
- * there is no badge, and the lines are counted rather than sliced. Anything
- * else (an MCP tool's prose) keeps the text reading it was written for.
  */
 function readRun(output: unknown): {
   status: string | null;

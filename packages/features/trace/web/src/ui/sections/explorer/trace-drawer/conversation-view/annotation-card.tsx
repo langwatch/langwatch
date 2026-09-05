@@ -20,10 +20,6 @@ interface AnnotationCardProps {
 
 /**
  * App composition for the reusable annotation card.
- *
- * The card owns its presentation in the feature web package. This adapter
- * supplies the app avatar and trace-navigation ports, keeping stores and
- * browser-only navigation at the app boundary.
  */
 export function AnnotationCard({
   annotation,

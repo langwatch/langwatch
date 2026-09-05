@@ -20,13 +20,6 @@ export interface LangyExternalLinkDialogProps {
 
 /**
  * Where a link goes, before it goes there.
- *
- * The host is the headline because it is the one fact the words on a link
- * cannot be trusted for, and Langy's answers are written from data the agent
- * read. The full address sits under it in its own scroll box, so a path long
- * enough to fill a screen can never push the host out of view. The words that
- * were clicked are deliberately absent: repeating them here would give the
- * lie equal billing with the truth.
  */
 export function LangyExternalLinkDialog({
   link,

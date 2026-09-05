@@ -1,8 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for TagPill component.
- *
+ * @vitest-environment jsdom
  * @see specs/features/tag-management.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

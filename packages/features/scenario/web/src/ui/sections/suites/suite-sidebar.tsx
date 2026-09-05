@@ -1,9 +1,5 @@
 /**
- * Suite sidebar with search, all runs link, suite list,
- * and external sets section.
- *
- * Single render path — isCollapsed controls width and label visibility,
- * so the DOM structure is stable and the toggle button never jumps.
+ * Suite sidebar with search, all runs link, suite list, and external sets section.
  */
 
 import {

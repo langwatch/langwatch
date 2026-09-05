@@ -21,17 +21,9 @@ export interface TraceV2DrawerShellProps {
    */
   t?: string;
   /**
-   * The project the trace belongs to, for openers whose page is not inside
-   * that project: the personal pages read the caller's own workspace while
-   * the chrome stays in the last project visited. Omitted everywhere the
-   * ambient project already is the trace's project.
-   *
-   * Declared here for the shape rather than read here. This shell takes its
-   * whole state from the drawer store, and an opener sets the project on that
-   * store through `openTrace(traceId, occurredAtMs, { projectId })`, which
-   * `useDrawerProjectId` then reads. The field exists on these props because
-   * the drawer registry types `openDrawer("traceV2Details", ...)` against
-   * them, so leaving it out would reject the openers that do pass it.
+   * The project the trace belongs to, for openers whose page is not inside that
+   * project: the personal pages read the caller's own workspace while the chrome stays
+   * in the last project visited.
    */
   projectId?: string;
 }
@@ -56,12 +48,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const pinned = useDrawerStore((s) => s.pinned);
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
-  // `open` is hardcoded `true` because the parent (`TracesPage`'s
-  // `<TraceDrawerMount>`) only mounts this shell while the drawer
-  // store holds a `traceId`. Click → store update → mount lands in
-  // the same render; close → store clear → unmount. Wiring `open` to
-  // anything reactive would just add a one-frame "open after the URL
-  // resolves" beat on top of an already-instant mount.
+  // `open` is hardcoded `true` because the parent (`TracesPage`'s `<TraceDrawerMount>`)
+  // only mounts this shell while the drawer store holds a `traceId`. Click → store
+  // update → mount lands in the same render; close → store clear → unmount.
 
   // Error state: trace not found, network failure, or no selection. The
   // dedicated empty-state component differentiates 404 vs load-failed and
@@ -86,14 +75,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   }
 
   // The drawer width is driven by the operator's drag (persisted in
-  // drawerStore.widthPx). Until they drag, we use a flat
-  // `DRAWER_DEFAULT_WIDTH_PX` (920) instead of the previous 45% rule
-  // — a deterministic first-paint width that doesn't visibly shift
-  // when the user later drags and the persisted px replaces the %.
-  // Below the `md` breakpoint (~768px) the drawer goes full viewport
-  // so the chrome stays usable on phones. We also cap any
-  // persisted/default width against the current viewport so a width
-  // remembered on a wide monitor never overflows a narrower window.
+  // drawerStore.widthPx).
   const viewportWidth = typeof window !== "undefined" ? window.innerWidth : Infinity;
   const isCompactViewport = viewportWidth < 768;
   const effectiveWidthPx = Math.min(widthPx ?? DRAWER_DEFAULT_WIDTH_PX, viewportWidth);
@@ -120,14 +102,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
       onOpenChange={() => handleClose()}
     >
       <Drawer.Content
-        // Transparent at the Content level so the header section
-        // below can run its own translucent + backdrop-blur fill
-        // (page content behind the drawer reads through blurred,
-        // consistent with the rest of the site's translucent
-        // chrome — see BelowFoldIndicator, sequence overlays).
-        // The lower pane container has its own `bg.surface` white,
-        // so only the header area is translucent — everything
-        // below stays solid white.
+        // Transparent at the Content level so the header section below can run its own translucent +
+        // backdrop-blur fill (page content behind the drawer reads through blurred, consistent with the rest
+        // of the site's translucent chrome — see BelowFoldIndicator, sequence overlays).
         bg="transparent"
         ref={drawerContentRef}
         paddingX={0}

@@ -6,12 +6,9 @@ const ERASING_MS = 40;
 const HOLD_MS = 2600;
 
 /**
- * Cycle through `examples`, typing each one out, holding, then erasing — used
- * as an AI composer placeholder while idle. Returns the first example with no
- * animation under reduced-motion.
- *
- * Shared by AiPromptInput and LangySidebar; keep it here (next to
- * useCyclingVerb) rather than copy-pasting the timing logic into each surface.
+ * Cycle through `examples`, typing each one out, holding, then erasing — used as an AI
+ * composer placeholder while idle. Returns the first example with no animation under
+ * reduced-motion.
  */
 export function useTypewriterPlaceholder(active: boolean, examples: readonly string[]): string {
   const reduceMotion = useReducedMotion();

@@ -91,18 +91,7 @@ export function extractInlineBlocks(content: string): ContentBlock[] {
 }
 
 /**
- * Parses `trimmed` (already known to look like a JSON object or array) into
- * content blocks, but only when doing so actually produces structure worth
- * having — a real block type, or a single non-raw record. Returns `null` on
- * a parse failure or a parse that resolves to nothing more useful than raw
- * text, so the caller falls through to its other parsing strategies.
- */
-/**
- * A "text" block whose text is itself a nested JSON object naming a
- * different, non-"text" block type is parsed as that nested block instead —
- * some producers wrap a tool/thinking block in a text envelope. Returns
- * `null` (keep the outer text as plain text) on a parse failure, an object
- * that isn't itself typed, or one whose nested parse still reads as raw.
+ * Parses `trimmed` (already known to look like a JSON object or array) into content blocks, but only when doing so actually produces structure worth having — a real block type, or a single non-raw record.
  */
 function tryParseNestedJsonTextBlock(trimmed: string): ContentBlock[] | null {
   try {

@@ -1,9 +1,5 @@
 /**
  * The one place the app turns an error into something a person can read.
- *
- * See `dev/docs/best_practices/error-handling.md` and ADR-045. In short:
- * never render `error.message` — since #5984 it is the error's code slug —
- * read the handled payload and let the code-keyed registry supply the words.
  */
 
 // `ErrorActions` is deliberately absent: the two inline surfaces below render

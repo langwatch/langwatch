@@ -9,11 +9,8 @@ import {
 } from "../langy-error-explainer";
 
 /**
- * The kind list is the contract between the worker's turn classifier
- * (the Langy server turn-error contract) and the copy the
- * browser renders. Pinning it here means adding a backend kind without copy —
- * or renaming one — fails loudly instead of silently landing in the generic
- * default.
+ * The kind list is the contract between the worker's turn classifier (the Langy server
+ * turn-error contract) and the copy the browser renders.
  */
 
 function domain(overrides: Partial<LangyDomainError>): LangyDomainError {
@@ -254,18 +251,9 @@ describe("explainLangyError", () => {
     describe("when the failure is explained", () => {
       /** @scenario A rejected model call never recites the provider's own message */
       it("keeps the provider's sentence off the card", () => {
-        // This test asserted the OPPOSITE until the leak was found, on the
-        // reasoning that a provider's error body is written for its caller and
-        // is therefore safe to show. It is written for whoever holds the KEY,
-        // and on a LangWatch-managed provider that is us: OpenAI answers a bad
-        // key with `Incorrect API key provided: sk-proj-…`, so the card was one
-        // 401 away from printing a platform credential. Masking it afterwards
-        // only covers the credential shapes someone enumerated.
-        //
-        // The message here is the benign out-of-credits one, deliberately: the
-        // rule is that NO upstream prose reaches the card, not that we filter
-        // the dangerous-looking ones. A test using a key-shaped fixture would
-        // still pass against a scrubber.
+        // This test asserted the OPPOSITE until the leak was found, on the reasoning
+        // that a provider's error body is written for its caller and is therefore safe
+        // to show.
         const providerMessage =
           "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.";
         const presentation = explainLangyError(
@@ -320,14 +308,8 @@ describe("explainLangyError", () => {
       it.each(["insufficient_quota", "billing_hard_limit_reached"])(
         "promotes %s to the plan-limit card",
         (reasonCode) => {
-          // The meaning the old relay carried — "you have nothing left to
-          // spend" — survives as a discriminant rather than as the provider's
-          // sentence. `usage_limit_reached` and `codex_plan_limit` were already
-          // promoted; these two are the same situation reached through OpenAI's
-          // own API codes, and they were only ever explained by the prose.
-          //
-          // `meta.message` is populated and must still not appear: the copy is
-          // selected by the code and written in the registry.
+          // The meaning the old relay carried — "you have nothing left to spend" —
+          // survives as a discriminant rather than as the provider's sentence.
           const presentation = explainLangyError(
             domain({
               code: "langy_agent_errored",
@@ -571,10 +553,9 @@ describe("explainLangyError", () => {
 
 describe("isStaleLangyHistoryRead", () => {
   /**
-   * The panel demotes a failed history read to a one-line footnote whenever
-   * there is content on screen, so a 3s poll blip mid-turn cannot wipe an
-   * answer that is still streaming. That rule asked only whether anything was
-   * visible, never which failure had arrived.
+   * The panel demotes a failed history read to a one-line footnote whenever there is
+   * content on screen, so a 3s poll blip mid-turn cannot wipe an answer that is still
+   * streaming.
    */
   const readFailedWith = (code: string) => explainLangyError(domain({ code, httpStatus: 404 }));
 

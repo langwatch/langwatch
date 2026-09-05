@@ -1,18 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration test for `ProjectLangyLayout` — the layout route that mounts
- * Langy once per project so it survives navigation between project pages.
- *
  * Spec: specs/langy/langy-navigation-persistence.feature
  *       specs/langy/langy-worker-prewarm.feature
- *
- * Boundary mocks: the host port (project / team / permissions / feature flag,
- * subscribable so a project switch mid-test genuinely re-renders the layout
- * the way the real resolver's own query subscription would), `useDrawer`, and
- * the heavy `LangySidecar` chat surface. `LangyContext` and the Langy store are
- * REAL, so the open/closed state is genuine — its survival across navigation
- * is exactly what is under test.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen } from "@testing-library/react";
@@ -23,12 +12,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Controllable host state (flipped per-test to exercise the visibility gate).
-// The layout keys Langy by the AMBIENT project the host resolves, so the fake
-// host is SUBSCRIBABLE: in production a project change re-renders the layout
-// through the host's own query subscription, and a static value would
-// silently skip exactly the re-render under test. `setGateProject` notifies
-// like the real resolver does.
-// ---------------------------------------------------------------------------
 type GateProject = { id: string; slug: string; name: string } | undefined;
 
 const gate = {

@@ -1,14 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The run confirmation offers the parameters the run plan's scenarios declare,
- * prefilled from their defaults, and sends whatever is typed over them with the
- * run.
- *
- * The hook and the dialog are rendered together, the way the simulations page
- * wires them: the values live in useRunSuite and the dialog only shows them, so
- * neither half proves the behaviour on its own.
- *
  * @see specs/scenarios/scenario-run-parameters.feature
  * @see specs/scenarios/secret-run-parameters.feature
  */

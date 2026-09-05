@@ -20,12 +20,8 @@ interface TraceEditDiffDialogProps {
 }
 
 /**
- * The full difference between the trace as captured and the trace as
- * corrected, line by line.
- *
- * The comparison is over the pretty-printed payloads rather than a field-level
- * walk: a correction can change anything, and a reviewer checking their own
- * work wants to read the same shape they read everywhere else in the drawer.
+ * The full difference between the trace as captured and the trace as corrected, line by
+ * line.
  */
 export function TraceEditDiffDialog({ open, onClose, patch }: TraceEditDiffDialogProps) {
   // Null until the reader picks a side themselves, so the dialog can keep
@@ -187,10 +183,9 @@ function tabLabel(name: DiffTab, stat: DiffStat): string {
 }
 
 /**
- * Drops runs of unchanged lines that sit far from any change, leaving a marker
- * where they were. A corrected trace payload is mostly unchanged, and scrolling
- * past thousands of identical lines to find three edited ones is not reading a
- * diff.
+ * Drops runs of unchanged lines that sit far from any change, leaving a marker where
+ * they were. A corrected trace payload is mostly unchanged, and scrolling past
+ * thousands of identical lines to find three edited ones is not reading a diff.
  */
 export function collapseUnchanged(lines: DiffLine[]): (DiffLine | "gap")[] {
   const keep = new Array<boolean>(lines.length).fill(false);

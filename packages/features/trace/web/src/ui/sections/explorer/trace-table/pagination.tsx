@@ -15,29 +15,22 @@ interface PaginationProps {
   /** What one row is, for the totals copy: "traces" (default) or "conversations". */
   itemNoun?: string;
   /**
-   * Renders a placeholder bar in place of the page description while data is
-   * loading, so the pagination row doesn't pop in when the first page
-   * resolves. The pager keeps rendering; its disabled state doesn't change
-   * between loading and loaded for the initial page, and it anchors the row's
-   * height.
+   * Renders a placeholder bar in place of the page description while data is loading,
+   * so the pagination row doesn't pop in when the first page resolves.
    */
   isLoading?: boolean;
   /** Prevent page-racing only while a different page key is replacing data. */
   isTransitioning?: boolean;
   /**
-   * Upper bound of the active lens's page-size domain. The rows-per-page
-   * preference is shared across lenses, so a larger persisted value clamps
-   * to this bound for the range copy and the highlighted option, and sizes
-   * beyond it are not offered. Unset means the full option list applies.
+   * Upper bound of the active lens's page-size domain. The rows-per-page preference is
+   * shared across lenses, so a larger persisted value clamps to this bound for the
+   * range copy and the highlighted option, and sizes beyond it are not offered.
    */
   maxPageSize?: number;
 }
 
 /**
- * Which page numbers the sessions lens can open. `tracesV2.sessions` reads by
- * cursor alone, so a page is reachable only once something has handed us the
- * cursor that enters it: the first batch, any batch already walked, the one on
- * screen, and the one the current batch's cursor points at.
+ * Which page numbers the sessions lens can open.
  */
 function reachableWithCursorsOnly({
   page,
@@ -56,14 +49,8 @@ function reachableWithCursorsOnly({
 }
 
 /**
- * Store-driven pagination for the trace table: translates the filter store's
- * page state into the shared bar's props, one translation per lens.
- *
- * The flat lens's endpoint falls back to an offset read when no cursor is
- * passed, so every page number is jumpable; the cursor is still used for the
- * one step the current batch already knows about, which keeps sequential
- * paging keyset-fast. The sessions lens has no offset path at all, so it
- * offers only the pages a cursor can reach.
+ * Store-driven pagination for the trace table: translates the filter store's page state
+ * into the shared bar's props, one translation per lens.
  */
 export const Pagination: React.FC<PaginationProps> = ({
   totalHits,

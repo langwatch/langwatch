@@ -1,12 +1,5 @@
 /**
- * The way to connect an agent from code (ADR-128), opened from the new
- * agent flow. The agent-first path comes first: hand the setup to a
- * coding agent or to Langy, or read the guide. The snippets below are
- * for the reader who pastes it in themselves.
- *
- * The drawer keeps listening while it is open, so the agent appears on
- * the page as soon as the process connects, with no reload.
- *
+ * The way to connect an agent from code (ADR-128), opened from the new agent flow.
  * @see specs/features/agents/connected-agents-ui.feature
  */
 

@@ -1,11 +1,9 @@
 import { useEffect } from "react";
 
 /**
- * `⌘I` / `Ctrl+I` toggles the Langy panel globally. Mirrors
- * useGlobalAiShortcut from traces-v2. preventDefault claims it for the page
- * when keyboard focus is inside the document. If a text input is active
- * with a non-empty selection we bail to avoid hijacking OS shortcuts
- * users might be relying on (e.g. select-line).
+ * `⌘I` / `Ctrl+I` toggles the Langy panel globally. Mirrors useGlobalAiShortcut from
+ * traces-v2. preventDefault claims it for the page when keyboard focus is inside the
+ * document.
  */
 export function useGlobalLangyShortcut(onTrigger: () => void): void {
   useEffect(() => {

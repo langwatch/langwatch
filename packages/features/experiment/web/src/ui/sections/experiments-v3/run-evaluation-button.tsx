@@ -1,14 +1,5 @@
 /**
  * Global "Run Evaluation" button with validation.
- *
- * Before executing an evaluation:
- * 1. Validates all targets have their required mappings
- * 2. Validates all evaluators have their required mappings
- * 3. If any mapping is missing, opens the first drawer with missing mappings
- *
- * When running:
- * - Shows "Stop" button to abort
- * - Displays progress indicator
  */
 
 import { Button, Spinner } from "@chakra-ui/react";
@@ -98,13 +89,9 @@ export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonPro
       } else if (validation.firstInvalidEvaluator) {
         const { evaluator, targetId } = validation.firstInvalidEvaluator;
 
-        // A chip-style comparison evaluator isn't tied to one target — it
-        // needs the variants/golden-field picker (ComparisonConfigForm), not
-        // the generic per-target mappings UI below. Without comparisonContext
-        // wired, the drawer renders nothing to fix the reported problem: no
-        // picker, and Save stays disabled since the local comparison state
-        // falls back to empty. openComparisonEditor is the same entry point
-        // the column header uses to edit an existing comparison.
+        // A chip-style comparison evaluator isn't tied to one target — it needs the
+        // variants/golden-field picker (ComparisonConfigForm), not the generic
+        // per-target mappings UI below.
         if (isComparisonEvaluator(evaluator)) {
           openComparisonEditor(evaluator);
           return;
@@ -161,13 +148,8 @@ export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonPro
           }
         };
 
-        // onMappingChange must be registered via setFlowCallbacks (durable),
-        // NOT embedded in mappingsConfig (ephemeral complexProps). The evaluator
-        // editor drawer sources onMappingChange from flowCallbacks and renders
-        // the field-mapping section only when it is present — see issue #3441.
-        // Embedding it in mappingsConfig instead left "Run" opening a drawer
-        // with no mapping controls, so the user could not map the evaluator's
-        // required fields (issue #950). Mirrors useOpenEvaluatorEditor.
+        // onMappingChange must be registered via setFlowCallbacks (durable), NOT
+        // embedded in mappingsConfig (ephemeral complexProps).
         setFlowCallbacks("evaluatorEditor", createEvaluatorEditorCallbacks({ onMappingChange }));
 
         // Open the evaluator editor drawer. mappingsConfig is an object so it

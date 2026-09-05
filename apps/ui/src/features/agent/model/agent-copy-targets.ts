@@ -1,25 +1,5 @@
 /**
  * Which projects an agent may be replicated into, and whether the reader may.
- *
- * `platform/app/src/hooks/useProjectsForCopy.ts` answered this by importing
- * `~/server/api/rbac` into a browser hook — `hasPermissionWithHierarchy` for a
- * custom role's own permission list, `teamRoleHasPermission` for the built-in
- * team roles. `apps/ui` may not reach `~/server`, and it does not have to:
- * `@langwatch/authz-contract` publishes both answers, and the roles module says
- * in its own docblock that they are parity-tested against the rbac pair this
- * replaces.
- *
- * THE PERMISSION IS PER TEAM, NOT PER PAGE, which is why the session
- * capability's `hasPermission` is the wrong question here: it answers for the
- * scope the reader is standing in, and this list offers every project in every
- * organization they belong to. A team the reader holds no membership row in
- * contributes no projects at all — the same shape the platform hook had, where a
- * missing member row returned an empty list for that team rather than a set of
- * greyed rows.
- *
- * A project the reader may NOT create in is still listed, greyed, because being
- * told the target exists and is closed to you is more use than a short list with
- * no explanation. That is the platform dialog's behaviour, carried over.
  */
 
 import {
@@ -59,11 +39,6 @@ const TEAM_ROLES = new Set(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 
 /**
  * A custom role's own permission list, when it has a non-empty one.
- *
- * The column is JSON, so a row that has never been edited arrives as `null` and
- * a legacy row can arrive as anything. Only an array of strings is a permission
- * list; everything else falls through to the built-in role, which is what the
- * platform hook did when `permissions.length === 0`.
  */
 function assignedPermissions(member: AgentCopyTeamMember): readonly string[] | undefined {
   const permissions = member.assignedRole?.permissions;

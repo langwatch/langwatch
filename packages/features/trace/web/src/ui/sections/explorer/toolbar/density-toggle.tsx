@@ -45,24 +45,17 @@ export const DensityToggle: React.FC = () => {
       <Group attached>
         {OPTIONS.map(({ density: value, label, Icon }) => {
           const isActive = density === value;
-          // Active button reads as a calm flat surface (transparent bg,
-          // full-opacity icon), inactive sits on the muted/emphasized
-          // surface that says "available target". rchaves prefers this
-          // mapping — the active state is recognised by the *icon*
-          // crispness, the inactive button reads as the chip you can
-          // click to flip to.
+          // Active button reads as a calm flat surface (transparent bg, full-opacity icon), inactive sits on the muted/emphasized
+          // surface that says "available target". rchaves prefers this mapping — the active state is recognised by the *icon*
+          // crispness, the inactive button reads as the chip you can click to flip to.
           return (
             <IconButton
               key={value}
               aria-label={label}
               aria-pressed={isActive}
               variant="outline"
-              // Active button gets a clear "selected" treatment instead
-              // of the previous subtle opacity-only difference. The
-              // previous styling (transparent bg + 0.6 opacity on the
-              // inactive icon) read as two near-identical icon buttons
-              // sitting side by side — users couldn't tell which mode
-              // was active without hovering for the tooltip.
+              // Active button gets a clear "selected" treatment instead of the previous
+              // subtle opacity-only difference.
               bg={isActive ? "bg.muted" : "transparent"}
               color={isActive ? "fg" : "fg.muted"}
               borderColor={isActive ? "border" : "border.muted"}

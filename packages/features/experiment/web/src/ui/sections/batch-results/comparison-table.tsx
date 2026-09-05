@@ -1,9 +1,5 @@
 /**
  * ComparisonTable - Table component for comparing multiple evaluation runs.
- *
- * Displays stacked per-run values with colored indicators. Optionally
- * groups rows under collapsible headers keyed on a dataset-entry
- * metadata field (issue #4632).
  */
 
 import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
@@ -381,10 +377,9 @@ const meanScores = (totals: EvaluatorScoreTotals): GroupAggregates[string] => {
 };
 
 /**
- * Mean evaluator score per (runId, evaluatorId) across the rows in the
- * group. Aggregates from `evaluatorResults` rather than the top-level
- * evaluatorIds list — that field can be V2/V3 keyed and is not needed
- * here since we only display present scores.
+ * Mean evaluator score per (runId, evaluatorId) across the rows in the group.
+ * Aggregates from `evaluatorResults` rather than the top-level evaluatorIds list — that
+ * field can be V2/V3 keyed and is not needed here since we only display present scores.
  */
 const computeGroupAggregates = (
   rowsInGroup: ComparisonRow[],

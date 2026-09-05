@@ -13,15 +13,9 @@ interface DimInputs {
 }
 
 /**
- * Coordinates the "view switching" dim signal + refresh pulse for the trace
- * list. We dim only when the user explicitly switches view (filter, sort,
- * page, pageSize, or a non-rolling time-range change). `isPlaceholderData` fires
- * on every key change including the rolling-time-range tail update, which
- * would dim every minute on a live view — so we gate it behind a stable
- * "view key" that ignores from/to drift while a label preset is active.
- *
- * Primitive comparison instead of JSON.stringify keeps this allocation-free
- * on the hot path.
+ * Coordinates the "view switching" dim signal + refresh pulse for the trace list. We
+ * dim only when the user explicitly switches view (filter, sort, page, pageSize, or a
+ * non-rolling time-range change).
  */
 export function useViewSwitchingDim({ isFetching, isFetched, isPlaceholderData }: DimInputs): void {
   const queryText = useFilterStore((s) => s.debouncedQueryText);

@@ -13,12 +13,9 @@ import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state";
 const COMPACT_MAX_HEIGHT_PX = 300;
 const EXPANDED_MAX_HEIGHT_PX = 500;
 
-// Structural Markdown signals. We render plain text as Markdown in Pretty
-// mode only when one of these matches, so genuine prose / log dumps / stack
-// traces (which carry none of these) keep the literal monospace pre-wrap and
-// don't get reflowed. Emphasis + inline code are included per the spec; a
-// lone "#" or "*" mid-prose won't fire because the patterns require the
-// construct's full shape. See specs/traces-v2/io-pretty-markdown.feature
+// Structural Markdown signals. We render plain text as Markdown in Pretty mode only
+// when one of these matches, so genuine prose / log dumps / stack traces (which carry
+// none of these) keep the literal monospace pre-wrap and don't get reflowed.
 const MARKDOWN_SIGNALS: RegExp[] = [
   /^#{1,6}\s+\S/m, // ATX heading
   /^\s*[-*+]\s+\S/m, // bullet list item

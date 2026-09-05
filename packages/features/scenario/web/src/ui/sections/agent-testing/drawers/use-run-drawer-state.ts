@@ -1,7 +1,4 @@
 /**
- * What the Agent Testing run drawer reads: the run behind the address, the
- * layout the window allows, and the version of the case the run used.
- *
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  * @see specs/features/agent-testing/live-single-scenario-run.feature
  * @see specs/scenarios/scenario-version-on-runs.feature
@@ -67,11 +64,6 @@ export function hasCriteria(scenarioState: {
 
 /**
  * True once the judge has spoken: criteria, a verdict, a reasoning or an error.
- *
- * A verdict is a verdict with no criteria under it. A scripted run, such as the
- * ping an agent test sends, is judged by its script and answers with a verdict
- * and a reasoning alone. The pending line and the reread both read this, so a
- * scripted run stops asking for results it already holds.
  */
 export function hasVerdict(scenarioState: {
   results?: {
@@ -100,11 +92,6 @@ const SETTLED_REREAD_DELAYS_MS = [500, 1_000, 2_000, 4_000];
 
 /**
  * Reads the stored run again after the run settles, until the results arrive.
- *
- * The event that carries the terminal status can beat the write of the
- * results, and a settled run stops polling, so without this the drawer keeps
- * the state it held while the run was still going: no criteria, and no
- * success rate.
  */
 function useRereadOnSettled({
   scenarioRunId,
@@ -182,13 +169,6 @@ function useResolvedScenarioRunId({ open }: { open: boolean }): {
 
 /**
  * The run the drawer reads before its record exists.
- *
- * A run of one scenario opens the drawer the moment it is queued, and the
- * record lands a moment later. Without a stand-in the drawer would draw a
- * bare "Queued" line first and the whole layout after it, so the reader
- * watches the drawer build itself. The stand-in carries what is true at that
- * moment and nothing more: the run is queued, it holds no message, and it has
- * no verdict.
  */
 function queuedRunStandIn({
   scenarioId,
@@ -209,11 +189,8 @@ function queuedRunStandIn({
 }
 
 /**
- * The detail the drawer draws: the stored run, or the queued stand-in while
- * the record is still on its way.
- *
- * The scenario is read here rather than through the stream, because the
- * stream learns the scenario id from the run it does not have yet.
+ * The detail the drawer draws: the stored run, or the queued stand-in while the record
+ * is still on its way.
  */
 function useDrawerDetail({
   detail,
@@ -291,9 +268,6 @@ export function useRunDrawerState({ open }: { open: boolean }) {
 
 /**
  * True when a run-state read failed for a reason the reader must see.
- *
- * A run that is not found is the ordinary case while a run is queued: the
- * record is written after the job goes out, so NOT_FOUND means "not yet".
  */
 export function isHardReadError(error: unknown): boolean {
   if (!error) return false;

@@ -4,9 +4,8 @@ import type { ParetoDominance } from "@langwatch/experiment-web";
 import { formatTradeoffSummary } from "@langwatch/experiment-web";
 
 /**
- * The sentence is what a reader acts on, so it is held to the same standard
- * as the verdict: it may not describe a comparison the run did not make.
- *
+ * The sentence is what a reader acts on, so it is held to the same standard as the
+ * verdict: it may not describe a comparison the run did not make.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 

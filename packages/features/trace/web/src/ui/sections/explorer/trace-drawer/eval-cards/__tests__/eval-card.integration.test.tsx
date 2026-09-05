@@ -1,10 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration coverage for the lazy-loaded evaluator inputs in EvalCard.
- * Renders the real card tree and only mocks the boundaries: the tRPC query
- * that fetches a single evaluation's inputs, the drawer store (trace id), and
- * the org/project hook.
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

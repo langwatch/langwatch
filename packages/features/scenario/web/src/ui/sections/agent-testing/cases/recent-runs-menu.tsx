@@ -1,19 +1,6 @@
 /**
- * Every way into a recent run of the Scenarios tab: the button above the table,
- * the submenu of a row menu, and the button in the scenario editor.
- *
- * All three read one list, so a run reads the same and opens the same wherever
- * it is reached from. What changes between them is the scope: the open set, one
- * test suite, or one scenario.
- *
- * A row holds the run plan the run belongs to, how long ago it started and how
- * it did, and nothing more. The whole point is to reach a run in one click, so
- * the list stays scannable and the results themselves stay on the Results tab.
- *
- * The button is offered when the set has a scenario that ran inside the
- * period, which is the one question the list itself answers, so the control is
- * never offered over an empty list and never hidden over a full one.
- *
+ * Every way into a recent run of the Scenarios tab: the button above the table, the
+ * submenu of a row menu, and the button in the scenario editor.
  * @see specs/features/agent-testing/cases-table.feature
  */
 
@@ -143,10 +130,6 @@ function RecentRunsList({
 
 /**
  * The button itself, which reads the same whether it is on or off.
- *
- * It spreads what it is given: as the trigger of the menu it is handed the
- * click, the ref and the aria state, and dropping them leaves a button that
- * opens nothing.
  */
 function RecentRunsTrigger(props: ButtonProps) {
   return (
@@ -189,17 +172,6 @@ export function RecentRunsMenu(props: RecentRunsMenuProps) {
 
 /**
  * The same list, as a submenu of a row menu.
- *
- * A row menu offered "Open last run", which reached one run and said nothing
- * about the rest. The submenu offers the same runs the button above the table
- * offers, narrowed to the row it hangs off, so a row menu and the line above
- * the table answer the same question the same way.
- *
- * The runs are read only once the submenu is opened, so a menu that nobody
- * opens this far downloads nothing.
- *
- * The list carries its own test id: a row submenu can be open while the button
- * above the table is mounted, and one id on both would match twice.
  */
 export function RecentRunsSubmenu({
   period,

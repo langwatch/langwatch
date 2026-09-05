@@ -4,11 +4,8 @@ import { computeVariantMetrics } from "@langwatch/experiment-web";
 import type { BatchResultRow } from "@langwatch/experiment-web";
 
 /**
- * The paired cost/duration intervals decide dominance, and dominance is a
- * statement about an unordered pair. If asking "is a cheaper than b" and "is
- * b cheaper than a" can give answers that are not mirror images, the same run
- * can report a beats b AND b beats a.
- *
+ * The paired cost/duration intervals decide dominance, and dominance is a statement
+ * about an unordered pair.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 

@@ -2,12 +2,7 @@ import { createContext, type ReactNode, useContext } from "react";
 import type { RouterOutputs } from "../../trace-api";
 
 /**
- * The one payload behind the read-only share page. The share page resolves the
- * token once via `sharedTrace.get` and puts the result here; the per-trace
- * drawer hooks (`useTraceHeader`, `useSpanTree`, …) read their slice from this
- * context instead of firing their own `protectedProcedure` reads, which would
- * 401 for an anonymous viewer. When the context is absent (the normal in-app
- * drawer), the hooks fetch as usual. See ADR-057.
+ * The one payload behind the read-only share page.
  */
 export type SharedTraceData = RouterOutputs["sharedTrace"]["get"];
 

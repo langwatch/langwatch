@@ -13,10 +13,9 @@ export function TurnView({
   turn: ConversationTurn;
   collapseTools?: boolean;
   /**
-   * When provided, the turn's inner header renders a chevron button
-   * that calls this back. Used by the threaded layout so the
-   * collapse affordance sits inline with the role chip instead of
-   * duplicating it in an outer row.
+   * When provided, the turn's inner header renders a chevron button that calls this
+   * back. Used by the threaded layout so the collapse affordance sits inline with the
+   * role chip instead of duplicating it in an outer row.
    */
   onCollapse?: () => void;
 }) {

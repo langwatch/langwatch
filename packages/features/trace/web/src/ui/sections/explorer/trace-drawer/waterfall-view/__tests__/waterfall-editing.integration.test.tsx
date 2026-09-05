@@ -1,10 +1,7 @@
 /**
+ * What the waterfall reads while a correction is being written: the rows an earlier correction already changed
+ * still say so, and removing a row takes its detail pane with it.
  * @vitest-environment jsdom
- *
- * What the waterfall reads while a correction is being written: the rows an
- * earlier correction already changed still say so, and removing a row takes its
- * detail pane with it.
- * See specs/traces-v2/trace-edit-mode.feature.
  */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

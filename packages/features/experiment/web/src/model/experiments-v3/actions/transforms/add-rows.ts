@@ -12,12 +12,6 @@ const paddedTo = ({ values, length }: { values: string[]; length: number }): str
 
 /**
  * Append rows to an inline dataset.
- *
- * Inline records are stored column-first (`records[columnId] = values[]`), so a
- * row-shaped input is transposed here. Every column is first padded to the
- * current row count, so ragged columns stay aligned, and a value missing from a
- * row becomes an empty cell rather than a hole. Row keys accept a column id or
- * a column name, because that is what a caller reading the table sees.
  */
 export const addRows: Transform<
   AddRowsPayload,

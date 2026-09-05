@@ -12,17 +12,6 @@ import type {
 
 /**
  * The third lane on this process's transport: the one a live procedure rides.
- *
- * The families still to move — traces, the experiments workbench, simulations
- * and the Langy layout — each open one of these and leave it open. A screen
- * whose subscription quietly took the request lane instead would render once
- * and then look like a page that simply had no news, so what is pinned here is
- * WHICH LANE an operation takes, not only that it works.
- *
- * The other pinned property is the session. There is no credential on this
- * channel: the browser attaches the reader's own cookie because the channel is
- * opened against the reader's own origin. Send it anywhere else and it is an
- * anonymous channel that still connects.
  */
 
 class FakeChannel implements SseEventSourceLike {

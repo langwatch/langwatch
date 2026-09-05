@@ -1,17 +1,5 @@
 /**
  * Skill-invocation detection for coding-agent traces.
- *
- * Claude Code (and compatible harnesses) run a loaded skill through a
- * built-in tool named `Skill` — a `tool_use` block whose input carries the
- * skill's slug. The block-cost classifier already treats this name as a
- * distinct `skill_invocation` category (the coding-agent cost-intelligence
- * ADR, on a separate branch); the trace UI mirrors that so a reader can spot
- * "here I invoked /surf-pr" at a glance instead of it hiding among ordinary
- * Bash/Edit tool calls.
- *
- * Kept as a tiny standalone predicate (no dependency on the block-cost
- * domain, which lives server-side) so both the conversation transcript and
- * the span waterfall can share one definition of "this is a skill".
  */
 
 /** The built-in tool name a harness emits to RUN a skill. */
@@ -38,14 +26,9 @@ export function isSkillSpan({
 }
 
 /**
- * The invoked skill's slug (e.g. `"surf-pr"`), pulled from a `Skill`
- * tool_use's input. Returns null when the block isn't a skill invocation or
- * the slug is absent/blank, so callers fall back to the bare "Skill" label.
- *
- * Accepts the input as `unknown` — trace payloads are untrusted shape. The
- * harness sends `{ skill: string, args?: string }`; a couple of lenient
- * aliases (`skill_name`, `name`) are honoured for robustness against minor
- * wire drift, none of which change the primary contract.
+ * The invoked skill's slug (e.g. `"surf-pr"`), pulled from a `Skill` tool_use's input.
+ * Returns null when the block isn't a skill invocation or the slug is absent/blank, so
+ * callers fall back to the bare "Skill" label.
  */
 export function skillSlugFromInput(input: unknown): string | null {
   if (!isRecord(input)) return null;

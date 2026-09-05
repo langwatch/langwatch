@@ -102,13 +102,7 @@ export function groupSiblings(children: WaterfallTreeNode[]): (WaterfallTreeNode
 }
 
 /**
- * Canonical identity for a sibling group. Includes every field
- * `groupSiblings` folds by (name, type, toolName) plus the parent, so
- * expansion state and React keys can never collide across distinct
- * groups — two tool groups under one parent share `name` and differ
- * only by `toolName`. JSON-encoded rather than delimiter-joined:
- * span names and types are arbitrary telemetry, so any in-band
- * separator could alias two distinct tuples.
+ * Canonical identity for a sibling group.
  */
 export function siblingGroupKey(group: {
   parentSpanId: string | null;
@@ -161,11 +155,6 @@ export function flattenTree(
 
 /**
  * The spans a row is nested under, nearest parent first.
- *
- * A collapsed ancestor keeps its whole subtree out of the flattened list, so
- * bringing one span into view means knowing which rows are folded over it.
- * Stops at a parent the trace does not carry, the same way `buildTree` treats
- * an orphan as a root.
  */
 export function ancestorSpanIds({
   spans,

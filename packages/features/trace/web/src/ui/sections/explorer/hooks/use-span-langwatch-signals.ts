@@ -7,10 +7,9 @@ import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-con
 import { useTraceQueryArgs } from "./use-trace-query-args";
 
 /**
- * Secondary signal-detection query for the open drawer trace. Fired in
- * parallel with `useSpanTree` so the cheap waterfall/list payload renders
- * first and the badges + "Only LangWatch spans" filter light up once this
- * resolves. Returns a Map<spanId, signals[]> for O(1) row lookup.
+ * Secondary signal-detection query for the open drawer trace. Fired in parallel with
+ * `useSpanTree` so the cheap waterfall/list payload renders first and the badges +
+ * "Only LangWatch spans" filter light up once this resolves.
  */
 export function useSpanLangwatchSignals() {
   const shared = useSharedTrace();

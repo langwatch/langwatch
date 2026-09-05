@@ -2,12 +2,9 @@ import { describe, expect, it } from "vitest";
 import { countPresentValues } from "../utils";
 
 /**
- * A categorical facet keeps its default-value scaffolding visible even when a
- * value has zero matching traces (STATUS always lists OK / Error / Warning so
- * any of them is one click away to filter on). The section header's value-count
- * badge, however, should report how many values are actually *present* in the
- * data — so it tallies only `count > 0`. These tests pin that rule so the badge
- * can't drift back to counting the empty default rows.
+ * A categorical facet keeps its default-value scaffolding visible even when a value has
+ * zero matching traces (STATUS always lists OK / Error / Warning so any of them is one
+ * click away to filter on).
  */
 describe("countPresentValues", () => {
   describe("when some default values have zero matching traces", () => {

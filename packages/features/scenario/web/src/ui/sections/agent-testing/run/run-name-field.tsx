@@ -1,19 +1,5 @@
 /**
  * The name of the run, and the configurations this scope already ran with.
- *
- * The field is a plain input until the scope has a history. Once it has one, a
- * caret opens the list, typing filters it, the arrow keys move through it and
- * Enter takes the highlighted entry.
- *
- * The keys are handled on the wrapping element rather than on the input,
- * because the caret takes focus when it opens the list and Escape has to close
- * the list from either.
- *
- * Escape needs both halves. Stopping the event keeps it off the dialog's own
- * React tree, and the dialog turns its own Escape handling off while the list
- * is open, because that one listens on the document in the capture phase and
- * therefore runs before anything inside the dialog can stop it.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -68,10 +54,7 @@ function useRunNameList({
   const isListOpen = isOpen && shown.length > 0;
 
   /**
-   * Drops a close the field is still waiting on. Every path that opens the
-   * list calls this first: a blur arms a close for 140ms, so a person who
-   * moves from the caret into the field and types would otherwise watch the
-   * list they just opened close under them.
+   * Drops a close the field is still waiting on.
    */
   const cancelClose = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -204,9 +187,6 @@ function RunNameOptions({ list }: { list: RunNameList }) {
 
 /**
  * The keys of the field, handled on the wrapping element.
- *
- * Escape stops here: without that it reaches the dialog's own listener and
- * takes the whole dialog away instead of only the list.
  */
 function listKeyHandler(list: RunNameList) {
   return (event: React.KeyboardEvent) => {

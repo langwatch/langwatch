@@ -1,10 +1,6 @@
 /**
+ * The conversation's mode segment.
  * @vitest-environment jsdom
- *
- * The conversation's mode segment. Annotations are no longer one of the modes:
- * they read beside the turn they are about instead of in a rollup the reviewer
- * has to leave the conversation to open. See specs/traces-v2/annotations.feature
- * and specs/traces-v2/annotation-rail.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

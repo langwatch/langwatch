@@ -1,10 +1,5 @@
 /**
  * The live-run subscription of the Agent Testing page.
- *
- * It refreshes the same query keys the v1 page refreshes, so a person moving
- * between the two interfaces never reads a stale list, and it steers a run
- * started from the SDK into this tab instead of a new browser tab.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 

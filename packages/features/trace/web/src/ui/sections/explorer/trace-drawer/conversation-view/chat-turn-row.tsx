@@ -51,12 +51,6 @@ interface MessageAnnotationSummary {
 
 /**
  * Which of a turn's comments read on which of its two messages.
- *
- * A comment about the turn as a whole is a judgement on the answer it gave, so
- * it counts on the reply, beside the comments left on the reply itself. A
- * comment on the turn's input counts on the message the user sent. Anything
- * narrower belongs to the surface where that part is read and counts on
- * neither.
  */
 function splitAnnotationsBySide({
   traceId,
@@ -385,10 +379,9 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
 });
 
 /**
- * A turn message slot whose content was hidden by a privacy rule. Reuses the
- * same role icon + label chrome as a real message (so the side/role still reads
- * at a glance) but renders the shared `RedactedInline` marker where the prose
- * would be. One treatment across the bubbles and thread layouts.
+ * A turn message slot whose content was hidden by a privacy rule. Reuses the same role
+ * icon + label chrome as a real message (so the side/role still reads at a glance) but
+ * renders the shared `RedactedInline` marker where the prose would be.
  */
 function RedactedTurnLine({
   layout,
@@ -466,10 +459,8 @@ interface TurnMessageProps {
 }
 
 /**
- * One message bubble in a turn, rendered either as a side bubble (bubbles
- * layout) or a full-width ChatGPT-style row (thread layout). Both share the
- * same tone / label / annotation inputs so toggling the layout never changes
- * what's shown, only how it's arranged.
+ * One message bubble in a turn, rendered either as a side bubble (bubbles layout) or a
+ * full-width ChatGPT-style row (thread layout).
  */
 function TurnMessage({ layout, side, media, ...rest }: TurnMessageProps) {
   if (layout === "thread") {
@@ -637,11 +628,9 @@ interface LedgerSegment {
 }
 
 /**
- * The scannable few fields a separator carries, in reading order: duration,
- * latency, cost, how many events the turn recorded, and how long ago it ran. A
- * field the turn has nothing to say about is left out rather than shown as
- * zero. The model abbreviation and the raw input→output token count read as
- * cryptic here, and live in the trace header and metrics instead.
+ * The scannable few fields a separator carries, in reading order: duration, latency,
+ * cost, how many events the turn recorded, and how long ago it ran. A field the turn
+ * has nothing to say about is left out rather than shown as zero.
  */
 function turnLedgerSegments(turn: TraceListItem): LedgerSegment[] {
   const segments: LedgerSegment[] = [{ id: "duration", text: formatDuration(turn.durationMs) }];
@@ -746,18 +735,9 @@ const TurnSeparator: React.FC<{
   const readsSelected = isCurrent || countsInSession;
   const annotationsOnLeft = assistantSide === "left";
   /*
-   * Hover actions float over one end of the separator instead of sitting in
-   * flow: the hidden chrome used to reserve ~180px of width, stopping the
-   * divider line short of the edge. Absolutely positioned, the lines span the
-   * full width and the actions overlay the end while the pointer is on the
-   * turn.
-   *
-   * The badge stays in flow, because it is on screen the whole time a turn
-   * carries an annotation and overlaying it would cover the ledger. That puts
-   * it at the same end as the actions, so the actions anchor to the badge
-   * rather than to the separator: a hidden action row is still a click target,
-   * and one lying across the badge swallows the click that opens the
-   * annotation list.
+   * Hover actions float over one end of the separator instead of sitting in flow: the
+   * hidden chrome used to reserve ~180px of width, stopping the divider line short of
+   * the edge.
    */
   const badgeAnchor = annotationsOnLeft
     ? { left: "100%", marginLeft: 2 }

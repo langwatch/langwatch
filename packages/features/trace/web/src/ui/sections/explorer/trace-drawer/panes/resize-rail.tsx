@@ -9,19 +9,6 @@ import {
 
 /**
  * Left-edge resize rail for the trace drawer.
- *
- * Inspired by the evaluations-v3 EditableCell expansion handle: a
- * thin vertical pill sits centered on the outer edge of the drawer with
- * a generous full-height invisible hit area around it. The whole rail is
- * draggable; the visible pill is purely an affordance.
- *
- * Gestures:
- *   - drag (pointerdown + move) → continuous width update
- *   - double-click → snap-maximize / restore (no single-click toggle)
- *
- * The rail intentionally does not receive keyboard focus — Tab should
- * never land on the invisible chrome. The M shortcut covers the
- * keyboard-driven maximize path.
  */
 export function ResizeRail() {
   const widthPx = useDrawerStore((s) => s.widthPx);

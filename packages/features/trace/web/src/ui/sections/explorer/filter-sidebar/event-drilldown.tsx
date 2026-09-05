@@ -20,19 +20,15 @@ interface EventDrilldownProps {
   item: FacetItem;
   ast: LiqeQuery;
   /**
-   * Toggle one top-level facet clause: `event.attribute.<metric key>` and,
-   * when the row is inactive, the `event:<type>` anchor added ahead of it.
-   * Two different active events still AND as trace-scoped subqueries — an
-   * accepted limitation; this only fixes the unscoped case.
+   * Toggle one top-level facet clause: `event.attribute.<metric key>` and, when the row
+   * is inactive, the `event:<type>` anchor added ahead of it.
    */
   toggleFacet: ({ field, value }: { field: string; value: string }) => void;
 }
 
 /**
- * Inline drilldown under an event-name row, rendered purely from
- * `item.eventMetrics` the discover endpoint already attached — no query of
- * its own. Labels are humanised, values are not: a row reads "thumbs down"
- * and emits the stored string verbatim so the filter round-trips.
+ * Inline drilldown under an event-name row, rendered purely from `item.eventMetrics`
+ * the discover endpoint already attached — no query of its own.
  */
 export const EventDrilldown: React.FC<EventDrilldownProps> = ({ item, ast, toggleFacet }) => {
   const metrics = item.eventMetrics ?? [];

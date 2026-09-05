@@ -1,34 +1,7 @@
 /**
+ * What the three addresses this change serves are actually behind, proved by mounting
+ * them.
  * @vitest-environment jsdom
- *
- * What the three addresses this change serves are actually behind, proved by
- * mounting them.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice a
- * loader that names the wrong grant — the failure that refuses a reader the
- * platform page admitted, or admits one it refused. So this file loads the real
- * loaders, mounts what they hand back under a session that answers precisely,
- * and reads the result.
- *
- * THE ASSERTION MOST OF THIS FILE MAKES IS AN ABSENCE, and it is deliberate.
- * None of these three keys carried a page-level grant or a flag in
- * `platform/app`: the two settings pages were `SettingsLayout` and nothing else,
- * deciding inline what a reader may DO; `/cli/auth` had no guard because it does
- * its own session redirect, which a permission guard would pre-empt. Inventing
- * one here would refuse readers the product admits today. The refusals are
- * asserted in BOTH directions, which is what turns "we did not add a guard" into
- * a decision somebody can disagree with.
- *
- * THE CHROME IS `NavigationShell` NOW, MOUNTED HERE — see
- * `settings-family-page-policy.integration.test.tsx` for why: this
- * application's own settings layout, which drew a duplicate of
- * `NavigationShell`'s own sidebar, is deleted. `/cli/auth` is not a
- * `/settings` address, so `NavigationShell` draws it no settings sidebar
- * either — the same absence the CLI authorize case below still asserts.
- *
- * Specs: specs/api-keys/unified-api-keys.feature,
- *        specs/secrets/secrets-manager.feature,
- *        specs/ai-governance/cli-onboarding/login-unified.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -4,9 +4,8 @@ import type { TraceEvalResult, TraceListItem } from "../types/trace";
 
 /**
  * Table-layer helpers for per-evaluator eval columns. The id grammar
- * (`eval:<field>:<evaluatorKey>`) lives in the dependency-free
- * `lens/evalColumnId`; this module adds the bits that need the trace data
- * shape and TanStack. See dev/docs/adr/029-trace-table-per-evaluator-columns.md.
+ * (`eval:<field>:<evaluatorKey>`) lives in the dependency-free `lens/evalColumnId`;
+ * this module adds the bits that need the trace data shape and TanStack.
  */
 
 /** Resolve the human label for an eval column header / picker entry. */
@@ -24,12 +23,9 @@ export function evalColumnLabel({
 }
 
 /**
- * The latest run of `evaluatorKey` on this trace. The server returns
- * evaluations ordered UpdatedAt DESC, so the first match per evaluator is
- * the most recent run (the first-in-DESC-order rule `EvaluationsCell` also
- * uses). An evaluator-id match takes precedence over a name match across
- * the whole list, so a free-text *name* the user typed still resolves
- * without a stray same-name collision beating the real id.
+ * The latest run of `evaluatorKey` on this trace. The server returns evaluations
+ * ordered UpdatedAt DESC, so the first match per evaluator is the most recent run (the
+ * first-in-DESC-order rule `EvaluationsCell` also uses).
  */
 export function latestEvalForKey({
   row,

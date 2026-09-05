@@ -1,16 +1,5 @@
 /**
  * Steps card for the PR-opening flow.
- *
- * The card shows checkpoints (cloning → branched → committed → pushed → opened)
- * as Langy's worker runs them. Each event is derived from the turn's TOOL PARTS
- * via {@link githubProgressFromToolParts} — `git push` IS the push, so the card
- * reads what the agent actually ran rather than a `[langy:progress:...]` marker
- * the model was asked to print into its reply. See
- * @langwatch/langy-contract github-command.ts.
- *
- * Because tool parts are persisted with the message (the sentinels were stripped
- * before persistence), the card now survives a refresh. It did not used to.
- *
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { Box, HStack, Text } from "@chakra-ui/react";

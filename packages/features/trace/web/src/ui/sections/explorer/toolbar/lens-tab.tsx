@@ -25,10 +25,9 @@ interface LensTabProps {
   isDraft: boolean;
   errorCount: number;
   /**
-   * When true the tab still mounts (so its `data-value` lives in the DOM
-   * and the overflow measurement loop can keep tracking lens identity)
-   * but is laid out with `display: none` so it occupies no space and
-   * isn't visible. The overflow menu surfaces these instead.
+   * When true the tab still mounts (so its `data-value` lives in the DOM and the
+   * overflow measurement loop can keep tracking lens identity) but is laid out with
+   * `display: none` so it occupies no space and isn't visible.
    */
   hidden?: boolean;
 }
@@ -57,12 +56,8 @@ export const LensTab: React.FC<LensTabProps> = ({ lens, isDraft, errorCount, hid
     revertLens(lens.id);
   };
 
-  // Build the screen-reader label up front so the badge count reads
-  // separated from the lens name. Without an explicit aria-label the
-  // browser concatenates the inner text ("Errors" + the badge's "5")
-  // into a single string "Errors5" — fine visually because the badge
-  // is offset with margin, broken for screen readers and any DOM-text
-  // consumer (test assertions, analytics).
+  // Build the screen-reader label up front so the badge count reads separated from the
+  // lens name.
   const ariaLabel =
     errorCount > 0 ? `${lens.name}, ${errorCount} error${errorCount === 1 ? "" : "s"}` : undefined;
 
@@ -133,11 +128,8 @@ const BuiltInTooltip: React.FC<BuiltInTooltipProps> = ({ enabled, children }) =>
 };
 
 /**
- * Orange dot marking a lens with unsaved local edits. Clicking the dot
- * opens a popover explaining "changes made" and offering Discard /
- * Save as new lens. Replaces the previous bare dot — which carried the
- * signal but no affordance, leaving users guessing what it meant or
- * how to resolve it.
+ * Orange dot marking a lens with unsaved local edits. Clicking the dot opens a popover
+ * explaining "changes made" and offering Discard / Save as new lens.
  */
 const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({ lensId, lensName }) => {
   const revertLens = useViewStore((s) => s.revertLens);
@@ -167,12 +159,7 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({ lensId, lens
                 as="span"
                 role="button"
                 tabIndex={0}
-                // Bumped 6px → 8px + ring. Original was easy to miss
-                // (especially against busy backgrounds), and missing it
-                // meant a stale draft filter loaded from localStorage
-                // could silently scope the table to a previous session's
-                // query without the user realising. The ring gives the
-                // dot some "halo" so it pops at a glance.
+                // Bumped 6px → 8px + ring.
                 width="8px"
                 height="8px"
                 borderRadius="full"
@@ -253,13 +240,9 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({ lensId, lens
 };
 
 const ErrorBadge: React.FC<{ count: number }> = ({ count }) => (
-  // The lens-tab error count is the only aggregate "how bad is it right now"
-  // signal on the trace explorer — every other surface (row tint, in-drawer
-  // exception accordion) is per-trace. It needs to read at a glance from
-  // across the room, so it's the only place we use a `solid` red badge
-  // instead of the subtle/muted treatment the rest of the tabs use. The
-  // count is bound to the user's currently-selected time range so it
-  // matches the window every other panel is querying.
+  // The lens-tab error count is the only aggregate "how bad is it right now" signal on
+  // the trace explorer — every other surface (row tint, in-drawer exception accordion)
+  // is per-trace.
   <Box
     as="span"
     display="inline-flex"

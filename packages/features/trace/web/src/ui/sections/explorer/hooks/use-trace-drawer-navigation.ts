@@ -5,11 +5,6 @@ import { guardTraceEditExit } from "../utils/trace-edit-mode";
 
 /**
  * Trace-to-trace navigation inside the v2 drawer with a back stack.
- *
- * `useDrawer` skips same-drawer navigations from its stack, so jumping
- * between traces in the conversation view would lose history. We keep our
- * own stack in `drawerStore` so the drawer can offer "back" through prior
- * traces (and remember which view mode the user was in).
  */
 export function useTraceDrawerNavigation() {
   const { openDrawer } = useDrawer();
@@ -39,10 +34,7 @@ export function useTraceDrawerNavigation() {
       fromTimestamp?: number;
       toTraceId: string;
       /**
-       * Trace's actual occurredAt (ms). Forwarded to the URL as `drawer.t`
-       * so per-trace queries use the same cache key as the prefetch — without
-       * this, jumping between siblings creates a fresh key each time and
-       * re-fetches even when the data is already in the cache.
+       * Trace's actual occurredAt (ms).
        */
       toTimestamp?: number;
       toViewMode?: DrawerViewMode;

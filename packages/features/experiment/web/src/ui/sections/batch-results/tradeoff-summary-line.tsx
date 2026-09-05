@@ -1,11 +1,6 @@
 /**
- * The trade-off chart's conclusion, rendered above the chart rather than
- * below it (#5103).
- *
- * Order is the point. A reader who stops after one line should still have
- * the answer; the scatter underneath is for checking it, not for reaching
- * it. Placing this after the chart would make the chart the primary reading
- * and this a footnote to work the reader already did.
+ * The trade-off chart's conclusion, rendered above the chart rather than below it
+ * (#5103).
  */
 import { HStack, Icon, Text } from "@chakra-ui/react";
 import { useMemo } from "react";

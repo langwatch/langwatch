@@ -8,21 +8,7 @@ import { useFilterStore } from "../../../../index";
 import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail";
 
 /**
- * Error surface for the FloatingAiBar. The floating bar covers the docked
- * search bar (where the unified error banner lives) while AI mode is
- * active, so a failure must render inside the floating overlay itself —
- * otherwise the request fails with no visible feedback at all (customer
- * report: Ask AI "does nothing", the provider_error only visible in the
- * network tab).
- *
- * Model-configuration failures additionally deep-link to Model Providers
- * settings: they almost always trace back to the project's model
- * configuration (wrong deployment, disabled provider, stale credentials),
- * and the operator can't act on a bare "Resource not found".
- *
- * The words come from `explainAnyError` — the code-keyed registry — not from
- * the error. This row used to render a server-composed sentence built out of
- * the SDK's own exception text.
+ * Error surface for the FloatingAiBar.
  */
 const CONFIGURATION_CODES = new Set([
   "ai_query_provider_error",

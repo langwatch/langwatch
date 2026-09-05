@@ -5,10 +5,9 @@ import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-c
 import type { CellDef } from "../../types";
 
 /**
- * Stored payload size of the trace (`_size_bytes` on trace_summaries),
- * humanised into decimal byte units ("12 kB", "1.4 MB"). Right-aligned like
- * the other numeric columns; an empty / zero size reads as an em-dash via
- * `formatBytes`.
+ * Stored payload size of the trace (`_size_bytes` on trace_summaries), humanised into
+ * decimal byte units ("12 kB", "1.4 MB"). Right-aligned like the other numeric columns;
+ * an empty / zero size reads as an em-dash via `formatBytes`.
  */
 export const SizeCell = {
   id: "size",

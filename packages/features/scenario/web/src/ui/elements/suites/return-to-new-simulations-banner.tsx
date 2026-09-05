@@ -13,15 +13,6 @@ import { clearNewSimulationsCalloutSnooze } from "./new-simulations-callout";
 
 /**
  * The way back to the new simulations screens, on the previous ones.
- *
- * A person who clicked "go back" on the welcome callout recorded a
- * per-browser preference for the previous screens
- * ({@link useLegacySimulationsPreference}), and without this banner that
- * choice had no way back. It shows only on that browser, only while the
- * Agent Testing release flag is on for the project, and a click clears the
- * preference and the welcome callout's dismissal, so the offer to return
- * works again in both directions.
- *
  * @see specs/suites/new-simulations-callout.feature
  */
 export function ReturnToNewSimulationsBanner({

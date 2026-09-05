@@ -12,10 +12,8 @@ interface SuggestionDropdownProps {
   ui: SuggestionUIState;
   onSelect: (label: string) => void;
   /**
-   * Horizontal offset (in pixels) from the search bar's left edge to the
-   * cursor's screen position. The dropdown anchors there instead of the
-   * far-left of the input — important when typing the second/third clause
-   * so the suggestions sit under the active token, not back at column 0.
+   * Horizontal offset (in pixels) from the search bar's left edge to the cursor's
+   * screen position.
    */
   anchorX?: number;
 }
@@ -36,10 +34,9 @@ export const SuggestionDropdown: React.FC<SuggestionDropdownProps> = ({
 };
 
 /**
- * The panel every suggestion list sits in: anchored under its input, lifted
- * like the other popovers of the app, with the key hints in its foot. The
- * search bar puts its grouped fields in it; a parameter line puts its names
- * and values in it.
+ * The panel every suggestion list sits in: anchored under its input, lifted like the
+ * other popovers of the app, with the key hints in its foot. The search bar puts its
+ * grouped fields in it; a parameter line puts its names and values in it.
  */
 export const SuggestionPanel: React.FC<{
   children: React.ReactNode;
@@ -48,10 +45,9 @@ export const SuggestionPanel: React.FC<{
   anchorX?: number;
   testId?: string;
   /**
-   * The id of the list of options, when the input that owns the panel points
-   * at it with `aria-controls` and `aria-activedescendant`. It lands on the
-   * box that holds the rows, not on the panel, so the footer stays out of the
-   * listbox.
+   * The id of the list of options, when the input that owns the panel points at it with
+   * `aria-controls` and `aria-activedescendant`. It lands on the box that holds the
+   * rows, not on the panel, so the footer stays out of the listbox.
    */
   listboxId?: string;
 }> = ({ children, footerAction, anchorX, testId, listboxId }) => (
@@ -144,12 +140,9 @@ const SyntaxDocsButton: React.FC = () => {
 };
 
 /**
- * Renders the items partitioned by `group`. Field-mode dropdowns show
- * section headers (Trace / Span / Event / Eval / Metrics / Scenario);
- * value-mode dropdowns have no group and render as a single ungrouped
- * list. Selection index threads through the partitioned layout —
- * keyboard navigation walks the *flat* list (`ui.items`) and we map
- * each row's flat index back to a per-section slot when rendering.
+ * Renders the items partitioned by `group`. Field-mode dropdowns show section headers
+ * (Trace / Span / Event / Eval / Metrics / Scenario); value-mode dropdowns have no
+ * group and render as a single ungrouped list.
  */
 const GroupedItems: React.FC<{
   ui: SuggestionUIState;
@@ -233,12 +226,9 @@ interface GroupedSection {
 const FACET_GROUP_LABEL = new Map(FACET_GROUPS.map((g) => [g.id, g.label] as const));
 
 /**
- * Bucket the flat suggestion list by the SAME taxonomy the facet sidebar /
- * manager use (`getFacetGroupId`), so the dropdown's section headers read
- * identically to the facet manager — "Traces", "Errors", "Spans & Events",
- * etc. Fields with no facet group (time, scenario, dynamic prefixes) fall
- * into a trailing "Other". Group order follows `FACET_GROUPS`; within a
- * group, rows keep their (rank-sorted) flat-list order.
+ * Bucket the flat suggestion list by the SAME taxonomy the facet sidebar / manager use (`getFacetGroupId`), so
+ * the dropdown's section headers read identically to the facet manager — "Traces", "Errors", "Spans & Events",
+ * etc. Fields with no facet group (time, scenario, dynamic prefixes) fall into a trailing "Other".
  */
 function groupRows(items: SuggestionRow[]): GroupedSection[] {
   const buckets = new Map<

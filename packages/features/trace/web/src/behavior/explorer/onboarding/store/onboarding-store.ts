@@ -5,24 +5,9 @@ import {
 } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
 
 /**
- * Consolidated onboarding state. Combines the stage state-machine, the
- * per-project dismissal flag, the in-memory `setupDisengaged` and
- * `tourActive` overrides, and the localStorage helpers for one-time
- * decisions (density confirmed, journey completed).
- *
- * Lives in the onboarding module so the rest of the codebase doesn't
- * have to know how onboarding state is shaped — it talks to the
- * public hooks (`useOnboardingActive`, `useTourEntryPoints`,
- * `useSamplePreview`) instead. The store itself stays internal.
- *
- * Field lifecycles, for reference:
- *
- *   stage, history, arrivedAt          — ephemeral; reset on unmount
- *   setupDisengaged                     — ephemeral; per-mount
- *   tourActive                          — ephemeral; cleared on dismiss
- *   setupDismissedByProject             — persisted (localStorage)
- *   density-confirmed flag              — persisted (separate key)
- *   journey-completed flag              — persisted (separate key)
+ * Consolidated onboarding state. Combines the stage state-machine, the per-project
+ * dismissal flag, the in-memory `setupDisengaged` and `tourActive` overrides, and the
+ * localStorage helpers for one-time decisions (density confirmed, journey completed).
  */
 
 interface OnboardingState {
@@ -40,59 +25,44 @@ interface OnboardingState {
    */
   history: StageId[];
   /**
-   * Monotonically increasing counter bumped by `replayStage()`. The
-   * hero motion key incorporates this token so a "replay current"
-   * action remounts the typewriter (or any other keyed effect) even
-   * when the underlying stage / heading hasn't changed. The token
-   * is in-memory only; reset semantics don't matter because
-   * consumers only watch for a *change*.
+   * Monotonically increasing counter bumped by `replayStage()`. The hero motion key
+   * incorporates this token so a "replay current" action remounts the typewriter (or
+   * any other keyed effect) even when the underlying stage / heading hasn't changed.
    */
   replayToken: number;
   /**
-   * Per-project persistent dismissal of the empty-state onboarding
-   * card. Keyed on `projectId` so dismissing the card on Project A
-   * doesn't hide it on Project B. Persisted to localStorage so a
-   * reload (or a different tab on the same browser/profile) honours
-   * the dismissal.
+   * Per-project persistent dismissal of the empty-state onboarding card. Keyed on
+   * `projectId` so dismissing the card on Project A doesn't hide it on Project B.
    */
   setupDismissedByProject: Record<string, boolean>;
   /**
-   * "User has committed to leaving the empty-state card" — flipped
-   * true the moment they click any exit action so the chrome dim
-   * lifts immediately, even when the card itself is still finishing
-   * its post-send countdown animation. In-memory only; reset whenever
-   * the card is re-opened.
+   * "User has committed to leaving the empty-state card" — flipped true the moment they
+   * click any exit action so the chrome dim lifts immediately, even when the card
+   * itself is still finishing its post-send countdown animation.
    */
   setupDisengaged: boolean;
   /**
-   * Forces the empty-state journey + sample-data preview to show
-   * regardless of `firstMessage`. Used by the toolbar's Tour button
-   * so existing customers can opt back into the demo experience on
-   * demand. In-memory only — closing the tab or hitting any dismiss
-   * path clears it so we don't sticky-trap real users in the demo.
+   * Forces the empty-state journey + sample-data preview to show regardless of
+   * `firstMessage`. Used by the toolbar's Tour button so existing customers can opt
+   * back into the demo experience on demand.
    */
   tourActive: boolean;
   /**
-   * Per-project epoch-ms timestamp of when the integration CTA card
-   * was dismissed. The card reappears after 14 days so users who
-   * integrate later still get a reminder if they haven't sent traces
-   * yet. Keyed on projectId. Persisted to localStorage.
+   * Per-project epoch-ms timestamp of when the integration CTA card was dismissed. The
+   * card reappears after 14 days so users who integrate later still get a reminder if
+   * they haven't sent traces yet. Keyed on projectId. Persisted to localStorage.
    */
   integrationCtaDismissedAtByProject: Record<string, number>;
   /**
-   * In-memory toggle for the "See sample data" toolbar button. When
-   * true, sample preview traces are injected into the table alongside
-   * (or instead of) real ones, with a SampleDataBanner ribbon as the
-   * marker. Defaults to false. Not persisted — the toolbar button is
-   * the explicit opt-in each session.
+   * In-memory toggle for the "See sample data" toolbar button. When true, sample
+   * preview traces are injected into the table alongside (or instead of) real ones,
+   * with a SampleDataBanner ribbon as the marker. Defaults to false.
    */
   showSamplePreview: boolean;
   /**
-   * Phase 2 spotlight tour — whether the contextual spotlight overlay
-   * is currently rendered. Decoupled from `tourActive` (the legacy
-   * journey state-machine flag, now dormant). Flipped on by the
-   * "Show me around" toolbar button or by parsing `#sp=<id>` from the
-   * URL fragment on mount.
+   * Phase 2 spotlight tour — whether the contextual spotlight overlay is currently
+   * rendered. Decoupled from `tourActive` (the legacy journey state-machine flag, now
+   * dormant).
    */
   spotlightsActive: boolean;
   /**
@@ -102,10 +72,9 @@ interface OnboardingState {
    */
   currentSpotlightId: string | null;
   /**
-   * Browser-level guard against starting the automatic first-trace tour
-   * more than once in the same profile. The server-backed user preference
-   * is the authoritative dismissal across projects, browsers, and devices.
-   * See specs/traces-v2/tour-visibility-and-persistence.feature
+   * Browser-level guard against starting the automatic first-trace tour more than once
+   * in the same profile. The server-backed user preference is the authoritative
+   * dismissal across projects, browsers, and devices.
    */
   firstTraceSpotlightFired: boolean;
   /**
@@ -118,10 +87,9 @@ interface OnboardingState {
   setStage: (stage: StageId) => void;
   goBack: () => void;
   /**
-   * Replay the current beat — bumps `replayToken` to force any
-   * keyed-by-token consumer (the hero `<AnimatePresence>` for the
-   * typewriter, the aurora) to remount. No stage transition; the
-   * journey stays where it is.
+   * Replay the current beat — bumps `replayToken` to force any keyed-by-token consumer
+   * (the hero `<AnimatePresence>` for the typewriter, the aurora) to remount. No stage
+   * transition; the journey stays where it is.
    */
   replayStage: () => void;
   reset: () => void;
@@ -134,11 +102,8 @@ interface OnboardingState {
   setSpotlightsActive: (active: boolean) => void;
   setCurrentSpotlightId: (id: string | null) => void;
   /**
-   * One-shot global: call when `hasAnyTraces` transitions false → true
-   * so we can auto-start the spotlight tour on the browser's first real
-   * trace. Idempotent — re-calling is safe; the consumer should still
-   * gate on `firstTraceSpotlightFired` to avoid re-triggering the
-   * overlay every render.
+   * One-shot global: call when `hasAnyTraces` transitions false → true so we can
+   * auto-start the spotlight tour on the browser's first real trace.
    */
   markFirstTraceSpotlightFired: () => void;
   /**
@@ -150,11 +115,9 @@ interface OnboardingState {
 
 const STORAGE_KEY = "langwatch:traces-v2:onboarding:state:v1";
 /**
- * Old key from when these fields lived inside `uiStore`. Read once
- * at module init for backwards compatibility — without this, every
- * project a user previously dismissed would show the journey again.
- * Safe to leave the old key untouched: `uiStore` keeps using it for
- * its remaining persisted fields (sidebar collapsed).
+ * Old key from when these fields lived inside `uiStore`. Read once at module init for
+ * backwards compatibility — without this, every project a user previously dismissed
+ * would show the journey again.
  */
 const LEGACY_UI_STORE_KEY = "langwatch:traces-v2:ui";
 
@@ -173,10 +136,9 @@ const DEFAULT_PERSISTED: PersistedShape = {
 };
 
 /**
- * Resolve the global first-trace-tour flag from a persisted blob,
- * migrating the old per-project map: if the stored shape predates the
- * global flag, treat "fired in any project" as globally seen so existing
- * users on this browser aren't re-toured after the migration.
+ * Resolve the global first-trace-tour flag from a persisted blob, migrating the old per-project map: if the
+ * stored shape predates the global flag, treat "fired in any project" as globally seen so existing users on this
+ * browser aren't re-toured after the migration.
  */
 function firstTraceFiredFrom(raw: unknown): boolean {
   if (typeof raw !== "object" || raw === null) return false;
@@ -393,10 +355,9 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 // ---------------------------------------------------------------------------
 
 /**
- * Per-browser flag tracking whether the user has ever confirmed a density
- * during the onboarding journey. The first confirmation sets it; subsequent
- * journeys skip the `densityIntro` stage so the user isn't asked the same
- * one-time preference repeatedly.
+ * Per-browser flag tracking whether the user has ever confirmed a density during the
+ * onboarding journey. The first confirmation sets it; subsequent journeys skip the
+ * `densityIntro` stage so the user isn't asked the same one-time preference repeatedly.
  */
 const DENSITY_CONFIRMED_KEY = "langwatch:traces-v2:onboarding:density-confirmed:v1";
 
@@ -419,10 +380,8 @@ export function markDensityConfirmed(): void {
 }
 
 /**
- * Per-browser flag tracking whether the user has reached the end of the
- * empty-state journey at least once (set when the journey hits `outro`).
- * Returning users get a hub of jump-to-this-bit buttons on the welcome
- * screen instead of the full linear narrative.
+ * Per-browser flag tracking whether the user has reached the end of the empty-state
+ * journey at least once (set when the journey hits `outro`).
  */
 const JOURNEY_COMPLETED_KEY = "langwatch:traces-v2:onboarding:journey-completed:v1";
 

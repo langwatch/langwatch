@@ -45,28 +45,17 @@ const traceColumnDefs = {
   trace: traceCol.accessor("name", {
     id: "trace",
     header: "Trace (summary)",
-    // Was flex (`size: 9999, meta.flex`) so the column absorbed every
-    // pixel of leftover space — fine on a typical lens with eight to
-    // ten columns visible, but with a slimmer column set (or a
-    // collapsed sidebar) the trace cell ballooned out to 800px+ of
-    // mostly empty whitespace beside the name + ID. Pinning the
-    // default to `560px` (and capping the resize range to 320–820)
-    // keeps the cell legible when it has room AND prevents
-    // pathological growth when the user trims columns. Resizing
-    // still works because non-flex columns honour `getSize()` width
-    // directly.
+    // Was flex (`size: 9999, meta.flex`) so the column absorbed every pixel of leftover space — fine on a
+    // typical lens with eight to ten columns visible, but with a slimmer column set (or a collapsed sidebar)
+    // the trace cell ballooned out to 800px+ of mostly empty whitespace beside the name + ID.
     size: 560,
     minSize: 320,
     maxSize: 820,
     enableSorting: false,
   }),
-  // Broken-out alternates to the composite `trace` column. Lenses can mix
-  // and match: engineers tend to prefer the dense `trace` summary; product
-  // people prefer dedicated input/output columns. They live here as
-  // first-class options so the column picker can toggle them. Trace name
-  // and root span name are split because the composite cell falls back
-  // from the former to the latter — exposing them separately lets the
-  // user see both when they diverge.
+  // Broken-out alternates to the composite `trace` column. Lenses can mix and match:
+  // engineers tend to prefer the dense `trace` summary; product people prefer dedicated
+  // input/output columns.
   "trace-name": traceCol.accessor((row) => row.traceName ?? "", {
     id: "trace-name",
     header: "Trace name",
@@ -211,11 +200,6 @@ const traceColumnDefs = {
     id: "evaluations",
     header: "Evals",
     // Default sized for the common case (0–2 evaluator chips per row).
-    // With chips capped at ~120px each (name truncated to 80px + score +
-    // borders + gap), 280px fits the typical two-chip row without
-    // padding waste; long evaluator names truncate inside the chip and
-    // surface the full name on hover. `maxSize` keeps an over-eager
-    // resize from punching the trace column off-screen.
     size: 280,
     minSize: 160,
     maxSize: 640,
@@ -500,10 +484,9 @@ export function buildTraceColumns(ids: string[]): Array<ColumnDef<TraceListItem,
 }
 
 /**
- * Single static column def by id, or `undefined` for an unknown id. Used
- * by `useTraceLensColumns` to interleave static and synthesised
- * per-evaluator eval columns in `columnOrder` order. Dynamic `eval:*`
- * columns are not here — they are built by `buildEvalColumnDef`.
+ * Single static column def by id, or `undefined` for an unknown id. Used by
+ * `useTraceLensColumns` to interleave static and synthesised per-evaluator eval columns
+ * in `columnOrder` order.
  */
 export function getTraceColumnDef(id: string): ColumnDef<TraceListItem, unknown> | undefined {
   return traceColumnDefsByString[id];

@@ -1,9 +1,5 @@
 /**
  * How the simulations page orders the scenario sets it lists.
- *
- * Tests that internal sets are pinned to the top and remaining sets
- * are sorted by last run date.
- *
  * @see specs/scenarios/internal-set-namespace.feature
  * @see specs/suites/internal-run-set-surface.feature
  */

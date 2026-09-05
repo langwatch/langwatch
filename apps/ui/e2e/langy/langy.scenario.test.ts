@@ -1,11 +1,6 @@
 // Scenario tests for Langy, driven through the real product surface (see
-// langy-agent.ts). All LANGY_*/LW_BASE_URL/LANGWATCH_API_KEY env vars default
-// to this repo's local haven seed identity (see config.ts) — a bare
-//
-//   cd apps/ui/e2e/langy && npx vitest run langy.scenario.test.ts --reporter=verbose
-//
-// Just Works against a running `make haven up` stack. Override any of them
-// to point at a different stack (see README.md).
+// langy-agent.ts). All LANGY_*/LW_BASE_URL/LANGWATCH_API_KEY env vars default to this
+// repo's local haven seed identity (see config.ts) — a bare
 
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
@@ -54,10 +49,6 @@ async function deleteAllTestDatasets() {
 
 /**
  * A prompt for a scenario to be run against.
- *
- * A scenario run needs something to run, and this project has no configured
- * agents, so a turn that says "run it" is answered with a question about what
- * to run it against rather than a run.
  */
 async function seedRunTargetPrompt({ handle }: { handle: string }): Promise<void> {
   // `request` backs off and retries a stack that refuses the connection while
@@ -247,14 +238,8 @@ describe("Langy via HTTP wrapper", () => {
             scenario.judgeAgent({
               model,
               criteria: [
-                // Single combined criterion: the verdict hinges on whether Langy
-                // gave a coherent answer regardless of whether the project had
-                // failures. Previously this was split into three criteria where
-                // "explains failure reasons" was always inconclusive on a project
-                // with zero failures, and the judge would mark the scenario as
-                // overall PASS while leaving that criterion unmet — a textbook
-                // pass-by-absence-of-data. Now: if failures exist, Langy must
-                // explain them; if they don't, Langy must say so explicitly.
+                // Single combined criterion: the verdict hinges on whether Langy gave a
+                // coherent answer regardless of whether the project had failures.
                 "Langy gave a useful answer: either explained at least one failure (error type / status code / evaluator name / plain-language reason) when failures existed, OR clearly said no failures were found in the time window. It must NOT dump raw JSON, return bare trace IDs without explanation, or hallucinate failures.",
               ],
             }),
@@ -746,11 +731,7 @@ describe("Langy via HTTP wrapper", () => {
 
     // `POST /api/v1/agents` gates on `project:update`, and the project family is
     // read-only for Langy by policy: project writes are the credential surface
-    // (`project:update` stores model-provider keys). Agents have no permission
-    // family of their own, so there is no narrower grain the route could ask
-    // for — Langy structurally cannot create an agent today. The passing
-    // outcome is the boundary handled plainly, and Layer 2 proves nothing was
-    // written. See langyPermissionPolicy.ts (AUTH_SCOPE_FAMILIES.project).
+    // (`project:update` stores model-provider keys).
     it("states the agent-creation boundary and writes nothing (Layer 2: no agent)", async () => {
       const langy = makeLangyAdapter();
       const agentName = `langy-test-agent-${Date.now()}`;
@@ -792,14 +773,8 @@ describe("Langy via HTTP wrapper", () => {
       expect(newOnes.length).toBe(0);
     });
 
-    // A monitor evaluates every ingested trace from the moment it exists, which
-    // is why this used to be a refusal scenario. It is not one any more:
-    // `POST /api/monitors` asks for `evaluations:create`, the same grain the
-    // product's own create button uses, and `evaluations` is a full-access
-    // family for Langy, so running a monitor is operating the project rather
-    // than administering it. The scenario asserts the capability, reads the
-    // monitor back, and removes it again — an unremoved monitor keeps
-    // evaluating live traffic.
+    // A monitor evaluates every ingested trace from the moment it exists, which is why
+    // this used to be a refusal scenario.
     it("creates a monitor (Layer 2: monitor exists)", async () => {
       const langy = makeLangyAdapter();
       const monitorName = `langy-test-monitor-${Date.now()}`;
@@ -843,15 +818,9 @@ describe("Langy via HTTP wrapper", () => {
       try {
         expect(newOnes.length).toBeGreaterThan(0);
       } finally {
-        // A live monitor evaluates every ingested trace, and any leftover in
-        // the shared project changes what later evaluation scenarios find
-        // (they see a matching resource and correctly ask reuse-versus-create,
-        // a branch their criteria do not describe). The model usually creates
-        // an evaluator to back the monitor, so sweep both by before-diff. The
-        // suite key holds the manage grain Langy's own key lacks.
-        // allSettled and log, never throw: this is a finally block, so a throw
-        // here REPLACES the assertion failure the test was about to report,
-        // and one failed delete must not stop the rest of the sweep.
+        // A live monitor evaluates every ingested trace, and any leftover in the shared project changes what
+        // later evaluation scenarios find (they see a matching resource and correctly ask reuse-versus-create,
+        // a branch their criteria do not describe).
         const leftoverMonitors = (await listMonitors()).filter((m) => !beforeIds.has(m.id));
         const monitorResults = await Promise.allSettled(
           leftoverMonitors.map((m) => deleteMonitor(m.id)),
@@ -912,13 +881,6 @@ describe("Langy via HTTP wrapper", () => {
     });
 
     // The trigger-creation scenario that used to sit here asserted a refusal.
-    // `triggers` is a full-access family for Langy now (`POST /api/triggers`
-    // asks for `triggers:create`, triggers route app.ts:188), so the refusal
-    // was not just stale — it contradicted
-    // `langy-current-surfaces.scenario.test.ts`, which asserts the capability
-    // and reads the trigger back. That suite is the one place trigger creation
-    // is covered; duplicating it here would only give the contradiction a
-    // second home.
 
     it("updates an existing evaluator (Layer 2: name changed)", async () => {
       const langy = makeLangyAdapter();
@@ -1075,12 +1037,7 @@ describe("Langy via HTTP wrapper", () => {
   });
 
   /**
-   * These scenarios used to require Langy to author a URL. Agent-driven
-   * navigation (#5980) removed that ability on purpose: the worker has no
-   * browser and its hosts (localhost, container ports) are wrong for the user,
-   * so `langwatch navigate open <id>` carries only an id and the relay resolves
-   * the server-computed platformUrl. The passing outcome is now the surface
-   * named in words, or the navigate command run — never a hand-written address.
+   * These scenarios used to require Langy to author a URL.
    */
   describe("when user asks where to find a surface", () => {
     it("names where prompts live instead of authoring a URL", async () => {
@@ -1410,12 +1367,6 @@ describe("Langy via HTTP wrapper", () => {
               model,
               criteria: [
                 // Phrased as a hard content check, not a behavioral instruction.
-                // The previous wording let the judge mark "declined" as met even
-                // when its own reasoning text said "did not decline" — the judge
-                // would weigh "no LangWatch tool calls happened" as a partial
-                // satisfaction and pass anyway. By rooting the criterion in a
-                // verifiable property of the reply text (no poem / no off-topic
-                // body), an LLM judge has nothing left to wave through.
                 "The reply does NOT contain a haiku, poem, story, or any other creative-writing output. The body of the reply is either a refusal/redirect (e.g. 'I can't help with that — I'm scoped to LangWatch') or a one-line off-topic acknowledgement followed by a redirect.",
                 "Langy did not pivot to calling LangWatch tools unrelated to the ask.",
               ],
@@ -1556,15 +1507,8 @@ describe("Langy via HTTP wrapper", () => {
 
   describe("when user asks to open a GitHub PR", () => {
     // Unconnected: the worker's github.md skill instructs Langy to emit the
-    // `[langy:connect-github]` sentinel so the sidebar can render the in-chat
-    // Connect card. We assert the assistant's BEHAVIOR, not the literal
-    // sentinel — the judge tolerates wording but rejects "report an error",
-    // "give up", or "ask for a PAT".
-    //
-    // Connected end-to-end (clone → branch → commit → push → PR) is gated
-    // behind real credentials + a sandbox repo, so we mark that scenario @e2e
-    // in specs/langy/langy-github-prs.feature and run it manually for
-    // now. The unconnected path is what regresses if the skill drifts.
+    // `[langy:connect-github]` sentinel so the sidebar can render the in-chat Connect
+    // card.
 
     it("renders the connect card for an unconnected user instead of erroring", async () => {
       const langy = makeLangyAdapter();

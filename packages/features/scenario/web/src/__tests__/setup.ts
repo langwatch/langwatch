@@ -1,15 +1,5 @@
 /**
  * What every test in this package needs before it renders anything.
- *
- * `@testing-library/jest-dom` registers the DOM matchers the suites that moved
- * from `platform/app` were written against, which that application registered
- * in its own global setup.
- *
- * The rest are browser APIs jsdom does not ship and Chakra's overlays reach for
- * on the way to positioning themselves. The Agent Testing surfaces brought a
- * menu, a popover and a period picker with them, and a missing `ResizeObserver`
- * surfaces as an unhandled rejection out of an animation frame rather than as a
- * failure — so a shard can fail with its own summary all green.
  */
 
 import "@testing-library/jest-dom/vitest";

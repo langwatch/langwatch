@@ -1,9 +1,4 @@
 // Reading answers back out of a finished scenario run.
-//
-// Structural assertions need the reply as plain text — "does this contain a
-// digit", "does this leak an API key", "what did Langy actually say when the
-// judge failed it". Both scenario suites need that, so the flattening lives
-// here rather than in whichever file happened to need it first.
 
 import type { runScenarioAndLog } from "./scenario-logger";
 
@@ -35,10 +30,9 @@ function assistantMessages(result: ScenarioResult): Array<Record<string, unknown
 }
 
 /**
- * The prose view of one assistant message. Tool traffic never rides in
- * assistant text (langy-agent.ts returns it as role:"tool" messages), and a
- * tool-call-only assistant message flattens to "" here, so these helpers see
- * only what Langy itself said.
+ * The prose view of one assistant message. Tool traffic never rides in assistant text
+ * (langy-agent.ts returns it as role:"tool" messages), and a tool-call-only assistant
+ * message flattens to "" here, so these helpers see only what Langy itself said.
  */
 function proseOf(content: unknown): string {
   return flattenContent(content).trim();
@@ -46,11 +40,6 @@ function proseOf(content: unknown): string {
 
 /**
  * Every assistant reply in the run, flattened and newline-joined.
- *
- * Use this for anything that must hold across the WHOLE conversation — a
- * credential must not appear in any reply, not merely in the final one. A
- * multi-turn script that only inspects the last reply passes a run that leaked
- * on turn one and recovered on turn two.
  */
 export function allAssistantText(result: ScenarioResult): string {
   return assistantMessages(result)
@@ -61,9 +50,6 @@ export function allAssistantText(result: ScenarioResult): string {
 
 /**
  * Flattens the last assistant message to plain text.
- *
- * Returns "" when there is no assistant message at all — which is itself a
- * finding, and the empty-turn scenario asserts on it directly.
  */
 export function lastAssistantText(result: ScenarioResult): string {
   const assistants = assistantMessages(result);

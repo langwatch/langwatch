@@ -44,12 +44,8 @@ const input = { projectId: "p1", traceId: "t1" };
 function makeUtils(pages: Page[]) {
   const query = vi.fn();
   for (const page of pages) query.mockResolvedValueOnce(page);
-  // The real thing `api.useUtils().client` returns: a `createTRPCClientProxy`
-  // wrapper, NOT the client itself. That distinction is load-bearing — the
-  // proxy only resolves keys the client *owns*, so `utils.client.query` is a
-  // recursive path proxy and `.bind()`ing it produces a function that throws
-  // on call. A plain `{ query }` double resolves `query` as an own property
-  // and would let that bug through green, which is how it shipped once.
+  // The real thing `api.useUtils().client` returns: a `createTRPCClientProxy` wrapper,
+  // NOT the client itself.
   const untyped = new TRPCUntypedClient({
     links: [httpBatchLink({ url: "http://localhost/api/trpc" })],
   });

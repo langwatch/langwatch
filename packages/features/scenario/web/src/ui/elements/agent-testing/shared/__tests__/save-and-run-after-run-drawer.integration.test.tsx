@@ -1,13 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Save & Run after a run drawer has been opened and closed.
- *
- * The scenario editor calls back into the page through the flow callbacks, and
- * closing a drawer clears the callbacks of the flows that ran through it. The
- * page is still mounted and never hears about that close, so its registration
- * has to survive it, or the second Save & Run only saves.
- *
+ * @vitest-environment jsdom
  * @see specs/features/agent-testing/cases-table.feature
  */
 

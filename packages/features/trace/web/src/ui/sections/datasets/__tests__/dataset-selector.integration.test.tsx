@@ -1,13 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Renders the real dataset picker used by the "Add to Dataset" drawer.
- *
- * The behaviour being pinned is what the picker says when it has nothing to
- * show. An empty dropdown renders identically whether the list is still
- * loading, genuinely empty, or failed to arrive - so a slow project looked
- * like a project with no datasets at all.
- *
+ * @vitest-environment jsdom
  * Spec: specs/datasets/add-to-dataset-picker.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -12,51 +12,33 @@ interface UseOverflowVisibilityOptions {
    */
   items: readonly string[];
   /**
-   * Currently active item, if any. The hook guarantees this id is
-   * never hidden — when measurement would otherwise drop it, the last
-   * visible item is sacrificed instead so the underline / highlight
-   * still has a target.
+   * Currently active item, if any. The hook guarantees this id is never hidden — when
+   * measurement would otherwise drop it, the last visible item is sacrificed instead so
+   * the underline / highlight still has a target.
    */
   activeId?: string | null;
   /**
-   * Pixel headroom reserved on the right edge of the scroller for the
-   * overflow trigger itself (plus any sibling chrome like a "+" button
-   * that lives in the same row). Defaults to 56px — wide enough for
-   * the trigger button + a comfortable hover ring.
+   * Pixel headroom reserved on the right edge of the scroller for the overflow trigger
+   * itself (plus any sibling chrome like a "+" button that lives in the same row).
+   * Defaults to 56px — wide enough for the trigger button + a comfortable hover ring.
    */
   reservePx?: number;
   /**
-   * Attribute used to mark which descendants of the scroller are
-   * measurable items. Default `data-overflow-id`; LensTabs uses
-   * Chakra's `data-value` so it can keep its existing markup — pass
-   * `"data-value"` when reusing the hook there.
+   * Attribute used to mark which descendants of the scroller are measurable items.
+   * Default `data-overflow-id`; LensTabs uses Chakra's `data-value` so it can keep its
+   * existing markup — pass `"data-value"` when reusing the hook there.
    */
   attribute?: string;
   /**
-   * Re-runs the measurement whenever this value changes. Pass it when the
-   * row holds something other than the items and that thing changes width:
-   * the ResizeObserver only reports the scroller's own box, which a flexed
-   * row keeps no matter what its contents do.
+   * Re-runs the measurement whenever this value changes.
    */
   remeasureKey?: string | number;
 }
 
 /**
- * Generic first-fit overflow detector. Measures children of `scrollerRef`
- * marked with `data-overflow-id` (or a custom attribute), and returns the
- * set of ids whose right edge would land past
- * `containerRight - reservePx`. Those ids should be visually hidden by
- * the caller (display: none) and surfaced through an `OverflowMenu`.
- *
- * The active id is always force-visible: if it would otherwise overflow,
- * the trailing visible item is swapped into the hidden set instead.
- *
- * Two-phase to avoid measurement thrash:
- * 1. Whenever inputs change (items, active id, container resize) the
- *    hidden set is cleared so every item renders — the next layout
- *    pass has accurate widths to measure.
- * 2. `useLayoutEffect` picks the cutoff once, sets the hidden set, and
- *    exits early on subsequent renders so we don't oscillate.
+ * Generic first-fit overflow detector. Measures children of `scrollerRef` marked with
+ * `data-overflow-id` (or a custom attribute), and returns the set of ids whose right
+ * edge would land past `containerRight - reservePx`.
  */
 export function useOverflowVisibility({
   scrollerRef,

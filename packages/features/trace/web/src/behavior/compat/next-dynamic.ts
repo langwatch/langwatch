@@ -1,8 +1,5 @@
 /**
  * Compatibility layer: next/dynamic → React.lazy
- *
- * Next.js `dynamic()` is essentially React.lazy() with optional SSR control
- * and a loading component. Since we no longer have SSR, this is a thin wrapper.
  */
 import {
   type ComponentType,

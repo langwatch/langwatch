@@ -3,16 +3,9 @@ import { useFilterStore } from "../../../../index";
 import type { LangyContextChip } from "@langwatch/langy-web";
 
 /**
- * Turns the Trace Explorer's active filter query into a Langy context chip —
- * "filtered: <query>" — so the agent scopes "these traces" to what the user has
- * narrowed the table to. Reads the shared `filterStore` query text (the liqe
- * expression that drives the table).
- *
- * Returns `null` when the query is empty. Deliberately keyed on the query text
- * only, not the time range: the default 30-day window isn't "filtering", and
- * surfacing it would put a low-signal chip on the composer for every visit. The
- * caller route-gates this to the Trace Explorer (the store is a module
- * singleton whose query survives navigation).
+ * Turns the Trace Explorer's active filter query into a Langy context chip — "filtered:
+ * <query>" — so the agent scopes "these traces" to what the user has narrowed the table
+ * to.
  */
 export function useLangyFilterContext(): LangyContextChip | null {
   const queryText = useFilterStore((s) => s.queryText);

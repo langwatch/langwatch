@@ -1,11 +1,6 @@
 /**
- * Everything the Scenarios tab reads: the test suites, the scenarios, the sets
- * that run from code, the last result of every scenario, and the names of the
- * people who wrote them.
- *
- * The scenario list and the last results are two reads on purpose. The table is
- * drawn from the list and the verdict cells fill in as the aggregate answers.
- *
+ * Everything the Scenarios tab reads: the test suites, the scenarios, the sets that run from code, the last
+ * result of every scenario, and the names of the people who wrote them.
  * @see specs/features/agent-testing/cases-table.feature
  */
 
@@ -171,12 +166,7 @@ function newerRun(current: SuiteLastRun | undefined, next: SuiteLastRun): SuiteL
 }
 
 /**
- * The last run of every suite, read off the last result of each of its
- * scenarios.
- *
- * A suite is a grouping, so a run of one of its scenarios counts whatever plan
- * started it. Reading the runs from the scenarios is what makes a suite whose
- * scenarios only ran one at a time still offer its last run.
+ * The last run of every suite, read off the last result of each of its scenarios.
  */
 function lastRunBySuite({
   cases,

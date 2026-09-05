@@ -43,16 +43,8 @@ export class ScenarioGenerationError extends Error {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Generate a scenario using AI.
- *
- * Calls the /api/scenario/generate endpoint with the given prompt and optional
- * current scenario for refinement.
- *
- * @param prompt - The user's description of the scenario to generate
- * @param projectId - The project ID to generate the scenario for
- * @param currentScenario - Optional existing scenario data for refinement
- * @returns The generated scenario data
- * @throws Error if the API call fails or returns invalid data
+ * Generates (or refines) scenario data from `prompt` via the AI endpoint; throws if
+ * the call fails or returns invalid data.
  */
 export async function generateScenarioWithAI(
   prompt: string,
@@ -69,14 +61,8 @@ export async function generateScenarioWithAI(
     }),
   });
 
-  // The endpoint answers with JSON on every outcome — 200 success and 4xx/5xx
-  // error envelopes alike. A NON-JSON body therefore did not come from the
-  // route handler; it came from a layer in FRONT of the app: a reverse-proxy
-  // or gateway 502/504, an auth-redirect login page, a timeout error page, or
-  // an older self-hosted build. Parsing it as JSON throws a raw
-  // `Unexpected token '<', "<!DOCTYPE "...` that masks the real HTTP status and
-  // strands the user — convert it into an actionable, status-bearing error
-  // instead (langwatch#5758).
+  // The endpoint answers with JSON on every outcome — 200 success and 4xx/5xx error
+  // envelopes alike.
   let payload: { error?: string; domainError?: unknown; scenario?: unknown };
   try {
     payload = await response.json();

@@ -1,9 +1,5 @@
 /**
  * Mapping rules for the drawer's rich evaluation entries (#6835 item 1).
- *
- * A processed evaluation with `passed == null` must map to the neutral
- * "processed" status — never an invented "pass" — and a missing score must
- * stay null rather than becoming a fabricated 0 that renders as "0.00".
  */
 import { describe, expect, it } from "vitest";
 import type { Evaluation } from "@langwatch/trace-contract";

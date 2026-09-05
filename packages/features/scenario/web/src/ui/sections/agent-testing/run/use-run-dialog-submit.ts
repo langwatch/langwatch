@@ -16,15 +16,8 @@ import type { RunScope } from "./run-configuration";
 type RunParameters = ReturnType<typeof toLineRunParameters>;
 
 /**
- * The targets a suite run is written against: what was chosen, the overrides
- * it was chosen with, and the bindings the suite already held for it.
- *
- * A target of a comparison carries its own overrides. Outside a comparison
- * the one target carries the overrides of the parameter block.
- *
- * The bindings only survive while the same prompt stays selected, because
- * they bind a scenario to that prompt's inputs and mean nothing for another
- * one.
+ * The targets a suite run is written against: what was chosen, the overrides it was
+ * chosen with, and the bindings the suite already held for it.
  */
 function toSuiteTargets({
   runTargets,
@@ -73,9 +66,6 @@ export type RunDialogSubmitInput = {
   target: TargetValue;
   /**
    * The name the run goes out under.
-   *
-   * The server resolves it: a name that matches a plan joins that plan and
-   * replaces its config, and a name that matches none creates a plan.
    */
   runName: string;
   /** The agent, or the targets of a comparison, each with its own overrides. */
@@ -129,9 +119,6 @@ function parameterErrorOf(error: unknown): ParameterFieldError | null {
 
 /**
  * Shows a coded refusal inside the dialog; anything else becomes a toast.
- *
- * A refusal that names one parameter goes under the field that holds it,
- * where the person is looking, rather than into the alert at the foot.
  */
 function useSurfaceRunError({
   setInlineError,

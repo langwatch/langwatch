@@ -52,30 +52,21 @@ interface AskAiButtonProps {
    */
   label?: string;
   /**
-   * When true, the click handler is replaced with a primer popover that
-   * explains the user needs to configure a model provider first. Used
-   * when no provider is enabled — the affordance still reads as gated,
-   * not entirely missing, so the feature stays discoverable.
+   * When true, the click handler is replaced with a primer popover that explains the
+   * user needs to configure a model provider first.
    */
   needsProviderPrimer?: boolean;
   /**
-   * When set, the button is fully gated: click is a no-op and the
-   * tooltip surfaces this reason instead of the usual "tell us what
-   * you want" copy. Used by sample-preview mode — Ask AI hits the
-   * real LLM and our sample fixtures don't exist server-side, so a
-   * click would either error or invent answers. Keeping the button
-   * visible (just dimmed) preserves the affordance so the user
-   * knows it'll be available on their real data.
+   * When set, the button is fully gated: click is a no-op and the tooltip surfaces this
+   * reason instead of the usual "tell us what you want" copy.
    */
   disabledReason?: string;
 }
 
 /**
- * The brand ask affordance — gradient-filled button with the `Sparkles` icon
- * and (optionally) a label, "Ask AI" by default. The search bar uses it to
- * enter the inline AI composer, or — relabelled "Ask Langy" — to hand the
- * search off to the Langy panel. Same visuals either way so the AI surface
- * reads as one consistent feature.
+ * The brand ask affordance — gradient-filled button with the `Sparkles` icon and
+ * (optionally) a label, "Ask AI" by default. The search bar uses it to enter the inline
+ * AI composer, or — relabelled "Ask Langy" — to hand the search off to the Langy panel.
  */
 const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
   onClick,
@@ -179,10 +170,7 @@ interface ProviderPrimerPopoverProps {
 }
 
 /**
- * Shown in place of the regular AI tooltip when no model provider is
- * enabled. The point isn't just to disable the affordance — it's to
- * teach the user *why* they need a provider and link them straight to
- * the settings page so they can finish setup in one click.
+ * Shown in place of the regular AI tooltip when no model provider is enabled.
  */
 const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({ trigger }) => {
   const [open, setOpen] = useState(false);

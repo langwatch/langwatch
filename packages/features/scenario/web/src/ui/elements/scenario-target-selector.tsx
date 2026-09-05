@@ -30,10 +30,6 @@ export type ScenarioTargetPrompt = {
 
 /**
  * One agent row as the picker reads it.
- *
- * The last three are a connected agent's and absent on every other kind
- * (ADR-128): the environment it registered in, whether a process is holding it
- * right now, and, in a development environment, whose laptop it is.
  */
 export type ScenarioTargetAgent = {
   id: string;
@@ -331,11 +327,6 @@ function ScenarioTargetAgentMark({ agent }: { agent: ScenarioTargetAgentOption }
 
 /**
  * The row itself: the mark, the label, and the marks the state adds to it.
- *
- * It is a button, so the keyboard reaches the row and Enter or Space picks it:
- * the list was mouse-only while every other control here was not. A row that
- * cannot be run keeps its focus, so the reason in its tooltip is still
- * readable, and only drops the handler.
  */
 function ScenarioTargetAgentRow({
   agent,
@@ -379,12 +370,8 @@ function ScenarioTargetAgentRow({
 }
 
 /**
- * One agent in the list: its kind, its label, and, for a connected agent,
- * whether a process is holding it right now.
- *
- * A development agent of another person is drawn but cannot be picked: only
- * its owner can run it, and hiding the reason would leave the reader clicking
- * a row that does nothing.
+ * One agent in the list: its kind, its label, and, for a connected agent, whether a
+ * process is holding it right now.
  */
 function ScenarioTargetAgentOption({
   agent,

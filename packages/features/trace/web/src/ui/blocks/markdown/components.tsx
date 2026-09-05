@@ -4,11 +4,9 @@ import { ShikiCodeBlock } from "../../elements/markdown/shiki-highlight";
 import { stripThinkingMarker, ThinkingText } from "../../elements/markdown/thinking";
 
 /**
- * Markdown → Chakra components mapping. Each element is a real Chakra
- * component (`Heading`, `Text`, `Link`, `Table`, etc.) so typography,
- * spacing, and colors all flow from the theme — instead of being pinned by
- * raw CSS strings. Shiki keeps doing the syntax highlighting for fenced
- * code blocks; everything else is themable.
+ * Markdown → Chakra components mapping. Each element is a real Chakra component
+ * (`Heading`, `Text`, `Link`, `Table`, etc.) so typography, spacing, and colors all
+ * flow from the theme — instead of being pinned by raw CSS strings.
  */
 export function buildMarkdownComponents(colorMode: string) {
   return {
@@ -67,12 +65,9 @@ export function buildMarkdownComponents(colorMode: string) {
       </Box>
     ),
     a: ({ children, href }: { children?: React.ReactNode; href?: string }) => (
-      // `display="inline"` for the same reason `strong`/`em`/`del` below set
-      // it: Chakra's link recipe is `inline-flex`, which makes the anchor an
-      // atomic inline box that cannot break across lines. A long autolinked
-      // URL would then paint outside the message. `overflowWrap="anywhere"`
-      // additionally shrinks min-content so a link in a table cell doesn't
-      // force the column wide.
+      // `display="inline"` for the same reason `strong`/`em`/`del` below set it:
+      // Chakra's link recipe is `inline-flex`, which makes the anchor an atomic inline
+      // box that cannot break across lines.
       <Link
         href={href}
         color="blue.fg"

@@ -15,18 +15,16 @@ interface IOPreviewProps {
   input: string | null;
   output: string | null;
   /**
-   * Media refs from the trace summary (fold-derived). When present they are
-   * the source of truth for the row's thumbnail/indicators — the summary's
-   * input/output are flattened text with no parts left to parse. Absent
-   * (older summaries, sample data), the row text is media-hint parsed.
+   * Media refs from the trace summary (fold-derived). When present they are the source
+   * of truth for the row's thumbnail/indicators — the summary's input/output are
+   * flattened text with no parts left to parse.
    */
   inputMediaRefs?: TraceMediaRef[];
   outputMediaRefs?: TraceMediaRef[];
   /**
-   * Render a muted "— no input/output recorded" row for a null side when the
-   * other side has content. Off by default so non-list consumers
-   * (ConversationCell) keep their current shape. A redacted side is never
-   * labelled missing — hidden content is not absent content.
+   * Render a muted "— no input/output recorded" row for a null side when the other side
+   * has content. Off by default so non-list consumers (ConversationCell) keep their
+   * current shape.
    */
   showMissingPlaceholders?: boolean;
   inputRedacted?: boolean | null;
@@ -81,10 +79,9 @@ interface MissingPlaceholderSides {
 }
 
 /**
- * Which sides get a "— no X recorded" placeholder: only a null side opposite
- * a recorded one, never a redacted side (RedactedField semantics belong to
- * the drawer; here silence is the only honest treatment for hidden content).
- * Pure + exported for unit testing.
+ * Which sides get a "— no X recorded" placeholder: only a null side opposite a recorded
+ * one, never a redacted side (RedactedField semantics belong to the drawer; here
+ * silence is the only honest treatment for hidden content).
  */
 export function missingPlaceholderSides({
   input,
@@ -107,26 +104,7 @@ export function missingPlaceholderSides({
 }
 
 /**
- * Build the row data once per cell. `formatPreview` runs the unified
- * unwrap/strip/glyph pipeline; `tryParseChat` is still consulted for the
- * isChat/isTool flags that drive the role icon. Both are cheap (each does
- * one JSON.parse attempt on the same input).
- */
-/**
- * Non-selectable hard-newline marker, rendered at the END of the line
- * that was broken — same affordance as a GitHub diff's `+`/`-` gutter:
- * visible, but never part of what you select and copy.
- *
- * Two properties make that work:
- *  - The glyph lives in a `::after` pseudo-element. Pseudo content is
- *    never part of the DOM text, so it can't be selected or copied in
- *    any browser (more robust than `user-select: none` alone, which
- *    Firefox still copies). `user-select: none` is kept as a belt to
- *    the pseudo's suspenders.
- *  - The span itself is zero-width with `overflow: visible`, so the
- *    glyph hangs past the last character without consuming layout
- *    width. It therefore can't push the line wider and can't wrap onto
- *    a line of its own.
+ * Build the row data once per cell.
  */
 const BreakMarker = () => (
   <chakra.span
@@ -147,10 +125,7 @@ const CLAMP_LINES = 2;
 
 /**
  * CSS rule that blanks a `BreakMarker` glyph once it's been tagged
- * `data-newline-marker-hidden` by `useBreakMarkerClampGuard`. Hiding via
- * the pseudo's `content` (rather than `display`/`visibility`) keeps the
- * span's box on its line, so measuring it on the next resize pass stays
- * stable.
+ * `data-newline-marker-hidden` by `useBreakMarkerClampGuard`.
  */
 const HIDE_TRUNCATED_MARKER = {
   "& [data-newline-marker][data-newline-marker-hidden]::after": {
@@ -159,11 +134,9 @@ const HIDE_TRUNCATED_MARKER = {
 } as const;
 
 /**
- * A `BreakMarker` only collides with the line clamp's `…` ellipsis when the
- * cell overflows AND the marker sits on the last visible (clamped) line —
- * that's the single line the clamp paints the ellipsis on. Markers on
- * earlier, fully-visible lines are safe and keep showing. `markerTop` and
- * `clampHeight` are measured relative to the clamped text box.
+ * A `BreakMarker` only collides with the line clamp's `…` ellipsis when the cell
+ * overflows AND the marker sits on the last visible (clamped) line — that's the single
+ * line the clamp paints the ellipsis on.
  */
 export function shouldHideBreakMarker({
   truncated,
@@ -181,10 +154,8 @@ export function shouldHideBreakMarker({
 
 /**
  * Tags the break markers that would overlap the clamp's `…` with
- * `data-newline-marker-hidden` (see `shouldHideBreakMarker`). Re-evaluates
- * on resize so it tracks column-width changes, not just the first paint.
- * The text node is `position: relative` so each marker's `offsetTop` is
- * measured against the clamped box.
+ * `data-newline-marker-hidden` (see `shouldHideBreakMarker`). Re-evaluates on resize so
+ * it tracks column-width changes, not just the first paint.
  */
 function useBreakMarkerClampGuard(text: string) {
   const ref = useRef<HTMLParagraphElement>(null);
@@ -215,10 +186,8 @@ function useBreakMarkerClampGuard(text: string) {
 }
 
 /**
- * Line-clamped preview text that renders hard breaks as non-selectable `↵`
- * markers and suppresses only the marker on the truncated line (see
- * `useBreakMarkerClampGuard`). Style props (`fontSize`, `color`,
- * `textStyle`, …) are forwarded so both density rows can share it.
+ * Line-clamped preview text that renders hard breaks as non-selectable `↵` markers and
+ * suppresses only the marker on the truncated line (see `useBreakMarkerClampGuard`).
  */
 const ClampedPreviewText: React.FC<{ text: string } & React.ComponentProps<typeof Text>> = ({
   text,
@@ -243,11 +212,9 @@ const ClampedPreviewText: React.FC<{ text: string } & React.ComponentProps<typeo
 };
 
 /**
- * Render preview text with a hard break shown as a trailing `BreakMarker`
- * on each broken line, followed by a real `\n` (the parent `Text` uses
- * `whiteSpace="pre-line"`, so the `\n` produces the actual visual wrap).
- * The text nodes stay clean — only the line content lands in the DOM, so
- * a copy of the selection round-trips to the original two-line string.
+ * Render preview text with a hard break shown as a trailing `BreakMarker` on each
+ * broken line, followed by a real `\n` (the parent `Text` uses `whiteSpace="pre-line"`,
+ * so the `\n` produces the actual visual wrap).
  */
 function renderWithBreakMarkers(text: string): ReactNode {
   // Strip trailing whitespace so we never end on a break, normalize CRLF/CR so
@@ -272,11 +239,9 @@ function renderWithBreakMarkers(text: string): ReactNode {
 }
 
 /**
- * Compact media summary for a preview row: the first image becomes a small
- * thumbnail below the preview text (same text-then-media order as the
- * drawer), everything else collapses into per-kind indicator icons inline
- * before the text. The collection is media-hint gated, so text-only rows
- * never pay a JSON parse.
+ * Compact media summary for a preview row: the first image becomes a small thumbnail
+ * below the preview text (same text-then-media order as the drawer), everything else
+ * collapses into per-kind indicator icons inline before the text.
  */
 interface RowMedia {
   imageSrc: string | null;

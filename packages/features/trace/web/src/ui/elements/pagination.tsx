@@ -10,16 +10,9 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
- * Prop-driven pagination bar: a plain-language description of the page on the
- * left, a numbered pager in the middle, and a deliberately empty right column
- * (the assistant's floating button lives in that corner and used to cover the
- * navigation).
- *
- * The page count is derived from `totalCount / pageSize`, the single source of
- * truth, so it stays correct the instant `pageSize` changes, before any
- * refetch. Cursor-only data sources, which cannot open an arbitrary page, say
- * so through `isPageReachable` and `canGoNext` rather than through a different
- * component.
+ * Prop-driven pagination bar: a plain-language description of the page on the left, a
+ * numbered pager in the middle, and a deliberately empty right column (the assistant's
+ * floating button lives in that corner and used to cover the navigation).
  */
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
@@ -41,10 +34,9 @@ export interface PaginationProps {
   /** Plural noun shown after the total, e.g. "records". Omit to hide the total. */
   unitLabel?: string;
   /**
-   * Rows actually rendered on this page. Given, the range copy ends where the
-   * data ends rather than where a full page would; omitted or zero (a count
-   * nobody has taken yet), a full page is assumed and the range is capped by
-   * the total.
+   * Rows actually rendered on this page. Given, the range copy ends where the data ends
+   * rather than where a full page would; omitted or zero (a count nobody has taken
+   * yet), a full page is assumed and the range is capped by the total.
    */
   visibleCount?: number;
   /**

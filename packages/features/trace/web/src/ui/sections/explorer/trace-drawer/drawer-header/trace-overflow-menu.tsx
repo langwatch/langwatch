@@ -47,10 +47,8 @@ interface TraceOverflowMenuProps {
 }
 
 /**
- * Single overflow menu that absorbs every secondary drawer action so the
- * top-right action cluster stays small (Share / Refresh / Maximize / More /
- * Close). High-frequency shortcuts (R, M, Esc) and sharing keep their
- * dedicated buttons; the rest hide here behind one click.
+ * Single overflow menu that absorbs every secondary drawer action so the top-right
+ * action cluster stays small (Share / Refresh / Maximize / More / Close).
  */
 export function TraceOverflowMenu({
   traceId,

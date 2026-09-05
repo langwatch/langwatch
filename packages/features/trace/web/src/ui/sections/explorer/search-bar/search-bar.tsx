@@ -58,12 +58,7 @@ function rankAndSlice({ values, query }: { values: readonly RankedValue[]; query
       continue;
     }
     const lower = v.value.toLowerCase();
-    // Match against the id only — never the label. The user has
-    // explicitly asked that names are display-only and the query
-    // language stay ID-rooted, which keeps the chip and the typed
-    // query in lock-step: if the user types "gpt-4o" they get a chip
-    // whose underlying value is `gpt-4o`, not whichever evaluator
-    // happens to be named "GPT-4o today".
+    // Match against the id only — never the label.
     if (lower.startsWith(q)) prefix.push(v);
     else if (lower.includes(q)) contains.push(v);
   }
@@ -107,12 +102,8 @@ export const SearchBar: React.FC = () => {
   // affordance belongs to Langy when Langy is available").
   const { langyRoutesAsk, askLangyFromSearch } = useAskLangyFromSearch();
   const askLabel = langyRoutesAsk ? "Ask Langy" : "Ask AI";
-  // Which Langy surface takes the question. With the panel already open,
-  // it does — the search rides over as attached context, no second
-  // composer. With it closed, a Langy-styled ask bar floats over the
-  // search bar so the question is typed at the top of the trace
-  // explorer, next to the traces it is about; Enter hands it off and
-  // opens the panel.
+  // Which Langy surface takes the question. With the panel already open, it does — the
+  // search rides over as attached context, no second composer.
   const langyPanelOpen = useLangyStore((s) => s.isOpen);
   const [langyAskMode, setLangyAskMode] = useState(false);
   const openLangyAsk = useCallback(() => {
@@ -129,25 +120,15 @@ export const SearchBar: React.FC = () => {
     if (langyPanelOpen) setLangyAskMode(false);
   }, [langyPanelOpen]);
 
-  // Gate the inline Ask AI composer on having at least one model provider
-  // configured. The AI mode submits requests against the user's own keys;
-  // with none enabled the request would 4xx. The button stays mounted so
-  // the affordance is discoverable, but click goes through a primer
-  // popover pointing the user at /settings/model-providers. Langy needs
-  // none of this — the panel walks the user through model setup itself —
-  // so when Langy owns the affordance the primer never blocks the way in.
+  // Gate the inline Ask AI composer on having at least one model provider configured.
+  // The AI mode submits requests against the user's own keys; with none enabled the
+  // request would 4xx.
   const { project } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } = useModelProvidersSettings({
     projectId: project?.id,
   });
   const askAiNeedsProviderPrimer = !langyRoutesAsk && !isLoadingProviders && !hasEnabledProviders;
-  // Both routes work on the user's real traces. In sample mode the rows
-  // are hardcoded client-side fixtures with no server footprint, so an
-  // AI query would error or hallucinate, and a search handed to Langy
-  // would describe rows the project doesn't have. Surface the button as
-  // gated with a one-line tooltip so the user knows the affordance is
-  // real, just unavailable here. The ⌘I / ⌘+⏎ shortcuts also bail in
-  // this mode so we don't dump them somewhere they can't submit from.
+  // Both routes work on the user's real traces.
   const isSamplePreview = usePreviewTracesActive();
   const askAiSampleDisabledReason = isSamplePreview
     ? `${askLabel} works on your real traces — not on the sample data.`
@@ -235,13 +216,9 @@ export const SearchBar: React.FC = () => {
     };
   }, [aiMode, langyAskMode]);
 
-  // ⌘I / Ctrl+I anywhere on the page fires the ask affordance: the Langy
-  // handoff when Langy owns it, otherwise AI mode — gated through the
-  // same provider-primer popover the button uses, since pressing the
-  // shortcut when no provider is configured shouldn't dump the user into
-  // a composer they can't actually submit from. The AI-mode branch fires
-  // the animation by flipping the same `aiMode` state the button does,
-  // so the gradient activation feels identical from key or click.
+  // ⌘I / Ctrl+I anywhere on the page fires the ask affordance: the Langy handoff when Langy owns it, otherwise
+  // AI mode — gated through the same provider-primer popover the button uses, since pressing the shortcut when
+  // no provider is configured shouldn't dump the user into a composer they can't actually submit from.
   const handleAiShortcut = useCallback(() => {
     if (isSamplePreview) return;
     if (langyRoutesAsk) {
@@ -302,12 +279,7 @@ export const SearchBar: React.FC = () => {
     return map;
   }, [facets]);
 
-  // Publish the (field → value → label) lookup the chip overlay reads
-  // from. The editor's FilterHighlight plugin watches this via a
-  // module-level ref; we ping it with a LABEL_REFRESH meta so chips
-  // re-render with their new overlays the moment facets land. Without
-  // the meta the plugin's cached decorations would stay stale until
-  // the next keystroke.
+  // Publish the (field → value → label) lookup the chip overlay reads from.
   useEffect(() => {
     const map: Record<string, Record<string, string>> = {};
     for (const facet of facets) {
@@ -473,10 +445,9 @@ export const SearchBar: React.FC = () => {
 };
 
 /**
- * Unified error banner rendered flush below the search bar.
- * Shows AI errors (with expand/collapse for structured details) or parse
- * errors (plain message only). AI error takes priority when both are set.
- * Each error type has its own dismiss button.
+ * Unified error banner rendered flush below the search bar. Shows AI errors (with
+ * expand/collapse for structured details) or parse errors (plain message only). AI
+ * error takes priority when both are set. Each error type has its own dismiss button.
  */
 function aiErrorMessage(error: AiActionError): string {
   const { title, description } = explainAnyError(error.cause);
@@ -574,10 +545,9 @@ const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(naviga
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 
 /**
- * Plain one-liner hint that floats just after the typed content.
- * Pure UTF-8 text — no Kbd chips, no clickable fragments. The whole
- * thing reads as a single faint hint and never competes with the
- * input for attention.
+ * Plain one-liner hint that floats just after the typed content. Pure UTF-8 text — no
+ * Kbd chips, no clickable fragments. The whole thing reads as a single faint hint and
+ * never competes with the input for attention.
  */
 const SearchSubmitHint: React.FC<{ anchorX: number; askLabel: string }> = ({
   anchorX,

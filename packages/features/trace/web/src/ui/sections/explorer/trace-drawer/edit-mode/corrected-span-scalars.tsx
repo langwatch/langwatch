@@ -5,10 +5,6 @@ import { CorrectedScalar } from "./corrected-field";
 
 /**
  * The corrected name and type of the open span, above its sections.
- *
- * They have no section of their own, since the name reads as the pane's title
- * and the type as a chip, so a correction to either would otherwise be
- * invisible to a reader looking at the detail rather than at the waterfall row.
  */
 export function CorrectedSpanScalars({
   changedFields,

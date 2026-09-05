@@ -10,13 +10,9 @@ interface UseTraceUpdateListenerOptions {
   enabled?: boolean;
   debounceMs?: number;
   /**
-   * Maximum time (ms) between callback fires during continuous events.
-   * Without this, trailing-edge debounce never fires during active ingestion
-   * because each event resets the timer.
-   *
-   * When set, the first event starts a maxWait timer that fires regardless
-   * of whether new events keep arriving. After firing, the cycle resets.
-   * If omitted, pure trailing-edge debounce is used (existing behavior).
+   * Maximum time (ms) between callback fires during continuous events. Without this,
+   * trailing-edge debounce never fires during active ingestion because each event
+   * resets the timer.
    */
   maxWaitMs?: number;
 }
@@ -28,14 +24,8 @@ interface TraceBroadcastPayload {
 
 /**
  * Hook for subscribing to real-time trace updates via tRPC subscriptions.
- * Differentiates between span storage events and trace summary updates
- * so callers can refetch only the relevant data.
- *
- * Supports two modes:
- * - **Trailing-edge debounce** (default): events accumulate traceIds during the
- *   window, callback fires only after `debounceMs` of silence.
- * - **Throttle with maxWait**: callback fires at most every `maxWaitMs` during
- *   continuous events, ensuring updates are visible during active ingestion.
+ * Differentiates between span storage events and trace summary updates so callers can
+ * refetch only the relevant data.
  */
 export function useTraceUpdateListener({
   projectId,

@@ -1,14 +1,5 @@
 /**
  * Unified simulations page — the primary view for all simulation runs.
- *
- * Rendered by multiple Next.js page files under /simulations/:
- *   /simulations                              (all runs view)
- *   /simulations/run-plans/:suiteSlug         (suite detail)
- *   /simulations/run-plans/:suiteSlug/:batchId (suite detail, scroll to batch)
- *   /simulations/:externalSetSlug             (external set detail)
- *   /simulations/:externalSetSlug/:batchId    (external set, scroll to batch)
- *
- * Layout: sidebar (search, +New Run Plan, All Runs, suite list) + main panel.
  */
 
 import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
@@ -64,11 +55,6 @@ export default function SimulationsPage() {
 
 /**
  * The period control's host, bridged from this family's own.
- *
- * `PeriodSelector` is `@langwatch/analytics-web`'s and reads the address
- * through the workflow host it was published against. Mounted here, at the top
- * of the page, so the whole board sees one address and a test that mocks this
- * package's router mocks one router.
  */
 function SimulationsBoard() {
   const { project } = useOrganizationTeamProject();

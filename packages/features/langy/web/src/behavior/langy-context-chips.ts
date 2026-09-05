@@ -2,15 +2,6 @@ import type { LangyContextChip } from "./langy.store";
 
 /**
  * Compose the candidate context-chip list from every source, in priority order.
- *
- * Callers pass their sources already flattened, MOST-SPECIFIC FIRST. The first
- * chip to claim an id wins; later duplicates are dropped. That ordering is what
- * makes a clicked target and an auto-derived one collapse into a single chip:
- * open the trace drawer for `abc123` (Langy derives `trace:abc123` from the
- * URL) and then click the same trace's row, and the composer still shows one
- * chip — the auto-derived one, whose label came from the richer source.
- *
- * Pure, so the merge rule can be unit-tested without a router or a store.
  */
 export function mergeContextChips(
   sources: (LangyContextChip | null | undefined)[],
@@ -72,19 +63,6 @@ export function datasetContextChip({
 
 /**
  * Every other resource's chip has the same shape, so it is written once.
- *
- * The two rules that matter are both structural here rather than repeated at
- * thirty call sites:
- *
- *   - The id is `<kind>:<ref>` and nothing else, which is what makes a chip the
- *     SAME chip however it was picked up. `useLangyPageContext.routeChips` and
- *     `drawerContextChips` mint exactly that key from the URL, so a card the
- *     user clicked on a list page and the resource they then opened collapse
- *     into one chip instead of stacking two.
- *   - The label leads with the resource's human NAME. An id tells the person
- *     reading the composer nothing; it stays in `ref`, where the agent's tools
- *     want it. A shortened id is the fallback for the rows that genuinely have
- *     no name.
  */
 function namedResourceChip({
   kind,
@@ -220,10 +198,9 @@ export function scenarioContextChip({
 }
 
 /**
- * An offline experiment. Keyed on the SLUG, because that is what
- * `/experiments/<slug>` puts in the URL and therefore what the route-derived
- * chip uses — keying on the database id here would produce two chips for one
- * experiment.
+ * An offline experiment. Keyed on the SLUG, because that is what `/experiments/<slug>`
+ * puts in the URL and therefore what the route-derived chip uses — keying on the
+ * database id here would produce two chips for one experiment.
  */
 export function experimentContextChip({
   slug,
@@ -257,10 +234,9 @@ export function dashboardContextChip({
 }
 
 /**
- * The stable chip a prompt becomes. Keyed on the prompt id (the same key the
- * prompt editor drawer derives), labelled by handle when one exists — the
- * handle is also what rides as `ref`, since it is the name the agent's own
- * prompt tools resolve.
+ * The stable chip a prompt becomes. Keyed on the prompt id (the same key the prompt
+ * editor drawer derives), labelled by handle when one exists — the handle is also what
+ * rides as `ref`, since it is the name the agent's own prompt tools resolve.
  */
 export function promptContextChip({
   promptId,

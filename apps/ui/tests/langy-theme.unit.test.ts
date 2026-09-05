@@ -1,21 +1,6 @@
 /**
  * Pins Langy's per-mode palette contract at the token layer (spec:
  * specs/langy/langy-panel-theme.feature).
- *
- * The system here is built the same way _app.tsx builds the real one,
- * `createSystem(defaultConfig, mergeConfigs(app tokens, langyThemeConfig))`,
- * with the app config reduced to the one token the contract turns on:
- * `bg.surface` with the app's own `_light` / `_dark` values. The assertions
- * run against the CSS the system actually emits, so they hold exactly when
- * the browser behaviour holds:
- *
- *   - LIGHT INHERITS THE APP. `.langy-root` carries no surface/text/border
- *     or accent-ramp override, so the app's light values apply unchanged
- *     inside the panel.
- *   - DARK IS INK. `.dark .langy-root` overrides the surface to the ink
- *     ground, at higher specificity than `.dark` itself.
- *   - THE IDENTITY NAMESPACE EXISTS IN BOTH. `langy.*` has no app fallback,
- *     so it must resolve on both grounds, along with the panel's type scale.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -89,10 +74,9 @@ describe("langyTheme token emission", () => {
   describe("given the panel's ambient textures in langy-theme.css", () => {
     const css = readFileSync(
       /**
-       * The sheet is `@langwatch/langy-web`'s now, and this test reads it as a
-       * FILE rather than importing it: the assertions are about the CSS text,
-       * and a bundler would hand back a module. Resolved from the package's own
-       * root, which vitest runs this from.
+       * The sheet is `@langwatch/langy-web`'s now, and this test reads it as a FILE
+       * rather than importing it: the assertions are about the CSS text, and a bundler
+       * would hand back a module.
        */
       join(process.cwd(), "../../packages/features/langy/web/src/ui/elements/langy-theme.css"),
       "utf8",

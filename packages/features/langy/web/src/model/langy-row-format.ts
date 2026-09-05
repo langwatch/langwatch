@@ -1,9 +1,5 @@
 /**
  * Row wording shared by the capability cards and the hydrators.
- *
- * A trace row reads the same whether it was parsed out of the stored CLI
- * output or hydrated fresh from the API — "2 Jul 14:03 · 1.2s · $0.0041 ·
- * failed" — so the formatting lives once, here, and both producers import it.
  */
 
 export function truncateRowText(text: string, max: number): string {

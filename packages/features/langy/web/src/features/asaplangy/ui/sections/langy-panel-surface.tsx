@@ -8,23 +8,6 @@ const MotionBox = motion.create(Box);
 
 /**
  * The Langy panel's material, as a reusable home surface.
- *
- * The briefing panels on the home are meant to read as genuine Langy surfaces,
- * not generic cards — so they reuse the panel's own skin and texture stack
- * exactly (`langy-root` + the ink ground's signal grid and top brand glow;
- * light is the app's own clean surface), theme-aware, with content stacked
- * above the texture. The one thing it
- * leaves out is the animated fold: that seam is driven by Langy's live activity
- * (a turn in flight), which a static home panel doesn't have, so faking it here
- * would be motion with nothing behind it.
- *
- * `accent` gives the hero briefing its warmth — but as a SLOW BREATHING layer,
- * not a flat fill: the amber wash and the warm border ring drift in intensity
- * together over ~7s, so the accent reads alive and calmer at once (a static
- * bright orange border read as too intense). The breathing range is kept
- * deliberately low (peaks well under full strength) so the warmth is a hint of
- * Langy, not an orange card — toned down but still present. Plain surfaces
- * (status strip, setup) sit on the quiet panel tone with no accent.
  */
 export function LangyPanelSurface({
   children,
@@ -34,12 +17,8 @@ export function LangyPanelSurface({
 }: BoxProps & { accent?: boolean; fill?: boolean }) {
   const reduce = useReducedMotion();
   // `fill` makes the whole surface stretch to the height its parent gives it (a
-  // stretched grid cell, or a flex column that hands it `flex`), so a short card
-  // never ends over a bare void next to a taller neighbour. It threads a flex
-  // column through all three boxes — outer, card, content — so the CONTENT can
-  // then distribute itself top-to-bottom (e.g. pin a footer to the bottom).
-  // The same flex-column recipe applied to all three boxes, so `flex: 1`
-  // propagates from the parent's height down to the content box.
+  // stretched grid cell, or a flex column that hands it `flex`), so a short card never
+  // ends over a bare void next to a taller neighbour.
   const fillColumn = fill
     ? ({
         flex: "1",

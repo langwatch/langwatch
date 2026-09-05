@@ -20,14 +20,8 @@ interface UseLangyConversationUpdateListenerOptions {
 }
 
 /**
- * Subscribes to the per-conversation freshness SSE (`langy.onConversationUpdate`)
- * and coalesces signals into a debounced callback. Mirrors
- * `useTraceUpdateListener`: trailing-edge debounce with a `maxWait` cap so a
- * steady stream of updates still flushes during active turns.
- *
- * The signal carries a lightweight operational payload (status/counts/activity),
- * NOT message content — see `langyConversationUpdateSignalSchema`. The
- * coordinator uses that payload to apply updates in place and skip a refetch.
+ * Subscribes to the per-conversation freshness SSE (`langy.onConversationUpdate`) and
+ * coalesces signals into a debounced callback.
  */
 export function useLangyConversationUpdateListener({
   projectId,

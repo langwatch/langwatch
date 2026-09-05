@@ -1,20 +1,15 @@
 import { FLOATING_PANEL_INSET, resolveFloatingPanelWidth } from "./langy-panel-layout";
 
 /**
- * Keeps the mounted panel itself visible as a small rest or near sliver.
- * Unmounting would lose an in-flight stream, while a separate peek element
- * would make the transition a swap rather than one continuous movement.
- * CSS `translate` is used because Framer already owns `transform`; the two
- * properties compose without measuring the panel or fighting animations.
+ * Keeps the mounted panel itself visible as a small rest or near sliver. Unmounting
+ * would lose an in-flight stream, while a separate peek element would make the
+ * transition a swap rather than one continuous movement.
  */
 
 export type LangyPeekPhase = "rest" | "near";
 
 /**
- * Floating: px of the panel's own header visible above the bottom viewport
- * edge. The card is bottom-anchored on `FLOATING_PANEL_INSET`, so that inset
- * is already visible and is subtracted out in `resolvePeekTranslate` — the
- * number here is the sliver you actually see.
+ * Floating: px of the panel's own header visible above the bottom viewport edge.
  */
 export const FLOATING_PEEK_REST_PX = 30;
 /** Risen far enough that the header's line — mark, title — reads. */
@@ -45,9 +40,6 @@ export function resolvePeekVisiblePx({
 
 /**
  * The CSS `translate` value that puts the panel at a peek position.
- *
- * Floating slides down its own full height (`100%`) less the part that should
- * stay showing. Sidebar is the same idea on X, against the dock's own width.
  */
 export function resolvePeekTranslate({
   mode,
@@ -66,11 +58,6 @@ export function resolvePeekTranslate({
 }
 
 // ── Proximity ───────────────────────────────────────────────────────────────
-/**
- * The pop arms when the pointer comes within ENTER px of the resting sliver,
- * and disarms only past EXIT px — hysteresis, so a pointer hovering right on
- * the boundary can't strobe the panel up and down.
- */
 export const PEEK_PROXIMITY_ENTER_PX = 140;
 export const PEEK_PROXIMITY_EXIT_PX = 200;
 
@@ -87,10 +74,8 @@ interface PeekProximityInput {
 }
 
 /**
- * Is the pointer near the peeking panel? Pure — the hook feeds it pointer +
- * viewport and the previous verdict. Distance is measured to the RESTING
- * sliver's rectangle (the thing the user is aiming at), not the risen one, so
- * the zone doesn't grow the moment the panel rises.
+ * Is the pointer near the peeking panel? Pure — the hook feeds it pointer + viewport
+ * and the previous verdict.
  */
 export function resolvePeekProximity({
   pointerX,

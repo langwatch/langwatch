@@ -1,12 +1,6 @@
 /**
- * The row that opens a group of scenarios inside a table: the test suite and
- * how many scenarios it holds.
- *
- * The row carries no result summary: the scenarios table is authoring only, so
- * results stay on the Results tab.
- *
- * The target is a real button that spans the row, so it takes focus and
- * answers Enter and Space.
+ * The row that opens a group of scenarios inside a table: the test suite and how many
+ * scenarios it holds.
  */
 import { chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronRight, Folder, type LucideIcon } from "lucide-react";

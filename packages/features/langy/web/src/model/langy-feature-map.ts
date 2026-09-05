@@ -1,36 +1,8 @@
 import { z } from "zod";
 
 /**
- * Typed access to `feature-map.json` — the canonical information architecture
- * at the repo root.
- *
- * Langy reaches LangWatch through the `langwatch` CLI, so a tool call is
- * `langwatch <resource> <verb>` (recorded by the server's CLI envelope as
- * `langwatch.<resource>.<verb>`). The map already lists every CLI command
- * against the feature that owns it, so the tool -> feature relation is DATA, not
- * a second table to hand-maintain. This module reads it once and exposes it as
- * typed lookups.
- *
- * What we take from the map is only what is TRUE OF THE FEATURE, whoever is
- * looking at it:
- *   - `surfaces.code.cli`  — the CLI commands the feature owns.
- *   - `produces`           — resource kinds a result of this feature contains.
- *   - `consumes`           — resource kinds this feature can act on.
- *
- * How a result LOOKS is not in the map and must not be: the Langy panel is one
- * view of these features among several (sidebar, docs, CLI itself), and each
- * binds its own rendering on top of the same facts. Langy's binding lives in
- * `langy-capability-registry.ts` (which surface, keyed by feature id — the card
- * itself comes from the shared `@langwatch/langy` contract) and
- * `langy-cli-follow-ups.ts`
- * (which offer, in which words) — so presentation can drift without structure.
- *
- * The app supplies the repository-root map through `createLangyFeatureMap`;
- * browser behaviour stays independent of app filesystem and transport imports.
- *
  * @see specs/langy/langy-cli-tool-envelope.feature
  */
-/** One feature (or sub-feature) of the map, reduced to what Langy needs. */
 export interface FeatureNode {
   id: string;
   name: string;

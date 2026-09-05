@@ -45,16 +45,7 @@ interface VerdictRowSpec {
 }
 
 /**
- * Inline drilldown rendered under each ACTIVE evaluator row. Shows
- * verdict counts, score range, and label presence — sourced from the
- * `aggregates` field that the discover endpoint already attaches to
- * each evaluator value, so no second round-trip is needed.
- *
- * Visually it speaks the sidebar's own language: verdicts are compact
- * facet-style rows (status dot + label + count, same hover/active
- * treatment as FacetRow), and the score range reuses the
- * RangeSection slider + click-to-edit endpoints rather than a pair of
- * boxed number inputs. No card chrome — just the tree indent guide.
+ * Inline drilldown rendered under each ACTIVE evaluator row.
  */
 export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
   item,
@@ -88,15 +79,9 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
   const visibleLabels = labelValues.filter((l) => l.count > 0);
   const maxLabelCount = Math.max(...visibleLabels.map((l) => l.count), 0);
 
-  // The "pass/fail rows AND a score slider" confusion comes from
-  // evaluators that emit a binary 0/1 score alongside `passed` — the
-  // slider over [0,1] just re-expresses the verdict the pill rows
-  // already show. Suppress the score control in that exact case: two
-  // distinct score values spanning [0, 1]. Genuine score ranges keep it,
-  // and an evaluator whose scores only *happen* to be constant in this
-  // window (a single distinct value) still renders its mono value line
-  // via ScoreRangeControl. `hasScore` alone fired for any non-null
-  // score, which is what surfaced the redundant slider.
+  // The "pass/fail rows AND a score slider" confusion comes from evaluators that emit a
+  // binary 0/1 score alongside `passed` — the slider over [0,1] just re-expresses the
+  // verdict the pill rows already show.
   const scoreMirrorsVerdict =
     aggregates.distinctScores === 2 && aggregates.scoreMin === 0 && aggregates.scoreMax === 1;
   const hasMeaningfulScore = aggregates.hasScore && !scoreMirrorsVerdict;
@@ -193,10 +178,9 @@ function buildVerdictSpecs(aggregates: {
 }
 
 /**
- * Values of `field` (verdict or label) that are actively INCLUDED in this
- * evaluator's group. Excluded (negated) sub-conditions aren't surfaced as
- * active — the drilldown rows only model include-state, matching the previous
- * behaviour.
+ * Values of `field` (verdict or label) that are actively INCLUDED in this evaluator's
+ * group. Excluded (negated) sub-conditions aren't surfaced as active — the drilldown
+ * rows only model include-state, matching the previous behaviour.
  */
 function computeActiveSubValues(
   group: { categorical: { field: string; value: string; negated: boolean }[] },
@@ -212,11 +196,9 @@ function computeActiveSubValues(
 const MIN_VISIBLE_FILL_PCT = 4;
 
 /**
- * Compact, clickable filter row in FacetRow's visual idiom: optional coloured
- * status dot, label, right-aligned count, a thin proportional fill bar along
- * the bottom edge, subtle-bg + right accent bar when active. Shared by the
- * verdict pills (with a status dot) and the emitted-label rows (no dot —
- * labels are free-form strings, not a closed traffic-light enum).
+ * Compact, clickable filter row in FacetRow's visual idiom: optional coloured status
+ * dot, label, right-aligned count, a thin proportional fill bar along the bottom edge,
+ * subtle-bg + right accent bar when active.
  */
 const ValueRow: React.FC<{
   label: string;
@@ -313,10 +295,9 @@ const ValueRow: React.FC<{
 };
 
 /**
- * Score range in RangeSection's idiom: slider + click-to-edit endpoint
- * values. Commits on drag end / typed commit; selecting the full range
- * clears the filter so the drilldown never pins a no-op range into the
- * query string.
+ * Score range in RangeSection's idiom: slider + click-to-edit endpoint values. Commits
+ * on drag end / typed commit; selecting the full range clears the filter so the
+ * drilldown never pins a no-op range into the query string.
  */
 const ScoreRangeControl: React.FC<{
   scoreMin: number | null;

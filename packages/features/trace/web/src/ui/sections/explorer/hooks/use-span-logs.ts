@@ -5,18 +5,6 @@ import { useTraceQueryArgs } from "./use-trace-query-args";
 
 /**
  * The open drawer trace's log records, grouped by the span that emitted them.
- *
- * A span can carry activity that never shows up in its own input/output —
- * a tool the user denied, an API retry, a mid-session compaction — because
- * those things only exist as log records, correlated back to the span by
- * `spanId`. The waterfall row uses this to flag which spans have logs at
- * all; the span detail's Logs section uses it to show them.
- *
- * Gated on the header's log-record count so the MAJORITY of traces (ordinary
- * LLM traces with zero logs) never pay a ClickHouse `traceLogs` query just to
- * compute an empty log-count icon on drawer open. Shares its query key with
- * the Terminal/Session tabs' own `traceLogs` read, so opening this trace's
- * waterfall after (or before) either tab costs no extra network round-trip.
  */
 export function useSpanLogs() {
   const { isReady, queryArgs } = useTraceQueryArgs();

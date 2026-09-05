@@ -1,18 +1,7 @@
 /**
+ * Coverage for the evaluator drilldown: - verdict / label rows toggle their sub-condition for THIS evaluator (the parens-scoping itself lives in evaluatorGroup; here we assert the row wiring fires the right field/value); - the Errored verdict row toggles `evaluatorVerdict: error` (it previously emitted "unknown", the Passed-is-null-but-not-errored bucket); - emitted-label values render as
+ * clickable rows that filter on `evaluatorLabel`, replacing the old static "Emits labels" text; - active state is read scoped to the evaluator's group, so a verdict pinned on a *different* evaluator doesn't light up this one; - score endpoint commits route through commitRange (clear at full range, clamp in-range), and degenerate ranges render a mono value line.
  * @vitest-environment jsdom
- *
- * Coverage for the evaluator drilldown:
- * - verdict / label rows toggle their sub-condition for THIS evaluator (the
- *   parens-scoping itself lives in evaluatorGroup; here we assert the row
- *   wiring fires the right field/value);
- * - the Errored verdict row toggles `evaluatorVerdict: error` (it previously
- *   emitted "unknown", the Passed-is-null-but-not-errored bucket);
- * - emitted-label values render as clickable rows that filter on
- *   `evaluatorLabel`, replacing the old static "Emits labels" text;
- * - active state is read scoped to the evaluator's group, so a verdict pinned
- *   on a *different* evaluator doesn't light up this one;
- * - score endpoint commits route through commitRange (clear at full range,
- *   clamp in-range), and degenerate ranges render a mono value line.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

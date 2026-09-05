@@ -33,21 +33,8 @@ interface NewTracesScrollUpIndicatorProps {
 }
 
 /**
- * Floating "N new" pill that surfaces when fresh traces are buffered.
- * Visible in two cases:
- *
- *   - Live mode + the user has scrolled past `SCROLL_THRESHOLD_PX` —
- *     auto-merge has the rows up-top, but the user is reading further
- *     down and might want to jump back to the latest.
- *   - Ask mode regardless of scroll — the table is frozen on the
- *     snapshot the user was reading, so the pill is the only signal
- *     that new rows are available.
- *
- * Click acknowledges (sets `since = now`, scrolls to top, refetches).
- *
- * Previous incarnation used a morphing-blob orb with two perpetual
- * animations. Replaced with a flat pill that just arrives once and
- * settles — the constant motion read as visual nag on busy projects.
+ * Floating "N new" pill that surfaces when fresh traces are buffered. Visible in two
+ * cases:
  */
 export const NewTracesScrollUpIndicator: React.FC<NewTracesScrollUpIndicatorProps> = ({
   scrollRef,

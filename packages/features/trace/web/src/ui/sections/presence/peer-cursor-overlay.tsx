@@ -18,10 +18,8 @@ interface PeerCursorOverlayProps {
 }
 
 /**
- * Drop-in container that, when mounted, both broadcasts the local user's
- * cursor and renders peer cursors at their fractional coordinates. Should
- * wrap the surface whose bounding box defines the (0..1, 0..1) coord
- * space — typically the panel that's identified by `anchor`.
+ * Drop-in container that, when mounted, both broadcasts the local user's cursor and
+ * renders peer cursors at their fractional coordinates.
  */
 export function PeerCursorOverlay({
   anchor,
@@ -50,13 +48,9 @@ export function PeerCursorOverlay({
   });
 
   return (
-    // `minHeight={0}` (and `minWidth={0}`) is load-bearing in flex
-    // contexts: without it, the implicit `min-height: auto` clamps
-    // this Box to its content's natural size and prevents the
-    // `height: 100%` from shrinking to fit a flex column parent. In
-    // the trace drawer that bug surfaced as a non-scrollable Summary
-    // tab — the overlay grew past `Drawer.Body`'s clipped bounds and
-    // hid content past the fold.
+    // `minHeight={0}` (and `minWidth={0}`) is load-bearing in flex contexts: without
+    // it, the implicit `min-height: auto` clamps this Box to its content's natural size
+    // and prevents the `height: 100%` from shrinking to fit a flex column parent.
     <Box
       ref={internalRef}
       position="relative"

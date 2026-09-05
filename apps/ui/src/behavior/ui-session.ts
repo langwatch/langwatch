@@ -49,11 +49,6 @@ export const UI_SIGN_IN_PATH = "/auth/signin";
 
 /**
  * Where a visitor goes once the session read has answered — null means stay.
- *
- * Carried over from `platform/app`'s `useRequiredSession`: the sign-in screen,
- * never onboarding, and the address they asked for rides along as the
- * callback. A public route needs no session, and an offline browser cannot
- * load the sign-in screen either, so both stay put.
  */
 export function uiSignedOutDeparture({
   actor,

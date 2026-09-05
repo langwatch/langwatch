@@ -7,14 +7,8 @@ interface TraceListPayload {
 }
 
 /**
- * Normalize the raw `tracesV2.list` payload into `TraceListItem` rows:
- * attach each trace's evaluations and default the optional spanCount field.
- * Shared by the full /traces list (`useTraceListQuery`) and the compact
- * personal recent-activity table so both render identical rows from the
- * same source.
- *
- * Rows start eventless: events are not on the trace summary, so the list
- * reads them separately (`useTraceListEvents`) and merges them in.
+ * Normalize the raw `tracesV2.list` payload into `TraceListItem` rows: attach each
+ * trace's evaluations and default the optional spanCount field.
  */
 export function mapTraceListPayload(data: TraceListPayload | undefined): TraceListItem[] {
   if (!data) return [];

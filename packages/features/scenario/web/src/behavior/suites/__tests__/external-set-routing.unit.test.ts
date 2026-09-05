@@ -1,8 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Unit tests for external set routing utilities.
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/external-sdk-ci-sets-in-sidebar.feature
  */
 import { describe, expect, it } from "vitest";

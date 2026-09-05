@@ -1,9 +1,5 @@
 /**
  * Headless hook for running a suite with confirmation state management.
- *
- * Manages: confirmation dialog state, the run mutation, and toast handling.
- * The consumer is responsible for rendering the confirmation dialog using
- * the returned state props.
  */
 
 import { generate } from "@langwatch/ksuid";
@@ -29,10 +25,9 @@ import { showSuiteRunError } from "./show-suite-run-error";
 export interface UseRunSuiteOptions {
   onRunScheduled?: (suiteId: string, batchRunId: string) => void;
   /**
-   * Invoked when the user clicks the "View run" action on the run-scheduled
-   * success toast. The consumer decides where to navigate (e.g. the run plan
-   * detail page). When omitted, the success toast carries no action — the hook
-   * never navigates on its own.
+   * Invoked when the user clicks the "View run" action on the run-scheduled success
+   * toast. The consumer decides where to navigate (e.g. the run plan detail page). When
+   * omitted, the success toast carries no action — the hook never navigates on its own.
    */
   onViewRun?: (suiteId: string) => void;
 }
@@ -61,15 +56,6 @@ export type ParameterDeclaringAgent = {
 
 /**
  * The parameters the scenarios of the run declare, keyed by name.
- *
- * Two scenarios can declare the same name and only one of them describe it or
- * default it, so a name keeps the first description and the first default any
- * of them gives it rather than the last one read.
- *
- * Secret is the one field that is not first-wins: a name any scenario in the
- * run declares secret is offered as secret. The run refuses that pair anyway,
- * and asking for the value behind a password field is what lets the person see
- * the conflict instead of typing a credential into a plain field first.
  */
 function scenarioDeclaredParameters({
   scenarioIds,
@@ -114,11 +100,8 @@ function agentDeclaredParameters(agent: ParameterDeclaringAgent): DeclaredParame
 }
 
 /**
- * Every parameter the run can carry: the union of what the scenarios in it
- * declare, then what its agents declare.
- *
- * A scenario declaration wins over an agent's on a name both declare, the way
- * the server resolves it.
+ * Every parameter the run can carry: the union of what the scenarios in it declare,
+ * then what its agents declare.
  */
 export function unionParameterDefinitions({
   scenarioIds,
@@ -140,14 +123,6 @@ export function unionParameterDefinitions({
 
 /**
  * The values the run sends, read back from what the confirmation shows.
- *
- * A name left empty is omitted rather than sent as an empty string: the run
- * then falls back to whatever default each scenario declares for it, which is
- * the same path a run that was never offered the name at all takes.
- *
- * A secret keeps whatever was typed as text. A token of digits is still a
- * token, and reading it as a number would both change it and have the run
- * refuse it, because a secret value has to be a string.
  */
 export function toRunParameters({
   definitions,
@@ -264,10 +239,9 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   }, [pendingSuite, allScenarios]);
 
   /**
-   * What the confirmation shows for each name: the declared default, replaced
-   * by whatever was typed over it. Only the overrides are held in state, so a
-   * default that arrives with the scenarios cannot overwrite an edit made
-   * before they loaded.
+   * What the confirmation shows for each name: the declared default, replaced by
+   * whatever was typed over it. Only the overrides are held in state, so a default that
+   * arrives with the scenarios cannot overwrite an edit made before they loaded.
    */
   const parameterValues = useMemo(() => {
     const values: Record<string, string> = {};

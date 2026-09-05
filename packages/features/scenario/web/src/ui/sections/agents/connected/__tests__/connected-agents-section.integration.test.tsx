@@ -1,8 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The connected agents of a project, as the agents page draws them.
- *
+ * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
  */
 

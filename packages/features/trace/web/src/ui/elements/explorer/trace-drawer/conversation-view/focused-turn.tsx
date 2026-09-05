@@ -5,10 +5,9 @@ import { type RefObject, useEffect, useState } from "react";
 const BLINK_MS = 900;
 
 /**
- * The tint the turn under review rests under: the blue the theme uses for a
- * subtle surface, thinned to half so it reads as a wash over the conversation
- * rather than a panel of its own. Mixed rather than swapped for another token,
- * so it follows the theme into dark mode.
+ * The tint the turn under review rests under: the blue the theme uses for a subtle
+ * surface, thinned to half so it reads as a wash over the conversation rather than a
+ * panel of its own.
  */
 const TINT_RESTING = "color-mix(in srgb, var(--chakra-colors-blue-subtle) 50%, transparent)";
 
@@ -23,23 +22,13 @@ const BLINK_KEYFRAMES = `
 }`;
 
 /**
- * How long the conversation rests where it loaded before carrying the reader to
- * the turn under review.
- *
- * Scrolling the instant the thread renders reads as landing on a fragment.
- * Resting first shows the reviewer they are in a conversation, and the carry is
- * then legible as movement within it.
+ * How long the conversation rests where it loaded before carrying the reader to the
+ * turn under review.
  */
 export const FOCUS_SCROLL_REST_MS = 500;
 
 /**
  * Whether the turn under review should blink right now.
- *
- * Once on arrival, and once more each time the reader is moved to a different
- * turn. It waits out the same rest the scroll does, so the eye lands with the
- * movement rather than a beat before it. The tint stays either way; the blink
- * is only what makes the eye land in the right place, so it is over as soon as
- * it has done that.
  */
 export function useFocusedTurnBlink(focusTraceId: string | undefined): boolean {
   const [blinkingFor, setBlinkingFor] = useState<string | null>(null);
@@ -69,16 +58,6 @@ const TINT_BLEED_PX = 6;
 
 /**
  * The turn under review, told apart from the rest of the thread.
- *
- * A background tint rather than a border or a marker: it survives the reader
- * scrolling away and back, reads at a glance from anywhere in the thread, and
- * is a different colour family from the amber a turn's annotations use, so
- * "this is the one I was sent to" and "this one has been commented on" never
- * read as the same thing.
- *
- * It wraps the turn's messages only. The annotation rail beside them is what
- * the reviewer writes into rather than what they were sent to read, and cards
- * of their own on a tinted band read as part of the turn.
  */
 export function FocusedTurnFrame({
   isFocused,
@@ -111,14 +90,8 @@ const SETTLE_MS = 1500;
 const SETTLE_TOLERANCE_PX = 8;
 
 /**
- * Centers the turn in its container and keeps re-centering until its offset
- * stops moving, then lets go. The turns above it (their annotation cards
- * especially) measure in after the first paint and push it further down, so a
- * single scroll lands short of where the turn ends up. Only a target that has
- * actually moved is scrolled to, and the chase gives up after a beat so it can
- * never fight the reader's own scrolling for long.
- *
- * Returns the way to call it off.
+ * Centers the turn in its container and keeps re-centering until its offset stops
+ * moving, then lets go.
  */
 function centerUntilSettled({
   container,
@@ -148,13 +121,8 @@ function centerUntilSettled({
 }
 
 /**
- * Brings the turn under review onto the screen, and brings the next one on when
- * the reader is moved along. Measured against the scroll container the way the
- * open turn's own centering is, because `offsetTop` is relative to the nearest
- * positioned ancestor, which that container is.
- *
- * The conversation is left where it loaded for a beat first, so the reviewer
- * reads a conversation before being carried inside it.
+ * Brings the turn under review onto the screen, and brings the next one on when the
+ * reader is moved along.
  */
 export function useScrollFocusedTurnIntoView({
   scrollRef,

@@ -12,12 +12,8 @@ interface ModeSwitchProps {
   turnLabel?: string;
   hasConversation?: boolean;
   /**
-   * True while the conversation context (turns) is still being fetched
-   * for a trace that declares a conversationId. In that window the
-   * Conversation tab is gated off with a "Loading conversation…"
-   * tooltip rather than enabled-but-empty — clicking through to a
-   * "no turns found" pane the moment the user opens the drawer reads
-   * as broken even though the data is en route.
+   * True while the conversation context (turns) is still being fetched for a trace that
+   * declares a conversationId.
    */
   isConversationLoading?: boolean;
   /**
@@ -34,11 +30,9 @@ interface ModeSwitchProps {
    */
   showTerminal?: boolean;
   /**
-   * True while the reviewer is annotating the trace. Usage and Terminal replay
-   * an agent run rather than showing the trace's own spans, so there is nothing
-   * in them to correct or comment on and they stay unavailable until the
-   * reviewer finishes. The Conversation stays open: a turn is a trace, and it
-   * is where commenting on one reads best.
+   * True while the reviewer is annotating the trace. Usage and Terminal replay an agent
+   * run rather than showing the trace's own spans, so there is nothing in them to
+   * correct or comment on and they stay unavailable until the reviewer finishes.
    */
   isEditing?: boolean;
   /**
@@ -137,10 +131,9 @@ function ModeTab({
 }
 
 /**
- * Tristate gate on the Conversation tab: no conversation id → permanently
- * disabled; has an id but its turns are still in flight → disabled with loading
- * copy; id plus turns → enabled. Annotating the trace does not close it, since
- * a turn is a trace and commenting on one happens here.
+ * Tristate gate on the Conversation tab: no conversation id → permanently disabled; has
+ * an id but its turns are still in flight → disabled with loading copy; id plus turns →
+ * enabled.
  */
 function conversationTabState({
   hasConversation,
@@ -163,12 +156,6 @@ function conversationTabState({
 
 /**
  * Usage and Terminal, the two tabs only a coding-agent trace has.
- *
- * "Usage" (not "Session", which already means the agent's own process/session
- * id elsewhere in this UI, and reads as jargon here) comes first: it answers
- * "what happened, what did it cost, what went wrong" in one screen, which is
- * what someone opening a coding-agent trace wants first.
- * Terminal is the replay you go to once you know which moment you are after.
  */
 function CodingAgentTabs({
   viewMode,
@@ -210,15 +197,7 @@ function CodingAgentTabs({
 }
 
 /**
- * Inline tab strip below the header chips. Three modes:
- *   - Trace       — waterfall + (optional) span detail pane
- *   - Summary     — trace-level accordions (I/O, metadata, evals, events)
- *   - Conversation — multi-turn chat rollup, only when the trace carries
- *                    a conversation id
- *
- * Summary used to be a tab inside the SpanTabBar; it moved here during
- * the trace-view redesign so a user reading the trace summary doesn't
- * have to lose their viz pane when they want to scan the metadata.
+ * Inline tab strip below the header chips.
  */
 export function ModeSwitch({
   viewMode,

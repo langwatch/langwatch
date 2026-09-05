@@ -1,12 +1,7 @@
 /**
- * A correction as the drawer's own shapes carry it: the waterfall nodes, one
- * span's detail, the trace header, and the markers saying which parts of them a
- * correction touched. `applyTraceEditOverlay.ts` holds the same corrections
- * against the canonical trace, and both read one patch through the same span
- * index.
- *
- * The patch is applied as given. What a viewer may read is decided before it
- * reaches here, by `redactPatchForViewer`.
+ * A correction as the drawer's own shapes carry it: the waterfall nodes, one span's
+ * detail, the trace header, and the markers saying which parts of them a correction
+ * touched.
  */
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { stringifySpanIO } from "@langwatch/trace-contract";
@@ -39,15 +34,9 @@ function correctedTreeNode({
 }
 
 /**
- * Applies a correction to the v2 waterfall/flame nodes: deleted spans (and
- * their descendants) drop out, renames and type changes land. Node payloads
- * carry no content, so nothing here is privacy-sensitive.
- *
- * `shouldKeepDeleted` is for the tree the reader looks at rather than the trace
- * the correction describes. A span that simply vanished reads as one that was
- * never captured, so the waterfall keeps it on the row it had, for the caller to
- * mark and strike through. Everything that asks what the corrected trace IS --
- * its span count, whether a comment still points at something -- leaves it off.
+ * Applies a correction to the v2 waterfall/flame nodes: deleted spans (and their
+ * descendants) drop out, renames and type changes land. Node payloads carry no content,
+ * so nothing here is privacy-sensitive.
  */
 export function applyOverlayToSpanTreeNodes({
   nodes,
@@ -174,13 +163,8 @@ function correctedSpanCount({
 }
 
 /**
- * The header's attribute map with the corrected metadata laid over it, or null
- * when the correction says nothing about the metadata.
- *
- * The header keeps the ingested spelling of every key, so a corrected metadata
- * key lands back on the attribute row it was read from. Header attributes are
- * strings, so a corrected structure is rendered as JSON, exactly as the rest of
- * the map already carries structured values.
+ * The header's attribute map with the corrected metadata laid over it, or null when the
+ * correction says nothing about the metadata.
  */
 function correctedHeaderAttributes({
   header,
@@ -220,13 +204,8 @@ export function changedTraceMetadataKeys(
 }
 
 /**
- * Applies the trace-level part of a correction to the v2 header. Durations and
- * cost stay as captured: they describe the run, not the corrected content.
- *
- * The span count is the exception, and only when the caller supplies the spans
- * the trace has: a corrected trace does not contain the spans the correction
- * removes, so a header counting eight above a waterfall listing seven reads as
- * a bug rather than as the correction working.
+ * Applies the trace-level part of a correction to the v2 header. Durations and cost
+ * stay as captured: they describe the run, not the corrected content.
  */
 export function applyOverlayToTraceHeader({
   header,

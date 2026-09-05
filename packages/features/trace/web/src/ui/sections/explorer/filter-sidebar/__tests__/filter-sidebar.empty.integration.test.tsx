@@ -1,10 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for FilterSidebar empty-state behaviour.
- * Verifies that the sidebar hides when descriptors are empty and the
- * project has no real traces, stays visible during genuine loading, and
- * becomes visible once real data arrives.
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

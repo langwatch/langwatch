@@ -9,14 +9,6 @@ interface ErrorDetailsProps {
 
 /**
  * Error details component.
- *
- * Normalizes every run error into a clean, actionable handled error — a stable
- * title + human message + optional hint — and never shows a raw stack trace or
- * child-process dump. `resolveScenarioError` renders the encoded envelope the
- * failure handler produces directly, and classifies any other error string
- * (e.g. the scenario SDK's `{ name, message, stack }`) on the fly so it reads
- * the same.
- *
  * @see /scenario-contract
  */
 export function ErrorDetails({ error }: ErrorDetailsProps) {

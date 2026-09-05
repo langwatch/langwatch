@@ -1,7 +1,6 @@
 /**
- * One row of the run results table: a scenario and target pair, its verdict,
- * its evaluators, its duration and its cost.
- *
+ * One row of the run results table: a scenario and target pair, its verdict, its
+ * evaluators, its duration and its cost.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

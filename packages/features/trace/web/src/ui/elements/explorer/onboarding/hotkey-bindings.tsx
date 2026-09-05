@@ -9,11 +9,8 @@ interface HotkeyBindingsProps {
 }
 
 /**
- * Single global keydown listener for the empty-state journey. Two
- * shortcuts: `integrateKey` opens the IntegrateDrawer, `skipKey`
- * dismisses the card. Gated on `!drawerOpen` so the drawer's own
- * S/M/P/I tab letters can claim the keyboard once the user is in the
- * integrate flow. Renders nothing — it's an event-binding component.
+ * Single global keydown listener for the empty-state journey. Two shortcuts:
+ * `integrateKey` opens the IntegrateDrawer, `skipKey` dismisses the card.
  */
 export function HotkeyBindings({
   drawerOpen,

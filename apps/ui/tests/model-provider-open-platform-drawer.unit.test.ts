@@ -1,20 +1,5 @@
 /**
  * What `openPlatformDrawer` writes.
- *
- * `openPlatformDrawer` is this family's single piece of drawer vocabulary. The
- * provider editor, the default-model override and the model-cost editor are all
- * addressed rather than mounted — two of them by openers outside this family —
- * so a screen names one and this function writes the address the rest of the
- * product already produces. `llmModelCost` is registered in
- * `installed-ui-features.ts` now; the other two are not, and
- * `dev/docs/plans/core-application-feature-extraction-plan.md` records why.
- *
- * Getting that address wrong is silent in both directions: a missing
- * `drawer.modelProviderId` opens an empty editor, and a LEFTOVER one from a
- * previous drawer opens the editor on the row the reader looked at before this
- * one. `openDrawer` clears every `drawer.*` key for exactly that reason, and
- * this has to as well.
- *
  * Spec: specs/model-providers/provider-configuration.feature
  */
 

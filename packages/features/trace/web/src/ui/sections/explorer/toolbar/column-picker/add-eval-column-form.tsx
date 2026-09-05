@@ -152,11 +152,9 @@ const EvaluatorSuggestions: React.FC<{
 );
 
 /**
- * Builds the commit handler that appends an `eval:<field>:<key>` column. If the
- * typed text matches a discovered evaluator (by id or label), the column is
- * keyed by its id — same as the suggestion-click path — so it binds to stored
- * eval results consistently. Otherwise the text is treated as a literal
- * free-text key. Re-adding an already-shown column surfaces an info toast.
+ * Builds the commit handler that appends an `eval:<field>:<key>` column. If the typed
+ * text matches a discovered evaluator (by id or label), the column is keyed by its id —
+ * same as the suggestion-click path — so it binds to stored eval results consistently.
  */
 const useEvalColumnAdder = ({
   evaluatorOptions,
@@ -212,10 +210,9 @@ type AddEvalColumnFormProps = {
 };
 
 /**
- * The "Add custom column" control in the picker's Evaluations section. Pick
- * a field (Score / Verdict / Label) and an evaluator (discovered list or
- * free-text); each commit appends an `eval:<field>:<key>` column. An
- * already-shown evaluator offers an inline Remove instead of re-adding.
+ * The "Add custom column" control in the picker's Evaluations section. Pick a field
+ * (Score / Verdict / Label) and an evaluator (discovered list or free-text); each
+ * commit appends an `eval:<field>:<key>` column.
  */
 export const AddEvalColumnForm: React.FC<AddEvalColumnFormProps> = ({
   evaluatorOptions,

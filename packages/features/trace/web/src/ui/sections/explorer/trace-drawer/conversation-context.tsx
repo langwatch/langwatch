@@ -28,28 +28,22 @@ interface ConversationContextProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   /**
-   * Optional ref the parent attaches so it can measure the natural
-   * content height. PaneLayout uses this to cap the ctx Panel's
-   * resizable range at the rows that actually exist (no "drag to
-   * infinite empty band" behaviour).
+   * Optional ref the parent attaches so it can measure the natural content height.
+   * PaneLayout uses this to cap the ctx Panel's resizable range at the rows that
+   * actually exist (no "drag to infinite empty band" behaviour).
    */
   contentRef?: RefObject<HTMLDivElement | null>;
   /**
-   * Optional ref attached to the header row. PaneLayout reads
-   * `offsetHeight` from this to set the collapsed Panel size pixel-
-   * accurately — no trailing band between the chevron strip and the
-   * viz tabs.
+   * Optional ref attached to the header row. PaneLayout reads `offsetHeight` from this
+   * to set the collapsed Panel size pixel- accurately — no trailing band between the
+   * chevron strip and the viz tabs.
    */
   headerRef?: RefObject<HTMLDivElement | null>;
 }
 
 /**
- * Display row built from a turn — represents BOTH halves (user + assistant)
- * because a "turn" in chat is an exchange, not a single message. Earlier
- * versions rendered one row per side and missed the user-prompt half on
- * the current turn, which made the context strip read as half a
- * conversation. Now each slot shows both halves stacked: user on top,
- * assistant below.
+ * Display row built from a turn — represents BOTH halves (user + assistant) because a
+ * "turn" in chat is an exchange, not a single message.
  */
 interface ConversationRow {
   key: string;
@@ -93,16 +87,8 @@ const SLIDE_VARIANTS: Variants = {
 const SLIDE_TRANSITION = { duration: 0.16, ease: "easeOut" as const };
 
 /**
- * Pull a readable snippet out of an input/output payload using the unified
- * `formatPreview` pipeline (JSON unwrap, fence/image strip, newline glyph,
- * cap). The `prefer` argument is a soft hint — when the payload is a chat
- * array, we walk it for the preferred role first and fall back to
- * `formatPreview` (which always returns the most-recent message of any
- * role) if there's no role match. For non-array payloads `formatPreview`
- * does all the work, so the strip's behaviour stays consistent across the
- * column / table / drawer surfaces.
+ * Pull a readable snippet out of an input/output payload using the unified `formatPreview` pipeline (JSON unwrap, fence/image strip, newline glyph, cap).
  */
-/** The last message in `parsed` whose role is `prefer`, formatted as a preview. */
 function lastPreferredMessagePreview(parsed: unknown[], prefer: "user" | "assistant"): string {
   for (let i = parsed.length - 1; i >= 0; i--) {
     const msg = parsed[i] as Record<string, unknown> | null;
@@ -142,10 +128,6 @@ function extractReadableSnippet(
 
 /**
  * Build the rows shown in the panel from the available turns.
- *
- * Reading flow we want is: previous user message → current assistant
- * response (highlighted) → next user message. Falls back to whatever side
- * is available when the other is missing.
  */
 function buildRows({
   previous,
@@ -298,15 +280,9 @@ export const ConversationContext = memo(function ConversationContext({
       width="100%"
       minHeight={0}
       minWidth={0}
-      // Light mode tone stack:
-      //   panel bg     = `bg.surface` (white) — header + content both
-      //                  sit on white, matching the accordion sections
-      //   row borders  = `gray.200` (light only)
-      //   non-selected = `bg.surface` (white)
-      //   selected     = `blue.subtle` — matches the row-selection blue
-      //                  used on the trace list, replacing the previous
-      //                  gray indent
-      // Dark mode keeps the validated palette.
+      // Light mode tone stack: panel bg = `bg.surface` (white) — header + content both sit on white, matching the accordion sections
+      // row borders = `gray.200` (light only) non-selected = `bg.surface` (white) selected = `blue.subtle` — matches the row-selection
+      // blue used on the trace list, replacing the previous gray indent Dark mode keeps the validated palette.
       bg={{ base: "bg.surface", _dark: "bg.surface" }}
       // Bottom border doubles as the ctx ↔ viz separator when the
       // pane is expanded (the header's own borderBottom only sits at
@@ -326,18 +302,9 @@ export const ConversationContext = memo(function ConversationContext({
         shouldShowTranslate={hasTranslatable && !collapsed}
       />
       {collapsed ? null : (
-        // Two-level structure on purpose:
-        //   - outer Box `flex={1} overflow="auto"` — the scroll
-        //     container, fills the Panel's remaining space
-        //   - inner Box `ref={contentRef}` — naturally sized
-        //     (no flex, no overflow), so its `scrollHeight` /
-        //     `offsetHeight` always equals the row content's actual
-        //     height regardless of how tall the Panel gets
-        // Without the split, `scrollHeight` on an overflow:auto
-        // element clamps to `>= clientHeight` — dragging the Panel
-        // bigger made the measured "content height" grow with it,
-        // ctxMaxSize grew with it, and the drag had no real cap
-        // (visible as the slow-drag with infinite trailing whitespace).
+        // Two-level structure on purpose: - outer Box `flex={1} overflow="auto"` — the scroll container, fills the Panel's remaining space - inner Box `ref={contentRef}` — naturally sized (no flex, no overflow), so its
+        // `scrollHeight` / `offsetHeight` always equals the row content's actual height regardless of how tall the Panel gets Without the split, `scrollHeight` on an overflow:auto element clamps to `>= clientHeight` —
+        // dragging the Panel bigger made the measured "content height" grow with it, ctxMaxSize grew with it, and the drag had no real cap (visible as the slow-drag with infinite trailing whitespace).
         <Box flex={1} minHeight={0} overflow="auto" paddingX={4} paddingY={3}>
           <Box ref={contentRef}>
             <ContextBody ctx={ctx} rows={displayRows} traceId={traceId} onSelect={navigate} />
@@ -349,11 +316,8 @@ export const ConversationContext = memo(function ConversationContext({
 });
 
 /**
- * Header matching the Section/Input-Output accordion style used
- * elsewhere in the drawer: white bg, muted uppercase title, chevron
- * on the right (not the left). Double-click the header to toggle
- * collapsed state — same affordance the Pane primitive used to
- * expose.
+ * Header matching the Section/Input-Output accordion style used elsewhere in the
+ * drawer: white bg, muted uppercase title, chevron on the right (not the left).
  */
 function ContextHeader({
   position,
@@ -649,12 +613,9 @@ const ConversationRow = memo(function ConversationRow({
         paddingX={3}
         paddingY={2}
         borderBottomWidth={isLast ? 0 : "1px"}
-        // Border color must not be inside the opacity-dimmed scope —
-        // otherwise the separator between the "Start of conversation"
-        // placeholder and the selected blue row reads as a barely-
-        // visible line. Use the same `gray.200` border the rest of
-        // the rows do, at full opacity, while the rest of the
-        // placeholder visuals stay dimmed via a child opacity wrapper.
+        // Border color must not be inside the opacity-dimmed scope — otherwise the
+        // separator between the "Start of conversation" placeholder and the selected
+        // blue row reads as a barely- visible line.
         borderColor={{ base: "gray.200", _dark: "border.muted" }}
         cursor="default"
       >
@@ -752,24 +713,8 @@ const ConversationRow = memo(function ConversationRow({
 });
 
 /**
- * Single line in a turn slot — either user or assistant half. The two
- * lines are visually distinct in three ways so the eye can parse a turn
- * at a glance:
- *
- *   1. The user line keeps the slot's background; the assistant line gets
- *      a subtle `bg.muted` tint that marks it as the reply card within
- *      the turn. One bar, two backgrounds — same idea you'd find in
- *      message threads (quoted reply on a tinted strip).
- *   2. The assistant line is indented and prefixed with a `↳` reply
- *      glyph so the hierarchy reads "this is the response to that".
- *   3. Icon colours differ per role: user = `fg` (full neutral), assistant
- *      = `blue.fg`. The reply text itself stays muted regardless of
- *      whether the slot is current, so the user prompt always reads as
- *      the louder of the two — which matches how people scan a chat
- *      ("what was asked, then what was answered").
- *
- * The `↳` glyph is `aria-hidden` because the user/bot icon already names
- * the role for assistive tech.
+ * Single line in a turn slot — either user or assistant half. The two lines are
+ * visually distinct in three ways so the eye can parse a turn at a glance:
  */
 const TurnLine: React.FC<{
   icon: React.ElementType;

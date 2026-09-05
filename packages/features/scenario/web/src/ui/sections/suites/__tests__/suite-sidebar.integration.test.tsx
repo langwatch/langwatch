@@ -1,14 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The Suite sidebar: run plans and external sets, search, collapse, and the
- * per-item run/status/context-menu affordances.
- *
- * @see specs/features/suites/external-sdk-ci-sets-in-sidebar.feature
- * @see specs/features/suites/all-runs-batch-origin-label.feature
- * @see specs/features/suites/rename-suites-to-runs.feature
- * @see specs/features/suites/remove-redundant-suites-label.feature
- * @see specs/components/search-input.feature
+ * @see specs/features/suites/external-sdk-ci-sets-in-sidebar.feature, specs/features/suites/all-runs-batch-origin-label.feature,
+ *   specs/features/suites/rename-suites-to-runs.feature, specs/features/suites/remove-redundant-suites-label.feature, specs/components/search-input.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

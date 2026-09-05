@@ -1,9 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The drawer of one connected agent: what it accepts, which processes hold
- * it, and one test turn.
- *
  * @see specs/features/agents/connected-agents-ui.feature
  * @see specs/agents/agent-test-run.feature
  */

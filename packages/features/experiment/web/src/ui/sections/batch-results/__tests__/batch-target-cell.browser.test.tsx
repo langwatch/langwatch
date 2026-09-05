@@ -1,8 +1,7 @@
 /**
- * Real-Chromium QA for the errored Output cell. jsdom can assert the tooltip
- * node exists, but it cannot prove that a real pointer hover surfaces the full
- * message above a two-line clamp. This drives an actual browser hover over
- * the clamped cell.
+ * Real-Chromium QA for the errored Output cell. jsdom can assert the tooltip node
+ * exists, but it cannot prove that a real pointer hover surfaces the full message above
+ * a two-line clamp. This drives an actual browser hover over the clamped cell.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

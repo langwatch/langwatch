@@ -1,8 +1,5 @@
 /**
  * Compute aggregate statistics from batch evaluation data.
- *
- * Similar to experiments-v3/utils/compute-aggregates.ts but works with
- * the transformed BatchEvaluationData format.
  */
 import type {
   BatchEvaluationData,

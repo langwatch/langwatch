@@ -33,15 +33,6 @@ interface TurnTarget {
 
 /**
  * What the top of the screen is currently offering.
- *
- * - `pending`: the session's turn list is still being read, so whether
- *   anything sits above this turn is not yet known.
- * - `hidden`: the trace belongs to no session, so there is nothing above it.
- * - `available`: earlier turns exist and are ready to load.
- * - `loading`: one is being read.
- * - `error`: the read failed and can be retried.
- * - `start`: the oldest loaded turn is the session's first.
- * - `unavailable`: the session is longer than the turn list can reach.
  */
 
 export interface SessionScrollback {
@@ -53,11 +44,9 @@ export interface SessionScrollback {
   /** Turns of the session still older than the oldest one loaded. */
   earlierCount: number;
   /**
-   * Totals of those unloaded earlier turns, from the session's turn list, so
-   * the bottom bar can count the whole session up to the reader's position.
-   * Loading a turn moves its share from here into the loaded entries, so the
-   * sum the bar shows stays put. Null when the trace has no walkable session,
-   * and a field is null when one of those turns does not carry it.
+   * Totals of those unloaded earlier turns, from the session's turn list, so the bottom
+   * bar can count the whole session up to the reader's position. Loading a turn moves
+   * its share from here into the loaded entries, so the sum the bar shows stays put.
    */
   earlierTotals: EarlierTotals | null;
   /** When the session's first turn started; null without a walkable session. */
@@ -66,13 +55,8 @@ export interface SessionScrollback {
 }
 
 /**
- * Read one turn of the session: its transcript, and the tool spans that carry
- * what its tools actually did. One commit or none, so the caller never has a
- * transcript on screen whose tool calls all read "(no output)" until their
- * spans catch up and rewrite every row under the reader.
- *
- * The transcript is the turn; its spans and events are enrichment, so a failed
- * span read leaves the turn readable rather than losing it.
+ * Read one turn of the session: its transcript, and the tool spans that carry what its
+ * tools actually did.
  */
 async function readTurn({
   utils,
@@ -117,17 +101,9 @@ function ledgerFor(prev: Ledger, key: string): Ledger {
 }
 
 /**
- * What the top of the screen offers, from what is known about the session.
- * An opened turn the list does not carry has no history to walk: on a full
- * page that means the session runs past what the list reaches, otherwise the
- * trace simply has no siblings.
- *
- * The cap is only ever a question for that case. `conversationContext` reads
- * the session oldest-first from its first turn, so a listed turn always has
- * the session's real beginning at `turns[0]`, and walking back to it is the
- * start however long the session ran. What a full list can hide is the other
- * end: a turn past the cap is absent from the list entirely, which is why the
- * absent case, and only it, distinguishes "unavailable" from "hidden".
+ * What the top of the screen offers, from what is known about the session. An opened
+ * turn the list does not carry has no history to walk: on a full page that means the
+ * session runs past what the list reaches, otherwise the trace simply has no siblings.
  */
 function deriveStatus({
   hasSession,
@@ -291,11 +267,8 @@ interface SessionScrollbackInput {
 }
 
 /**
- * Where the opened turn sits in the session, and how far back the loaded
- * window already reaches.
- *
- * A turn the session does not list is a turn with no history to walk, so it
- * has no position and nothing above it, whatever the ledger holds.
+ * Where the opened turn sits in the session, and how far back the loaded window already
+ * reaches.
  */
 function useSessionPosition({
   turns,
@@ -333,12 +306,7 @@ function useOpenedTurn({ traceId, timestamp, entries, toolSpans }: LoadedTurn): 
 }
 
 /**
- * What the bottom bar counts from the turns above the loaded window. A field is
- * null when one of those turns does not carry it, which is not the same as
- * zero: the session total for that field cannot be stated at all, and the bar
- * leaves it out rather than reporting a sum that is short by the turns it could
- * not read. Cost is null for a reader without `cost:view`, since the turn list
- * carries no spend for them.
+ * What the bottom bar counts from the turns above the loaded window.
  */
 
 /**
@@ -356,12 +324,8 @@ function sumOrNull(values: (number | null | undefined)[]): number | null {
 }
 
 /**
- * Where the bottom bar counts from: the totals of the turns above the loaded
- * window, and the session's own start.
- *
- * Each turn's totals come from the session's turn list, so no transcript read
- * is needed, and loading a turn moves its share from this sum into the loaded
- * entries: the bar's total at a fixed position never moves.
+ * Where the bottom bar counts from: the totals of the turns above the loaded window,
+ * and the session's own start.
  */
 function useSessionBaseline({
   hasSession,
@@ -392,10 +356,6 @@ function useSessionBaseline({
 
 /**
  * The session behind the opened turn, read backwards on demand.
- *
- * The opened turn is always the newest thing on screen and is never re-read
- * here: it arrives already loaded from the tab, and this hook only ever
- * prepends older turns to it.
  */
 export function useSessionScrollback({
   projectId,

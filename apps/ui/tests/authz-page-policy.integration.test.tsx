@@ -1,30 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * What the two RBAC addresses are actually behind, proved by mounting them.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice
- * a loader that names the wrong grant — the failure that refuses a reader the
- * platform page admitted, or admits one it refused. So this file loads the real
- * loaders, mounts what they hand back under a session that answers precisely,
- * and reads the result.
- *
- * THIS FILE INHERITS A REGRESSION PIN. `platform/app/src/pages/settings/__tests__/admin-page-guards.unit.test.ts`
- * read `roles.tsx` off disk to prove it required `organization:manage`, because
- * five legacy administration pages once guarded themselves on permissions a
- * MEMBER inherits and leaked full organization data to every member. The page
- * is no longer there to read, so the line is held here — by mounting, which is
- * strictly stronger than a source match.
- *
- * The screens are faked. What is under test is the policy the frontend feature
- * wraps them in, plus the settings chrome sitting OUTSIDE the guard, so a
- * refused reader still sees the settings frame they navigated into.
- *
- * THE CHROME IS `NavigationShell` NOW, MOUNTED HERE — see
- * `settings-family-page-policy.integration.test.tsx` for why: this
- * application's own settings layout, which drew a duplicate of
- * `NavigationShell`'s own sidebar, is deleted.
- *
  * Spec: specs/rbac/custom-role-permission-editing.feature
  * Spec: specs/rbac/role-binding-audit.feature
  */

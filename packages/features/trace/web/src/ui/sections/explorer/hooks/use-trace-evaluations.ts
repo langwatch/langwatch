@@ -45,11 +45,9 @@ export interface TraceEvaluationsResult {
 }
 
 /**
- * Evaluator inputs, when the source carries them. The in-app read returns them;
- * the shared-trace payload deliberately omits the field entirely, because they
- * are captured trace content that is never shared at any visibility (ADR-057).
- * Narrowing on the property rather than its value keeps that distinction
- * visible instead of letting an absent field look like an empty one.
+ * Evaluator inputs, when the source carries them. The in-app read returns them; the
+ * shared-trace payload deliberately omits the field entirely, because they are captured
+ * trace content that is never shared at any visibility (ADR-057).
  */
 function readEvaluationInputs(
   ev: Evaluation | Omit<Evaluation, "inputs">,
@@ -99,18 +97,8 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
   const storeTraceId = useDrawerStore((s) => s.traceId);
   const traceId = shared?.header.traceId ?? storeTraceId;
 
-  // TODO(traces-v2): migrate to `tracesV2.evals` once the v2 schema carries
-  // `spanId`, `errorStacktrace`, and `retries` — the rich evaluations panel
-  // surfaces all three. Until then, keep the v1 endpoint but split it off
-  // the drawer batch so it doesn't block the 7 other v2 procedures the
-  // drawer fires on open.
-  // Preview traces live entirely client-side — sending them to the
-  // real evaluations endpoint either errors (unknown trace id) or
-  // returns nothing useful. Match the other v2 drawer hooks that
-  // already gate on `!isPreviewTraceId(traceId)`; the drawer's
-  // evaluations tab will read whatever was seeded into the cache by
-  // `useOpenTraceDrawer` instead (empty for synthesised previews,
-  // a hand-built set for the rich arrival trace).
+  // TODO(traces-v2): migrate to `tracesV2.evals` once the v2 schema carries `spanId`,
+  // `errorStacktrace`, and `retries` — the rich evaluations panel surfaces all three.
   const isPreview = !!traceId && isPreviewTraceId(traceId);
   const query = api.traces.getEvaluations.useQuery(
     { projectId: project?.id ?? "", traceId: traceId ?? "" },

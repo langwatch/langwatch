@@ -1,17 +1,6 @@
 /**
- * Hook to open the *grading evaluator* editor drawer for a given
- * (evaluator, target) pair, with variable-mapping sources ordered target-first.
- *
- * Distinct from useOpenTargetEditor, which edits a TARGET (and exposes only the
- * dataset as a mapping source). Here the entity is an EvaluatorConfig that
- * applies to all targets; the graded field (e.g. "output") should surface the
- * runner's outputs ahead of dataset columns, so target outputs come first.
- *
- * Shared by:
- *  - TargetCell: clicking an evaluator chip to edit its mapping for that cell.
- *  - EvaluationsV3Table: auto-opening when a freshly added evaluator still has
- *    unmapped required fields, so the user is shown where to map them instead
- *    of the picker silently closing.
+ * Hook to open the *grading evaluator* editor drawer for a given (evaluator, target)
+ * pair, with variable-mapping sources ordered target-first.
  */
 
 import { useCallback } from "react";
@@ -33,15 +22,6 @@ import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 
 /**
  * Opens the Comparison config form for an existing comparison evaluator.
- *
- * A comparison grades no single target — its candidates come from OTHER
- * targets' outputs, picked once via the form — so unlike every other
- * evaluator it needs no (target, targetName) pair and no mapping sources.
- * That is why it is its own entry point: the column header has an evaluator
- * and nothing else to give.
- *
- * A legacy pairwise evaluator lands here too: its config is normalized to
- * `comparison` on load, so it opens in the same form.
  */
 export const useOpenComparisonEditor = () => {
   const { openDrawer } = useDrawer();
@@ -190,11 +170,8 @@ export const useOpenEvaluatorEditor = () => {
       }
 
       // Comparison evaluators: bypass the per-row mapping form and render a
-      // variants+golden picker instead. The required `candidates` input has no
-      // per-row source — it comes from OTHER targets' outputs, picked once via
-      // the form. The orchestrator's `generateComparisonCells` reads
-      // `evaluator.comparison` at run time to assemble the per-row candidates.
-      // Neither the mapping sources nor `target` above are used on this path.
+      // variants+golden picker instead. The required `candidates` input has no per-row
+      // source — it comes from OTHER targets' outputs, picked once via the form.
       if (isComparisonEvaluator(evaluator)) {
         openComparisonEditor(evaluator);
         return;

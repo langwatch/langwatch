@@ -1,11 +1,5 @@
 /**
  * BatchEvaluationResultsTable - Main table component for batch evaluation results
- *
- * This is a wrapper component that renders either:
- * - SingleRunTable: for viewing a single evaluation run
- * - ComparisonTable: for comparing multiple runs side by side
- *
- * The actual table implementations are in separate files for better maintainability.
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Columns3, HelpCircle, ListTree, Rows3, SlidersHorizontal } from "lucide-react";
@@ -139,10 +133,6 @@ const FieldToggle = ({
 
 /**
  * Fields control — independent checkboxes for which target details render.
- * The trigger label is always "Fields": it never mutates to reflect the
- * current selection, so there's no state it can't name (unlike a preset
- * button whose label degrades to a generic fallback once the selection
- * doesn't match any preset). Exported for use in the page header.
  */
 export type FieldsButtonProps = {
   fields: Record<ResultField, boolean>;
@@ -184,15 +174,6 @@ const GROUPABLE_FIELD_HELP =
 
 /**
  * Group the comparison rows by a dataset-entry metadata key.
- *
- * Sits in the results toolbar with Row height / Fields / Columns rather than
- * floating above the table on its own: it is the same kind of control — a
- * per-view display choice — and a lone button on its own row read as belonging
- * to the data rather than to the toolbar.
- *
- * Uses the shared Popover for the same reason the neighbours do. The in-table
- * version had to hand-roll a Portal to escape an `overflow: hidden` ancestor;
- * from the toolbar there is nothing to escape.
  */
 export const GroupRowsButton = ({ availableKeys, value, onChange }: GroupRowsButtonProps) => {
   if (availableKeys.length === 0) return null;
@@ -257,10 +238,9 @@ export const GroupRowsButton = ({ availableKeys, value, onChange }: GroupRowsBut
 };
 
 /**
- * Row height control — how much of each cell's content shows before it
- * needs expanding. Unlike field visibility, nothing is hidden here, only
- * resized, so it's safe (and useful) to persist across sessions — see
- * {@link useResultDisplayPreferences}.
+ * Row height control — how much of each cell's content shows before it needs expanding.
+ * Unlike field visibility, nothing is hidden here, only resized, so it's safe (and
+ * useful) to persist across sessions — see {@link useResultDisplayPreferences}.
  */
 export type RowHeightButtonProps = {
   value: RowHeight;

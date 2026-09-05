@@ -1,11 +1,6 @@
 /**
+ * Server-side facet value search.
  * @vitest-environment jsdom
- *
- * Server-side facet value search. Typing in a categorical facet's value
- * search queries `tracesV2.facetValues` with a `prefix`, matching against ALL
- * distinct values — so a high-cardinality facet (models, users, services,
- * trace names, labels) can surface a value beyond the preloaded top-50.
- * See specs/traces-v2/search.feature, rule "Very high-cardinality facets".
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -123,12 +118,8 @@ describe("<FacetSection /> server-side value search", () => {
   });
 
   describe("given a substring match lives within a preloaded value", () => {
-    // The server does a PREFIX match anchored at the start, so "gpt-4o" misses
-    // the namespaced "openai/gpt-4o-mini" and returns nothing. Pre-fix the code
-    // REPLACED the preloaded list with the (empty) server result and blanked
-    // the client query, so the row vanished. The SUPPLEMENT fix unions
-    // preloaded + server and keeps the live client substring filter, so a value
-    // beyond the server's anchored match is still found locally.
+    // The server does a PREFIX match anchored at the start, so "gpt-4o" misses the
+    // namespaced "openai/gpt-4o-mini" and returns nothing.
     it("still finds a substring match within the preloaded items while the server search is active", async () => {
       apiMock.useQuery.mockImplementation(
         (_input: { prefix?: string }, opts: { enabled?: boolean }) =>

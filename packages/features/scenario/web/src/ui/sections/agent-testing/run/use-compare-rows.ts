@@ -1,12 +1,5 @@
 /**
  * Moving the run dialog into a comparison and back, and editing its rows.
- *
- * Entering takes the agent and the parameter line the dialog holds into row
- * one. Leaving, by the x of the section or by removing rows down to one, puts
- * the remaining row back: its agent becomes the agent to be tested and its
- * line goes back to the Parameters section. The secret rows never move: they
- * are run-level and shared across the targets either way.
- *
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

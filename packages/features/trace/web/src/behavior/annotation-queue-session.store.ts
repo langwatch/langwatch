@@ -2,12 +2,6 @@ import { create } from "zustand";
 
 /**
  * How a turn's trace came to be counted into the session.
- *
- * "auto" is a trace the walk itself brought in: the turn the reviewer was sent
- * to, or a turn they annotated. Both are counted because walking and annotating
- * are what the sitting is for. "on" and "off" are the reviewer saying so
- * themselves, which is why an "off" is not undone by a later annotation or by
- * walking back to the turn: a deliberate untick outranks a rule of thumb.
  */
 export type SessionMark = "auto" | "on" | "off";
 
@@ -32,11 +26,6 @@ interface AnnotationQueueSessionState {
 
 /**
  * The traces one sitting at the queue has collected.
- *
- * Which traces to hand to a dataset is a decision about the sitting the
- * reviewer is in, so it lives outside the pages that come and go as the queue
- * is walked and is dropped the moment the queue is left. A set carried over
- * from last week silently feeding a dataset would be worse than re-ticking.
  */
 export const useAnnotationQueueSessionStore = create<AnnotationQueueSessionState>((set) => ({
   active: false,

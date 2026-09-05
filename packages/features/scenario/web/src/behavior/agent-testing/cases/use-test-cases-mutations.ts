@@ -1,7 +1,5 @@
 /**
- * Every write the Scenarios tab makes, and the dialog state each write needs
- * to close itself when it lands.
- *
+ * Every write the Scenarios tab makes, and the dialog state each write needs to close itself when it lands.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/suites/test-suites.feature
  */

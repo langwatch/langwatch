@@ -1,11 +1,6 @@
 /**
+ * Unmapped-cost suggestion in the span detail pane: shows when the span detail carries `costSuggestion`, opens the model costs page prefilled in a new window.
  * @vitest-environment jsdom
- *
- * Unmapped-cost suggestion in the span detail pane: shows when the span
- * detail carries `costSuggestion`, opens the model costs page prefilled in
- * a new window. Renders the real SpanAccordions tree with the span-detail
- * data hook as the mocked boundary.
- *
  * Spec: specs/traces-v2/span-unmapped-cost-suggestion.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

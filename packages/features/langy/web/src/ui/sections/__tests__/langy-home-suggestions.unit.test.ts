@@ -1,8 +1,5 @@
 /**
- * The asks escalate with what the project can actually act on — on the home
- * page's capability row AND the panel's empty state, which share the one
- * selection.
- *
+ * The asks escalate with what the project can actually act on — on the home page's capability row AND the panel's empty state, which share the one selection.
  * Spec: specs/home/langy-home.feature,
  * specs/langy/langy-empty-state-suggestions.feature
  */

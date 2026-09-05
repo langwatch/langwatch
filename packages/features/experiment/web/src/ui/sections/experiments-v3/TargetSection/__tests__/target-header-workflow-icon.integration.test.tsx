@@ -1,9 +1,6 @@
 // @vitest-environment jsdom
 /**
- * A workflow agent runs a whole Studio workflow, not a single code node. The
- * target column has to say so: reading the code icon there is what tells an
- * author their target is broken when it is only mislabelled.
- *
+ * A workflow agent runs a whole Studio workflow, not a single code node.
  * @see specs/agents/workflow-agent-as-target.feature
  */
 import "@testing-library/jest-dom/vitest";

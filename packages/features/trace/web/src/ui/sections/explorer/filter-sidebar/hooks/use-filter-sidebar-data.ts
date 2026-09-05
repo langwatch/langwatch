@@ -99,12 +99,9 @@ export function useFilterSidebarData() {
   const setSectionOrder = useFacetLensStore((s) => s.setSectionOrder);
   const setAllSectionsOpen = useFacetLensStore((s) => s.setAllSectionsOpen);
 
-  // Density + per-user visibility prefs feed the "which sections should
-  // even show up" filter further down. Both are owned outside the
-  // sidebar (density is global, visibility is per-project) so we just
-  // subscribe + read them here. The actual resolver
-  // (`isSectionVisibleForDensity`) is declared below `facetStateLookup`
-  // because it depends on AST-active fields.
+  // Density + per-user visibility prefs feed the "which sections should even show up"
+  // filter further down. Both are owned outside the sidebar (density is global,
+  // visibility is per-project) so we just subscribe + read them here.
   const density = useDensityStore((s) => s.density);
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? null;
@@ -188,17 +185,9 @@ export function useFilterSidebarData() {
     [facetStateLookup],
   );
 
-  // Synthesise when (a) discover is still in flight, (b) discover
-  // completed but returned no descriptors (project has no traces yet), or
-  // (c) discover returned descriptors that all partition away — every
-  // categorical had zero buckets, every range a zero span, and no
-  // attribute keys surfaced — so nothing usable survives for the current
-  // view (e.g. a project with traces but an empty distinct set in this
-  // time window). Cases (b) and (c) used to collapse the sidebar to zero
-  // sections, leaving a blank rail. The synthetic rows are fully
-  // interactive (clicks still apply against the AST) but flagged so
-  // FacetRow / RangeSection render a "no data yet" placeholder instead of
-  // lying with a zero count / flat range bar.
+  // Synthesise when (a) discover is still in flight, (b) discover completed but returned no descriptors (project has no traces yet), or (c) discover returned
+  // descriptors that all partition away — every categorical had zero buckets, every range a zero span, and no attribute keys surfaced — so nothing usable survives
+  // for the current view (e.g. a project with traces but an empty distinct set in this time window).
   const {
     categoricals,
     ranges,
@@ -237,14 +226,8 @@ export function useFilterSidebarData() {
   const attributeSections = useMemo<AttributesSectionData[]>(() => {
     const sections: AttributesSectionData[] = [];
     // Metadata leads the attribute block. Discovered keys are FULL
-    // (`metadata.environment`); `filterPrefix: "attribute"` + the full key
-    // yields `attribute.metadata.environment:value` →
-    // `Attributes['metadata.environment']`. `displayStripPrefix` strips the
-    // redundant `metadata.` from the label only, leaving the filter intact.
-    // Metadata always leads the attribute block, even with zero discovered
-    // keys — it's the primary way users filter their own traces, so it stays
-    // visible and renders a docs-linked empty state (rather than vanishing and
-    // leaving users unable to find where metadata filtering lives).
+    // (`metadata.environment`); `filterPrefix: "attribute"` + the full key yields
+    // `attribute.metadata.environment:value` → `Attributes['metadata.environment']`.
     sections.push({
       key: METADATA_SECTION_KEY,
       label: "Metadata",
@@ -288,18 +271,8 @@ export function useFilterSidebarData() {
     const map = new Map<string, FacetItem[]>();
     for (const cat of categoricals) {
       const baseItems = buildFacetItems(cat, cat.synthetic ?? isSynthetic);
-      // Surface values that the user typed in the search bar but that
-      // discover didn't return (rare value, custom label, paste from
-      // another query). Without this, an active filter like
-      // `status:custom` shows up as `1` in the section's badge but the
-      // matching row is invisible — users can't see what's selected
-      // and can't click to remove. Synthesised AST-only rows render
-      // with no count so they don't lie about hit counts.
-      //
-      // Pin AST extras to the TOP of the list so they always stay
-      // above the show-more cut — otherwise an actively-filtered value
-      // can hide below the fold the moment a section has more than ten
-      // discovered values.
+      // Surface values that the user typed in the search bar but that discover didn't
+      // return (rare value, custom label, paste from another query).
       const known = new Set(baseItems.map((i) => i.value));
       const { include, exclude } = getFacetValues(ast, cat.key);
       const extras: FacetItem[] = [];
@@ -463,13 +436,9 @@ function partitionDescriptors(
 
   for (const d of descriptors) {
     if (d.kind === "categorical") {
-      // Keep a categorical section mounted when (a) it has buckets to
-      // show, (b) the AST has an active filter on this field, or (c) it
-      // was synthesised as a placeholder before traces arrive. Without
-      // (b), filtering on a categorical with zero matching distinct
-      // values would drop the section from the sidebar — the user would
-      // have no way to clear the filter. Without (c), cold tenants see
-      // a blank sidebar on first load.
+      // Keep a categorical section mounted when (a) it has buckets to show, (b) the AST
+      // has an active filter on this field, or (c) it was synthesised as a placeholder
+      // before traces arrive.
       const isSynthetic = (d as { synthetic?: boolean }).synthetic;
       if (d.topValues.length > 0 || activeFieldSet.has(d.key) || isSynthetic) {
         cats.push({
@@ -498,18 +467,7 @@ function partitionDescriptors(
         });
       }
     } else if (d.kind === "dynamic_keys") {
-      // Parallel attribute discovery streams. Each one corresponds to a
-      // distinct `Map` (or `Array(Map)`) column in ClickHouse — except
-      // `metadata`, which is the `metadata.*` subset of the same
-      // `trace_summaries.Attributes` map as `metadataKeys`, scoped
-      // server-side:
-      //   `metadataKeys`        → `trace_summaries.Attributes` (all keys)
-      //   `metadata`            → `trace_summaries.Attributes` (metadata.* only)
-      //   `spanAttributeKeys`   → `stored_spans.SpanAttributes`
-      //   `eventAttributeKeys`  → `stored_spans.Events.Attributes`
-      // Split here so the sidebar can render distinct sections under
-      // their respective groups (event keys live with the trace block
-      // because span events are hoisted onto the trace at ingest).
+      // Parallel attribute discovery streams.
       if (d.key === "metadataKeys") traceAttrs = d.topKeys;
       else if (d.key === "metadata") metadataAttrs = d.topKeys;
       else if (d.key === "spanAttributeKeys") spanAttrs = d.topKeys;
@@ -528,12 +486,8 @@ function partitionDescriptors(
 }
 
 /**
- * True when a partition surfaced no renderable section at all — no
- * categoricals, no ranges, no attribute keys. This is the "discover
- * returned descriptors but every one of them partitioned away" case
- * (zero-bucket categoricals, zero-span ranges, no attribute keys),
- * which would otherwise leave a blank rail. The caller swaps in the
- * synthetic FACET_DEFAULTS set so the minimal facets always render.
+ * True when a partition surfaced no renderable section at all — no categoricals, no
+ * ranges, no attribute keys.
  */
 function isPartitionEmpty(partition: ReturnType<typeof partitionDescriptors>): boolean {
   return (
@@ -547,31 +501,17 @@ function isPartitionEmpty(partition: ReturnType<typeof partitionDescriptors>): b
 }
 
 /**
- * Build a synthetic descriptor list from FACET_DEFAULTS and RANGE_DEFAULTS
- * — used to render the sidebar before discover responds (or when discover
- * returns empty because the project has no traces yet), so users see the
+ * Build a synthetic descriptor list from FACET_DEFAULTS and RANGE_DEFAULTS — used to render the sidebar before
+ * discover responds (or when discover returns empty because the project has no traces yet), so users see the
  * well-known facets immediately instead of a blank sidebar.
- *
- * Categorical rows carry count=0 and are flagged synthetic so FacetRow
- * hides the count + value bar. Range descriptors use min=0, max=0 and are
- * flagged synthetic so RangeSection renders a placeholder caption.
- *
- * `partitionDescriptors` keeps synthetic rows even when empty because of
- * the `isSynthetic` guard — no filter needed here.
  */
 type Descriptors = NonNullable<ReturnType<typeof useTraceFacets>["data"]>;
 function synthesizeDefaultDescriptors(): Descriptors {
   const out: (Descriptors[number] & { synthetic?: boolean })[] = [];
 
   for (const [key, values] of Object.entries(FACET_DEFAULTS)) {
-    // `descriptor.group` here uses the backend's `SectionGroup`
-    // taxonomy (evaluation/metadata/prompt/span/trace). The sidebar
-    // renders a flat, lens-ordered list, so this field does NOT drive
-    // section placement — it only feeds an icon fallback when
-    // `FACET_ICONS[key]` is missing. Every key in FACET_DEFAULTS except
-    // `spanStatus` has a curated icon today, so the synthetic
-    // placeholder still renders correctly. Pinning `"trace"` here keeps
-    // the type clean.
+    // `descriptor.group` here uses the backend's `SectionGroup` taxonomy
+    // (evaluation/metadata/prompt/span/trace).
     out.push({
       kind: "categorical",
       key,

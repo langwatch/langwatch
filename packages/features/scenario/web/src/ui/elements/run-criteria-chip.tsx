@@ -1,10 +1,5 @@
 /**
  * Criteria summary chip for the run detail drawer header.
- *
- * Green when every success criterion was met, red otherwise. Hovering
- * reveals the full criteria breakdown — each met criterion with a check,
- * each unmet one with a cross — so the verdict is explorable without
- * scrolling to the results section.
  */
 
 import { HStack, Icon, Text, VStack } from "@chakra-ui/react";

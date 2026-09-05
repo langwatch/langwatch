@@ -1,11 +1,6 @@
 /**
+ * "Any of" header hint on a facet section.
  * @vitest-environment jsdom
- *
- * "Any of" header hint on a facet section. Two or more INCLUDED values of
- * the same field combine with OR (a trace's field can equal only one value),
- * so the header surfaces a quiet "any of" hint to signal the values are
- * alternatives, not a narrowing AND — see specs/traces-v2/search.feature,
- * rule "Same-field multi-select shows an 'any of' header hint".
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

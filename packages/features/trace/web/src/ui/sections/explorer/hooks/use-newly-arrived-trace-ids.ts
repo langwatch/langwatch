@@ -6,11 +6,9 @@ const NEW_ID_TTL_MS = 3500;
 const SEEN_IDS_CAP = 5_000;
 
 /**
- * Track which trace IDs are "new": arrived since this hook mounted AND started
- * after mount time. The timestamp gate keeps filter / page / sort changes from
- * making every backfilled trace pulse. Each new id self-evicts after
- * `NEW_ID_TTL_MS`. The seen-ids set is bounded so a long-running tab doesn't
- * grow it without limit.
+ * Track which trace IDs are "new": arrived since this hook mounted AND started after
+ * mount time. The timestamp gate keeps filter / page / sort changes from making every
+ * backfilled trace pulse. Each new id self-evicts after `NEW_ID_TTL_MS`.
  */
 export function useNewlyArrivedTraceIds(traces: TraceListItem[]): Set<string> {
   const mountedAtRef = useRef(Date.now());

@@ -1,20 +1,6 @@
 /**
  * Every navigation destination the app declares must resolve to a real page.
- *
  * Spec: specs/navigation/destination-route-registration.feature
- *
- * `ui-route-table.ts` is a hand-maintained table, not filesystem routing, so
- * adding a page and linking to it are two edits — and the third, registering
- * the route, is the one nothing complains about. `projectNavItems` is the
- * ONE data source the sidebar builds its links from (`main-menu.tsx` writes
- * no href literal of its own any more), so it is also the one place "every
- * declared destination" needs to be read from.
- *
- * "Resolves" has to mean what React Router means by it, not "matches some
- * pattern in the file". The table ends in a `*` route that renders the 404,
- * so every path on earth matches something; `matchRoutes` applies the real
- * ranking and hands back the route that would actually render, which is the
- * only answer worth asserting on.
  */
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";

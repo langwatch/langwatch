@@ -1,9 +1,6 @@
 /**
+ * The parameter line field: what it offers while typed, and how the keyboard drives the list.
  * @vitest-environment jsdom
- *
- * The parameter line field: what it offers while typed, and how the keyboard
- * drives the list.
- *
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

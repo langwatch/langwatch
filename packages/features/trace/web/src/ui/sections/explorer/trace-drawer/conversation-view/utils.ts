@@ -18,17 +18,6 @@ const NO_MEDIA: MediaPartData[] = [];
 
 /**
  * The media that hangs off one side of a turn's messages.
- *
- * Two sources, in the order the trace table already reads them. A turn's
- * input and output text is flattened at fold time, so the fold-derived
- * references are the only record of what the winning span payload carried and
- * they win whenever they exist. A turn handed over with its raw payload (a
- * threadless trace the host fetched itself) has no references, so its value
- * is walked for parts instead.
- *
- * Either way the same side rule applies as on the summary strips: the caller's
- * media stays on the input side, the agent's reply on the output side, and
- * media recorded without a role stays wherever it was recorded.
  */
 export function turnMediaForSide({
   refs,
@@ -59,16 +48,7 @@ export interface ConversationMarkdownChunk {
 }
 
 /**
- * Build the conversation markdown as a list of independently-renderable
- * chunks. The MarkdownConversationView mounts one `<RenderedMarkdown>` per
- * chunk through a virtualizer, so very long conversations only pay the
- * react-markdown / Shiki cost for what's actually on screen. Chunking is
- * intentionally finer than per-turn — the user prompt and the assistant
- * answer for a single turn each get their own chunk so a single huge
- * assistant response doesn't pin a giant row in memory.
- *
- * The Copy button still hands back the full string via
- * `joinConversationMarkdown(chunks)` so paste-as-one-doc keeps working.
+ * Build the conversation markdown as a list of independently-renderable chunks.
  */
 export function buildConversationMarkdownChunks(
   conversationId: string,

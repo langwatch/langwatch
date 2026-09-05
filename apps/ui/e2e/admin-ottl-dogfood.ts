@@ -1,20 +1,7 @@
 /**
- * admin-ottl-dogfood.ts — Ask A real-user QA for IngestionTemplates
- * authoring flow at /governance/inventory?tab=catalog → Ingestion
- * Templates inner tab. Drives the 4 paths shipped at d61842a3f:
- *
- *   1. List view shows platform rows + org-authored rows
- *   2. View OTTL on platform row → read-only drawer with ottlRules
- *   3. Clone to customise on platform row → org-authored row created,
- *      Edit drawer opens
- *   4. Edit OTTL on org row → save → row updated
- *   5. Archive on org row → row disappears
- *
- * Outputs PNGs to /tmp/ottl-dogfood/ + a JSON report (pass/fail per path).
- *
- * Prereqs:
- *   - Dev stack running, e2e/auth.json valid (rogerio with org:manage)
- *   - At least one Platform IngestionTemplate seeded (claude_code etc.)
+ * admin-ottl-dogfood.ts — Ask A real-user QA for IngestionTemplates authoring flow at
+ * /governance/inventory?tab=catalog → Ingestion Templates inner tab. Drives the 4 paths
+ * shipped at d61842a3f:
  */
 import * as fs from "fs";
 import * as path from "path";

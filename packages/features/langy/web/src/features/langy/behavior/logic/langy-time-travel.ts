@@ -1,31 +1,5 @@
 /**
  * TIME TRAVEL for the chat panel itself (developer mode).
- *
- * When the inspector's scrubber leaves LIVE, the panel stops rendering the
- * engine's present and renders THIS view instead: the conversation as it stood
- * at one moment of the recorded tape. It is a pure function of (tape prefix,
- * durable history) — no store is mutated, no engine state is touched, and
- * snapping back to LIVE simply stops substituting. Rendering the past must
- * never be able to corrupt the present.
- *
- * How the moment is reconstructed, per source of truth:
- *
- *   settled turns   from the DURABLE lane: every `agent_responded` at or
- *                   before the moment contributes its recorded AnswerParts,
- *                   deduplicated against the history rows by messageId (the
- *                   event and the projection row share the id by design).
- *   history rows    `langy.messages` rows whose createdAtMs is at or before
- *                   the moment — the conversation as the durable projections
- *                   had it. Rows carry server clocks and the tape carries this
- *                   client's, so the durable-event dedup above is what keeps
- *                   skew from double-rendering an answer.
- *   the live turn   when the replayed fold is mid-turn at the moment: the
- *                   user's just-sent text from the OUTBOUND lane, and the
- *                   partial answer from the STREAM lane's deltas for that
- *                   turn — the prose exactly as far as it had streamed.
- *   the signals     the last status/progress at or before the moment, and the
- *                   turn's accumulated reasoning — what the thinking line and
- *                   status row were showing right then.
  */
 import { LANGY_CONVERSATION_EVENT_TYPES, type LangyEventCursor } from "@langwatch/langy-contract";
 
@@ -72,12 +46,9 @@ export function buildTimeTravelView({
   const atMs = visible.at(-1)?.atMs ?? 0;
   const fold = replayTurnProjection(visible);
 
-  // Settled messages carry a SERVER-TIME sort key, and the two sources share
-  // one clock by construction: a history row's createdAtMs IS the event's
-  // occurredAt (the message map stamps CreatedAt from it). Merging on that key
-  // is what keeps order right — an answer recorded on the tape but not yet in
-  // the history rows must still sort BETWEEN its question and the next one,
-  // never appended at the end of the whole baseline.
+  // Settled messages carry a SERVER-TIME sort key, and the two sources share one clock
+  // by construction: a history row's createdAtMs IS the event's occurredAt (the message
+  // map stamps CreatedAt from it).
   const settled: { key: number; message: TimeTravelMessage }[] = [];
 
   // History rows the durable projection had by the moment. Rows with no
@@ -180,14 +151,9 @@ export function buildTimeTravelView({
     }
   }
 
-  // THE SETTLE GAP. The answer's history row lands on the SERVER clock, but
-  // the fold only turns terminal once the closing event reaches the tape — a
-  // catch-up round-trip later. A scrub position inside that gap has the
-  // settled answer among the rows AND a non-terminal fold, which double-
-  // rendered the answer (settled + its own partial) under a still-going
-  // thinking line. The streamed prose IS the persisted prose, so a settled
-  // assistant text that extends the streamed text means the answer landed —
-  // drop the partial and let the working indicators end.
+  // THE SETTLE GAP. The answer's history row lands on the SERVER clock, but the fold
+  // only turns terminal once the closing event reaches the tape — a catch-up round-trip
+  // later.
   const lastSettledAssistant = [...messages]
     .reverse()
     .find((message) => message.role === "assistant");

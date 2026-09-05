@@ -1,11 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Unit tests for useSuiteRouting hook — catch-all path routing.
- *
- * All simulation sub-paths are handled by [[...path]].tsx, so
- * sidebar navigation uses shallow routing within the same page.
- *
+ * @vitest-environment jsdom
  * @see specs/suites/simulation-runs-page.feature
  */
 import { act, renderHook } from "@testing-library/react";

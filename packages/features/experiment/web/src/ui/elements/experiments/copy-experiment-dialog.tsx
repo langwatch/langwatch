@@ -27,14 +27,6 @@ export const CopyExperimentDialog = ({
 
   /**
    * Where this experiment may be replicated to.
-   *
-   * `platform/app` walked the organization graph here and asked
-   * `~/server/api/rbac` whether the reader's team membership carried
-   * `evaluations:manage` — a server module imported into a browser component,
-   * with the reader's own id read off the session. The host answers the same
-   * question now, derived from `@langwatch/authz-contract` by the composing
-   * application, and a target the reader cannot create in is still LISTED and
-   * greyed rather than hidden, which is what this select has always done.
    */
   const projects = copyTargets.map((target) => ({
     label: target.name,

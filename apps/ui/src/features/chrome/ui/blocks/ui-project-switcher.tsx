@@ -1,19 +1,5 @@
 /**
  * The project switcher, as this application answers it.
- *
- * `@langwatch/navigation-web` owns the control — the combobox, its search, its
- * keyboard and its rows — AND, since the shell moved, the groups too: which
- * projects to offer and where each one goes is `useProjectPickGroups`, read off
- * the navigation host. This block fetches nothing and computes nothing; it is
- * the seam that hands the control to a screen whose header wants one.
- *
- * WHY IT STILL EXISTS now that the shell draws its own. A screen's host port
- * carries this as a `ReactNode` — the organization family's audit log and the
- * secret family both take one — so the screen decides where in its own header
- * it goes. That is a different placement from the shell's top bar, and it is
- * why the control is read through the OPTIONAL host: a screen mounted where the
- * chrome layout route does not reach renders no switcher rather than crashing
- * on a header decoration.
  */
 
 import {

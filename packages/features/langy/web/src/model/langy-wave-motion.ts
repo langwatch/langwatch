@@ -6,10 +6,8 @@ import {
 } from "./langy-thinking-line";
 
 /**
- * Maps observable Langy activity to low-amplitude fold motion. The fold never
- * follows the pointer or claims unobserved work. Each state has a distinct
- * target and `stepWaveMotion` eases one shared vector between them, with a
- * slower fall than rise so fast state changes do not pop.
+ * Maps observable Langy activity to low-amplitude fold motion. The fold never follows
+ * the pointer or claims unobserved work.
  */
 
 export type LangyWaveActivity = "idle" | "waiting" | "thinking" | "streaming" | "tool" | "settling";
@@ -31,10 +29,7 @@ export interface LangyWaveMotion {
 }
 
 /**
- * Per-state motion targets. Invariants the unit tests pin:
- * streaming is the most energetic and fastest; thinking is calmer (slower,
- * deeper, near-zero flutter) than streaming; only the tool state pulses;
- * settling is the stillest; nothing exceeds energy 1.
+ * Per-state motion targets.
  */
 export const WAVE_MOTION_TARGETS: Record<LangyWaveActivity, LangyWaveMotion> = {
   // Idle is the permanent look and must be nearly imperceptible — a barely-there
@@ -42,16 +37,7 @@ export const WAVE_MOTION_TARGETS: Record<LangyWaveActivity, LangyWaveMotion> = {
   // are multipliers; the renderer's absolute pixel amplitudes are deliberately
   // tiny (see `sampleRope`), so even "streaming" only whispers.
   idle: { energy: 0.22, drift: 0.45, flutter: 0.25, pulse: 0 },
-  // WAITING IS THE ONE PEOPLE WATCH. It is the cold-start window — the longest
-  // stretch anyone stares at this panel — and it used to sit at 0.35 energy with
-  // idle's own flutter, which is to say it looked switched off at exactly the
-  // moment the user most wants to know something is happening. The wake ripple
-  // marked the send and then the rope went back to almost-still.
-  //
-  // It now blows: high flutter and near-streaming drift, so the rope wiggles in
-  // the wind rather than merely drifting. It stays UNDER streaming (that
-  // ordering is load-bearing and pinned by test) — the difference is character
-  // rather than volume, a gusty wait against a purposeful travelling wind.
+  // WAITING IS THE ONE PEOPLE WATCH.
   waiting: { energy: 0.58, drift: 0.8, flutter: 0.55, pulse: 0 },
   // Thinking stays the deep slow swell: MORE amplitude than waiting, much less
   // flutter and much less drift. Reasoning reads as considered, not agitated.
@@ -67,13 +53,9 @@ export function restingWaveMotion(): LangyWaveMotion {
 }
 
 /**
- * Rising energy answers within ~half a second (a state change should be
- * legible promptly); falling energy takes ~2s to visually settle (a turn's end
- * eases out, never snaps). The fall is a little quicker than it was, because the
- * working states now sit higher — from a louder peak the same time constant left
- * the rope perceptibly moving after the answer had landed. Character params (drift/flutter/pulse) share one
- * medium time constant so waveform shape morphs smoothly through rapid
- * tool→stream→tool flips.
+ * Rising energy answers within ~half a second (a state change should be legible
+ * promptly); falling energy takes ~2s to visually settle (a turn's end eases out, never
+ * snaps).
  */
 export const WAVE_ENERGY_RISE_TAU_S = 0.45;
 export const WAVE_ENERGY_FALL_TAU_S = 0.7;
@@ -86,24 +68,7 @@ export const WAVE_PULSE_PERIOD_S = 2.6;
 
 /**
  * ── ONE-SHOT GESTURES ───────────────────────────────────────────────────────
- *
- * On top of the continuous ambient motion, the fold plays short, legible
- * GESTURES on the events of a turn — the fold's personality, kept quiet at rest
- * and expressive only at the moment something happens:
- *
- *   • seam glitter — while a STATUS LABEL is showing on the conversation (the
- *     orange-orbed "Analysing traces…" rows), a bright warm pulse runs down the
- *     seam like light down a fibre. Not a one-shot: a sustained shimmer whose
- *     intensity eases in while the status is up and out when it clears.
- *   • shake        — the turn FAILED: a brief nervous side-to-side shiver, then
- *     still. Never frantic, never long.
- *   • celebrate    — the turn SUCCEEDED: a quick, springy, happy wag down the
- *     rope that eases out. The one upbeat beat in the vocabulary.
- *
- * Shake and celebrate are one-shots with decaying envelopes; the glitter is a
- * level that tracks the status label. The renderer owns the clock.
  */
-/** Error shake: a brief, nervous side-to-side shiver of the whole rope. */
 export const WAVE_SHAKE_DURATION_S = 0.5;
 /** Success vibrate: a quick, springy, happy wag that eases out. */
 export const WAVE_CELEBRATE_DURATION_S = 0.75;
@@ -116,10 +81,6 @@ export const WAVE_GLITTER_FALL_TAU_S = 0.9;
 
 /**
  * Map Langy's live turn signals to the fold's activity state.
- *
- * Priority mirrors the thinking line: a failure/recovery settles everything;
- * otherwise the most specific provable signal wins (tool > tokens > reasoning),
- * and a turn with nothing on the wire yet is merely "waiting".
  */
 export function deriveWaveActivity({
   turnInFlight,

@@ -1,13 +1,5 @@
 /**
- * The results of the selected run: a table by default, or the classic wall of
- * live conversation cards. Which run this is reads in the header line above,
- * so the results start straight away.
- *
- * A run against more than one target is a comparison, and reads as one: the
- * charts that put the targets next to each other, then the matrix with one
- * column per target. The grid reads one section per target, each under the
- * dot and the name of its target.
- *
+ * The results of the selected run: a table by default, or the classic wall of live conversation cards.
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/features/agent-testing/comparison-mode.feature
  */
@@ -108,10 +100,6 @@ function ComparisonGrid({
 
 /**
  * How a card or a row names its target.
- *
- * On a comparison a target reads under the label its column carries, so the
- * same agent on two sets of parameters is told apart on a card too. A run of
- * a target the list does not hold falls back to the name the project holds.
  */
 function targetNameResolver({
   targets,

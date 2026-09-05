@@ -1,16 +1,5 @@
 /**
  * The browser application, composed once.
- *
- * Provider order, the root layout, the route table and the router are this
- * package's structure. The composing application hands over only what it still
- * owns — the providers it implements, the loader for each page key, and the
- * two error components — and gets back the outer provider and router the
- * application shell renders.
- *
- * `features` is the other half: what this package serves itself. A screen that
- * has moved declares its loader, the feature-api Providers its hooks need and
- * the capability ports it fills, all three in one place, and the host is not
- * edited at all.
  */
 
 import type { ComponentType } from "react";
@@ -37,10 +26,6 @@ import { createUiRootLayout } from "./ui-root-layout";
 
 /**
  * What `apps/ui` serves itself.
- *
- * Every field is optional and every default is this package's own standing
- * declaration, so a host that knows nothing about any of it composes exactly
- * as it did before.
  */
 export type UiFeatureInstall = {
   /**
@@ -56,10 +41,8 @@ export type UiFeatureInstall = {
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
   /**
-   * The live session this application reads for itself — pass
-   * `useBrowserUiSession` to serve the reader, the scope and the permissions
-   * from the deployment. Absent means the session port refuses by name, which
-   * is what a composition with no host to ask should do.
+   * The live session this application reads for itself — pass `useBrowserUiSession` to
+   * serve the reader, the scope and the permissions from the deployment.
    */
   session?: UiSessionSource;
 };

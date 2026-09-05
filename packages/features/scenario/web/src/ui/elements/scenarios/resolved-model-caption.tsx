@@ -1,10 +1,8 @@
 import { Link, Text } from "@chakra-ui/react";
 
 /**
- * Caption shown next to a scenario Generate button: which model
- * generation will use, with a link to change it in the model provider
- * settings. Renders nothing while the resolved model is unknown —
- * the no-provider / no-default states have their own banners.
+ * Caption shown next to a scenario Generate button: which model generation will use,
+ * with a link to change it in the model provider settings.
  */
 export function ResolvedModelCaption({ model }: { model: string | null | undefined }) {
   if (!model) return null;

@@ -1,14 +1,7 @@
 /**
+ * Summary view mode in TraceDrawerShell renders the ConversationContext strip (inside a flexShrink=0 / maxHeight wrapper) when the trace
+ * has a conversationId, wired to drawerStore's `paneState.conversationContext.collapsed` and `togglePaneCollapsed("conversationContext")`.
  * @vitest-environment jsdom
- *
- * Summary view mode in TraceDrawerShell renders the ConversationContext
- * strip (inside a flexShrink=0 / maxHeight wrapper) when the trace has a
- * conversationId, wired to drawerStore's
- * `paneState.conversationContext.collapsed` and
- * `togglePaneCollapsed("conversationContext")`. Mounting the full shell
- * needs a drawer + queries + presence stack, so this test renders the
- * summary branch's JSX contract with the real ConversationContext
- * component and a mocked store/hook boundary.
  */
 
 import { Box, ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -94,11 +87,9 @@ interface SummaryTrace {
 }
 
 /**
- * Mirrors TraceDrawerShell's `viewMode === "summary"` branch: the strip
- * wrapper + ConversationContext only mount when the trace has a
- * conversationId, collapse state comes from the drawer store's
- * conversationContext pane, and the toggle dispatches
- * `togglePaneCollapsed("conversationContext")`.
+ * Mirrors TraceDrawerShell's `viewMode === "summary"` branch: the strip wrapper + ConversationContext only mount
+ * when the trace has a conversationId, collapse state comes from the drawer store's conversationContext pane, and
+ * the toggle dispatches `togglePaneCollapsed("conversationContext")`.
  */
 function SummaryBranch({ trace }: { trace: SummaryTrace }) {
   const collapsed = storeState.paneState.conversationContext.collapsed;

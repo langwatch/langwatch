@@ -1,22 +1,5 @@
 /**
  * SpotlightOverlay — the Phase 2 contextual tour popover system.
- *
- * Mounts once in TracesPage. When `spotlightsActive` is true it finds
- * the current spotlight's anchor element via `[data-spotlight="<anchor>"]`,
- * measures its position, and renders a Chakra-based popover next to it.
- *
- * Non-modal: the user can interact with the page while a spotlight is
- * showing. The popover just floats next to the highlighted element.
- *
- * If the anchor element is not in the DOM (e.g. the trace drawer isn't
- * open yet), the spotlight is skipped to the next applicable one rather
- * than blocking the tour with an invisible popover.
- *
- * URL fragment persistence:
- *   - On mount, if `#sp=<id>` is present, spotlightsActive is flipped on
- *     and currentSpotlightId is set. (Handled by useSpotlightURLSync.)
- *   - On next/back, the fragment is updated.
- *   - On done/dismiss, the fragment is removed.
  */
 import { Box, Button, Flex, HStack, Portal, Text } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
@@ -108,10 +91,9 @@ export function measureAnchor(anchor: string): AnchorRect | null {
 }
 
 /**
- * True when an anchor's left edge sits at or beyond the right viewport edge,
- * i.e. it is still parked off-screen by an entrance animation (the drawer, or
- * Langy's companion ride, slides in from the right). A zero-rect (jsdom) reads
- * as on-screen. `left` carries `scrollX`, so subtract it back for the check.
+ * True when an anchor's left edge sits at or beyond the right viewport edge, i.e. it is
+ * still parked off-screen by an entrance animation (the drawer, or Langy's companion
+ * ride, slides in from the right). A zero-rect (jsdom) reads as on-screen.
  */
 export function isAnchorParkedOffscreen(
   rect: AnchorRect,
@@ -122,10 +104,8 @@ export function isAnchorParkedOffscreen(
 }
 
 /**
- * The spotlight ring may only be PLACED once its anchor has settled: on
- * screen (not parked off the right by an entrance ride) and holding the same
- * rect as the previous frame. Placing on a transient off-screen rect would
- * strand the fixed ring and its full-viewport scrim off the visible screen.
+ * The spotlight ring may only be PLACED once its anchor has settled: on screen (not parked off the right by an
+ * entrance ride) and holding the same rect as the previous frame.
  * Spec: the drawer companion ride, specs/langy/langy-panel-layout.feature.
  */
 export function isAnchorSettled(
@@ -410,16 +390,6 @@ export function SpotlightPopover({
 
 export function HighlightRing({ anchorRect }: { anchorRect: AnchorRect }): React.ReactElement {
   // Soft orange focus, not a blue aurora.
-  //
-  // Design rule: BLUE is reserved on this screen for "you need to act"
-  // affordances (the Next/Done buttons in the popover footer, primary
-  // action chips, etc.). Using it as a passive "look here" indicator
-  // around an arbitrary anchor steals semantic weight from those real
-  // CTAs. The ring now does the full stage-light treatment: a huge
-  // outer shadow dims the rest of the page (~12%) so the anchor reads
-  // as a literal spotlight cutout, and a gentle breathing pulse keeps
-  // the eye anchored without strobing. Pointer events stay off — the
-  // tour is non-modal and the dim is cosmetic, not a click shield.
   return (
     <Box
       data-testid="spotlight-highlight"
@@ -461,12 +431,8 @@ export function HighlightRing({ anchorRect }: { anchorRect: AnchorRect }): React
 
 /**
  * Drop-in at the TracesPage root. Subscribes to `spotlightsActive` +
- * `currentSpotlightId`. When active, renders a floating popover next to
- * the current spotlight's anchor element.
- *
- * Context for `isApplicable` preconditions is built here — the overlay
- * is the right place because it's inside TracesPage and has access to
- * the filter sidebar's descriptor list.
+ * `currentSpotlightId`. When active, renders a floating popover next to the current
+ * spotlight's anchor element.
  */
 export function SpotlightOverlay(): React.ReactElement | null {
   const { dismiss: persistDismissal } = useTraceExplorerTourPreference();

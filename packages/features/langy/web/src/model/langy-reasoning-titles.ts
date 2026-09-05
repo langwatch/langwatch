@@ -1,9 +1,7 @@
 /**
- * Moves leading reasoning headlines into the completed-actions receipt.
- * Only short leading bold paragraphs are eligible, and only when the turn has
- * activity. Ordinary emphasis stays untouched. A glued headline needs an
- * earlier standalone headline as evidence, and the fold never empties the
- * answer. Recorded `reasoning` parts contribute through the same path.
+ * Moves leading reasoning headlines into the completed-actions receipt. Only short
+ * leading bold paragraphs are eligible, and only when the turn has activity. Ordinary
+ * emphasis stays untouched.
  */
 
 import { z } from "zod";
@@ -56,13 +54,6 @@ function titleOfReasoningPart(part: ReasoningPart): string | null {
 
 /**
  * Peel the leading `**Title**` paragraphs off a settled answer.
- *
- * Standalone headlines (the bold run is the whole paragraph) peel repeatedly.
- * A GLUED headline peels on evidence: either a standalone run came before it,
- * or it is glued to yet another headline — consecutive reasoning segments with
- * no tool call between them arrive as `**a****b**`, which no answer's own
- * markdown looks like. Severing the last glue is what lets the reply start as
- * its own block.
  */
 function peelLeadingTitles(text: string): { titles: string[]; text: string } {
   const titles: string[] = [];
@@ -93,13 +84,9 @@ function peelLeadingTitles(text: string): { titles: string[]; text: string } {
 }
 
 /**
- * The fold: reasoning-part headlines plus the peeled leading headlines of
- * the answer text, and the text that remains for the reply itself.
- *
  * @param parts       the settled message's parts (reasoning parts, if any)
  * @param text        the reply text, already cleaned of hidden directives
- * @param hasActivity the turn renders a process record (the receipt the
- *                    titles fold into). Without one the text is untouched.
+ * @param hasActivity whether a process record exists for titles to fold into
  */
 export function foldReasoningTitles({
   parts,

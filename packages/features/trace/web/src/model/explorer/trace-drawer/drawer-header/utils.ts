@@ -12,15 +12,8 @@ export function readNumberAttribute(
 }
 
 /**
- * Format a raw attribute value for display in a pin pill. Strings pass
- * through; primitives stringify; objects fall back to JSON.
- *
- * When `key` is provided, key-aware formatting kicks in for attributes
- * whose raw shape would otherwise read as noise:
- *  - `langwatch.labels` arrives as a JSON-encoded array (e.g.
- *    `["sample","prod"]`). Rendering the literal array bracket + quotes in
- *    a pill pollutes the strip; we unwrap to a `·`-separated list so the
- *    user sees the labels themselves.
+ * Format a raw attribute value for display in a pin pill. Strings pass through;
+ * primitives stringify; objects fall back to JSON.
  */
 export function formatPinValue({ key, value }: { value: unknown; key?: string }): string | null {
   if (value === undefined || value === null || value === "") return null;
@@ -41,13 +34,8 @@ export function formatPinValue({ key, value }: { value: unknown; key?: string })
 }
 
 /**
- * Labels arrive in two practical shapes:
- *   1. JSON-encoded array string: `'["sample","prod"]'`
- *   2. Already-decoded array of strings.
- *
- * Either way, render as `sample · prod` so the user sees the labels and
- * not the array literal. Falls back to the raw string when neither shape
- * applies (e.g. legacy traces that wrote a plain comma-separated string).
+ * Labels arrive in two practical shapes: 1. JSON-encoded array string:
+ * `'["sample","prod"]'` 2. Already-decoded array of strings.
  */
 function formatLabelsValue(value: unknown): string | null {
   let arr: unknown = value;

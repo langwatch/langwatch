@@ -1,8 +1,5 @@
 /**
  * The version of a scenario, as a chip: "v3".
- *
- * A case with no version yet renders nothing, so the chip can be placed
- * before every case carries a version.
  */
 import { Badge } from "@chakra-ui/react";
 

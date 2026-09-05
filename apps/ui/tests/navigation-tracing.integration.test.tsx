@@ -1,17 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration test for the router half of browser navigation spans.
- *
  * Spec: specs/observability/browser-rum-trace-correlation.feature
  * ADR: dev/docs/adr/058-full-stack-trace-correlation-browser-rum.md
- *
- * The router is REAL — a memory data router with a lazy child route, so a
- * navigation genuinely passes through `loading` before it commits, which is
- * the transition the hook keys off. The OpenTelemetry provider is real too,
- * exporting in memory: what is asserted is the trace that came out, not the
- * calls that were made. Nothing is mocked: the enabled flag is an argument the
- * composing application supplies, so a scenario simply passes it.
  */
 
 import { NavigationContextManager } from "@langwatch/react-rum";

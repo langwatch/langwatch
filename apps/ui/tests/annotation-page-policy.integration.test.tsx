@@ -1,31 +1,6 @@
 /**
+ * What the four annotations addresses are actually behind, proved by mounting them — and which VIEW each of them is.
  * @vitest-environment jsdom
- *
- * What the four annotations addresses are actually behind, proved by mounting
- * them — and which VIEW each of them is.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice a
- * loader that names the wrong grant, which is the failure that refuses a reader
- * the platform page admitted or admits one it refused. Nor would it notice a key
- * mapped to the wrong view, which is this family's own new failure: four keys
- * share one screen and the loader is the only place that says which list each
- * address is. Both are read here, off the real loaders.
- *
- * ONLY ONE OF THE FOUR KEYS CARRIES A GRANT, and the asymmetry is the platform
- * pages', carried rather than tidied. `annotations.tsx` was
- * `withPermissionGuard("annotations:view")`; `all.tsx`, `me.tsx` and
- * `[slug].tsx` were wrapped in nothing at all. Inventing a guard is a change to
- * who can reach a page, which a page move does not own — and it is not a hole:
- * every procedure behind all four keys carries `annotations:view` as its own
- * policy, so a reader without the grant meets a page whose reads all refused
- * rather than data they should not see. Asserted in both directions so that if
- * somebody does decide to state the grant on all four, this file is what makes
- * it a decision.
- *
- * The screen itself is faked, and so is the transport the host provider reads
- * the organization graph over: what is under test is the policy and the mapping
- * the frontend feature wraps the screen in.
- *
  * Spec: packages/features/annotation/specs/annotations-list-selection.feature
  */
 
@@ -236,11 +211,7 @@ describe("given the four keys map to four views", () => {
     });
 
     /**
-     * FIVE KEYS NOW, not four. The queue walker was the one address of the
-     * family that stayed in `platform/app`, because it mounts the trace
-     * family's conversation view; that view is `@langwatch/trace-web`'s since
-     * the traces move, so the walker came too and this registry answers the
-     * whole family.
+     * FIVE KEYS NOW, not four.
      */
     it("registers every annotations key, the queue walker included", () => {
       expect(Object.keys(annotationFeature.loaders).sort()).toEqual(

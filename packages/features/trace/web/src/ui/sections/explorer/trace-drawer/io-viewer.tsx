@@ -40,24 +40,9 @@ const TRUNCATE_TAIL_MIN = 1_000;
 const IO_CONTAINER_PADDING = 3;
 
 /**
- * Outer-container chrome for the IOViewer body. Returns whether the body
- * paints flush (no border / radius / bg — the content owns its own chrome)
- * and the inner padding between the border and the content.
- *
- *   - `flush`: only Pretty + chat goes flush — every turn already paints its
- *     own bubble / card, so wrapping them in a redundant "bg.subtle + border"
- *     box just adds a gray frame (operator complaint). Everything else —
- *     plain text, JSON, *and Markdown (rendered or source)* — sits in the
- *     bordered box so the views read consistently side by side.
- *   - `innerPadding`: zero for views that paint edge-to-edge themselves (the
- *     virtualized chat list owns its viewport; the Markdown *source* view is
- *     a `flush` Shiki block whose horizontal scrollbar must hug the outer
- *     border). Rendered Markdown is NOT one of these — it takes the standard
- *     padding so it reads identically to Pretty's plain-text Markdown box.
- *
- * Round 5: rendered Markdown previously went flush, leaving it as bare text
- * floating in the pane while Pretty sat in a tidy bordered box beside it.
- * Both now share the bordered container.
+ * Outer-container chrome for the IOViewer body. Returns whether the body paints flush
+ * (no border / radius / bg — the content owns its own chrome) and the inner padding
+ * between the border and the content.
  */
 export function ioContainerChrome({
   format,
@@ -81,25 +66,16 @@ interface IOViewerProps {
   label: string;
   content: string;
   /**
-   * "input" renders the full chat history (all messages, all roles, tool calls
-   * inline). "output" — when the content happens to be a chat-history array —
-   * narrows to just the *final assistant message* of that array, since the
-   * trace's actual output for this turn is the model's last reply, not the
-   * whole transcript. For non-chat content this is a no-op.
+   * "input" renders the full chat history (all messages, all roles, tool calls inline).
    */
   mode?: "input" | "output";
   /**
-   * When provided, the panel header offers to comment on this field and, where
-   * a suggestion can correct it, to suggest what it should have said. The
-   * comment is recorded against the field this viewer is rendering: the span's
-   * when the viewer has a span, the trace's own otherwise.
+   * When provided, the panel header offers to comment on this field and, where a
+   * suggestion can correct it, to suggest what it should have said.
    */
   traceId?: string;
   /**
-   * Span this IOViewer is rendering. When set on an `llm` span the header
-   * surfaces an "Open in Playground" affordance — the chat history is the
-   * natural place to pick the conversation back up, especially for
-   * third-party traces with no managed prompt tied to the call.
+   * Span this IOViewer is rendering.
    */
   spanId?: string;
   /** Span type — `llm` enables the Playground affordance. */
@@ -114,17 +90,9 @@ export const IOViewer = memo(function IOViewer({
   spanId,
   spanType,
 }: IOViewerProps) {
-  // Translate-to-English swaps the content feeding the whole viewer
-  // pipeline, so every format (pretty/chat/json/markdown) renders the
-  // translated variant; Copy follows what's displayed. Chat-shaped
-  // payloads are translated per text leaf (message prose and text parts)
-  // and re-serialized, so the translated variant still parses and renders
-  // as the same conversation — translating the raw transcript JSON as one
-  // blob would come back as prose and collapse the chat view to a
-  // monospace dump. The translated view renders the conversation itself;
-  // envelope keys around it are structure, not language. Each leaf is
-  // capped at the display truncation bound so text the viewer never shows
-  // is not sent to the model.
+  // Translate-to-English swaps the content feeding the whole viewer pipeline, so every
+  // format (pretty/chat/json/markdown) renders the translated variant; Copy follows
+  // what's displayed.
   const originalChatMessages = useMemo(
     () => coerceToChatMessages(tryParseJSON(originalContent)),
     [originalContent],
@@ -174,21 +142,9 @@ export const IOViewer = memo(function IOViewer({
   const isChat = allChatMessages !== null;
   const canJson = parsed !== null;
 
-  // Split the chat-shape payload between the two panels:
-  //   • Input panel = the full conversation history sent to the model on
-  //     this turn — user messages, system / developer prompts, and every
-  //     prior assistant operation (thinking, tool_use, tool_result echoes,
-  //     intermediate text). Tool_use IDs in input are distinct from those
-  //     in output (they belong to earlier LLM calls in the agent loop),
-  //     so this is real history, not duplicated output. Trailing
-  //     assistant messages still get trimmed because those are this
-  //     turn's response and live in the output panel.
-  //   • Output panel = everything from the last text-bearing user message
-  //     onwards, in full. That keeps the agent's reasoning, tool calls,
-  //     tool results, and intermediate assistant turns visible as the
-  //     response — which is what they actually are. Earlier behaviour
-  //     narrowed this to the final assistant message; that hid the
-  //     operation chain.
+  // Split the chat-shape payload between the two panels: • Input panel = the full conversation history sent to
+  // the model on this turn — user messages, system / developer prompts, and every prior assistant operation
+  // (thinking, tool_use, tool_result echoes, intermediate text).
   const chatMessagesToRender = useMemo<ChatMessage[]>(() => {
     if (!allChatMessages) return [];
     const all = allChatMessages;
@@ -276,13 +232,9 @@ export const IOViewer = memo(function IOViewer({
     isVirtualizingChat,
   });
 
-  // Track whether the preview box's content actually exceeds its visible
-  // height. The "Click to interact" scrim only makes sense when there's
-  // hidden content to reveal — otherwise it's noise on a one-line input.
-  // ResizeObserver catches both initial layout and any reflow (format
-  // toggle, density change, font load, etc.). The fallback `scroll` listener
-  // covers the case where content height changes without the element
-  // resizing (rare, but cheap to add).
+  // Track whether the preview box's content actually exceeds its visible height. The
+  // "Click to interact" scrim only makes sense when there's hidden content to reveal —
+  // otherwise it's noise on a one-line input.
   const previewBoxRef = useRef<HTMLDivElement>(null);
   // Value intentionally unread — the effect re-runs measurement on resize/
   // scroll; the overflow flag itself isn't surfaced yet.

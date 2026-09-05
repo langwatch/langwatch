@@ -1,23 +1,5 @@
 /**
  * Reading the CLI's result document.
- *
- * Every LangWatch CLI read runs with `--format json`, and the server's CLI
- * envelope lifts that document out of the console noise before recording it — so
- * a settled tool call carries a JSON document as a string (a string all the way to
- * the browser, because that is what an AI-SDK tool output is).
- *
- * This module used to duck-type that document: it guessed which key held the rows,
- * guessed how the total was spelled, and tolerated everything because it had no
- * contract with the producer. It has one now. `@langwatch/langy` is the shared
- * package the CLI publishes its result shapes in and the panel reads them back
- * with, so the shape is stated ONCE and both ends compile against it.
- *
- * What remains here is the panel's own view logic — how many things a result holds,
- * which rows to draw — expressed on top of that contract rather than instead of it.
- *
- * Still tolerant by design: a shape the contract does not recognise returns
- * null/undefined rather than a guess, so a drifted CLI degrades to "no card detail"
- * and never to a wrong one.
  */
 import {
   asJsonDocument,
@@ -28,10 +10,9 @@ import {
 } from "@langwatch/langy-contract";
 
 /**
- * Keys whose array value is the result list in a LangWatch JSON document.
- * List envelopes named after their resource (`{ experiments: [...] }`,
- * `{ prompts: [...] }`) are recognised structurally below instead of being
- * enumerated here.
+ * Keys whose array value is the result list in a LangWatch JSON document. List
+ * envelopes named after their resource (`{ experiments: [...] }`, `{ prompts: [...] }`)
+ * are recognised structurally below instead of being enumerated here.
  */
 const COLLECTION_KEYS = ["traces", "items", "records", "results", "data"];
 
@@ -46,10 +27,8 @@ export function textValue(raw: unknown): string | undefined {
 }
 
 /**
- * The rows in a document: a top-level array, or the first recognised collection
- * key (`{ traces: [...] }`). Null when the document holds no collection — which is
- * different from an EMPTY one, and the difference is the whole point: an empty list
- * is the honest answer "nothing matched".
+ * The rows in a document: a top-level array, or the first recognised collection key (`{
+ * traces: [...] }`).
  */
 function rawCollectionOf(document: unknown): unknown[] | null {
   if (Array.isArray(document)) return document;
@@ -89,10 +68,6 @@ export function collectionOf(document: unknown): unknown[] | null {
 
 /**
  * A paginated document's true total, which may exceed the rows it returned.
- *
- * The platform counts two ways — `totalHits` for traces, `total` for the paged
- * REST collections — and reconciling them is the shared contract's job, not this
- * module's.
  */
 export function totalOf(document: unknown): number | null {
   if (!document || typeof document !== "object") return null;
@@ -110,11 +85,8 @@ export function totalOf(document: unknown): number | null {
 }
 
 /**
- * How many things a result actually contains. An offer to act on nothing is noise,
- * so this is what gates a follow-up suggestion.
- *
- * A structured document answers exactly; unstructured text can only be read for the
- * "found nothing" tell, and is otherwise assumed to carry something.
+ * How many things a result actually contains. An offer to act on nothing is noise, so
+ * this is what gates a follow-up suggestion.
  */
 export function countResults(output: unknown): number {
   const document = asJsonDocument(output);

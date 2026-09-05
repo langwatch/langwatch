@@ -1,12 +1,7 @@
 /**
+ * Header-layout + affordance coverage for SidebarSection: - the drag grip is lifted out of the in-flow header so the section icon + title line up with the value rows beneath (one cohesive left-aligned block) rather
+ * than sitting ~38px to their right (T20); - the per-section value filter toggle reads as "filter THESE values" (list-filter funnel), not the global search bar (T16).
  * @vitest-environment jsdom
- *
- * Header-layout + affordance coverage for SidebarSection:
- * - the drag grip is lifted out of the in-flow header so the section icon +
- *   title line up with the value rows beneath (one cohesive left-aligned
- *   block) rather than sitting ~38px to their right (T20);
- * - the per-section value filter toggle reads as "filter THESE values"
- *   (list-filter funnel), not the global search bar (T16).
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

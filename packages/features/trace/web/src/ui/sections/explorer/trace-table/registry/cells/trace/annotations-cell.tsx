@@ -13,14 +13,9 @@ import type { CellDef } from "../../types";
 type Density = "compact" | "comfortable";
 
 /**
- * What reviewers left on the trace: a count per kind, each opening what was
- * written on hover. Counts rather than text because a page of traces has to
- * stay scannable, and one comment in full is taller than the whole row.
- *
- * The cell's states, in the order it decides between them: pending while the
- * page's annotations are still coming, unavailable when they cannot be read,
- * the empty marker for a trace nobody has reviewed, and otherwise the counts.
- * The first two exist so the empty marker only ever means "nobody reviewed it".
+ * What reviewers left on the trace: a count per kind, each opening what was written on
+ * hover. Counts rather than text because a page of traces has to stay scannable, and
+ * one comment in full is taller than the whole row.
  */
 const AnnotationsCellView: React.FC<{
   row: TraceListItem;

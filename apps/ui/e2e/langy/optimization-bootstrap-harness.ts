@@ -73,12 +73,8 @@ export type ExpectedSource =
   | { from: "target"; output: string };
 
 /**
- * Assert that an evaluator of the wanted type landed AND resolves every input
- * it needs on the seeded column.
- *
- * The type on its own is not the outcome these scenarios describe: an
- * evaluator whose inputs point nowhere scores no row, so it passes a
- * type-only check while measuring nothing.
+ * Assert that an evaluator of the wanted type landed AND resolves every input it needs
+ * on the seeded column.
  */
 export function expectEvaluatorWiring({
   evaluators,

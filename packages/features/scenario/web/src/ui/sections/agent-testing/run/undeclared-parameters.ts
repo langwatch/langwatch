@@ -1,13 +1,5 @@
 /**
  * The parameter names a run carries that nothing in it declares.
- *
- * A run resolves its values against what the scenarios in scope declare plus
- * what the agent it goes against declares, and the server refuses a name that
- * is in neither. The dialog reads the same two sources, so it can say the same
- * thing before the run goes out.
- *
- * Everything here is pure, so the rules can be read and tested on their own.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -37,9 +29,6 @@ export function undeclaredNamesOnLine({
 
 /**
  * The names the plain rows hold that nothing in the run declares.
- *
- * A secret row is left out: a secret is typed for one run and never declared
- * by an agent, and a row with no name yet is not a value at all.
  */
 export function undeclaredNamesOnRows({
   rows,
@@ -58,10 +47,6 @@ export function undeclaredNamesOnRows({
 
 /**
  * The line without the pairs nothing in the run declares.
- *
- * Used on a line the dialog wrote itself, never on one somebody is writing: a
- * run remembers the values of the agent it went against, and opening on
- * another agent must not carry them to one that cannot read them.
  */
 export function lineWithoutUndeclared({
   line,

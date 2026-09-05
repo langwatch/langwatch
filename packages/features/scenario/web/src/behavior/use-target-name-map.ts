@@ -1,12 +1,5 @@
 /**
  * Target reference ids, resolved to what a person calls them.
- *
- * The application's `~/hooks/useTargetNameMap` went to `@langwatch/experiment-web`
- * with the experiments workbench while this family was moving; naming that
- * package from here would be a web-to-web edge onto a family whose transport
- * and host port are not this one's. The read is two queries and a Map, and both
- * queries are already in this family's procedure map, so it is stated here
- * against this family's transport instead.
  */
 
 import { useMemo } from "react";

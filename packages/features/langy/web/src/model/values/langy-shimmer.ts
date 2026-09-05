@@ -12,16 +12,6 @@ const sweep = keyframes`
 
 /**
  * Langy's "thinking" shimmer.
- *
- * CALM by design — the shared `thinkingShimmerStyles` (traces-v2) sweeps three
- * saturated stops fast and reads as a strobe at the 13px size the panel uses.
- * Here the line stays muted body colour for most of its width and the brand AI
- * gradient (blue → purple → orange) passes through a narrow band in the middle,
- * slowly: one gentle pass every 6s. The stops are the theme's `--langy-ai-*`
- * vars, so the sweep lifts on dark grounds along with the rest of the skin.
- *
- * Reduced motion: callers drop `animation` (see LangyThinkingLine), leaving the
- * static gradient — the text stays legible, nothing moves.
  */
 export const langyThinkingShimmerStyles = {
   // The colour never reaches full strength. Each stop is the brand hue MIXED

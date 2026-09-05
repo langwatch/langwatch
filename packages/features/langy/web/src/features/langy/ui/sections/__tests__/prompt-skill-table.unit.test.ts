@@ -1,12 +1,6 @@
 /**
- * Langy's prompt carries a table routing common intents to skills. Every skill
- * it names has to be one the worker actually gets.
- *
- * A row for a skill that is not in the tree is an instruction to call something
- * that is not there: the `skill` tool fails, and the turn spends a retry on a
- * name the prompt invented. The reverse is fine and expected, since the table
- * is a shortcut rather than an inventory and the prompt says so; the harness
- * injects the full list into every turn under `<available_skills>`.
+ * Langy's prompt carries a table routing common intents to skills. Every skill it names
+ * has to be one the worker actually gets.
  */
 import fs from "fs";
 import path from "path";

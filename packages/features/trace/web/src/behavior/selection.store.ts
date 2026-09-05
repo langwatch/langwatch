@@ -2,12 +2,6 @@ import { create } from "zustand";
 
 /**
  * Selection state for bulk actions on the trace table.
- *
- * Two modes:
- * - "explicit": `traceIds` is the authoritative set the user picked
- * - "all-matching": all traces matching the current filter (capped server-side
- *   at 10,000 to match the export limit). `traceIds` is empty in this mode and
- *   bulk actions reuse the active filters/time range instead of an ID list.
  */
 export type SelectionMode = "explicit" | "all-matching";
 
@@ -25,11 +19,8 @@ interface SelectionState {
 }
 
 /**
- * An id made of nothing addresses no trace, and every bulk action downstream
- * would carry it to the server as if it did. Selection is where the ids leave
- * the table, so it is where they are refused; what a placeholder id looks like
- * belongs to the table that mints them, so that filter sits at the component
- * boundary feeding this store.
+ * An id made of nothing addresses no trace, and every bulk action downstream would
+ * carry it to the server as if it did.
  */
 const addressesATrace = (traceId: string): boolean => traceId.trim().length > 0;
 

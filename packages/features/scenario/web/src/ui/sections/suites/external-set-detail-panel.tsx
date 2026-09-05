@@ -1,10 +1,5 @@
 /**
  * Read-only detail panel for external SDK/CI scenario sets.
- *
- * Displays the set name and batch run history with the shared filter bar
- * (scenario filter, pass/fail filter, group-by, list/grid toggle).
- *
- * External sets omit "Target" from group-by since they have no target resolution.
  */
 
 import { Box, Button, EmptyState, HStack, Text, VStack } from "@chakra-ui/react";

@@ -1,34 +1,5 @@
 /**
  * Trace-sample card (`langwatch.trace.search`).
- *
- * Langy finding 34 traces and telling you so is not the same as showing you
- * any of them. This card closes that gap: it renders a SAMPLE of the matched
- * traces, each one clickable through to its drawer, plus a way into the full
- * result set in the Trace Explorer.
- *
- * Two rules it holds to:
- *
- *   THE SAMPLE NEVER PRETENDS TO BE THE RESULT. The CLI returns up to `--limit`
- *   traces (25 by default), and 25 traces down a chat column is a wall nobody
- *   reads. So it shows three, and it says so — "34 traces · showing 3". The
- *   count comes from the result's own `pagination.totalHits`, not from the
- *   length of the array we happen to be holding, which is a different number
- *   and the source of the lie we are avoiding.
- *
- *   THE WAY OUT LANDS ON THE SAME QUESTION. "View in Trace Explorer" carries the
- *   agent's actual query — the free text and the exact time window — into the
- *   Explorer's URL. See `@langwatch/langy-web` for how the CLI's grammar
- *   maps onto the Explorer's, and for the one dimension (`--limit`) that has
- *   nowhere to go in that URL.
- *
- * The rows lead with what the Trace Explorer's own table leads with — when it
- * ran, what went in, how long it took, what it cost, whether it failed — so the
- * card and the table read as the same product rather than two different tools
- * that happen to both know about traces.
- *
- * Visually this is nothing but the existing kit: `LangyCapabilityCard` for the
- * chrome, `CapabilityRow` for the rows. It deliberately introduces no styling of
- * its own, so whatever the card shell becomes, this follows.
  */
 
 import { Button, Text } from "@chakra-ui/react";
@@ -212,10 +183,8 @@ function TraceSampleShell({
 }
 
 /**
- * The hydrated card: rows fetched fresh through the product's own API from the
- * result's references, with the viewer's session and permissions. The digest's
- * counts title the card IMMEDIATELY (they are part of the reference), so the
- * card holds its final shape while the rows fill in.
+ * The hydrated card: rows fetched fresh through the product's own API from the result's
+ * references, with the viewer's session and permissions.
  */
 function HydratedTraceSampleCard({
   hydration,
@@ -369,14 +338,8 @@ function numberAt(source: unknown, key: string): number | undefined {
 }
 
 /**
- * The CLI runs its reads with `--format json`, so what lands here is the
- * structured document (`{ traces: [...], pagination: { totalHits } }`).
- *
- * An EMPTY list is a real answer ("nothing matched"), not a miss — hence
- * `{ traces: [] }` with a total, rather than a null that would read as "we
- * couldn't parse this". NULL is reserved for exactly that miss: output that
- * is not a document we recognise (e.g. JSON truncated upstream). The card
- * must render that as "couldn't read this", never as "0 traces".
+ * The CLI runs its reads with `--format json`, so what lands here is the structured
+ * document (`{ traces: [...], pagination: { totalHits } }`).
  */
 function parseTraceSearch(output: unknown): {
   total: number | null;

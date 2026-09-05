@@ -1,10 +1,5 @@
 /**
  * Which run plan a scenario set belongs to.
- *
- * A run belongs to the set it was written into, and the Results tab lists
- * plans, not sets. A set derived from a test suite belongs to the plan of that
- * suite; a set a code run wrote belongs to a plan named after the set itself.
- *
  * @see specs/features/agent-testing/cases-table.feature
  */
 

@@ -1,22 +1,7 @@
 /**
+ * The panel's picture of a conversation IS the recorded conversation (ADR-059): the snapshot it reads back after a refresh, the optimistic overlay that covers the instant between clicking Send and the backend accepting the turn, the rollback when the backend refuses, and the ahead-only rule that keeps a momentarily-stale durable read from shortening what is on screen.
  * @vitest-environment jsdom
- *
- * The panel's picture of a conversation IS the recorded conversation (ADR-059):
- * the snapshot it reads back after a refresh, the optimistic overlay that
- * covers the instant between clicking Send and the backend accepting the turn,
- * the rollback when the backend refuses, and the ahead-only rule that keeps a
- * momentarily-stale durable read from shortening what is on screen.
- *
  * Spec: specs/langy/langy-event-sourced-frontend.feature
- *
- * Boundary mocks: the host port (project / feature flag), `behavior/langy-api`
- * (an in-memory stand-in serving the real DTO shapes, including the snapshot's
- * `eventCursor` / `currentTurnId`), `@langwatch/ui-drawer`, and `@ai-sdk/react`'s
- * `useChat` — modelled as a real little engine (its messages are state the
- * panel can read back and `setMessages` writes through) so assertions are
- * about what the conversation RENDERS, not about which mock function was
- * called. Everything under test — the panel, the composer, the store, the
- * fold — is real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";

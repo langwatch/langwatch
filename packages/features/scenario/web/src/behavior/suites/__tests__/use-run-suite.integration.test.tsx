@@ -1,18 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration test for issue #3363 (founder follow-up on PR #3983).
- *
- * Pins the founder-requested compromise: after a successful quick-run with no
- * skipped archived items, useRunSuite's success toast must carry an opt-in
- * "View run" action whose onClick delegates to the onViewRun option (with the
- * scheduled suite id). The hook itself does NOT navigate — it hands the suite
- * id back to the consumer, preserving the no-auto-navigate thesis.
- *
- * The success path is driven by capturing api.suites.run.useMutation's
- * onSuccess handler and invoking it with a fake successful result, rather than
- * running a full tRPC mutation cycle.
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/quick-run-stay-in-place.feature (AC8)
  */
 import { renderHook } from "@testing-library/react";

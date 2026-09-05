@@ -12,25 +12,17 @@ interface BeadStripProps {
   /** Current journey stage — used to compute which dot is active. */
   stage: StageId;
   /**
-   * Optional callback. When provided, dots act as click-to-jump
-   * affordances; consumers (`TracesEmptyOnboarding`) translate the
-   * chosen chapter into a starting `StageId` and call `setStage`.
-   * When omitted the strip is purely indicative.
+   * Optional callback. When provided, dots act as click-to-jump affordances; consumers
+   * (`TracesEmptyOnboarding`) translate the chosen chapter into a starting `StageId`
+   * and call `setStage`. When omitted the strip is purely indicative.
    */
   onJump?: (chapter: ChapterId) => void;
 }
 
 /**
- * Chapter progress strip — connector line, six beads, and a
- * chapter-name label underneath. Sits below the secondary footer
- * (docs / skip buttons) so the dots aren't competing with the hero
- * copy or the primary CTA. The connector line and the active "pill"
- * (a wider rounded rect rather than a dot) make the "you are here +
- * how many left" reading land in one glance, which the previous
- * six-equal-dots design didn't quite do.
- *
- * Tooltip on hover/focus surfaces the chapter label + one-line hint
- * so the dots still earn their semantic weight.
+ * Chapter progress strip — connector line, six beads, and a chapter-name label
+ * underneath. Sits below the secondary footer (docs / skip buttons) so the dots aren't
+ * competing with the hero copy or the primary CTA.
  */
 export function BeadStrip({ stage, onJump }: BeadStripProps): React.ReactElement {
   const currentIdx = chapterIndex(stage);

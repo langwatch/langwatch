@@ -1,11 +1,6 @@
 /**
- * What the judge decided about one run: a labelled verdict line, then the
- * criteria that passed in one section, the criteria that failed in another,
- * and whatever the judge said about the run as a whole.
- *
- * The panel carries no status pill, no success rate, no criteria count and no
- * duration: the chip strip at the top of the drawer already reads all four.
- *
+ * What the judge decided about one run: a labelled verdict line, then the criteria that passed in one section,
+ * the criteria that failed in another, and whatever the judge said about the run as a whole.
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
@@ -30,13 +25,8 @@ const PASSED_COLOR = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgCol
 const FAILED_COLOR = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED].fgColor;
 
 /**
- * The criteria of a run split into passed and failed, each list held in the
- * order the scenario declares them.
- *
- * The judge answers with two lists, met and unmet, which lose the order the
- * case was written in. The case still holds that order, so it is what each
- * list is sorted by. A criterion the case no longer declares keeps its place
- * at the end of its list rather than being dropped.
+ * The criteria of a run split into passed and failed, each list held in the order the
+ * scenario declares them.
  */
 function orderCriteria(criteria: readonly string[], declaredCriteria: readonly string[]): string[] {
   const rankOf = (criterion: string) => {
@@ -110,10 +100,9 @@ function PanelHeading({
 }
 
 /**
- * The labelled verdict line at the top of the panel. It reads the run status
- * as a single word: PASSED in green when the run met every criterion, FAILED
- * in red when the judge missed one. It reads first because it is the answer;
- * the criteria under it are how the judge got there.
+ * The labelled verdict line at the top of the panel. It reads the run status as a
+ * single word: PASSED in green when the run met every criterion, FAILED in red when the
+ * judge missed one.
  */
 function VerdictStatusLine({ status }: { status: ScenarioRunStatus }) {
   const word =
@@ -196,11 +185,6 @@ function CriteriaSection({
 
 /**
  * True when the reasoning payload is an error object rather than a paragraph.
- *
- * The judge fails at every layer under the same shape: an object with a
- * `name` that ends in `Error` and, most of the time, a `message` and a
- * `stack`. When the payload parses as one, the drawer must not read it as
- * "the judge's reasoning"; it reads as the failure the run hit.
  */
 function isErrorPayload(reasoning: string | null | undefined): boolean {
   if (!reasoning) return false;
@@ -221,10 +205,8 @@ function isErrorPayload(reasoning: string | null | undefined): boolean {
 }
 
 /**
- * The reasoning the scenario runner writes for every run it fails: the raw
- * failure text with one sentence in front of it. The failure panel already
- * names that failure, so a drawer that draws both reads it twice, the second
- * time as the raw text the panel exists to replace.
+ * The reasoning the scenario runner writes for every run it fails: the raw failure text
+ * with one sentence in front of it.
  */
 const RESTATED_FAILURE_PREFIX = /^scenario failed with error:/i;
 
@@ -235,12 +217,6 @@ function restatesFailure(reasoning: string): boolean {
 
 /**
  * Why a run never reached a verdict, read as a named failure.
- *
- * A run stores whatever failed it: an envelope the failure handler wrote, the
- * scenario SDK's `{ name, message, stack }`, or a plain sentence. All three
- * resolve to one title, one message the customer can act on, and one hint. The
- * raw text sits behind More info, because a stack answers "where" for the one
- * reader who asks for it and says nothing to everybody else.
  */
 function RunFailurePanel({ raw }: { raw: string }) {
   const [detailOpen, setDetailOpen] = useState(false);

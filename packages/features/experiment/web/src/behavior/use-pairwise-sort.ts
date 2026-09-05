@@ -12,9 +12,6 @@ export type RankedEntry = BTLeaderboardEntry & {
 
 /**
  * Sort state for the Bradley-Terry leaderboard table.
- *
- * Rank travels with the incoming score-sorted order, so sorting another column
- * does not renumber a variant's original standing.
  */
 export function usePairwiseSort({
   entries,

@@ -1,9 +1,7 @@
 /**
+ * Unit tests for grouping chat messages into conversation turns (specs/traces-v2/media-rendering.feature: a
+ * message carrying only media is still the user speaking).
  * @vitest-environment node
- *
- * Unit tests for grouping chat messages into conversation turns
- * (specs/traces-v2/media-rendering.feature: a message carrying only media is
- * still the user speaking).
  */
 import { describe, expect, it } from "vitest";
 import { groupMessagesIntoTurns } from "../turns";

@@ -1,9 +1,6 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Token counts as a reader meets them in a table cell.
- *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it } from "vitest";

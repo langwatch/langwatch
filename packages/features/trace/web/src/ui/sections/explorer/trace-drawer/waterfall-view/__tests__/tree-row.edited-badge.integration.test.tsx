@@ -1,9 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * What tells a reader that a correction changed a row, other than its colour.
- * The tint and the edge tick are the fast signal while scanning; the badge is
- * what carries the same fact to a reader who cannot separate the hues.
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";

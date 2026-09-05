@@ -1,11 +1,6 @@
 /**
- * The evaluator-inference branches of the prompt optimization skill: Langy
- * reads what the dataset holds and wires the evaluator that measures it.
- * Judge-graded, and the evaluator that actually landed is then asserted
- * through the workbench-state REST surface: its type AND its mappings.
- *
- * RUN (one file per vitest run, see README):
- *   cd apps/ui/e2e/langy && npx vitest run langy-evaluator-inference.scenario.test.ts --reporter=verbose
+ * The evaluator-inference branches of the prompt optimization skill: Langy reads what
+ * the dataset holds and wires the evaluator that measures it.
  */
 
 import * as scenario from "@langwatch/scenario";

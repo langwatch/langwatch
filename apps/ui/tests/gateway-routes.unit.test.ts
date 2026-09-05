@@ -1,16 +1,5 @@
 /**
  * Which page key each gateway screen answers, and what it is behind.
- *
- * The ten keys are the contract with the route table, and the permissions are
- * the policy that used to be spelled out at the bottom of each page file. Both
- * are easy to get subtly wrong in a way nothing else notices — a missing key
- * throws only when someone navigates, and a wrong grant either refuses a reader
- * the page admitted or admits one it refused — so both are stated here.
- *
- * The refusal itself is `withUiPageGuard`'s and is proven in
- * `ui-page-guard.unit.test.tsx`; WHICH grant each page asks it for is proven by
- * mounting the loaders in `gateway-page-policy.integration.test.tsx`. This file
- * is the cheaper half: that the keys and the table agree at all.
  */
 
 import { describe, expect, it } from "vitest";

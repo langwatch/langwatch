@@ -13,12 +13,8 @@ const VIEW_OPTIONS = [
 ] as const;
 
 /**
- * Lets the reader switch between the corrected trace and the one that was
- * captured, says who corrected it, and opens the full difference.
- *
- * Renders nothing when the trace has no correction: there would be nothing to
- * switch between, and an inert toggle on every trace is noise. Also absent
- * while editing, when the drawer is showing the correction being written.
+ * Lets the reader switch between the corrected trace and the one that was captured,
+ * says who corrected it, and opens the full difference.
  */
 export function EditedOriginalToggle() {
   const overlay = useTraceEditOverlay();

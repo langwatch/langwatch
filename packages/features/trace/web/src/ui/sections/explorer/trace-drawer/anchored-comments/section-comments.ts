@@ -3,12 +3,6 @@ import { focusSectionForAnchorPath } from "../../hooks/use-jump-to-annotation-an
 
 /**
  * How many comments each section of one element carries, by section id.
- *
- * A section the reader left closed hides everything said inside it, so the
- * header carries the count and the reader knows there is something to open.
- * Comments about parts this build has no section for are counted nowhere
- * rather than heaped onto the first section, which would send the reader
- * somewhere the comment is not.
  */
 export function commentCountsBySection({
   comments,

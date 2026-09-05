@@ -2,11 +2,7 @@ import { create } from "zustand";
 import { z } from "zod";
 
 /**
- * Cross-feature UI prefs for the traces-v2 page that aren't tied to
- * onboarding state. Everything onboarding-related (setup dismissal,
- * tour active, journey completion flags, stage machinery) lives in
- * `onboarding/store/onboardingStore.ts` and is reached via the
- * onboarding module's public API.
+ * Cross-feature UI prefs for the traces-v2 page that aren't tied to onboarding state.
  */
 interface UIState {
   sidebarCollapsed: boolean;
@@ -32,10 +28,9 @@ interface UIState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSidebarWidth: (width: number | null) => void;
   /**
-   * Persist the current `sidebarCollapsed` + `sidebarWidth` snapshot to
-   * `localStorage`. Pair with `setSidebarWidth` (which intentionally
-   * stays in-memory only during a drag) — call this once on drag-end
-   * so the user's chosen width survives a reload.
+   * Persist the current `sidebarCollapsed` + `sidebarWidth` snapshot to `localStorage`.
+   * Pair with `setSidebarWidth` (which intentionally stays in-memory only during a
+   * drag) — call this once on drag-end so the user's chosen width survives a reload.
    */
   persistSidebarLayout: () => void;
   setSyntaxHelpOpen: (open: boolean) => void;

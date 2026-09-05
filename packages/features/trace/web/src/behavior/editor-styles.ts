@@ -24,13 +24,9 @@ export const editorStyles: SystemStyleObject = {
     height: 0,
     pointerEvents: "none",
   },
-  // Left half of the chip — the X widget styled by `.filter-token-delete`
-  // is the right half. Together they read as one piece: the token drops its
-  // right border + right radius, the button picks them up with a matching
-  // separator on its left edge. `whiteSpace: nowrap` on the chunk + a
-  // sub-pixel negative margin on the button (below) keep the two halves
-  // visually glued so the X can't detach when the editor scrolls or the
-  // browser sub-pixel-rounds adjacent inline elements.
+  // Left half of the chip — the X widget styled by `.filter-token-delete` is the right
+  // half. Together they read as one piece: the token drops its right border + right
+  // radius, the button picks them up with a matching separator on its left edge.
   "& .filter-token": {
     display: "inline-flex",
     alignItems: "center",
@@ -53,14 +49,8 @@ export const editorStyles: SystemStyleObject = {
     marginLeft: "1px",
   },
   // Label collapse: when a chip carries a human-readable `label`, render the
-  // field-qualified label (`evaluator:Policy Check`) as in-flow ::after text
-  // and collapse the underlying id to zero width (font-size:0). The chip then
-  // hugs the *label*, not the longer id — no spare space reserved for the
-  // value tail. The id stays in the DOM (selection / copy / the query
-  // language all keep it) and returns to full size on hover, where the label
-  // hides and the chip grows in place to reveal the full id. The `evaluator:`
-  // prefix is part of both the label and the id, so it never moves — only the
-  // value tail differs.
+  // field-qualified label (`evaluator:Policy Check`) as in-flow ::after text and
+  // collapse the underlying id to zero width (font-size:0).
   "& .filter-token[data-filter-chip-label]": {
     fontSize: "0px",
   },
@@ -134,12 +124,9 @@ export const editorStyles: SystemStyleObject = {
     color: "fg.subtle",
     fontWeight: "semibold",
   },
-  // Right half of the chip — flush against the token, full chip height,
-  // rounded only on the right side. Variant tints are mirrored from the
-  // adjacent token via sibling selectors so the two halves match.
-  // `marginLeft: -1px` overlaps the button's left border with the token's
-  // right edge, so any sub-pixel gap from inline-flow rounding closes
-  // visually — the X always reads as the right side of the same chip.
+  // Right half of the chip — flush against the token, full chip height, rounded only on
+  // the right side. Variant tints are mirrored from the adjacent token via sibling
+  // selectors so the two halves match.
   "& .filter-token-delete": {
     display: "inline-flex",
     alignItems: "center",
@@ -152,12 +139,9 @@ export const editorStyles: SystemStyleObject = {
     borderTop: "1px solid",
     borderBottom: "1px solid",
     borderRight: "1px solid",
-    // Intentionally NO borderLeft — the left half of the chip
-    // (`.filter-token`) paints its own right edge is omitted by design,
-    // and `marginLeft: -1px` here visually butts the two halves
-    // together. Adding a left border draws a faint inner divider that
-    // becomes obvious on hover when both halves take on the red.muted
-    // tint, looking like a misaligned middle stripe.
+    // Intentionally NO borderLeft — the left half of the chip (`.filter-token`) paints
+    // its own right edge is omitted by design, and `marginLeft: -1px` here visually
+    // butts the two halves together.
     borderColor: "blue.solid",
     borderTopRightRadius: "8px",
     borderBottomRightRadius: "8px",

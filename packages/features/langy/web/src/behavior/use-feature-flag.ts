@@ -1,10 +1,5 @@
 /**
  * A release flag, tri-state, answered by the host.
- *
- * `~/hooks/useFeatureFlag` read the application's flag query. The dock reads
- * three flags and each answer is a tri-state on purpose: `undefined` means the
- * answer has not arrived, and a panel that flashed a capability off while it
- * was in flight would be worse than one that waits.
  */
 
 import { useLangyHost } from "../model/langy-host";
@@ -19,11 +14,6 @@ export type UseFeatureFlagResult = {
 
 /**
  * `options` is accepted and ignored.
- *
- * The application hook took a project and an organization to evaluate a
- * targeting rule against; the host resolves the flag for the scope the reader
- * is already in, which is the same scope every call site here passed. `enabled`
- * gated the round trip, and there is no round trip.
  */
 export function useFeatureFlag(
   flag: string,

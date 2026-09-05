@@ -9,17 +9,6 @@ import { NO_TRACE_EVENTS } from "../types/trace";
 
 /**
  * Attaches each row's events, read once per visible page.
- *
- * Events are OTel span events on `stored_spans`; the trace-summary fold
- * deliberately stopped hoisting them (it grew the fold state O(span-count)),
- * so the list reads them back rather than finding them on the summary row.
- * That read is its own query: the list is what gates first paint, and a page
- * whose columns and grouping never mention events pays nothing.
- *
- * A failed read leaves the rest of the list standing rather than taking it
- * down: the column is supplementary to every other thing on the row. It says
- * so rather than falling back to the empty marker, which would report a trace
- * with events as having none.
  */
 export function useTraceListEvents({
   rows,

@@ -1,10 +1,7 @@
 /**
- * Real-Chromium tests for the wired-up <SearchBar /> — exercises the path
- * from typing through the real filterStore so we can verify side effects
- * (URL fragment writes, clear button, parse error indicator) end-to-end.
- *
- * Editor-level interaction coverage lives in `ActiveSearchEditor.browser.test`.
- * This file focuses on the wiring around it.
+ * Real-Chromium tests for the wired-up <SearchBar /> — exercises the path from typing
+ * through the real filterStore so we can verify side effects (URL fragment writes,
+ * clear button, parse error indicator) end-to-end.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

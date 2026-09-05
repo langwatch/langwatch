@@ -1,29 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for AgentCodeEditorDrawer Save gate — Issue #3412
- *
- * AgentCodeEditorDrawer.tsx computes:
- *   isValid = name.trim().length > 0 &&
- *             isScenarioMappingValid({ mappings: scenarioMappings })
- *
- * There is NO structural workflowOutputs.length guard here — the code agent
- * always has its own outputs declared in state (DEFAULT_OUTPUTS or loaded from
- * config). The only gate is isScenarioMappingValid.
- *
- * After the fix (isScenarioMappingValid drops && hasOutputMapping), a code agent
- * with a valid input mapping must be saveable even when the user has explicitly
- * cleared the output-field selection (scenarioOutputField = "").
- *
- * Test matrix:
- *   (a) RED→GREEN  — valid input mapping + outputs present + outputField
- *                    explicitly cleared ("") → Save ENABLED after fix
- *   (b) FAIL-CLOSED — only threadId mapped (no input/messages) → Save stays
- *                    DISABLED (fail-closed preserved)
- *
- * Uses the real isScenarioMappingValid / hasScenarioInputMapping via
- * importOriginal so the tests actually exercise the predicate change.
- *
+ * @vitest-environment jsdom
  * @see specs/features/scenarios/minimal-input-mapping.feature
  */
 
@@ -149,12 +126,8 @@ vi.mock("../../../../behavior/scenario-api", () => ({
 // ── Agent fixtures ────────────────────────────────────────────────────────────
 
 /**
- * Code agent with a valid input mapping (userQuery → input), outputs present,
- * but scenarioOutputField explicitly cleared ("").
- *
- * RED case: isScenarioMappingValid returns false now because
- *   hasOutputMapping = (outputs.length > 0) && "" !== "" = false
- * After fix: returns hasScenarioInputMapping(mappings) = true → Save enabled.
+ * Code agent with a valid input mapping (userQuery → input), outputs present, but
+ * scenarioOutputField explicitly cleared ("").
  */
 const CODE_AGENT_INPUT_MAPPED_OUTPUT_CLEARED = {
   id: "code-agent-cleared",

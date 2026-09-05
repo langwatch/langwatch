@@ -1,13 +1,6 @@
 /**
- * The scrolling body of the suites rail: the test suites of the project, then
- * the sets that run from code.
- *
- * Both headings are plain labels. There is no root list of suites to open, so
- * a heading has nowhere to lead.
- *
- * No row carries a count or a time. How many scenarios a set holds reads once,
- * beside the title of the panel.
- *
+ * The scrolling body of the suites rail: the test suites of the project, then the sets
+ * that run from code.
  * @see specs/features/agent-testing/suites-rail.feature
  */
 

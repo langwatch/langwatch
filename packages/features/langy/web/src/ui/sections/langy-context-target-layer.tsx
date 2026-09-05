@@ -12,35 +12,8 @@ import {
 import { useLangyStore } from "../../behavior/langy.store";
 
 /**
- * The one moving part behind "point at things and add them to Langy". Mounted
- * once, next to the panel.
- *
- * It does two jobs, and does them for EVERY target on the page from a single
- * place — which is the whole reason it exists:
- *
- *  1. PROXIMITY. It follows the pointer and works out which registered targets
- *     are near it and which one is under it, and writes that to the store.
- *     Targets read booleans off it and light up accordingly, so the page shows
- *     a quiet field of outlines around your hand instead of lighting up
- *     everything at once.
- *
- *  2. THE AFFORDANCE. It renders ONE button — "Absorb context" / "Absorbed" —
- *     in a portal, floated over whichever target you're hovering. One node for
- *     the whole page, not one per row. That matters for more than bookkeeping:
- *     a button rendered INSIDE a target would have to live inside a <tbody>,
- *     where any generated box gets wrapped in an anonymous table row and wrecks
- *     the row's geometry. A fixed-position portal touches nothing.
- *
- * Both jobs are gated on the page OFFERING its targets, which is two states, not
- * one: ARMED — `#`, see `useLangyContextArming` — or REVEALED,
- * the brief `#trace` → "Show traces on this page" glow. Both light targets up
- * and both make them clickable, so both need the pointer layer; a reveal that
- * lit rows the button never appeared over made the palette's own promise
- * ("anything that lights up can be added as context") untrue.
- *
- * With Langy merely open, this attaches one keydown listener and renders
- * nothing; with Langy closed it does not even do that. The pointer tracking, the
- * measurement and the button only exist inside a mode the user asked for.
+ * The one moving part behind "point at things and add them to Langy". Mounted once,
+ * next to the panel.
  */
 
 /** How close the pointer has to get before a target admits it exists (px). */
@@ -52,18 +25,12 @@ interface TargetRect {
 }
 
 /**
- * Marks the layer's OWN floating chrome. The pointer resting on the "Absorb
- * context" button must not read as "the pointer left the target" — the button
- * is drawn in a portal on top of it, so a naive hit test finds the button, not
- * the row, and the thing you are reaching for unmounts as you reach for it.
+ * Marks the layer's OWN floating chrome.
  */
 const OVERLAY_ATTR = "data-langy-overlay";
 
 /**
- * Subtrees the page has taken out of play. Ark/Chakra mark everything behind an
- * open modal drawer or dialog `aria-hidden` / `inert`, which is exactly the
- * "don't offer this" signal we want — a row sitting under a drawer must not
- * glow, and must not be absorbable, through the thing covering it.
+ * Subtrees the page has taken out of play.
  */
 const OCCLUDED_SELECTOR = '[aria-hidden="true"], [inert]';
 
@@ -106,15 +73,8 @@ export function LangyContextTargetLayer() {
 }
 
 /**
- * Panel → page. The user runs their eye down the context list; whichever chip
- * is under the pointer, its card lights up where it actually sits.
- *
- * Drawn as an overlay rather than by handing the target another visual state,
- * for two reasons that both matter. The ring the targets paint themselves is
- * suppressed on table rows (a sticky first column paints over an ancestor's
- * outline — see the stylesheet), so a row could not answer this at all. And the
- * spotlight has to be legible at a glance from across the page, which is a
- * different job from the deliberately-barely-there proximity field.
+ * Panel → page. The user runs their eye down the context list; whichever chip is under
+ * the pointer, its card lights up where it actually sits.
  */
 function SpotlightLayer() {
   const spotlightId = useLangyContextTargetStore((s) => s.spotlightId);
@@ -123,14 +83,8 @@ function SpotlightLayer() {
 }
 
 /**
- * The absorb flourish: purple wells up through the thing you just handed over
- * and is gone in half a second.
- *
- * Drawn as an overlay rather than by the target, for the same reason the
- * spotlight is: a `<tbody>` cannot carry a pseudo-element without generating an
- * anonymous table box and wrecking the row's geometry, and half the things
- * worth absorbing are table rows. An overlay works on every element there is,
- * costs nothing when idle, and takes no clicks.
+ * The absorb flourish: purple wells up through the thing you just handed over and is
+ * gone in half a second.
  */
 function AbsorbFlashLayer() {
   const absorbFlash = useLangyContextTargetStore((s) => s.absorbFlash);
@@ -233,14 +187,9 @@ function TargetSpotlight({ targetId }: { targetId: string }) {
 }
 
 /**
- * Open, but idle. All this does is listen for the arming gesture — one keydown
- * handler, no pointer tracking, no measurement, nothing rendered. The page is
- * untouched until the user asks for it.
- *
- * A REVEAL counts as asking for it. `#trace` → "Show traces on this page" lights
- * targets up and makes them clickable for a couple of seconds; without the
- * pointer layer running they would light up and answer to nothing — no hover
- * state, and no button over the row the user is pointing at.
+ * Open, but idle. All this does is listen for the arming gesture — one keydown handler,
+ * no pointer tracking, no measurement, nothing rendered. The page is untouched until
+ * the user asks for it.
  */
 function ArmableLayer() {
   useLangyContextArming();
@@ -261,17 +210,8 @@ const HINT_BOTTOM_PX = 20;
 const HINT_BAR_GAP_PX = 8;
 
 /**
- * How far up the hint must move to clear whatever else floats at the
- * bottom-center — the selection action bars (`data-bottom-floating-bar`, see
- * `SelectionActionBar`). The collision is not hypothetical: Shift is BOTH the
- * range-select modifier and the arm gesture, so the armed hint and the "N
- * selected" bar routinely exist at the same moment, in the same spot, and the
- * hint used to land straight on top of the bar's buttons.
- *
- * Measured, not guessed: the bars differ in height and offset, so the hint
- * clears the tallest one actually mounted. Watches the DOM while the hint is
- * up (bars mount as selections are made mid-arm) — cheap, because the hint
- * only exists inside the brief armed/revealed mode.
+ * How far up the hint must move to clear whatever else floats at the bottom-center —
+ * the selection action bars (`data-bottom-floating-bar`, see `SelectionActionBar`).
  */
 function useBottomBarLift(): number {
   const [lift, setLift] = useState(0);
@@ -303,11 +243,7 @@ function useBottomBarLift(): number {
 }
 
 /**
- * The mode indicator. A mode you cannot see is a trap — the page suddenly
- * intercepting clicks with no explanation is exactly how a feature earns a bug
- * report — so while targets are being offered there is always one line saying
- * what is happening and how it ends. A reveal ends by itself, which is the only
- * thing that changes between the two.
+ * The mode indicator.
  */
 function OfferHint() {
   const source = useLangyContextTargetStore((s) => s.armSource);
@@ -383,12 +319,7 @@ function ActiveLayer() {
       return;
     }
 
-    // Which target is under the pointer is a HIT TEST, not an arithmetic
-    // question. Rect maths alone cannot see a drawer, a dialog, the Langy panel
-    // itself, or a sticky header — it happily reports a row the user physically
-    // cannot touch, and the affordance then floats over the covering surface
-    // offering to absorb something behind it. `elementFromPoint` answers with
-    // whatever is actually on top, which is the only honest answer.
+    // Which target is under the pointer is a HIT TEST, not an arithmetic question.
     const hit = document.elementFromPoint(pointer.x, pointer.y);
     // Our own floating button counts as "still on the target" — see OVERLAY_ATTR.
     const onOwnOverlay = !!hit?.closest(`[${OVERLAY_ATTR}]`);
@@ -481,15 +412,6 @@ const AFFORDANCE_INSET_PX = 6;
 
 /**
  * Where the button sits on its target.
- *
- * LEFT by default, and that is not arbitrary: the Langy panel is docked on the
- * RIGHT, so a button pinned to a target's right edge is the one most likely to
- * end up underneath it (or crushed against it) — exactly where you can't see or
- * click it. The left edge of a row is the one place that is never contested.
- *
- * It flips right only when the target's own left edge is off-screen (a wide
- * table scrolled horizontally), where a left-anchored button would be the thing
- * that's clipped.
  */
 function affordancePlacement(box: DOMRect): "left" | "right" {
   return box.left < AFFORDANCE_INSET_PX ? "right" : "left";
@@ -546,14 +468,7 @@ function TargetAffordance({ targetId }: { targetId: string }) {
       type="button"
       className={`langy-target-affordance langy-target-affordance--${placement}`}
       data-testid="langy-absorb-context"
-      // THE ATTRIBUTE THE HIT TEST LOOKS FOR. Without it the pointer landing
-      // on this button read as "the pointer left the target": elementFromPoint
-      // returns the button, `closest("[data-langy-target]")` finds nothing
-      // (this is portaled to document.body, so it is not a DESCENDANT of the
-      // row it floats over), the hovered target clears, and the button
-      // unmounts from under the cursor reaching for it. The constant existed
-      // for exactly this and was never actually applied, so clicking to absorb
-      // was impossible on every surface in the app.
+      // THE ATTRIBUTE THE HIT TEST LOOKS FOR.
       {...{ [OVERLAY_ATTR]: "" }}
       onClick={onClick}
       // "Absorb" is the verb for taking a thing on the page into Langy's

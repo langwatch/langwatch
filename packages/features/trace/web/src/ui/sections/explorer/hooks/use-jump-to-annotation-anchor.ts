@@ -17,13 +17,8 @@ export interface AnnotationAnchorTarget {
 }
 
 /**
- * The section of the detail stack holding a field, or null when this build has
- * no section for it.
- *
- * A field path names the field first (`output`, `params.temperature`), and a
- * section anchor names the section outright, so the head of the path is what
- * decides. An unknown head resolves to nothing rather than to a guess, and the
- * jump then only selects the span.
+ * The section of the detail stack holding a field, or null when this build has no
+ * section for it.
  */
 export function focusSectionForAnchorPath(
   anchorPath: string | null | undefined,
@@ -37,11 +32,6 @@ export function focusSectionForAnchorPath(
 
 /**
  * Whether a comment's anchor is something the reader can be taken to.
- *
- * A comment about the whole trace has nowhere narrower to go, a message is read
- * inside the span holding it rather than navigated to, and an anchor whose
- * element the trace no longer has must offer no jump at all: it would land the
- * reader on nothing, or worse, on whatever now sits at that id.
  */
 export function canJumpToAnnotationAnchor({
   anchor,
@@ -59,13 +49,9 @@ export function canJumpToAnnotationAnchor({
 }
 
 /**
- * Takes the reader to the part of the trace a comment is about: the trace view,
- * the span selected and flashed in the waterfall, and the section holding the
- * field open and briefly haloed.
- *
- * Selecting the span is not enough on its own. A long trace can leave the
- * selected row hundreds of rows off screen, so the waterfall scrolls to the
- * selection of its own accord; this only has to name the span.
+ * Takes the reader to the part of the trace a comment is about: the trace view, the
+ * span selected and flashed in the waterfall, and the section holding the field open
+ * and briefly haloed.
  */
 export function useJumpToAnnotationAnchor(): (anchor: AnnotationAnchorTarget) => void {
   const openSpanInTrace = useDrawerStore((s) => s.openSpanInTrace);

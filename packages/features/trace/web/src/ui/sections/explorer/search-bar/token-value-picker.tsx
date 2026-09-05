@@ -28,16 +28,8 @@ interface TokenValuePickerProps {
 }
 
 /**
- * Floating popover that opens when a user clicks an existing
- * `field:value` chip in the search bar. Lists the discovered values for
- * that field (from the same `useTraceFacets` payload that drives the
- * sidebar) and rewrites the AST in place when one is picked, preserving
- * the chip's location, field name, and any wrapping NOT.
- *
- * Visual treatment mirrors `SuggestionDropdown` (the autocomplete that
- * pops while typing `field:`) so chip-edit and field-autocomplete read
- * as the same affordance — same shadow, glow ring, fade-in, mono row
- * layout, and footer with shortcut hints + syntax-docs button.
+ * Floating popover that opens when a user clicks an existing `field:value` chip in the
+ * search bar.
  */
 export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onClose }) => {
   const setFacetValueAt = useFilterStore((s) => s.setFacetValueAt);
@@ -64,14 +56,9 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
     filterSeededAnchorKey.current = anchor ? `${anchor.field}:${anchor.location.start}` : null;
   }, [anchor?.field, anchor?.location.start, anchor?.currentValue]);
 
-  // Focus the search input when the picker OPENS — deferred to the next
-  // frame so it wins the race against the chip-click that opened it
-  // (a plain `autoFocus` fires mid-mount and the opening click can steal
-  // focus straight back, which read as "the popover stole my cursor and
-  // I can't type"). Keyed to the anchor identity, NOT to `filter`, so it
-  // never re-fires on keystrokes — re-focusing on every change would
-  // snap the caret to the end and make clicking mid-text to reposition
-  // impossible. See specs/traces-v2/filter-bar-interactions.feature
+  // Focus the search input when the picker OPENS — deferred to the next frame so it wins the race against the
+  // chip-click that opened it (a plain `autoFocus` fires mid-mount and the opening click can steal focus
+  // straight back, which read as "the popover stole my cursor and I can't type").
   useEffect(() => {
     if (!anchor) return;
     const raf = requestAnimationFrame(() => {
@@ -106,26 +93,17 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
     filter.trim() === "" ||
     filter.trim().toLowerCase() === anchor.currentValue.trim().toLowerCase();
 
-  // Debounce the typed text before it hits the server — a per-keystroke
-  // `facetValues` prefix scan over a high-cardinality facet is a real
-  // ClickHouse round-trip. The client-side substring filter in the `values`
-  // memo below stays on the live `filter` for instant local narrowing; only
-  // this server query reads the debounced value. `serverPristine` mirrors
-  // `pristine` on the debounced text so the query doesn't fire until typing
-  // settles.
+  // Debounce the typed text before it hits the server — a per-keystroke `facetValues`
+  // prefix scan over a high-cardinality facet is a real ClickHouse round-trip.
   const debouncedFilter = useDebouncedValue(filter, 300);
   const serverPristine =
     !anchor ||
     debouncedFilter.trim() === "" ||
     debouncedFilter.trim().toLowerCase() === anchor.currentValue.trim().toLowerCase();
 
-  // Gated on BOTH the live `pristine` and the debounced `serverPristine`: the
-  // debounced gate waits for typing to settle before fetching, the live gate
-  // disables the query the instant the text returns to the chip's value so a
-  // stale prefix can't keep firing for the debounce window. Also gated on the
-  // filter having been (re)seeded for the CURRENT anchor — a chip-to-chip switch
-  // changes `anchor.field` one render before the reseed effect resets `filter`,
-  // so without this the query would fire for the new field with the old text.
+  // Gated on BOTH the live `pristine` and the debounced `serverPristine`: the debounced gate waits for typing to
+  // settle before fetching, the live gate disables the query the instant the text returns to the chip's value so
+  // a stale prefix can't keep firing for the debounce window.
   const serverSearch = useFacetSearch({
     facetKey: anchor?.field ?? "",
     prefix: debouncedFilter,
@@ -140,13 +118,6 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
   const values = useMemo(() => {
     if (!anchor || !cat) return [];
     // Pristine → the preloaded alternatives, shown unfiltered as a dropdown.
-    // Edited → SUPPLEMENT the preloaded top-N with the server prefix results
-    // (union, preloaded first so it wins on a shared value), then narrow by the
-    // live (undebounced) substring filter: a server prefix hit is also a
-    // substring match so it survives, while a substring living WITHIN a
-    // preloaded value (which the server's anchored prefix match misses) is
-    // still found locally. Annotated to the common shape so `.map` resolves
-    // over the two source arrays without a union-of-arrays call error.
     const source: { value: string; label?: string; count: number }[] = pristine
       ? cat.topValues
       : dedupeByValue([...cat.topValues, ...serverSearch.values]);
@@ -160,12 +131,9 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
       .slice(0, MAX_VALUES_PER_PAGE);
   }, [anchor, cat, pristine, serverSearch.values, filter]);
 
-  // On open, move the highlight onto the current value's row so ↑↓ starts
-  // from where the user is and a bare Enter re-commits the current value (a
-  // no-op) rather than jumping to whichever value sorts first. Guarded so it
-  // seeds once per open — it must not fight the user's own navigation once
-  // they start editing. Waits until the prefill has landed (filter === the
-  // current value) so it reads this chip's full list, not a stale one.
+  // On open, move the highlight onto the current value's row so ↑↓ starts from where
+  // the user is and a bare Enter re-commits the current value (a no-op) rather than
+  // jumping to whichever value sorts first.
   useEffect(() => {
     if (!anchor) {
       seededOpenKey.current = null;
@@ -217,13 +185,6 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
   }, [anchor, onClose]);
 
   // Esc dismisses; arrow keys navigate; Enter commits.
-  // Scoped to the picker container — NOT the document — so peer
-  // document-level handlers (a host dialog's "close on Esc", the
-  // search bar's own Enter/Arrow shortcuts) don't fire alongside us
-  // for keys the picker is consuming. `stopPropagation` on the same
-  // event keeps the keystroke from bubbling further up the DOM tree
-  // toward those peers; without scoping AND stopping, the picker
-  // would race with whatever else listens at document.
   useEffect(() => {
     if (!anchor) return;
     const node = containerRef.current;
@@ -417,12 +378,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
                 );
               })}
               {customValue && (
-                // Custom-value row — committed verbatim as the field's
-                // value. Surfaced when the typed text doesn't match a
-                // known id; the operator is telling us they know
-                // exactly which id they want (rare value, new
-                // evaluator, paste from a log). Renders below the
-                // known values so it never displaces a top-N match.
+                // Custom-value row — committed verbatim as the field's value.
                 <chakra.button
                   key="__custom__"
                   type="button"

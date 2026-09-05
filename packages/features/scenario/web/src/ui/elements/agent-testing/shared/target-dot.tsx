@@ -1,11 +1,6 @@
 /**
- * The mark of one target of a comparison: its colour as a dot, and its name
- * beside it when asked for.
- *
- * The same dot reads on the run dialog rows, on the column headers of the
- * comparison table, on the grid sections, in the run settings and in the runs
- * rail, so one target reads in one colour everywhere.
- *
+ * The mark of one target of a comparison: its colour as a dot, and its name beside it
+ * when asked for.
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

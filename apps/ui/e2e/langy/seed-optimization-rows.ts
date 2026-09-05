@@ -1,10 +1,5 @@
 /**
  * The fixture rows the prompt-optimization suites seed their workbench with.
- *
- * The baseline prompt deliberately knows none of Brightcart's policy facts
- * while the golden answers state them, so roughly the last third of the rows
- * fail an answer-match evaluator until the prompt learns the policies. That is
- * the improvement the loop scenarios expect Langy to find.
  */
 
 export interface SeedRow {

@@ -15,12 +15,7 @@ function displaySpanType(spanType: string): string {
 }
 
 /**
- * Span-type chip used in trace-row summaries. Uses Chakra's
- * `colorPalette` token scope (`colorPalette.subtle` / `.emphasized`)
- * instead of hardcoding `blue.subtle` / `blue.emphasized`, because the
- * hardcoded form rendered the LLM icon as near-invisible on the dark
- * theme (dark blue text on dark blue bg). The palette scope picks the
- * right light/dark pair automatically.
+ * Span-type chip used in trace-row summaries.
  */
 export const SpanTypeBadge: React.FC<{ spanType: string } & Omit<TextProps, "children">> = ({
   spanType,

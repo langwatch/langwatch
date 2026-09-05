@@ -4,52 +4,35 @@ import { api } from "../../trace-api";
 import { useRefreshUIStore } from "../../../../index";
 
 /**
- * Smallest gap (ms) between two manual refresh clicks. Multiple clicks
- * inside this window collapse to a single invalidation — without it a
- * frustrated operator hammering the icon would queue up N round-trips
- * the backend has to honour before it gets to serve the latest data.
+ * Smallest gap (ms) between two manual refresh clicks.
  */
 const REFRESH_DEBOUNCE_MS = 350;
 
 interface UseTraceListRefreshResult {
   /**
-   * Trigger an invalidation of list / discover / newCount. Cancels any
-   * in-flight fetches of the same keys first so the operator only ever
-   * sees the result of their *most recent* click — not whichever
-   * round-trip happens to finish last.
+   * Trigger an invalidation of list / discover / newCount. Cancels any in-flight
+   * fetches of the same keys first so the operator only ever sees the result of their
+   * *most recent* click — not whichever round-trip happens to finish last.
    */
   refresh: () => void;
   /**
-   * True while any of (list, discover, newCount) is fetching. Tied to
-   * the React-Query cache directly so the spinner / tint stay on until
-   * the data actually lands, instead of clearing after a fixed
-   * timeout. Used by `RefreshProgressBar` to know when an EXPLICIT
-   * refresh has settled — not a UI-facing spinner signal on its own,
-   * since `discover`/`newCount` also refetch on routine background SSE
-   * activity (see `shouldSpin` below for that).
+   * True while any of (list, discover, newCount) is fetching. Tied to the React-Query
+   * cache directly so the spinner / tint stay on until the data actually lands, instead
+   * of clearing after a fixed timeout.
    */
   isRefreshing: boolean;
   /**
-   * The refresh BUTTON's spin state: an explicit refresh in flight, or a
-   * genuinely new trace being merged into `list` — never a background
-   * `discover`/`newCount` refetch triggered by a routine span update to a
-   * trace already on screen. A busy coding-agent trace fires those on
-   * nearly every span; spinning the button for each one reads as "something
-   * is wrong" when nothing new actually happened.
+   * The refresh BUTTON's spin state: an explicit refresh in flight, or a genuinely new
+   * trace being merged into `list` — never a background `discover`/`newCount` refetch
+   * triggered by a routine span update to a trace already on screen.
    */
   shouldSpin: boolean;
 }
 
 /**
- * Invalidate the trace-list-side queries (list, discover, newCount).
- * Used by manual refresh affordances and by visibility/freshness signals
- * that want to surface anything that landed while we weren't looking.
- *
- * Returns both the action AND an `isRefreshing` flag sourced from
- * tanstack's `useIsFetching` so callers can mirror the loading state
- * onto a spinner/tint that stays visible for the full duration of the
- * fetch (the previous fixed 900ms pulse cleared the spinner mid-fetch
- * on slow projects, which looked like the refresh had failed).
+ * Invalidate the trace-list-side queries (list, discover, newCount). Used by manual
+ * refresh affordances and by visibility/freshness signals that want to surface anything
+ * that landed while we weren't looking.
  */
 export function useTraceListRefresh(): UseTraceListRefreshResult {
   const trpcUtils = api.useUtils();

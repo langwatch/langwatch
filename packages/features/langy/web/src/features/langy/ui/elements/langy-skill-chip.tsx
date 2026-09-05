@@ -8,31 +8,6 @@ import type { LangyContextChip, LangySkillChip } from "../../../../index";
 
 /**
  * A skill chip: "do THIS", optionally "…on THAT".
- *
- * ── THE ASSOCIATION MODEL ──────────────────────────────────────────────────
- * A skill is a VERB and a resource is its OBJECT. Two chips sitting side by side
- * — [GitHub] [Trace abc123] — state two facts and leave the agent to guess the
- * relationship between them. So the verb takes the object: a skill chip owns an
- * optional TARGET SLOT, and the chip reads as the sentence the user meant.
- *
- *     [ ✦ GitHub · on Trace abc123 ✕ ]
- *
- * ── COMPACT BY DEFAULT ─────────────────────────────────────────────────────
- * At rest the chip is just the verb: a small [ ✦ GitHub ⌄ ] pill, quiet enough
- * to sit in a row of context chips without reading as a card. The target slot
- * and the remove control only appear when you EXPAND it (the chevron), so the
- * common case — "use the GitHub skill" — stays out of the way, and the fuller
- * "…on this trace" grammar is one click away when you want it. A bound target
- * is hinted by a small accent dot while collapsed, so the association is never
- * silently hidden.
- *
- * The slot is a menu over the resource chips ALREADY attached to this turn, so
- * association can only ever point at something real and present. There is no way
- * to bind a skill to a resource that isn't in context, because there is no such
- * turn to send.
- *
- * ⚠ Like every chip, this reaches the agent only once `chatRequestSchema` spreads
- * `langyTurnContextSchema`. See that file.
  */
 export function LangySkillChipView({
   chip,

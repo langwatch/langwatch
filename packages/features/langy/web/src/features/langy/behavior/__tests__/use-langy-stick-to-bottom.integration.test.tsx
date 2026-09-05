@@ -14,15 +14,7 @@ vi.mock("../../../../behavior/use-reduced-motion", () => ({
 
 /**
  * jsdom has no layout engine: `scrollHeight` and `clientHeight` are hard 0 and
- * `scrollIntoView` does not exist. So we drive geometry by hand — a fake
- * viewport of VIEWPORT_H over a content box we grow ourselves — and let the
- * hook do exactly what it would do in a browser: read the numbers, decide
- * whether it holds the pin, and move `scrollTop`.
- *
- * This is the point of the test. The bug being pinned here is NOT "does the
- * browser scroll" — it is "does the hook still follow content that grew without
- * `messages` changing" (Stream B tokens, turn signals, cards), and "does it
- * stop following the moment the user scrolls up".
+ * `scrollIntoView` does not exist.
  */
 const VIEWPORT_H = 100;
 
@@ -51,10 +43,7 @@ function fakeBox(el: HTMLElement, { scrollHeight }: { scrollHeight: number }) {
 }
 
 /**
- * jsdom has no `scrollIntoView`. Stand in for what a browser does when the hook
- * asks to bring the bottom sentinel into view: park the scroller at its live
- * edge, and emit the scroll event that a real scroll emits — which is precisely
- * the event that used to release the pin mid-glide.
+ * jsdom has no `scrollIntoView`.
  */
 function installScrollIntoView(scroller: HTMLElement) {
   Element.prototype.scrollIntoView = function scrollIntoViewStub() {
@@ -130,13 +119,9 @@ function touch({
 }
 
 /**
- * A mouse, at an element and a height. `target` is what separates the
- * scrollbar from the message content: a press on the scroller ITSELF is its
- * scrollbar, a press on a child is a click or a selection.
- *
- * A move is dispatched where the cursor actually IS, which for a drag is
- * frequently outside the column, exactly as a browser addresses it. One
- * `pointerId` throughout, because it is one hand.
+ * A mouse, at an element and a height. `target` is what separates the scrollbar from
+ * the message content: a press on the scroller ITSELF is its scrollbar, a press on a
+ * child is a click or a selection.
  */
 function pointer({
   target,
@@ -255,12 +240,8 @@ describe("given the Langy message column follows a stream", () => {
       grow({ scroller, to: 500 });
 
       // What the column does to itself: a turn finalises and its live parts are
-      // replaced by shorter recorded ones, the browser clamps scrollTop to the
-      // new maximum, and the column re-grows before the scroll event is
-      // dispatched. The same geometry as a reader scrolling up, and nobody
-      // touched an input device. Reading it as a reader left a "jump to latest"
-      // pill in front of someone who had not scrolled, and killed the follow
-      // for the rest of the conversation.
+      // replaced by shorter recorded ones, the browser clamps scrollTop to the new
+      // maximum, and the column re-grows before the scroll event is dispatched.
       layoutScrollTo({ scroller, top: 100 });
 
       expect(pinned()).toBe("true");
@@ -382,12 +363,8 @@ describe("given the Langy message column follows a stream", () => {
       const { scroller, content, pinned } = setup();
       grow({ scroller, to: 500 });
 
-      // A selection DOES scroll the column, but only once it is dragged past
-      // the top edge — and there the pointer says so itself. The move is
-      // dispatched OUTSIDE the column, because that is where the cursor is and
-      // a mouse takes no pointer capture, so that is where a browser addresses
-      // it. The scroller's box is all zeros under jsdom, so above it is a
-      // negative clientY.
+      // A selection DOES scroll the column, but only once it is dragged past the top
+      // edge — and there the pointer says so itself.
       act(() => {
         pointer({ target: content, type: "pointerdown", clientY: 50 });
         pointer({ target: document.body, type: "pointermove", clientY: -10 });

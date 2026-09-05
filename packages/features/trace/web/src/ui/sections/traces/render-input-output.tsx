@@ -21,10 +21,7 @@ type RenderInputOutputProps = {
   collapsed?: TraceJsonViewOptions["collapsed"];
   collapseStringsAfterLength?: TraceJsonViewOptions["collapseStringsAfterLength"];
   /**
-   * Per-node collapse decision, e.g. "start every array collapsed". Kept here
-   * rather than on `TraceJsonViewOptions`: the shared trace component knows
-   * only `collapsed` and `collapseStringsAfterLength`, and stays free of the
-   * JSON viewer this wrapper happens to render with.
+   * Per-node collapse decision, e.g. "start every array collapsed".
    */
   shouldCollapse?: (field: CollapsedFieldProps) => boolean;
   /** Show the entry count beside each object and array. */

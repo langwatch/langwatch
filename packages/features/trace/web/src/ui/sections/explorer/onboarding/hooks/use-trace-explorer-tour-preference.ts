@@ -3,10 +3,6 @@ import { api } from "../../../trace-api";
 
 /**
  * User-scoped persistence for automatic Traces Explorer tours.
- *
- * Automatic tours fail closed while the preference is loading so a dismissed
- * tour never flashes before the server response arrives. Explicit replay from
- * the toolbar is intentionally independent from this preference.
  */
 export function useTraceExplorerTourPreference() {
   const utils = api.useUtils();

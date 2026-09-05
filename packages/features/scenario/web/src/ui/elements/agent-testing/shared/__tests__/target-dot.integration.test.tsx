@@ -1,8 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The mark of one target: its dot, and the label beside it.
- *
+ * @vitest-environment jsdom
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

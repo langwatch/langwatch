@@ -14,13 +14,9 @@ export interface EvalSummary {
   score: number | boolean | null;
   scoreType: "numeric" | "boolean" | "categorical";
   /**
-   * - `pass` / `fail` / `warning` — the evaluator ran and produced a verdict.
-   * - `processed` — the evaluator ran to completion but produced no pass/fail
-   *   verdict (score-only or verdict-less runs). Neutral: not a pass.
-   * - `skipped` — the evaluator wasn't run (e.g. provider not configured,
-   *   preconditions not met). The score is meaningless; don't show it.
-   * - `error` — the evaluator crashed / errored out. Distinct from a "fail"
-   *   verdict — the evaluator never produced a real score.
+   * - `pass` / `fail` / `warning` — the evaluator ran and produced a verdict. -
+   * `processed` — the evaluator ran to completion but produced no pass/fail verdict
+   * (score-only or verdict-less runs).
    */
   status: "pass" | "warning" | "fail" | "processed" | "skipped" | "error";
 }
@@ -52,9 +48,8 @@ export interface TraceListEventGroup {
 
 /**
  * A trace's events as the list renders them. Read from `stored_spans` by
- * `tracesV2.listEvents` once per visible page, not carried on the trace
- * summary — the fold stopped hoisting events so that folding stays O(1) per
- * span (migration 00025).
+ * `tracesV2.listEvents` once per visible page, not carried on the trace summary — the
+ * fold stopped hoisting events so that folding stays O(1) per span (migration 00025).
  */
 export interface TraceListEvents {
   /** Ordered by first occurrence; shorter than `distinctCount` when trimmed. */
@@ -73,10 +68,9 @@ export const NO_TRACE_EVENTS: TraceListEvents = {
 };
 
 /**
- * Shape of a trace as rendered in the trace table.
- * This is the client-side view model — not the ClickHouse row.
- * Only contains the data needed for table rendering. Heavy fields
- * (full I/O, span trees, eval reasoning) are fetched progressively.
+ * Shape of a trace as rendered in the trace table. This is the client-side view model —
+ * not the ClickHouse row. Only contains the data needed for table rendering. Heavy
+ * fields (full I/O, span trees, eval reasoning) are fetched progressively.
  */
 export interface TraceListItem {
   traceId: string;
@@ -119,11 +113,9 @@ export interface TraceListItem {
   inputMediaRefs?: TraceMediaRef[];
   outputMediaRefs?: TraceMediaRef[];
   /**
-   * Set when a restrict privacy rule hides the content from this viewer (the
-   * server nulled `input`/`output`). Lets the Input/Output cells render a
-   * "Redacted" marker instead of the em-dash used for genuinely-absent content.
-   * `*VisibleTo` is the audience label ("Admins" / "no one") or null/undefined
-   * for the generic copy.
+   * Set when a restrict privacy rule hides the content from this viewer (the server
+   * nulled `input`/`output`). Lets the Input/Output cells render a "Redacted" marker
+   * instead of the em-dash used for genuinely-absent content.
    */
   inputRedacted?: boolean | null;
   outputRedacted?: boolean | null;
@@ -165,11 +157,8 @@ export interface TraceListItem {
    */
   eventsUnavailable?: boolean;
   /**
-   * What reviewers left on the trace: their comments, ratings, scores and
-   * suggested outputs. Annotations live in their own store rather than on the
-   * trace summary, so the list reads them separately and lays them over the
-   * row (`useTraceListAnnotations`). Undefined until the Annotations column
-   * asks for them.
+   * What reviewers left on the trace: their comments, ratings, scores and suggested
+   * outputs.
    */
   annotations?: AnnotationByTrace[];
   /**

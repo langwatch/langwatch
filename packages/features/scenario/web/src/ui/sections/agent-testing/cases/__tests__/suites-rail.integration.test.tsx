@@ -1,9 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The rail of the Scenarios tab: the test suites, the sets that run from code,
- * the period picker at its foot, and the one dialog that names a suite.
- *
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */
@@ -134,10 +130,9 @@ function railEntries(): string[] {
 }
 
 /**
- * Two batches of the project: one that covered a scenario of Refunds, and one
- * that covered a scenario of another suite. Narrowing to the open suite is the
- * work the submenu does, so a fixture holding only its own runs would prove
- * nothing.
+ * Two batches of the project: one that covered a scenario of Refunds, and one that
+ * covered a scenario of another suite. Narrowing to the open suite is the work the
+ * submenu does, so a fixture holding only its own runs would prove nothing.
  */
 const TWO_HOURS_AGO = Date.now() - 2 * 60 * 60 * 1000 - 60_000;
 

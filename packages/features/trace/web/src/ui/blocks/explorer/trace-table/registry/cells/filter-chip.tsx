@@ -31,18 +31,8 @@ type FilterChipProps = FilterChipBaseProps &
   );
 
 /**
- * Shared interaction wrapper for the trace table's value chips (label,
- * model, evaluation, prompt). One consistent behaviour everywhere:
- *
- *   - clicking the chip body toggles a facet filter for that value —
- *     `stopPropagation` keeps it from opening the row's trace drawer;
- *   - an optional ↗ link-out fades in at the trailing edge on hover and
- *     navigates to the value's source (provider, definition, prompt…).
- *
- * The ↗ keeps its layout slot even while hidden, so a chip doesn't shift
- * as the icon fades in. `forwardRef` + prop spread let the chip double as
- * a HoverCard trigger (the model cell wraps it in the multi-model list
- * popover).
+ * Shared interaction wrapper for the trace table's value chips (label, model,
+ * evaluation, prompt). One consistent behaviour everywhere:
  */
 export const FilterChip = forwardRef<
   HTMLDivElement,

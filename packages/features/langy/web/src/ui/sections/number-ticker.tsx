@@ -3,19 +3,7 @@ import { useEffect } from "react";
 import { useReducedMotion } from "../../behavior/use-reduced-motion";
 
 /**
- * A spring number ticker. On first paint it rolls up from 0 to `value`; on
- * every later change it springs from its current display to the new value.
- * Used for any metric Langy reports mid-turn ("Analysing 1,204 traces", a
- * score, a progress percent). The spring settles in well under 500ms.
- *
- * Respects `prefers-reduced-motion` — reduced-motion users see the final value
- * with no animation.
- */
-/**
- * A counter reads best as a whole number, but a value below one is not a
- * counter — it is a measurement, and rounding it away leaves "0" where the
- * whole point was the magnitude. So: whole numbers for anything at or above
- * one, significant digits below it.
+ * A spring number ticker.
  */
 function defaultFormat(value: number): string {
   if (!Number.isFinite(value)) return "—";
@@ -41,14 +29,8 @@ export function NumberTicker({
     damping: 26,
     mass: 0.5,
   });
-  // Rounding happened HERE, before `format` ever saw the number — so a cost of
-  // 0.432559 was handed to the formatter as 0 and rendered as "0". Any figure
-  // smaller than one was displayed as nothing at all, which is the worst
-  // possible failure for a cost: it reads as free.
-  //
-  // A caller that passes `format` owns the presentation entirely and gets the
-  // real value. Only the bare path rounds, and it rounds for DISPLAY of a
-  // counter — and even then it keeps fractions that would otherwise vanish.
+  // Rounding happened HERE, before `format` ever saw the number — so a cost of 0.432559
+  // was handed to the formatter as 0 and rendered as "0".
   const display = useTransform(spring, (v) => (format ? format(v) : defaultFormat(v)));
 
   useEffect(() => {

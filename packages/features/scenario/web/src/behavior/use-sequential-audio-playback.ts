@@ -1,23 +1,5 @@
 /**
  * useSequentialAudioPlayback — per-renderer-instance audio playback coordinator.
- *
- * Responsibilities:
- *  - Exclusivity: when any registered audio starts playing, all others are paused.
- *  - Sequential auto-advance: when an audio ends, the next audio in `orderedIds`
- *    is played. The ordered list is passed each render so appended messages are
- *    always reflected without requiring ref re-fire.
- *  - Isolation: each call to this hook is independent; two renderer instances do
- *    not interfere.
- *
- * Usage (canonical caller: ScenarioMessageRenderer):
- *   const orderedIds = useMemo(
- *     () => items.filter((i) => i.kind === "media" && i.part.type === "audio").map((i) => i.id),
- *     [items],
- *   );
- *   const { getAudioProps } = useSequentialAudioPlayback({ orderedIds });
- *
- *   // Wire into each <MediaPart>:
- *   <MediaPart part={item.part} projectId={projectId} audioPlayback={getAudioProps(item.id)} />
  */
 
 import { useCallback, useRef } from "react";

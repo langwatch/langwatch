@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Running one scenario keeps the person in place: the run dialog confirms, the
- * run goes out as an ordinary run plan named after the scenario and the agent,
- * the wide drawer opens at queue time, the conversation streams into it, and
- * the verdict lands in the same drawer.
- *
  * @see specs/features/agent-testing/live-single-scenario-run.feature
  * @see specs/suites/run-plan-identity-by-name.feature
  */

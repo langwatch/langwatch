@@ -9,12 +9,7 @@ import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 /**
- * Editor for the parameters a scenario declares, opened from the Parameters
- * group in the scenario editor footer.
- *
- * Rows are edited straight on the scenario form, so closing keeps what was
- * typed and nothing is stored until the scenario itself is saved.
- *
+ * Editor for the parameters a scenario declares, opened from the Parameters group in the scenario editor footer.
  * @see specs/scenarios/scenario-run-parameters.feature
  * @see specs/scenarios/secret-run-parameters.feature
  */
@@ -75,11 +70,6 @@ export function ScenarioParametersDialog({
 
 /**
  * Validation messages for the parameters field.
- *
- * The schema reports a bad name or a duplicate against the row that carries it
- * and the twenty-parameter cap against the array itself, so both are read back
- * separately: a row message sits under its row, the array message under the
- * list.
  */
 function readParameterErrors(errors: FieldErrors<ScenarioFormData>): {
   parametersError: string | undefined;

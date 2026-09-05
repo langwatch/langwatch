@@ -1,13 +1,6 @@
 /**
- * LeaderboardVerdictPanel — the answer, stated in one sentence, above the
- * evidence for it.
- *
- * A ranked table makes the reader do the statistics: compare "1.42 ± 0.18"
- * against "1.31 ± 0.22", notice the intervals overlap, and conclude the run
- * did not actually separate them. Most readers instead take the top row as
- * the winner. So the conclusion is computed and written out, and the bars
- * below exist to show WHY it holds — overlapping whiskers make a tie
- * visible at a glance in a way two ± figures never do.
+ * LeaderboardVerdictPanel — the answer, stated in one sentence, above the evidence for
+ * it.
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
@@ -27,26 +20,8 @@ const nameOf = (variantId: string, variantNames: Record<string, string>): string
   variantNames[variantId] ?? variantId;
 
 /**
- * The horizontal scale for the score bars: which scores are allowed to set the
- * axis bounds, and how a value maps onto 0-100%.
- *
- * A named function rather than an inline filter chain because the rule it
- * encodes has already been lost once in a refactor. Two exclusions carry the
- * whole behaviour:
- *
- *  - **Scale to the scores, not the intervals.** Over few comparisons a single
- *    interval can be many times wider than the spread of the scores; scaling
- *    to it squashes every marker into one edge and the reader loses the
- *    comparison entirely. Bands clip at the track edges instead, which reads
- *    as "the uncertainty runs off the chart" — the correct impression.
- *  - **Degenerate entries do not set the bounds.** A variant that never won or
- *    never lost has no meaningful MLE score and in practice lands on an
- *    extreme sink value. Letting it into min/max stretches the axis around a
- *    number that means nothing. Its bar is still drawn and still labelled
- *    "not scoreable"; it just does not get a vote on the scale.
- *
- * Returns null when nothing is scoreable, which the caller renders as no bars
- * rather than as a degenerate axis.
+ * The horizontal scale for the score bars: which scores are allowed to set the axis
+ * bounds, and how a value maps onto 0-100%.
  */
 export const computeScoreBarScale = (
   entries: BTLeaderboard["entries"],
@@ -73,13 +48,6 @@ export const computeScoreBarScale = (
 
 /**
  * Which edges of an interval run past the chart.
- *
- * The scale is built from the scores, so a wide interval routinely extends
- * beyond both bounds and `pct` clamps it to the track. Clamping alone is a
- * lie by omission: a band cut off at the edge draws exactly like a band that
- * genuinely ends there, which makes the uncertainty look SMALLER than it is —
- * the one misreading this chart exists to prevent. The caller fades the
- * clipped edge so "runs off the chart" and "stops here" stop looking alike.
  */
 export const computeBandClipping = ({
   ci,
@@ -184,11 +152,7 @@ function Callout({
 }
 
 /**
- * A bootstrap over very few comparisons can hand back a non-finite bound. One
- * of those anywhere in the set turns min/max into NaN, which makes every
- * position below NaN, which the browser silently drops — collapsing the whole
- * chart to slivers at the left edge. So treat a non-finite interval as no
- * interval at all rather than letting it poison the scale.
+ * A bootstrap over very few comparisons can hand back a non-finite bound.
  */
 const finiteCI = (entry: BTLeaderboard["entries"][number]): [number, number] | null =>
   entry.scoreCI && Number.isFinite(entry.scoreCI[0]) && Number.isFinite(entry.scoreCI[1])
@@ -279,10 +243,6 @@ function ScoreBarTrack({
 
 /**
  * One bar per variant with its 95% interval drawn as a whisker.
- *
- * The whisker is the point: two bars of visibly different length whose
- * whiskers overlap is the exact picture of "looks better, isn't provably
- * better", and it takes no statistical training to read.
  */
 function ScoreBars({
   leaderboard,

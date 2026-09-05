@@ -1,15 +1,5 @@
 /**
  * The Results tab list: the filter row, the charts it drives, and the table.
- *
- * Top to bottom, the order is deliberate. The filters read first, then the
- * numbers they move, then the rows themselves, so a person sets the question
- * before reading the answer. The charts start closed: the page opens on what
- * ran, not on a wall of figures nobody asked for yet.
- *
- * The four groupings draw different columns but are one table to the reader,
- * and all four read the same rows, so no control on the page can move one
- * number without moving the rest.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
@@ -81,10 +71,6 @@ function LoadingRows() {
 
 /**
  * What the tab says while the window holds nothing.
- *
- * It offers the next wider window as well. The period picker lives in the
- * filter row, which this state stands in for, so without the button a person
- * whose runs are older than the window has no way back to them.
  */
 function NoRunsYet({
   period,
@@ -293,12 +279,7 @@ export function ResultsList({
 
   const isLoading = isPlansLoading || results.isLoading;
 
-  // The empty state is about the window, not about the plan list. Runs started
-  // outside a run plan, a single scenario or a test suite, are counted by the
-  // header and listed by the scenario, target and flat groupings, so a project
-  // holding those and no plan was told it had no runs while the same header
-  // counted them, and lost the grouping selector and the period picker with
-  // the filter row.
+  // The empty state is about the window, not about the plan list.
   const isEmptyWindow = !hasAnyPlans && results.totals.executions === 0;
 
   const openRun = (row: ResultRow) => onSelectRun(row.planSlug, row.runId);

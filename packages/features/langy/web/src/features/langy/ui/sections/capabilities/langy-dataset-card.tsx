@@ -1,10 +1,6 @@
 /**
  * Dataset capability card (`platform_list_datasets`, `platform_get_dataset`,
  * `platform_list_dataset_records`).
- *
- * Summarises what a dataset read returned — a count plus the first few named
- * rows — and links into Datasets. Read-only. (A dataset CREATE is a write and
- * renders through the resource-result card / staged proposal instead.)
  */
 import { Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy-contract";

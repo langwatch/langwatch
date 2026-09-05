@@ -1,13 +1,5 @@
 /**
  * The connected agents of a project, as cards of the agents page (ADR-128).
- *
- * One card is one name in one environment: the process in production, the
- * one on a shared staging box, and one for every developer who runs it on
- * their laptop. The card carries the presence, the name with its
- * environment, the SDK that registered it and who it belongs to. It is the
- * same card the HTTP and the code agents are drawn in, so one page reads as
- * one list. The run parameters it declares are read in its drawer.
- *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
@@ -33,9 +25,6 @@ import {
 
 /**
  * The connected agents as cards.
- *
- * The cards are drawn straight into the grid of the agents page, so they sit
- * beside the agents of every other kind at the same size.
  */
 export function ConnectedAgentsSection({
   agents,
@@ -66,9 +55,6 @@ export function ConnectedAgentsSection({
 
 /**
  * The dot and the word that say whether a process holds the agent.
- *
- * The header carries the word alone, and the tooltip carries the rest: how
- * many instances hold it, or when it was last seen.
  */
 function PresenceMark({ agent }: { agent: ConnectedAgentView }) {
   const label = presenceLabel({

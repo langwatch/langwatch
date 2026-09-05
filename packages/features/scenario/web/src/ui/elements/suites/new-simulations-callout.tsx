@@ -11,24 +11,7 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
 import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**
- * Small announcement card pinned to the bottom of the Agent Testing
- * sidebars. It tells the reader they are on the new simulations screens and
- * offers the way back to the previous ones: a click records the per-browser
- * preference ({@link preferLegacySimulations}) and navigates to the previous
- * screen that matches where the card sits, `target="scenarios"` to the
- * scenario library and `target="runs"` to the runs list.
- *
- * The dismissal key is its own, so people who dismissed the earlier voice
- * announcement still see this one. Snoozes for {@link SNOOZE_DAYS} days per
- * project; the key carries a `:v1:` version segment so a future announcement
- * can recycle the card by bumping the version.
- *
- * The card retires on {@link SUNSET}: the retirement is read per render, so
- * a sidebar already on screen keeps the card until it next renders. The
- * `?simulations-welcome=1` address parameter brings it back past the
- * dismissal, the retirement and the recorded preference, so a person who
- * wants the way back to the previous screens can still reach it.
- *
+ * Small announcement card pinned to the bottom of the Agent Testing sidebars.
  * @see specs/suites/new-simulations-callout.feature
  */
 const SNOOZE_DAYS = 14;

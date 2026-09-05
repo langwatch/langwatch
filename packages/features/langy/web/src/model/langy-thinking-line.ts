@@ -1,10 +1,9 @@
 import { parseLangwatchCommand } from "@langwatch/langy-contract";
 
 /**
- * Derives an honest status from observable turn signals. A running tool is
- * named, visible tokens need no extra line, live reasoning says “Thinking…”,
- * and silence escalates from waiting to stuck. Whimsical cycling is permitted
- * only while work is provably active because cycling itself implies progress.
+ * Derives an honest status from observable turn signals. A running tool is named,
+ * visible tokens need no extra line, live reasoning says “Thinking…”, and silence
+ * escalates from waiting to stuck.
  */
 
 /** What the line is describing, so the caller can pick its treatment. */
@@ -74,14 +73,6 @@ export interface ThinkingMessage {
 
 /**
  * How long we wait before admitting nothing is happening.
- *
- * A cold spawn legitimately takes a few seconds (fork the worker, lay out the
- * home, install skills, wait for readiness), so silence is normal at first. The
- * first two steps name the startup's real phases — the control plane prepares
- * the worker's workspace, then the agent starts — so the wait reads as
- * progress, not one frozen line. It stops being normal quickly, and by 75s a
- * spawn that has produced NOTHING has almost certainly failed — the manager's
- * own readiness budget is long gone.
  */
 export const THINKING_STARTING_LANGY_MS = 6_000;
 export const THINKING_STILL_STARTING_MS = 12_000;
@@ -89,12 +80,8 @@ export const THINKING_SLOW_MS = 35_000;
 export const THINKING_STUCK_MS = 75_000;
 
 /**
- * The assistant message of the CURRENT turn: the one after the last user
- * message, or nothing while the reply has not started arriving. The wire-truth
- * checks below must read THIS message, never the last assistant overall — on a
- * follow-up send the last assistant overall is the PREVIOUS completed reply,
- * whose settled text would read as this turn already generating when it has
- * produced nothing.
+ * The assistant message of the CURRENT turn: the one after the last user message, or
+ * nothing while the reply has not started arriving.
  */
 export function currentTurnAssistant(messages: ThinkingMessage[]): ThinkingMessage | undefined {
   const lastUserIndex = messages.findLastIndex((m) => m.role === "user");
@@ -136,11 +123,9 @@ export function hasTokens(message: ThinkingMessage | undefined): boolean {
 }
 
 /**
- * The escalation the two waiting paths share: silence is normal for a moment,
- * then it is not, then it is a fault. Only the wording of the final admission
- * differs between a cold start and a follow-up, so one ladder serves both.
- * Returns nothing while the silence is still young enough to say something more
- * specific than "this is slow".
+ * The escalation the two waiting paths share: silence is normal for a moment, then it
+ * is not, then it is a fault. Only the wording of the final admission differs between a
+ * cold start and a follow-up, so one ladder serves both.
  */
 function silenceEscalation({
   elapsedMs,
@@ -163,10 +148,7 @@ function silenceEscalation({
 }
 
 /**
- * Nothing is on the wire yet. What that MEANS depends on whether this
- * conversation has answered before: a follow-up is waiting on a worker that is
- * (almost always) alive, so the model is working; a first turn is waiting on a
- * worker that does not exist yet, so the startup phases are the true account.
+ * Nothing is on the wire yet.
  */
 function waitingLine({
   messages,
@@ -177,12 +159,9 @@ function waitingLine({
   elapsedMs: number;
   workerReady: boolean;
 }): LangyThinkingLineState {
-  // A FOLLOW-UP IS WAITING — or a first message whose worker a panel-open warm
-  // already PROVED alive (`workerReady`). Either way the model is working, not
-  // booting; the manager's own "Thinking…" status lands moments later and
-  // takes over. The startup ladder here would claim a boot that is not
-  // happening, and a connection-flavoured line read as a lost connection. Long
-  // silence still escalates, because a live worker can wedge too.
+  // A FOLLOW-UP IS WAITING — or a first message whose worker a panel-open warm already
+  // PROVED alive (`workerReady`). Either way the model is working, not booting; the
+  // manager's own "Thinking…" status lands moments later and takes over.
   if (hasPriorReply(messages) || workerReady) {
     return (
       silenceEscalation({
@@ -218,11 +197,8 @@ function waitingLine({
 }
 
 /**
- * The line for the current state of a turn, or null when no line should
- * render at all (the streaming answer is on screen and speaks for itself).
- *
- * Pure: the caller measures `elapsedMs` (time since the turn was sent) and owns
- * the clock. Everything here is derived from what is provably on the wire.
+ * The line for the current state of a turn, or null when no line should render at all
+ * (the streaming answer is on screen and speaks for itself).
  */
 export function langyThinkingLine({
   messages,
@@ -236,29 +212,17 @@ export function langyThinkingLine({
   /** Time since the turn was sent. */
   elapsedMs: number;
   /**
-   * What the page Langy is driving is doing right now, in the page's own
-   * words, or null when it is doing nothing. The page reports the work it is
-   * actually carrying out — the column it is running and how many rows are
-   * back — so this is the most specific true line available, and it outranks
-   * everything the turn can infer. While the agent waits for a run it is
-   * blocked on a status poll, and naming the poll describes its bookkeeping
-   * where naming the run describes the reader's own work.
+   * What the page Langy is driving is doing right now, in the page's own words, or null
+   * when it is doing nothing.
    */
   pageActivity?: string | null;
   /**
-   * The model's ephemeral reasoning is streaming right now. Reasoning deltas
-   * never become message parts (they are live-edge only), so without this
-   * signal a reasoning-but-no-prose turn read as a startup wait — a false
-   * claim: the model is provably working.
+   * The model's ephemeral reasoning is streaming right now.
    */
   hasLiveReasoning?: boolean;
   /**
-   * A panel-open warm proved this conversation's worker alive before the send
-   * (`warmed: true` from `langy.warmWorker`). A first message then skips the
-   * startup ladder — the workspace it would claim to be preparing already
-   * exists — and reads "Thinking…" like a follow-up. If the proof went stale
-   * (the worker was reaped since), the manager's readiness status corrects
-   * the line moments later, the same recovery a follow-up relies on.
+   * A panel-open warm proved this conversation's worker alive before the send (`warmed:
+   * true` from `langy.warmWorker`).
    */
   workerReady?: boolean;
   toolNarrator?: LangyToolNarrator;

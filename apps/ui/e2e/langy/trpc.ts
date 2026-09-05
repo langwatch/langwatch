@@ -1,20 +1,6 @@
 /**
- * The browser's own credentials and the browser's own tRPC wire, for every
- * caller in this suite that has to act as a signed-in user rather than as an
- * API key.
- *
- * Three credentials are in play across the suite and mixing them is the easiest
- * mistake here:
- *
- * | Surface | Credential |
- * |---|---|
- * | `langy.*`, `experiments.saveEvaluationsV3`, `experiments.getEvaluationsV3BySlug`, `POST /api/experiments/execute` | the session cookie below |
- * | `GET/PUT /api/experiments/:slug/workbench-state`, `GET /api/experiments/runs*`, `POST /api/experiments` | `X-Auth-Token` (workbench-rest.ts) |
- * | `POST /api/langy/ui/actions` | the agent worker's own session key, never the suite's |
- *
- * Wire format (POST body `{"json": input}`, response
- * `{"result":{"data":{"json": output}}}`) was confirmed directly against a live
- * haven stack; see README.md for how to point this at a different stack.
+ * The browser's own credentials and the browser's own tRPC wire, for every caller in
+ * this suite that has to act as a signed-in user rather than as an API key.
  */
 
 import { ADMIN_EMAIL, ADMIN_PASSWORD, APP_BASE } from "./config";
@@ -32,10 +18,6 @@ let cachedCookie: Promise<string> | null = null;
 
 /**
  * Sign in once (per test process) and cache the better-auth session cookie.
- * Clears the cache on rejection: otherwise a single transient sign-in
- * failure (a momentary network blip, the app mid-restart) would permanently
- * poison every remaining test in the run, since `??=` only checks for
- * null/undefined at assignment time and a rejected promise is neither.
  */
 export function getSessionCookie(): Promise<string> {
   cachedCookie ??= (async () => {
@@ -79,12 +61,6 @@ export function getSessionCookie(): Promise<string> {
 
 /**
  * The error envelope, read the way the app reads it.
- *
- * The tRPC error envelope nests the domain code at `data.error.code` (see the
- * langy_turn_in_progress payload:
- * `{"json":{"data":{"error":{"code":"langy_turn_in_progress"}}}}`). The old
- * `data.domainError.code` path never matched anything, which silently disabled
- * the turn-lock retry.
  */
 function toCallError({
   path,
@@ -128,12 +104,9 @@ export async function trpcMutate<T>({
   path: string;
   input: unknown;
   /**
-   * Generous on purpose for a turn: under a queue backlog the turn mutation
-   * has been measured completing server-side at 135s, and a full
-   * failure-analysis turn has been measured working past 180s. Aborting a
-   * still-working turn destroys the run (the judge grades a one-token reply),
-   * and retrying is worse: the retry races the accepted first attempt into
-   * langy_turn_in_progress.
+   * Generous on purpose for a turn: under a queue backlog the turn mutation has been
+   * measured completing server-side at 135s, and a full failure-analysis turn has been
+   * measured working past 180s.
    */
   timeoutMs?: number;
 }): Promise<T> {

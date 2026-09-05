@@ -1,9 +1,5 @@
 /**
  * Unified run history panel for both single-suite and cross-suite views.
- *
- * When scenarioSetId is provided, filters to that suite.
- * When absent, shows runs across all suites.
- * Both paths use cursor-based pagination with Load More.
  */
 
 import { Box, Button, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
@@ -426,14 +422,9 @@ export function RunHistoryPanel({
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onExport={openExportDialog}
-          // totals.runCount counts the pages fetched so far, not what the
-          // server would export, so it is never compared against a total —
-          // that would block a valid export of a longer history.
-          //
-          // Zero only means "nothing matched" once there is nothing left to
-          // fetch. Filter to a scenario whose runs sit on a later page and the
-          // loaded pages hold none of them, while the server-side sweep would
-          // return every one — so `hasMore` is what makes the zero definitive.
+          // totals.runCount counts the pages fetched so far, not what the server would
+          // export, so it is never compared against a total — that would block a valid
+          // export of a longer history.
           isExportDisabled={isLoading || (totals.runCount === 0 && !hasMore)}
           isExporting={isExporting}
           exportProgress={exportProgress}

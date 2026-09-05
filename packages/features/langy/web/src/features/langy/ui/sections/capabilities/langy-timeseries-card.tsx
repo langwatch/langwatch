@@ -1,22 +1,5 @@
 /**
  * The plotted answer.
- *
- * "Compare trace cost this week to last" is a question about a TREND, and the
- * metrics card answered it with two large decimals — `$0.41456935` against
- * `$0.16630300`. Both numbers were right and the answer was useless: the shape
- * of the change is the thing being asked for, and a shape needs a plot.
- *
- * Chart engine is recharts, which the whole Analytics surface already uses, via
- * Chakra's `useChart` — a theme-aware wrapper over that same recharts, so this
- * introduces a styling layer, not a second charting stack. Colours, number and
- * date formatting therefore come from the theme rather than from constants
- * hand-picked here, and the chart follows light/dark without being told.
- *
- * The card can also SAVE what it drew: a plot you can only look at once is a
- * screenshot, and the natural next thing after "show me the trend" is "keep
- * watching this". That is only offered when the agent supplied a graph
- * definition — the panel never invents one, because a graph it guessed at would
- * silently disagree with the plot above it the moment the dashboard refetched.
  */
 
 import { useChart } from "@chakra-ui/charts";
@@ -101,14 +84,8 @@ function valueFormatter(unit: TimeseriesPayload["unit"]) {
 }
 
 /**
- * The largest single point across every series, and what share of the total it
- * accounts for.
- *
- * The spike is usually the answer. "Cost went up 154%" invites the next
- * question — WHEN, and was it one bad day or a steady climb — and a series that
- * puts two-thirds of its total in one bucket is telling a completely different
- * story from one that rose evenly. Calling it out turns the chart from a shape
- * into a finding.
+ * The largest single point across every series, and what share of the total it accounts
+ * for.
  */
 function peakOf(series: TimeseriesSeries[]): {
   t: string;
@@ -192,11 +169,6 @@ export function LangyTimeseriesCard({ output, projectSlug }: CapabilityCardInput
 
 /**
  * The plot itself, without a card around it.
- *
- * Separate from the card so the declarative card's `chart` body draws the SAME
- * plot rather than a second implementation of one — and so the chart hooks sit
- * below the "is there anything to draw" guard instead of above it, where their
- * count depended on the payload.
  */
 export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
   const series = payload.series ?? [];
@@ -357,10 +329,6 @@ function ComparisonHeadline({
 
 /**
  * Save the plot onto a dashboard — an existing one, or a new one named after it.
- *
- * Renders nothing without a graph definition. An "Add to dashboard" button that
- * saved a guessed query would produce a dashboard tile quietly disagreeing with
- * the card it came from, which is worse than not offering it.
  */
 function SaveToDashboard({ graph, title }: { graph: unknown; title?: string }) {
   const { project } = useOrganizationTeamProject();

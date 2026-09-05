@@ -11,10 +11,9 @@ interface TokenBreakdownTooltipContentProps {
   /** Cache-write tokens; row hidden when null. */
   cacheCreationTokens: number | null;
   /**
-   * Anthropic's cache-write split by TTL. A 1h write bills at 2x base input
-   * while a 5m write bills at 1.25x, so which TTL a session is writing to is
-   * a cost question, not trivia. Rows hidden when null (only claude code
-   * sessions with raw body telemetry report the split).
+   * Anthropic's cache-write split by TTL. A 1h write bills at 2x base input while a 5m
+   * write bills at 1.25x, so which TTL a session is writing to is a cost question, not
+   * trivia.
    */
   cacheCreation5mTokens?: number | null;
   cacheCreation1hTokens?: number | null;
@@ -31,12 +30,9 @@ interface TokenBreakdownTooltipContentProps {
 }
 
 /**
- * The token breakdown shown in the trace-details Tokens pill tooltip, shared so
- * the trace list's Tokens cell surfaces the same input / output / cache read /
- * cache write / reasoning split on hover instead of just the input+output
- * delta. Cache + reasoning rows render only when the trace actually reported
- * them — a model with no prompt caching (or no reasoning) shouldn't carry empty
- * rows.
+ * The token breakdown shown in the trace-details Tokens pill tooltip, shared so the
+ * trace list's Tokens cell surfaces the same input / output / cache read / cache write
+ * / reasoning split on hover instead of just the input+output delta.
  */
 export function TokenBreakdownTooltipContent({
   inputTokens,

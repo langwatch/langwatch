@@ -25,22 +25,6 @@ export interface ConversationAnnotations {
 
 /**
  * Every annotation on a conversation, read once for all of its turns.
- *
- * The turn cards, the rail, and the drawer's header chip all want the same
- * list, and each one asking separately meant the same rows fetched several
- * times over. One subscription here, grouped once, and the query key is stable
- * across callers because the ids are sorted before they become one.
- *
- * Asks for every comment on the turns, the ones about their parts included:
- * this is a reader looking at the trace itself, which is where a comment about
- * one of its spans belongs. The two groups are kept apart here rather than at
- * the read, because the same fetch feeds both the count and the rail.
- *
- * `keepPreviousData` keeps annotations on screen while a turn list that grew
- * is re-read, so the rail does not blank between pages. The retained rows are
- * held to the turns being asked about, because the same retention hands back
- * the last conversation's annotations while the next one is still loading, and
- * counting those would credit this conversation with another one's work.
  */
 export function useConversationAnnotations(traceIds: string[]): ConversationAnnotations {
   const { project, hasPermission } = useOrganizationTeamProject();

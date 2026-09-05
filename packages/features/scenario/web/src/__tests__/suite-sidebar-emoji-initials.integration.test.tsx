@@ -1,15 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The collapsed suite strip with emoji-named suites.
- *
- * Deliberately a file of its own rather than a block inside
- * SuiteSidebar.integration.test.tsx: that file names the generated database
- * client for a fixture type, which puts it in the datastore lane behind
- * containers and migrations it never touches. This one derives its fixture
- * type from the component's own props instead, so it runs in the component
- * lane, where a test that renders React into jsdom belongs.
- *
  * @see specs/features/suites/collapsible-suite-sidebar.feature
  * @see specs/navigation/project-avatar-initial.feature
  */

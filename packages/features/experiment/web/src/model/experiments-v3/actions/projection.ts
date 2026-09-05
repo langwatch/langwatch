@@ -6,14 +6,8 @@ import { disambiguateNames } from "@langwatch/experiment-contract";
 import type { WorkbenchState } from "./transforms";
 
 /**
- * A compact, serializable view of the workbench, for an agent reading the
- * board before it acts.
- *
- * Everything a decision needs is here — which datasets exist and what their
- * columns are called, which targets run against them and how they are wired,
- * which evaluators grade them, and how the last run went. Everything a decision
- * does not need is left out: full dataset rows, per-row outputs, per-row
- * evaluator results, drawer and selection state.
+ * A compact, serializable view of the workbench, for an agent reading the board before
+ * it acts.
  */
 
 /** UTF-8 size of the serialized projection, which the output never exceeds. */
@@ -41,12 +35,8 @@ export type ProjectedDataset = {
 };
 
 /**
- * A comparison, as the board shows it: which columns it judges and what it
- * judges them against.
- *
- * `variantNames` carries the same "(1)" / "(2)" suffixes a run's own errors
- * use, so "Waiting on category_classifier (1)" names a column the reader can
- * find here rather than one of two identically named ones.
+ * A comparison, as the board shows it: which columns it judges and what it judges them
+ * against.
  */
 export type ProjectedComparison = {
   variants: string[];
@@ -222,11 +212,6 @@ const projectDataset = (dataset: DatasetReference): ProjectedDataset => ({
 
 /**
  * What every column is called, disambiguated the way a run's errors do it.
- *
- * A resolved name comes from the caller: a prompt's handle lives in the
- * database, and this projection is pure. What state alone can answer is the
- * fallback, and the column's own id is the last one, which is at least the
- * thing every other field is keyed on.
  */
 const nameTargets = ({
   targets,
@@ -330,10 +315,6 @@ const countFilledCells = ({
 
 /**
  * The kinds of failure this column carries, not one entry per failed row.
- *
- * A column that failed the same way 200 times says so once. The target's own
- * failures report their code, and the evaluator rows report their `error_type`,
- * which is what names a comparison waiting on a column that never ran.
  */
 const sampleErrorTypes = ({
   results,
@@ -544,14 +525,6 @@ const fitToBudget = (projection: ProjectedWorkbenchState): ProjectedWorkbenchSta
 
 /**
  * Project the workbench for an agent.
- *
- * Pass `results` to include a per-target summary of the last run; without it
- * the projection is state only. Pass `targetNames` to give each column the
- * name its own header shows; without it the projection falls back to what the
- * state itself can answer. The output is capped at `PROJECTION_BUDGET_BYTES`
- * UTF-8 bytes: sample rows go first, then mappings collapse to counts, then the
- * results detail goes, then whole entries are dropped and counted in the
- * `omitted*` fields. `truncated` says so whenever anything was left out.
  */
 export const projectWorkbenchState = ({
   state,

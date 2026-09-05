@@ -1,11 +1,7 @@
 /**
+ * The Conversation Context panel carries a panel-level Translate toggle: it translates
+ * every visible turn preview to English at once and flips back on "Show original".
  * @vitest-environment jsdom
- *
- * The Conversation Context panel carries a panel-level Translate toggle: it
- * translates every visible turn preview to English at once and flips back on
- * "Show original". Renders the real ConversationContext with the real
- * useTextTranslation hook; only the tRPC boundary is mocked.
- * See specs/traces-v2/message-translation.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

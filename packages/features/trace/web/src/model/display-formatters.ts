@@ -14,10 +14,9 @@ export function formatRelativeTime(timestamp: number): string {
 }
 
 /**
- * Verbose natural-language relative time — "1 minute ago", "2 hours ago",
- * "3 weeks ago". Used by the SINCE column, which trades compactness for
- * readability (the compact `formatRelativeTime` stays the format for the
- * narrow TIME column).
+ * Verbose natural-language relative time — "1 minute ago", "2 hours ago", "3 weeks
+ * ago". Used by the SINCE column, which trades compactness for readability (the compact
+ * `formatRelativeTime` stays the format for the narrow TIME column).
  */
 export function formatVerboseRelative(timestamp: number): string {
   // Clock skew can produce `timestamp > Date.now()` for traces that arrive
@@ -47,20 +46,18 @@ export function formatVerboseRelative(timestamp: number): string {
 }
 
 /**
- * Full ISO 8601 timestamp in UTC, e.g. `2026-06-02T13:14:15.123Z`. Used by
- * the TIMESTAMP column for users who want to copy-paste a precise wall-
- * clock into log queries / external tools without translating from a
- * relative string.
+ * Full ISO 8601 timestamp in UTC, e.g. `2026-06-02T13:14:15.123Z`. Used by the
+ * TIMESTAMP column for users who want to copy-paste a precise wall- clock into log
+ * queries / external tools without translating from a relative string.
  */
 export function formatISOTimestamp(timestamp: number): string {
   return new Date(timestamp).toISOString();
 }
 
 /**
- * Local-time string with the viewer's IANA zone abbreviated (e.g.
- * `2026-06-02 15:14:15 CEST`). Used inside the TimeHoverCard. Falls back
- * gracefully on environments without `Intl` (SSR) — returns the bare
- * locale string.
+ * Local-time string with the viewer's IANA zone abbreviated (e.g. `2026-06-02 15:14:15
+ * CEST`). Used inside the TimeHoverCard. Falls back gracefully on environments without
+ * `Intl` (SSR) — returns the bare locale string.
  */
 export function formatLocalWithZone(timestamp: number): string {
   const d = new Date(timestamp);
@@ -113,11 +110,8 @@ export function formatDayOfWeek(timestamp: number): string {
 }
 
 /**
- * Compact relative-time formatter with an explicit "ago" suffix for
- * drawer-header / detail surfaces. No space between the number and
- * unit (`10m ago`, `16d ago`) so it stays tight at small sizes, but
- * keeps the natural-language hint that the table-cell
- * `formatRelativeTime` drops.
+ * Compact relative-time formatter with an explicit "ago" suffix for drawer-header /
+ * detail surfaces.
  */
 export function formatRelativeTimeAgo(timestamp: number): string {
   const diffMs = Date.now() - timestamp;
@@ -144,12 +138,9 @@ export function formatAbsoluteTime(timestamp: number): string {
 }
 
 /**
- * Human-readable byte size using decimal (SI) units — bytes, kB, MB, GB, TB.
- * Decimal, not binary (KiB), because the source is ClickHouse `byteSize(...)`
- * which reports raw byte totals and SI units read more naturally to users
- * ("1.4 MB"). Sub-kB renders as a plain integer ("512 B"); kB and up carry
- * one decimal place. A zero / negative / non-finite size reads as the em-dash
- * placeholder so an empty Size column matches the other numeric cells.
+ * Human-readable byte size using decimal (SI) units — bytes, kB, MB, GB, TB. Decimal,
+ * not binary (KiB), because the source is ClickHouse `byteSize(...)` which reports raw
+ * byte totals and SI units read more naturally to users ("1.4 MB").
  */
 const BYTE_UNITS = ["B", "kB", "MB", "GB", "TB"] as const;
 
@@ -198,12 +189,9 @@ export const STATUS_COLORS = {
 } as const;
 
 /**
- * Hash palette — deliberately conservative. Each entry is a Chakra colorPalette
- * name whose `.subtle`/`.muted`/`.emphasized` variants render legibly in BOTH
- * light and dark mode. Yellow is excluded because its low-contrast subtle tones
- * are easy to miss against light backgrounds; red is excluded because it carries
- * negative-state semantics elsewhere in the UI (status). Order is fixed so the
- * mapping is stable across deploys.
+ * Hash palette — deliberately conservative. Each entry is a Chakra colorPalette name
+ * whose `.subtle`/`.muted`/`.emphasized` variants render legibly in BOTH light and dark
+ * mode.
  */
 const HASH_COLOR_PALETTE = [
   "blue.solid",

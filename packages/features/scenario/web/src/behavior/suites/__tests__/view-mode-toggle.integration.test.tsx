@@ -1,11 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for list/grid view mode toggle.
- *
- * Tests the view toggle in RunHistoryFilters and the rendering
- * of scenario results in grid vs list mode within RunRow and GroupRow.
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/grid-view-and-borderless-tables.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -1,10 +1,7 @@
 /**
+ * A dataset row carries what the reviewers said about the trace, which includes the reviews left on one span rather than on the whole
+ * trace, and a new dataset's annotations column is filled from them without further setup.
  * @vitest-environment jsdom
- *
- * A dataset row carries what the reviewers said about the trace, which includes
- * the reviews left on one span rather than on the whole trace, and a new
- * dataset's annotations column is filled from them without further setup.
- * See specs/datasets/dataset-annotations-mapping.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, waitFor } from "@testing-library/react";

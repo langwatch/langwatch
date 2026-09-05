@@ -10,13 +10,8 @@ import type {
 import { api } from "../scenario-api";
 
 /**
- * Orchestrates the scenario run CSV export: dialog state, the streaming
- * download, and cancellation.
- *
- * The scope passed in is whatever the panel is currently showing — set,
- * scenario, pass/fail and date range — so the file always matches the list the
- * user was looking at when they clicked Export.
- *
+ * Orchestrates the scenario run CSV export: dialog state, the streaming download, and
+ * cancellation.
  * @see specs/scenarios/scenario-run-export.feature
  */
 export function useExportScenarioRuns({
@@ -46,10 +41,7 @@ export function useExportScenarioRuns({
     total: 0,
   });
   /**
-   * Set from the X-Export-Id response header once the stream starts. The
-   * server broadcasts progress over Redis rather than in the response body
-   * because the body is the file itself — it goes to disk, so the only way to
-   * report a count is out of band.
+   * Set from the X-Export-Id response header once the stream starts.
    */
   const [exportId, setExportId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -125,11 +117,6 @@ export function useExportScenarioRuns({
 
 /**
  * Relays the server's progress broadcasts into the counter.
- *
- * Its own hook because the count travels on a different transport from the
- * file: the response body IS the download and goes to disk, so the only way to
- * report how far along the sweep is, is out of band. Nothing else in the export
- * needs to know that.
  */
 function useExportProgressUpdates({
   projectId,
@@ -159,11 +146,6 @@ function useExportProgressUpdates({
 
 /**
  * The filters the panel is currently showing, as a request body.
- *
- * Absent filters are omitted rather than sent as `undefined`: the route parses
- * the body with a Zod schema, and an explicit `scenarioId: undefined` survives
- * `JSON.stringify` as a missing key anyway — so building it this way keeps the
- * wire format and the type in agreement instead of relying on that.
  */
 function buildExportRequest({
   projectId,
@@ -194,13 +176,8 @@ function buildExportRequest({
 }
 
 /**
- * Runs one export request to completion: POST, read the headers the server
- * answers with, then write the body to disk.
- *
- * Lives outside the hook so `startExport` reads as the state transition it is.
- * The two callbacks are the only things it needs from React — the progress
- * denominator the moment the server accepts, and the final count once the body
- * has been read.
+ * Runs one export request to completion: POST, read the headers the server answers
+ * with, then write the body to disk.
  */
 async function downloadExport({
   request,
@@ -232,13 +209,9 @@ async function downloadExport({
     const total = Number(response.headers.get("X-Total-Runs") ?? "0");
     onAccepted({ total, exportId: response.headers.get("X-Export-Id") });
 
-    // Nothing matched, so the file would be a header and no rows. Said before
-    // the download rather than after, because a spreadsheet with only a header
-    // reads as a broken export and the reason is not in the file.
-    //
-    // Keyed on the count the server reported, not on the size of what came
-    // back: the serializer always writes the header, so the body is never
-    // empty and a size check here would never fire.
+    // Nothing matched, so the file would be a header and no rows. Said before the
+    // download rather than after, because a spreadsheet with only a header reads as a
+    // broken export and the reason is not in the file.
     if (total === 0) {
       toaster.create({
         title: "Export produced no data",
@@ -266,14 +239,7 @@ async function downloadExport({
 }
 
 /**
- * The failure body the route sent, so the toast can say what actually went
- * wrong.
- *
- * `handleError` serializes a HandledError to `{ error: "<code>", ... }`, which
- * `showErrorToast` resolves to the registered copy — "Ask an admin for access"
- * rather than the status code. Returning the parsed body rather than an Error
- * is what keeps that path open; a body we cannot parse falls back to the status
- * so the toast still has something to show.
+ * The failure body the route sent, so the toast can say what actually went wrong.
  */
 async function readExportFailure(response: Response): Promise<unknown> {
   try {

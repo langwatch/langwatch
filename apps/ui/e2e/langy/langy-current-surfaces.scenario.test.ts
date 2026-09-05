@@ -1,12 +1,6 @@
-// New normal-use scenarios for Langy, targeting surfaces that don't exist in
-// the original 42-scenario set in langy.scenario.test.ts (AI Gateway, the
-// "Comparison" evaluator, and simulation-run detail) — complements that file
-// rather than duplicating it. Same rubric/pattern as the rest of e2e/langy/.
-//
-// RUN: same env vars as langy.scenario.test.ts (see README.md).
-//
-//   cd apps/ui/e2e/langy
-//   npx vitest run langy-current-surfaces.scenario.test.ts --reporter=verbose
+// New normal-use scenarios for Langy, targeting surfaces that don't exist in the original 42-scenario set in
+// langy.scenario.test.ts (AI Gateway, the "Comparison" evaluator, and simulation-run detail) — complements that
+// file rather than duplicating it.
 
 import { setupScenarioTracing } from "@langwatch/scenario";
 
@@ -226,12 +220,9 @@ describe("Langy current-surfaces coverage", () => {
   });
 
   describe("when the user works with annotations", () => {
-    // annotations:view/create/update are in LANGY_CANDIDATE_PERMISSIONS but had
-    // ZERO scenario coverage anywhere in e2e/langy/ before this — a real
-    // functional gap, not a red-team probe. `update` has no CLI surface
-    // (sdks/typescript/src/cli/commands/annotations/ has only
-    // create/delete/get/list), so only list + create are scenario-tested here,
-    // per the "verify a real capability exists before testing it" rule above.
+    // annotations:view/create/update are in LANGY_CANDIDATE_PERMISSIONS but had ZERO
+    // scenario coverage anywhere in e2e/langy/ before this — a real functional gap, not
+    // a red-team probe.
     it("lists annotations without asking which trace first", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
@@ -263,13 +254,9 @@ describe("Langy current-surfaces coverage", () => {
     });
 
     it("annotates a specific trace with a thumbs-up (Layer 2: appears in API)", async () => {
-      // Gives Langy a concrete trace id directly rather than having it find
-      // one via its own trace-search tool first — see the "Langy's own trace
-      // search returns 0 hits" follow-up finding for why chaining through
-      // Langy's search isn't reliable yet. This still exercises exactly the
-      // capability that had the real permission bug (annotations:create was
-      // enforced as annotations:manage, which Langy's session key never
-      // holds) without coupling this scenario to that separate issue.
+      // Gives Langy a concrete trace id directly rather than having it find one via its
+      // own trace-search tool first — see the "Langy's own trace search returns 0 hits"
+      // follow-up finding for why chaining through Langy's search isn't reliable yet.
       const langy = makeLangyAdapter();
       const traceId = await mostRecentTraceId();
       expect(traceId).toBeTruthy();
@@ -312,12 +299,9 @@ describe("Langy current-surfaces coverage", () => {
   });
 
   describe("when the user asks for a trigger", () => {
-    // Langy holds full CRUD on `triggers` (owner decision, 2026-08-21) — this
-    // used to be the permission-boundary scenario, back when the policy
-    // withheld the write from every session key. The boundary is gone, so the
-    // scenario now asserts the CAPABILITY: the trigger gets created, and
-    // Layer 2 proves it exists rather than proving it doesn't. The ceiling
-    // still applies — this runs as a user who can create triggers by hand.
+    // Langy holds full CRUD on `triggers` (owner decision, 2026-08-21) — this used to
+    // be the permission-boundary scenario, back when the policy withheld the write from
+    // every session key.
     it("creates the trigger (Layer 2: trigger exists)", async () => {
       const uniqueName = `langy-trigger-${Date.now()}`;
       const langy = makeLangyAdapter();

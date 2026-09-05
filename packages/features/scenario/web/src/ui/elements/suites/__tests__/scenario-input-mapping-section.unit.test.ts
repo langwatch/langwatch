@@ -1,10 +1,5 @@
 /**
  * Unit tests for isScenarioMappingValid — Issue #3412
- *
- * A valid input mapping alone is sufficient; output mapping is not required.
- * The function returns true whenever a source mapping wires to "input" or
- * "messages", and false (fail-closed) when no such mapping is present.
- *
  * @see specs/features/scenarios/minimal-input-mapping.feature
  */
 import { describe, expect, it } from "vitest";

@@ -2,16 +2,8 @@ import type { NumericMode } from "../../../../index";
 import type { RangeSectionData } from "../../../../behavior/explorer/filter-sidebar/types";
 
 /**
- * Pure resolution of numeric-facet presentation mode. Two small helpers
- * factored out of `useFilterSidebarData` so they can be unit-tested
- * without rendering the sidebar:
- *
- *   • `computeDiscreteEligible` — picks the range descriptors that carry
- *     a small enough bounded distinct set to render as a tick-list.
- *   • `resolveNumericModeByKey` — folds in the per-project user override
- *     (`override ?? "discrete"` — eligible facets default to Discrete).
- *
- * The hook re-implements neither: it calls these and renders the result.
+ * Pure resolution of numeric-facet presentation mode. Two small helpers factored out of
+ * `useFilterSidebarData` so they can be unit-tested without rendering the sidebar:
  */
 
 export function computeDiscreteEligible(params: {

@@ -1,12 +1,6 @@
 /**
+ * `useTraceListAnnotations` lays each row's reviews over it from their own read.
  * @vitest-environment jsdom
- *
- * `useTraceListAnnotations` lays each row's reviews over it from their own
- * read. Annotations live in another store than the rest of a row, so when the
- * list asks for them, and what a row shows before the answer arrives, is part
- * of the behaviour rather than an implementation detail.
- *
- * See specs/traces-v2/trace-list-annotations-column.feature.
  */
 
 import { renderHook } from "@testing-library/react";

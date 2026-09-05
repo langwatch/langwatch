@@ -3,15 +3,6 @@ import type { BuiltTree, Viewport } from "./types";
 
 /**
  * Keyboard navigation for the flame view.
- * Handles:
- *   Escape / 0 / Home — reset zoom or clear selection
- *   Enter            — zoom-fit the focused span
- *   Space            — select the focused span
- *   ArrowLeft/Right  — pan viewport (+ Shift) or move between siblings (focused span)
- *   ArrowUp/Down     — navigate to parent / first child
- *   +/= and -/_      — zoom in / out toward center
- *
- * Uses functional setState so the listener itself remains stable across renders.
  */
 export function useFlameKeyboard({
   containerRef,
@@ -85,13 +76,9 @@ export function useFlameKeyboard({
         }
         case "ArrowLeft":
         case "ArrowRight": {
-          // Only intercept Arrow keys when the user has actually engaged
-          // with the flame — either holding shift to pan the viewport, or
-          // navigating between sibling spans after focusing one. Without
-          // a focused span and no modifier, the drawer-level handler is
-          // the right consumer (prev/next trace in the conversation), and
-          // the previous unconditional `preventDefault()` here used to fight
-          // it depending on what had document focus.
+          // Only intercept Arrow keys when the user has actually engaged with the flame
+          // — either holding shift to pan the viewport, or navigating between sibling
+          // spans after focusing one.
           const direction = e.key === "ArrowLeft" ? -1 : 1;
           if (e.shiftKey) {
             e.preventDefault();

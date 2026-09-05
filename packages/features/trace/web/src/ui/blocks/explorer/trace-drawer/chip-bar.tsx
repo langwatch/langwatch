@@ -29,10 +29,9 @@ interface ChipBarProps {
 const DEFAULT_MAX_VISIBLE = 6;
 
 /**
- * Horizontal strip of Chip pills with consistent spacing and a graceful
- * overflow affordance. Drives the metadata strip above the drawer mode
- * switch — service, origin, scenario link, prompts, sdk, etc. all flow
- * through here.
+ * Horizontal strip of Chip pills with consistent spacing and a graceful overflow
+ * affordance. Drives the metadata strip above the drawer mode switch — service, origin,
+ * scenario link, prompts, sdk, etc. all flow through here.
  */
 export function ChipBar({ chips, maxVisible = DEFAULT_MAX_VISIBLE, endSlot }: ChipBarProps) {
   const { primary, overflowChip } = splitChipsForOverflow(chips, maxVisible);
@@ -53,13 +52,9 @@ export function ChipBar({ chips, maxVisible = DEFAULT_MAX_VISIBLE, endSlot }: Ch
 }
 
 /**
- * Lower-level helper exposing ChipBar's overflow logic so callers can
- * compose the primary chips inline with other content (e.g. metrics + pins
- * + chips in one wrapped strip) and still get the "+N more" affordance.
- *
- * Returns `primary` (chips to render in document order) and `overflowChip`
- * (a single ready-to-render `<Chip>` whose popover lists the dropped chips,
- * or `null` when nothing overflows).
+ * Lower-level helper exposing ChipBar's overflow logic so callers can compose the
+ * primary chips inline with other content (e.g. metrics + pins + chips in one wrapped
+ * strip) and still get the "+N more" affordance.
  */
 export function splitChipsForOverflow(
   chips: ChipDef[],

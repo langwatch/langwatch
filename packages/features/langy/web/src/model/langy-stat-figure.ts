@@ -1,11 +1,5 @@
 /**
  * Display rules for a derived `stats` item.
- *
- * The unit on a derived card is free text written by the model, so it arrives
- * as whatever word the model reached for. It reaches a card body that appends
- * it to the number, and "35" plus "percent" reads as "35percent". These rules
- * turn the word into the symbol a reader expects and decide whether the unit
- * hugs the number or stands off it.
  */
 
 /** Unit words with a canonical symbol that joins the number tightly. */
@@ -58,12 +52,9 @@ const SMALL_MAGNITUDE = 0.01;
 const SMALL_MAGNITUDE_SIGNIFICANT_DIGITS = 6;
 
 /**
- * A reading as a reader should see it. Small magnitudes keep significant
- * digits rather than decimal places, so they never read as zero; everything
- * else keeps the grouped, three-decimal drawing that suits a whole number.
- *
- * This is the one rule for drawing a number a reader sees on a card, shared
- * with the live turn metrics of `StreamingStatCard`.
+ * A reading as a reader should see it. Small magnitudes keep significant digits rather
+ * than decimal places, so they never read as zero; everything else keeps the grouped,
+ * three-decimal drawing that suits a whole number.
  */
 export const formatStatNumber = (value: number): string => {
   // `toLocaleString` keeps the sign of negative zero, so a reading of -0 would
@@ -91,14 +82,9 @@ export const formatStatFigure = ({
 };
 
 /**
- * Whether a set of items reads better as a bar comparison than as a row of
- * figures: two or more numeric readings on the same scale, which is the shape
- * an optimization report has (baseline against candidate). One reading has
- * nothing to compare against, and mixed units share no axis.
- *
- * The scale is the canonical unit, not the word: the model may write the same
- * unit two ways in one report ("percent" here, "pct" there), and a raw string
- * comparison would drop that report back to a row of figures.
+ * Whether a set of items reads better as a bar comparison than as a row of figures: two
+ * or more numeric readings on the same scale, which is the shape an optimization report
+ * has (baseline against candidate).
  */
 export const isComparableSeries = (
   items: readonly { value: string | number; unit?: string }[],

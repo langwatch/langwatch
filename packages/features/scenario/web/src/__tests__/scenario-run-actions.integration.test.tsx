@@ -1,10 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for ScenarioRunActions component.
- *
- * Tests the "Run again" button disabled state when a scenario has been archived.
- *
+ * @vitest-environment jsdom
  * @see specs/scenarios/scenario-deletion.feature - "Run again is blocked for archived scenarios"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -1,9 +1,5 @@
 /**
  * The scenarios of a project, and the rules that filter and summarise them.
- *
- * Everything here is pure, so the filtering and the aggregates can be read and
- * tested without a router or a query.
- *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
@@ -44,11 +40,6 @@ export const DEFAULT_SUITE_NAME = "Default";
 
 /**
  * The suites of the rail, with Default at the front.
- *
- * Default is an ordinary suite in every other way, so it is only moved and
- * never marked. Existing projects got theirs from the migration, which makes
- * it the newest row of the list rather than the first, and a person who
- * renames it has an ordinary suite that keeps its place in the list.
  */
 export function orderSuitesDefaultFirst(suites: TestSuiteEntry[]): TestSuiteEntry[] {
   const isDefault = (suite: TestSuiteEntry) => suite.name === DEFAULT_SUITE_NAME;

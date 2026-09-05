@@ -1,10 +1,5 @@
 /**
  * Asks for the name of a test suite, and nothing else.
- *
- * A suite is only a grouping: it carries no targets, no repeat count, no
- * simulation models and no evaluators, so naming it is the whole of editing
- * one. The same dialog creates one and renames one.
- *
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */

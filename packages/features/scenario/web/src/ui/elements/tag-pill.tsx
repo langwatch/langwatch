@@ -10,10 +10,8 @@ import { X } from "lucide-react";
 const StyledButton = chakra("button");
 
 /**
- * How a pill is coloured. `neutral` is one muted grey for every label.
- * `pastel` gives each label a colour of its own, so a row of labels can be
- * told apart at a glance. A pastel pill is drawn in the monospace face, which
- * is what tells a label from the words of the row it sits in.
+ * How a pill is coloured. `neutral` is one muted grey for every label. `pastel` gives
+ * each label a colour of its own, so a row of labels can be told apart at a glance.
  */
 export type TagPillTone = "neutral" | "pastel";
 
@@ -36,16 +34,7 @@ export function pastelHueForLabel(label: string): number {
 }
 
 /**
- * The colour of the dot that stands for a label where no pill is drawn, in the
- * label filter. One step stronger than the pill's ground, so a 10px dot still
- * carries its hue.
- */
-/**
- * The two colours of a pill, at one hue.
- *
- * Lightness and chroma are fixed and only the hue moves, so every label reads
- * at the same strength and the same contrast: a pale ground and text dark
- * enough to read on it. On a dark page the two swap roles.
+ * The colour of the dot that stands for a label where no pill is drawn, in the label filter.
  */
 export function pastelSwatchColor(label: string): string {
   return `oklch(0.62 0.14 ${pastelHueForLabel(label)})`;

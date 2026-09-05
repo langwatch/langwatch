@@ -4,12 +4,6 @@ import type { Transform } from "./types";
 
 /**
  * Point one evaluator input field at a source, for one dataset and one target.
- *
- * Evaluator mappings are three levels deep because every evaluator applies to
- * every target: the same evaluator grades target A's `output` and target B's,
- * and those two live in different columns. All three ids have to resolve: a
- * mapping filed under one that resolves to nothing is wiring a run can never
- * apply.
  */
 export const setEvaluatorMapping: Transform<
   SetEvaluatorMappingPayload,

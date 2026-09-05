@@ -2,16 +2,9 @@ import { useEffect } from "react";
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store";
 
 /**
- * Tags `<body>` with the current onboarding stage so global CSS rules
- * can react — specifically the drawer and sidebar glow that highlight
- * those targets while the corresponding stage is active. The drawer
- * is portaled to body, so a parent-scoped CSS selector can't reach it;
- * a body-level `data-traces-tour-stage` attribute is the simplest hook
- * a global stylesheet can match against.
- *
- * Renders nothing. Mounts only when `OnboardingHost` decides onboarding
- * is active, so users not in the journey never get the attribute on
- * their body element.
+ * Tags `<body>` with the current onboarding stage so global CSS rules can react —
+ * specifically the drawer and sidebar glow that highlight those targets while the
+ * corresponding stage is active.
  */
 export function BodyStageAttribute(): null {
   const stage = useOnboardingStore((s) => s.stage);

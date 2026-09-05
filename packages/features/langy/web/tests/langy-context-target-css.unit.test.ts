@@ -1,13 +1,7 @@
 /**
+ * The armed ring's colour is modulated by an animated REGISTERED custom property (`@property` + var() references inside keyframes).
  * Spec: specs/langy/langy-context-awareness.feature
  *   "Everything armed twinkles rather than pulsing in formation"
- *
- * The armed ring's colour is modulated by an animated REGISTERED custom
- * property (`@property` + var() references inside keyframes). Where that
- * animation doesn't run, the colour falls back to whatever the cascade says —
- * and it used to say `transparent`, so arming the page visibly did nothing.
- * These tests pin the fix: every lit state carries a static, visible baseline
- * colour of its own, independent of the animation.
  */
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";

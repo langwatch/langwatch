@@ -1,15 +1,6 @@
 /**
- * The name of the run, which follows what the dialog holds until the person
- * takes it over.
- *
- * The derived name is "<scope> <targets>", so a suite run against two agents
- * reads "Refunds dev-agent vs prod-agent". Typing a name, or picking one from
- * the dropdown, pins it and stops it following.
- *
- * A dialog opened on a stored run plan opens on the plan's own name, pinned
- * from the first render. The plan already answers to that name, and deriving
- * one again would append the target to a name that ends with it.
- *
+ * The name of the run, which follows what the dialog holds until the person takes it
+ * over.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -44,9 +35,6 @@ export function buildTargetLabels({
 
 /**
  * What the scope is called in the run name.
- *
- * An entry point that fixed the scope already knows the words for it, so it
- * hands them in. Only the New run plan entry point derives them from the rule.
  */
 export function scopeLabelOf({
   subject,
@@ -87,11 +75,6 @@ function testSuiteScopeLabel({
 
 /**
  * One hand-picked scenario reads by its own name; several read as a count.
- *
- * A run of one scenario is named after that scenario, always. A count in its
- * place says how many ran and never which, so "1 scenario dev-agent" names
- * every single-scenario run of that agent the same thing and they all resolve
- * onto one run plan.
  */
 function scenarioScopeLabel({
   scope,

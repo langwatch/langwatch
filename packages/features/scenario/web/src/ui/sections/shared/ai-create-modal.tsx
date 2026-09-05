@@ -435,11 +435,9 @@ function InspirationChips({
 }
 
 /**
-/**
- * Idle footer for the assistant path: the model hint on the left, the one warm
- * "Draft with {assistant}" action on the right — the same clean orange action
- * the inline `ScenarioAIGeneration` panel uses, so the two scenario-draft
- * surfaces read as one design.
+ * Idle footer for the assistant path: the model hint on the left, the one warm "Draft with {assistant}" action on
+ * the right — the same clean orange action the inline `ScenarioAIGeneration` panel uses, so the two
+ * scenario-draft surfaces read as one design.
  */
 function AssistFooter({
   onGenerate,
@@ -588,10 +586,7 @@ function IdleFooter({ onSkip, onGenerate, isGenerateDisabled, footerHint }: Idle
 }
 
 /**
- * The two-path chooser at the top of the assistant idle body. It makes the
- * choice structural — the assistant is one option, "build it myself" is a
- * first-class peer sitting right beside it — so the modal never implies the
- * assistant is the only way through.
+ * The two-path chooser at the top of the assistant idle body.
  */
 function StartModeToggle({
   mode,

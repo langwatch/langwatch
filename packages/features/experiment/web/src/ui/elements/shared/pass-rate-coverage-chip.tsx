@@ -4,11 +4,6 @@ import { passRateCoverage } from "../../../model/shared/pass-rate-coverage";
 
 /**
  * The row count that belongs beside a rate covering part of a dataset.
- *
- * Draws nothing when the rate covers every row, so a caller renders it
- * unconditionally and never has to repeat the completeness test. The workbench
- * header and the results page both use it, so a reader sees the same mark and
- * the same numbers whichever surface they are on.
  */
 export const PassRateCoverageChip = ({
   completedRows,

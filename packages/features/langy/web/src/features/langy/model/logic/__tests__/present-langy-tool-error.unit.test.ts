@@ -1,15 +1,5 @@
 /**
  * The copy a failed tool call turns into.
- *
- * Three failures drove this file. The first said only "This step couldn't be
- * completed" while the reason sat in raw JSON only a developer would find. The
- * second reported a PLAN LIMIT as a permissions problem, because the card keyed
- * off `httpStatus: 403` rather than off the code — sending the reader to check
- * their permissions when the truth was they had used 3 of the 3 scenarios their
- * plan includes. The third is the one this file guards hardest: a code the panel
- * has no copy for must still name itself, because a code nobody can read is a
- * support thread nobody can close.
- *
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A failure keeps its structure all the way to the card"
  */

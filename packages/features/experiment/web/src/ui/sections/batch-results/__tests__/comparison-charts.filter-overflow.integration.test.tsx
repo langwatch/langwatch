@@ -2,14 +2,8 @@ import "@testing-library/jest-dom/vitest";
 
 // @vitest-environment jsdom
 /**
- * Regression test for issue #4631: experiment comparison filter dropdowns
- * (Group by, Metrics) get clipped by overflow:hidden ancestors in
- * BatchEvaluationResults. Fix renders each dropdown body in a <Portal> so it
- * escapes ancestor clipping.
- *
- * Strategy: assert the dropdown DOM is rendered OUTSIDE the ComparisonCharts
- * subtree (i.e., portaled). jsdom does not compute layout, so we test the
- * structural property that guarantees no clipping rather than measuring pixels.
+ * Regression test for issue #4631: experiment comparison filter dropdowns (Group by,
+ * Metrics) get clipped by overflow:hidden ancestors in BatchEvaluationResults.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

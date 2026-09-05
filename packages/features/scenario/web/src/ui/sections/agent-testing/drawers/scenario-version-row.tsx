@@ -1,7 +1,5 @@
 /**
- * One version in the history of a scenario: who saved it, when, what changed,
- * and what it held.
- *
+ * One version in the history of a scenario: who saved it, when, what changed, and what it held.
  * @see specs/features/agent-testing/case-version-history.feature
  * @see specs/scenarios/scenario-version-restore.feature
  */

@@ -1,16 +1,5 @@
 /**
  * What a parameter line offers while it is typed.
- *
- * The line reads `name=value, name=value`. Before the "=" of a token the
- * field is in key mode and lists the declared parameters; after it the field
- * is in value mode and lists what the parameter accepts. The suggestions are
- * a help and not a gate: free text always commits, and the server refuses a
- * value it cannot accept when the run starts.
- *
- * Everything here is pure, so the rules can be read and tested on their own.
- * The token state machine is the one the traces search bar uses, with "=" and
- * "," as its separators.
- *
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 
@@ -65,10 +54,6 @@ export type ParameterFieldMode =
 
 /**
  * The suggestion state of a field, by what it edits.
- *
- * A name field is always in key mode over its whole text, and a value field
- * always in value mode for its row's name, so the list opens on focus and the
- * accepted entry replaces the whole text.
  */
 export function parameterFieldState({
   mode,
@@ -119,9 +104,6 @@ export type ParameterFieldError = {
 
 /**
  * Whether the pair `name=raw` is the one a refusal names.
- *
- * The refused value arrives typed, so the raw text matches it as it was
- * written or as its JSON form: "007" and "\"007\"" both spell the text "007".
  */
 function pairIsRefused({
   name,
@@ -269,11 +251,6 @@ export function parameterSuggestions({
 
 /**
  * The line after a row is accepted.
- *
- * A key replaces the token with `name=` and the list reopens on the values.
- * A value replaces the token with `name=value` and the list closes. The whole
- * token goes, up to the comma that ends it, so a caret in the middle of
- * `model=gp|t` leaves no "t" behind; a pair further along the line stays.
  */
 export function acceptParameterSuggestion({
   text,

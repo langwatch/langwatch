@@ -1,9 +1,5 @@
 /**
  * Which suites of a project are run plans.
- *
- * One rule serves the number beside the Results tab and the rows of the Test
- * Runs list, so the two can never disagree.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 

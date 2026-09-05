@@ -1,15 +1,5 @@
 /**
  * The product switcher, as this application answers it.
- *
- * `@langwatch/navigation-web` owns the control — which products the reader can
- * reach, what each one's home is, and the pitch line under each row. What
- * belongs here is the one thing the control cannot know: WHICH PRODUCT THE
- * CURRENT ADDRESS BELONGS TO. That is `resolveShellRoute`, the package's own
- * resolver, asked with the two scope facts this application already holds.
- *
- * The settings detour is not a product, and neither is an address the resolver
- * cannot place, so both render nothing rather than marking a product the reader
- * is not in.
  */
 
 import {

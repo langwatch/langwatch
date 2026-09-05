@@ -20,11 +20,6 @@ type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 /**
  * The one action the turn separator carries: opening the turn's trace where a
  * correction can be written.
- *
- * Everything said about a message is said on the message itself, so the
- * separator is left with the one thing that is about the turn rather than
- * about either side of it. Correcting a trace is what the annotation queue's
- * own Edit trace does, and it asks for the same permission here.
  */
 export function TurnEditTraceAction({
   traceId,
@@ -59,10 +54,6 @@ export function TurnEditTraceAction({
 
 /**
  * Whether this turn's trace is one the sitting at the queue counts.
- *
- * Annotating a turn counts it on its own, so the box is mostly a way to
- * disagree: to keep a trace the reviewer only read, or to drop one they
- * annotated and thought better of.
  */
 export function TurnSessionCheckbox({ traceId }: { traceId: string }) {
   const isMarked = useAnnotationQueueSessionStore((s) => isSessionMarked(s.marks, traceId));
@@ -93,10 +84,9 @@ interface TurnAnnotationBadgesProps {
 }
 
 /**
- * Compact inline indicators showing this turn already carries an annotation
- * and/or a suggested correction. Clicking the badge pops a small list of
- * who annotated; clicking an entry opens it in the edit popover. Replaces
- * the redundant inline panel that used to live below the bubbles.
+ * Compact inline indicators showing this turn already carries an annotation and/or a
+ * suggested correction. Clicking the badge pops a small list of who annotated; clicking
+ * an entry opens it in the edit popover.
  */
 export function TurnAnnotationBadges({
   traceId,
@@ -183,11 +173,6 @@ export function TurnAnnotationBadges({
 
 /**
  * One annotation in the badge's list, and the way into editing it.
- *
- * For a reviewer who may edit, the line itself is the button that opens the
- * correction popover: it anchors the form where the reviewer was reading, it
- * answers Enter and Space like any button, and closing hands the keyboard back
- * to it. For everyone else it is text.
  */
 function AnnotationListRow({
   annotation,

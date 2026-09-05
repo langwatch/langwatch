@@ -1,11 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for ExportProgress component.
- *
- * Tests that the progress indicator displays correct text, progress bar,
- * and cancel button during trace export.
- *
+ * @vitest-environment jsdom
  * @see specs/traces/trace-export.feature — "Streaming Download and Progress" section
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -1,10 +1,6 @@
 /**
  * @vitest-environment jsdom
  * @integration
- *
- * The trace-sample card's honesty rule: it shows a SAMPLE of matched traces
- * and says so, rather than letting the sample pass for the whole result.
- *
  * Spec: specs/langy/langy-trace-explorer-link.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

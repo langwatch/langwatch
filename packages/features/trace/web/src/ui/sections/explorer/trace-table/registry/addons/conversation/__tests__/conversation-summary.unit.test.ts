@@ -1,8 +1,7 @@
 /**
- * The expanded session summary reports the session's TRUE trace count (the
- * server rollup) while the turn list under it is a capped preview, so the
- * label has to say which of the two the rows below it are
- * (specs/traces-v2/sessions-lens.feature).
+ * The expanded session summary reports the session's TRUE trace count (the server
+ * rollup) while the turn list under it is a capped preview, so the label has to say
+ * which of the two the rows below it are (specs/traces-v2/sessions-lens.feature).
  */
 import { describe, expect, it } from "vitest";
 import type { TraceListItem } from "../../../../../types/trace";

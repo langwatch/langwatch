@@ -1,14 +1,6 @@
 /**
  * useResultsGrouping — shared discovery for "group by" surfaces in the
  * batch-evaluation-results view.
- *
- * Two callers, two sources:
- *  - ComparisonTable rows  → dataset-entry metadata (row.datasetEntry)
- *  - ComparisonCharts bars → target-column metadata (targetCol.metadata)
- *
- * The hook returns just the discovered keys. Selection state and URL
- * sync are owned by the callsite (see BatchEvaluationResults for the
- * dataset-entry/URL pairing).
  */
 
 import { useMemo } from "react";
@@ -88,10 +80,8 @@ function discoverDatasetEntryKeys(data: ComparisonRunData[]): string[] {
 }
 
 /**
- * Pick metadata keys from `targetColumn.metadata` that should appear as
- * generic Group-by options in the chart. Reserved keys ("model",
- * "prompt_id", "prompt", "version") are surfaced via their own
- * dedicated options upstream and are excluded here.
+ * Pick metadata keys from `targetColumn.metadata` that should appear as generic
+ * Group-by options in the chart.
  */
 function discoverTargetMetadataKeys(data: ComparisonRunData[]): string[] {
   const keys = new Set<string>();

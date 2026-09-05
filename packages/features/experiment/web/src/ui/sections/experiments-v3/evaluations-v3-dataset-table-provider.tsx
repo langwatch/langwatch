@@ -1,8 +1,7 @@
 /**
- * Adapter that backs the shared dataset table cells with the evaluations
- * workbench store. The cells (EditableCell, TableCell) only know the narrow
- * DatasetTableContext contract; this provider maps the workbench's zustand
- * state onto it.
+ * Adapter that backs the shared dataset table cells with the evaluations workbench
+ * store. The cells (EditableCell, TableCell) only know the narrow DatasetTableContext
+ * contract; this provider maps the workbench's zustand state onto it.
  */
 import type { PropsWithChildren } from "react";
 

@@ -1,11 +1,5 @@
 /**
  * TableSettingsMenu - "Run Options" popover menu for the workbench toolbar.
- *
- * Contains:
- * - Row height toggle (compact/fit)
- * - Concurrency control
- * - Automation: opens the "Run via API" dialog to run this evaluation from a
- *   pipeline
  */
 import { Box, Button, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { ListChevronsDownUp, ListChevronsUpDown, SlidersHorizontal, Terminal } from "lucide-react";

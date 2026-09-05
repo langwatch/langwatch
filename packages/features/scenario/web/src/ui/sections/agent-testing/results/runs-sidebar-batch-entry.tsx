@@ -1,6 +1,5 @@
 /**
  * One run of the plan in the runs rail, read from the rows the run produced.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/features/agent-testing/comparison-mode.feature
  */

@@ -1,27 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// The product journey lives in dev/tests/agentic-e2e now, and it signs up its
-// own account, so nothing here reads a hand-saved auth.json any more.
-/*
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-// import dotenv from 'dotenv';
-// import path from 'path';
-// dotenv.config({ path: path.resolve(__dirname, '.env') });
+// The product journey lives in dev/tests/agentic-e2e now, and it signs up its own
+// account, so nothing here reads a hand-saved auth.json any more.
 
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
   testDir: "./",
-  // Exclude the auth-regression subfolder from `pnpm test:e2e`. Those
-  // scripts are standalone `tsx` regression scripts, not
-  // `@playwright/test` specs — they need a running dev server plus an
-  // isolated Postgres and talk directly to Prisma for fixture setup.
-  // See `e2e/auth-regression/README.md`.
-  // The langy/ subfolder is a vitest scenario suite, not playwright —
-  // it's invoked manually per its README.
+  // Exclude the auth-regression subfolder from `pnpm test:e2e`.
   testIgnore: ["**/auth-regression/**", "**/langy/**"],
   /* Run tests in files in parallel */
   fullyParallel: false,

@@ -1,11 +1,4 @@
 /**
- * One entry of the runs rail: the name of the run, the note the person left
- * with it, how long ago it started and how it went.
- *
- * A run that is still going reads its progress instead of a pass rate it does
- * not have yet. A run against more than one target reads one rate per target
- * once it settled, so the rail already says which did better.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/features/agent-testing/comparison-mode.feature
  * @see specs/suites/run-notes.feature
@@ -49,13 +42,6 @@ export type RunsSidebarEntryProps = {
 
 /**
  * How a comparison went: one rate per target, "62% vs 81% · 2 targets".
- *
- * The dot before each rate is the colour of the target, which is what tells
- * the two rates apart; the rate itself reads in its own pass-rate colour, the
- * same scale as everywhere else on the surface.
- *
- * Colour alone would leave a rate unnamed for a reader who cannot see it, so
- * each rate carries the name of its target as accessible text.
  */
 function ComparisonResult({
   targetRates,
@@ -104,10 +90,6 @@ function EntryNote({ note, testId }: Pick<RunsSidebarEntryProps, "note" | "testI
 
 /**
  * How the run went: the dot and the percentage beside it.
- *
- * Both take their colour from {@link passRateColor}, the one scale the whole
- * surface reads, so a rate here cannot read green while the same rate reads
- * amber in the plan table.
  */
 function EntryResult({
   passRate,

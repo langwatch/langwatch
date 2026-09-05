@@ -1,26 +1,6 @@
 /**
+ * What `/settings/integrations` is actually behind, proved by mounting it under the real chrome.
  * @vitest-environment jsdom
- *
- * What `/settings/integrations` is actually behind, proved by mounting it
- * under the real chrome.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice
- * a loader that names the wrong grant — the failure that refuses a reader the
- * platform page admitted, or admits one it refused. So this file loads the real
- * loader, mounts what it hands back under a session that answers precisely, and
- * reads the result.
- *
- * THE GRANT IS `organization:manage`, one for one with the platform page's
- * `withPermissionGuard("organization:manage", { layoutComponent: SettingsLayout })`.
- * It is the administrator's grant on purpose: the spec lets any member LEARN
- * that a connection exists, but starting or removing an installation changes
- * what LangWatch can write to on the organization's repositories.
- *
- * THE CHROME IS `NavigationShell` NOW, MOUNTED HERE — see
- * `settings-family-page-policy.integration.test.tsx` for why: this
- * application's own settings layout, which drew a duplicate of
- * `NavigationShell`'s own sidebar, is deleted.
- *
  * Spec: specs/integrations/github-connection.feature
  */
 

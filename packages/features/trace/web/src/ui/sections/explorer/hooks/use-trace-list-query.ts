@@ -27,18 +27,8 @@ export interface TraceListQueryResult {
 }
 
 /**
- * Pure tRPC + mapping layer. The lens's saved filter is encoded into
- * `filterStore.queryText` when the lens is selected, so this hook only
- * has to forward queryText, sort, page, and time range — no per-lens
- * special-casing.
- *
- * Onboarding sample-data injection is delegated to `useSamplePreview`
- * from the onboarding module's public API. When the journey is active
- * that hook returns a fixture set; when it's not, this hook just runs
- * the real tRPC query like normal. We don't import any other onboarding
- * internals — `useSamplePreview` is the entire integration seam.
+ * Pure tRPC + mapping layer.
  */
-/** The `tracesV2.list` input for the current filter, sort and page state. */
 function traceListQueryInput({
   projectId,
   timeRange,

@@ -1,28 +1,5 @@
 /**
- * The `question` TOOL is the choices card (ADR-060 §6) — this module is the
- * bridge.
- *
- * The worker's agent asks the user something by calling its `question` tool:
- * the part arrives as `tool-question` (or `dynamic-tool` named `question`)
- * carrying `{ questions: [{ question, header, options: [{ label,
- * description }], multiple }] }` — and then waits. Nothing settles it from
- * the model's side, so the part sits at `input-available` forever. Rendered
- * as generic tool activity that read as a dead card stuck on "Question…"
- * (with the payload as raw JSON in developer mode) — a question the user
- * could see but never answer.
- *
- * The designed mechanism for "the decision belongs to the user" already
- * exists: the choices card, with its recorded-selection answer path. So the
- * tool part maps onto that contract — question → question, options →
- * options, `multiple` → `multiSelect` — and validates through the SAME
- * schema the relay stamps fenced blocks with (`parseLangyCardPart`), so a
- * malformed ask degrades exactly like a malformed block: it stays on the
- * honest raw-activity path instead of half-rendering.
- *
- * Pure and JSX-free: `MessageContent` renders the parts this yields through
- * the ordinary `LangyDerivedCardView` path, `langyChoicesTimeline` counts
- * them as questions so the lock state derives correctly, and
- * `LangyToolActivity` excludes the tool part from the activity spine.
+ * The `question` TOOL is the choices card (ADR-060 §6) — this module is the bridge.
  */
 import {
   type LangyCardPart,
@@ -96,11 +73,8 @@ function parseQuestions(input: unknown) {
 }
 
 /**
- * The stamped card parts a `question` tool call renders as — one choices
- * card per question it carries. Empty when the part is not a question tool,
- * its input is still streaming, or nothing in it survives the shared
- * contract's validation (the caller then leaves the part on the raw path,
- * where a broken payload belongs).
+ * The stamped card parts a `question` tool call renders as — one choices card per
+ * question it carries.
  */
 export function questionToolCardParts(part: unknown): LangyCardPart[] {
   const parsedPart = questionToolPartSchema.safeParse(part);

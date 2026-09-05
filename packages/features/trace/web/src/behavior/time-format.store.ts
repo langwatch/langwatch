@@ -12,16 +12,9 @@ interface TimeColumnSizing {
 }
 
 /**
- * Width the Time column needs for the active value format. Relative labels
- * ("3m", "now") sit comfortably in ~68px, but a full ISO 8601 stamp
- * (`2026-06-02T13:14:15.123Z`, 24 monospace chars) needs ~220px or it
- * clips. Toggling format from the column picker swaps these in so the
- * column tracks its content instead of staying frozen at the relative
- * width — matching the dedicated `timestamp` column's footprint when ISO.
- *
- * Applied as the column def's default/min: a user's manual resize (held in
- * `columnSizingStore`) still wins for the rendered width, but the bumped
- * `minSize` floors a stale narrow override so the stamp never clips in ISO.
+ * Width the Time column needs for the active value format. Relative labels ("3m",
+ * "now") sit comfortably in ~68px, but a full ISO 8601 stamp
+ * (`2026-06-02T13:14:15.123Z`, 24 monospace chars) needs ~220px or it clips.
  */
 export function timeColumnSizing(format: TimeColumnFormat): TimeColumnSizing {
   if (format === "iso") {
@@ -31,11 +24,8 @@ export function timeColumnSizing(format: TimeColumnFormat): TimeColumnSizing {
 }
 
 /**
- * How the Time column renders its value — compact relative ("3m") or
- * full ISO 8601 ("2026-06-02T13:14:15.123Z"). A personal display
- * preference (like density), not per-lens or per-URL, so it lives in its
- * own localStorage-backed store and follows the user across lens
- * switches. Switchable from the column picker's Time row.
+ * How the Time column renders its value — compact relative ("3m") or full ISO 8601
+ * ("2026-06-02T13:14:15.123Z").
  */
 function load(): TimeColumnFormat {
   if (typeof window === "undefined") {

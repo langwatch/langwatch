@@ -1,9 +1,6 @@
 /**
+ * The Events column.
  * @vitest-environment jsdom
- *
- * The Events column. A trace's events are OTel span events read back from
- * `stored_spans` per page, and a row collapses them by name: an agent turn
- * that retried a tool 237 times is one badge, not 237.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

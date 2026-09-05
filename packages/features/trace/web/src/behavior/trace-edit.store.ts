@@ -18,11 +18,7 @@ export type TraceOverlayView = "edited" | "original";
 type TraceMetadataEdits = NonNullable<TraceEditOverlayPatch["trace"]>["metadata"];
 
 /**
- * One edited input or output. The drawer only ever sees a rendered string, so
- * the text it was seeded from travels alongside the edited text: a value that
- * was never structured stays unstructured when it is encoded back into the
- * correction, instead of a typed number or object appearing where the trace
- * held prose.
+ * One edited input or output.
  */
 export interface SpanIODraft {
   text: string;
@@ -53,10 +49,8 @@ export interface SpanEditDraft {
 export type SpanDraftField = "name" | "type" | "input" | "output";
 
 /**
- * What the drawer should show for one span while it is being edited: the
- * correction already stored for it, with the reviewer's uncommitted changes on
- * top. Reading it rather than the captured span is what stops a second editing
- * session from quietly reverting the first one.
+ * What the drawer should show for one span while it is being edited: the correction
+ * already stored for it, with the reviewer's uncommitted changes on top.
  */
 export interface EffectiveSpanEdit {
   name?: string;
@@ -83,18 +77,16 @@ interface TraceEditState {
   traceInputDraft: SpanIODraft | null;
   traceOutputDraft: SpanIODraft | null;
   /**
-   * Per-key overrides on the trace's own metadata, in the bare keys the
-   * canonical trace metadata uses. A `null` value removes that key. Only the
-   * keys the reviewer touched travel, so a correction to one label never
-   * restates the rest of the map.
+   * Per-key overrides on the trace's own metadata, in the bare keys the canonical trace
+   * metadata uses. A `null` value removes that key. Only the keys the reviewer touched
+   * travel, so a correction to one label never restates the rest of the map.
    */
   traceMetadataDrafts: Record<string, unknown>;
   overlayView: TraceOverlayView;
   /**
-   * Something that wants to leave the trace (closing the drawer, opening
-   * another trace) and is waiting on the reviewer to say what happens to their
-   * unsaved work. Held rather than run so the confirmation and the action stay
-   * one decision.
+   * Something that wants to leave the trace (closing the drawer, opening another trace)
+   * and is waiting on the reviewer to say what happens to their unsaved work. Held
+   * rather than run so the confirmation and the action stay one decision.
    */
   pendingExit: (() => void) | null;
   /**
@@ -110,11 +102,9 @@ interface TraceEditState {
 
   startEditing: (params: { traceId: string; basePatch?: TraceEditOverlayPatch | null }) => void;
   /**
-   * Records the stored correction once the read for it lands. Editing can
-   * start before that read resolves (a link straight into edit mode), and this
-   * is what keeps the session layered on the correction instead of replacing
-   * it. Ignored once a baseline is set, so a refetch can never move the ground
-   * under an edit in progress.
+   * Records the stored correction once the read for it lands. Editing can start before
+   * that read resolves (a link straight into edit mode), and this is what keeps the
+   * session layered on the correction instead of replacing it.
    */
   adoptBasePatch: (params: { traceId: string; basePatch: TraceEditOverlayPatch }) => void;
   /**
@@ -222,11 +212,8 @@ function withSpanDraft(
 }
 
 /**
- * Moves every draft's attribute snapshot onto the correction that just became
- * the session's baseline. An attribute edited before the stored correction was
- * read froze the captured attributes as the record the overrides apply to, and
- * saving that record would drop whatever attributes the correction already
- * changed.
+ * Moves every draft's attribute snapshot onto the correction that just became the
+ * session's baseline.
  */
 function rebasedParams(
   drafts: Record<string, SpanEditDraft>,
@@ -265,11 +252,6 @@ function deepEqual(a: unknown, b: unknown): boolean {
 
 /**
  * Whether writing this value leaves the field saying what it already said.
- *
- * A value the trace recorded as text stays text, so a reviewer who retypes a
- * JSON document into it has changed nothing even though the editor hands back
- * a parsed structure; comparing the parsed baseline is what keeps that from
- * being stored as a correction.
  */
 function valuesAgree(baseline: unknown, value: unknown): boolean {
   if (deepEqual(baseline, value)) return true;
@@ -331,10 +313,7 @@ function parsedOrUndefined(text: string): unknown {
 }
 
 /**
- * Whether the reviewer's text still says what the field said before they
- * touched it. A captured JSON value is seeded into the editor formatted across
- * lines, so the comparison is on what the two texts parse to whenever both are
- * JSON; anything else compares as written.
+ * Whether the reviewer's text still says what the field said before they touched it.
  */
 function ioTextIsUnchanged({
   text,
@@ -424,11 +403,6 @@ const sessionActions = (set: SetTraceEditState) => ({
 
 /**
  * Editing the name, type, input and output of one span.
- *
- * Every setter drops its field when the reviewer has typed their way back to
- * what the field already said. Without that, changing a value and undoing it
- * leaves a draft that enables Save, stores a correction identical to what was
- * there, and marks the field as edited for good.
  */
 const spanFieldActions = (set: SetTraceEditState) => ({
   setSpanName: ({
@@ -600,11 +574,9 @@ function basePatchForSpan(
 }
 
 /**
- * What a field should read before this session touched it: the stored
- * correction's value if it has one, and nothing otherwise (the caller falls
- * back to the captured span). This is what an editor is seeded from and what
- * Reset returns to, so correcting a trace twice starts from the first
- * correction rather than from the raw capture.
+ * What a field should read before this session touched it: the stored correction's
+ * value if it has one, and nothing otherwise (the caller falls back to the captured
+ * span).
  */
 export function selectSpanEditBaseline({
   basePatch,
@@ -736,10 +708,9 @@ export function selectIsTraceEditDirty(state: TraceEditDraftState): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * A hint about what the baseline value was, for the shared encoder. Text that
- * never parsed as JSON was prose, so it is declared as text and stays text
- * however the reviewer rewrites it; anything else lets the encoder decide from
- * the new text.
+ * A hint about what the baseline value was, for the shared encoder. Text that never
+ * parsed as JSON was prose, so it is declared as text and stays text however the
+ * reviewer rewrites it; anything else lets the encoder decide from the new text.
  */
 function baselineShapeHint(baselineText: string | null): SpanInputOutput | null {
   if (baselineText === null) return null;
@@ -766,11 +737,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 /**
  * Where each attribute the reviewer sees lives inside the nested params object.
- * The attributes table shows one flat dotted key per leaf, so an edit to
- * `langwatch.params.region` has to land on `params.langwatch.params.region`
- * rather than on a new top-level key that only looks the same. Building the map
- * by walking the params exactly as the table flattens them keeps the two in
- * step even for a segment that itself contains a dot.
  */
 function attributePathsByFlatKey(
   params: Record<string, unknown>,
@@ -858,10 +824,9 @@ function mergeSpanPatch({
 }
 
 /**
- * Turns the stored correction plus this session's draft into the correction to
- * save. Text becomes a canonical captured value through the same encoder the
- * server uses, so the drawer and the suggestion flow agree on what a given
- * piece of text means.
+ * Turns the stored correction plus this session's draft into the correction to save.
+ * Text becomes a canonical captured value through the same encoder the server uses, so
+ * the drawer and the suggestion flow agree on what a given piece of text means.
  */
 export function buildTraceEditPatch(state: TraceEditDraftState): TraceEditOverlayPatch {
   const deletedSpanIds = mergeDeletedSpanIds(state);
@@ -920,10 +885,9 @@ function mergeSpanPatches({
 }
 
 /**
- * The trace's own corrected metadata, layered on whatever the stored correction
- * already changed. A stored clear is replaced once new keys are corrected: the
- * overlay says which keys change, and "clear everything except these" is not a
- * thing it can say.
+ * The trace's own corrected metadata, layered on whatever the stored correction already
+ * changed. A stored clear is replaced once new keys are corrected: the overlay says
+ * which keys change, and "clear everything except these" is not a thing it can say.
  */
 function mergeTraceMetadata(state: TraceEditDraftState): TraceMetadataEdits {
   const base = state.basePatch?.trace?.metadata;

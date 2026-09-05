@@ -1,16 +1,6 @@
 /**
- * The numbers the filters drive: a strip of totals and the pass rate over
- * time, all read from the same rows the table below lists.
- *
- * Hidden until the Charts control is used. The question comes first and the
- * answer second, so the page opens on the filters and the list rather than on
- * a wall of figures nobody asked for yet.
- *
- * Every total here states what it covers. A total that quietly leaves rows out
- * reads as the whole and is wrong by however much it dropped, which is the way
- * a cost total once under-reported this page fourfold while looking entirely
- * plausible.
- *
+ * The numbers the filters drive: a strip of totals and the pass rate over time, all
+ * read from the same rows the table below lists.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
@@ -143,9 +133,6 @@ function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
 
 /**
  * What a cost total covers, in words.
- *
- * Null when every row's cost is known, because then the total is the total and
- * a coverage line would only add doubt.
  */
 export function costCoverageNote(cost: AtomCost): string | null {
   if (cost.unknownAtoms === 0) return null;

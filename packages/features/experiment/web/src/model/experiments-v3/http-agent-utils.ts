@@ -1,9 +1,5 @@
 /**
  * HTTP Agent Utilities for Evaluations V3
- *
- * Provides functions for working with HTTP agent targets, including:
- * - Extracting input variables from body templates
- * - Building target configs from HTTP agent data
  */
 
 import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
@@ -15,14 +11,8 @@ import type { HttpConfig, TargetConfig } from "./types";
 
 /**
  * Extract variable names from an HTTP body template.
- * Variables are referenced using {{variableName}} mustache syntax.
- *
  * @param bodyTemplate - The body template string with mustache variables
  * @returns Array of unique variable names found in the template
- *
- * @example
- * extractVariablesFromBodyTemplate('{"thread_id": "{{thread_id}}", "messages": {{messages}}}')
- * // Returns: ["thread_id", "messages"]
  */
 export const extractVariablesFromBodyTemplate = (bodyTemplate: string | undefined): string[] => {
   if (!bodyTemplate) return [];
@@ -42,8 +32,6 @@ export const extractVariablesFromBodyTemplate = (bodyTemplate: string | undefine
 
 /**
  * Convert HttpComponentConfig (from optimization_studio) to HttpConfig (for experiments-v3).
- * These types are similar but HttpConfig is the Zod-validated version.
- *
  * @param config - The HTTP component config from optimization studio
  * @returns The HttpConfig for experiments-v3
  */
@@ -61,8 +49,6 @@ export const convertHttpComponentConfig = (config: HttpComponentConfig): HttpCon
 
 /**
  * Build inputs array from HTTP body template variables.
- * All extracted variables become string inputs.
- *
  * @param bodyTemplate - The body template with mustache variables
  * @returns Array of Field objects for the inputs
  */
@@ -76,8 +62,6 @@ export const buildInputsFromBodyTemplate = (bodyTemplate: string | undefined): F
 
 /**
  * Build a TargetConfig for an HTTP agent.
- * Extracts inputs from the body template automatically.
- *
  * @param params - Parameters for creating the HTTP agent target
  * @returns A TargetConfig ready to be added to the store
  */

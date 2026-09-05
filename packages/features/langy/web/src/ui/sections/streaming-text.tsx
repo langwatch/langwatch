@@ -9,10 +9,9 @@ const MotionSpan = motion.create(chakra.span);
 const WORD_STAGGER_S = 0.06;
 const MAX_BATCH_DELAY_S = 0.3;
 /**
- * A long streamed answer used to leave one Motion span alive per word. That
- * makes the active DOM and fiber tree grow with the answer, then reconciles the
- * whole thing every token batch. Keep the visible reveal, but only for the
- * recent tail; settled prose is one normal text node.
+ * A long streamed answer used to leave one Motion span alive per word. That makes the
+ * active DOM and fiber tree grow with the answer, then reconciles the whole thing every
+ * token batch.
  */
 const MAX_ANIMATED_WORDS = 48;
 const REVEAL_SPRING = {
@@ -23,14 +22,9 @@ const REVEAL_SPRING = {
 };
 
 /**
- * Streams the live turn's tokens with a blur-to-clear WORD reveal: each newly
- * arrived word transitions from blurred to sharp with a slight upward drift,
- * on a spring, staggered ~60ms across words that land in the same batch. Only
- * NEW words animate — previously settled words never re-animate as the text
- * grows (append-only streaming), because their motion element stays mounted.
- *
- * Respects `prefers-reduced-motion`: reduced-motion users get the plain text
- * with no blur/drift.
+ * Streams the live turn's tokens with a blur-to-clear WORD reveal: each newly arrived
+ * word transitions from blurred to sharp with a slight upward drift, on a spring,
+ * staggered ~60ms across words that land in the same batch.
  */
 export function StreamingText({ text }: { text: string }) {
   const reduce = useReducedMotion();
@@ -88,11 +82,8 @@ export function StreamingText({ text }: { text: string }) {
 }
 
 /**
- * Split text into word segments, each carrying its trailing SAME-LINE
- * whitespace so `inline-block` spans don't collapse spacing. Whitespace runs
- * containing a newline are their own tokens — they must render outside the
- * inline-block spans (see the render above). Append-only, so index keys are
- * stable across streamed growth.
+ * Split text into word segments, each carrying its trailing SAME-LINE whitespace so
+ * `inline-block` spans don't collapse spacing.
  */
 function splitWords(text: string): string[] {
   const matches = text.match(/[^\S\n]*\n\s*|\S+[^\S\n]*|[^\S\n]+/g);

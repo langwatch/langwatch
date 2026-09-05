@@ -1,24 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * What each automations address is actually behind, proved by mounting it.
- *
- * `automations-routes.unit.test.ts` pins which tab each key shows;
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering. Neither would notice
- * a loader that names the wrong grant — which is the failure that refuses a
- * reader the platform page admitted, or admits one it refused. So this file
- * loads the real loaders, mounts what they hand back under a session that
- * answers precisely, and reads the result.
- *
- * The screen itself is faked, and so is the transport the host provider reads
- * the organization graph over. What is under test is the policy the frontend
- * feature wraps the screen in, and loading a thousand lines of Chakra over a
- * live tRPC client to assert a refusal would test the screen instead.
- *
- * `triggers:view` is the platform page's own grant, carried over one for one
- * from `withPermissionGuard("triggers:view")`. It is not a flag: this family
- * released long ago and the platform page was behind none.
- *
+ * @vitest-environment jsdom
  * Spec: specs/automations/authoring-drawer.feature
  */
 

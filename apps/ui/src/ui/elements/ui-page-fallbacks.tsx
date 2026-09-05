@@ -1,19 +1,5 @@
 /**
  * What a routed page shows instead of itself.
- *
- * The three answers `withUiPageGuard` can give — still asking, not here, not
- * yours — as three small components every frontend feature can pass it. They
- * live in the global layer rather than in a feature because the guard is
- * shared, and a family that wants its own look passes its own.
- *
- * DELIBERATELY PLAIN, and worth saying why. `platform/app` answers the same
- * three states with a full-viewport logo screen (`LoadingScreen`), a 486-line
- * canvas scene over a 439-line renderer (`NotFoundScene`) and a permission
- * alert that reads its copy out of the client presentation registry
- * (`PermissionAlert`). None of the three can move as it stands: the scene reads
- * `process.env`, which browser UI may not, and the alert's words come from a
- * ~90-entry registry whose harvest is its own slice. These say the same thing
- * with the same tone until those land.
  */
 
 import { Box, Center, Heading, HStack, Spinner, Stack, Text } from "@chakra-ui/react";

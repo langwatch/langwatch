@@ -1,11 +1,5 @@
 /**
  * A pass rate as a plain coloured percentage.
- *
- * Not a pill. Every grouping of the Results tab states its result the same
- * way, and a boxed pill repeated down a column read as clutter: the cost and
- * the duration it also carried belong to the run itself, where a total is a
- * total rather than a sum of whatever happened to load.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

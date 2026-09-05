@@ -25,10 +25,9 @@ export function buildSpanTree(spans: SpanTreeNode[]): Record<string, SpanWithChi
 }
 
 /**
- * Coerces an arbitrary string into a Mermaid-safe identifier. Strips
- * everything outside `[A-Za-z0-9]` to underscores, trims leading/trailing
- * underscores, and prefixes a leading digit with `n_` so the result is a
- * valid Mermaid node id.
+ * Coerces an arbitrary string into a Mermaid-safe identifier. Strips everything outside
+ * `[A-Za-z0-9]` to underscores, trims leading/trailing underscores, and prefixes a
+ * leading digit with `n_` so the result is a valid Mermaid node id.
  */
 export function sanitiseMermaidId(raw: string): string {
   const cleaned = raw.replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "");

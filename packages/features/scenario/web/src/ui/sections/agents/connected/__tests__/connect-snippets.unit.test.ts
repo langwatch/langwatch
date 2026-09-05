@@ -1,10 +1,5 @@
 /**
  * The snippets a person copies out of the connect panel.
- *
- * An agent name is any text of up to 64 characters, so these check that a
- * name never escapes the string literal it sits in, and that the declaration
- * the snippet writes is one the language accepts.
- *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 

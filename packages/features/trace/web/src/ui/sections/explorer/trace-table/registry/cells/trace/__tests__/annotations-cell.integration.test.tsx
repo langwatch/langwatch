@@ -1,11 +1,6 @@
 /**
+ * The Annotations column.
  * @vitest-environment jsdom
- *
- * The Annotations column. A trace's reviews live in their own store, so the
- * cell reads what the list laid over the row: a count per kind of thing a
- * reviewer leaves behind, and an honest answer while it has none.
- *
- * See specs/traces-v2/trace-list-annotations-column.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -1,12 +1,6 @@
 /**
- * Langy's prompt names the trace origins it may pass to `--origin`, and that
- * list has to match the ones the platform actually stamps.
- *
- * A wrong name here does not fail: `parseOriginOption` forwards the string
- * unvalidated ("origins are free-form strings on the platform"), so an origin
- * Langy has never heard of returns zero rows and reads like a correct empty
- * answer. Every "what has my agent been up to?" question rides on this list,
- * which is why it is pinned to the product rather than maintained by hand.
+ * Langy's prompt names the trace origins it may pass to `--origin`, and that list has
+ * to match the ones the platform actually stamps.
  */
 import fs from "fs";
 import path from "path";
@@ -22,10 +16,8 @@ const promptPath = path.resolve(
 
 /**
  * `langy` is stamped by the relay and has its own precedence rule in
- * `trace-origin.service.ts`, but has no row in `ORIGIN_DISPLAY` yet, so it
- * renders in the Trace Explorer as a raw lowercase label with a hash-rotated
- * colour. Adding that row is a Trace Explorer change with a palette decision
- * attached; until then it is named here so this check still covers it.
+ * `trace-origin.service.ts`, but has no row in `ORIGIN_DISPLAY` yet, so it renders in
+ * the Trace Explorer as a raw lowercase label with a hash-rotated colour.
  */
 const STAMPED_ONLY_ORIGINS = ["langy"];
 

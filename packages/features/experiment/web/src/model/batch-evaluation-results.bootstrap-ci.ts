@@ -1,10 +1,6 @@
 /**
- * Percentile CI for mean cost or duration. Per-row cost is right-skewed and
- * bounded at zero, so a normal interval is misleading at these sample sizes.
- *
- * Quality uses the same bootstrap method: chart axes must express the same
- * quantity. This is not an IQR, which describes row spread rather than
- * uncertainty in the mean.
+ * Percentile CI for mean cost or duration. Per-row cost is right-skewed and bounded at
+ * zero, so a normal interval is misleading at these sample sizes.
  */
 
 import { mulberry32 } from "./random.mulberry32";

@@ -13,11 +13,9 @@ interface LatencyBarProps {
 }
 
 /**
- * Inline latency bar — scaled to the visible page's p95 instead of
- * its `max(...)`. Rows >= p95 cap the bar at full width and switch to
- * red so tail-latency outliers visually pop instead of being hidden by
- * a single bigger outlier compressing the whole column. Shared by the
- * Duration and TTFT columns, each scaling against its own p95.
+ * Inline latency bar — scaled to the visible page's p95 instead of its `max(...)`. Rows
+ * >= p95 cap the bar at full width and switch to red so tail-latency outliers visually
+ * pop instead of being hidden by a single bigger outlier compressing the whole column.
  */
 function LatencyBar({ valueMs, p95Ms, hasStats, width, height }: LatencyBarProps) {
   const ratio = hasStats && valueMs > 0 ? valueMs / p95Ms : null;
@@ -57,10 +55,8 @@ export interface LatencyCellContentProps {
 }
 
 /**
- * Renders the latency value (the read at a glance), the inline bar,
- * and a tooltip that hovers over BOTH (wraps the VStack). Phrasing
- * the comparison as a percentage of p95 reads more naturally than the
- * raw multiplier — "30% of the page's p95" beats "0.3× p95".
+ * Renders the latency value (the read at a glance), the inline bar, and a tooltip that
+ * hovers over BOTH (wraps the VStack).
  */
 export function LatencyCellContent({
   valueMs,

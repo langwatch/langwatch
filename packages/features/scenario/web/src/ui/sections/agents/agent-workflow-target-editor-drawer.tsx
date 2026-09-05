@@ -35,13 +35,6 @@ export type AgentWorkflowTargetEditorDrawerProps = {
 
 /**
  * Drawer for a workflow-type agent target in the Experiments Workbench.
- *
- * A workflow-type agent has no code of its own to edit inline — it's a
- * pointer to a Studio workflow, and a full graph editor can't be edited
- * meaningfully inside a narrow sidebar. So this drawer shows the linked
- * workflow as a card with a link to open the real editor in a new tab, and
- * below it, the mapping UI that every other agent target type already gets
- * (dataset columns -> the workflow's real input fields).
  */
 export function AgentWorkflowTargetEditorDrawer(props: AgentWorkflowTargetEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
@@ -108,13 +101,9 @@ export function AgentWorkflowTargetEditorDrawer(props: AgentWorkflowTargetEditor
                 <Field.Root>
                   <Field.Label>Workflow</Field.Label>
                   {editorHref ? (
-                    // isExternal renders a plain anchor directly, not
-                    // composed through the app router's client-side Link:
-                    // target="_blank" is always a hard navigation into a
-                    // new tab regardless, and composing through NextLink
-                    // previously swallowed data-testid — Chakra's asChild
-                    // slot only forwards style-related props to the
-                    // composed child, not arbitrary data attributes.
+                    // isExternal renders a plain anchor directly, not composed through the app router's client-side Link: target="_blank" is always
+                    // a hard navigation into a new tab regardless, and composing through NextLink previously swallowed data-testid — Chakra's
+                    // asChild slot only forwards style-related props to the composed child, not arbitrary data attributes.
                     <Link href={editorHref} isExternal data-testid="open-workflow-link">
                       <WorkflowCardDisplay
                         name={workflowQuery.data.name}

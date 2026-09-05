@@ -4,12 +4,6 @@ import { api } from "../../../../behavior/langy-api";
 
 /**
  * Write commands for Langy conversations, through the defined tRPC API.
- *
- * The whole Langy conversation surface — the `langy.list` / `langy.messages`
- * reads AND this delete — goes through one tRPC router (never an ad-hoc client
- * `fetch`). `remove` calls `langy.deleteConversation`, which dispatches the
- * event-sourced archive command server-side, then invalidates the React Query
- * list cache so the recents list drops the row without a bespoke local edit.
  */
 export function useLangyConversationCommands(): {
   remove: (id: string) => Promise<void>;

@@ -4,13 +4,9 @@ import { computeBTLeaderboard } from "@langwatch/experiment-web";
 import { comparabilityOf, computeComparability } from "@langwatch/experiment-web";
 
 /**
+ * These pin the two shapes that defeated the old per-variant guard.
  * @see specs/experiments/comparison-leaderboard.feature
  *   "A ranking the run cannot justify is refused, not rounded off"
- *
- * These pin the two shapes that defeated the old per-variant guard. Both were
- * found by auditing the solver against Ford (1957): the previous check asked
- * whether any single variant had zero wins or zero losses, which is necessary
- * for the MLE to exist but not sufficient.
  */
 
 const wins = (winner: string, loser: string, times: number) =>

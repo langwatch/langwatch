@@ -1,19 +1,8 @@
 import type { StageId } from "./onboarding-journey-config";
 
 /**
- * Chapter is the user-facing grouping of the journey — six stops on
- * a narrative arc. Each chapter contains 1+ stages. The journey
- * itself runs on `StageId`s (the small machine), but consumers that
- * want to talk to the user about *progress* (BeadStrip, returning-
- * user hub) should think in chapters.
- *
- * Arc per the §14 design discussion (drawer-as-finale):
- *
- *   welcome → density → slice → arrivals → drawer → outro
- *
- * Cosmetic → structural → temporal → diagnostic → close. Reads like
- * a sentence: greet, match prefs, teach filtering, watch data land,
- * dig into one trace, wrap up.
+ * Chapter is the user-facing grouping of the journey — six stops on a narrative arc.
+ * Each chapter contains 1+ stages.
  */
 export type ChapterId = "welcome" | "density" | "slice" | "arrivals" | "drawer" | "outro";
 
@@ -30,10 +19,9 @@ export interface Chapter {
 }
 
 /**
- * The canonical chapter order. Index in this array doubles as the
- * "you are here" position for the BeadStrip. Order matches the
- * current stage order — see the file header for the planned
- * reorder.
+ * The canonical chapter order. Index in this array doubles as the "you are here"
+ * position for the BeadStrip. Order matches the current stage order — see the file
+ * header for the planned reorder.
  */
 export const CHAPTERS: Chapter[] = [
   { id: "welcome", label: "Welcome", hint: "Meet the trace explorer." },

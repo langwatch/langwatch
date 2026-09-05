@@ -17,10 +17,6 @@ export type StreamingEventPayload = CompactStreamingEvent;
 
 /**
  * Manages optimistic streaming state from SSE events.
- *
- * Uses a mutable store + useSyncExternalStore so rapid CONTENT deltas
- * are batched into a single render per animation frame instead of
- * triggering a React re-render on every token.
  */
 export function useSimulationStreamingState(scenarioRunId?: string) {
   const storeRef = useRef(createStreamingStore());

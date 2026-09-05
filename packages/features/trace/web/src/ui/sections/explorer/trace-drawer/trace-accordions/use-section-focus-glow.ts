@@ -3,24 +3,6 @@ import { useFocusSectionStore } from "../../../../../index";
 
 /**
  * Wires an accordion stack to the cross-component focus pipeline:
- *
- *   1. Subscribes to `useFocusSectionStore.pending`.
- *   2. When a request matches `traceId` AND the requested section is
- *      one this stack renders, expands the section, scrolls it into
- *      view, then publishes a `glow` payload that the caller renders
- *      via `<SectionFocusGlow>`.
- *
- * Returning the glow payload (instead of mounting the overlay here)
- * lets the caller control where the overlay lives in the JSX tree —
- * the summary accordions render their own overlay sibling, and the
- * span-detail accordions render theirs. The hook is the brain; the
- * overlay is the visual.
- */
-/**
- * Watches `root` for the glow target section to appear in the DOM (it may
- * not be mounted yet — e.g. the span tab just switched and the detail
- * skeleton is still showing), retrying `tryScrollAndGlow` on every mutation
- * until it succeeds or a 5s bail timer runs out.
  */
 function watchForSectionAndGlow(
   root: HTMLElement,

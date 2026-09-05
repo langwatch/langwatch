@@ -22,24 +22,14 @@ export function useTraceHeaderCanonical() {
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
   const backfillOccurredAtMs = useDrawerStore((s) => s.backfillOccurredAtMs);
-  // SSE-aware polling: when `useTraceFreshness` has an active
-  // subscription, `trace_summary_updated` events invalidate this query
-  // push-style and any timer is redundant. The prompt-pending fallback
-  // still runs regardless — it's not an SSE-covered transition (the
-  // prompt aggregator writes asynchronously and doesn't broadcast a
-  // trace-updated event when only the `lastUsedPromptId` slot fills in).
+  // SSE-aware polling: when `useTraceFreshness` has an active subscription,
+  // `trace_summary_updated` events invalidate this query push-style and any timer is
+  // redundant.
   const sseConnected = useSseStatusStore((s) => s.sseConnectionState === "connected");
 
-  // Treat the URL hint as our liveness signal. When the trace started
-  // within the last 3 min and SSE is OFF, set a 10s refetch interval so
-  // newly arrived spans show up without a manual refresh. Once the
-  // trace is older than the window, the interval falls away and the
-  // query goes back to its normal staleTime caching behaviour.
-  // full: true — this is the drawer's own detail read; it's the one caller
-  // of tracesV2.header that actually shows/exports untruncated input/output
-  // (see buildTraceMarkdown), so it's worth the extra spans read full
-  // resolution costs. Every other header caller (peek, name lookups, bulk
-  // hydrators, sibling prefetch) passes false.
+  // Treat the URL hint as our liveness signal. When the trace started within the last 3
+  // min and SSE is OFF, set a 10s refetch interval so newly arrived spans show up
+  // without a manual refresh.
   const query = api.tracesV2.header.useQuery(
     { ...queryArgs, full: true },
     {
@@ -63,17 +53,9 @@ export function useTraceHeaderCanonical() {
     },
   );
 
-  // When the drawer opened without a partition hint (deep link / refresh
-  // whose URL carried no `t`), the header itself runs an unconstrained
-  // by-id scan — but its result carries the trace's real timestamp. Feed
-  // that back into the store so the drawer's *other* per-trace reads
-  // (span tree, events, signals) and any header refetch prune partitions
-  // instead of cold-scanning `stored_spans` on S3. No-op when a hint was
-  // already present, so a correct opener-supplied value is never lost.
-  // Guard against `placeholderData: keepPreviousData`: on a trace switch the previous
-  // trace's header lingers in `query.data` until the new fetch lands, so
-  // only trust the timestamp when it belongs to the trace we're asking
-  // about — otherwise we'd backfill trace A's time onto trace B.
+  // When the drawer opened without a partition hint (deep link / refresh whose URL
+  // carried no `t`), the header itself runs an unconstrained by-id scan — but its
+  // result carries the trace's real timestamp.
   const resolvedTimestamp =
     query.data?.traceId === queryArgs.traceId ? query.data.timestamp : undefined;
   useEffect(() => {
@@ -87,11 +69,8 @@ export function useTraceHeaderCanonical() {
 }
 
 /**
- * The trace header as the reader sees it: corrected when a correction applies,
- * captured otherwise. The trace's own input and output move, and so does the
- * span count once the caller hands over the captured spans, so the header
- * agrees with the waterfall underneath it. Durations and cost describe the run
- * rather than the corrected content, and never move.
+ * The trace header as the reader sees it: corrected when a correction applies, captured
+ * otherwise.
  */
 export function useTraceHeader({
   spans,

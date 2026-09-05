@@ -15,12 +15,7 @@ const SSE_STATE_STYLE: Record<ConnectionState, { dotColor: string; pulse: boolea
   disconnected: { dotColor: "red.solid", pulse: false },
 };
 
-// Module-level keyframes via @emotion/react. The previous setup nested
-// `@keyframes` inside Chakra's `css` prop which didn't get hoisted into
-// a global stylesheet — the rule existed but the animation never had a
-// `@keyframes` block to reference, so the icon stayed still. Defining
-// it through `keyframes` emits a real, named animation that Emotion
-// guarantees is in the stylesheet before the `animation` rule runs.
+// Module-level keyframes via @emotion/react.
 const refreshSpin = keyframes`
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -49,13 +44,9 @@ export const LiveIndicator: React.FC = () => {
   // instead of letting the user wonder why nothing happened.
   const isSamplePreview = usePreviewTracesActive();
 
-  // In `ask` mode the dot is solid blue: SSE is on (so we know new rows
-  // exist) but the user is in charge of when to pull them in. In `live`
-  // mode the dot reflects the SSE connection state — green pulse when
-  // connected. `paused` reuses the connection style (which goes red /
-  // disconnected by definition). The "N new" affordance reuses the
-  // existing floating pill (`NewTracesScrollUpIndicator`) — there is
-  // exactly one "new rows available" surface across both modes.
+  // In `ask` mode the dot is solid blue: SSE is on (so we know new rows exist) but the
+  // user is in charge of when to pull them in. In `live` mode the dot reflects the SSE
+  // connection state — green pulse when connected.
   const dotStyle =
     liveUpdatesMode === "ask"
       ? { dotColor: "blue.solid", pulse: false }
@@ -107,24 +98,16 @@ export const LiveIndicator: React.FC = () => {
         <IconButton
           aria-label="Refresh traces"
           variant={isRefreshing ? "subtle" : "ghost"}
-          // Blue while the fetch is in flight so the operator gets
-          // both motion (the spinning icon) and a colour change as
-          // feedback that their click took effect. Stays on for the
-          // full duration of the fetch — `isRefreshing` is sourced
-          // from React-Query's in-flight count, not a fixed timer,
-          // so it doesn't clear mid-load on slow projects.
+          // Blue while the fetch is in flight so the operator gets both motion (the
+          // spinning icon) and a colour change as feedback that their click took
+          // effect.
           colorPalette={isRefreshing ? "blue" : undefined}
           size="xs"
           onClick={refresh}
           disabled={isSamplePreview}
-          // We don't actually disable the button during a normal fetch
-          // — `useTraceListRefresh` debounces internally and cancels
-          // prior in-flight calls, so a mid-fetch click is a no-op
-          // that costs nothing, and disabling would kill the
-          // affordance for someone who *wants* to re-kick a stalled
-          // fetch. Sample-preview is the exception: there's literally
-          // nothing on the server to refresh, so clicking would just
-          // flash the spinner for no reason. The tooltip explains.
+          // We don't actually disable the button during a normal fetch — `useTraceListRefresh` debounces
+          // internally and cancels prior in-flight calls, so a mid-fetch click is a no-op that costs nothing,
+          // and disabling would kill the affordance for someone who *wants* to re-kick a stalled fetch.
           css={isRefreshing ? REFRESH_SPIN_CSS : undefined}
         >
           <RefreshCw size={12} />

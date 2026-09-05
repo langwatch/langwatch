@@ -5,10 +5,9 @@ import type { ParsedTurn } from "../types";
 import { buildConversationMarkdownChunks } from "../utils";
 
 /**
- * The conversation Markdown export must emit a `[Redacted]` sentinel for
- * turns the server has nulled — otherwise a pasted transcript looks like
- * the turn never happened, which is misleading for whoever's reading it
- * later (compliance reviewer, support ticket, audit trail).
+ * The conversation Markdown export must emit a `[Redacted]` sentinel for turns the server has nulled — otherwise
+ * a pasted transcript looks like the turn never happened, which is misleading for whoever's reading it later
+ * (compliance reviewer, support ticket, audit trail).
  */
 
 const trace = (overrides: Partial<TraceListItem> = {}): TraceListItem => ({

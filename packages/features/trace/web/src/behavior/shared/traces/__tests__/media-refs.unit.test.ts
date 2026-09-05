@@ -1,9 +1,7 @@
 /**
+ * Unit tests for the compact trace-level media refs (specs/traces-v2/media-rendering.feature — the trace list and
+ * drawer summary render from fold-derived refs, not from span payloads).
  * @vitest-environment node
- *
- * Unit tests for the compact trace-level media refs
- * (specs/traces-v2/media-rendering.feature — the trace list and drawer
- * summary render from fold-derived refs, not from span payloads).
  */
 import { describe, expect, it } from "vitest";
 import {

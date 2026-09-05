@@ -1,11 +1,5 @@
 /**
  * Opens one run of a run plan from the Scenarios tab.
- *
- * The Scenarios tab holds no plan of its own, so it names both the plan and
- * the run in one push rather than pushing the plan and then the run. The push
- * is shallow, the way every move inside Agent Testing is, so the page keeps
- * its live-run subscription and a run that is still going keeps streaming.
- *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/page-structure.feature
  */

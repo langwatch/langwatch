@@ -4,10 +4,9 @@ import { api } from "../../trace-api";
 import { useDrawerStore } from "../../../../index";
 
 /**
- * Returns a callback that prefetches span detail for a given span id under
- * the currently-open trace. Wire it up to onMouseEnter/onFocus on span rows
- * (waterfall, span list, span tabs) so detail is already cached by the time
- * the user clicks.
+ * Returns a callback that prefetches span detail for a given span id under the
+ * currently-open trace. Wire it up to onMouseEnter/onFocus on span rows (waterfall,
+ * span list, span tabs) so detail is already cached by the time the user clicks.
  */
 export function usePrefetchSpanDetail() {
   const { project } = useOrganizationTeamProject();

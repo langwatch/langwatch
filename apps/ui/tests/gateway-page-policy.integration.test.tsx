@@ -1,20 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * What each gateway address is actually behind, proved by mounting it.
- *
- * `gateway-routes.unit.test.ts` pins which key each screen answers;
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering. Neither would notice
- * a loader that names the wrong grant, or one that forgot the section flag —
- * which is the failure that opens an unreleased page or refuses a reader the
- * platform page admitted. So this file loads the real loaders, mounts what they
- * hand back under a session that answers precisely, and reads the result.
- *
- * The screens themselves are faked, and so is the transport the host provider
- * reads the organization graph over. What is under test is the policy the
- * frontend feature wraps a screen in, and loading six thousand lines of Chakra
- * over a live tRPC client to assert a refusal would test the screen instead.
- *
  * Spec: specs/ai-governance/rbac/delegated-governance-viewer.feature
  * (Routing policies opens on the grant its router asks for).
  */

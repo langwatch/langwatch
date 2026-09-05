@@ -39,12 +39,9 @@ export const modelProviderIcons: Record<keyof typeof modelProviders, React.React
 };
 
 /**
- * Provider icons that are flat monochrome marks — they ship with a
- * hardcoded near-black fill (or with no `fill` at all, so they default to
- * SVG's own black). On the dark theme that lands as near-invisible.
- * Coloured-brand icons (Groq orange, AWS yellow, GoogleCloud primaries,
- * Cerebras orange) are left alone — they're brand-coloured marks that
- * read well in both modes already.
+ * Provider icons that are flat monochrome marks — they ship with a hardcoded near-black
+ * fill (or with no `fill` at all, so they default to SVG's own black). On the dark
+ * theme that lands as near-invisible.
  */
 export const MONOCHROME_PROVIDER_ICONS = new Set<keyof typeof modelProviders>([
   "openai",

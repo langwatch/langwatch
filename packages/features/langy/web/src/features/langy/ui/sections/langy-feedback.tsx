@@ -15,17 +15,8 @@ type FeedbackRating = "up" | "down";
 type FeedbackSentiment = "frustrated" | "delighted" | "neutral";
 
 /**
- * The four-point ordinal Langy scores each final answer on. Selecting a
- * segment is the whole signal; the label is what the customer reads.
- *
- * The backend feedback model only stores an up/down `rating` (+ sentiment)
- * today, so we DERIVE both from the ordinal: score >= 2 reads as a thumbs-up.
- *
- * TODO(backend slice): add a first-class `score` (0-3) field to the Langy
- * feedback model / event so we stop flattening this ordinal to up/down and
- * can trend "okay vs great" over time. Until then the derivation below is the
- * lossy bridge that keeps the existing data path working — the exact number a
- * customer types (see the 1-5 field) rides along in `comment` so it isn't lost.
+ * The four-point ordinal Langy scores each final answer on. Selecting a segment is the
+ * whole signal; the label is what the customer reads.
  */
 const SCALE: {
   label: string;
@@ -68,16 +59,6 @@ const MotionDiv = motion.create("div");
 
 /**
  * Low-chrome, four-point feedback under a completed assistant answer.
- *
- * A quiet card wearing the Langy card language (the asaplangy `CARD` tokens: a
- * restrained warm hairline, a whisper of accent wash, no bright fill) with four
- * evenly-spaced ghost segments (bad / okay / good / great) that go muted →
- * foreground on hover and flash the soft brand accent as you pick. One tap is
- * the whole interaction: it submits and the card collapses to a small "Thanks,
- * noted", so it never lingers or nags. For a sharper signal there is also an
- * inline 1-5 field you can type into. The ordinal (and the exact typed number)
- * is recorded through the backend feedback capture. Enters with a whisper of a
- * fade; static under `prefers-reduced-motion`.
  */
 export function LangyFeedback({
   conversationId,
@@ -92,12 +73,9 @@ export function LangyFeedback({
   /** The moment Langy classified this as, via its feedback directive. */
   sentiment?: LangyFeedbackSentiment;
   /**
-   * How this card came to be: the backend cadence asked ("asked"), the agent's
-   * in-stream directive asked ("directive"), the user summoned it with
-   * `/feedback` ("requested"), or the dev card gallery is rendering a fixture
-   * ("preview" — fully inert: no pin, no marks, no cadence). Only "asked" and
-   * "directive" count a SHOW against the quiet period — a user asking to rate
-   * is not us nagging them — but a RATING counts for every live origin.
+   * How this card came to be: the backend cadence asked ("asked"), the agent's in-stream directive asked
+   * ("directive"), the user summoned it with `/feedback` ("requested"), or the dev card gallery is rendering a
+   * fixture ("preview" — fully inert: no pin, no marks, no cadence).
    */
   origin?: "asked" | "directive" | "requested" | "preview";
 }) {

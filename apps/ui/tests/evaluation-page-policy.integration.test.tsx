@@ -1,25 +1,6 @@
 /**
+ * What the two evaluation addresses are actually behind, proved by mounting them — and what the application does with the overlay a screen asks for.
  * @vitest-environment jsdom
- *
- * What the two evaluation addresses are actually behind, proved by mounting
- * them — and what the application does with the overlay a screen asks for.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice
- * a loader that names the wrong grant, which is the failure that refuses a
- * reader the platform page admitted or admits one it refused. BOTH platform
- * pages carried `withPermissionGuard("evaluations:view")`, so there is no
- * asymmetry to carry here and none to invent — and asserting it in both
- * directions is what keeps a later tidy-up from quietly widening or narrowing
- * who can read the evaluator library or the live evaluations.
- *
- * THE OVERLAY ADDRESS IS THE OTHER HALF, and it is this family's own new seam.
- * Three of the evaluator screen's actions and three of the monitor screen's are
- * `platform/app` drawers that did not travel; the screens ask for them by NAME
- * and this application decides what the name means. Under `apps/ui` today
- * nothing opens — the registry is mounted by `DashboardPageBody` — but the
- * address is what a shared link already means and what makes the overlay come
- * back for free when the chrome layout route lands.
- *
  * Spec: specs/evaluations/evaluation-pages.feature
  */
 

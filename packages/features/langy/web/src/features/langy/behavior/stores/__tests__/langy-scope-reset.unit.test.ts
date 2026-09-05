@@ -5,18 +5,6 @@ import { useLangyDevLog } from "../langy-dev-log";
 
 /**
  * Nothing Langy holds may follow the user somewhere else.
- *
- * "Somewhere else" is three moves — a different project, a different
- * organization, a different signed-in person — and the whole feature is a set of
- * MODULE SINGLETONS that survive all three (deliberately: the panel and an
- * in-flight answer have to survive navigating between pages). So the boundary is
- * announced rather than inferred, and everything scoped goes at once.
- *
- * The failure this pins is not cosmetic. A trace row clicked in project A stayed
- * in the target store's `picked`, `useLangyPageContext` folded it back into the
- * candidates, and the composer's "+ context" menu offered it in project B —
- * where taking it would have sent another project's resource ref to the agent.
- *
  * Spec: specs/langy/langy-context-awareness.feature
  */
 
@@ -198,14 +186,9 @@ describe("Langy state across a change of scope", () => {
 });
 
 /**
- * The structural claim, and the reason the reset is derived from the store's own
- * shape instead of a hand-written list of fields: a field added tomorrow is
- * cleared tomorrow, without anybody remembering to extend anything.
- *
- * The survivors are re-stated here rather than imported on purpose. Adding state
- * that outlives a change of account should have to be argued for in two places,
- * because the cost of getting it wrong is invisible — one customer's ids quietly
- * offered as context under another's name.
+ * The structural claim, and the reason the reset is derived from the store's own shape
+ * instead of a hand-written list of fields: a field added tomorrow is cleared tomorrow,
+ * without anybody remembering to extend anything.
  */
 describe("the scope reset's coverage", () => {
   const SURVIVORS = [

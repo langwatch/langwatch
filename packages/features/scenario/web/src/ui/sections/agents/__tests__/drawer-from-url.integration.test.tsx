@@ -1,12 +1,6 @@
 /**
+ * Regression tests for #3193: the Add New Agent flow from Edit Scenario navigated nowhere because the registry-mounted agent editor drawers never computed `open=true`.
  * @vitest-environment jsdom
- *
- * Regression tests for #3193: the Add New Agent flow from Edit Scenario
- * navigated nowhere because the registry-mounted agent editor drawers never
- * computed `open=true`. `CurrentDrawer` mounts a drawer with the URL-parsed
- * `drawer.*` object, so `open` arrives as the drawer-name STRING. The
- * `*FromUrl` wrappers coerce the URL state into a boolean instead.
- *
  * @see specs/features/scenarios/scenarios-editor-ui-regressions.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

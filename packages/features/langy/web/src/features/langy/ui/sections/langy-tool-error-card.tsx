@@ -6,23 +6,6 @@ import { LangyFailureReference } from "../../../../index";
 
 /**
  * A failed Langy tool call, separate from both assistant prose and raw JSON.
- *
- * A calm `change`-weight receipt in Langy's own skin (asaplangy CARD_TAXONOMY),
- * not a red-washed alert box: the rust tone lives on the icon and title so the
- * card names what didn't complete without shouting, the message says it plainly,
- * the one specific fact behind it follows as a detail, and the ways forward —
- * the platform's next steps, its docs, the trace and the logs — are offered as
- * clear actions.
- *
- * The platform's own CODE is always on the card (LangyFailureReference), in mono
- * under the message, together with the disclosure that holds the engine's own
- * words. A failure that carried no code but did carry text still gets that row:
- * the text is the only handle the reader has, and it is never card copy.
- *
- * A failure that turns out to be a PLAN limit is not drawn here at all — it
- * belongs to LangyPlanLimitCard, which says what ran out and offers the way to
- * change it. What the reading of the failure decides — headline, detail, code,
- * plan limit — lives in `logic/langy-tool-failure.ts`; this file only draws it.
  */
 export function LangyToolErrorCard({ presentation }: { presentation: LangyToolErrorPresentation }) {
   const hasActions = presentation.traceUrl || presentation.logsUrl || presentation.docsUrl;

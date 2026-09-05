@@ -23,12 +23,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Single keydown listener for the trace drawer. Reads mutable UI state
- * directly from `drawerStore.getState()` inside the handler so the effect
- * dep list stays small — the listener is registered once per `trace` and
- * stays stable for the trace's lifetime. Shortcuts are defined in
- * `traceDrawerShortcutTable.ts` so the help dialog and dispatcher share
- * one source.
+ * Single keydown listener for the trace drawer. Reads mutable UI state directly from
+ * `drawerStore.getState()` inside the handler so the effect dep list stays small — the
+ * listener is registered once per `trace` and stays stable for the trace's lifetime.
  */
 export function useTraceDrawerShortcuts({
   trace,

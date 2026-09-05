@@ -1,7 +1,5 @@
 /**
- * How wide the scenario editor drawer opens, and that the width is a named step
- * of the drawer recipe rather than an override at the call site.
- *
+ * How wide the scenario editor drawer opens, and that the width is a named step of the drawer recipe rather than an override at the call site.
  * @see specs/features/agent-testing/cases-table.feature
  * @see dev/docs/best_practices/drawers.md
  */

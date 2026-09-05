@@ -5,24 +5,18 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 interface TraceDrawerSkeletonProps {
   onClose: () => void;
   /**
-   * Span count carried over from the table row that opened the drawer.
-   * When known, the accordion body section renders that many skeleton
-   * rows so the panel doesn't reflow once the real spanTree query
-   * resolves. `null` for entry paths that don't have the row in hand
-   * (URL hydration, history back/forward) — the skeleton then falls
-   * back to a small default block.
+   * Span count carried over from the table row that opened the drawer. When known, the
+   * accordion body section renders that many skeleton rows so the panel doesn't reflow
+   * once the real spanTree query resolves.
    */
   expectedSpanCount?: number | null;
 }
 
 /**
- * Layout-mirroring skeleton for the trace drawer. Mirrors the real
- * `DrawerHeader` + viz + tab-bar + accordion structure so the loading state
- * doesn't reflow the panel when content arrives, and so the close affordance
- * stays clickable while the trace fetches.
+ * Layout-mirroring skeleton for the trace drawer. Mirrors the real `DrawerHeader` + viz
+ * + tab-bar + accordion structure so the loading state doesn't reflow the panel when
+ * content arrives, and so the close affordance stays clickable while the trace fetches.
  */
-// Visible-span budget for the skeleton body. Most operators won't scroll
-// past ~30 rows during a load; rendering more is wasted layout work.
 const MAX_SKELETON_SPAN_ROWS = 30;
 // Approximate height of a single span row in the accordion when fully
 // rendered. Matches the SpanAccordions row height at the comfortable

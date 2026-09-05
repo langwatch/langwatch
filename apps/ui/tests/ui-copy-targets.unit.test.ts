@@ -1,15 +1,5 @@
 /**
  * Which projects a reader could replicate into.
- *
- * `platform/app/src/hooks/useProjectsForCopy.ts` decided this by importing
- * `~/server/api/rbac` into a browser hook, and NOTHING ASSERTED IT: getting it
- * wrong either hides a project the reader may write to, or offers one the
- * server then refuses with a 401 the dialog reports as a generic failure.
- *
- * The interesting cases are the two the platform hook handled implicitly — a
- * custom role whose permission column has never been written, and a legacy role
- * string nothing recognises.
- *
  * Spec: specs/evaluations/evaluation-pages.feature
  */
 

@@ -59,10 +59,7 @@ function isNoisyKey(key: string): boolean {
 }
 
 /**
- * Flatten a nested object to dot-path key:value lines, YAML-flavoured. We
- * drop noise keys, compact arrays inline when small, and truncate long
- * strings — the goal is to give the LLM enough signal without blowing the
- * context window with framework boilerplate.
+ * Flatten a nested object to dot-path key:value lines, YAML-flavoured.
  */
 function flattenAttributes(obj: Record<string, unknown>, prefix = ""): string[] {
   const out: string[] = [];
@@ -174,14 +171,9 @@ function compactIO(raw: string | null | undefined): string[] {
 }
 
 /**
- * Pull every distinct `role: system` content from the trace's I/O and any
- * available full-span inputs. Returns deduped strings so the same system
- * prompt that's shared across multiple LLM spans only surfaces once.
- *
- * The system prompt is the most useful single anchor for an LLM trying to
- * reason about a trace — it tells the model what the agent was *supposed*
- * to do. Surfacing it as its own block at the top makes that obvious
- * without forcing the consumer to scroll the full input list.
+ * Pull every distinct `role: system` content from the trace's I/O and any available
+ * full-span inputs. Returns deduped strings so the same system prompt that's shared
+ * across multiple LLM spans only surfaces once.
  */
 function extractSystemMessages(trace: TraceHeader, fullSpans?: FullSpan[]): string[] {
   const seen = new Set<string>();
@@ -267,11 +259,6 @@ function stringifyMessageContent(content: unknown): string {
 
 /**
  * Inline thinking-tag patterns we recognise inside plain text content.
- * Different models / SDKs surface "thinking" in different shapes — block
- * types (Anthropic's `thinking`, OpenAI's `reasoning`), and inline tags
- * (`<thinking>…</thinking>`, `<think>…</think>`, `<reflection>…</reflection>`).
- * We strip them out of the surrounding text and re-emit them as proper
- * thinking lines so the shimmer + tooltip apply uniformly.
  */
 const THINKING_TAG_RE = /<(thinking|think|reasoning|reflection)>([\s\S]*?)<\/\1>/gi;
 
@@ -311,20 +298,7 @@ function thinkingLine(content: string): string {
 }
 
 /**
- * Walk a chat message's content and emit YAML-friendly lines per content
- * block. Used by `compactIO` so an `assistant` turn that contains a
- * thinking block + a tool call + an answer renders as multiple expanded
- * sub-lines instead of one squished `[tool:foo]` placeholder.
- *
- * Block treatments:
- * - `text` → inline text, with `<thinking>` / `<reasoning>` / `<think>`
- *   tags split out as proper thinking lines
- * - `thinking` / `reasoning` / `redacted_thinking` → markdown italics with
- *   a 🧠 marker so the rendered viewer can shimmer + label them
- * - `tool_use` / `tool_call` → name + flattened `input`/`arguments`
- * - `tool_result` → tool_use_id link + flattened or quoted content
- * - `image` → `[image]`
- * - anything else → compact JSON
+ * Walk a chat message's content and emit YAML-friendly lines per content block.
  */
 type Block = Record<string, unknown>;
 type BlockRenderer = (block: Block, lines: string[]) => void;
@@ -455,10 +429,9 @@ function renderMessageBlocks(content: unknown): string[] {
 }
 
 /**
- * Render an ASCII Gantt waterfall — one row per span, bar positioned by
- * start offset, sized by duration. Uses box-drawing chars so it reads as a
- * proper terminal chart, not a fence-and-dot approximation. Width is fixed
- * for deterministic copy-paste alignment.
+ * Render an ASCII Gantt waterfall — one row per span, bar positioned by start offset,
+ * sized by duration. Uses box-drawing chars so it reads as a proper terminal chart, not
+ * a fence-and-dot approximation. Width is fixed for deterministic copy-paste alignment.
  */
 function renderSpanTimeline(spans: SpanTreeNode[], width: number): string[] {
   if (spans.length === 0) return [];
@@ -507,17 +480,9 @@ function renderSpanTimeline(spans: SpanTreeNode[], width: number): string[] {
 }
 
 /**
- * Unicode flame graph — one row per stack depth, spans positioned and
- * sized along the time axis. Uses block characters so the visual lands
- * intact when pasted. Different shading per row (▓/█/▒/░) makes adjacent
- * depths visually distinct.
- *
- * Layout (deepest at top, shallowest at bottom — call-stack-style):
- *   d3:        ▓▓▓▓
- *   d2:    ████████████
- *   d1: ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
- *   d0: ░░░░░░░░░░░░░░░░░░░░░░░░░░░░
- *       ↑ time axis →
+ * Unicode flame graph — one row per stack depth, spans positioned and sized along the
+ * time axis. Uses block characters so the visual lands intact when pasted. Different
+ * shading per row (▓/█/▒/░) makes adjacent depths visually distinct.
  */
 function renderUnicodeFlame(spans: SpanTreeNode[], width: number): string[] {
   if (spans.length === 0) return [];
@@ -838,13 +803,8 @@ export interface TraceMarkdownChunk {
 }
 
 /**
- * Split a trace markdown blob into chunks at top-level heading boundaries
- * (`# `) so a virtualized list can mount one section at a time. The first
- * chunk is the preamble (title + subtitle + metric strip + detail block);
- * each subsequent chunk carries one `# section` heading + its body.
- *
- * The Copy button still uses the full string — chunking is purely a
- * rendering optimisation for very long traces.
+ * Split a trace markdown blob into chunks at top-level heading boundaries (`# `) so a
+ * virtualized list can mount one section at a time.
  */
 export function splitTraceMarkdown(markdown: string): TraceMarkdownChunk[] {
   if (!markdown) return [];

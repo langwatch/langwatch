@@ -1,11 +1,7 @@
 /**
+ * The overlay read keeps the previous trace's data while the next one is in flight, so
+ * the hook has to say which trace the correction it is holding belongs to.
  * @vitest-environment jsdom
- *
- * The overlay read keeps the previous trace's data while the next one is in
- * flight, so the hook has to say which trace the correction it is holding
- * belongs to. Without that, opening a second trace reads the first one's
- * correction as its own and adopts it as an editing baseline.
- * See specs/traces-v2/trace-edit-overlay.feature.
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

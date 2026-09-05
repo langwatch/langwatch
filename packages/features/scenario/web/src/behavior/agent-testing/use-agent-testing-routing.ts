@@ -1,18 +1,5 @@
 /**
  * Path routing for the single Agent Testing page.
- *
- * Every Agent Testing address is served by one catch-all page file
- * ([[...path]].tsx) and every move inside it is a shallow push, so the page
- * never remounts and the live-run subscription it holds is never dropped.
- *
- * Addresses:
- *   /agent-testing                                  Scenarios, the first suite
- *   /agent-testing/suites/:suiteSlug                Scenarios, one suite
- *   /agent-testing/external/:setId                  Scenarios, external set
- *   /agent-testing/results                          Results, run plans list
- *   /agent-testing/results/:planSlug                Results, one plan
- *   /agent-testing/results/:planSlug/:batchRunId    Results, one run
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { useCallback, useMemo } from "react";
@@ -29,10 +16,9 @@ export const EXTERNAL_SEGMENT = "external" as const;
 export type AgentTestingTab = "cases" | "results";
 
 /**
- * What the Scenarios tab is open on. A `suite` with no slug is an address that
- * names no suite yet: the tab opens the first suite of the rail, which the
- * address alone cannot know. The same arm covers an address naming a suite
- * that no longer exists, so a stale link degrades instead of rendering broken.
+ * What the Scenarios tab is open on. A `suite` with no slug is an address that names no
+ * suite yet: the tab opens the first suite of the rail, which the address alone cannot
+ * know.
  */
 export type AgentTestingSelection =
   | { kind: "suite"; slug: string | null }

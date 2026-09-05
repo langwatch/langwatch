@@ -1,19 +1,5 @@
 /**
  * LeaderboardTrustPanel — whether the verdict above is worth acting on.
- *
- * Replaces three separate warning banners that only appeared when something
- * was wrong. Silence is a bad way to communicate "this is fine": a reader
- * cannot tell a clean run from a check that was never made. Each condition
- * is therefore stated either way, so the absence of a warning is visible
- * evidence rather than an assumption.
- *
- * Checks come in two kinds, and conflating them would be a mistake. Some
- * are pass/fail — the sample was big enough or it wasn't. Others are
- * measurements the reader has to interpret: how much longer the winner's
- * answers were, whether the judge shares a model family with a candidate.
- * A measurement rendered in warning colours fires on legitimate runs often
- * enough to train people to skip the panel, so those are reported in
- * neutral type and left to the reader.
  */
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { LuCheck, LuInfo, LuTriangleAlert } from "react-icons/lu";
@@ -48,10 +34,8 @@ export type LeaderboardTrustPanelProps = {
 export type TrustTone = "ok" | "warn" | "note";
 
 /**
- * Share of non-converged bootstrap replicates above which the intervals stop
- * being reported as exact. Not zero: a handful of awkward resamples is normal
- * and does not meaningfully move a percentile built from a thousand of them,
- * so warning on any at all would fire on healthy runs and be tuned out.
+ * Share of non-converged bootstrap replicates above which the intervals stop being
+ * reported as exact.
  */
 const BOOTSTRAP_NONCONVERGENCE_LIMIT = 0.02;
 
@@ -70,17 +54,6 @@ const joinNames = (names: string[]): string =>
 
 /**
  * Whether the run actually connected the field well enough to rank it.
- *
- * Bradley-Terry needs the win graph to be strongly connected for a unique
- * answer to exist. When it is not, the solver still returns numbers — it has
- * to stop somewhere — but the gap across the break reflects the iteration cap
- * rather than the evidence, and grows if you raise the cap. Two shapes reach
- * here from ordinary data: a field that splits into tiers where the top never
- * lost to the bottom, and a field where some variants never met at all
- * (routine when a candidate produces no output for a row and is dropped).
- *
- * Reported as a warning rather than suppressing the table, because the
- * WITHIN-group ordering is still sound and usually still the answer.
  */
 const buildComparabilityCheck = (
   leaderboard: LeaderboardTrustPanelProps["leaderboard"],
@@ -128,12 +101,7 @@ const buildSweepCheck = (leaderboard: BTLeaderboard): TrustCheck => ({
 });
 
 /**
- * `didConverge` alone would overstate this. The solver stops when consecutive
- * iterates stop moving much, which cannot distinguish settling on an answer
- * from creeping toward one that does not exist — on a field that fails the
- * Ford condition it reports success while the scores march off with the
- * iteration cap. So the claim is only made when there was an answer to
- * converge to.
+ * `didConverge` alone would overstate this.
  */
 const buildSettledCheck = (leaderboard: BTLeaderboard): TrustCheck => ({
   label: "Ranking settled",
@@ -146,11 +114,9 @@ const buildSettledCheck = (leaderboard: BTLeaderboard): TrustCheck => ({
 });
 
 /**
- * The margins of error are built from a thousand OTHER fits, and their
- * failures used to be discarded — so the settled check could report a clean
- * convergence while the intervals beside it came from fits that never settled.
- * A resample is often harder to fit than the full dataset, because it can drop
- * a variant's only wins.
+ * The margins of error are built from a thousand OTHER fits, and their failures used to
+ * be discarded — so the settled check could report a clean convergence while the
+ * intervals beside it came from fits that never settled.
  */
 const buildMarginsCheck = (leaderboard: BTLeaderboard): TrustCheck[] => {
   const rate = leaderboard.bootstrapNonConvergence;
@@ -168,13 +134,6 @@ const buildMarginsCheck = (leaderboard: BTLeaderboard): TrustCheck[] => {
 
 /**
  * Rows the judge produced no verdict for.
- *
- * Reported because it is the missing half of the comparability check above.
- * A run whose judge declined many rows loses that evidence from the win
- * graph, which is exactly how a field comes apart into groups the fit may not
- * rank across — and the reader who is told "not enough overlap" otherwise has
- * no way to see why, or that re-running would not help until the judge stops
- * flipping. Stated either way, like every other check here.
  */
 const buildDeclinedRowsCheck = ({
   leaderboard,
@@ -227,13 +186,8 @@ export const buildTrustChecks = ({
   return [
     buildSampleSizeCheck({ leaderboard, warnThreshold }),
     buildSweepCheck(leaderboard),
-    // Split out from the check above, which used to end "...so all of them can
-    // be placed on the same scale". No variant sweeping is necessary for that
-    // and not sufficient: a field can have every variant winning and losing
-    // and still break into groups the run never bridged, in which case the
-    // scores across that break are an artefact of where the solver stopped
-    // rather than a measurement. Ford (1957) is the sufficient condition, so
-    // it gets its own check rather than riding on the sweep one.
+    // Split out from the check above, which used to end "...so all of them can be
+    // placed on the same scale".
     buildComparabilityCheck(leaderboard),
     ...buildDeclinedRowsCheck({ leaderboard, rowsWithoutVerdict }),
     buildSettledCheck(leaderboard),
@@ -250,10 +204,8 @@ export const buildTrustChecks = ({
 };
 
 /**
- * The count above is several 95% tests reported as one number, so it is not
- * a joint guarantee. Stated as a plain chance rather than corrected for: the
- * simultaneous version was measured and separated fewer pairs than the test
- * this feature replaced, so it would cost real findings to fix a sentence.
+ * The count above is several 95% tests reported as one number, so it is not a joint
+ * guarantee.
  */
 const multiplicityNote = (adequacy: SampleAdequacy): string => {
   const rate = adequacy.familyWiseFalsePositiveRate;
@@ -294,10 +246,9 @@ const buildResolutionCheck = (adequacy: SampleAdequacy): TrustCheck => {
 };
 
 /**
- * Verbosity bias: judges score longer answers higher regardless of quality.
- * Reported as a ratio and never as a failure — for plenty of tasks the
- * longer answer genuinely is the better one, and the reader is the one who
- * knows which task this is.
+ * Verbosity bias: judges score longer answers higher regardless of quality. Reported as
+ * a ratio and never as a failure — for plenty of tasks the longer answer genuinely is
+ * the better one, and the reader is the one who knows which task this is.
  */
 const buildVerbosityCheck = (verbosity: VerbosityProfile): TrustCheck => {
   const { leaderRatio } = verbosity;
@@ -347,10 +298,9 @@ const buildVerbosityCheck = (verbosity: VerbosityProfile): TrustCheck => {
 };
 
 /**
- * Self-preference: a judge rates its own model family's output higher. The
- * judge model is read off the run, not off the evaluator's current config,
- * so editing the evaluator later cannot retroactively change what this says
- * about an old run.
+ * Self-preference: a judge rates its own model family's output higher. The judge model
+ * is read off the run, not off the evaluator's current config, so editing the evaluator
+ * later cannot retroactively change what this says about an old run.
  */
 const buildJudgeIndependenceCheck = (
   independence: JudgeIndependence,

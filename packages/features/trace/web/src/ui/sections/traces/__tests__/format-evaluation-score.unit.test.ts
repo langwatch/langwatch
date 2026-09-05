@@ -4,13 +4,6 @@ import { formatEvaluationScore } from "../evaluation-status-item";
 
 /**
  * Characterization test for langwatch/langwatch#6397.
- *
- * `formatEvaluationScore` returns "N/A" before handing a value to `numeral`,
- * and it had no test file at all — so "existing suites pass" asserted nothing
- * about it. The zero case is the load-bearing one: `llm_boolean` returns
- * `score = 1 if passed else 0`, so a genuine 0.0 is real data, and any guard
- * rewritten as a falsy check (`score ? … : "N/A"`) would silently start
- * reporting real zeros as not-scored.
  */
 describe("formatEvaluationScore", () => {
   describe("given a score that is absent", () => {

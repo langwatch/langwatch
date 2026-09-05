@@ -1,9 +1,7 @@
 /**
- * The Langy chat transport is the browser's critical turn-start path (S2 D): it
- * chooses create vs continue, adopts the ids the server mints, and surfaces a
- * rejected turn-start to `useChat().error`. These lock that contract at the
- * transport boundary — the tRPC client and the onTurnStream subscription are
- * mocked so only the transport's own decisions are under test.
+ * The Langy chat transport is the browser's critical turn-start path (S2 D): it chooses
+ * create vs continue, adopts the ids the server mints, and surfaces a rejected
+ * turn-start to `useChat().error`.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,11 +13,6 @@ import {
 
 /**
  * What a tRPC subscription hands back.
- *
- * `@trpc/server/observable` is where the name lives, and ADR-004 seals
- * `@trpc/server` off from a web package — the rule fires on the import
- * declaration without checking `importKind`, so `import type` is rejected too.
- * One method is the whole surface either side of the wire uses.
  */
 type Unsubscribable = { unsubscribe: () => void };
 

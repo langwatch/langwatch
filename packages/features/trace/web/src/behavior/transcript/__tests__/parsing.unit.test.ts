@@ -322,10 +322,9 @@ describe("chat text leaves (translation splice)", () => {
 });
 
 /**
- * A comment on one message of a transcript is stored against the key that
- * message reads under, so the key has to be the same every time the transcript
- * is read, and has to be gone when the message it named is.
- * See specs/traces-v2/anchored-comments.feature.
+ * A comment on one message of a transcript is stored against the key that message reads
+ * under, so the key has to be the same every time the transcript is read, and has to be
+ * gone when the message it named is. See specs/traces-v2/anchored-comments.feature.
  */
 describe("block keys", () => {
   const transcript = (assistantSays: string) =>

@@ -1,20 +1,7 @@
 /**
- * Every internal ops page the route table registers must be reachable
- * from the settings menu.
- *
+ * Every internal ops page the route table registers must be reachable from the settings
+ * menu.
  * Spec: specs/navigation/ops-navigation-v2.feature
- *
- * In the current navigation the settings menu is the ONLY place the ops
- * pages are offered: the product sidebars carry no ops section any more. So
- * a page that lands in `ui-route-table.ts` and not in `opsGroup()` or
- * `backofficeGroup()` has no entry anywhere, and nothing else would say so.
- * The route table and the menu are both hand-maintained, which is exactly
- * the pair that drifts.
- *
- * "Reachable" is read from the menu data itself rather than from a list
- * repeated here, so the menu stays the single statement of what it covers:
- * an entry claims its own address, everything under its prefix, and the
- * addresses it names in `alsoActiveAt`.
  */
 import { describe, expect, it } from "vitest";
 import {

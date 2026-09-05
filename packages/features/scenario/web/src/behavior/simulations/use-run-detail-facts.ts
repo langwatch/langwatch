@@ -15,9 +15,6 @@ import type { ScenarioRunState } from "./use-run-state-stream";
 
 /**
  * The names of the secrets the run used, as recorded on it.
- *
- * Read defensively, like the plain values beside them: a run recorded by an
- * older build has nothing here, and the section is simply shorter.
  */
 const secretParameterNamesSchema = z.array(z.string());
 

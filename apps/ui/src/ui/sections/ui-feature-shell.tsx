@@ -1,21 +1,5 @@
 /**
  * What `apps/ui` mounts around every routed page.
- *
- * One place, three jobs: the transport a feature package's hooks run on, the
- * Providers those hooks need, and the capability ports a screen asks instead
- * of reaching for the document, the router or a toast singleton. A feature
- * that moves into this package declares all three in `createUiApplication`
- * and mounts nothing itself.
- *
- * It renders inside the root layout's error boundary, so a transport or
- * capability fault shows the page error fallback rather than blanking the
- * application.
- *
- * The capabilities resolve INNERMOST, below the QueryClient and every feature
- * Provider. A live session is four reads and a subscription to the address
- * bar, so the port that answers `hasPermission` can only be built where those
- * reads are legal — and a composition that installs no session source pays for
- * none of it and keeps the refusing default.
  */
 
 import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";

@@ -1,25 +1,5 @@
 /**
  * Whether a routed page opens at all.
- *
- * `platform/app` said this with two higher-order components — `withFeatureFlagGuard`
- * outside `withPermissionGuard` — both reading `useOrganizationTeamProject` and
- * the flag hook directly. Neither import is available to a screen, and the
- * policy is not the screen's anyway: ADR-004 gives routing, session lookup and
- * the decision to show a page to the owning frontend feature. So the guard moves
- * here, over the session capability, and every family that follows composes the
- * same one.
- *
- * THE ORDER IS THE POLICY, and it is carried over unchanged:
- *
- * 1. A flag that is off reads as a 404 for everyone, BEFORE any permission is
- *    considered — a page behind an unreleased flag must not tell a viewer that
- *    they merely lack a grant.
- * 2. Nothing is refused while the answer is still arriving. An unanswered flag
- *    is not "off" and an unanswered permission set is not "denied"; the naive
- *    `if (!enabled) return <NotFound/>` flashes a 404 on every load, which is
- *    the bug `withFeatureFlagGuard`'s docblock was written about.
- * 3. The page renders while permissions are still settling, exactly as the
- *    platform guard did, so a page with its own loading state keeps it.
  */
 
 import type { ComponentType } from "react";
@@ -44,9 +24,6 @@ export type UiPageGuardInstall = {
 
 /**
  * The guard's answer for one render, without any of the rendering.
- *
- * Split out so the ordering above is testable as a decision rather than
- * through three mounted components.
  */
 export type UiPageAccess =
   | { kind: "loading" }

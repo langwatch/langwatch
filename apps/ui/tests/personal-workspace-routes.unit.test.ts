@@ -1,16 +1,5 @@
 /**
  * Which page key each personal-workspace screen answers, and what it is behind.
- *
- * Seven keys, and they are the contract with the route table. Two of them are
- * project-scoped, which is the thing worth stating out loud: `/:project/sessions`
- * and `/:project/pull-requests` are children of a layout route the host still
- * serves, and they belong to this family because their whole page bodies were
- * its tables.
- *
- * The refusal itself is `withUiPageGuard`'s and is proven in
- * `ui-page-guard.unit.test.tsx`; WHICH flag each page is behind is proven by
- * mounting the loaders in `personal-workspace-page-policy.integration.test.tsx`.
- * This file is the cheaper half: that the keys and the table agree at all.
  */
 
 import { describe, expect, it } from "vitest";

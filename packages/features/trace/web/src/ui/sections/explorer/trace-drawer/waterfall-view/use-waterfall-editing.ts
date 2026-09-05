@@ -8,10 +8,8 @@ import { selectIsSpanDeleted, useDrawerStore, useTraceEditStore } from "../../..
 const NO_DRAFT_NAMES: ReadonlyMap<string, string> = new Map();
 
 /**
- * The name each row should read with while the correction is being written:
- * what an earlier correction renamed it to, with this session's rename on top.
- * The tree itself is the captured one while editing, so leaving the stored
- * rename out would read as this session having lost it.
+ * The name each row should read with while the correction is being written: what an
+ * earlier correction renamed it to, with this session's rename on top.
  */
 function correctedNames({
   basePatch,
@@ -31,12 +29,8 @@ function correctedNames({
 }
 
 /**
- * The waterfall's half of edit mode: which rows the correction removes, what
- * the reviewer has renamed so far, and how to remove a span or bring one back.
- *
- * Deleting a span deletes its subtree, so every descendant is marked too:
- * a struck-through parent above untouched children would say the correction
- * keeps them, and it does not.
+ * The waterfall's half of edit mode: which rows the correction removes, what the
+ * reviewer has renamed so far, and how to remove a span or bring one back.
  */
 export function useWaterfallEditing(spans: SpanTreeNode[]): {
   isEditing: boolean;

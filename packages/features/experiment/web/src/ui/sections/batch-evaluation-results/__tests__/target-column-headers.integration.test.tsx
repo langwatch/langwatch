@@ -1,17 +1,6 @@
 // @vitest-environment jsdom
 /**
  * The name each target column shows in its header.
- *
- * A board can hold two targets stored under the identical name, for example
- * the same prompt added twice with a different configuration. The workbench
- * separates them with a "(1)" / "(2)" suffix added at display time. The
- * results page printed the raw stored name, so both columns read the same and
- * there was no way to tell which output belonged to which target.
- *
- * The run data goes through `transformBatchEvaluationData` here rather than
- * being handed to the table as a literal, so the assertion covers the whole
- * chain the page uses.
- *
  * @see specs/batch-evaluation-results/target-column-identity.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

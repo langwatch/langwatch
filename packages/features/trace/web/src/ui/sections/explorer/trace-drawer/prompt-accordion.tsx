@@ -15,16 +15,9 @@ interface PromptAccordionProps {
 }
 
 /**
- * Span-level prompt panel. Renders whatever's available so the section
- * pulls its weight even when only some `langwatch.prompt.*` keys made it
- * onto the span. The trace-level Prompts tab is the rollup view; this is
- * the per-span deep dive.
- *
- * Always renders on `llm` spans, even when no prompt metadata exists —
- * the "Open in Playground" action still works (it creates a brand-new
- * playground tab from the LLM span's input/output) so operators can
- * continue any LLM call regardless of whether a managed prompt was tied
- * to it. Mirrors the old SpanDetails behaviour.
+ * Span-level prompt panel. Renders whatever's available so the section pulls its weight
+ * even when only some `langwatch.prompt.*` keys made it onto the span. The trace-level
+ * Prompts tab is the rollup view; this is the per-span deep dive.
  */
 export function PromptAccordion({ span }: PromptAccordionProps) {
   const { openDrawer } = useDrawer();

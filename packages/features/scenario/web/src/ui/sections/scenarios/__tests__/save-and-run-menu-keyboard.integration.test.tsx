@@ -1,9 +1,6 @@
 /**
+ * The agent rows of the save-and-run menu read to the keyboard: the focus reaches a row and Enter runs the scenario against it.
  * @vitest-environment jsdom
- *
- * The agent rows of the save-and-run menu read to the keyboard: the focus
- * reaches a row and Enter runs the scenario against it.
- *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -70,16 +67,8 @@ describe("<SaveAndRunMenu/>", () => {
 
       const row = await screen.findByTestId("save-and-run-agent-agent-1");
 
-      // The bug here was a bare `HStack` carrying only `onClick`: nothing the
-      // keyboard could reach. The contract is that the row IS a button, which
-      // the tab order includes and which Enter and Space activate by
-      // definition, and that activating it runs the scenario.
-      //
-      // The activation is a click rather than `user.keyboard("{Enter}")`.
-      // Sending the key needs `document.activeElement` to still be the row,
-      // and the popover's own focus management takes it back during the await
-      // inside that call, so the key landed elsewhere and the run handler saw
-      // no call. That failed in CI twice while passing locally every time.
+      // The bug here was a bare `HStack` carrying only `onClick`: nothing the keyboard
+      // could reach.
       expect(row.tagName).toBe("BUTTON");
       expect(row).not.toBeDisabled();
       expect(row).not.toHaveAttribute("tabindex", "-1");

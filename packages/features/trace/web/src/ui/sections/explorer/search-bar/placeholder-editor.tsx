@@ -10,10 +10,8 @@ import {
 } from "../../../../behavior/explorer/search-bar/filter-highlight";
 
 /**
- * The search bar's at-rest invitation, parameterised on who answers the ask —
- * "Ask AI" for the inline composer, "Ask Langy" when Langy owns the
- * affordance. One builder so the cold placeholder here and the live TipTap
- * editor's placeholder can never drift apart.
+ * The search bar's at-rest invitation, parameterised on who answers the ask — "Ask AI"
+ * for the inline composer, "Ask Langy" when Langy owns the affordance.
  */
 export function searchBarPlaceholder(askLabel: string): string {
   return `Search filters, free text, or ${askLabel}…`;
@@ -27,10 +25,9 @@ type DecoratedSegment =
       text: string;
       className?: string;
       /**
-       * Liqe-text-coordinate range for AND/OR operator segments. Set
-       * when the slot wraps a BooleanOperator so the placeholder's
-       * click handler can flip the keyword in place — same affordance
-       * the live ProseMirror editor exposes.
+       * Liqe-text-coordinate range for AND/OR operator segments. Set when the slot
+       * wraps a BooleanOperator so the placeholder's click handler can flip the keyword
+       * in place — same affordance the live ProseMirror editor exposes.
        */
       opLoc?: { start: number; end: number };
       /**
@@ -43,17 +40,9 @@ type DecoratedSegment =
   | { kind: "delete"; token: TokenRef };
 
 /**
- * Slice the query into segments matching the decoration plan, so the
- * placeholder mirrors the same syntax-highlighted look as the live editor —
- * including the per-token delete (X) widgets that the live editor renders
- * via ProseMirror decorations. Without these, an existing query loaded
- * fresh shows styled tokens but no remove affordance until the user
- * clicks into the bar (which mounts the real editor); the placeholder
- * looked half-functional in that interim.
- *
- * Segments without a className render as plain text; segments of kind
- * `delete` render as a token-X button using the same `.filter-token-delete`
- * styling as the live widget so the visual hand-off is invisible.
+ * Slice the query into segments matching the decoration plan, so the placeholder
+ * mirrors the same syntax-highlighted look as the live editor — including the per-token
+ * delete (X) widgets that the live editor renders via ProseMirror decorations.
  */
 function buildSegments(text: string): DecoratedSegment[] {
   if (!text) return [];
@@ -127,10 +116,8 @@ interface PlaceholderEditorProps {
 }
 
 /**
- * Lightweight stand-in for the TipTap-backed editor. Mounted on cold load to
- * avoid the ~270ms ProseMirror init reflow. Activates (and tears itself down)
- * on first focus, click, or `/` keystroke — the parent then mounts the real
- * editor and forwards focus to it.
+ * Lightweight stand-in for the TipTap-backed editor. Mounted on cold load to avoid the
+ * ~270ms ProseMirror init reflow.
  */
 export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
   queryText,
@@ -267,13 +254,9 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                 field: tok.field,
                 value: tok.value!,
               });
-              // Render the raw `field:value` text and let the shared CSS
-              // overlay (editorStyles `.filter-token[data-filter-chip-label]`)
-              // paint the field-qualified label on top — exactly what the
-              // live editor does. Both renderers now produce an identical
-              // chip, so the hand-off when the placeholder swaps for the
-              // real editor is a no-op (no width lurch). Token coords,
-              // data-attrs, and the query text all keep the unique id.
+              // Render the raw `field:value` text and let the shared CSS overlay
+              // (editorStyles `.filter-token[data-filter-chip-label]`) paint the
+              // field-qualified label on top — exactly what the live editor does.
               const overlayLabel = chipOverlayLabel({
                 field: tok.field,
                 value: tok.value!,

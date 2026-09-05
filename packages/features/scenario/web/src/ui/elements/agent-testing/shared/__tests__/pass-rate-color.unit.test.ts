@@ -1,11 +1,5 @@
 /**
  * The one place a pass rate becomes a colour.
- *
- * Thresholds and colours are stated together, so the percentage text and the
- * fill of a trend bar cannot disagree. Two scales that shared a palette and
- * held their own thresholds once made a 95 percent run read amber as text and
- * green as a bar in the same row.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

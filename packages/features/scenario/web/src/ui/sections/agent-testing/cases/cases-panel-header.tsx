@@ -1,15 +1,6 @@
 /**
- * The line above the scenarios table: the suite that is open, how many scenarios
- * it holds, the label filter and the entry points that write.
- *
- * The way into a recent run sits here too, between "New scenario" and
- * "Run suite", so writing a scenario, reading what the suite already did and
- * running it again are one row of controls.
- *
- * A set that runs from code is read-only, so it offers the recent runs and
- * nothing else. Its results stay one click away: a row of the table opens
- * them as well.
- *
+ * The line above the scenarios table: the suite that is open, how many scenarios it
+ * holds, the label filter and the entry points that write.
  * @see specs/features/agent-testing/cases-table.feature
  */
 
@@ -57,11 +48,8 @@ function recentRunScenarioIds(props: CasesPanelHeaderProps): string[] {
 }
 
 /**
- * Has a scenario of this set run inside the period, which is the one question
- * the list itself answers. The control is never offered over an empty list.
- *
- * A set that runs from code is listed only because a run wrote it, so its
- * rows are the answer.
+ * Has a scenario of this set run inside the period, which is the one question the list
+ * itself answers. The control is never offered over an empty list.
  */
 function hasRunInPeriod(props: CasesPanelHeaderProps): boolean {
   if (props.isExternal) return props.externalCases.length > 0;

@@ -10,11 +10,9 @@ const formatStatNumber = (value: number): string => {
 };
 
 /**
- * Compact metrics card for a live turn — e.g. "1,204 traces · 94% pass rate".
- * Each value spring-rolls up from 0 in a tabular-nums monospace so the digits
- * don't jitter as they climb. Renders nothing when the turn reports no metrics
- * (the clean seam until the PR3 metric transport lands). Static under
- * `prefers-reduced-motion` — NumberTicker shows the final value.
+ * Compact metrics card for a live turn — e.g. "1,204 traces · 94% pass rate". Each
+ * value spring-rolls up from 0 in a tabular-nums monospace so the digits don't jitter
+ * as they climb.
  */
 export function StreamingStatCard({ metrics }: { metrics: LangyTurnMetric[] }) {
   if (metrics.length === 0) return null;

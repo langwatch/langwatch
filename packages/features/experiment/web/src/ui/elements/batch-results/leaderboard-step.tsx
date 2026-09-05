@@ -1,10 +1,5 @@
 /**
  * LeaderboardStep — numbered section wrapper for the leaderboard drawer.
- *
- * The drawer answers three questions in a fixed order: what should I ship,
- * can I believe it, and what do I do about it. Numbering them makes that
- * order legible instead of leaving a reader to infer it from a stack of
- * charts, and lets someone stop after step 1 with a defensible answer.
  */
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { LuInfo } from "react-icons/lu";
@@ -18,12 +13,6 @@ export type LeaderboardStepProps = {
   subtitle: string;
   /**
    * The longer "what am I actually looking at" answer, behind an info icon.
-   *
-   * Separate from `subtitle` on purpose. The subtitle has to stay one short
-   * line or the three steps stop scanning as a sequence, but a reader
-   * meeting a Bradley-Terry score for the first time needs more than a line
-   * — and putting that in the header would bury the answer under a
-   * statistics lesson for everyone who already knows.
    */
   help?: React.ReactNode;
   /**

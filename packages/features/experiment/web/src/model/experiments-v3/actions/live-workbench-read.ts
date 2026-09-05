@@ -27,14 +27,6 @@ export type LiveWorkbenchRead = ProjectedWorkbenchState & {
 
 /**
  * The workbench as the agent should read it from an open page.
- *
- * `source` mirrors the backend fallback's marker, so the agent always knows
- * whether it read the live page or the saved document.
- *
- * Pure, and free of React: the page calls it with the store's state and so does
- * a headless stand-in for the page, which is what keeps the two answering the
- * same shape. `targetNames` is the caller's, because a prompt handle only
- * exists in the database and this projection reaches nothing.
  */
 export const readLiveWorkbench = ({
   state,

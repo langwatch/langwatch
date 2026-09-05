@@ -20,8 +20,6 @@ function pairs(label: string, table?: Readonly<Record<string, string>>): string 
 /**
  * Transcribes the table the way the fixture was transcribed from the legacy
  * `routes.tsx`: one line per route, in match order, indented by layout depth.
- * A path rename, a reordered family, a dropped redirect, a retargeted redirect
- * or a page key pointed at a different module all change a line.
  */
 function transcribe(table: readonly UiRouteDescriptor[], depth = 0): string[] {
   return table.flatMap((descriptor) => {

@@ -1,13 +1,6 @@
 /**
- * One scenario of a comparison across every target, and the run lines a cell
- * of that row holds.
- *
- * A cell stacks one line per run of its scenario and target, so a run that
- * repeated reads three verdicts rather than one. Each line opens the same run
- * drawer a row of the single-target table opens, which is where rerun and the
- * editor live, so the rows carry no menu of their own. A scenario the run
- * never went against with a target says so in that cell.
- *
+ * One scenario of a comparison across every target, and the run lines a cell of that
+ * row holds.
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

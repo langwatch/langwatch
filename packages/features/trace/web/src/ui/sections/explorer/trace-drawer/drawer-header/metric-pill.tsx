@@ -8,12 +8,8 @@ import { TooltipRow } from "../../../../elements/explorer/shared/tooltip-row";
 import { Chip, type ChipTone } from "../../../../elements/explorer/trace-drawer/chip";
 
 /**
- * Thin wrapper around `<Chip>` for the duration / spans / cost / tokens /
- * model row in the drawer header. The pre-existing `MetricPill` was a
- * one-off pill with its own padding, font sizing, and colour choices —
- * which left the header reading as two distinct visual designs (these
- * pills next to the source/origin Chip strip). Routing through Chip
- * collapses them into one design language; callers keep the same API.
+ * Thin wrapper around `<Chip>` for the duration / spans / cost / tokens / model row in
+ * the drawer header.
  */
 export function MetricPill({
   label,
@@ -28,10 +24,9 @@ export function MetricPill({
 }
 
 /**
- * MetricPill-shaped pill for a pinned (or auto-pinned) attribute. Sits
- * inline with Duration/Cost/Tokens so the user sees their pinned attrs
- * exactly where they expect scannable data — not as a separate strip up
- * top.
+ * MetricPill-shaped pill for a pinned (or auto-pinned) attribute. Sits inline with
+ * Duration/Cost/Tokens so the user sees their pinned attrs exactly where they expect
+ * scannable data — not as a separate strip up top.
  */
 export function PinnedMetricPill({
   pin,

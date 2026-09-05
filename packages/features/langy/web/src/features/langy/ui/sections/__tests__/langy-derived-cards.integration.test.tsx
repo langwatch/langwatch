@@ -1,18 +1,7 @@
 /**
+ * The block channel, rendered (ADR-060 / specs/langy/langy-derived-cards .feature + langy-derived-stats-presentation.feature): the copy this browser streamed for itself draws its fences as cards because nothing ever
+ * stamped it; a streamed question is answerable because the timeline reads the same fences the panel draws; a loosely written opening fence still previews; and a stats card keeps every reading in the card.
  * @vitest-environment jsdom
- *
- * The block channel, rendered (ADR-060 / specs/langy/langy-derived-cards
- * .feature + langy-derived-stats-presentation.feature): the copy this browser
- * streamed for itself draws its fences as cards because nothing ever stamped
- * it; a streamed question is answerable because the timeline reads the same
- * fences the panel draws; a loosely written opening fence still previews; and
- * a stats card keeps every reading in the card.
- *
- * MOVED from `platform/app/src/features/langy/__tests__/LangyDerivedCards
- * .integration.test.tsx` and `StreamingCardFenceForms.integration.test.tsx`.
- *
- * Boundary mocks: router (SPA anchors), project hook (deep links), the tRPC
- * client (choices ref hydration).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

@@ -1,18 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The time range is the widest-reaching axis the fragment carries — every
- * query on the page is scoped by it — and it is the one axis where "the URL
- * said nothing" and "the URL said use the default" are different statements.
- *
- * Inside a fragment they are the same: the writer omits `preset` exactly when
- * it equals the default, so `#errors` positively denotes the default window
- * (pinned by `useURLSync.pagination.unit.test.ts`, where Back onto an entry
- * predating a range change has to restore the window that entry denotes). A
- * URL with no fragment at all is that statement only on `popstate`; on arrival
- * it is just where the user landed.
- *
- * See specs/traces-v2/data-layer.feature (URL state) and
- * specs/traces-v2/search.feature (time range selector).
+ * The time range is the widest-reaching axis the fragment carries — every query on the page is scoped by it — and
+ * it is the one axis where "the URL said nothing" and "the URL said use the default" are different statements.
  */
 import { act, renderHook } from "@testing-library/react";
 // `useURLSync` reads React Router's own `useLocation()` now (see the
@@ -68,11 +57,8 @@ function selectPreset(id: string): void {
 }
 
 /**
- * Store a window the way `TimeRangePicker.applyAbsolute` does: `{from, to}`
- * and NO preset id. The instants here line up with a rolling preset, which is
- * the common case rather than a contrived one — the absolute inputs are
- * prefilled from the current range, so pressing Apply after editing only one
- * end lands well inside the preset's match tolerance.
+ * Store a window the way `TimeRangePicker.applyAbsolute` does: `{from, to}` and NO
+ * preset id.
  */
 function pinAbsoluteWindow(range: { from: number; to: number }): void {
   useFilterStore.getState().setTimeRange(range);
@@ -114,13 +100,9 @@ describe("useURLSync time range across browser history navigation", () => {
   describe("given the user pinned an absolute window and paged forward", () => {
     describe("when Back lands on the drawer's own entry", () => {
       it("keeps the page, its cursors and the pinned window", () => {
-        // The entry carries the same fragment the writer emitted for the
-        // absolute range, so it denotes the state the store already holds:
-        // there is nothing to apply. Reading `from`/`to` back as the preset
-        // they happen to align with made the two sides spell the same state
-        // differently, and the guard could only conclude "this is a real
-        // navigation" — costing the user their page AND converting their
-        // pinned window into a rolling one.
+        // The entry carries the same fragment the writer emitted for the absolute
+        // range, so it denotes the state the store already holds: there is nothing to
+        // apply.
         const { from, to } = computePreset("24h");
         const body = `#all-traces?from=${from}&to=${to}`;
 

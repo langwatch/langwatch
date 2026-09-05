@@ -1,15 +1,8 @@
 import { useEffect, useState } from "react";
 
 /**
- * Watches the screen-space `left` coordinate of the element marked
- * with `data-edge-grip="true"` (the resize handle on the trace
- * drawer). Used by the empty-state hero during drawer-tour stages
- * to centre itself in the *visible* canvas — the area between the
- * dashboard's left edge and the drawer's left edge — rather than
- * across the full viewport.
- *
- * Returns `null` when the element isn't on screen, so the hero can
- * fall back to its default centred layout.
+ * Watches the screen-space `left` coordinate of the element marked with
+ * `data-edge-grip="true"` (the resize handle on the trace drawer).
  */
 export function useEdgeGripAnchor(active: boolean): number | null {
   const [left, setLeft] = useState<number | null>(null);

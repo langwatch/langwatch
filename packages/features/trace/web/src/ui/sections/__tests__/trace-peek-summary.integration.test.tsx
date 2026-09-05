@@ -14,11 +14,6 @@ import { TracePeekSummary } from "../trace-peek-summary";
 /**
  * Proves a feature web package's hooks are testable with no tRPC server and no
  * application: a link that answers from a map is the whole harness.
- *
- * It also owns the assertion that used to live in
- * `platform/app/src/features/traces-v2/components/__tests__/TraceIdPeek.integration.test.tsx`
- * — that the `occurredAtMs` partition hint reaches the header read. That
- * assertion belongs beside the query now that the query is here.
  */
 
 type RecordedCall = { path: string; input: unknown };

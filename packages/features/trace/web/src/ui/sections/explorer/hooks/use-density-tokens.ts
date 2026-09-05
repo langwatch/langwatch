@@ -2,10 +2,6 @@ import { useDensityStore } from "../../../../index";
 
 /**
  * All density-dependent sizing in one place.
- *
- * Components should NOT branch on `density` themselves — they read the tokens
- * here. Adding a new dimension means adding it to both COMPACT and COMFORTABLE
- * below, then using it from the hook.
  */
 export interface DensityTokens {
   /** Main trace row vertical padding (per cell) */

@@ -1,12 +1,5 @@
 /**
  * IntegratePane — the default view for no-traces projects.
- *
- * Shown when `hasAnyTraces === false` and the user hasn't flipped on
- * "See sample data". The page mints an access token first, then offers
- * the ways forward under it: hand the setup to an agent, read the SDK
- * instructions, or look at sample data before writing any code. One
- * thing to read at a time, in the order the reader does them.
- *
  * Spec: specs/traces-v2/integrate-pane.feature
  */
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
@@ -106,10 +99,9 @@ export const IntegratePane: React.FC = () => {
 };
 
 /**
- * The ways forward, under the token because that is the order they
- * happen in, and centred because none of the three is the one
- * everybody takes. They wrap rather than shrink, so a phone gets three
- * readable buttons on as many rows as it needs.
+ * The ways forward, under the token because that is the order they happen in, and
+ * centred because none of the three is the one everybody takes. They wrap rather than
+ * shrink, so a phone gets three readable buttons on as many rows as it needs.
  */
 function SetupActions({
   token,
@@ -157,14 +149,8 @@ function SetupActions({
 }
 
 /**
- * The real SearchBar and Toolbar in a non-interactive treatment, so the
- * page still reads as the trace explorer (just empty). Pointer events
- * off, focus skips via `inert` (set imperatively, because the JSX prop
- * is dropped silently by older React versions while the IDL property
- * always sticks), aria-hidden for screen readers, user-select none so
- * the text cannot even be highlighted. `tabIndex={-1}` is the belt: if
- * `inert` is ever stripped by a Chakra update, the wrapper still
- * refuses focus.
+ * The real SearchBar and Toolbar in a non-interactive treatment, so the page still
+ * reads as the trace explorer (just empty).
  */
 function PageChrome() {
   const chromeRef = useRef<HTMLDivElement>(null);

@@ -64,9 +64,6 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
 
 /**
  * Modal for creating a new scenario with AI assistance.
- *
- * Opens the ScenarioFormDrawer with initial data via complexProps.
- * No DB record is created until the user clicks "Save" in the drawer.
  */
 export function ScenarioCreateModal({
   open,

@@ -1,9 +1,5 @@
 /**
  * ComparisonCharts - Bar charts for comparing metrics across runs
- *
- * Displays cost, latency, and per-evaluator metrics.
- * Each evaluator gets its own chart (score or pass rate).
- * Supports different X-axis groupings (by run, target, model, prompt, custom metadata).
  */
 
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
@@ -120,10 +116,9 @@ type ComparisonChartsProps = {
   /** Callback to provide target color map when X-axis is "target" */
   onTargetColorsChange?: (colors: Record<string, string>) => void;
   /**
-   * Comparison columns detected in the run. Rendered as extra chart cards
-   * inside the same flex row as Cost / Latency so the win-rate chart
-   * shows up at parity size with its siblings — not as a separate row
-   * below.
+   * Comparison columns detected in the run. Rendered as extra chart cards inside the
+   * same flex row as Cost / Latency so the win-rate chart shows up at parity size with
+   * its siblings — not as a separate row below.
    */
   comparisonColumns?: BatchComparisonColumn[];
   /**
@@ -316,13 +311,6 @@ export const computeRunMetrics = (data: BatchEvaluationData): RunMetricsResult =
 
 /**
  * Which model each target ran on, and which model judged each comparison.
- *
- * Evaluators are keyed under BOTH ids on purpose. detectComparisonColumns keys
- * a column-style comparison by its TARGET id, while an inline evaluator is
- * keyed by its config id — so `column.evaluatorId` is one or the other
- * depending on how the comparison was authored. Indexing only the config id
- * silently missed every column-style comparison, which is the shape the
- * workbench actually creates.
  */
 const collectRunModels = (targetColumns: BatchTargetColumn[]) => {
   const modelByTargetId: Record<string, string | null> = {};
@@ -357,16 +345,9 @@ const perEvaluatorMetrics = ({
   }));
 
 /**
- * Win-rate and Bradley-Terry leaderboard entries for the comparison columns,
- * so both toggle through the same Metrics visibility system as their siblings
- * (Cost / Latency / Score / Pass Rate).
- *
- * Two independent gates on the leaderboard, for two different reasons. The
- * rollout flag decides whether this organization has the feature at all;
- * variant count is a product rule that applies once it does — a 2-variant
- * comparison is already a plain win-rate story, which the win-rate chart
- * already tells. Additive to that chart, never a replacement, so both are
- * offered for a 3+ comparison.
+ * Win-rate and Bradley-Terry leaderboard entries for the comparison columns, so both
+ * toggle through the same Metrics visibility system as their siblings (Cost / Latency /
+ * Score / Pass Rate).
  */
 const comparisonMetrics = ({
   columns,
@@ -447,15 +428,9 @@ export const ComparisonCharts = ({
   onOpenLeaderboard,
 }: ComparisonChartsProps) => {
   /**
-   * The comparison evaluators on this page, which are excluded from the
-   * candidate-oriented charts in two ways:
-   *  - no `<name> (Score)` chart, because a comparison's 0/1 label reads as a
-   *    misleading "score 0" for the non-scored prompts on the same axis;
-   *  - no bar on Cost / Latency, because a judge is not a candidate.
-   * Both get their own home in the WinRateChart instead.
-   *
-   * detectComparisonColumns keys a column-style comparison by its target id, so
-   * this same set matches both an evaluator id and a target id.
+   * The comparison evaluators on this page, which are excluded from the candidate-oriented charts in two ways: -
+   * no `<name> (Score)` chart, because a comparison's 0/1 label reads as a misleading "score 0" for the
+   * non-scored prompts on the same axis; - no bar on Cost / Latency, because a judge is not a candidate.
    */
   const comparisonEvaluatorIds = useMemo(
     () => new Set((comparisonColumns ?? []).map((c) => c.evaluatorId)),
@@ -463,15 +438,8 @@ export const ComparisonCharts = ({
   );
 
   /**
-   * Which model each target ran on, and which model judged each comparison,
-   * as recorded on the run itself.
-   *
-   * The leaderboard's self-preference check asks whether the judge shares a
-   * model family with a candidate. Both halves have to come off the run
-   * rather than off live config: an evaluator or prompt edited after the
-   * fact would otherwise retroactively change what an old run reports about
-   * itself, which is exactly the kind of quiet misattribution this panel
-   * exists to prevent.
+   * Which model each target ran on, and which model judged each comparison, as recorded
+   * on the run itself.
    */
   const modelsFromRun = useMemo(
     () => collectRunModels(comparisonData[0]?.data?.targetColumns ?? []),
@@ -809,13 +777,6 @@ export const ComparisonCharts = ({
   const axis = axisLabelProps(chartData.length);
 
   // Bar labels, precomputed for the whole row rather than trimmed per tick.
-  // A tickFormatter only ever sees one value, so it cannot know that the
-  // other three bars share a prefix with this one — which is how these charts
-  // ended up rendering four bars all labelled "support-assista…" while their
-  // siblings rendered "(1) (2) (3) (4)". Same names, same trim, everywhere.
-  //
-  // Held by bar position, not by name: two targets on one board can carry the
-  // identical name, and a name-keyed lookup gives both bars the last label.
   const axisLabels = useMemo(
     () =>
       buildAxisLabels(
@@ -898,18 +859,6 @@ export const ComparisonCharts = ({
   );
 
   // Show every metric the run offers, including ones that appear later.
-  //
-  // The previous guard keyed off `internalVisibleMetrics.size <= 2`, which
-  // fails in both directions. A metric that becomes available after the first
-  // load — a comparison column arriving with run data, an evaluator finishing
-  // — was never switched on, because by then the set had grown past two; a
-  // chart nobody knows to look for is a chart nobody finds. And since the
-  // initial set is exactly {cost, latency}, a run offering only those two kept
-  // the guard true forever, setting a fresh Set on every pass.
-  //
-  // Track which ids have already been offered instead. Newly-offered metrics
-  // switch on once; anything the user has since unchecked stays unchecked,
-  // because it is already in `seen`.
   const seenMetricIdsRef = useRef<Set<MetricType>>(new Set());
   useEffect(() => {
     const unseen = availableMetrics

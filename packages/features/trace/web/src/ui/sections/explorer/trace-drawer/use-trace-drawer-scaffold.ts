@@ -31,30 +31,16 @@ interface TraceDrawerScaffold {
 }
 
 /**
- * Data wiring + cross-cutting effects for the trace drawer. Owns the
- * URL → store hydration, header/span-tree queries, conversation context,
- * navigation history, prefetch warmups, the close-on-outside-double-click
- * listener, and keyboard-shortcut binding. The consumer renders layout from
- * the returned values; UI state (viewMode, vizTab, etc.) is read directly
- * from `useDrawerStore` by the layout component.
+ * Data wiring + cross-cutting effects for the trace drawer.
  */
 export function useTraceDrawerScaffold(): TraceDrawerScaffold {
-  // `goBack` so closing the drawer pops just our entry off the drawer
-  // stack, e.g. clicking the close button from a trace opened via the
-  // scenarioRunDetail drawer restores that scenario drawer instead of nuking
-  // the whole drawer-state (which `closeDrawer` would do, also stripping the
-  // `span` and other shared params from the URL). `goBack` itself falls back
-  // to `closeDrawer` when the stack is at its root, so deep links still close
-  // cleanly. `closeDrawer` is for when the stack no longer describes this
-  // drawer at all, see `closeDrawerNow`.
+  // `goBack` so closing the drawer pops just our entry off the drawer stack, e.g. clicking the close button from
+  // a trace opened via the scenarioRunDetail drawer restores that scenario drawer instead of nuking the whole
+  // drawer-state (which `closeDrawer` would do, also stripping the `span` and other shared params from the URL).
   const { goBack, closeDrawer } = useDrawer();
 
   // The drawer store is the source of truth for `traceId` — see
-  // `useTraceDrawerUrlHydrator` (mounted at the page level) for the
-  // URL → store sync. Reading from the store here avoids the close →
-  // immediate reopen race where the URL push lags one tick behind the
-  // synchronous `store.openTrace` call, which previously read as a
-  // brief "No trace selected" empty state between drawers.
+  // `useTraceDrawerUrlHydrator` (mounted at the page level) for the URL → store sync.
   const traceId = useDrawerStore((s) => s.traceId) ?? undefined;
 
   // Single source of truth — the drawer store. URL is just a serialization.
@@ -63,31 +49,18 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const setMaximized = useDrawerStore((s) => s.setMaximized);
 
-  // The captured tree feeds the header the one thing it cannot work out on its
-  // own: how many of the trace's spans a correction removes, which is what
-  // keeps the header's span count agreeing with the waterfall below it. Both
-  // readings come from one read, so the live delta poll keeps a single observer.
-  // The tree the drawer draws keeps the rows a correction removes, struck
-  // through, so the reader can see what went away rather than having to spot an
-  // absence. What the corrected trace actually contains is `corrected`, which is
-  // what the header counts.
+  // The captured tree feeds the header the one thing it cannot work out on its own: how
+  // many of the trace's spans a correction removes, which is what keeps the header's
+  // span count agreeing with the waterfall below it.
   const { captured: capturedSpanTree, display: spanTreeQuery } = useSpanTreeWithCaptured();
   const headerQuery = useTraceHeader({ spans: capturedSpanTree.data });
-  // `useTraceHeader` uses React Query's `keepPreviousData`, so the
-  // previous trace's data lingers until the new fetch resolves. That
-  // matters now that the drawer is mounted optimistically: switching
-  // from trace A → close → open trace B no longer unmounts the hook,
-  // so without an explicit id match check we'd briefly show A's
-  // header chips, conversation context, etc. under the new selection.
-  // Guard by traceId match; the spans tree is keyed on traceId too.
+  // `useTraceHeader` uses React Query's `keepPreviousData`, so the previous trace's
+  // data lingers until the new fetch resolves.
   const trace = headerQuery.data && headerQuery.data.traceId === traceId ? headerQuery.data : null;
   const spanTree = spanTreeQuery.data && trace ? spanTreeQuery.data : [];
-  // Show the full-shell skeleton whenever we have a traceId in the URL but
-  // no result yet — including the moment before the project context has
-  // loaded and the query is still disabled. Without this guard, hard
-  // reloading a drawer URL renders the 404 page for one frame before the
-  // refetch even runs. Also covers the A→B reopen case above (no `trace`
-  // until the matching fetch lands).
+  // Show the full-shell skeleton whenever we have a traceId in the URL but no result
+  // yet — including the moment before the project context has loaded and the query is
+  // still disabled.
   const isLoading = traceId ? !trace && !headerQuery.error : false;
 
   const conversationContext = useConversationContext(
@@ -124,13 +97,9 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
 
   const trpcUtils = api.useUtils();
   const closeDrawerNow = useCallback(() => {
-    // Cancel any in-flight per-trace queries so closing during a slow
-    // load doesn't leave the request running in the background, racing
-    // against a future re-open of the same drawer (or a different
-    // trace) and burning bandwidth/CH cycles for a result nobody is
-    // waiting on. React Query rolls cancellation through the AbortController
-    // we plumb through tRPC, so this is a no-op when the request has
-    // already settled.
+    // Cancel any in-flight per-trace queries so closing during a slow load doesn't leave the request running in
+    // the background, racing against a future re-open of the same drawer (or a different trace) and burning
+    // bandwidth/CH cycles for a result nobody is waiting on.
     if (traceId) {
       void trpcUtils.tracesV2.header.cancel();
       void trpcUtils.tracesV2.spanTree.cancel();

@@ -78,28 +78,8 @@ function extractFilename({
 }
 
 /**
- * The failure behind a non-OK download response, as something the shared error
- * reader understands.
- *
- * `/api/export/traces/download` answers a rejection with the flat handled body
- * — `{ error: "<code>", message, ...meta, trace }`, see
- * `src/app/api/middleware/error-handler.ts` — and that code is the entire
- * point: a payload too large, a rate limit and a gateway timeout are three
- * different things, and only the first two are worth retrying differently.
- * Synthesising `new Error("Export failed: 413 Payload Too Large")` threw all of
- * it away, and `showErrorToast` — handed an error with no handled payload on it
- * — answered every one of them with "We've been notified. Try again in a
- * moment."
- *
- * The body rides ON an `Error` rather than replacing it, so the throw stays an
- * Error (the `AbortError` check downstream depends on that) while
- * `readHandledError` still finds the flat REST payload hanging off it.
- *
- * A body carrying no recognisable code — an unhandled 500, or an ingress
- * answering HTML before the route ever ran — degrades to `export_failed`, the
- * registry's own code for an export that did not finish. That is already a far
- * better answer than the generic unknown, and it improves on its own the moment
- * the route names its rejections.
+ * The failure behind a non-OK download response, as something the shared error reader
+ * understands.
  */
 async function exportRequestError(response: Response): Promise<Error> {
   const body: unknown = await response.json().catch(() => null);
@@ -117,23 +97,10 @@ async function exportRequestError(response: Response): Promise<Error> {
 }
 
 /**
- * Hook that orchestrates the trace export flow:
- * dialog state, file download streaming, tRPC subscription progress updates, and cancellation.
- *
- * The export uses two connections:
- * 1. A POST to `/api/export/traces/download` that streams the file data
- * 2. A tRPC subscription via BroadcastService for real-time progress (works across K8s pods)
- *
- * The tRPC subscription is activated when the download response headers arrive,
- * providing the exportId via the X-Export-Id header.
- *
+ * Hook that orchestrates the trace export flow: dialog state, file download streaming,
+ * tRPC subscription progress updates, and cancellation.
  * @see specs/traces/trace-export.feature
  */
-// Pre-existing: this file moved out of components/messages/ unchanged when the
-// legacy Traces page was removed, and the new-violation gate compares by path,
-// so a relocation reads as a brand-new file. Splitting these up is a separate
-// change from moving them.
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: relocated, not rewritten
 export function useExportTraces({
   projectId,
   filters,

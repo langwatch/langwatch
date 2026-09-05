@@ -14,11 +14,6 @@ export function hasNoResults(status?: ScenarioRunStatus): boolean {
 /**
  * Whether the drawer should show an explicit "No response" empty state for the
  * conversation.
- *
- * True only when the run has genuinely finished (terminal status) with zero
- * messages AND did not fail at the infrastructure level — i.e. the agent under
- * test ran but produced nothing. An in-flight run (still streaming) or an
- * errored run (the error is surfaced separately) must NOT show it.
  */
 export function shouldShowNoResponse(params: {
   status?: ScenarioRunStatus;

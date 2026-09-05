@@ -1,18 +1,6 @@
 /**
- * The results of a comparison run as a matrix: one row per scenario, one
- * column per target, and in each cell how that scenario went against that
- * target.
- *
- * The columns put the targets next to each other, which is what a comparison
- * is for. Each column header carries the dot and the name of its target and
- * the summary of that target's runs alone, so the two pills sit side by side
- * where the single run reads one pill in its header line.
- *
- * The rows and the cells live in `ComparisonResultsRow` and the column widths
- * in `comparison-columns`; this file owns the grid: which scenarios are rows
- * and which targets are columns. The matrix scrolls sideways inside its own
- * card once the columns do not fit, so the page itself never does.
- *
+ * The results of a comparison run as a matrix: one row per scenario, one column per
+ * target, and in each cell how that scenario went against that target.
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

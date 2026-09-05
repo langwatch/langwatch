@@ -34,12 +34,6 @@ function dedupeLatest(evals: TraceEvalResult[]): TraceEvalResult[] {
 
 /**
  * Resolve which definition drawer (if any) an evaluator id opens.
- *
- * Langevals built-in evaluator *types* carry a "/" (e.g.
- * "ragas/faithfulness") and have no editable definition → null.
- * Configured evaluators (`evaluator_*`) open the evaluator editor; other
- * slash-free ids are legacy online monitors and open the
- * online-evaluation drawer — mirroring the legacy EvaluationStatusItem.
  */
 export function evalDefinitionTarget(
   evaluatorId: string | null | undefined,
@@ -102,14 +96,8 @@ const EvaluationsCellView: React.FC<{
     );
   }
   const gap = density === "compact" ? 1 : 1.5;
-  // With an IO preview row actually rendering below, this cell rowSpans
-  // into it — there's plenty of vertical room, so wrap chips freely up
-  // to the historic cap. Without the addon row, the cell drives the
-  // row's own height, and a few stacked chips inflate every trace row
-  // by ~40px each. In that case we keep the row to one line and
-  // overflow via "+N more". Lens-level gating matters: the "Errors"
-  // lens omits `io-preview` entirely, so even rows with input+output
-  // get the capped layout because no addon row is coming.
+  // With an IO preview row actually rendering below, this cell rowSpans into it —
+  // there's plenty of vertical room, so wrap chips freely up to the historic cap.
   const ioPreviewBelow =
     enabledAddonIds.includes("io-preview") && ioPreviewWillRenderFor(row, isExpanded);
   if (ioPreviewBelow) {
@@ -166,13 +154,8 @@ interface CappedEvalChipsRowProps {
 }
 
 /**
- * Renders eval chips on a single horizontal line, replacing chips that
- * would overflow with a `+N more` pill. The measurement strategy is
- * a hidden full-render pass (so we get each chip's natural width) plus
- * a `ResizeObserver` on the visible container so a column-resize or a
- * sidebar resize re-fits the count. Visible-but-hidden start makes the
- * eventual capped row appear with the chips already in place instead
- * of pop-in.
+ * Renders eval chips on a single horizontal line, replacing chips that would overflow
+ * with a `+N more` pill.
  */
 function CappedEvalChipsRow({ evals, gap, decorate }: CappedEvalChipsRowProps) {
   const measureRef = useRef<HTMLDivElement>(null);

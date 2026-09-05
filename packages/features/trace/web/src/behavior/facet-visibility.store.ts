@@ -2,23 +2,8 @@ import { create } from "zustand";
 import { z } from "zod";
 
 /**
- * Per-project, per-user overrides on top of the density-driven default
- * facet visibility. Two opt-in sets:
- *
- *   - `explicitlyShown` — facet keys the user added back even though
- *     the active density (Comfortable) would hide them by default.
- *   - `explicitlyHidden` — facet keys the user dismissed even though
- *     the active density (Compact / Comfortable) would show them.
- *
- * Effective visibility = (density-default ∪ explicitlyShown ∪
- * active-in-AST) \ explicitlyHidden \ has-zero-data. The resolver lives
- * in `useFilterSidebarData`; this store just owns the persistence +
- * mutation surface so the sidebar can `addFacet` / `hideFacet` without
- * caring about how the resolver consumes them.
- *
- * State is keyed per project — copied from `pinnedAttributesStore`'s
- * approach so a user with multiple projects doesn't carry their
- * customer-A facet shape into customer-B.
+ * Per-project, per-user overrides on top of the density-driven default facet
+ * visibility. Two opt-in sets:
  */
 export interface FacetVisibilityState {
   byProject: Record<
@@ -113,10 +98,9 @@ function emptyPrefs() {
 }
 
 /**
- * Stable empty reference for the selector — Zustand bails out of
- * re-renders when the selected slice is referentially equal, so we
- * must hand the same object back on every unhydrated read. A fresh
- * `emptyPrefs()` would force a re-render on each subscription tick.
+ * Stable empty reference for the selector — Zustand bails out of re-renders when the
+ * selected slice is referentially equal, so we must hand the same object back on every
+ * unhydrated read.
  */
 const STABLE_EMPTY_PREFS: {
   explicitlyShown: string[];
@@ -165,12 +149,9 @@ export const useFacetVisibilityStore = create<FacetVisibilityState>((set, get) =
 }));
 
 /**
- * Convenience selector — returns the prefs for a project. A pure
- * projection on store state, so it keeps Zustand's ref-equality bailout
- * intact: consumers see the same object reference on every read until
- * `byProject[projectId]` actually changes. Hydration is a side-effect
- * the caller schedules separately (`hydrateFromStorage` in a mount
- * effect); pre-hydrate reads land on `STABLE_EMPTY_PREFS`.
+ * Convenience selector — returns the prefs for a project. A pure projection on store
+ * state, so it keeps Zustand's ref-equality bailout intact: consumers see the same
+ * object reference on every read until `byProject[projectId]` actually changes.
  */
 export function selectVisibilityFor(
   state: FacetVisibilityState,

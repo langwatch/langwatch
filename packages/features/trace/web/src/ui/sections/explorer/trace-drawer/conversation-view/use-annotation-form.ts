@@ -46,12 +46,9 @@ function saveCallbacks({
 }
 
 /**
- * Reads and writes for one turn's annotation: the annotation being edited,
- * the project's active score keys, and the create / update / delete calls
- * with their toasts and cache invalidation.
- *
- * `enabled` gates the reads, so a host that keeps the form mounted while it is
- * closed pays nothing for it. `onDone` fires after a successful write.
+ * Reads and writes for one turn's annotation: the annotation being edited, the
+ * project's active score keys, and the create / update / delete calls with their toasts
+ * and cache invalidation.
  */
 export function useAnnotationMutations({
   traceId,

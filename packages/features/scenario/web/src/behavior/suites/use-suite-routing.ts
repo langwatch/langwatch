@@ -1,16 +1,5 @@
 /**
  * Hook for path-based suite routing.
- *
- * All simulation sub-paths are handled by a single catch-all page file
- * ([[...path]].tsx), so sidebar navigation uses shallow routing — no
- * full page transitions, no remounting, no skeleton flicker.
- *
- * Derives the active selection from router.query.path:
- *   []                            → All Runs
- *   ["run-plans", slug]           → Suite detail
- *   ["run-plans", slug, batchId]  → Suite + highlight batch
- *   [setSlug]                     → External set
- *   [setSlug, batchId]            → External set + highlight batch
  */
 import { useCallback } from "react";
 import { useRouter } from "@langwatch/ui-host/use-router";
@@ -35,18 +24,8 @@ export function toExternalSetSelection(scenarioSetId: string): string {
 }
 
 /**
- * The URL a simulations path should be sent to instead of rendered, or null to
- * render it as it stands.
- *
- * Everything under /simulations that is not a known shape is read as an
- * external SET slug, so a near-miss URL does not fail — it quietly renders the
- * run history for a set that does not exist, which reads as "your thing isn't
- * here". `/simulations/scenarios/<id>` is the near-miss that matters: the
- * scenario library is a real page one segment away, and a link built by hand
- * (or by an agent) lands on it constantly. Send those to the library with the
- * scenario open rather than to an empty set.
- *
- * Pure and exported so the redirect rules are testable without a router.
+ * The URL a simulations path should be sent to instead of rendered, or null to render
+ * it as it stands.
  */
 export function resolveSimulationsRedirect({
   projectSlug,
@@ -100,26 +79,6 @@ const DRAWER_NAMES: Record<string, string> = {
 
 /**
  * The Agent Testing address that shows what a simulations address shows.
- *
- * A saved link, a link the scenario library printed before the project moved
- * to Agent Testing, or one an older CLI derived, all name the v1 page. With
- * the release flag on the project reads Agent Testing, so the v1 page sends
- * the reader here instead of rendering.
- *
- *   /simulations                          /agent-testing/results
- *   /simulations/scenarios[/id]           /agent-testing, the editor open on id
- *   /simulations/suites?suite=slug        /agent-testing/results/slug
- *   /simulations/suites?externalSet=id    /agent-testing/results/external:id
- *   /simulations/run-plans/slug[/batch]   /agent-testing/results/slug[/batch]
- *   /simulations/set[/batch[/run]]        /agent-testing/results/external:set[/batch],
- *                                         the run detail drawer open on run
- *
- * Every other query param travels: the period, the grouping, an open drawer
- * and the tab key of a handoff. The v1 scenario editor drawer becomes the
- * case editor. The platform's own sets are listed under their plans, so an
- * address naming one opens the results list.
- *
- * Pure and exported so the mapping is testable without a router.
  */
 export function toAgentTestingAddress({
   projectSlug,
@@ -259,14 +218,6 @@ const ROUTE_PARAM_KEYS = new Set(["project", "path"]);
 
 /**
  * Whether a query param carries over when the sidebar selection changes.
- *
- * The date window (`period`, or `startDate` plus `endDate`) and the
- * run-history view state (`groupBy`, `scenarioId`, `passFailStatus`) describe
- * what the user is looking at rather than which set they picked, so they
- * follow the selection. Dropping `period` snapped a widened window back to
- * the 30-day default and hid the older run the user had widened the window to
- * reach. An open drawer is the exception: it holds a run from the set being
- * navigated away from.
  */
 export const survivesSelectionChange = (key: string): boolean =>
   !ROUTE_PARAM_KEYS.has(key) && !key.startsWith("drawer");

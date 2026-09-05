@@ -11,11 +11,9 @@ interface RedactedFieldProps {
   children: React.ReactNode;
   loadingComponent?: React.ReactNode;
   /**
-   * When provided, drives the redaction state directly instead of the per-field
-   * query: the traces-v2 drawer passes the DTO's own redaction info so the
-   * marker can never disagree with the content the server already nulled.
-   * `visibleTo` is the human audience label ("Admins, Security group" or "no
-   * one"), or null for the generic copy.
+   * When provided, drives the redaction state directly instead of the per-field query:
+   * the traces-v2 drawer passes the DTO's own redaction info so the marker can never
+   * disagree with the content the server already nulled.
    */
   redacted?: boolean;
   visibleTo?: string | null;
@@ -43,20 +41,8 @@ function explanationFor(visibleTo: string | null): string {
 }
 
 /**
- * The shared redacted-content marker: a lock + "Redacted" with an optional
- * audience hint and a tooltip that links to the privacy settings. This is the
- * ONE redaction treatment every traces-v2 surface reuses (summary I/O, span
- * I/O, conversation context, conversation view, table cells) so a redacted
- * field reads identically everywhere instead of each surface inventing its own
- * "no content" placeholder.
- *
- * Kept as its own component so the organization/permission lookup it needs for
- * the "Open privacy settings" link only runs when content is actually redacted,
- * never for content that renders normally (the common case, which may render
- * outside an org context).
- *
- * `size="xs"` shrinks the lock + text for dense rows (table cells, the
- * conversation-context strip); the default reads at the drawer's `sm` body size.
+ * The shared redacted-content marker: a lock + "Redacted" with an optional audience
+ * hint and a tooltip that links to the privacy settings.
  */
 export const RedactedInline: React.FC<{
   visibleTo?: string | null;

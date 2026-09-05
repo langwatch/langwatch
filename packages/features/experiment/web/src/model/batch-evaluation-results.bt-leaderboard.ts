@@ -1,11 +1,6 @@
 /**
- * Bradley-Terry MLE leaderboard for the Comparison evaluator (#5103).
- * Pure client-side helper — mirrors the shape of `computeBatchAggregates.ts`.
- * No I/O, no React.
- *
- * Math: iterative MM update from Hunter (2004) "MM algorithms for generalized
- * Bradley-Terry models". Bootstrap percentile CIs for the Elo-style score.
- * Tie convention: 0.5 win + 0.5 loss to each side (LMSYS Arena).
+ * Bradley-Terry MLE leaderboard for the Comparison evaluator (#5103). Pure client-side
+ * helper — mirrors the shape of `computeBatchAggregates.ts`. No I/O, no React.
  */
 
 import { quantile } from "./batch-evaluation-results.metric-stats";
@@ -30,10 +25,8 @@ export type BTLeaderboardEntry = {
   /** Total losses (1 per loss, 0.5 per tie). */
   losses: number;
   /**
-   * Total PAIRWISE matchups this variant took part in — wins + losses in the
-   * win matrix, where an N-way verdict contributes one matchup per pair it
-   * implies. Not a row count: on a four-way run a variant appearing in all 60
-   * rows records 116 matchups, not 60. `winRate` is over the same denominator.
+   * Total PAIRWISE matchups this variant took part in — wins + losses in the win
+   * matrix, where an N-way verdict contributes one matchup per pair it implies.
    */
   matchups: number;
   /** Win rate over matchups, or null if no matchups. */
@@ -49,10 +42,9 @@ export type BTLeaderboardEntry = {
 };
 
 /**
- * Pair-by-pair win count: matrix[a][b] = number of times variant a beat
- * variant b (ties count 0.5 to each side). Keyed by variantId (not index)
- * so the consumer doesn't have to track ordering. The heatmap in
- * PairwiseLeaderboard reads this directly.
+ * Pair-by-pair win count: matrix[a][b] = number of times variant a beat variant b (ties
+ * count 0.5 to each side). Keyed by variantId (not index) so the consumer doesn't have
+ * to track ordering. The heatmap in PairwiseLeaderboard reads this directly.
  */
 export type WinMatrix = Record<string, Record<string, number>>;
 
@@ -71,35 +63,16 @@ export type BTLeaderboard = {
   didConverge: boolean;
   /**
    * Which variants this fit is entitled to compare.
-   *
-   * `hasDegenerate` above tests a per-variant condition that is necessary but
-   * NOT sufficient for the MLE to exist. This is the sufficient one (Ford
-   * 1957): scores are comparable only within a strongly connected component.
    */
   comparability: Comparability;
   /**
-   * 95% CI of the DIFFERENCE between two scores, per ordered pair. Null when
-   * the bootstrap did not run.
-   *
-   * This is the statistic the separation question actually asks, and it is
-   * not recoverable from the per-variant intervals above. Every replicate
-   * re-fits the whole field at once, so two variants' replicate scores move
-   * together — a resample that happens to favour the field lifts both. The
-   * difference cancels that shared movement; comparing the two marginal
-   * intervals does not, and so tests a strictly stronger condition than
-   * "these two differ". The cost is real: intervals can overlap while every
-   * replicate still puts a ahead of b.
+   * 95% CI of the DIFFERENCE between two scores, per ordered pair. Null when the
+   * bootstrap did not run.
    */
   scoreDifferenceCI: ScoreDifferenceCI | null;
   /**
-   * Share of bootstrap replicates whose own fit hit the iteration cap
-   * instead of settling. Null when the bootstrap did not run.
-   *
-   * The point fit reports `didConverge`, but the interval is built from a
-   * thousand other fits and their failures used to be discarded. A resample
-   * can be much harder to fit than the full dataset — it routinely drops a
-   * variant's only wins — so a run can converge cleanly and still have its
-   * interval drawn largely from fits that never did.
+   * Share of bootstrap replicates whose own fit hit the iteration cap instead of
+   * settling. Null when the bootstrap did not run.
    */
   bootstrapNonConvergence: number | null;
 };
@@ -114,12 +87,6 @@ export type ScoreDifferenceCI = Record<string, Record<string, [number, number]>>
 export type BTLeaderboardOptions = {
   /**
    * Bootstrap resamples for CI. 0 disables. Default: 1000.
-   *
-   * Not 200: at that size the Monte-Carlo error on the interval endpoints was
-   * large enough to change which pairs the run called separated on a mere
-   * reseed — measured on 24 of 60 datasets, worst spread 3 pairs of 6. Since
-   * "did this run separate them" is the product's central claim, it must not
-   * depend on the seed. 1000 cuts the endpoint SD roughly in half.
    */
   bootstrapSamples?: number;
   /** Deterministic seed (mulberry32). Default: 1. */
@@ -131,15 +98,8 @@ export type BTLeaderboardOptions = {
 };
 
 /**
- * Beta(eps, eps) pseudo-count added to every pair when the field contains a
- * degenerate variant, so the MM fit stays finite (Hunter §4).
- *
- * Named because the value is load-bearing rather than incidental: it decides
- * how hard the prior pulls short-sample pairs toward 50/50, and with it the
- * rank order of variants that are not themselves degenerate. Measured at 545
- * order flips across 4000 such matrices between 1e-4 and this value — see the
- * note at the call site. Changing it silently changes published rankings, so
- * it belongs somewhere a reader can find it.
+ * Beta(eps, eps) pseudo-count added to every pair when the field contains a degenerate
+ * variant, so the MM fit stays finite (Hunter §4).
  */
 const DEGENERATE_SMOOTHING_EPS = 0.5;
 
@@ -164,15 +124,7 @@ export function computeBTLeaderboard({
   if (n === 0) return emptyLeaderboard();
 
   const idx = new Map(variantIds.map((id, i) => [id, i]));
-  // Rows that survive to contribute evidence. `winner !== null` alone was too
-  // permissive: an N-way tie, an unknown winner, or an empty candidate list all
-  // pass it and are then discarded while building the matrix, so the run
-  // reported "based on 60 comparisons" while ranking on fewer. Resolve first
-  // and count what is left.
-  //
-  // Resolving here rather than inside each consumer also keeps the bootstrap
-  // off the Map: re-resolving inside every replicate was ~3M string-key
-  // lookups on a mid-sized run and dominated the whole computation.
+  // Rows that survive to contribute evidence.
   const usable = comparisons
     .map((comparison) => resolveComparison({ comparison, idx }))
     .filter((resolved): resolved is ResolvedComparison => resolved !== null);
@@ -183,22 +135,8 @@ export function computeBTLeaderboard({
   const degenerateMask = wins.map((w, i) => w === 0 || losses[i] === 0);
   const hasDegenerate = degenerateMask.some(Boolean);
 
-  // Smoothing keeps MM finite when at least one variant is degenerate. A
-  // shared Beta(eps, eps) prior across every pair is the standard fix
-  // (Hunter §4).
-  //
-  // It is NOT order-preserving, and an earlier comment here claimed it was.
-  // The prior adds the same pseudo-count to every pair regardless of how many
-  // real games that pair played, so a pair with two games is dragged most of
-  // the way to 50/50 while a pair with thirty barely moves. On unequal sample
-  // sizes that reorders healthy variants: measured 545 flips across 4000 such
-  // matrices between eps=1e-4 and the eps=0.5 used here. The trigger is a
-  // degenerate variant elsewhere in the field, which is why the reordering can
-  // involve two variants that have nothing to do with it.
-  //
-  // Kept because the alternative — no finite fit at all — is worse, and
-  // because the degenerate variant that triggers it is excluded from the
-  // ranking anyway. Callers are told via the trust panel.
+  // Smoothing keeps MM finite when at least one variant is degenerate. A shared
+  // Beta(eps, eps) prior across every pair is the standard fix (Hunter §4).
   const smooth = hasDegenerate ? DEGENERATE_SMOOTHING_EPS : 0;
   const { strength, didConverge } = fitBT({
     W,
@@ -251,13 +189,7 @@ function emptyLeaderboard(): BTLeaderboard {
     comparisonCount: 0,
     minMatchups: 0,
     hasDegenerate: false,
-    // `false`, not `true`. Nothing was fitted, so nothing converged and
-    // nothing was placed on one scale — and the trust panel renders these as
-    // ticks, which would have told the reader "Ranking settled ✓" and
-    // "Everything is on one scale ✓" about a run holding no comparisons.
-    // Green because nothing was checked is the one thing that panel exists to
-    // avoid. Both flow into a step that is only reached with entries, so this
-    // corrects the claim rather than any rendered output today.
+    // `false`, not `true`.
     didConverge: false,
     comparability: { identifiable: false, groups: [], dominates: [] },
     scoreDifferenceCI: null,
@@ -374,12 +306,9 @@ function resolveComparison({
   if (comparison.winner === null) return null;
 
   const wIdx = idx.get(comparison.winner);
-  // The winner must have been ON the row. types.ts assembles variantIds from
-  // every label the column ever produced, while `candidates` is the per-row
-  // set the judge actually saw — so a winner naming a variant that was
-  // dropped from this row (no output) resolves fine against the global index
-  // and then beats opponents it never faced. Ten such rows fabricated twenty
-  // matchups and a first-place finish.
+  // The winner must have been ON the row. types.ts assembles variantIds from every label the column ever produced, while `candidates` is
+  // the per-row set the judge actually saw — so a winner naming a variant that was dropped from this row (no output) resolves fine
+  // against the global index and then beats opponents it never faced.
   if (wIdx === void 0 || !candIdxs.includes(wIdx)) return null;
   return { candIdxs, winner: wIdx };
 }
@@ -434,13 +363,9 @@ function perVariantTotals(W: number[][]): {
 }
 
 /**
- * Hunter (2004) MM update:
- *   p_i ← (W_i + smooth*(n-1)) / Σ_{j≠i} (N_ij + 2*smooth) / (p_i + p_j)
- * where W_i = Σ_j W[i][j] and N_ij = W[i][j] + W[j][i]. Smoothing adds a
+ * Hunter (2004) MM update: p_i ← (W_i + smooth*(n-1)) / Σ_{j≠i} (N_ij + 2*smooth) /
+ * (p_i + p_j) where W_i = Σ_j W[i][j] and N_ij = W[i][j] + W[j][i]. Smoothing adds a
  * shared Beta(smooth, smooth) prior to every pair.
- *
- * Normalizes after each iteration so geometric mean(p) = 1, which makes
- * score = 400*log10(p) center around 0.
  */
 function fitBT({
   W,
@@ -533,10 +458,6 @@ function maxRelativeChange({ next, previous }: { next: number[]; previous: numbe
 
 /**
  * The Beta(eps, eps) prior a given win matrix needs to keep MM finite.
- *
- * Shared by the point fit and by every bootstrap replicate: any variant with
- * no wins or no losses makes the MLE degenerate, and the prior (Hunter §4) is
- * what keeps its strength off zero without reordering healthy data.
  */
 function smoothingFor(W: number[][], n: number): number {
   for (let i = 0; i < n; i++) {
@@ -663,13 +584,7 @@ function runBootstrapReplicates({
       resampled[k] = resolved[r]!;
     }
     const Wb = buildWinMatrix({ resolved: resampled, n });
-    // Smoothing must be decided per replicate, not inherited from the full
-    // dataset. A resample routinely contains a variant that happened to win
-    // nothing, even when no variant is degenerate overall — and with smooth=0
-    // that variant's strength goes to 0, so 400*log10(0) is -Infinity and the
-    // geometric-mean renormalisation throws its opponent to ~1e300, i.e.
-    // +120000. The resulting interval is not merely wide, it is fabricated,
-    // and it is finite, so downstream isFinite() guards let it through.
+    // Smoothing must be decided per replicate, not inherited from the full dataset.
     const { strength, didConverge } = fitBT({
       W: Wb,
       smooth: smoothingFor(Wb, n),
@@ -693,13 +608,9 @@ function percentileCI(samples: number[]): [number, number] | null {
 }
 
 /**
- * Per-pair CIs use score differences from the same bootstrap replicate, which
- * cancels shared field movement. They calibrate each individual pair at 95%;
- * they are not a simultaneous guarantee across the whole leaderboard.
- *
- * `computeSampleAdequacy` must state that multiplicity when it reports a count
- * of separated pairs. Wider simultaneous bands were rejected because they
- * weakened every claim more than the previous overlap rule.
+ * Per-pair CIs use score differences from the same bootstrap replicate, which cancels
+ * shared field movement. They calibrate each individual pair at 95%; they are not a
+ * simultaneous guarantee across the whole leaderboard.
  */
 function pairwiseDifferenceCIs({
   scoreSamples,
@@ -738,10 +649,9 @@ function pairwiseDifferenceCIs({
 }
 
 /**
- * Replicate-by-replicate gap between two variants. A replicate that produced
- * a non-finite score for either variant says nothing about the gap between
- * them. Dropping it is the only honest option; keeping it would poison every
- * quantile.
+ * Replicate-by-replicate gap between two variants. A replicate that produced a
+ * non-finite score for either variant says nothing about the gap between them. Dropping
+ * it is the only honest option; keeping it would poison every quantile.
  */
 function finiteDifferences({
   a,

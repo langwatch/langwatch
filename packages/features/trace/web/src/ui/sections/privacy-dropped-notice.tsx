@@ -3,18 +3,8 @@ import { useOrganizationTeamProject } from "../../behavior/use-organization-team
 import NextLink from "../elements/next-link";
 
 /**
- * Banner shown when a trace is missing content because a `drop` privacy policy
- * stripped it before storage.
- *
- * Dropped content never reached storage, so the field renders empty. Without a
- * marker that reads as missing instrumentation, which sends people hunting for a
- * broken SDK when the cause is a deliberate policy. This notice names the
- * categories that were dropped and makes clear the content was never stored and
- * cannot be recovered (unlike a read-time restriction, which keeps the data and
- * only hides who can read it).
- *
- * The categories come from a marker the drop stamps on the span, so the notice
- * follows the data: traces from before a rule was added are not mislabeled.
+ * Banner shown when a trace is missing content because a `drop` privacy policy stripped
+ * it before storage.
  */
 const CATEGORY_LABELS: Record<string, string> = {
   input: "input",

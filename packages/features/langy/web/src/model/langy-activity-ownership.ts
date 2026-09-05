@@ -2,11 +2,6 @@ import type { LangyProgressSample } from "./values/langy-turn";
 
 /**
  * One piece of work gets one visible progress owner.
- *
- * A pending capability card is more specific than the global turn status, so
- * it owns the label, progress bar, measured count, and the wave's travelling
- * status pulse for as long as it is present. Metrics remain global because
- * they describe the whole turn rather than the one capability call.
  */
 export function resolveLangyActivityOwnership({
   hasInlineProgressOwner,

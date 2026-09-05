@@ -1,9 +1,6 @@
 /**
+ * The drawer header's annotations chip.
  * @vitest-environment jsdom
- *
- * The drawer header's annotations chip. It counts the annotations on the whole
- * conversation and takes the reader to the Conversation view, where each one
- * reads beside the turn it is about. See specs/traces-v2/annotations.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

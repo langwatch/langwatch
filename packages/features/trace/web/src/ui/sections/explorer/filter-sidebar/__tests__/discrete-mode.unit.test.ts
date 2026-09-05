@@ -4,15 +4,6 @@ import type { RangeSectionData } from "../../../../../behavior/explorer/filter-s
 
 /**
  * `discreteMode` factors two pure helpers out of `useFilterSidebarData`:
- *
- *   • `computeDiscreteEligible({ ranges, maxDistinctValues })` picks the
- *     range descriptors that carry a bounded `discrete` payload — a small
- *     enough distinct-value set to render as a tick-list rather than the
- *     min/max slider.
- *   • `resolveNumericModeByKey({ discreteEligible, numericModes })` folds
- *     the per-project override on top: `override ?? "discrete"` for every
- *     eligible key. Non-eligible keys never enter the map (the section
- *     stays a slider regardless of override).
  */
 
 const range = (partial: Partial<RangeSectionData> & { key: string }): RangeSectionData => ({

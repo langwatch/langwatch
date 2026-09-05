@@ -7,10 +7,6 @@ import type { VariantMetrics } from "../../batch-evaluation-results.variant-metr
 
 /**
  * What the trade-off chart is allowed to draw.
- *
- * The scatter is the surface a reader acts on when choosing what to ship, so
- * it must not contradict the table and trust panel beside it.
- *
  * @see specs/experiments/comparison-leaderboard.feature
  */
 
@@ -67,13 +63,9 @@ const metricsFor = (ids: string[]): Record<string, VariantMetrics> =>
 describe("buildParetoPoints", () => {
   describe("given a variant that swept every matchup", () => {
     /**
-     * `computeParetoDominance` excludes degenerates because "their score is
-     * not a measurement", the table labels them, and the trust panel says
-     * they are excluded from the ranking. The scatter was the one surface
-     * that drew them anyway — and drew them SOLID, the styling that means
-     * still-in-contention, because `dominatedBy` is keyed over ranked
-     * variants only so a degenerate never appears in it. On a quality axis
-     * that put a Beta(0.5, 0.5) smoothing artifact at the top.
+     * `computeParetoDominance` excludes degenerates because "their score is not a
+     * measurement", the table labels them, and the trust panel says they are excluded
+     * from the ranking.
      */
     it("does not plot it as a live option", () => {
       const points = buildParetoPoints({

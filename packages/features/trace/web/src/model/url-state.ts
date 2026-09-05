@@ -1,10 +1,5 @@
-// Density is intentionally NOT serialised into the URL — it's a personal
-// preference, not a shareable view setting. Lives in `densityStore.ts`.
-//
-// Column / grouping / sort drafts are also NOT serialised — they're per-user
-// view tweaks, not shareable query state. They live in `viewStore`'s
-// `draftState`; the lens tab shows an "unsaved" dot when any are active.
-// To persist them across reloads, the user saves them into a (custom) lens.
+// Density is intentionally NOT serialised into the URL — it's a personal preference,
+// not a shareable view setting. Lives in `densityStore.ts`.
 
 export interface BarStateOverrides {
   query?: string;

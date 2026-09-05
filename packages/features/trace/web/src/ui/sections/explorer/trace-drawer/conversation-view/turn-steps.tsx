@@ -17,12 +17,7 @@ const GENIE_MESSAGE_SPAN = "databricks_genie.message";
 const TOOL_SPAN_NAMES = new Set([TOOL_SPAN, GENIE_QUERY_SPAN]);
 
 /**
- * Whether a conversation turn is a routed Genie message with steps worth
- * opening. Genie turns carry no coding-agent service name, so the mount site
- * cannot reuse its Claude Code check; the trace name is the reliable signal
- * (the mapper names every root span `databricks_genie.message`). A spanCount
- * of 1 is the root alone — a message that generated no SQL — and mounting the
- * strip there would announce steps and then find none.
+ * Whether a conversation turn is a routed Genie message with steps worth opening.
  */
 export function turnHasGenieSteps(turn: { traceName?: string | null; spanCount: number }): boolean {
   return turn.traceName === GENIE_MESSAGE_SPAN && turn.spanCount > 1;
@@ -40,15 +35,6 @@ interface TurnStepsProps {
 
 /**
  * What actually ran inside one coding-agent turn.
- *
- * A Claude Code turn is an agentic LOOP — model, tool, model, tool, answer —
- * and the conversation's user/assistant bubbles show only its two ends. A turn
- * that ran twelve tools and called the model five times looks, in the thread,
- * exactly like a turn that answered in one shot. This strip is the middle.
- *
- * Collapsed it costs nothing: the step count rides on the turn summary already.
- * The spans are fetched only when the row is actually opened, so a long thread
- * doesn't fire a query per turn.
  */
 export const TurnSteps = memo(function TurnSteps({
   traceId,

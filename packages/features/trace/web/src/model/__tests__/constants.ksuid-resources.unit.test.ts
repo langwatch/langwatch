@@ -1,12 +1,5 @@
 /**
  * KSUID resource ID generation patterns for `KSUID_RESOURCES`.
- *
- * Was `platform/app/src/server/scenarios/__tests__/simulation-runner.unit.test.ts`
- * (`~/utils/constants`). Only the "New scenario ID" case ports here — the
- * "Synthetic scenario run ID" scenario is already bound against
- * `generateScenarioRunId()` in
- * `packages/features/scenario/contract/src/__tests__/scenario.ids.unit.test.ts`.
- *
  * @see specs/scenarios/scenario-job-id-uniqueness.feature
  */
 import { generate } from "@langwatch/ksuid";

@@ -1,12 +1,6 @@
 /**
+ * The select column's header while the trace table is still loading.
  * @vitest-environment jsdom
- *
- * The select column's header while the trace table is still loading. The
- * loading table is fed placeholder rows so the layout does not jump, and those
- * rows carry no trace: a "select all" over them hands the bulk actions ids that
- * address nothing, and deselecting cannot take them back out again because the
- * ids are gone from the table by then.
- * See specs/traces-v2/bulk-actions.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";

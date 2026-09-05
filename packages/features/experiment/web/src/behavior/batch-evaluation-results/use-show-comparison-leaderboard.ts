@@ -10,23 +10,8 @@ import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 export const COMPARISON_LEADERBOARD_FLAG = "release_ui_comparison_leaderboard_enabled" as const;
 
 /**
- * Whether this reader gets the leaderboard at all
- * (spec: specs/experiments/comparison-leaderboard.feature).
- *
- * Org-targeted rather than project-targeted: the leaderboard is a way of
- * reading a Comparison, not a property of one dataset, so enabling it for a
- * customer means enabling it everywhere they work rather than project by
- * project.
- *
- * `enabled` reads false while the query is in flight, which is the right
- * default for hiding a chart: the results page renders without it and the
- * chart appears once the flag answers, rather than flashing a card that then
- * vanishes.
- *
- * Deliberately ONE gate covering both surfaces — the metric entry in the
- * Metrics dropdown and the chart it toggles. Gating only the chart would
- * leave a menu item that switches nothing on, which is worse than either
- * state on its own.
+ * Whether this reader gets the leaderboard at all (spec:
+ * specs/experiments/comparison-leaderboard.feature).
  */
 export function useShowComparisonLeaderboard(): boolean {
   const { project, organization } = useOrganizationTeamProject({

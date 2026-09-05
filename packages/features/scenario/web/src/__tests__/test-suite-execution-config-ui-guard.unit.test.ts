@@ -1,22 +1,6 @@
 /**
+ * A test suite row still carries execution settings, because a caller that addresses a test suite BY ID has nothing else to run against: the command line, the MCP tool and the SDK all reach `POST /api/suites/:id/run`.
  * @vitest-environment node
- *
- * A test suite row still carries execution settings, because a caller that
- * addresses a test suite BY ID has nothing else to run against: the command line,
- * the MCP tool and the SDK all reach `POST /api/suites/:id/run`. What keeps
- * that from being a licence for the product UI to treat a test suite as a run
- * plan again is this guard.
- *
- * The v2 Agent Testing UI queues every run through `suites.runPlan`, which
- * writes the configuration onto a RUN PLAN. It must never reach the id-based
- * `suites.run` or `suites.runAll`, and it must never write a suite row
- * directly through `suites.create` or `suites.update`, which are the two
- * procedures that accept targets, a repeat count and the models.
- *
- * A static read of the source, not a render: the point is that no file
- * anywhere under the feature calls these, which no single rendered component
- * can show.
- *
  * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";

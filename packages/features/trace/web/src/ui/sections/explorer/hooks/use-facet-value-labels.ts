@@ -2,12 +2,9 @@ import { useCallback, useMemo } from "react";
 import { useTraceFacets } from "./use-trace-facets";
 
 /**
- * Resolve a facet `field:value` pair to its human label using the same
- * discover payload the filter sidebar renders from (e.g. evaluator
- * `monitor_0005…` → "Ragas Response Relevancy"). Returns undefined when
- * the value has no richer label — callers should fall back to the raw
- * value. Backed by the shared `discover` React Query cache, so this
- * costs no extra request.
+ * Resolve a facet `field:value` pair to its human label using the same discover payload
+ * the filter sidebar renders from (e.g. evaluator `monitor_0005…` → "Ragas Response
+ * Relevancy").
  */
 export function useFacetValueLabelResolver(): ({
   field,

@@ -1,13 +1,6 @@
 /**
+ * Integration tests for the "evaluations" field mapping dropdown in TracesMapping.
  * @vitest-environment jsdom
- *
- * Integration tests for the "evaluations" field mapping dropdown in
- * TracesMapping.
- *
- * Like the spans dropdown, it must offer every evaluator name the project ran
- * in the last 30 days, not just the evaluators present on the currently loaded
- * trace(s). These tests render the real component tree and assert the merged
- * behaviour.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

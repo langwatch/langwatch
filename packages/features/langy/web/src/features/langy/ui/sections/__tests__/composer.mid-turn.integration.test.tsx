@@ -1,14 +1,6 @@
 /**
+ * The composer takes no queue: while a turn is in flight Enter sends nothing, and the draft waits in the field until the turn ends.
  * @vitest-environment jsdom
- *
- * The composer takes no queue: while a turn is in flight Enter sends nothing,
- * and the draft waits in the field until the turn ends. That is deliberate,
- * but the mid-turn placeholder used to read "Write your next message…", which
- * invites exactly the action that is refused. A user following it typed a
- * message, pressed Enter, and got no message, no error and no sign of either.
- *
- * So the placeholder is pinned here alongside the behaviour it describes.
- *
  * @see specs/langy/langy-composer-feedback-and-cards.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

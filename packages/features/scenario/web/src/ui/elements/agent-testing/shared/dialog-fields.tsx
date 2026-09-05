@@ -1,10 +1,7 @@
 /**
- * The small pieces every Agent Testing dialog is drawn from: the label above a
- * field, the field styling itself, and the message under a field the server or
- * the schema refused.
- *
- * One copy, so the scenario dialog, the run plan dialog and the run dialog
- * all read the same.
+ * The small pieces every Agent Testing dialog is drawn from: the label above a field,
+ * the field styling itself, and the message under a field the server or the schema
+ * refused.
  */
 
 import { HStack, Text } from "@chakra-ui/react";

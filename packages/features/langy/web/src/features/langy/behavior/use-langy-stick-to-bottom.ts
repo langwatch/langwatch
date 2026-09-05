@@ -3,56 +3,16 @@ import { useReducedMotion } from "../../../behavior/use-reduced-motion";
 
 /**
  * Follow-the-stream scrolling for the Langy message column.
- *
- * WHY A ResizeObserver AND NOT AN EFFECT ON `messages`:
- * the old autoscroll was `useEffect(..., [messages, status])`, which assumed
- * every growth of the column passes through `messages`. It doesn't. The granular
- * turn signals (status / progress / metrics) come off `useLangyTurnSignals`, and
- * the capability + activity cards render off tool parts — neither of which
- * changed the effect's deps. So the column grew and the scroller never moved, and
- * the answer streamed off the bottom of the panel.
- *
- * Chasing that with a longer dep list is a losing game: the next thing anyone
- * streams in breaks it again. So the trigger is the one thing that is true of
- * ALL of them — the content got taller. A ResizeObserver on the content element
- * cannot be defeated by a new growth source.
- *
- * NEVER FIGHT THE USER: auto-follow is engaged only while the viewport is at
- * (or within `BOTTOM_THRESHOLD_PX` of) the bottom. The moment someone scrolls up
- * to read, we release and stop moving the scroller under them; when they come
- * back to the bottom, we re-engage. `isPinned` + `canScroll` drive the
- * "jump to latest" affordance, which is the only way back to the live edge
- * without manual scrolling.
- *
- * ONLY THE READER RELEASES THE PIN: a scroll event says the scroller moved, and
- * never says who moved it. The column rearranges itself constantly — a turn
- * finalises and its live parts are replaced by recorded ones, a status line
- * disappears, a card collapses — and a shrink the browser answers by clamping
- * `scrollTop` looks, geometrically, exactly like a reader scrolling up. Reading
- * it that way killed auto-follow for the rest of the conversation and left the
- * reader with a "jump to latest" pill they never asked for. So an upward
- * movement releases the pin only when input that could have caused it is behind
- * it — see `trackReaderGestures`.
  */
 
 /**
  * How close to the bottom still counts as "at the bottom".
- *
- * Not zero: sub-pixel layout, a scrollbar's rounding, and the browser's own
- * rounding of `scrollHeight - scrollTop - clientHeight` all mean an
- * exactly-bottomed scroller frequently reports a residue of a pixel or two. A
- * small tolerance also means a user who scrolls a hair off the bottom stays
- * followed rather than being surprised by a dead stream.
  */
 const BOTTOM_THRESHOLD_PX = 40;
 
 /**
- * How long an upward gesture keeps counting as the cause of what the scroller
- * does next.
- *
- * Trackpad momentum keeps firing `wheel` long after the fingers leave, and a
- * held key arrives as a burst, so this outlasts the gesture rather than trying
- * to match it.
+ * How long an upward gesture keeps counting as the cause of what the scroller does
+ * next.
  */
 const USER_GESTURE_WINDOW_MS = 700;
 
@@ -60,29 +20,8 @@ const USER_GESTURE_WINDOW_MS = 700;
 const UPWARD_KEYS = new Set(["ArrowUp", "PageUp", "Home"]);
 
 /**
- * Answers one question about a scroller: could the reader be the cause of the
- * upward movement being reported right now?
- *
- * Only input that can move the column UP counts. A wheel notch pushed down,
- * `PageDown`, a finger dragging the page up: none of them can be behind an
- * upward jump, so none of them may qualify one. Taking any input at all as the
- * cause would hand the layout an alibi, and the alibi would be the commonest
- * gesture there is — a reader at the live edge flicking further down, which
- * moves nothing, and a finalisation clamp arriving in the same breath.
- *
- * A pointer drag is the one gesture that cannot report a direction, so it is
- * qualified by where it can reach instead. A press that lands on the scroller
- * ITSELF is its scrollbar, and the column follows that hand until it is let
- * go; a press that lands on a child is a click or a text selection, which
- * moves nothing. A selection does eventually scroll the column, but only once
- * it is dragged past the top edge, and there the pointer says so itself.
- *
- * The drag is followed on the WINDOW, not on the scroller. A mouse takes no
- * implicit pointer capture, so its moves are addressed to whatever sits under
- * it, and both drags leave the column by design: the scrollbar drag ends
- * wherever the hand stops, and the selection only scrolls once it is ABOVE the
- * column. Listening on the scroller would go deaf at exactly the moment there
- * is something to hear.
+ * Answers one question about a scroller: could the reader be the cause of the upward
+ * movement being reported right now?
  */
 function trackReaderGestures(el: HTMLElement) {
   const controller = new AbortController();
@@ -170,10 +109,9 @@ export function useLangyStickToBottom({
   enabled = true,
 }: {
   /**
-   * False when the column is a DOCUMENT rather than a stream (the inline
-   * model setup, the card gallery): reading starts at the TOP, so auto-follow
-   * must not drag the heading off-screen as the content mounts and grows.
-   * Manual scrolling still works; the pin simply never pulls.
+   * False when the column is a DOCUMENT rather than a stream (the inline model setup,
+   * the card gallery): reading starts at the TOP, so auto-follow must not drag the
+   * heading off-screen as the content mounts and grows.
    */
   enabled?: boolean;
 } = {}): LangyStickToBottom {
@@ -207,28 +145,10 @@ export function useLangyStickToBottom({
 
   /**
    * Bring the live edge into view, smoothly.
-   *
-   * `scrollIntoView` on a bottom sentinel rather than assigning `scrollTop`: it
-   * animates, and a repeated call RETARGETS the in-flight animation instead of
-   * restarting it — which is what makes continuous following during a token
-   * stream read as one smooth glide rather than a stutter.
-   *
-   * Coalesced to one call per animation frame. Tokens can land several times
-   * per frame, and asking the browser to re-aim the same scroll three times
-   * before it has painted once is pure waste.
-   *
-   * `block: "end"` pins the sentinel to the bottom edge; `inline: "nearest"`
-   * forbids any sideways scrolling. The panel is `position: fixed`, so the
-   * document itself never has to move to satisfy this.
    */
   const scrollToEnd = useCallback((behavior: ScrollBehavior) => {
-    // The guard is a SEPARATE flag, not `frameRef.current !== null`, and it is
-    // raised BEFORE the rAF is requested. Guarding on the frame id is a latch
-    // waiting to happen: `frameRef.current = requestAnimationFrame(cb)` assigns
-    // the id only AFTER `cb` has returned, so any rAF that runs its callback
-    // synchronously leaves the id written back over the `null` the callback just
-    // set — and every later call sees a non-null id and returns early. The
-    // scroller would follow exactly one growth and then silently stop forever.
+    // The guard is a SEPARATE flag, not `frameRef.current !== null`, and it is raised
+    // BEFORE the rAF is requested.
     if (scheduledRef.current) return;
     scheduledRef.current = true;
     frameRef.current = requestAnimationFrame(() => {
@@ -267,28 +187,8 @@ export function useLangyStickToBottom({
   }, [reduceMotion, scrollToEnd, setPinned]);
 
   /**
-   * The pin is RELEASED by scrolling up, and RE-ENGAGED by arriving at the
-   * bottom. Nothing else touches it.
-   *
-   * The obvious implementation — `setPinned(atBottom)` on every scroll event —
-   * is broken by our own smooth scrolling: a smooth `scrollIntoView` emits a
-   * scroll event for every intermediate position, and every one of those is
-   * "not at the bottom yet". It would therefore release the pin mid-glide, on
-   * the very animation that was honouring it, and auto-follow would die after
-   * the first token.
-   *
-   * Direction is what separates our own scrolling from the reader's. Our
-   * programmatic scroll only ever moves DOWN, toward the bottom; a user who
-   * wants out of the stream scrolls UP. So: moving up releases, reaching the
-   * bottom engages, and everything in between (including our own animation in
-   * flight) leaves the pin exactly as it was.
-   *
-   * Direction alone is not enough, because the column also moves up on its own.
-   * When content is removed the browser clamps `scrollTop` down to the new
-   * maximum, and if the column re-grows before the scroll event is dispatched,
-   * that event reads as a large upward jump far from the bottom. Upward INPUT
-   * is what tells the two apart: a movement no wheel, touch, key or pointer
-   * could have caused is the page rearranging itself, and the pin survives it.
+   * The pin is RELEASED by scrolling up, and RE-ENGAGED by arriving at the bottom.
+   * Nothing else touches it.
    */
   useEffect(() => {
     const el = scrollRef.current;

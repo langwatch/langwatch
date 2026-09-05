@@ -4,13 +4,8 @@ import { z } from "zod";
 export type NumericMode = "range" | "discrete";
 
 /**
- * Per-project, per-facet override for how a numeric facet is presented —
- * "range" (the min/max slider) or "discrete" (tick the distinct integer
- * values). Only meaningful for discrete-eligible facets; the sidebar resolves
- * the effective mode as `override ?? registry-default` (eligible facets
- * default to "discrete"). Modeled on `facetVisibilityStore`: keyed per project
- * so one project's choice doesn't leak into another, persisted to
- * localStorage, hydrated on mount.
+ * Per-project, per-facet override for how a numeric facet is presented — "range" (the
+ * min/max slider) or "discrete" (tick the distinct integer values).
  */
 export interface NumericModeState {
   byProject: Record<string, Record<string, NumericMode>>;

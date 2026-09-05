@@ -1,23 +1,5 @@
 /**
  * Empty-state sizing, driven by the panel's ACTUAL width.
- *
- * The Langy panel is not one fixed size: the floating card ranges ~340–432px
- * with the viewport (see `langyPanelLayout`), and the docked sidebar is a fixed
- * 392px. The old empty state sized its hero + suggestion rows off the *mode*
- * (floating vs sidebar), so a cramped 340px floating card got the exact same
- * 44px mark and 27px greeting as a roomy 432px one — and the long
- * "Investigate an issue and open a PR" row is what fixed the tight measure.
- *
- * So the FLOATING metrics interpolate on real width instead: they sit at the
- * current look at full width and ease DOWN toward a compact anchor as the card
- * narrows, which keeps the long suggestion row on one line and stops the hero
- * from feeling oversized in a split-screen / mobile card.
- *
- * The SIDEBAR is a fixed width and wants a calmer hero regardless (it's a panel
- * you keep open, not a momentary overlay), so it keeps its own tuned constants.
- *
- * The hero mark (the LangWatch logo) runs ~16-18% larger than the original
- * anchors at every size — the logo carried the pane's identity too quietly.
  */
 
 export interface EmptyStateMetrics {
@@ -40,10 +22,7 @@ export interface EmptyStateMetrics {
 }
 
 /**
- * Interpolation band for the floating card. It never renders narrower than
- * FLOATING_PANEL_MIN_WIDTH (340) nor wider than FLOATING_PANEL_MAX_WIDTH (432),
- * and past ~416 the centred 360px measure already has all the room it needs — so
- * the roomy anchor sits there and everything clamps above it.
+ * Interpolation band for the floating card.
  */
 const FLOATING_NARROW_WIDTH = 340;
 const FLOATING_ROOMY_WIDTH = 416;

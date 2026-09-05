@@ -1,6 +1,5 @@
 /**
  * What the scenarios panel reads when it has no row to draw.
- *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/suites-rail.feature
  */

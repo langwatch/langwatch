@@ -1,14 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for nested drawer typing.
- *
- * Verifies that:
- * - ScenarioFormDrawerFromUrl opens when rendered from the drawer registry
- *   (no explicit `open` prop) and the URL indicates it is active
- * - Keyboard input is captured by the drawer's input fields
- * - The command bar does not steal keystrokes from focused inputs
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/nested-drawer-typing.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

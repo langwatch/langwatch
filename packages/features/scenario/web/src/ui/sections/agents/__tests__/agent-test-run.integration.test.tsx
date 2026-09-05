@@ -1,9 +1,6 @@
 /**
+ * "Test agent" from the agents page: the menu item on a card and on a connected row, the run it schedules, and the run drawer it opens.
  * @vitest-environment jsdom
- *
- * "Test agent" from the agents page: the menu item on a card and on a
- * connected row, the run it schedules, and the run drawer it opens.
- *
  * @see specs/agents/agent-test-run.feature
  */
 

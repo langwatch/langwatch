@@ -1,14 +1,5 @@
 /**
  * The parameter overrides of a run, as rows.
- *
- * The single line `name=value, name=value` is the simple case. The moment a
- * value must be hidden the line cannot carry it, because a line shows what it
- * holds, so the block turns into one row per parameter: a key, a value, and a
- * lock that says the value is a credential.
- *
- * Everything here is pure, so the rules that move a line into rows and back
- * can be read and tested on their own.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -35,9 +26,6 @@ export function rowsFromLine(line: string): ParameterRow[] {
 
 /**
  * The line a set of rows reads as.
- *
- * A secret row is left out: the line would show what it holds, which is why
- * the block cannot go back to one line while a row is secret.
  */
 export function lineFromRows(rows: ParameterRow[]): string {
   return rows
@@ -57,14 +45,8 @@ function namedRows(rows: ParameterRow[]): ParameterRow[] {
 }
 
 /**
- * What the run sends: every named row, plus whatever was typed for the
- * secrets the scenarios declare.
- *
- * A name is sent as it was written, declared or not, so a name no scenario
- * declares is refused by the server by name rather than dropped in silence.
- * A plain row left with an empty value is omitted, so the run falls back to
- * the default each scenario declares for it. A secret keeps whatever was typed as
- * text: a token of digits is still a token.
+ * What the run sends: every named row, plus whatever was typed for the secrets the
+ * scenarios declare.
  */
 export function toRowsRunParameters({
   rows,
@@ -102,9 +84,6 @@ function rowValueOf(row: ParameterRow, type: ScenarioParameterDefinition["type"]
 
 /**
  * What the suite is allowed to remember: the plain rows and their values.
- *
- * A row left with an empty value is dropped, the way the line drops one: the
- * run falls back to the default the scenarios declare for that name.
  */
 export function toStorableRowParameters({
   rows,
@@ -130,9 +109,6 @@ export function toStorableRowParameters({
 
 /**
  * The keys of the secret rows, which is all a suite may remember of them.
- *
- * The next dialog shows the row again with an empty value, so a run that
- * needs a credential asks for it every time instead of losing the row.
  */
 export function storableSecretRowNames(rows: ParameterRow[]): string[] | undefined {
   const names = [

@@ -1,21 +1,5 @@
 /**
  * THE CLI EXCHANGE, PINNED BYTE FOR BYTE.
- *
- * The other side of this wire is the published `langwatch` binary: it prints the
- * verification URI, the reader approves here, and the CLI's `/exchange` poll
- * picks up the record these calls flip. So the paths, the method, the header and
- * the snake-cased body are a compatibility surface with software that is already
- * installed — not an internal detail a refactor may adjust.
- *
- * Every assertion below is the platform page's behaviour restated as a
- * transport-level one. Where the old suite mocked `globalThis.fetch` inside a
- * page render and read the bodies off the mock, this drives the three functions
- * directly, which is what makes the status-code branches legible: 404 and 410 are
- * DIFFERENT outcomes, and collapsing either into "failed" costs the reader the
- * one sentence that tells them what to do next.
- *
- * Specs: specs/ai-governance/cli-onboarding/login-unified.feature,
- *        specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

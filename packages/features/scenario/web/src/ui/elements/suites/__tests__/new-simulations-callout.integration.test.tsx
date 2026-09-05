@@ -1,9 +1,6 @@
 /**
+ * The Agent Testing sidebars pin an announcement that offers the way back to the previous simulations screens.
  * @vitest-environment jsdom
- *
- * The Agent Testing sidebars pin an announcement that offers the way back
- * to the previous simulations screens.
- *
  * @see specs/suites/new-simulations-callout.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

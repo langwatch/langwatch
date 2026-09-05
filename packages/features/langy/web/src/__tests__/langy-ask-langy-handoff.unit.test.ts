@@ -2,11 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useLangyStore } from "../behavior/langy.store";
 
 /**
- * The command bar's "Ask Langy" hands a question to the panel through the store:
- * `askLangy` opens the panel on a fresh conversation and QUEUES the question;
- * the panel's effect auto-sends it and calls `consumePendingPrompt` so it fires
- * exactly once. This pins that contract (spec:
- * specs/langy/langy-command-bar-activation.feature).
+ * The command bar's "Ask Langy" hands a question to the panel through the store: `askLangy` opens the panel on a
+ * fresh conversation and QUEUES the question; the panel's effect auto-sends it and calls `consumePendingPrompt`
+ * so it fires exactly once.
  */
 describe("askLangy — command-bar → panel handoff", () => {
   beforeEach(() => {

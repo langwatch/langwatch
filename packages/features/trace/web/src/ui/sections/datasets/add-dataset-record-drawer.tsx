@@ -1,26 +1,5 @@
 /**
- * "Add to Dataset": pick a dataset, map the trace onto its columns, add the
- * rows.
- *
- * Recovered from `platform/app/src/components/AddDatasetRecordDrawer.tsx`,
- * deleted in `cc91631cd8`. Three surfaces address it and none of them had
- * anything to open: the explorer's bulk-action bar, the trace drawer's overflow
- * menu and the annotation queue's end-of-walk hand-off.
- *
- * IT IS THE TRACE FAMILY'S DRAWER even though its subject is a dataset: what it
- * reads is traces with their spans, corrections applied, and what it renders is
- * this package's trace-to-column mapping. The dataset procedures it calls are
- * declared on this package's own map under the dataset family's segment names,
- * so the list it reads and the list the Datasets page reads are one cache entry.
- *
- * THE DATASET EDITOR IS INJECTED RATHER THAN IMPORTED. "+ Create New" and "Edit
- * Columns" open `@langwatch/dataset-web`'s editor, which runs on the STUDIO
- * host — a host the composing application mounts and a feature package may not.
- * It also cannot be navigated to the way `drawers.md` prescribes, because this
- * package's drawer navigator carries only what a URL can carry and the editor's
- * `onSuccess` is a function. So the application hands the editor in already
- * hosted, and a composition that supplies none simply does not offer the two
- * affordances rather than offering two dead ones.
+ * "Add to Dataset": pick a dataset, map the trace onto its columns, add the rows.
  */
 
 import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
@@ -50,9 +29,6 @@ type FormValues = {
 
 /**
  * The dataset editor this drawer leads to, as the application hands it over.
- *
- * The shape is `@langwatch/dataset-web`'s `AddOrEditDatasetDrawer`, narrowed to
- * what this caller passes.
  */
 export type DatasetEditorComponent = ComponentType<{
   datasetToSave?: {
@@ -65,13 +41,9 @@ export type DatasetEditorComponent = ComponentType<{
   open?: boolean;
   onClose?: () => void;
   /**
-   * OPTIONAL, MATCHING THE EDITOR'S OWN PROP. The editor is a registered drawer
-   * as well as a component, and an address cannot carry a function, so it
-   * declares `onSuccess` optional and calls it only when one arrived. Requiring
-   * it here would make the real editor unassignable to this slot: `ComponentType`
-   * admits a class component, whose props are invariant, so a required callback
-   * on this side rejects an optional one on that side. This caller always passes
-   * one.
+   * OPTIONAL, MATCHING THE EDITOR'S OWN PROP. The editor is a registered drawer as well
+   * as a component, and an address cannot carry a function, so it declares `onSuccess`
+   * optional and calls it only when one arrived.
    */
   onSuccess?: (dataset: { datasetId: string; name: string; columnTypes: DatasetColumns }) => void;
 }>;
@@ -83,9 +55,6 @@ export interface AddDatasetRecordDrawerProps {
   traceId?: string;
   /**
    * The traces a bulk selection is adding.
-   *
-   * A single id survives the address bar as a bare string rather than a
-   * one-element list, so both spellings are accepted.
    */
   selectedTraceIds?: string[] | string;
   /** The hosted dataset editor, when the application composed one. */

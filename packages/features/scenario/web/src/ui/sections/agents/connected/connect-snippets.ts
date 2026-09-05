@@ -1,16 +1,5 @@
 /**
  * The code a person copies to connect an agent (ADR-128).
- *
- * The same two snippets the connect-your-agent docs page carries, so the
- * product and the documentation never teach two different things. The name
- * and the environment are filled in when the reader is looking at an agent
- * that already exists, so a teammate can connect their own process to the
- * same identity.
- *
- * The TypeScript snippet declares its run parameters with a zod schema, which
- * is the form the SDK types `params` from and validates the incoming values
- * with.
- *
  * @see docs/agent-testing/connect-your-agent.mdx
  * @see specs/features/agents/connected-agents-ui.feature
  */
@@ -31,11 +20,6 @@ const EXAMPLE_NAME = "support-agent";
 
 /**
  * A string as source code of either language.
- *
- * An agent name is any text of up to 64 characters, so it can hold a quote, a
- * backslash or a line break. Written raw it would end the literal early, and
- * what the reader copies would no longer be the code this page shows. Both
- * languages read the JSON escapes, so one encoder serves both.
  */
 function quoted(value: string): string {
   return JSON.stringify(value);
@@ -43,12 +27,6 @@ function quoted(value: string): string {
 
 /**
  * Words either language refuses as the name of a declaration.
- *
- * The union of the Python keywords and the JavaScript and TypeScript reserved
- * words, so one check serves both snippets. The list holds the words only
- * strict mode refuses as well, because a TypeScript module is always strict.
- * A word that one of the two languages does accept still takes the fallback,
- * which keeps the two snippets of an agent named after the same thing.
  */
 const RESERVED_NAMES = new Set([
   "and",
@@ -120,9 +98,6 @@ const RESERVED_NAMES = new Set([
 
 /**
  * A declaration name the language accepts.
- *
- * A name of digits alone, or one that reads as a keyword, would produce a
- * snippet that does not parse, so it takes the fallback instead.
  */
 function declarationName(candidate: string, fallback: string): string {
   if (candidate === "") return fallback;

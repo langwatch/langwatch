@@ -78,12 +78,7 @@ export const FilterSidebar: React.FC = () => {
   // — it IS the unfiltered baseline. Kept here only to gate the `r` shortcut.
   const canResetToLens = isDraft(activeLensId) && activeLensId !== "all-traces";
 
-  // Whether the Configure trigger shows its "shown / total" chip. With reset
-  // moved to the lens bar, the only optional header button left is Clear, so
-  // the chip is hidden ONLY when Clear is present AND the rail is narrow enough
-  // that it'd crowd — otherwise it always shows (the "don't hide it when it's
-  // not needed" rule). The header cluster is [clear?] [Configure
-  // (+chip)] [expand-all].
+  // Whether the Configure trigger shows its "shown / total" chip.
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const headerExtraButtons = hasActiveFilters ? 1 : 0;
   const showConfigureCount =
@@ -147,13 +142,9 @@ export const FilterSidebar: React.FC = () => {
     }),
   );
 
-  // With group-of-groups gone, individual sections are the unit users
-  // drag. The flat-list reorder writes through to `setSectionOrder`,
-  // which `useFilterSidebarData` reads alongside the registry order to
-  // compute the next render's `orderedKeys`. Sections that aren't
-  // currently visible (filtered out by density) keep their place in the
-  // saved order — we only reorder among the visible keys, then merge
-  // the result with any non-visible ones still in the stored order.
+  // With group-of-groups gone, individual sections are the unit users drag. The
+  // flat-list reorder writes through to `setSectionOrder`, which `useFilterSidebarData`
+  // reads alongside the registry order to compute the next render's `orderedKeys`.
   const handleDragStart = useCallback(({ active }: DragStartEvent) => {
     setActiveId(String(active.id));
   }, []);
@@ -191,15 +182,7 @@ export const FilterSidebar: React.FC = () => {
     [orderedKeys, setAllSectionsOpen],
   );
 
-  // Header-bar expand/collapse-all toggle. Mirror state locally so the
-  // icon flips between "expand" and "collapse" on each click without
-  // having to inspect per-section open state through the lens store
-  // (sections have a smart per-key default that the store doesn't
-  // explicitly record). First click expands all → flip to "collapse";
-  // next click collapses all → flip back. Resets to the conservative
-  // "expand" affordance whenever the user manually toggles a section
-  // back is *not* something we attempt to detect — the explicit button
-  // is for "do them all at once," not "track which mode I'm in."
+  // Header-bar expand/collapse-all toggle.
   const [allExpanded, setAllExpanded] = useState(false);
   const handleToggleAll = useCallback(() => {
     const next = !allExpanded;
@@ -207,18 +190,7 @@ export const FilterSidebar: React.FC = () => {
     setAllExpanded(next);
   }, [allExpanded, orderedKeys, setAllSectionsOpen]);
 
-  // Sidebar keyboard shortcuts — one per header button. Scoped to the
-  // sidebar's lifetime (these listeners only exist while it's mounted /
-  // expanded) and bound to the local handlers next to each action:
-  //   c → Configure facets (open the manager popover)
-  //   e → Expand / collapse all sections
-  //   x → Clear all filters   (only while there ARE active filters)
-  //   r → Reset to the active lens (only while a local draft deviates)
-  // (Hide-the-sidebar's `[` is owned by the page-level `useSidebarShortcut`.)
-  // Bare single keys, matching the page's existing `[` / `?` / `D` style.
-  // Ignored while the user is typing in any input/contentEditable (incl.
-  // the search bar and per-section value search) and when a modifier is
-  // held, so they never hijack ⌘C / Ctrl+F / etc.
+  // Sidebar keyboard shortcuts — one per header button.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't fire sidebar shortcuts while the trace drawer is open — the
@@ -323,22 +295,13 @@ export const FilterSidebar: React.FC = () => {
     ],
   );
 
-  // The hook now synthesises FACET_DEFAULTS rows while discover is in
-  // flight, so `descriptors.length === 0 && facetsLoading` no longer
-  // happens — `categoricals` is always populated. We keep `showSkeleton`
-  // wired through but it'll only fire in genuinely degenerate states
-  // (empty FACET_DEFAULTS, etc.) so as not to silently regress to a
-  // blank rail if the synthesis is ever short-circuited.
+  // The hook now synthesises FACET_DEFAULTS rows while discover is in flight, so
+  // `descriptors.length === 0 && facetsLoading` no longer happens — `categoricals` is
+  // always populated.
   const showSkeleton = facetsLoading && descriptors.length === 0 && categoricals.length === 0;
 
-  // Hide the sidebar entirely when the discover endpoint has returned
-  // with no descriptors AND the project has never received a real trace.
-  // This avoids showing a "Getting filters ready…" hint + skeleton rail
-  // that will never populate for projects that haven't integrated yet.
-  // Once real traces arrive (hasAnyTraces flips true), the sidebar
-  // reveals itself on the next render because this condition no longer
-  // holds. The genuine loading state (facetsLoading true) is a different
-  // branch and still shows the caption + skeleton below.
+  // Hide the sidebar entirely when the discover endpoint has returned with no
+  // descriptors AND the project has never received a real trace.
   if (hasAnyTraces === false && !facetsLoading && descriptors.length === 0) {
     return null;
   }
@@ -566,11 +529,9 @@ export const FilterSidebar: React.FC = () => {
 };
 
 /**
- * Lightweight ghost rendered in the DragOverlay while the user is dragging a
- * section. Shows only the header strip (icon + label + grip icon) — much
- * cheaper to paint than the full section tree, which avoids jank on slow
- * devices. Styled to match the SidebarSection header so it looks like a
- * real row being lifted.
+ * Lightweight ghost rendered in the DragOverlay while the user is dragging a section.
+ * Shows only the header strip (icon + label + grip icon) — much cheaper to paint than
+ * the full section tree, which avoids jank on slow devices.
  */
 const DragGhostHeader: React.FC<{
   label: string;

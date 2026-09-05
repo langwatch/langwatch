@@ -1,14 +1,6 @@
 /**
+ * The toolbar of the Results tab: how the list is grouped, what is cut from it, and the numbers those choices drive.
  * @vitest-environment jsdom
- *
- * The toolbar of the Results tab: how the list is grouped, what is cut from
- * it, and the numbers those choices drive.
- *
- * The order on screen is the point. Filters read first, then the stat strip
- * and the chart they move, then the table, so a person sets the question
- * before reading the answer. The charts start closed, and the four groupings
- * sit on screen as connected tabs rather than behind a dropdown.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -29,11 +21,6 @@ const NOW = 1_700_000_000_000;
 
 /**
  * The address, as the page reads and writes it.
- *
- * The grouping and the filters live in the query, so a click that changes
- * either pushes a new address and the page re-reads it. The mock does the same
- * round trip rather than shortcutting to state, which is what lets a test
- * prove the address is what the view follows.
  */
 const routerState = vi.hoisted(() => ({
   query: {} as Record<string, string | string[] | undefined>,

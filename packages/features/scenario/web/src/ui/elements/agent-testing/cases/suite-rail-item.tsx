@@ -1,8 +1,6 @@
 /**
- * The three building blocks of the suites rail: one selectable row, the
- * heading that names a section of rows, and the row-shaped button that ends a
- * section.
- *
+ * The three building blocks of the suites rail: one selectable row, the heading that
+ * names a section of rows, and the row-shaped button that ends a section.
  * @see specs/features/agent-testing/suites-rail.feature
  */
 

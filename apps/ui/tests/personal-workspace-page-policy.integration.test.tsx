@@ -1,25 +1,6 @@
 /**
+ * What each personal-workspace address is actually behind, proved by mounting it.
  * @vitest-environment jsdom
- *
- * What each personal-workspace address is actually behind, proved by mounting
- * it.
- *
- * `personal-workspace-routes.unit.test.ts` pins which key each screen answers;
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering. Neither would notice
- * a loader that forgot the release flag — which is the failure that opens an
- * unreleased page — so this file loads the real loaders, mounts what they hand
- * back under a session that answers precisely, and reads the result.
- *
- * The screens themselves are faked, and so is the transport the host provider
- * reads the organization graph over. What is under test is the policy the
- * frontend feature wraps a screen in, and loading the whole personal workspace
- * over a live tRPC client to assert a refusal would test the screen instead.
- *
- * THE FLAG SCENARIOS OF THE TWO PROJECT PAGES LIVE HERE NOW. They were bound in
- * `platform/app`'s `pages/[project]/__tests__/coding-agent-pages.integration.test.tsx`,
- * where the guard was part of the page body; the guard is route policy now, so
- * the binding follows it.
- *
  * Spec: specs/coding-agent/project-menu-links.feature.
  */
 
@@ -147,12 +128,8 @@ async function openPage(key: string, flags: Record<string, boolean | undefined>)
   const loader = personalWorkspaceFeature.loaders[key];
   if (!loader) throw new Error(`no loader is registered for ${key}`);
   const Mounted = (await loader()).default;
-  // The refusal fallbacks are Chakra, so a refused page needs a system even
-  // though the page it refuses never renders. The query client is there for the
-  // host provider, which builds the session refresher the avatar control asks
-  // for; the shell always has one and this is the smallest way to say so. The
-  // router is there for the settings key: the harvested chrome reads the
-  // address to decide which settings group is open.
+  // The refusal fallbacks are Chakra, so a refused page needs a system even though the
+  // page it refuses never renders.
   render(
     <ChakraProvider value={defaultSystem}>
       <QueryClientProvider client={new QueryClient()}>

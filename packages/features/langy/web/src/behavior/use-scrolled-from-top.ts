@@ -2,18 +2,6 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * Whether a scroll container has content scrolled off above its top edge.
- *
- * Drives the classic scroll-shadow treatment: an edge affordance (the
- * conversation column's top mask fade) that must be absent while the very
- * first line of content is visible, and appear only once something is hidden
- * above. `scrollTop` is layout state, not React state, so a passive scroll
- * listener mirrors it into a boolean; scrolling therefore only re-renders on
- * the at-top edge crossing, not per scroll event.
- *
- * The subscription re-arms whenever the element behind the ref changes
- * identity, not just on mount: the Langy scroller unmounts while the recents
- * list takes over the panel body and remounts on the way back, and a
- * mount-time-only listener would be left holding the dead element.
  */
 export function useScrolledFromTop(scrollRef: React.RefObject<HTMLElement | null>): boolean {
   const [isScrolledFromTop, setIsScrolledFromTop] = useState(false);

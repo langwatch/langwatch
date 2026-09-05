@@ -1,17 +1,6 @@
 // @vitest-environment jsdom
 /**
  * The label under each bar when two targets carry the identical name.
- *
- * `buildAxisLabels` returns one label per bar, in bar order. The chart held
- * them in a map keyed by the bar's NAME, so two targets stored under the same
- * name collapsed onto one entry and both bars drew the second label. On a real
- * run both cost bars read "…classifier (2)".
- *
- * recharts lays its chart out from measurements jsdom cannot produce, so the
- * mock captures the data and the tick formatter the component hands it and
- * applies them the way recharts does: the formatter gets the datum's `name`
- * and its position.
- *
  * @see specs/batch-evaluation-results/target-column-identity.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

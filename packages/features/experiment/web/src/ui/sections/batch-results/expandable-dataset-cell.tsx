@@ -1,8 +1,5 @@
 /**
  * ExpandableDatasetCell - A cell that can expand to show full content.
- *
- * Used for dataset columns in the batch results table.
- * Simpler version of BatchTargetCell without evaluator chips and trace buttons.
  */
 
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";

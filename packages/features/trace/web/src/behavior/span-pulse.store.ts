@@ -7,10 +7,9 @@ import { create } from "zustand";
 const PULSE_DURATION_MS = 1_200;
 
 /**
- * Minimum gap between two pulses for the same spanId. Bursts of SSE
- * events for the same span within this window coalesce into a single
- * visual pulse — prevents strobe-like animation when the backend
- * batches several span updates close together.
+ * Minimum gap between two pulses for the same spanId. Bursts of SSE events for the same
+ * span within this window coalesce into a single visual pulse — prevents strobe-like
+ * animation when the backend batches several span updates close together.
  */
 const PULSE_COALESCE_MS = 600;
 

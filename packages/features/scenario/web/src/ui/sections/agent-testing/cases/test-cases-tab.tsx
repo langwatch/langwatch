@@ -1,9 +1,5 @@
 /**
  * The Scenarios tab: the suites rail beside the table of scenarios.
- *
- * The reads and the writes of the tab live in useTestCasesTab. The rail, the
- * panel and the dialogs are views over the model it returns.
- *
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/features/agent-testing/cases-table.feature
  */

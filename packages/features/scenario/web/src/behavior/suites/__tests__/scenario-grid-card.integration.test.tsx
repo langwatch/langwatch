@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for ScenarioGridCard component.
- *
- * Tests that the grid card displays a "Target: Scenario (#N)" title
- * using the same format as ScenarioTargetRow.
- *
  * @see specs/features/suites/grid-view-and-borderless-tables.feature
  *   Scenario: Grid card shows scenario name, target, and iteration
  */

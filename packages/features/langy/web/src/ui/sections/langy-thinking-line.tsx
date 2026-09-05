@@ -35,10 +35,9 @@ export function LangyThinkingLine({
 }: {
   messages: ThinkingMessage[];
   /**
-   * The model's ephemeral reasoning is streaming right now. Reasoning deltas
-   * never become message parts, so without this signal a reasoning-but-no-prose
-   * turn would read as a startup wait — a false claim. The text itself is never
-   * shown; see the module doc.
+   * The model's ephemeral reasoning is streaming right now. Reasoning deltas never
+   * become message parts, so without this signal a reasoning-but-no-prose turn would
+   * read as a startup wait — a false claim.
    */
   hasLiveReasoning?: boolean;
   /**
@@ -86,16 +85,9 @@ export function LangyThinkingLine({
   const text = line.allowWhimsy ? `${cyclingVerb}…` : line.text;
 
   return (
-    // Stretch to the column, not shrink-to-fit: a `flex-start` box grows to the
-    // verb's intrinsic nowrap width, so `maxWidth: 100%` on the verb would
-    // resolve against that overgrown width and never clamp. Full width + a
-    // shrinkable child is what lets the clip below engage.
-    //
-    // The row wears the SHARED status-line frame (STATUS_LINE_ROW, see
-    // StreamingStatusLine): same gap, same padding, and the same leading orb
-    // slot as the status rows this line alternates with — so "Preparing Langy's
-    // workspace…" → "Starting Langy…" → "Thinking…" reads as one line changing its words,
-    // never a line hopping between layouts.
+    // Stretch to the column, not shrink-to-fit: a `flex-start` box grows to the verb's
+    // intrinsic nowrap width, so `maxWidth: 100%` on the verb would resolve against
+    // that overgrown width and never clamp.
     <HStack
       gap={STATUS_LINE_ROW.gap}
       alignSelf="stretch"
@@ -135,12 +127,9 @@ function ThinkingLineText({
       minHeight="1.5em"
       display="flex"
       alignItems="center"
-      // The verb is a single nowrap line (the crossfade can't reflow mid-swap),
-      // so a long tool line — "Using the GitHub skill — <the skill's whole
-      // summary>" — used to run straight off the panel's right edge. Clamp it
-      // to the available width and mark the cut with an ellipsis. NO fade
-      // mask: it applied to short lines too, so "Thinking…" dissolved to
-      // near-invisible at its tail and read as broken text, not chrome.
+      // The verb is a single nowrap line (the crossfade can't reflow mid-swap), so a
+      // long tool line — "Using the GitHub skill — <the skill's whole summary>" — used
+      // to run straight off the panel's right edge.
       flexShrink={1}
       minWidth={0}
       maxWidth="100%"

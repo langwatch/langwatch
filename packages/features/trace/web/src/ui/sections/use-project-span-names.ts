@@ -3,15 +3,6 @@ import { reservedTraceMetadataSchema } from "@langwatch/trace-contract";
 import { api } from "./trace-api";
 
 /**
- * Hook to fetch distinct span names, metadata keys and evaluator names for a
- * project. Uses a dedicated ClickHouse aggregation endpoint instead of loading
- * full traces.
- *
- * The underlying query scans the last 30 days of spans/summaries/evaluations,
- * so callers that only need it conditionally (e.g. only when a span / metadata /
- * evaluation column is being mapped) should pass `enabled: false` until it is
- * actually needed.
- *
  * @param projectId - The project ID to fetch field names from
  * @param enabled - Gate the query (default true); combined with projectId presence
  * @returns Object with spanNames, metadataKeys, evaluationNames arrays, isLoading state, and error if any

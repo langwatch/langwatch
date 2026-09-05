@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Filing a scenario into a test suite: where a new scenario lands, what the
- * editor offers, what archiving asks, and how a run plan picks scenarios.
- *
- * @see specs/scenarios/scenario-test-suite-assignment.feature
- * @see specs/suites/test-suite-run-plan-reuse.feature
- * @see specs/features/agent-testing/cases-table.feature
- * @see specs/features/agent-testing/page-structure.feature
+ * @see specs/scenarios/scenario-test-suite-assignment.feature, specs/suites/test-suite-run-plan-reuse.feature,
+ *   specs/features/agent-testing/cases-table.feature, specs/features/agent-testing/page-structure.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";

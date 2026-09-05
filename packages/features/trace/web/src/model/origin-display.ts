@@ -1,12 +1,6 @@
 /**
- * Single source of truth for how a trace origin renders anywhere in
- * traces-v2 — the Origin column badge, the filter sidebar facet dots,
- * and any future chip. Label casing and colour come from the same row
- * here so the table can't say orange "Coding Agent" while the sidebar
- * says something else for the identical `langwatch.origin` value.
- *
- * Palettes mirror the platform-wide `~/utils/originColors.ts` mapping
- * ("evaluation" is always green, "application" always blue, etc.).
+ * Single source of truth for how a trace origin renders anywhere in traces-v2 — the
+ * Origin column badge, the filter sidebar facet dots, and any future chip.
  */
 export const ORIGIN_DISPLAY = {
   application: { label: "Application", colorPalette: "blue" },

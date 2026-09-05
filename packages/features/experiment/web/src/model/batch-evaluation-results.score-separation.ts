@@ -1,8 +1,7 @@
 /**
- * The single quality-separation rule used by verdicts and adequacy reporting.
- * Prefer the CI of the score difference from the same bootstrap replicates:
- * shared fit movement cancels, unlike marginal-interval overlap. With no
- * bootstrap difference, overlap is the deliberately conservative fallback.
+ * The single quality-separation rule used by verdicts and adequacy reporting. Prefer
+ * the CI of the score difference from the same bootstrap replicates: shared fit
+ * movement cancels, unlike marginal-interval overlap.
  */
 
 import type {
@@ -20,28 +19,6 @@ const isFinitePair = (interval: [number, number]): boolean =>
 
 /**
  * Whether the run separates these two variants on quality.
- *
- * A missing or non-finite interval means the bootstrap was disabled or the
- * sample was too small to produce one. That is an absence of evidence, not
- * evidence of a difference, so it counts as "cannot separate" — the
- * conservative direction, and the one that avoids inventing a winner from
- * thin data. NaN in particular has to be caught explicitly: every comparison
- * against it is false, so an unguarded overlap check returns false and its
- * negation reads "distinguishable".
- *
- * ── Why comparability is consulted before any interval ──
- *
- * A pair in different strongly connected components that never met, directly
- * or through a chain, has no gap to measure. The distance between their
- * scores is a gauge artifact of `normalizeToGeometricMean`, and because every
- * bootstrap replicate applies the SAME gauge, the difference interval comes
- * out tight — so the interval test reports high confidence in a number that
- * carries no information. That is the one failure mode here that is confident
- * and wrong rather than merely conservative, so it is checked first.
- *
- * `dominated` pairs deliberately fall through to the interval test: there the
- * direction is established even though the magnitude is unbounded, so the run
- * really has separated them.
  */
 export const areDistinguishable = ({
   a,

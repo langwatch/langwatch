@@ -1,10 +1,6 @@
 /**
+ * Server-side search inside the search-bar value picker.
  * @vitest-environment jsdom
- *
- * Server-side search inside the search-bar value picker. Once the user edits
- * a categorical chip's value the picker queries `tracesV2.facetValues` with a
- * `prefix`, so a value beyond the preloaded top-N can be found and picked.
- * See specs/traces-v2/search.feature, rule "Very high-cardinality facets".
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -135,12 +131,8 @@ describe("<TokenValuePicker /> server-side search", () => {
   });
 
   describe("given a substring match lives within a preloaded value", () => {
-    // The server does a PREFIX match anchored at the start, so "gpt-4o" misses
-    // the namespaced "openai/gpt-4o-mini" and returns nothing. A replace-regression
-    // (the empty server result REPLACING the preloaded list) would drop the row;
-    // the SUPPLEMENT contract unions preloaded + server and keeps the live client
-    // substring filter, so the preloaded value — a substring match — stays shown.
-    // Mirrors FacetSection.serverSearch's preloaded-survival regression.
+    // The server does a PREFIX match anchored at the start, so "gpt-4o" misses the
+    // namespaced "openai/gpt-4o-mini" and returns nothing.
     describe("when the user edits the chip to a value the server prefix-search misses", () => {
       /** @scenario "Editing a search-bar value chip searches all values, not just the preloaded set" */
       it("keeps a matching preloaded value when the server prefix search misses it (supplement, not replace)", async () => {

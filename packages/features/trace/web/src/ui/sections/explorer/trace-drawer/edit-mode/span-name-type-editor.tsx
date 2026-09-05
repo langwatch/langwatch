@@ -10,10 +10,7 @@ function isSpanType(value: string): value is SpanTypes {
 }
 
 /**
- * Name and type editor for the selected span, above its accordions. Both live
- * on the span row rather than inside a section because they are what the
- * reviewer is correcting most often: a tool call named after its handler
- * instead of the tool, or a step recorded with the wrong kind.
+ * Name and type editor for the selected span, above its accordions.
  */
 export function SpanNameTypeEditor({
   spanId,

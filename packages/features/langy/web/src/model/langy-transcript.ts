@@ -1,22 +1,5 @@
 /**
  * One assistant turn, split into the runs it is read in.
- *
- * A turn is a sequence of events: a paragraph, a call, another paragraph,
- * another call. The panel used to render it as two piles keyed by kind — every
- * tool card, then the whole reply joined into one body underneath — so a reader
- * watching a live turn saw cards change at the top while text grew at the
- * bottom, with nothing on screen saying which paragraph followed which call.
- *
- * This is the pure split that fixes it: consecutive answer parts (prose and the
- * stamped card blocks that belong to the reply) form an ANSWER run, consecutive
- * tool parts form an ACTIVITY run, and the runs come back in the order the
- * parts carry. Each run is then handed to the renderer that already owns it —
- * `langyAnswerSegments` for the answer, `LangyActivityParts` for the activity —
- * so this module decides ordering and nothing else.
- *
- * Reasoning parts belong to neither: the model's thinking is not the answer,
- * and it is folded into the turn's process record elsewhere
- * (logic/langyReasoningTitles).
  */
 import { LANGY_CARD_FAILED_PART_TYPE, LANGY_CARD_PART_TYPE } from "@langwatch/langy-contract";
 
@@ -35,9 +18,8 @@ const ANSWER_PART_TYPES = new Set<string>([
 
 /**
  * Parts that render nowhere in the transcript, so they must not split a run:
- * `reasoning` folds into the process record, and `step-start` is the AI SDK's
- * own boundary marker. Left in, either would cut a paragraph in half and put a
- * seam in the middle of the reply.
+ * `reasoning` folds into the process record, and `step-start` is the AI SDK's own
+ * boundary marker.
  */
 const INERT_PART_TYPES = new Set<string>(["reasoning", "step-start"]);
 

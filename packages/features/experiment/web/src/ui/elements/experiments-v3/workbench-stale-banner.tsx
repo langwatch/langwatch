@@ -4,10 +4,8 @@ import { useState } from "react";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 
 /**
- * Shown when the server holds a newer version of this workbench and the user
- * has unsaved edits. Reloading discards those edits, so it is the user's
- * button to press, never automatic; a clean workbench reloads silently and
- * this banner never appears (`useWorkbenchUpdateListener`).
+ * Shown when the server holds a newer version of this workbench and the user has
+ * unsaved edits.
  */
 export function WorkbenchStaleBanner({
   actorLabel,

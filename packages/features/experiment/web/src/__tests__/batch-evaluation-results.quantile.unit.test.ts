@@ -1,15 +1,5 @@
 /**
  * The quantile both confidence intervals are read from.
- *
- * The bootstrap CI and the Bradley-Terry leaderboard each draw a 95% interval
- * by asking for the 2.5th and 97.5th percentile of a resample. They had a copy
- * of this each, identical, which is two intervals over the same data that can
- * come to disagree.
- *
- * The interpolation is the part worth pinning. A bootstrap of 1,000 resamples
- * puts the 2.5th percentile at position 24.975 — between two samples — and
- * snapping to a neighbour instead of interpolating shifts the published bound
- * by a whole sample. Removing it left every test in the package green.
  */
 
 import { describe, expect, it } from "vitest";

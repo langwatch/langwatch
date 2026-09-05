@@ -47,25 +47,12 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
           inset={0}
           overflow="auto"
           bg="bg.muted"
-          // Pre-disengaged: full opacity. Pointer events are suppressed
-          // so the table behind the empty-state hero isn't accidentally
-          // clickable through the overlay. The "rows-above-and-below"
-          // band effect is *not* a mask on the table any more — it's a
-          // hero-attached radial halo (see `EmptyState.tsx`) that auto-
-          // aligns with the flex-centred hero. That keeps the layout
-          // robust across viewport heights without fragile percentage
-          // bands or media-query tuning.
+          // Pre-disengaged: full opacity. Pointer events are suppressed so the table
+          // behind the empty-state hero isn't accidentally clickable through the
+          // overlay.
           {...(setupDisengaged || isPostArrival
             ? // Fully clickable during postArrival — the table takes
-              // the whole canvas and the user gets to explore. Any
-              // sample row opens the drawer (and advances the journey
-              // straight to drawerOverview, the finale chapter); the
-              // highlighted rich row is just the visually obvious
-              // target, not the only one. setupDisengaged is the
-              // post-onboarding state where preview data is still
-              // rendering. The row glow itself is a global stylesheet
-              // rule injected by `OnboardingHost`'s `<RichRowGlow>`
-              // effect — see `onboarding/effects/RichRowGlow.tsx`.
+              // the whole canvas and the user gets to explore.
               {}
             : ({
                 pointerEvents: "none",

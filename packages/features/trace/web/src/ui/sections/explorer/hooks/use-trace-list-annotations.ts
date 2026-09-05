@@ -13,20 +13,6 @@ const NO_ANNOTATIONS: AnnotationByTrace[] = [];
 
 /**
  * Attaches what reviewers left on each row, read once per visible page.
- *
- * Annotations live in Postgres while the rest of a row comes from the trace
- * summary in ClickHouse, so the two are never joined in a query: the list reads
- * the reviews of the traces it is already showing and lays them over the rows.
- * That read is its own query, and a page whose columns never mention
- * annotations pays nothing.
- *
- * It asks for every annotation on the trace, the ones left on its parts
- * included: a comment on one span is still something said about that trace, and
- * the row is the only place a reader would find it from the list.
- *
- * A failed read leaves the rest of the list standing rather than taking it
- * down, and says so rather than falling back to the empty marker, which would
- * report a reviewed trace as one nobody has looked at.
  */
 export function useTraceListAnnotations({
   rows,

@@ -11,10 +11,9 @@ export interface PresenceFeatureState {
 }
 
 /**
- * Resolves whether multiplayer presence is enabled for the active project.
- * The org-level toggle is the global kill-switch — when it's off, the project
- * toggle is irrelevant. Loading states are treated as "enabled" so we don't
- * flash a disabled UI on first paint.
+ * Resolves whether multiplayer presence is enabled for the active project. The
+ * org-level toggle is the global kill-switch — when it's off, the project toggle is
+ * irrelevant.
  */
 export function usePresenceFeatureEnabled(): PresenceFeatureState {
   const { organization, project } = useOrganizationTeamProject();

@@ -64,12 +64,9 @@ const DIMMED_PROPS = {
   opacity: 0.45,
   pointerEvents: "none" as const,
   "aria-disabled": true,
-  // `inert` keeps focus, hover, and pointer interactions out of the chrome
-  // while the empty-state body is what the user should be touching.
-  // React types lag the DOM property, so we widen via a record cast at the
-  // call sites that compose this object. `inert` belt-and-suspenders the
-  // pointer-events block: even if a portal-rendered popover bypassed the
-  // wrapper's pointer-events, the trigger's click never fires under inert.
+  // `inert` keeps focus, hover, and pointer interactions out of the chrome while the
+  // empty-state body is what the user should be touching. React types lag the DOM
+  // property, so we widen via a record cast at the call sites that compose this object.
   inert: "",
 };
 
@@ -101,13 +98,8 @@ export const TracesPage: React.FC = () => {
   const tourActive = useOnboardingStore((s) => s.tourActive);
   const showSamplePreview = useOnboardingStore((s) => s.showSamplePreview);
   const setupDismissed = project ? !!setupDismissedByProject[project.id] : false;
-  // Read the onboarding stage at the top level so we can decide
-  // whether to surface the FilterSidebar even while the empty
-  // state is technically "active". The slice chapter
-  // (`serviceSegue` + `facetsReveal`) and the `outro` chapter want
-  // the sidebar visible — slice teaches it, outro is the
-  // victory-lap chapter where the user is dropping into the real
-  // product.
+  // Read the onboarding stage at the top level so we can decide whether to surface the
+  // FilterSidebar even while the empty state is technically "active".
   const topLevelOnboardingStage = useOnboardingStore((s) => s.stage);
   const sidebarVisibleDuringEmpty =
     topLevelOnboardingStage === "serviceSegue" ||
@@ -135,13 +127,9 @@ export const TracesPage: React.FC = () => {
     hasAnyTraces,
   });
 
-  // Project switches reset the per-project surfaces: the open drawer
-  // points at a trace the new project can't load, and the active
-  // filter query references facet values (evaluator ids, models,
-  // metadata) that don't exist across projects — both would render as
-  // confusing empty/error states if left in place. The ref skips the
-  // initial mount so a plain page load never wipes a URL-restored
-  // filter.
+  // Project switches reset the per-project surfaces: the open drawer points at a trace the new project can't
+  // load, and the active filter query references facet values (evaluator ids, models, metadata) that don't exist
+  // across projects — both would render as confusing empty/error states if left in place.
   const prevProjectIdRef = useRef<string | null>(null);
   const closeDrawerOnSwitch = useDrawerStore((s) => s.closeDrawer);
   const clearFilters = useFilterStore((s) => s.clearAll);
@@ -199,14 +187,9 @@ export const TracesPage: React.FC = () => {
                 for the facets/outro beats. */}
             {!showIntegratePane &&
               (!showEmptyState || sidebarVisibleDuringEmpty) && (
-                // `height="full"` + `overflow="hidden"` on this wrapper is
-                // load-bearing: without it the inner aside expands to its
-                // intrinsic content height (1700px+ once every facet group
-                // is rendered) and the HStack just hides the overflow at
-                // the bottom — meaning ~half the facets are invisible AND
-                // unscrollable on shorter viewports. Constraining the
-                // wrapper here lets the inner VStack's `overflowY="auto"`
-                // actually kick in.
+                // `height="full"` + `overflow="hidden"` on this wrapper is load-bearing: without it the inner aside expands to
+                // its intrinsic content height (1700px+ once every facet group is rendered) and the HStack just hides the
+                // overflow at the bottom — meaning ~half the facets are invisible AND unscrollable on shorter viewports.
                 <Box flexShrink={0} data-tour-target="sidebar" height="full" overflow="hidden">
                   <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
                 </Box>
@@ -251,13 +234,8 @@ export const TracesPage: React.FC = () => {
 };
 
 /**
- * Cross-fade wrapper for the three main pane modes (IntegratePane /
- * EmptyResultsPane / ResultsPane). `mode="wait"` on the parent
- * AnimatePresence + a tiny enter delay on the incoming child gives
- * the outgoing pane time to actually leave the DOM before the
- * heavy mount (table virtualizer, aurora SVG, facet sidebar) starts
- * — the user reads the swap as deliberate motion rather than a
- * dropped frame.
+ * Cross-fade wrapper for the three main pane modes (IntegratePane / EmptyResultsPane /
+ * ResultsPane).
  */
 const PaneFader: React.FC<{
   children: React.ReactNode;
@@ -277,11 +255,8 @@ const PaneFader: React.FC<{
 );
 
 /**
- * Optimistic drawer mount. Reads `traceId` straight from the drawer
- * store so a click → store-update → render lands in the same frame.
- * The URL is still kept in sync (via openDrawer / closeDrawer in the
- * scaffold), it just no longer gates the mount the way
- * `CurrentDrawer` used to.
+ * Optimistic drawer mount. Reads `traceId` straight from the drawer store so a click →
+ * store-update → render lands in the same frame.
  */
 const TraceDrawerMount: React.FC = () => {
   const hasTrace = useDrawerStore((s) => !!s.traceId);
@@ -300,12 +275,8 @@ const FilterAside: React.FC<{
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
   const { hasAnyTraces } = useProjectHasTraces();
   const isSamplePreview = usePreviewTracesActive();
-  // Below `md` the expanded sidebar steals 240px+ from a 390px-wide
-  // viewport, leaving the actual trace table unreadable. Force the
-  // collapsed rail on small screens regardless of the persisted preference,
-  // BUT honour the transient `mobileExpandedOverride` so the explicit
-  // expand button and the keyboard shortcut still work — they flip the
-  // override instead of the persisted desktop pref.
+  // Below `md` the expanded sidebar steals 240px+ from a 390px-wide viewport, leaving
+  // the actual trace table unreadable.
   const forceCollapsedSmallScreen = useBreakpointValue(
     { base: true, md: false },
     { fallback: "md" },
@@ -317,14 +288,8 @@ const FilterAside: React.FC<{
   // continuous slab while collapsed, with one button to bring it back.
   if (collapsed) return null;
 
-  // No real traces yet — the discover endpoint won't return any field
-  // descriptors, so the filter facets have nothing to show. Hide the
-  // sidebar entirely until real data arrives so we don't present an
-  // empty chrome rail with "Getting filters ready…" that never
-  // populates. Exception: if the user is in sample-preview mode,
-  // `useTraceFacets` swaps the empty discover response for a
-  // hardcoded set derived from the sample fixtures, so the sidebar
-  // has real facets to show even with `hasAnyTraces === false`.
+  // No real traces yet — the discover endpoint won't return any field descriptors, so
+  // the filter facets have nothing to show.
   if (hasAnyTraces === false && !isSamplePreview) return null;
 
   // User-set width wins when present, else the fixed default.
@@ -343,12 +308,8 @@ const FilterAside: React.FC<{
       aria-label="Trace filters"
       position="relative"
       flexShrink={0}
-      // `height="full"` chains the height constraint from the
-      // outer tour-target wrapper through the aside into FilterSidebar's
-      // inner `overflowY="auto"` VStack. Without it the aside ignored
-      // the parent's height and let the VStack render at its intrinsic
-      // ~1700px, which the parent then clipped — facets past the
-      // viewport were invisible *and* unscrollable.
+      // `height="full"` chains the height constraint from the outer tour-target wrapper
+      // through the aside into FilterSidebar's inner `overflowY="auto"` VStack.
       height="full"
       width={`${expandedWidth}px`}
       transition="width 0.15s ease"
@@ -404,24 +365,9 @@ const ResultsPane: React.FC = React.memo(() => {
   // sample preview (see IntegratePane / TracesPage routing), so always showing
   // the banner here is safe and honest.
   const showSampleBanner = isPreviewActive;
-  // Aurora ribbon is a *one-shot* arrival moment. Two ways to arm it,
-  // both purely mount-scoped (no persistence — if you're not on the
-  // page when it happens, it's gone):
-  //
-  //   1. Sample-preview just flipped on for a no-traces project —
-  //      the user opted into "show me what this looks like" and the
-  //      ribbon punctuates that opt-in.
-  //   2. While the page is mounted, `hasAnyTraces` transitions from
-  //      false to true — the project's first real trace just landed,
-  //      and the aurora bridges the IntegratePane → ResultsPane swap
-  //      with a wash that announces "your data is here". Tracked via
-  //      a simple ref of the previous value, so refreshes and tab
-  //      switches naturally skip the replay (the user wasn't watching
-  //      anyway), and we don't need a persisted flag.
-  //
-  // Either trigger arms the aurora for ~3.6s — long enough for one
-  // full curtain cycle — then closes even if the underlying condition
-  // is still true. Sample preview re-arms on every toggle.
+  // Aurora ribbon is a *one-shot* arrival moment. Two ways to arm it, both purely
+  // mount-scoped (no persistence — if you're not on the page when it happens, it's
+  // gone):
   const auroraArmedSample = isPreviewActive && hasAnyTraces === false;
   const prevHasAnyTracesRef = useRef<boolean | undefined>(undefined);
   const [auroraArmedFirstReal, setAuroraArmedFirstReal] = useState(false);
@@ -532,13 +478,8 @@ const ResultsPane: React.FC = React.memo(() => {
 ResultsPane.displayName = "ResultsPane";
 
 /**
- * Aurora ribbon rendered as an absolute overlay inside the results pane's
- * `position: relative` Box. Plays once (fade-in, held, fade-out) when the
- * user first flips to sample preview for a no-traces project — the same
- * marquee moment as the legacy journey, now triggered by the toolbar toggle.
- *
- * The aurora intentionally has pointer-events:none and a high-but-not-
- * overlay zIndex so table rows remain clickable behind it.
+ * Aurora ribbon rendered as an absolute overlay inside the results pane's `position:
+ * relative` Box.
  */
 const AuroraOverlay: React.FC = () => (
   <AnimatePresence>
@@ -546,13 +487,9 @@ const AuroraOverlay: React.FC = () => (
       key="aurora-sample-preview"
       aria-hidden="true"
       initial={{ opacity: 0 }}
-      // Cap the peak opacity well below 1 — the SVG inside has its own
-      // per-curtain opacity keyframe that already peaks at 1.0, so a
-      // wrapper opacity of 0.45 lands the visible intensity in
-      // "ribbon, not headlight" territory. Earlier full-opacity reads
-      // as someone shouting; the marquee moment should announce, not
-      // shout. Fade-out runs longer than fade-in so the dismissal
-      // feels more like the wash receding than a hard cut.
+      // Cap the peak opacity well below 1 — the SVG inside has its own per-curtain
+      // opacity keyframe that already peaks at 1.0, so a wrapper opacity of 0.45 lands
+      // the visible intensity in "ribbon, not headlight" territory.
       animate={{ opacity: 0.45 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.7, ease: "easeOut" }}

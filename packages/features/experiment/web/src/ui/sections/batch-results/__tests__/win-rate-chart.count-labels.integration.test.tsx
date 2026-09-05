@@ -2,20 +2,7 @@ import "@testing-library/jest-dom/vitest";
 
 // @vitest-environment jsdom
 /**
- * The win count printed above each bar, and specifically the one above the
- * TALLEST bar.
- *
- * The axis tops out at the highest tally, so the leading candidate's bar
- * reaches the top of the plot area exactly, its count is drawn above that, and
- * the chart clips anything outside its box. The result on a real run: a chart
- * of 4, 0 and 3 wins shows "3" over the short bar and nothing at all over the
- * winner, which is the one number the chart was added to communicate.
- *
- * jsdom has no layout, so the clipping itself is not observable here: the
- * label element exists in the DOM whether it is drawn on screen or off it.
- * What IS observable is the room the chart asks for, which is what decides
- * whether the label lands inside the box, so that is what these assert. The
- * arrangement is verified visually in the browser.
+ * The win count printed above each bar, and specifically the one above the TALLEST bar.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

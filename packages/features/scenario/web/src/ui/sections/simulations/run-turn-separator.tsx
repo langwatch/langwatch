@@ -1,8 +1,6 @@
 /**
- * Turn separator line for the run detail conversation, matching the
- * Traces V2 conversation view: a hairline with "TURN N" centered. When the
- * turn's trace has landed, the separator grows a "View trace" affordance —
- * hover previews the trace, click opens the trace drawer.
+ * Turn separator line for the run detail conversation, matching the Traces V2
+ * conversation view: a hairline with "TURN N" centered.
  */
 
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";

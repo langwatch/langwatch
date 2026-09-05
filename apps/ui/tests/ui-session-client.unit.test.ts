@@ -1,11 +1,6 @@
 /**
- * The session read, and the one deployment fact the scope rules need from the
- * HTML shell.
- *
- * A payload without a user id is signed out, not a broken user: the endpoint
- * answers `null` for a reader with no session, and a half-shaped user is a
- * reply nothing can act on either way. Reading it as a user would show a
- * signed-out visitor as signed in.
+ * The session read, and the one deployment fact the scope rules need from the HTML
+ * shell.
  */
 
 import { describe, expect, it } from "vitest";
@@ -20,10 +15,6 @@ import {
 
 /**
  * An auth client that answers a read and refuses to end the session.
- *
- * `signOut` rides the same instance because the account menu ends the session
- * through it, but a session READ never reaches it — so this refuses rather
- * than resolving quietly, which would let one slip in here unnoticed.
  */
 const readingClient = ($fetch: UiAuthClient["$fetch"]): UiAuthClient => ({
   $fetch,

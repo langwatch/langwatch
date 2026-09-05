@@ -32,12 +32,9 @@ export type AgentListDrawerProps = {
 };
 
 /**
- * Drawer for selecting an existing agent or creating a new one.
- * Features:
- * - Shows list of saved agents
- * - Empty state with create CTA
- * - "New Agent" button at top
- * - Reusable across the app via useDrawer
+ * Drawer for selecting an existing agent or creating a new one. Features: - Shows list
+ * of saved agents - Empty state with create CTA - "New Agent" button at top - Reusable
+ * across the app via useDrawer
  */
 export function AgentListDrawer(props: AgentListDrawerProps) {
   const { project } = useOrganizationTeamProject();

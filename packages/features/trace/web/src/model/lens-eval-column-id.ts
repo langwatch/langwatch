@@ -1,19 +1,5 @@
 /**
  * Pure grammar for dynamic per-evaluator eval column ids:
- *
- *   eval:<field>:<evaluatorKey>
- *
- * A column targets one evaluator AND one field of its result, so a single
- * evaluator can back several columns (Score, Verdict, Label). Field-first
- * ordering makes parsing unambiguous even when the evaluator key contains
- * delimiters (langevals types like `ragas/faithfulness`, or a free-text
- * key the user typed): split on the first two colons, `field` is the
- * middle token, `evaluatorKey` is everything after.
- *
- * This module is intentionally dependency-free (no React, no TanStack) so
- * both the lens layer (`capabilities.reconcileColumns`) and the table
- * layer (`evalColumns.buildEvalColumnDef`) can import it without creating a
- * layering inversion. See dev/docs/adr/029-trace-table-per-evaluator-columns.md.
  */
 
 export type EvalColumnField = "score" | "verdict" | "label";

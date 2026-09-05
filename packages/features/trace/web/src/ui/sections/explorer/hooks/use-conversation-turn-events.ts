@@ -11,12 +11,6 @@ const WINDOW_PAD_MS = 60 * 60 * 1000;
 
 /**
  * Attaches each conversation turn's events, read once per thread.
- *
- * Turns come from `tracesV2.list`, which stopped carrying events on the trace
- * summary, so the count on a turn separator has to be read back the same way
- * the trace table reads it. The table's own `useTraceListEvents` is bound to
- * the list's columns and filter time range; a thread has neither, so it reads
- * over the span the turns themselves cover.
  */
 export function useConversationTurnEvents(turns: TraceListItem[]): TraceListItem[] {
   const projectId = useDrawerProjectId();

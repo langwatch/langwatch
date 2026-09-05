@@ -1,16 +1,5 @@
 /**
  * How wide the columns of a comparison table are.
- *
- * The header of a target column carries the whole label of the target, which
- * is the agent name with its environment and the parameters that tell two
- * targets of the same agent apart. The width is read off the longest of them,
- * so a long name keeps a column of its own instead of running over the column
- * beside it. Past the maximum the label wraps to a second line and the
- * columns stay where they are.
- *
- * The header and the rows are separate grids, so both are given the same
- * template and the columns stay aligned.
- *
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

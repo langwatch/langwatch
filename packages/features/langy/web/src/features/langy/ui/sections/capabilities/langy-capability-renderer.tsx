@@ -1,24 +1,5 @@
 /**
  * Capability-card dispatcher.
- *
- * Given one settled tool call, decodes its result and mounts the card that
- * result was stamped with (`capabilityRenderFor`; the command's name only
- * seeds the descriptor's wording and surface). The project slug (for deep
- * links) is read once here from the org/team/project hook and threaded down,
- * so the individual cards stay pure of app context.
- *
- * Beneath the card it also draws the follow-up suggestions the result justifies
- * — the quiet "Alert me on this" / "Open in X" chips. WHICH offers to make is
- * `cli-follow-ups.ts`'s call, driven by the feature map; WHERE each lands is
- * `follow-up-chips.ts`'s, which reads the search through the same
- * `traceExplorerLink` reader the card's own Explorer button uses and carries it
- * where a destination can actually hold it (the automation drawer's subject).
- * Offers nothing can carry resolve as plain "Open in <surface>" navigation.
- *
- * `hasCapabilityCard` is the shared predicate that decides whether a call
- * renders as a card at all — used both here and by LangyToolActivity to skip
- * such calls in the generic activity collapser (so a settled search never shows
- * both a "Analysing traces" line AND a traces card).
  */
 
 import { VStack } from "@chakra-ui/react";
@@ -88,20 +69,6 @@ export function toolResultForCapability(
 
 /**
  * A result that cannot substantiate the card it would draw.
- *
- * A create card is a CLAIM — "this exists now, here is the way to it" — and a
- * create whose result names nothing created cannot support it. The card used to
- * own that doubt out loud ("Couldn't confirm the scenario was created"), which
- * was better than the green receipt it replaced but is still a card about
- * nothing: it appeared beside the error card for the SAME operation, telling the
- * same failure a second time in weaker words, and it contradicted the first
- * card's framing. If we are not sure something happened, we do not draw a card
- * saying so — the prose and the failure card already carry it, and the call
- * still appears in the turn's completed-steps receipt.
- *
- * Two signals, because they arrive on different vintages of turn: `outcome` is
- * the verdict the CLI envelope records (`toCliToolResult`), and the payload
- * check catches turns stored before that field existed.
  */
 function claimsNothing(result: CliToolResult): boolean {
   if (result.kind !== "card") return false;
@@ -111,18 +78,6 @@ function claimsNothing(result: CliToolResult): boolean {
 
 /**
  * The card a call draws, and the result behind it.
- *
- * TWO steps, in this order, and the order is the whole point. The name gives a
- * descriptor — which is what lets an older turn's raw output be read back into
- * a result at all. The result then says which card it was stamped with at the
- * command boundary, and THAT card is the one drawn (`withDecidedCard`).
- *
- * What this replaced: both callers re-derived the card from the name and then
- * required the envelope's card to equal it. A promotion's defining property is
- * that the two differ, so every promotion failed the check and the call
- * dropped out of the capability stream entirely — the mechanism could only
- * ever remove a card, never improve one. See ADR-079 §1, and the spec rule
- * "The card a result was stamped with is the card that renders".
  */
 export function capabilityRenderFor(call: CapabilityToolCall): {
   descriptor: CapabilityDescriptor;

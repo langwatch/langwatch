@@ -1,11 +1,7 @@
 /**
+ * Rendered behavior of the table's IO preview cell: the newline-marker affordance and
+ * the media thumbnail/indicator badges.
  * @vitest-environment jsdom
- *
- * Rendered behavior of the table's IO preview cell: the newline-marker
- * affordance and the media thumbnail/indicator badges. These render the real
- * component tree (with the density store boundary mocked), so they are
- * integration tests; the pure clamp-geometry helper stays in
- * IOPreview.unit.test.tsx.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";

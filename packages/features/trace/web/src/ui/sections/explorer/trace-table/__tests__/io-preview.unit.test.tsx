@@ -1,10 +1,6 @@
 /**
+ * Pure clamp-geometry helper for the IO preview's newline markers.
  * @vitest-environment node
- *
- * Pure clamp-geometry helper for the IO preview's newline markers. The
- * rendered behavior (markers in the DOM, media badges) lives in
- * IOPreview.integration.test.tsx — this file only covers logic with no
- * component tree.
  */
 import { describe, expect, it } from "vitest";
 import { shouldHideBreakMarker } from "../io-preview";

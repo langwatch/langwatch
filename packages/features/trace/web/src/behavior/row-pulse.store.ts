@@ -7,10 +7,9 @@ import { create } from "zustand";
 const PULSE_DURATION_MS = 1_200;
 
 /**
- * Minimum gap between two pulses for the same traceId. Bursts of SSE
- * events for the same trace within this window coalesce into a single
- * visual pulse — prevents strobe-like animation on high-throughput
- * projects.
+ * Minimum gap between two pulses for the same traceId. Bursts of SSE events for the
+ * same trace within this window coalesce into a single visual pulse — prevents
+ * strobe-like animation on high-throughput projects.
  */
 const PULSE_COALESCE_MS = 600;
 

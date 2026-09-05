@@ -1,17 +1,6 @@
 /**
- * The charts of a comparison run: the targets next to each other on the
- * numbers a person compares them by, and how each target has done over the
- * runs of the plan.
- *
- * Every number is read off the runs the page already holds, on the one
- * formula every group of runs is summed with, so a bar here and the pill on
- * the column header say the same thing.
- *
- * "Pass rate over runs" draws the runs of the plan the rail has loaded,
- * oldest first, one bar per target. A target is matched across runs by its
- * key, so the same agent on the same parameters lines up from run to run, and
- * a run that did not go against a target draws a gap for it.
- *
+ * The charts of a comparison run: the targets next to each other on the numbers a
+ * person compares them by, and how each target has done over the runs of the plan.
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
@@ -37,10 +26,6 @@ export type ComparisonChartsBlockProps = {
 
 /**
  * One bar per target on one number of the run on screen.
- *
- * The label under a bar is the short one, so two targets of one agent read
- * as what tells them apart rather than as the same truncated name twice.
- * The full label reads on hover.
  */
 function targetGroups({
   targets,

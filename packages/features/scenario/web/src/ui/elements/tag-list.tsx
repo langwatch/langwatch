@@ -1,8 +1,5 @@
 /**
  * Lovable-style tag list component for displaying and managing labels.
- *
- * Renders a list of TagPills with optional add/remove actions.
- * Display-only when neither onRemove nor onAdd are provided.
  */
 
 import { Button, HStack, Input } from "@chakra-ui/react";

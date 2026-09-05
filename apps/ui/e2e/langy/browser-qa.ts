@@ -1,12 +1,6 @@
-// A third, independent verification pass on top of the scenario framework's
-// own judge: after a scenario's conversation finishes, actually look at the
-// real product surface in a real browser. Runs for every scenario via
-// scenario-logger.ts (not opt-in per test) — a pure evidence screenshot when
-// there's nothing to assert, a real DOM check when there is.
-//
-// Auth is a real UI sign-in (not a cookie injected around it), done once per
-// test file and reused across every scenario's browser-QA pass in that file —
-// this also means a broken login page fails loudly instead of being skipped.
+// A third, independent verification pass on top of the scenario framework's own judge:
+// after a scenario's conversation finishes, actually look at the real product surface
+// in a real browser.
 
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
@@ -19,11 +13,8 @@ const SCREENSHOT_DIR = path.resolve(__dirname, "scenario-logs", "screenshots");
 const VIDEO_DIR = path.resolve(__dirname, "scenario-logs", "videos");
 
 /**
- * Opt-in video recording: LANGY_QA_VIDEO=1 records every page in the shared
- * context to scenario-logs/videos as .webm. Playwright only finalizes the
- * files when the CONTEXT closes, so a recording run must end with
- * closeBrowserQA() (an afterAll in the suite, or the process exiting through
- * vitest's teardown) or the videos stay half-written.
+ * Opt-in video recording: LANGY_QA_VIDEO=1 records every page in the shared context to
+ * scenario-logs/videos as .webm.
  */
 const RECORD_VIDEO = process.env.LANGY_QA_VIDEO === "1";
 
@@ -31,9 +22,8 @@ let browserPromise: Promise<Browser> | null = null;
 let contextPromise: Promise<BrowserContext> | null = null;
 
 /**
- * Clears the corresponding cache on rejection — otherwise a single transient
- * launch/login failure would permanently disable browser QA for every
- * remaining scenario in the run (`??=` only checks null/undefined at
+ * Clears the corresponding cache on rejection — otherwise a single transient launch/login failure would
+ * permanently disable browser QA for every remaining scenario in the run (`??=` only checks null/undefined at
  * assignment time, and a rejected promise is neither).
  */
 async function getSharedContext(): Promise<BrowserContext> {

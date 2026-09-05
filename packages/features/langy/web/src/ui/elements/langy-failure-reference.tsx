@@ -6,21 +6,6 @@ import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboa
 /**
  * The platform's own code for a failure, verbatim and selectable, with the whole
  * failure one click away.
- *
- * Every card that reports a failure shows this. The code is never the headline —
- * `resource_limit_exceeded` is our vocabulary, not the customer's — but it is
- * always THERE, because it is the one string that can be searched, quoted in a
- * support thread or pasted into an issue, and a card that knows it and hides it
- * makes the reader's problem harder than it was.
- *
- * Selectable is the point (`userSelect: text` inside a card that is otherwise a
- * click target): the first thing anyone does with a code is paste it somewhere.
- * The button copies the FULL failure document rather than just the code, because
- * that is what a support thread actually needs.
- *
- * The engine's own words, a traceback or a wall of stderr, belong here
- * too, behind the disclosure, never in the card body. A failure that carries
- * nothing but that text still gets this row, so the reader keeps a way to it.
  */
 export function LangyFailureReference({ code, raw }: { code: string; raw?: string }) {
   const { copied, copy } = useCopyToClipboard();

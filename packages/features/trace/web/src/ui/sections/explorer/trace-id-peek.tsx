@@ -10,12 +10,8 @@ interface TracePreviewHoverCardProps {
   traceId: string;
   children: ReactNode;
   /**
-   * Approximate trace timestamp (ms epoch) forwarded to the summary
-   * fetch as a partition-pruning hint. `trace_summaries` is partitioned
-   * on `OccurredAt`, so a read filtered only by `traceId` cannot prune
-   * partitions and walks every weekly partition including the cold S3
-   * tier. Pass it from the surrounding row whenever it is known; when
-   * omitted the popover falls back to the unconstrained by-id fetch.
+   * Approximate trace timestamp (ms epoch) forwarded to the summary fetch as a
+   * partition-pruning hint.
    */
   occurredAtMs?: number;
   /**
@@ -27,10 +23,9 @@ interface TracePreviewHoverCardProps {
 }
 
 /**
- * Hover wrapper that surfaces a compact v2 trace summary popover on any
- * trigger you put inside it. Use it to add a hover-peek to any element
- * already mounted next to a trace — buttons, links, badges — without
- * needing a standalone trigger like the eye icon.
+ * Hover wrapper that surfaces a compact v2 trace summary popover on any trigger you put
+ * inside it. Use it to add a hover-peek to any element already mounted next to a trace
+ * — buttons, links, badges — without needing a standalone trigger like the eye icon.
  */
 export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
   traceId,
@@ -88,13 +83,8 @@ interface TraceIdPeekProps {
 }
 
 /**
- * Standalone eye-icon trigger that opens the trace drawer on click and
- * shows the same hover-peek popover as `<TracePreviewHoverCard>`.
- *
- * Used in dense table rows where there's no other natural "go to
- * trace" affordance to attach the popover to. For surfaces that
- * already have a button or link you can wrap, prefer
- * `<TracePreviewHoverCard>` directly so the eye doesn't crowd the row.
+ * Standalone eye-icon trigger that opens the trace drawer on click and shows the same
+ * hover-peek popover as `<TracePreviewHoverCard>`.
  */
 export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId, occurredAtMs }) => {
   const { openDrawer } = useDrawer();

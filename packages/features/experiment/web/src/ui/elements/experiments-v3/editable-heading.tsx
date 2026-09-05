@@ -10,11 +10,6 @@ type EditableHeadingProps = {
 
 /**
  * EditableHeading - A heading that can be clicked to edit inline.
- *
- * Shows a pencil icon on hover to indicate editability.
- * Clicking transforms it into an input field.
- * Saves on blur or Enter, cancels on Escape.
- * Shows a skeleton when loading an existing evaluation.
  */
 export function EditableHeading({ value, onSave, isLoading = false }: EditableHeadingProps) {
   const [isEditing, setIsEditing] = useState(false);

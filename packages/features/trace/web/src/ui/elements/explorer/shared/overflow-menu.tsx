@@ -13,11 +13,7 @@ export interface OverflowMenuItem {
   /** Disable the menu row without removing it. */
   disabled?: boolean;
   /**
-   * Full row content override. When provided, the menu item renders
-   * `content` instead of the default `icon` + `label` + `endSlot`
-   * arrangement — useful when the caller wants the dropdown row to
-   * mirror exactly what the in-row visible item renders (icon + label
-   * + kbd shortcut + counts, etc.) without re-plumbing each field.
+   * Full row content override.
    */
   content?: React.ReactNode;
 }

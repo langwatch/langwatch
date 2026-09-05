@@ -1,19 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * DOM-level integration tests for the SearchBar editor's rendered output.
- *
- * These confirm that for queries the user can type, the AST-driven decoration
- * plan flows into the actual DOM as expected — separate `.filter-token`
- * spans for each tag, a `.filter-keyword-and` span for the boolean operator,
- * and a per-token `.filter-token-delete` X widget. If a regression ever
- * eats the user's space (collapsing `model:gpt-* AND status:error` into
- * one merged token), these tests catch it.
- *
- * jsdom doesn't implement every API ProseMirror wants, so we render
- * `ActiveSearchEditor` with `autoFocus={false}` and only inspect the
- * statically rendered DOM. We don't simulate keystrokes here — that path
- * is covered by handleKey/getSuggestionState unit tests.
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

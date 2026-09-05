@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import { foldReasoningTitles, stripReasoningTitles } from "../langy-reasoning-titles";
 
 /**
- * The reasoning-summary fold (see logic/langyReasoningTitles.ts): a codex
- * turn's `**Headline**` thinking paragraphs leak into the settled answer text
- * ahead of the reply, with the last one glued straight onto the reply's first
- * word. The fold peels them for the completed receipt and leaves the reply
- * as clean prose.
+ * The reasoning-summary fold (see logic/langyReasoningTitles.ts): a codex turn's
+ * `**Headline**` thinking paragraphs leak into the settled answer text ahead of the
+ * reply, with the last one glued straight onto the reply's first word.
  */
 
 // The real dogfood shape: five standalone headlines, then one glued onto the

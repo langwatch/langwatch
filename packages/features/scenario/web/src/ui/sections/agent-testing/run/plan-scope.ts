@@ -1,16 +1,5 @@
 /**
  * What a stored row covers, and how the run dialog opens on it.
- *
- * A test suite is only a grouping, so it covers itself: the scenarios filed in
- * it. A run plan carries its own rule instead, and a hand-picked one carries
- * its list inside that rule, because the stored rule names no scenario.
- *
- * Telling the two apart matters because a run replaces the config of the plan
- * its name resolves onto. A run plan opened as though it were a test suite would
- * go out covering "the scenarios filed in the test suite with this plan's id",
- * which is nothing, and would write that empty rule over the plan's real
- * scope.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -41,10 +30,6 @@ export function scopeOfStoredPlan(plan: StoredPlanRow): RunScope {
 
 /**
  * The run dialog subject of a stored row, however the Results tab reached it.
- *
- * One builder for both ways in, so the plan header, the plan row menu and the
- * Run button on an open plan can never disagree about what the dialog is
- * opened on.
  */
 export function storedPlanSubject(
   plan: StoredPlanRow,

@@ -17,10 +17,9 @@ import { api } from "../../ui/sections/trace-api";
 const noop = () => undefined;
 
 /**
- * The shared trace, rendered with the Trace Explorer surface. All per-trace
- * data comes from the one `sharedTrace.get` payload in context — the drawer's
- * internal hooks read their slice from there rather than firing their own
- * (now protected) reads. See ADR-057.
+ * The shared trace, rendered with the Trace Explorer surface. All per-trace data comes
+ * from the one `sharedTrace.get` payload in context — the drawer's internal hooks read
+ * their slice from there rather than firing their own (now protected) reads.
  */
 function SharedTraceView() {
   const shared = useSharedTrace();
@@ -85,17 +84,6 @@ function SharedTraceView() {
 
 /**
  * The way forward from a dead share link.
- *
- * This is the only screen in the product whose visitor is, by definition, not
- * a customer — someone was shown a trace and the link had already gone. They
- * arrived curious and the page has nothing for them, which is a poor use of
- * the one visit we get. So under the explanation there is an invitation:
- * what this thing is, and a way in.
- *
- * Deliberately quiet — a separator, one line, one primary action and a
- * sign-in link for people who already have an account and simply weren't
- * signed in. It sits BELOW the error, never in place of it: the first job of
- * the page is still to say what happened.
  */
 function SharePageSignUpInvitation() {
   return (
@@ -124,10 +112,8 @@ export default function SharePage() {
   const token = typeof router.query.id === "string" ? router.query.id : "";
 
   /**
-   * One token-validated read returns the whole read-only payload and consumes
-   * exactly one view. Driven through the tRPC query so its key dedupes the
-   * page, the layout chrome and every drawer hook onto a SINGLE request — a
-   * page load never burns more than one view. See ADR-057.
+   * One token-validated read returns the whole read-only payload and consumes exactly
+   * one view.
    */
   const shared = api.sharedTrace.get.useQuery(
     { token },

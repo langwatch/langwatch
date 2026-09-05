@@ -2,12 +2,9 @@ import { describe, expect, it } from "vitest";
 import { escapeCssAttributeValue as escape } from "../hover-highlight-style";
 
 /**
- * The escape function is the only thing standing between a malformed
- * search query (or hostile facet value flowing in via OTel attributes)
- * and arbitrary CSS injection on the page. Every test here proves a
- * specific class of hostile input can't break out of the
- * `[data-...="ESCAPED"]` selector or terminate the surrounding `<style>`
- * block.
+ * The escape function is the only thing standing between a malformed search query (or
+ * hostile facet value flowing in via OTel attributes) and arbitrary CSS injection on
+ * the page.
  */
 describe("escapeCssAttributeValue", () => {
   describe("given plain alphanumerics", () => {

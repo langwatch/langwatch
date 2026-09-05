@@ -1,25 +1,5 @@
 /**
  * `targetTypeSelector`: the picker that adds a column to an evaluation.
- *
- * RECOVERED FROM `platform/app/src/components/targets/TargetTypeSelectorDrawer.tsx`,
- * deleted in `cc91631cd8`. The Evaluations v3 table's "+" and the Run Evaluation
- * button both write `?drawer.open=targetTypeSelector`, so with the component
- * gone the one affordance that adds anything to an evaluation opened nothing.
- *
- * IT LANDS HERE RATHER THAN IN A DRAWER FOLDER OF THE APPLICATION'S because
- * every card it offers is this family's vocabulary: `TargetType` and
- * `COMPARISON_EVALUATOR_TYPE` are `@langwatch/experiment-contract`'s, and the
- * comparison card's whole behaviour - list the saved comparison evaluators,
- * then create one pre-configured for the comparison judge - is the workbench's
- * own flow. The three imports the platform owned are the only lines that
- * changed: the drawer chrome comes from the design system now, and the
- * navigator plus its in-memory props slot from `@langwatch/ui-drawer`.
- *
- * FOUR OF THE FIVE ADDRESSES IT WRITES ARE REGISTERED TODAY - `promptList`,
- * `evaluatorList`, `evaluatorEditor` - and `agentList` is not: its component is
- * `@langwatch/scenario-web`'s and unexported. So picking Agent writes the right
- * address and nothing opens, which is the same recorded gap the agent type
- * selector carries one drawer further in.
  */
 
 import { Badge, Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
@@ -102,15 +82,8 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
 
   const handleSelectType = (type: TargetCardKey) => {
-    // A comparison is a saved evaluator, so it gets the same list-then-create
-    // flow as Prompt, Agent and Evaluator: pick one you already have, or make a
-    // new one. The list is EvaluatorListDrawer narrowed to comparison
-    // evaluators — same component, same cards, same empty state.
-    //
-    // The save flow (set up by handleAddTarget) creates the column as an
-    // evaluator-target either way. comparisonContext is forwarded from
-    // handleAddTarget so the creation form shows the variant picker and Golden
-    // field immediately, matching edit-mode UX.
+    // A comparison is a saved evaluator, so it gets the same list-then-create flow as
+    // Prompt, Agent and Evaluator: pick one you already have, or make a new one.
     if (type === "comparison") {
       const comparisonContext = (complexProps.comparisonContext ??
         props.comparisonContext) as TargetTypeSelectorDrawerProps["comparisonContext"];

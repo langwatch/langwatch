@@ -92,15 +92,9 @@ const colorMap: Record<string, { background: string; color: string }> = {};
 export type RotatingColorSet = keyof typeof rotatingColors;
 
 /**
- * Bare Chakra `colorPalette` names derived from `rotatingColors.colors` (the
- * leading segment of each `background` token, e.g. `"orange.subtle"` →
- * `"orange"`), so a given string hashes to the same hue whether you ask for
- * the token pair (`getColorForString`) or the bare palette name
- * (`getColorPaletteForString`). Deriving from the single source keeps the
- * order in lockstep — reordering `rotatingColors.colors` can't desync the two
- * paths. The bare name feeds `<Badge colorPalette>` so the badge's bg/border/fg
- * are all mode-aware (good dark contrast) instead of a hand-picked
- * subtle/emphasized token pair.
+ * Bare Chakra `colorPalette` names derived from `rotatingColors.colors` (the leading segment of each `background`
+ * token, e.g. `"orange.subtle"` → `"orange"`), so a given string hashes to the same hue whether you ask for the
+ * token pair (`getColorForString`) or the bare palette name (`getColorPaletteForString`).
  */
 const ROTATING_PALETTES = rotatingColors.colors.map((c) => c.background.split(".")[0]!);
 
@@ -133,20 +127,9 @@ export const getColorForString = (
 };
 
 /**
- * Hex-string sibling of `getColorForString("colors", ...)` — same
- * sum-of-char-codes hash, same 8-color palette ordering — but returns
- * literal hex usable in Recharts SVG `fill` / `stroke`. Lets the
- * governance bird's-eye chart segments paint the exact same hue as
- * the ProjectAvatar / row-dot tokens for the same name, with no
- * Chakra-token-to-hex translation step.
- *
- * Palette values are Chakra v3 mid-saturation hex keyed by palette NAME, then
- * projected through `ROTATING_PALETTES` so the array lands in
- * `rotatingColors.colors` order automatically. Keying by name (rather than a
- * second hand-ordered array) means reordering or extending
- * `rotatingColors.colors` reshuffles the chart hues in lockstep — the index
- * desync this used to risk can't happen. A name that hashes to slot 3 paints
- * `yellow.subtle` in the avatar AND `#eab308` (yellow-500) in the chart.
+ * Hex-string sibling of `getColorForString("colors", ...)` — same sum-of-char-codes
+ * hash, same 8-color palette ordering — but returns literal hex usable in Recharts SVG
+ * `fill` / `stroke`.
  */
 const PALETTE_HEX: Record<string, string> = {
   orange: "#f97316",

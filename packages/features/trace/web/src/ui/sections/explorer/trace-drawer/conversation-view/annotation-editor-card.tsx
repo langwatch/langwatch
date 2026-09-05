@@ -89,10 +89,7 @@ function buildComposerFormState({
 }
 
 /**
- * The annotation composer, docked in the rail where the annotation itself
- * sits. Same form body as the popover; the difference is where the values live
- * (the draft store, so they survive the turn scrolling out of view) and that it
- * takes its place in the column rather than floating over the conversation.
+ * The annotation composer, docked in the rail where the annotation itself sits.
  */
 export function AnnotationEditorCard({ draft, input, output }: AnnotationEditorCardProps) {
   const patchDraft = useAnnotationDraftStore((s) => s.patchDraft);

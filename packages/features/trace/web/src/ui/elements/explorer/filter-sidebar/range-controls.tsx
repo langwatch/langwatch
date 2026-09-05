@@ -21,16 +21,9 @@ export function parseEditedValue(input: string): number | null {
 }
 
 /**
- * Slider step scaled to the range's span. zag-js defaults `step` to 1
- * and throws when `max - min < step`, which made sub-unit ranges (cost
- * in dollars: $0 – $0.004) fail to render at all. 1/200th of the span
- * gives finer-than-pixel drag resolution at sidebar widths, rounded
- * down to a power of ten so dragged values land on tidy numbers
- * instead of 17-decimal floats. Falls back to 1 for degenerate spans
- * (zero, negative, NaN, Infinity) where the power-of-ten math would
- * produce NaN or 0 and trip zag-js's invariants. Shared between
- * RangeSection and EvaluatorDrilldown's score slider, which has the
- * same sub-unit span problem (scores live in [0, 1]).
+ * Slider step scaled to the range's span. zag-js defaults `step` to 1 and throws when
+ * `max - min < step`, which made sub-unit ranges (cost in dollars: $0 – $0.004) fail to
+ * render at all.
  */
 export function stepForSpan(span: number): number {
   if (!Number.isFinite(span) || span <= 0) return 1;
@@ -48,15 +41,9 @@ interface CommitRangeParams {
 }
 
 /**
- * Shared commit path for range filters. Drops NaN / Infinity straight
- * away so we never emit `[NaN TO NaN]` into the URL — zag-js can hand
- * us undefined on degenerate slider states. Clamps to [min, max] and
- * sorts low/high so callers can't briefly emit an inverted or
- * out-of-range tuple, then calls `onClear` when both endpoints sit
- * within CLEAR_EPSILON of the full range (a full-range filter is a
- * no-op we'd rather not pin into the query string) and `onChange`
- * otherwise. Returns the normalised tuple, or null when the input was
- * dropped, so callers can sync local slider state.
+ * Shared commit path for range filters. Drops NaN / Infinity straight away so we never
+ * emit `[NaN TO NaN]` into the URL — zag-js can hand us undefined on degenerate slider
+ * states.
  */
 export function commitRange({
   rawFrom,
@@ -93,12 +80,9 @@ interface RangeEndpointInputProps {
 }
 
 /**
- * Click-to-edit range endpoint. Shows the formatted value (e.g. "1.5s",
- * "$0.05") in the steady state; on focus it switches to the raw number
- * so users can type a precise filter bound — much faster than dragging
- * the slider to a specific cost or duration. Commits on Enter or blur,
- * silently rejects unparseable input (the field reverts to the current
- * value via the next prop sync).
+ * Click-to-edit range endpoint. Shows the formatted value (e.g. "1.5s", "$0.05") in the
+ * steady state; on focus it switches to the raw number so users can type a precise
+ * filter bound — much faster than dragging the slider to a specific cost or duration.
  */
 export const RangeEndpointInput: React.FC<RangeEndpointInputProps> = ({
   value,

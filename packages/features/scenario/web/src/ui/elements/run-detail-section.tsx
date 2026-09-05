@@ -1,10 +1,5 @@
 /**
  * Accordion section for the run detail drawer body.
- *
- * Mirrors the Traces V2 drawer section language (uppercase tracked title,
- * count badge, 12px rotating chevron) without importing that feature's
- * Section, which is private to its drawer and carries presence/spotlight/
- * density behaviors that don't apply here.
  */
 
 import { Accordion, Badge, Box, HStack, Icon, Text } from "@chakra-ui/react";
@@ -66,10 +61,7 @@ export function RunDetailSection({
   /** Set false for full-bleed content like the results console. */
   contentPadding?: boolean;
   /**
-   * Inline controls rendered over the trigger's right edge, before the
-   * chevron. Rendered as a positioned sibling of the trigger (never inside
-   * it — the trigger is a <button> and nesting interactive controls in it
-   * breaks keyboard/AT behavior), so real <button> elements are fine here.
+   * Inline controls rendered over the trigger's right edge, before the chevron.
    */
   actions?: ReactNode;
   children: ReactNode;

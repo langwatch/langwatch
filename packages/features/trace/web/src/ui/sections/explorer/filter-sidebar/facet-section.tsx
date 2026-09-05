@@ -49,38 +49,19 @@ interface FacetSectionProps {
   };
   /**
    * When true, the per-facet value search ALSO reaches the SERVER (queries
-   * `facetValues` with the typed text as a `prefix`) to SUPPLEMENT — not
-   * replace — the client-side filter over `items`, so values beyond the
-   * preloaded top-N surface too. Set only by the categorical render branch;
-   * see {@link useFacetSearch} — server search is categorical-only. The
-   * Enter-to-filter fallback is kept regardless for not-yet-ingested values.
+   * `facetValues` with the typed text as a `prefix`) to SUPPLEMENT — not replace — the
+   * client-side filter over `items`, so values beyond the preloaded top-N surface too.
    */
   serverValueSearch?: boolean;
   /**
-   * Optional per-row extras renderer. Invoked for any row whose value
-   * is currently active (i.e. surfaced via `pinnedContent`). The
-   * returned node is rendered immediately below the active row so the
-   * extras read as a continuation of the row's UI. The evaluator
-   * section uses this to inline a drilldown (verdict pills, score
-   * range slider) under each active evaluator without firing a second
-   * server query. Returns `null` to skip extras for a given item.
+   * Optional per-row extras renderer. Invoked for any row whose value is currently
+   * active (i.e. surfaced via `pinnedContent`).
    */
   renderActiveRowExtras?: (item: FacetItem) => React.ReactNode;
   /**
-   * Optional extras renderer for INACTIVE rows. Invoked for each
-   * inactive item in the visible window. Receives the item, whether
-   * this row is currently expanded, and a callback to toggle the
-   * expansion. Returns `null` to skip extras for that item.
-   *
-   * Split into two slots: `trailing` renders inline at the row's right
-   * edge (the expand chevron) and `below` renders underneath the row
-   * (the expanded drilldown panel). Keeping the toggle inline — rather
-   * than as a full-width row beneath — is why the contract is an object
-   * rather than a single node.
-   *
-   * FacetSection owns the `expandedInactiveRows` Set so the state is
-   * automatically reset whenever the section unmounts or the sidebar
-   * is closed — no external persistence needed.
+   * Optional extras renderer for INACTIVE rows. Invoked for each inactive item in the
+   * visible window. Receives the item, whether this row is currently expanded, and a
+   * callback to toggle the expansion. Returns `null` to skip extras for that item.
    */
   renderInactiveRowExtras?: (
     item: FacetItem,
@@ -132,12 +113,8 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
   const [showMore, setShowMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  // The typed-value filter is hidden by default; the SidebarSection
-  // header shows a list-filter funnel icon that reveals (and auto-
-  // focuses) the input. Audit feedback was that the always-on input took
-  // ~32px off every section's vertical real estate for an affordance most
-  // operators only reach for on long-tail values. We keep it
-  // *available* (one click) but stop spending the space.
+  // The typed-value filter is hidden by default; the SidebarSection header shows a
+  // list-filter funnel icon that reveals (and auto- focuses) the input.
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
@@ -175,17 +152,9 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   // in the list for one-click filtering; the badge just stops tallying them.
   const presentValueCount = useMemo(() => countPresentValues(items), [items]);
 
-  // Server-side value search. When the per-facet search is open with a
-  // non-empty query, ALSO query `facetValues` with that text as a `prefix` so
-  // the match reaches ALL of this facet's distinct values — not just the
-  // preloaded top-N `items`. The typed text is debounced before it hits the
-  // server: a per-keystroke prefix scan over a high-cardinality facet is a real
-  // ClickHouse round-trip. Gated on `serverValueSearch` — see useFacetSearch
-  // (server search is categorical-only) — AND on BOTH the live and debounced
-  // query: the debounced value drives the fetch (wait for typing to settle),
-  // while the live value disables it the instant the input is cleared so a
-  // stale prefix can't keep firing for the debounce window. The hook is always
-  // called (hooks can't be conditional) but stays disabled until the gate opens.
+  // Server-side value search. When the per-facet search is open with a non-empty query,
+  // ALSO query `facetValues` with that text as a `prefix` so the match reaches ALL of
+  // this facet's distinct values — not just the preloaded top-N `items`.
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const serverSearchActive =
     !!serverValueSearch &&
@@ -207,14 +176,9 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     [serverSearch.values],
   );
 
-  // SUPPLEMENT, don't replace: while server search is active, feed the UNION of
-  // the preloaded items and the server prefix results (preloaded first so it
-  // wins on a shared value, keeping its dotColor / aggregates). The client-side
-  // substring filter still runs over that union on the LIVE query every
-  // keystroke — a server prefix hit is also a substring match, so it survives,
-  // while a substring living WITHIN a preloaded value (e.g. "gpt-4o" inside
-  // "openai/gpt-4o-mini", which the server's anchored prefix match misses) is
-  // still found locally.
+  // SUPPLEMENT, don't replace: while server search is active, feed the UNION of the
+  // preloaded items and the server prefix results (preloaded first so it wins on a
+  // shared value, keeping its dotColor / aggregates).
   const baseItems = useMemo(
     () => (serverSearchActive ? dedupeByValue([...items, ...serverItems]) : items),
     [serverSearchActive, items, serverItems],
@@ -256,13 +220,9 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     [facetWindow.visible],
   );
 
-  // Freeze the row layout while the pointer is inside the section. A click
-  // toggles a value's state but must not yank it up to the pinned area or
-  // reshuffle the count-sorted list under the cursor (jarring). We snapshot
-  // the rendered partition (pinned actives + windowed rest) on pointer-enter
-  // and keep rendering it until the pointer leaves, at which point the live
-  // partition re-flows. Each row still reads its *live* state, so the clicked
-  // value lights up in place without moving.
+  // Freeze the row layout while the pointer is inside the section. A click toggles a
+  // value's state but must not yank it up to the pinned area or reshuffle the
+  // count-sorted list under the cursor (jarring).
   const liveLayoutRef = useRef({ activeItems, facetWindow, maxCount });
   liveLayoutRef.current = { activeItems, facetWindow, maxCount };
   const [frozenLayout, setFrozenLayout] = useState<{
@@ -275,14 +235,9 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     [],
   );
   const thawLayout = useCallback(() => setFrozenLayout(null), []);
-  // Bypass freeze whenever a typed-search is active: the value-search input
-  // lives inside the same hover-Box, so by the time the user types the
-  // layout is already frozen — `searchQuery → filtered → facetWindow`
-  // narrows live, but a frozen `layout.facetWindow.visible` would keep
-  // showing the pre-search snapshot. We re-flow on every keystroke so the
-  // list narrows as the user types. Reorder-on-click (the reason the
-  // freeze exists) doesn't intersect search, since clicking a row blurs
-  // the input and dismounts the search affordance.
+  // Bypass freeze whenever a typed-search is active: the value-search input lives inside the same hover-Box, so
+  // by the time the user types the layout is already frozen — `searchQuery → filtered → facetWindow` narrows
+  // live, but a frozen `layout.facetWindow.visible` would keep showing the pre-search snapshot.
   const layout = searchQuery
     ? { activeItems, facetWindow, maxCount }
     : (frozenLayout ?? { activeItems, facetWindow, maxCount });
@@ -340,16 +295,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
           ) : undefined
         }
         activeIndicator={
-          // "Any of" hint — the only header indicator left. Shown when 2+
-          // values are INCLUDED, i.e. the same-field OR case, telling the
-          // user the selection is a set of alternatives (OR), not a
-          // narrowing AND, without making them read the query bar. The old
-          // numeric selection badge was removed: it floated mid-header,
-          // double-counted against the present-value count on the right,
-          // and was wrong for off-list custom values (it only tallied
-          // values present in `items`). The selection is already legible —
-          // chosen values stay pinned + visible above the list (even when
-          // collapsed) and the title goes bold via `hasActive`.
+          // "Any of" hint — the only header indicator left.
           showAnyOfHint ? (
             <Text
               textStyle="2xs"
@@ -433,12 +379,9 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
             so the user can start typing immediately. */}
           {items.length > 0 &&
             searchOpen && (
-              // The Input carries an inset focus ring (outlineOffset -2px) so
-              // the keyboard outline renders fully inside the element instead
-              // of being clipped at the edge by the sidebar scroll
-              // container's overflow (#18b). The small paddingX/paddingY
-              // gutter is kept purely for visual breathing room around the
-              // focused input.
+              // The Input carries an inset focus ring (outlineOffset -2px) so the
+              // keyboard outline renders fully inside the element instead of being
+              // clipped at the edge by the sidebar scroll container's overflow (#18b).
               <VStack gap={0.5} align="stretch" marginTop={1} paddingX={0.5} paddingY={0.5}>
                 <Input
                   ref={searchInputRef}
@@ -460,14 +403,9 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
                     if (e.key !== "Enter") return;
                     const typed = searchQuery.trim();
                     if (!typed) return;
-                    // Prefer an exact match against a known FacetItem so
-                    // facets where label !== value (friendly topic names,
-                    // etc.) submit `value` rather than the typed `label`.
-                    // Fall back to the raw typed value for rare values
-                    // (a one-off `metadata.tenant`, a long error string
-                    // copy-pasted from a log) that don't surface in the
-                    // top-50 facet response. Toggle is symmetric: typing
-                    // the same value again removes the filter.
+                    // Prefer an exact match against a known FacetItem so facets where
+                    // label !== value (friendly topic names, etc.) submit `value`
+                    // rather than the typed `label`.
                     const lowered = typed.toLowerCase();
                     const matched = items.find(
                       (i) => i.value.toLowerCase() === lowered || i.label.toLowerCase() === lowered,

@@ -14,9 +14,6 @@ interface IsolatedErrorBoundaryProps {
   scope?: string;
   /**
    * Reset keys — when any change, the boundary remounts its children.
-   * Same semantics as `react-error-boundary`'s built-in: feed the IDs the
-   * inner content depends on so navigating to a different trace/span
-   * re-attempts rendering instead of staying stuck on the error.
    */
   resetKeys?: ReadonlyArray<unknown>;
   /**
@@ -29,11 +26,8 @@ interface IsolatedErrorBoundaryProps {
 }
 
 /**
- * Wraps children so a render-time crash inside renders an inline error
- * panel — without closing the surrounding drawer/dialog or unmounting
- * siblings. Used by default inside `DrawerContent` and `DialogContent`
- * so any drawer/dialog body that throws shows the error in place rather
- * than taking down the whole page.
+ * Wraps children so a render-time crash inside renders an inline error panel — without
+ * closing the surrounding drawer/dialog or unmounting siblings.
  */
 export const IsolatedErrorBoundary: React.FC<IsolatedErrorBoundaryProps> = ({
   scope,
@@ -61,12 +55,8 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
   resetErrorBoundary,
   scope,
 }) => {
-  // This is the fallback for every drawer and dialog in the app, so whatever it
-  // prints, a customer reads — in production. `error.message` is a render-time
-  // crash's message: since #5984 a handled one is the code slug, and an
-  // unhandled one is a stack-adjacent internal. The registry decides the words;
-  // the raw message stays behind the dev gate, exactly as `PageErrorFallback`
-  // does it.
+  // This is the fallback for every drawer and dialog in the app, so whatever it prints,
+  // a customer reads — in production.
   const explanation = explainAnyError(error);
   // A render crash almost never carries a handled payload, so the registry's
   // headline is usually the generic one — and the caller's `scope` ("Couldn't

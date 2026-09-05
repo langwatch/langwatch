@@ -1,10 +1,7 @@
 /**
+ * One redaction notice for the whole conversation: the policy that scrubbed a turn is the project's, so the
+ * conversation says so once, above the turns, with the link to the setting behind it.
  * @vitest-environment jsdom
- *
- * One redaction notice for the whole conversation: the policy that scrubbed a
- * turn is the project's, so the conversation says so once, above the turns,
- * with the link to the setting behind it. See
- * specs/traces-v2/conversation-redaction-notice.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

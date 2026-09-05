@@ -33,10 +33,8 @@ export interface ChatMessage {
 }
 
 /**
- * Anthropic-style typed content blocks. A single message's `content` can be
- * a heterogenous array of text / thinking / tool_use / tool_result, all
- * mixed together. We render each block with its own dedicated UI so the
- * thinking and tool calls don't end up dumped as raw JSON in the body.
+ * Anthropic-style typed content blocks. A single message's `content` can be a
+ * heterogenous array of text / thinking / tool_use / tool_result, all mixed together.
  */
 export type ContentBlock =
   | { kind: "text"; text: string }
@@ -57,10 +55,7 @@ export type ContentBlock =
   | { kind: "raw"; data: unknown };
 
 /**
- * A content block with the identity a comment can be left on. The key is
- * derived from what the block holds rather than from where it sits, so reading
- * the same transcript again recognises the same messages, and a message whose
- * content changed is a message nothing points at.
+ * A content block with the identity a comment can be left on.
  */
 export type KeyedContentBlock = ContentBlock & { blockKey: string };
 
@@ -93,9 +88,8 @@ export type ChatLayout = "thread" | "bubbles";
 export const VIRTUALIZE_AT = 8;
 
 /**
- * Above this turn count we collapse everything except the last turn by
- * default — short convos still benefit from showing the last couple
- * expanded; long convos drown the user in collapsed noise unless we're
- * aggressive about hiding.
+ * Above this turn count we collapse everything except the last turn by default — short
+ * convos still benefit from showing the last couple expanded; long convos drown the
+ * user in collapsed noise unless we're aggressive about hiding.
  */
 export const LONG_THREAD_THRESHOLD = 6;

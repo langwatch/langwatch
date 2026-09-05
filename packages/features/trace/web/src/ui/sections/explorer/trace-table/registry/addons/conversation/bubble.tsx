@@ -73,10 +73,9 @@ interface BubbleProps {
   /** Truncate the text body to N characters. 0 disables. */
   maxChars?: number;
   /**
-   * When set, marks the bubble as carrying annotations. The amber accent
-   * stripe lights up so a long thread is scannable for noted turns;
-   * `hasCorrection` upgrades the inline badge to the lightbulb tone used
-   * elsewhere for "suggested output".
+   * When set, marks the bubble as carrying annotations. The amber accent stripe lights
+   * up so a long thread is scannable for noted turns; `hasCorrection` upgrades the
+   * inline badge to the lightbulb tone used elsewhere for "suggested output".
    */
   annotation?: { count: number; hasCorrection: boolean };
   /**

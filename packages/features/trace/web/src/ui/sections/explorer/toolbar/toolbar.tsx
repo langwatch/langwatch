@@ -21,26 +21,17 @@ import { LensTabs } from "./lens-tabs";
 import { LiveIndicator } from "./live-indicator";
 import { TimeRangePicker } from "./time-range-picker";
 
-// Toolbar widths (the bar's own measured width, not the viewport) below which
-// controls progressively shed chrome to keep the lens tabs readable when the
-// window is narrow or the filters sidebar is wide. Two steps: first the verbose
-// labels ("Last 30 days", "Automate") collapse to their icons; then, tighter
-// still, the menu-trigger dropdown chevrons drop too. Tunable — they key off
-// the real toolbar width via ResizeObserver, so they hold across sidebar
-// resizes, not just browser-window resizes.
+// Toolbar widths (the bar's own measured width, not the viewport) below which controls
+// progressively shed chrome to keep the lens tabs readable when the window is narrow or
+// the filters sidebar is wide.
 const TOOLBAR_LABELS_MIN_WIDTH = 800;
 const TOOLBAR_CHEVRONS_MIN_WIDTH = 620;
 
 interface ToolbarProps {
   onExportAll?: () => void;
   /**
-   * When true, the "See sample data" toggle is rendered fully
-   * transparent (kept in the layout so the toolbar spacing doesn't
-   * jump but invisible to the user). IntegratePane uses this because
-   * the larger hero "See sample data" button alongside the page title
-   * is the canonical entry point in the empty-trace state — having
-   * two visible affordances for the same action splits the user's
-   * attention.
+   * When true, the "See sample data" toggle is rendered fully transparent (kept in the
+   * layout so the toolbar spacing doesn't jump but invisible to the user).
    */
   hideSampleDataAction?: boolean;
 }
@@ -54,15 +45,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
 
   const showSamplePreview = useOnboardingStore((s) => s.showSamplePreview);
   const setShowSamplePreview = useOnboardingStore((s) => s.setShowSamplePreview);
-  // Sample data is an onboarding affordance — once the project has its
-  // own real traces (`Project.firstMessage = true`, set by the
-  // projectMetadata subscriber on first non-sample ingest), the toggle is
-  // noise. We gate visibility on `hasAnyTraces === false` rather than
-  // `!== true` so the button stays put during the brief window where
-  // `firstMessage` is still unknown (avoids a flicker on first load).
-  // Note: this only filters out *real* traces — seeded sample traces
-  // continue to leave `firstMessage` false, so the toggle remains
-  // available during sample-data exploration.
+  // Sample data is an onboarding affordance — once the project has its own real traces
+  // (`Project.firstMessage = true`, set by the projectMetadata subscriber on first
+  // non-sample ingest), the toggle is noise.
   const { hasAnyTraces } = useProjectHasTraces();
   const isNewAccount = useIsNewAccount();
   const { dismiss: persistTourDismissal } = useTraceExplorerTourPreference();
@@ -89,12 +74,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
       onEndTour();
     } else {
       setShowSamplePreview(true);
-      // Auto-start spotlights when the user opts into sample data — the
-      // whole point of "See sample data" is to give the user a tour of
-      // what the trace explorer looks like with content in it, which
-      // pairs naturally with contextual callouts that explain what each
-      // surface does. They can dismiss the spotlights from any step
-      // without turning samples off.
+      // Auto-start spotlights when the user opts into sample data — the whole point of "See sample data" is to
+      // give the user a tour of what the trace explorer looks like with content in it, which pairs naturally
+      // with contextual callouts that explain what each surface does.
       const first = TRACE_EXPLORER_SPOTLIGHTS[0];
       const firstId = first?.id ?? null;
       setCurrentSpotlightId(firstId);

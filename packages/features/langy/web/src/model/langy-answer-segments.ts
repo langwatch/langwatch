@@ -1,19 +1,7 @@
 /**
- * Split an assistant message's parts into the ordered render sequence the
- * block channel needs (ADR-060 §1): prose stays prose, a stamped
- * `langy-card` part renders as its card WHERE THE BLOCK SAT in the reply's
- * flow, and a `langy-card-failed` part renders as the disclosure.
- *
- * This reads the parts the relay recorded — it never re-parses fences out of
- * text. A text part that happens to CONTAIN a ```langy-card fence renders as
- * text (the browser renders the stamped part, never its own parse; a fence
- * that reached the client as text is a fence the relay decided was not a
- * block — quoted inside a code example, or from a turn recorded before the
- * channel existed).
- *
- * A part claiming `type: "langy-card"` that does not parse against the
- * shared contract degrades to a FAILED segment carrying its JSON — a
- * malformed stamp must never vanish quieter than a failed block would.
+ * Split an assistant message's parts into the ordered render sequence the block channel needs (ADR-060 §1): prose
+ * stays prose, a stamped `langy-card` part renders as its card WHERE THE BLOCK SAT in the reply's flow, and a
+ * `langy-card-failed` part renders as the disclosure.
  */
 import {
   LANGY_CARD_FAILED_PART_TYPE,
@@ -52,10 +40,9 @@ export function hasLangyBlockParts(parts: readonly unknown[]): boolean {
 }
 
 /**
- * The ordered segments. Consecutive text parts merge into one prose run with
- * a paragraph break at each part boundary — distinct parts are distinct
- * blocks, and a bare join glued the last word of one part onto the first
- * word of the next. Empty text segments are dropped.
+ * The ordered segments. Consecutive text parts merge into one prose run with a
+ * paragraph break at each part boundary — distinct parts are distinct blocks, and a
+ * bare join glued the last word of one part onto the first word of the next.
  */
 export function langyAnswerSegments(parts: readonly unknown[]): LangyAnswerSegment[] {
   const segments: LangyAnswerSegment[] = [];
@@ -111,22 +98,8 @@ export function langyAnswerSegments(parts: readonly unknown[]): LangyAnswerSegme
 }
 
 /**
- * The same ordered segments for a message the relay never stamped FOR THIS
- * CLIENT: the copy the panel streamed for itself.
- *
- * A turn the reader watched leaves two copies of its reply. The durable record
- * carries the parts the relay stamped out of the fences; the streamed copy in
- * the chat engine carries the fences as text and is never replaced by the
- * durable one (replacing it would drop the mid-turn narration, which the saved
- * reply does not keep). So the reader who watched the turn was the only reader
- * who saw the reply's closing cards as JSON in a code block, and a page reload
- * drew them properly.
- *
- * Reading those fences here is not the browser second-guessing the relay. It
- * is the SAME scanner and the SAME salvage the stamp uses, so it can only
- * reach the verdict the stamp reached: a fence quoted inside another code block
- * stays opaque text on both sides. Returns null when the text holds no fence,
- * so an ordinary reply keeps the plain markdown path.
+ * The same ordered segments for a message the relay never stamped FOR THIS CLIENT: the
+ * copy the panel streamed for itself.
  */
 export function langyAnswerSegmentsFromText(text: string): LangyAnswerSegment[] | null {
   if (!mightContainLangyCardFence(text)) return null;

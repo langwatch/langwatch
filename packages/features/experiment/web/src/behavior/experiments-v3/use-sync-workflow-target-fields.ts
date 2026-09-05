@@ -43,14 +43,8 @@ const sameFields = ({
   );
 
 /**
- * The fields a target records that its workflow no longer agrees with, or
- * undefined when the two already match.
- *
- * A derivation the agent could not resolve is not an answer, so nothing is
- * applied from it: the workflow is archived, deleted, or in another project,
- * and clearing the column would take the user's mappings with it. A workflow
- * that resolved and declares nothing is an answer, and an emptied column is
- * the honest reflection of it.
+ * The fields a target records that its workflow no longer agrees with, or undefined
+ * when the two already match.
  */
 const staleFields = ({
   target,
@@ -76,22 +70,6 @@ const staleFields = ({
 
 /**
  * Keeps a workflow agent target's recorded fields in step with its workflow.
- *
- * Every other target owns the fields it declares: a prompt, a code agent and
- * an HTTP agent each save what they read and produce. A workflow agent owns
- * nothing — it points at a Studio graph, and that graph's entry node and its
- * RESULTS are the only record of its shape. A target column that copied those
- * fields once, when it was added, therefore describes the workflow as it was
- * at that moment. Add a result in the Studio and the workbench never hears
- * about it: the evaluator's variable picker keeps offering the old list, and
- * there is nothing in the UI to press to refresh it.
- *
- * Reconciling on load fixes both directions — columns added before these
- * fields were derived at all, and columns whose workflow has since changed.
- *
- * The reconciliation stays out of undo history. It is not an edit the user
- * made, so Ctrl+Z landing on it would either look like nothing happened or put
- * back a shape the workflow no longer has.
  */
 export const useSyncWorkflowTargetFields = () => {
   const { project } = useOrganizationTeamProject();

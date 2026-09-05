@@ -4,15 +4,6 @@ import type { StageId } from "../../../../model/explorer/onboarding/chapters/onb
 
 /**
  * Hero-text helpers shared by `StaticHero` and `TypewriterHero`.
- *
- * - `BlinkingCursor` — the typewriter caret. Lives here because both heroes
- *   use it (typewriter while typing; static could use it for a stub state).
- * - `applyAuroraTextShimmer` — wraps every standalone occurrence of
- *   `aurora` (case-insensitive) in a span that animates a multi-stop
- *   gradient across background-clipped text.
- * - `renderHeading` — most stages render their heading verbatim; a few
- *   (currently `postArrival`) prepend a coloured directional glyph.
- *   Returns React nodes, not a string.
  */
 
 export const BlinkingCursor: React.FC<{ color?: string }> = ({ color = "fg" }) => (

@@ -1,24 +1,5 @@
 /**
- * The live turn's answer, with blocks previewing as they stream
- * (ADR-060 §7).
- *
- * While the assistant text streams, any ```langy-card fence in it is fed —
- * chunk by chunk — through the SAME salvage + validation the relay will
- * stamp with at settle (`feedLangyDerivedCardPreview`), so a preview is only
- * ever shown for data that already validates: nothing renders for a fence
- * until a validating prefix exists, the card grows as points arrive, and a
- * chunk that momentarily breaks validation keeps the last good block on
- * screen instead of flickering.
- *
- * Previews are a live-stream affair. At settle the relay's stamped parts
- * replace the streamed text wholesale (the settled part wins — the same
- * server-clock rule the text merge follows), and this component simply
- * stops rendering: the settled path (`AnswerWithCards`) draws the one true
- * card. Preview and settled card can never coexist, so "exactly one card"
- * holds by construction, not by bookkeeping.
- *
- * A forming card is never interactive: choices render visibly forming and
- * unanswerable until the stamped part arrives.
+ * The live turn's answer, with blocks previewing as they stream (ADR-060 §7).
  */
 import { Box, VStack } from "@chakra-ui/react";
 import {

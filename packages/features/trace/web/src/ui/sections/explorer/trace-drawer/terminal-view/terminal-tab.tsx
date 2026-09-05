@@ -31,21 +31,6 @@ interface TerminalTabProps {
 
 /**
  * The Terminal tab's data boundary.
- *
- * Reads the WHOLE session's transcript from the backend (`codingAgentTranscript`
- * — spans and logs, ordered by timestamp) rather than rebuilding it in the
- * browser from the last model call's rolling message history. That rebuild
- * only ever showed the final turn, and collapsed entirely when the final call
- * was a lone tool request with no reply text.
- *
- * The transcript's `tool` entries carry only what got recorded generically;
- * the tools' REAL I/O (Bash stdout, a file's content, Edit's structured patch)
- * rides on `tool.output` span events, which are fetched alongside and joined
- * in by span id.
- *
- * A trace is one TURN of a session, so the reads above cover the turn the
- * drawer opened on. The rest of the session sits in its sibling traces, and
- * `useSessionScrollback` walks backwards into them as the reader scrolls up.
  */
 export function TerminalTab({
   projectId,
@@ -147,12 +132,8 @@ function TranscriptError() {
 }
 
 /**
- * The whole session's cost for the bottom bar, off the same pre-folded row
- * the Usage tab reads (and the same query, so opening both tabs fetches
- * once). The replay walks backward only and its turn list is bounded, so the
- * bar's running figure alone understates any session bigger than what loaded
- * — stating this total beside it is what keeps a position-scoped number from
- * passing for the session total.
+ * The whole session's cost for the bottom bar, off the same pre-folded row the Usage
+ * tab reads (and the same query, so opening both tabs fetches once).
  */
 function useSessionCostUsd({
   projectId,

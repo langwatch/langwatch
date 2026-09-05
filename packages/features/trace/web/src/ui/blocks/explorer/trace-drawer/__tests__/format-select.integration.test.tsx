@@ -1,8 +1,7 @@
 /**
+ * The compact format selector: active format in the pill with a caret, the alternatives
+ * in the menu it opens. See specs/traces-v2/io-toolbar.feature.
  * @vitest-environment jsdom
- *
- * The compact format selector: active format in the pill with a caret, the
- * alternatives in the menu it opens. See specs/traces-v2/io-toolbar.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -47,15 +46,9 @@ describe("FormatSelect", () => {
     });
 
     /**
-     * Keyboard selection has to reach the same handler as a pointer. zag
-     * activates the highlighted item by dispatching a real click on it, which
-     * is what lets one `onClick` serve both.
-     *
-     * ArrowDown on the closed trigger both opens the menu and highlights the
-     * first option, so the highlight is set by the same gesture rather than by
-     * a second press that has to land after the first one settles. The active
-     * option is JSON and the keyboard picks the first one, so the reported
-     * value cannot be the one that was already active.
+     * Keyboard selection has to reach the same handler as a pointer. zag activates the
+     * highlighted item by dispatching a real click on it, which is what lets one
+     * `onClick` serve both.
      */
     it("picks an option from the keyboard", async () => {
       const user = userEvent.setup();

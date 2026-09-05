@@ -2,13 +2,9 @@ import { describe, expect, it } from "vitest";
 import { describeToolCall, effectiveToolName, skillCardDetail } from "../langy-tool-label";
 
 /**
- * The frames in this file are the ones that were ON SCREEN in the screenshot
- * that failed review — a `skill` call that rendered "SKILL / Skill", and a
- * `bash` call running a LangWatch search that rendered "BASH / Coding…".
- *
- * They are pinned here because both faults had already been reported once and
- * came back. A card gallery cannot catch this class of bug: it renders fixtures
- * we wrote, and our fixtures were more flattering than the real stream.
+ * The frames in this file are the ones that were ON SCREEN in the screenshot that
+ * failed review — a `skill` call that rendered "SKILL / Skill", and a `bash` call
+ * running a LangWatch search that rendered "BASH / Coding…".
  */
 describe("given a tool frame from the live stream", () => {
   describe("when the agent invokes a skill", () => {

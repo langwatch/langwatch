@@ -1,20 +1,5 @@
 /**
  * MediaPart — renders a single AG-UI media content part inline.
- *
- * Handles three shapes:
- *  - URL source (source.type="url" or binary with url set): renders native HTML5 element.
- *  - Inline data (source.type="data" or binary with data set): renders with a data: URI (legacy back-compat).
- *  - Unavailable: when the bytes are gone, or we cannot even find out, the
- *    element is replaced by a stated placeholder rather than left mounted.
- *
- * Uses native HTML5 <audio>, <img>, <video> — no third-party player library.
- * Non-media binary parts (documents) render as an attachment chip that opens
- * the stored file in a new tab.
- *
- * Every path out of loading is visible. A player that stays at zero seconds
- * with no explanation is indistinguishable from a silent recording, so a
- * failed element goes to a placeholder while the existence probe runs and
- * lands on a named state whether the probe answers or fails.
  */
 import { Box, Icon, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink, File, FileText } from "lucide-react";
@@ -137,14 +122,9 @@ export function MediaPart({
     }
   }
 
-  // Legacy raw-PCM references: objects stored before store-time WAV wrapping
-  // carry header-less pcm16 / G.711 bytes under a raw mime type — a bare
-  // <audio src> cannot decode those. Fetch the bytes once, wrap them in a
-  // WAV container client-side, and play from a blob URL. New objects are
-  // wrapped at store time and never take this path. Gated on
-  // `storedObjectId`: only our own stored objects can BE legacy raw-PCM
-  // refs, and an eager fetch of an arbitrary external URL would beacon the
-  // viewer to whoever controls the part.
+  // Legacy raw-PCM references: objects stored before store-time WAV wrapping carry
+  // header-less pcm16 / G.711 bytes under a raw mime type — a bare <audio src> cannot
+  // decode those.
   const rawUrlFormat =
     storedObjectId && category === "audio" ? resolveRawPcmFormat(undefined, mimeType) : null;
   const [wrappedSrc, setWrappedSrc] = useState<string | null>(null);
@@ -286,13 +266,7 @@ export function MediaPart({
     );
   }
 
-  // binary fallback — attachment chip. Stored-object URLs open in a new tab
-  // (the /api/files read route serves Content-Disposition: inline, so PDFs
-  // render in the browser's viewer); legacy inline base64 falls back to a
-  // download, since browsers block top-frame navigation to data: URIs.
-  // Stored objects are content-addressed and carry no filename of their own,
-  // so pass the message-level one along — downloads from the opened viewer
-  // then keep the original name instead of the object id.
+  // binary fallback — attachment chip.
   const filename = part.type === "binary" ? part.filename : undefined;
   const chipHref =
     filename && storedObjectId ? `${src}?filename=${encodeURIComponent(filename)}` : src;

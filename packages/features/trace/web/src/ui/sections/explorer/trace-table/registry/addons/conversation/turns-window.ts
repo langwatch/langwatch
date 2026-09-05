@@ -18,10 +18,9 @@ export interface TurnsWindow {
 }
 
 /**
- * Slice a thread into a head window plus an always-visible tail. When the
- * thread is longer than `visibleCount`, the head holds the first
- * `visibleCount - 1` turns and the tail holds the last turn, with the
- * remainder counted as hidden. When it fits, `head` is the whole thread.
+ * Slice a thread into a head window plus an always-visible tail. When the thread is
+ * longer than `visibleCount`, the head holds the first `visibleCount - 1` turns and the
+ * tail holds the last turn, with the remainder counted as hidden.
  */
 export function windowTurns({
   traces,

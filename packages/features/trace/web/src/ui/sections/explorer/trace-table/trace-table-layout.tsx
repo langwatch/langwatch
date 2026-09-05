@@ -52,13 +52,8 @@ export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
   const ownedElRef = useRef<HTMLDivElement | null>(null);
   const isReplacingData = useRefreshUIStore((s) => s.isReplacingData);
 
-  // Tracking which element this layout owns lets the store reject a
-  // stale unmount-cleanup fire from clobbering a *newer* layout's
-  // already-published element. This matters when the page swaps
-  // between ResultsPane and EmptyResultsPane on tour activation:
-  // React mounts the new layout (publishing its element) before
-  // running the old layout's unmount cleanup, and an unconditional
-  // `setRef(null)` would overwrite the live element with null.
+  // Tracking which element this layout owns lets the store reject a stale
+  // unmount-cleanup fire from clobbering a *newer* layout's already-published element.
   const setRef = useCallback((el: HTMLDivElement | null) => {
     scrollRef.current = el;
     if (el) {

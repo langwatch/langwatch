@@ -1,11 +1,5 @@
 /**
  * The agents a simulation can be pointed at, and what each of them reads as.
- *
- * A connected agent is one of them (ADR-128): it carries an environment, a
- * presence and, in a development environment, an owner. A development agent
- * that belongs to another person can only be run by that person, so the
- * picker draws it disabled and says why on hover.
- *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
@@ -128,11 +122,8 @@ export function isAgentTarget(
 }
 
 /**
- * Why a teammate's development agent cannot be picked, in the words the
- * product already uses for that refusal.
- *
- * Read from the code-keyed registry rather than written again here, so the
- * picker and the refused run say the same thing.
+ * Why a teammate's development agent cannot be picked, in the words the product already
+ * uses for that refusal.
  */
 export function ownerOnlyCopy(ownerName?: string | null): string {
   const explanation = explainHandledError({

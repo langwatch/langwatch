@@ -1,15 +1,5 @@
 /**
  * Traces capability card (`langwatch.trace.search` / `langwatch.trace.get`).
- *
- * A trace search renders a row list — one row per matched trace, each linking
- * to that trace — under a "Found N traces" header. A single-trace lookup
- * renders a one-trace summary. Both are reads: no Apply, just the results and
- * the "Open in Traces" deep link.
- *
- * The CLI runs its reads with `--format json`, so what lands here is the
- * structured document (`{ traces: [...], pagination: { totalHits } }`), read
- * through `cliResultDocument`. The markdown-digest parse below it is the older
- * MCP transport's shape, kept so a conversation recorded under it still replays.
  */
 import { Button, Text, VStack } from "@chakra-ui/react";
 // `asJsonDocument` is the shared CLI contract's, not the panel's — the CLI and the
@@ -52,10 +42,9 @@ function traceIdOf(row: unknown): string | null {
 }
 
 /**
- * The CLI's trace-search document. Null when the output is not one, so the
- * caller falls back to the digest parse. An EMPTY list is a real answer
- * ("nothing matched"), not a miss — which is why this returns `{ traces: [] }`
- * rather than null in that case.
+ * The CLI's trace-search document. Null when the output is not one, so the caller falls
+ * back to the digest parse. An EMPTY list is a real answer ("nothing matched"), not a
+ * miss — which is why this returns `{ traces: [] }` rather than null in that case.
  */
 function parseTracesJson(output: unknown): { total: number | null; traces: ParsedTrace[] } | null {
   const document = asJsonDocument(output);
@@ -98,11 +87,8 @@ function singleTraceLines(output: unknown): string[] | null {
 }
 
 /**
- * Null means UNREADABLE — neither the JSON contract nor the legacy markdown
- * digest recognised the output (e.g. JSON truncated upstream). That is a
- * different thing from an EMPTY result, and the caller must render it
- * differently: "couldn't read this" is honest; "0 traces matched" would be a
- * confident wrong answer manufactured out of garbage.
+ * Null means UNREADABLE — neither the JSON contract nor the legacy markdown digest
+ * recognised the output (e.g. JSON truncated upstream).
  */
 function parseTraces(output: unknown): {
   total: number | null;
@@ -134,13 +120,6 @@ function parseTraces(output: unknown): {
 export function LangyTracesCard({ descriptor, input, output, projectSlug }: CapabilityCardInput) {
   const isSingle = descriptor.render === "trace";
   // The search Langy actually ran, offered back as somewhere to GO.
-  //
-  // `@langwatch/langy-web` owns this, and reusing it is not tidiness: the
-  // CLI's `--query` is FREE TEXT while the Explorer's `q` is a liqe expression,
-  // so an unquoted `status:error` silently stops being a text search and
-  // becomes a field filter — the user lands on a different result set than the
-  // card just showed them. That module quotes the term and carries the time
-  // window; a local copy of it did neither.
   const router = useRouter();
   const search = readTraceSearchQuery(input);
   const queryHref = search.query
@@ -246,13 +225,8 @@ export function LangyTracesCard({ descriptor, input, output, projectSlug }: Capa
 }
 
 /**
- * "Search this in Traces" — the query Langy wrote, handed to the Trace
- * Explorer's search bar.
- *
- * It shows the query itself rather than a bare verb, because the query IS the
- * claim: the user is about to hand a filter to a page they trust, and they
- * should be able to read it before they do. A truncated one still reads as a
- * query; a button labelled only "Open" asks them to take it on faith.
+ * "Search this in Traces" — the query Langy wrote, handed to the Trace Explorer's
+ * search bar.
  */
 function OpenSearchButton({ query, onOpen }: { query: string; onOpen: () => void }) {
   return (

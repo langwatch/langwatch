@@ -1,8 +1,6 @@
 /**
- * The drawer header reads its token figures out of the trace's flat attribute
- * map, where every value is a string and a key may simply be absent. Which key
- * wins, and what "absent" means, is the part that decides whether a pill shows
- * at all, so it is pinned here rather than left to the 1,300-line component.
+ * The drawer header reads its token figures out of the trace's flat attribute map,
+ * where every value is a string and a key may simply be absent.
  */
 import { describe, expect, it } from "vitest";
 import { readNumberAttribute } from "../utils";

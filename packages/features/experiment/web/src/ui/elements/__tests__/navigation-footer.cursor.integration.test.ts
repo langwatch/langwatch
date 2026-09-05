@@ -1,9 +1,7 @@
 /**
+ * Regression test for issue #4077 — Bug 1: prevPage() in cursor-based pagination mode
+ * always jumps to page 1 instead of navigating to the previous page.
  * @vitest-environment jsdom
- *
- * Regression test for issue #4077 — Bug 1:
- * prevPage() in cursor-based pagination mode always jumps to page 1
- * instead of navigating to the previous page.
  */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

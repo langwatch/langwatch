@@ -46,15 +46,8 @@ import { LangyModelPill } from "../elements/langy-model-pill";
 const COMPOSER_RADIUS = "18px";
 
 /**
- * Marks the composer's outer card in the DOM so a surface OUTSIDE the panel can
- * measure where it is going to land.
- *
- * The home page's send animates a copy of its own composer to the panel's, and
- * the panel is mounted in a different tree behind a `position: fixed` boundary,
- * so there is no ref to pass. An attribute is the seam: one selector, no
- * plumbing through three components, and nothing breaks if the reader is not on
- * the home page. The value distinguishes the panel's composer (the destination)
- * from the home page's own (the origin).
+ * Marks the composer's outer card in the DOM so a surface OUTSIDE the panel can measure
+ * where it is going to land.
  */
 export const COMPOSER_ANCHOR_ATTR = "data-langy-composer";
 
@@ -99,17 +92,6 @@ const COMPOSER_DATA_USE_NOTICE = "Note: these chats are used by LangWatch to imp
 
 /**
  * The composer rail — affordances that sit beside the model picker.
- *
- * The rail carries only REAL controls. Three buttons used to sit here and are
- * gone, for the same reason in three directions. "Skills" went because they
- * became REAL — a catalogue, a chip, and a `/` to summon them — and a dead
- * button beside a live feature teaches people that the buttons are decoration.
- * "Attach a file" went because it is NOT coming: there is no upload path at any
- * layer (no write endpoint, no field on the turn, no way to get bytes to the
- * worker), so a greyed paperclip was advertising a feature with nothing behind
- * it and no plan to build it. "Reasoning effort" went last: it sat as a greyed
- * "coming soon" placeholder with no backend behind it, and a placeholder is a
- * promise; an indefinite one is a lie.
  */
 function ComposerImpl({
   model,
@@ -161,12 +143,7 @@ function ComposerImpl({
   const hero = variant === "hero";
   const reduceMotion = useReducedMotion();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // The draft subscription lives in ComposerInputRow, NOT here. When this
-  // component read the draft, every character re-rendered the whole card:
-  // context menu, model picker combobox (portal, positioner and every row,
-  // even closed) and the sigil tooltips — ~580 component renders per
-  // keystroke, measured. `setDraft` is a stable function, so subscribing to
-  // it re-renders nothing.
+  // The draft subscription lives in ComposerInputRow, NOT here.
   const setDraft = useLangyStore((s) => s.setDraft);
   // The turn phase is the SINGLE source for the send/stop affordance (ADR-078):
   // `idle` lets the composer send; `active`/`stopping` disable sending and show
@@ -176,12 +153,9 @@ function ComposerImpl({
   const turnPhase = useLangyStore((s) => s.turnPhase);
   const turnActive = turnPhase !== "idle";
 
-  // An `askLangy` handoff asks the panel's composer to take focus so the
-  // reader can keep typing. Honored on mount (the panel usually opens WITH the
-  // handoff) or on change (panel already open), then consumed so it fires
-  // once. The hero variant never takes it: it is the origin of a handoff,
-  // never the destination. Focus before consume, inside one frame — consuming
-  // first would re-run this effect and cancel the frame that focuses.
+  // An `askLangy` handoff asks the panel's composer to take focus so the reader can
+  // keep typing. Honored on mount (the panel usually opens WITH the handoff) or on
+  // change (panel already open), then consumed so it fires once.
   const composerFocusRequested = useLangyStore((s) => s.composerFocusRequested);
   const consumeComposerFocus = useLangyStore((s) => s.consumeComposerFocus);
   useEffect(() => {
@@ -193,26 +167,12 @@ function ComposerImpl({
     return () => cancelAnimationFrame(frame);
   }, [composerFocusRequested, hero, consumeComposerFocus]);
 
-  // The rainbow sheen is an ACTIVITY signal, not an invitation. It used to ride
-  // the border only while the composer was blank and idle ("start here") and
-  // drop the instant you sent — which meant the one moment the composer had
-  // something to say about itself was the one moment it said nothing. Now it is
-  // lit for exactly as long as a turn is in flight (including the `stopping`
-  // window), so the ring travelling round the composer means "Langy is working".
-  // It pairs with the 3px sink below: same trigger, same phase, one posture.
+  // The rainbow sheen is an ACTIVITY signal, not an invitation.
 
   /**
-   * Two keys, two palettes, and the split is the whole point: `#` summons
-   * CONTEXT (the things on this page Langy could be given), `/` summons SKILLS
-   * (the things Langy knows how to do). One is nouns, the other verbs.
-   *
-   * The trigger key is NEVER inserted into the draft — we intercept it on
-   * keydown and open the palette instead. That is why there is no "strip the
-   * token" step anywhere in this file: there is no token. A half-typed `/git`
-   * cannot leak into a prompt because it never lived in the textarea.
-   *
-   * Only fires at a word boundary (start of the message, or after whitespace),
-   * so a URL's `https://` and a `#tag` mid-sentence are left alone.
+   * Two keys, two palettes, and the split is the whole point: `#` summons CONTEXT (the
+   * things on this page Langy could be given), `/` summons SKILLS (the things Langy
+   * knows how to do). One is nouns, the other verbs.
    */
   const [palette, setPalette] = useState<PaletteMode | null>(null);
   const [paletteQuery, setPaletteQuery] = useState("");
@@ -225,13 +185,6 @@ function ComposerImpl({
 
   /**
    * A picked skill becomes a real, editable message rather than a token.
-   *
-   * A skill declares the question it answers (`userPrompt` in its own
-   * SKILL.md); dropping that into the draft leaves the user with something they
-   * can read, edit and send. The alternative — inserting `/tracing` and hoping
-   * — asks them to finish a sentence in a syntax nobody documented. Client
-   * commands are the exception: `/feedback` IS the message the composer
-   * intercepts, so it goes in verbatim.
    */
   const pickSkill = (skill: LangySkill) => {
     const text =
@@ -310,14 +263,7 @@ function ComposerImpl({
           // while the light still reads through the edges.
           background={hero ? "bg.panel/88" : "bg.subtle"}
           backdropFilter={hero ? "blur(8px)" : undefined}
-          // Focus swaps in the brand-orange ring in both layouts. At rest the
-          // floating card leans on the panel it overlays (no shadow, as before),
-          // while the sidebar card grows its own drop shadow so it lifts off the
-          // flat dock instead of reading as a bar welded to the bottom.
-          //
-          // The ring is pure CSS (`:has` on the field's focus) rather than
-          // React state: a `focused` boolean here re-rendered the whole card —
-          // model picker and all — twice per focus cycle for a border color.
+          // Focus swaps in the brand-orange ring in both layouts.
           boxShadow={
             floating
               ? undefined
@@ -412,12 +358,7 @@ function ComposerImpl({
             // control height (see SigilButton) and the row centers explicitly
             // rather than by luck.
             align="center"
-            // ...and it STAYS one row. In a narrow panel the rail was breaking
-            // onto a second line, which put the model control on its own row
-            // above two left-stranded sigils and made the footer look like a
-            // stack of unrelated chrome. Nothing here may wrap; if the rail
-            // runs out of room the model pill gives up its width first (it
-            // collapses to a glyph by design), never the row's shape.
+            // ...and it STAYS one row.
             flexWrap="nowrap"
             minWidth={0}
             paddingLeft={2.5}
@@ -502,17 +443,6 @@ Composer.displayName = "Composer";
 
 /**
  * The input row — the ONLY part of the composer that re-renders per keystroke.
- *
- * The draft subscription lives here, at a real leaf: a character updates the
- * textarea and the send button, and nothing else. Memoized with stable props
- * (the palette opener is a `useCallback`, the rest are refs and primitives),
- * so the row is equally untouched when the card around it re-renders for a
- * palette or a turn-phase change.
- */
-/**
- * The composer's key handling. A sigil typed at a word boundary opens its
- * palette instead of typing; Enter sends, Shift+Enter keeps the newline. With
- * the palettes closed a sigil types as the ordinary character it is.
  */
 function composerKeyHandler({
   input,
@@ -750,10 +680,7 @@ function SigilButton({
   hint: string;
   onClick: () => void;
   /**
-   * Greyed while a turn is in flight, alongside the model picker. Both change
-   * what the NEXT send carries, and the send has already gone — a palette that
-   * opened here would let someone attach context to a turn that cannot take
-   * it, and then look like it had done nothing.
+   * Greyed while a turn is in flight, alongside the model picker.
    */
   disabled?: boolean;
 }) {

@@ -12,25 +12,13 @@ export type TracePeekSummaryProps = {
   traceId: string;
   /**
    * Approximate trace timestamp (ms epoch) forwarded to the summary fetch as a
-   * partition-pruning hint. `trace_summaries` is partitioned on `OccurredAt`,
-   * so a read filtered only by `traceId` cannot prune partitions and walks
-   * every weekly partition including the cold S3 tier. Pass it from the
-   * surrounding row whenever it is known; when omitted the popover falls back
-   * to the unconstrained by-id fetch.
+   * partition-pruning hint.
    */
   occurredAtMs?: number;
 };
 
 /**
  * The compact trace summary a hover-peek shows.
- *
- * The read is `tracesV2.header` on the same cache entry the drawer's own header
- * query uses, which is the point: opening the drawer on a trace the reader has
- * already hovered is a cache hit, and `useOpenTraceDrawer`'s `setData` seed
- * (still an application hook) lands on this query too.
- *
- * `full: false` — the popover only ever shows a 2-line clamp of input/output,
- * never worth what full resolution of offloaded content costs.
  */
 export function TracePeekSummary({ projectId, traceId, occurredAtMs }: TracePeekSummaryProps) {
   const { header: trace, isLoading } = useTraceHeader({

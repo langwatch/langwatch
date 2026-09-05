@@ -8,29 +8,9 @@ import type { LangyMessageDto } from "@langwatch/langy-contract";
 import type { createLangyChatTransport } from "./logic/langy-chat-transport";
 
 /**
- * The panel's chat ENGINE as one owned seam: the `useChat` transport state plus
- * the only two operations that may write to it from outside a live turn —
- * hydrating a stored history into it, and resetting it.
- *
- * Everything `useChat` owns that Zustand cannot reach is reset HERE, so a
- * caller can never forget a field:
- *
- *   - the ERROR. The bug people saw: start a new chat after a failed turn and
- *     the red error card is still sitting under an empty panel, because
- *     nothing ever cleared `useChat`'s error. `clearError()` is the only thing
- *     that does. (`stop()` is a no-op once the turn has errored — it returns
- *     early unless the status is streaming/submitted — so it was never going
- *     to.)
- *   - the MESSAGES. Cleared explicitly rather than via the panel's
- *     `activeConversationId === null` effect, which only fires on a TRANSITION
- *     to null — so a new chat started from an already-null conversation (a
- *     first message that failed before the server adopted an id) left the dead
- *     messages on screen.
- *
- * What is deliberately NOT here: the recovery timer (owned by
- * `useLangyTurnRecovery`, which exposes its own `reset()`) and the backend
- * stop (a panel-level coordination of store + server). The panel composes
- * owned seams; it does not reach into this engine's internals.
+ * The panel's chat ENGINE as one owned seam: the `useChat` transport state plus the
+ * only two operations that may write to it from outside a live turn — hydrating a
+ * stored history into it, and resetting it.
  */
 export function useLangyChatEngine({
   transport,

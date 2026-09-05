@@ -13,10 +13,6 @@ export type SuggestionIcon = ComponentType<{ size?: string | number }>;
 
 /**
  * What a project must already have for an ask to be able to succeed.
- *
- * Ordered by how much of the product the reader has reached, because that is
- * exactly what governs which asks are honest to offer them: "compare my last
- * two runs" is a dead end until there are two runs.
  */
 export type SuggestionRequirement = "nothing" | "traces" | "evaluations" | "experiments";
 
@@ -27,33 +23,15 @@ export interface LangySuggestion {
   /** Absent means it works from a standing start. */
   requires?: SuggestionRequirement;
   /**
-   * Offer this ask only UNTIL the project has the named thing. Setup asks are
-   * promises about a gap — "onboard your agent" to a project that already has
-   * traces is the product not knowing its own customer — so once the gap
-   * closes, the ask is withdrawn rather than topped up.
+   * Offer this ask only UNTIL the project has the named thing.
    */
   until?: SuggestionRequirement;
 }
 
 /**
- * The suggested actions double as onboarding: each one names a different thing
- * Langy can do — read traces, build evals, compare experiments, ship a fix as a
- * PR — so a first-time user learns the range by scanning the list. Simple
- * icon + label rows (Notion-style), not pills; clicking sends the prompt.
- *
- * EVERY ROW MUST BE A THING LANGY CAN ACTUALLY DO. A suggestion that reliably
- * fails is worse than no suggestion — it is the product lying on its own home
- * screen. See the GitHub row for what that constraint cost.
- *
- * Exported because the home page's lit block offers a few of these as its
- * capability row. It reads THIS array rather than keeping a parallel copy, so
- * home can never promise an ask the panel does not offer.
- *
- * The `requires` field is what lets BOTH surfaces offer a DIFFERENT few to a
- * project that has nothing than to one that has months of runs: the panel's
- * own list is selected by the same `selectLangySuggestions` the home page
- * uses (see logic/langyHomeSuggestions.ts), so a project with no traces is
- * offered ways to get set up rather than four asks that can only dead-end.
+ * The suggested actions double as onboarding: each one names a different thing Langy
+ * can do — read traces, build evals, compare experiments, ship a fix as a PR — so a
+ * first-time user learns the range by scanning the list.
  */
 export const SUGGESTIONS: LangySuggestion[] = [
   {
@@ -75,19 +53,8 @@ export const SUGGESTIONS: LangySuggestion[] = [
     requires: "experiments",
   },
   {
-    // The GitHub glyph, not a generic pull-request icon — this row is the only
-    // place a first-time user learns Langy can reach their repo at all. If they
-    // haven't connected it, asking is still the right move: the answer is a
-    // connect card in the conversation, not a dead end.
-    //
-    // The wording carries the whole loop — investigate, then ship the fix as a
-    // PR — because that IS the loop the agent runs (see
-    // app-layer/langyagent/skills/github/SKILL.md: clone → branch → edit →
-    // commit → push → `gh pr create`). It stops there, and so does this copy.
-    // Opening an ISSUE and VALIDATING a fix are NOT capabilities today — there
-    // is no `gh issue create` anywhere in the skill, the progress vocabulary
-    // ends at `opened`, and the rate limiter is scoped to PR permits. Offering
-    // either would be a suggestion that reliably fails.
+    // The GitHub glyph, not a generic pull-request icon — this row is the only place a
+    // first-time user learns Langy can reach their repo at all.
     icon: GitHub,
     label: "Investigate an issue and open a PR",
     prompt:
@@ -98,12 +65,6 @@ export const SUGGESTIONS: LangySuggestion[] = [
 
 /**
  * What to offer a project that has no data yet.
- *
- * The four above all start from traces, evaluations or experiment runs, so on
- * an empty project every one of them is a dead end — exactly the "suggestion
- * that reliably fails" the note above rules out. These ask Langy to help set
- * the project up instead, which it can do from a standing start, and they live
- * beside their siblings so the same constraint governs both lists.
  */
 export const SETUP_SUGGESTIONS: LangySuggestion[] = [
   {
@@ -128,19 +89,6 @@ export const SETUP_SUGGESTIONS: LangySuggestion[] = [
 
 /**
  * The opening line, of which there are three.
- *
- * There were twenty-three. A rotation that wide stops reading as personality
- * and starts reading as a slot machine: nobody sees the same panel twice, so no
- * line ever becomes Langy's, and the weakest of them set the tone as often as
- * the best. Three lines get remembered.
- *
- * They deliberately do three different jobs, and the split is the point: the
- * first INTRODUCES him and is the joke, the second says what he is actually
- * FOR and is not, the third ASKS for something. Rotating registers rather than
- * lines is what stops a second reading landing as the same gag twice.
- *
- * Kept dry, never cutesy: Langy is a competent teammate having a good day, not
- * a mascot. A fresh one is picked each time the empty state mounts.
  */
 const GREETINGS = ["Hey, I'm Langy!"];
 
@@ -153,18 +101,15 @@ export function EmptyState({
   onPick: (prompt: string) => void;
   /**
    * The asks this project can actually act on, picked by the panel via
-   * `selectLangySuggestions` from the project's reach — the same selection the
-   * home page runs, so the two surfaces can never disagree about what is
-   * honest to offer. Empty while the reach is still unknown: a row that
-   * appears and is then withdrawn is worse than a beat of nothing.
+   * `selectLangySuggestions` from the project's reach — the same selection the home
+   * page runs, so the two surfaces can never disagree about what is honest to offer.
    */
   suggestions: LangySuggestion[];
   variant?: "floating" | "sidebar";
   /**
-   * The panel's real rendered width. The floating card ranges ~340–432px with
-   * the viewport and the dock is fixed at 392px, so the hero + rows size off THIS
-   * rather than the mode — a narrow card no longer gets the same big hero as a
-   * roomy one. See `emptyStateMetrics`.
+   * The panel's real rendered width. The floating card ranges ~340–432px with the
+   * viewport and the dock is fixed at 392px, so the hero + rows size off THIS rather
+   * than the mode — a narrow card no longer gets the same big hero as a roomy one.
    */
   panelWidth?: number;
 }) {
@@ -187,12 +132,9 @@ export function EmptyState({
       flex="1"
       height="full"
       justify={sidebar ? "flex-start" : "center"}
-      // One centred measure for the whole empty state — the hero and the
-      // suggestion list share these bounds, so nothing sits in its own width
-      // (the subtitle used to be capped at 260px while the list ran the full
-      // ~428px). 360px is ~0.77 of the 468px panel: tight enough that the
-      // centred text isn't marooned in air, wide enough that the long GitHub
-      // row never wraps — true-golden 0.618 (≈289px) would clip it.
+      // One centred measure for the whole empty state — the hero and the suggestion
+      // list share these bounds, so nothing sits in its own width (the subtitle used to
+      // be capped at 260px while the list ran the full ~428px).
       maxWidth="360px"
       marginX="auto"
       width="full"
@@ -323,13 +265,7 @@ function SuggestionRow({
       paddingX={`${paddingX}px`}
       paddingY={`${paddingY}px`}
       borderRadius="12px"
-      // A resting SHAPE, not a bare row. These sat as plain text on the
-      // panel's gradient with nothing but a hover fill to say they could be
-      // pressed — so until the pointer happened to cross one, the four best
-      // starting points in the product looked like a list of headings. The
-      // hairline and the glass give each one an edge at rest; the warm border
-      // on hover is the only colour they take, so the mark stays the panel's
-      // one saturated thing.
+      // A resting SHAPE, not a bare row.
       borderWidth="1px"
       borderStyle="solid"
       borderColor="border.muted"

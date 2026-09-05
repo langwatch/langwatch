@@ -2,10 +2,8 @@ import { Box, Skeleton, VStack } from "@chakra-ui/react";
 import { SkeletonHeader } from "../../elements/sequence/skeleton-header";
 
 /**
- * Minimal placeholder for the topology view: a few rounded "node" cards
- * scattered across the canvas, each shimmering via Chakra's built-in
- * Skeleton. Different silhouette from SequenceSkeleton (no lifelines) so
- * users can tell which view is loading at a glance.
+ * Minimal placeholder for the topology view: a few rounded "node" cards scattered
+ * across the canvas, each shimmering via Chakra's built-in Skeleton.
  */
 const NODES = [
   { left: "8%", top: "28%", width: "16%", height: "30px" },

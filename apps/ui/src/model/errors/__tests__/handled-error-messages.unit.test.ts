@@ -1,24 +1,6 @@
 /**
- * @vitest-environment node
- *
  * Keeps the "nothing on a handled error is sensitive" rule executable.
- *
- * A `HandledError`'s `message` is customer-safe BY DEFINITION — the Hono
- * boundary ships it in the response body verbatim (`error-handler.ts` sets
- * `message` from the error's own sentence), and the CLI/SDKs render it when
- * they have no copy of their own. So a message that names `LW_GATEWAY_BASE_URL`,
- * `clickhouse-0.internal` or `10.0.0.4:5432` is a leak with an audience, not a
- * style problem. That exact leak shipped once already — see
- * `trpc-error-formatter.unit.test.ts`, "never leaks server configuration named
- * in a handled error's message".
- *
- * It was an authoring convention with nothing enforcing it (ADR-045 wrote it
- * down; a `.feature` scenario asserted it with no `When` and no test). This is
- * the check: read every message a `HandledError` is constructed with and fail
- * on the shapes that can only be internal.
- *
- * Internals still belong in the log line beside the throw, where the trace id
- * ties them back to the customer-facing error.
+ * @vitest-environment node
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -28,10 +10,9 @@ import { describe, expect, it } from "vitest";
 const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
 /**
- * The same three trees `codes.unit.test.ts` walks, for the same reason: a
- * handled error declared in `ee/` or in a workspace package reaches a customer
- * exactly like one declared in `src/`, so a guard that only reads `src/` is a
- * guard that passes forever for everywhere else.
+ * The same three trees `codes.unit.test.ts` walks, for the same reason: a handled error declared in `ee/` or in a
+ * workspace package reaches a customer exactly like one declared in `src/`, so a guard that only reads `src/` is
+ * a guard that passes forever for everywhere else.
  */
 const ROOTS = [
   join(PACKAGE_ROOT, "src"),
@@ -44,24 +25,15 @@ const ROOTS = [
 ];
 
 /**
- * Below this many messages, assume the extractor stopped matching rather than
- * that the codebase stopped raising handled errors. A scanner that finds
- * nothing reports no offenders.
- *
- * Roughly 105 literal messages match today. The floor sits far enough below
- * that ordinary churn doesn't trip it and a broken extractor — which finds
- * zero — does.
+ * Below this many messages, assume the extractor stopped matching rather than that the
+ * codebase stopped raising handled errors. A scanner that finds nothing reports no
+ * offenders.
  */
 const MINIMUM_MESSAGES = 60;
 
 /**
- * Shapes that can only have come from a config value, a deployment topology or
- * a driver — never from a sentence written for a customer.
- *
- * Deliberately narrow. The point is to catch the leak that actually happens
- * (an env var name or an internal address pasted into the message), not to
- * police tone: prose quality is a review concern, and a guard that fires on
- * judgement calls gets exempted into uselessness.
+ * Shapes that can only have come from a config value, a deployment topology or a driver
+ * — never from a sentence written for a customer.
  */
 const FORBIDDEN: { label: string; pattern: RegExp }[] = [
   {
@@ -115,10 +87,9 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 /**
- * Reads the string or template literal starting at `from`, returning its
- * literal text (interpolations blanked) — or `null` when the argument is not a
- * literal at all, which is the `${}`-free half of the corpus this guard cannot
- * see and does not pretend to.
+ * Reads the string or template literal starting at `from`, returning its literal text
+ * (interpolations blanked) — or `null` when the argument is not a literal at all, which
+ * is the `${}`-free half of the corpus this guard cannot see and does not pretend to.
  */
 function readLiteral(source: string, from: number): string | null {
   const quote = source[from];

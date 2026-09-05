@@ -1,21 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The gap eighteen family manifests recorded, asserted closed.
- *
- * Every family that moved a screen out of `platform/app` wrote the same line:
- * the screen asks its host to open a drawer, the host writes
- * `?drawer.open=<name>` into the address, and NOTHING OPENS — because the mount
- * lived in `platform/app`'s `DashboardLayout` and the registry behind it named
- * forty-five modules of that application. This drives the whole path the way a
- * reader does: an address that names a drawer, through the chrome LAYOUT ROUTE,
- * onto a page below it, and the drawer is on screen.
- *
- * The registry is stubbed and the route table is not. What is under test is the
- * wiring — that the layout route mounts the host, that the host reads the
- * address, that closing writes the address back — and a stub registry is what
- * keeps that from turning into a test of one family's tRPC provider. The real
- * registry's own invariants are asserted in `installed-ui-drawers.unit.test.ts`.
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -40,21 +25,6 @@ vi.mock("../src/features/navigation", () => ({
 
 /**
  * The Providers the shell's own reads run on.
- *
- * The shell asks four procedures for itself — the usage meter, the pending
- * annotation count, the personal-workspace features and the per-organization
- * product flags — so a suite that stubs the host still has to give those hooks
- * a client to be mounted under. Nothing answers: every query fails against no
- * server, which is exactly the frame this suite is about, since each of those
- * reads renders nothing until it has data.
- */
-/**
- * A desktop viewport, because jsdom does not implement `matchMedia` at all.
- *
- * Without it every Chakra breakpoint query reports false, `base` wins, and the
- * shell draws its PHONE chrome — one compact bar and a full-screen menu, with
- * no sidebar column to find. The stub answers every `min-width` query yes,
- * which is what a wide window looks like.
  */
 function useDesktopViewport() {
   window.matchMedia = ((query: string) => ({
@@ -86,12 +56,6 @@ function ShellTransport({ children }: { children: React.ReactNode }) {
 
 /**
  * Enough workspace for the shell to draw itself.
- *
- * The shell waits on the graph before it renders anything — a chrome drawn
- * against half a workspace is how a reader ends up looking at another
- * organization's sidebar — so a suite about the LAYOUT has to hand it a
- * resolved one. `organization:view` is what puts the Settings entry in the
- * column, which is the assertion below.
  */
 const TEAM = {
   id: "team-1",
@@ -112,12 +76,6 @@ const SHELL_READINGS = {
 
 /**
  * The trace drawer's global mount, stubbed.
- *
- * The chrome mounts it beside `CurrentDrawer` because the trace drawer cannot
- * be a registry entry (its URL sync has to outlive `?drawer.open=`). It reads
- * the trace family's host, which reads this application's capability ports —
- * and a suite about the LAYOUT mounts none of those. Its own wiring is asserted
- * in `trace-drawer-mount.integration.test.tsx`.
  */
 vi.mock("../src/features/traces", () => ({
   UiTraceDrawerMount: () => null,

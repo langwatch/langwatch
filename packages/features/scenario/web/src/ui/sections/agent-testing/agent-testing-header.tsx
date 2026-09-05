@@ -1,14 +1,6 @@
 /**
- * The one header line of the Agent Testing page: the page title on the left
- * and the tabs in the middle.
- *
- * With a run plan open the title is the name of that plan, with what the plan
- * is beside it. Leaving the plan hands the title back to the page.
- *
- * Neither tab carries an action here. Every write entry sits in the section
- * header above the table it writes into: New scenario beside the set it files
- * into, New run plan beside the Test Runs list it adds to.
- *
+ * The one header line of the Agent Testing page: the page title on the left and the
+ * tabs in the middle.
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { Box, Grid, GridItem, HStack, Tabs, Text } from "@chakra-ui/react";

@@ -12,13 +12,7 @@ const FEATURE_LABEL: Record<PersonalFeatureKey, string> = {
 };
 
 /**
- * Click-to-enable dialog rendered when a user triggers an advanced
- * action on their personal workspace while the bundle is off. Confirm
- * fires `personalWorkspaceFeatures.enableAll` and the original action
- * proceeds inline (modal-flow (b)) — the only follow-up surface is the
- * one the action would have opened anyway (e.g. the Add-to-dataset
- * picker), not a second permission prompt.
- *
+ * Click-to-enable dialog rendered when a user triggers an advanced action on their personal workspace while the bundle is off.
  * Spec: specs/ai-gateway/governance/personal-workspace-features.feature
  *       @modal scenarios
  */

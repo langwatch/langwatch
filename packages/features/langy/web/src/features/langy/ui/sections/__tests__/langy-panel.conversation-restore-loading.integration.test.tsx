@@ -1,21 +1,7 @@
 /**
- * @vitest-environment jsdom
- *
  * Coming back to a conversation that still has to load.
- *
- * The panel remembers WHICH conversation was open, so from the instant it
- * mounts it knows there is one — before the history read lands. It used to
- * spend that window rendering the empty state's invitation ("Hey, I'm Langy!"
- * plus starter suggestions) over a conversation the reader had already had,
- * then swap it for the real thread a beat later. Restoring is not starting
- * fresh, and this pins that it no longer looks like it.
- *
+ * @vitest-environment jsdom
  * Spec: specs/langy/langy-navigation-persistence.feature
- *
- * Boundary mocks only: the project/feature-flag context, the Langy API surface
- * (an in-memory tRPC-shaped double whose history read is held open on
- * purpose), and `@ai-sdk/react`. The panel, the store and the empty/skeleton
- * branch are all real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -57,10 +43,9 @@ const resolveHistory = () =>
   });
 
 /**
- * The chat engine, modelled as real state: the panel applies the loaded
- * history through `setMessages`, so an inert mock would show an empty thread
- * forever and the "placeholder gives way to the conversation" assertion could
- * never be true.
+ * The chat engine, modelled as real state: the panel applies the loaded history through
+ * `setMessages`, so an inert mock would show an empty thread forever and the
+ * "placeholder gives way to the conversation" assertion could never be true.
  */
 interface EngineMessage {
   id: string;

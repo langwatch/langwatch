@@ -1,10 +1,7 @@
 /**
+ * The trace's own fields as a reviewer corrects them in the summary: its input beside
+ * its output, and its metadata as key and value rows.
  * @vitest-environment jsdom
- *
- * The trace's own fields as a reviewer corrects them in the summary: its input
- * beside its output, and its metadata as key and value rows. The keys that
- * decide where the trace belongs carry no editor at all
- * (specs/traces-v2/trace-edit-mode.feature).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

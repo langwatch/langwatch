@@ -6,14 +6,8 @@ export interface ErrorSpanRanked {
 }
 
 /**
- * Return every span whose status is `"error"`, ranked deepest-first
- * (the leaf that actually threw leads), then by start time as a
- * stable tiebreaker. Matches the ordering the trace-summary
- * Exceptions accordion uses so the header chip's tooltip and the
- * full accordion list can't drift apart.
- *
- * Returns an empty array when there are no error spans — caller code
- * should treat that as "fall back to trace-level error message only".
+ * Return every span whose status is `"error"`, ranked deepest-first (the leaf that
+ * actually threw leads), then by start time as a stable tiebreaker.
  */
 export function rankedErrorSpans(spans: SpanTreeNode[]): ErrorSpanRanked[] {
   if (spans.length === 0) return [];

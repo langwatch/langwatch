@@ -1,16 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for Save & Run data-loss regression (Bug #8).
- *
- * Verifies that:
- * - When the save mutation succeeds and run fails, the save is NOT rolled back.
- * - A save failure in Save & Run is not misreported as "Failed to run scenario".
- * - The drawer stays open when the save mutation fails during Save & Run.
- *
- * Root cause: handleSave for edit mode propagated updateMutation.mutateAsync
- * rejections through handleSubmit's callback to the outer try/catch in
- * handleSaveAndRun, which reported every save error as "Failed to run scenario".
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

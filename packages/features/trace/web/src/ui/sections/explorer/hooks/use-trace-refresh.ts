@@ -2,12 +2,9 @@ import { useCallback, useState } from "react";
 import { api } from "../../trace-api";
 
 /**
- * Refresh-button handler for the drawer header. Invalidates everything
- * that backs the drawer + the underlying trace-table row, so projection
- * updates that landed since open propagate without a page reload.
- *
- * Returns `{ refresh, isRefreshing }`. `isRefreshing` is true for the
- * round-trip; the trigger button uses it to spin.
+ * Refresh-button handler for the drawer header. Invalidates everything that backs the
+ * drawer + the underlying trace-table row, so projection updates that landed since open
+ * propagate without a page reload.
  */
 export function useTraceRefresh(traceId: string) {
   const trpcUtils = api.useUtils();

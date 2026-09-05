@@ -1,14 +1,6 @@
 /**
- * The results of one run as a table: one row per scenario and target pair,
- * with the verdict, the duration and the cost.
- *
- * The table is a grid inside one bordered card, the way the Scenarios table
- * is drawn, so both tabs read as one surface.
- *
- * A row that is still going can be stopped on its own. A row that finished
- * carries no Stop control. The time and the cost are only read once the run
- * has settled: a run that just started has neither.
- *
+ * The results of one run as a table: one row per scenario and target pair, with the
+ * verdict, the duration and the cost.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

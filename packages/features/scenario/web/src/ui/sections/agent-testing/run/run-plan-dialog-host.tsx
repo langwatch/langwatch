@@ -1,14 +1,6 @@
 /**
- * The run dialog as the Results tab reaches it: New run plan, and opening a
- * stored plan to change what it runs.
- *
- * A run plan is a name and a configuration, and the run dialog is where both
- * are chosen, so there is no separate editor. New run plan opens the dialog
- * with the scope still open; a stored plan opens it with the scope that plan
- * already holds.
- *
- * The page mounts this once.
- *
+ * The run dialog as the Results tab reaches it: New run plan, and opening a stored plan
+ * to change what it runs.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

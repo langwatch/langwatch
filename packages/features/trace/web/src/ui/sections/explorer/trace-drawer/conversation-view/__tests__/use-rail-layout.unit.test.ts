@@ -1,10 +1,7 @@
 /**
+ * The rail's two decisions, taken away from the DOM: whether the conversation has a
+ * rail at all, and what shape it takes at a given pane width.
  * @vitest-environment jsdom
- *
- * The rail's two decisions, taken away from the DOM: whether the conversation
- * has a rail at all, and what shape it takes at a given pane width. Both are
- * biased towards keeping the annotations beside the turn.
- * See specs/traces-v2/annotation-rail.feature.
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

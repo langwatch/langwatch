@@ -36,11 +36,9 @@ function TtftCellInner({
 }
 
 /**
- * Time-to-first-token column. Mirrors the Duration column's p95-scaled
- * bar so streaming latency outliers pop the same way slow traces do —
- * but scaled against the page's TTFT p95, not the duration p95.
- * Traces without a TTFT (non-streaming, or instrumentation that never
- * reported one) render a plain dash with no bar.
+ * Time-to-first-token column. Mirrors the Duration column's p95-scaled bar so streaming
+ * latency outliers pop the same way slow traces do — but scaled against the page's TTFT
+ * p95, not the duration p95.
  */
 export const TtftCell = {
   id: "ttft",

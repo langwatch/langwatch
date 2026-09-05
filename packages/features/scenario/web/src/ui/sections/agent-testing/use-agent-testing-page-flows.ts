@@ -1,7 +1,6 @@
 /**
- * The flows the Agent Testing page owns: the suite the address names, the
- * view state a shared link carries, and the two drawers that start work.
- *
+ * The flows the Agent Testing page owns: the suite the address names, the view state a
+ * shared link carries, and the two drawers that start work.
  * @see specs/features/agent-testing/page-structure.feature
  */
 
@@ -45,9 +44,6 @@ export function useHydrateViewFromUrl(): void {
 
 /**
  * New run plan opens the run dialog with the scope still to be chosen.
- *
- * A run plan is a name and a configuration, and the run dialog is the only
- * place either is chosen, so there is no separate editor to open.
  */
 export function useNewRunPlanFlow(): () => void {
   return useOpenNewRunPlan();

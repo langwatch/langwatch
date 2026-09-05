@@ -1,33 +1,5 @@
 /**
  * ComparisonLeaderboardDrawer - full Bradley-Terry leaderboard view (#5103).
- *
- * Structured as three questions in the order a reader actually has them:
- * what should I ship, can I believe that, and what do I do about it. The
- * first step alone is meant to be a defensible answer - someone who reads
- * nothing else should still leave with the right variant. The detail that
- * used to lead (a sortable score table) now sits under step 3, because it
- * answers "why" for people who want it rather than "what" for everyone.
- *
- * Opened from ComparisonLeaderboardChart's expand affordance. Data
- * (`column`, `rows`, `targetColors`) is passed via drawer complexProps
- * rather than refetched - it's the same data already loaded on the results
- * page, and these can be large enough that URL serialization would be the
- * wrong tool.
- *
- * Which means the drawer has two mount paths, not one. `CurrentDrawer` also
- * mounts it straight from the query string, where complexProps are gone and
- * only `evaluatorId` survives; that path gets `LeaderboardNeedsResultsPage`.
- * Everything below the gate in `ComparisonLeaderboardDrawer` may assume the
- * data is present, and nothing above it may touch the data.
- *
- * RECOVERED FROM `platform/app/src/components/ComparisonLeaderboardDrawer.tsx`,
- * deleted in `cc91631cd8`. Every panel, chart and computation it composes was
- * already this package's, which is why the census recorded the loss as "the
- * drawer wrapper does not exist, the chart does": what died was the twelve
- * lines of layout around them and nothing else. Only the three imports the
- * platform owned changed - the drawer chrome now comes from the design system
- * and the navigator from `@langwatch/ui-drawer`, both of which this package
- * already depends on.
  */
 
 import { Box, Separator, Text, VStack } from "@chakra-ui/react";
@@ -61,12 +33,6 @@ export type ComparisonLeaderboardDrawerProps = {
   evaluatorId: string;
   /**
    * The run's data, handed over in memory by the results page.
-   *
-   * OPTIONAL because it cannot survive the URL. `CurrentDrawer` mounts this
-   * component from the query string on a reload or a pasted link, and then
-   * only `evaluatorId` arrives — everything below is undefined. Typing these
-   * as required described a guarantee the drawer does not have, and the code
-   * dereferenced them on the strength of it.
    */
   column?: BatchComparisonColumn;
   rows?: BatchResultRow[];
@@ -131,14 +97,6 @@ const useLeaderboardAnalysis = ({
   );
 
   // Asked of the checks themselves rather than re-derived from their inputs.
-  //
-  // The badge on step 2 used to be a parallel boolean listing the conditions
-  // it thought were serious, and it had drifted from the panel twice: it
-  // never learned about a fit whose graph broke into groups that never met,
-  // nor about a bootstrap whose resamples failed to settle. Both render an
-  // amber line inside a step whose border and badge stayed neutral, which is
-  // the one thing this step must not do — it exists to say "look here".
-  // Deriving it means a check added later cannot be forgotten here.
   const trustChecks = useMemo(
     () =>
       buildTrustChecks({
@@ -314,18 +272,6 @@ function TradeoffStep({
 
 /**
  * Mounted from a URL with no in-memory data behind it.
- *
- * The run's rows are far too large to serialize into a query string, so a
- * reload or a pasted link cannot rebuild them here. Saying so is the point:
- * the alternative was dereferencing `column` anyway, which threw a TypeError
- * into the ErrorBoundary above and silently stripped the drawer from the URL,
- * leaving the reader on the results page with no indication anything had been
- * asked for.
- *
- * Reconstituting properly needs the run identifiers in the URL alongside
- * `evaluatorId` so the drawer can refetch — tracked as a follow-up rather
- * than done here, because it means threading them through two more
- * components.
  */
 function LeaderboardNeedsResultsPage({ evaluatorId }: { evaluatorId: string }) {
   const { closeDrawer } = useDrawer();
@@ -360,14 +306,9 @@ export function ComparisonLeaderboardDrawer({
   rows,
   ...rest
 }: ComparisonLeaderboardDrawerProps) {
-  // The chart's expand button is the only affordance that opens this, and it
-  // is already gone when the flag is off — but a drawer is addressable by URL,
-  // so a link shared out of an enabled organization would otherwise render the
-  // whole leaderboard for one that has not been given it.
-  //
-  // Both bails sit ABOVE every deref of `column`. They used to sit seventeen
-  // lines below one, so the URL path threw before it could reach this gate and
-  // the gate was unreachable on exactly the route it exists to guard.
+  // The chart's expand button is the only affordance that opens this, and it is already gone when the flag is
+  // off — but a drawer is addressable by URL, so a link shared out of an enabled organization would otherwise
+  // render the whole leaderboard for one that has not been given it.
   const showLeaderboard = useShowComparisonLeaderboard();
   if (!showLeaderboard) return null;
   if (!column || !rows) {

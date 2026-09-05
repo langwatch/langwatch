@@ -1,7 +1,6 @@
 /**
- * Every run entry of the Scenarios tab. Each one opens the run dialog; the
- * dialog owns the target choice, the note, the overrides, and the run itself.
- *
+ * Every run entry of the Scenarios tab. Each one opens the run dialog; the dialog owns
+ * the target choice, the note, the overrides, and the run itself.
  * @see specs/features/agent-testing/cases-table.feature
  */
 
@@ -15,10 +14,6 @@ import { useOpenLiveRun } from "../../../../behavior/agent-testing/cases/use-ope
 
 /**
  * The run dialog subject of a whole suite, with the scenarios it holds.
- *
- * A test suite carries no run option of its own, so the subject brings none.
- * The dialog then preselects from the newest run plan of the suite, which is
- * what `useRunHistorySeed` reads.
  */
 function runSubjectForSuite({
   suite,
@@ -40,11 +35,8 @@ function runSubjectForSuite({
 }
 
 /**
- * What happens the moment a run is queued. Shared by the table and the scenario
- * editor, so a run started from either one opens the same way.
- *
- * The run set is always the one of the plan the run joined, so the drawer and
- * the runs rail read the run back under that plan.
+ * What happens the moment a run is queued. Shared by the table and the scenario editor,
+ * so a run started from either one opens the same way.
  */
 export function useRunStartedHandler(): (info: RunStartedInfo) => void {
   const { openLiveRun } = useOpenLiveRun();

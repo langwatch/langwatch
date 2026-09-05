@@ -13,19 +13,8 @@ import {
 import { useColumnEducationStore } from "../../../../index";
 
 /**
- * One-off teaching dialog that fires the first time the operator tries
- * to drag a column header in the v2 trace table. The v2 table doesn't
- * (yet) support native drag-to-reorder — historically users would
- * try it, nothing would happen, and they'd conclude "you can't change
- * the columns." This dialog catches that first attempt and points at
- * the Columns dropdown / Configure CTA where reordering actually
- * lives. A "Don't show again" checkbox + localStorage persistence
- * means the dialog only fires once per device.
- *
- * The visual hint uses CSS-illustrated chips rather than an image
- * asset so it stays sharp on every viewport and tracks the live
- * design tokens (no orphan PNG to update when the column-picker UI
- * evolves).
+ * One-off teaching dialog that fires the first time the operator tries to drag a column
+ * header in the v2 trace table.
  */
 export const ColumnEducationDialog: React.FC = () => {
   const isOpen = useColumnEducationStore((s) => s.isOpen);

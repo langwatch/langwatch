@@ -8,19 +8,15 @@ import { useOnboardingActive } from "../../../../../behavior/explorer/onboarding
 
 export interface OnboardingEntryState {
   /**
-   * Launch the empty-state journey on top of the current page state.
-   * For new-user (firstMessage=false) projects this just clears any
-   * dismissal. For existing-customer projects it sets `tourActive`
-   * so the journey runs over the real data table. Always safe to
-   * call — exits cleanly via `onEndTour`.
+   * Launch the empty-state journey on top of the current page state. For new-user
+   * (firstMessage=false) projects this just clears any dismissal. For existing-customer
+   * projects it sets `tourActive` so the journey runs over the real data table.
    */
   onLaunchTour: () => void;
   /**
-   * End the active tour — flips the per-project dismissal flag on
-   * and clears the `tourActive` override so the empty-state pane
-   * unmounts immediately and the user lands in the clean (real)
-   * table. Resets the trace list cache so the first real fetch
-   * shows a skeleton rather than stale sample rows.
+   * End the active tour — flips the per-project dismissal flag on and clears the
+   * `tourActive` override so the empty-state pane unmounts immediately and the user
+   * lands in the clean (real) table.
    */
   onEndTour: () => void;
   /**
@@ -30,11 +26,9 @@ export interface OnboardingEntryState {
    */
   tourActive: boolean;
   /**
-   * Whether the toolbar should be showing the "SDK connection
-   * pending" affordance. True only when the project has *never*
-   * received a real trace and the user has dismissed the empty-state
-   * card; false otherwise. Existing customers and active-tour states
-   * don't need this — the Tour button is the entry point.
+   * Whether the toolbar should be showing the "SDK connection pending" affordance. True
+   * only when the project has *never* received a real trace and the user has dismissed
+   * the empty-state card; false otherwise.
    */
   sdkPendingVisible: boolean;
   /**
@@ -46,11 +40,9 @@ export interface OnboardingEntryState {
 }
 
 /**
- * Single source of truth for the toolbar's onboarding entry points.
- * The toolbar uses this hook for both the Tour button (existing
- * customers + replay) and the SDK-pending button (new users who've
- * dismissed). One hook, two affordances, no direct store imports
- * from outside the onboarding module.
+ * Single source of truth for the toolbar's onboarding entry points. The toolbar uses
+ * this hook for both the Tour button (existing customers + replay) and the SDK-pending
+ * button (new users who've dismissed).
  */
 export function useTourEntryPoints(): OnboardingEntryState {
   const { project } = useOrganizationTeamProject();
@@ -72,14 +64,8 @@ export function useTourEntryPoints(): OnboardingEntryState {
     // their populated table.
     setSetupDismissedForProject(projectId, false);
     setTourActive(true);
-    // Purge every filter/lens/time-range tweak the user might have
-    // had active so the sample-preview fixtures render unblocked
-    // for the whole journey. Filters are NOT restored at tour end
-    // — the tour is a clean slate and any prior state would re-
-    // hide rows the moment the user lands back on the real table.
-    // `useSamplePreview` substring-matches on `debouncedQueryText`,
-    // and the time-range filters real fetches once preview ends —
-    // both need to be at defaults.
+    // Purge every filter/lens/time-range tweak the user might have had active so the
+    // sample-preview fixtures render unblocked for the whole journey.
     useViewStore.getState().selectLens("all-traces");
     const filter = useFilterStore.getState();
     filter.clearAll();
@@ -106,12 +92,9 @@ export function useTourEntryPoints(): OnboardingEntryState {
     // rather than lingering stale sample rows.
     setSetupDismissedForProject(projectId, true);
     setTourActive(false);
-    // Use reset (not invalidate) so the cache is purged immediately —
-    // the next useTraceListQuery flows through isLoading=true → skeleton
-    // instead of keeping the stale sample rows visible until the real
-    // fetch lands. Called without args to match all cached entries for
-    // this procedure (tRPC v10 reset requires the full input shape when
-    // filtering, so broad reset is safer here).
+    // Use reset (not invalidate) so the cache is purged immediately — the next
+    // useTraceListQuery flows through isLoading=true → skeleton instead of keeping the
+    // stale sample rows visible until the real fetch lands.
     void utils.tracesV2.list.reset();
   }, [projectId, setSetupDismissedForProject, setTourActive, utils]);
 

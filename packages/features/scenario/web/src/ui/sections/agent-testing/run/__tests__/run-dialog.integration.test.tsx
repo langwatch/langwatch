@@ -1,14 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The run dialog: the agent to be tested, the customize chips, and how a run
- * starts, persists its target, and reads its refusals.
- *
- * @see specs/features/agent-testing/run-dialog.feature
- * @see specs/features/agent-testing/comparison-mode.feature
- * @see specs/suites/run-notes.feature
- * @see specs/suites/test-suite-run-plan-reuse.feature
- * @see specs/features/agent-testing/results-tabs.feature
+ * @see specs/features/agent-testing/run-dialog.feature, specs/features/agent-testing/comparison-mode.feature,
+ *   specs/suites/run-notes.feature, specs/suites/test-suite-run-plan-reuse.feature, specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
@@ -226,10 +219,6 @@ function casesDeclaring(parameters: unknown) {
 
 /**
  * The style the emitted class carries for one element.
- *
- * A dialog lifts the buttons it holds, so a control that must stay flat says
- * so itself. The style lives in a class rather than on the element, and jsdom
- * does not read the emitted sheet, so the rule is read from the sheet by hand.
  */
 function styleRuleOf(element: Element): string {
   const className = [...element.classList].find((name) => name.startsWith("css-"));

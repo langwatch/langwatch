@@ -4,13 +4,7 @@ import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-pr
 import type { AddonDef } from "../../types";
 
 /**
- * Reserved columns the IO preview must never paint over. The preview cell
- * scrolls with the table body (it is deliberately NOT pinned — see the render
- * comment for why a pinned full-width cell can't also be bounded), so its
- * right edge is fixed at the LEFTMOST of these in the CURRENT column order via
- * `colSpan`. That glues the edge to the reserved column at every scroll offset,
- * so the wrapped preview text can never bleed into a column that carries its
- * own content. Resolved against the live cells, so it survives reorder / hide.
+ * Reserved columns the IO preview must never paint over.
  */
 export const RESERVED_PREVIEW_COLUMN_IDS = ["labels", "evaluations", "prompt", "events"] as const;
 
@@ -33,12 +27,7 @@ export function ioPreviewContentBoundary({
 }
 
 /**
- * Lay out the addon row's cells. The first segment is the IO preview content,
- * spanning `[0, contentBoundary)` — its `colSpan` bounds the preview's right
- * edge to the first reserved column so the wrapped text can't bleed past it.
- * Everything after the boundary is empty filler that scrolls normally, except
- * columns the main row already claimed via `rowSpan` (evals), which are dropped
- * here because the cell above already occupies that slot.
+ * Lay out the addon row's cells.
  */
 function splitColumnsAround({
   colCount,
@@ -74,11 +63,7 @@ function splitColumnsAround({
 }
 
 /**
- * Whether the IO preview addon will render for `row` under the given
- * expansion state. Exported so other cells (notably the evals cell)
- * can adapt their layout based on whether the addon row below will
- * absorb their rowSpan or not — keeping the two predicates in sync
- * is the whole point of pulling this out.
+ * Whether the IO preview addon will render for `row` under the given expansion state.
  */
 export function ioPreviewWillRenderFor(row: TraceListItem, isExpanded: boolean): boolean {
   // One recorded side is enough: a coding-agent turn often has an input but
@@ -113,20 +98,9 @@ export const IOPreviewAddon: AddonDef<TraceListItem> = {
             key={i}
             bg={style.bg}
             colSpan={seg.span}
-            // Defeat the table shell's global sticky-first-column rule
-            // (`tbody > tr > td:first-child { position: sticky; left: 0 }`,
-            // which exists to pin the select-checkbox column on the MAIN
-            // rows). The addon row's first cell is this preview content cell,
-            // and a sticky cell keeps its full width while sliding to the
-            // viewport's left edge — so on horizontal scroll it slid right and
-            // painted the preview text OVER the reserved columns (labels /
-            // evals / events / prompt) that carry their own content. A
-            // full-cell-width element fundamentally can't both stay pinned
-            // left AND stop at its right neighbour, so the cell scrolls with
-            // the body instead; its `colSpan`-bounded right edge stays glued
-            // to the reserved-column boundary at every scroll offset. Inline
-            // `position: static` beats the shell's descendant selector and
-            // makes its `left` / `zIndex` inert.
+            // Defeat the table shell's global sticky-first-column rule (`tbody > tr >
+            // td:first-child { position: sticky; left: 0 }`, which exists to pin the
+            // select-checkbox column on the MAIN rows).
             style={i === 0 ? { position: "static" } : undefined}
             padding={
               seg.role === "content"
@@ -135,13 +109,8 @@ export const IOPreviewAddon: AddonDef<TraceListItem> = {
             }
             borderLeftWidth={i === 0 ? "2px" : undefined}
             borderLeftColor={i === 0 ? style.borderColor : undefined}
-            // The main trace row drops its own bottom border whenever an
-            // addon row sits below it (see RegistryRow). Re-apply it here
-            // so the next trace row is cleanly separated from the
-            // expanded preview — without it the addon and the following
-            // trace row read as one blob. `border` (the default token) is
-            // strong enough to register against the row tint without
-            // looking heavy.
+            // The main trace row drops its own bottom border whenever an addon row sits
+            // below it (see RegistryRow).
             borderBottomWidth="1px"
             borderBottomColor={style.bottomSeparatorColor}
             overflow="hidden"

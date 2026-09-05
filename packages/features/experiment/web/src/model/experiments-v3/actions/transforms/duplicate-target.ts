@@ -5,10 +5,9 @@ import { requireTarget } from "./helpers";
 import type { Transform } from "./types";
 
 /**
- * A mapping that reads the source target's output must read the copy's output
- * instead — the duplicate is a new column and grades itself, not its original.
- * Every other mapping (dataset sources, literal values, other targets) is
- * copied unchanged.
+ * A mapping that reads the source target's output must read the copy's output instead —
+ * the duplicate is a new column and grades itself, not its original. Every other
+ * mapping (dataset sources, literal values, other targets) is copied unchanged.
  */
 const repointToCopy = ({
   mapping,
@@ -41,16 +40,6 @@ const copyFieldMappings = ({
 
 /**
  * Duplicate a target, keeping its wiring.
- *
- * The copy carries the source's own per-dataset mappings AND a copy of every
- * evaluator's `mappings[datasetId][sourceTargetId]` bucket, so the duplicate's
- * evaluators grade the same fields the source's do. Without the second half the
- * copy would rely on re-inference, which silently drops any mapping the user
- * had picked by hand.
- *
- * Gaps left by the copy (a dataset the source was never mapped against, an
- * evaluator input the source had unmapped) are filled by the same auto-mapping
- * `addTarget` runs, so a duplicate is never wired worse than a fresh add.
  */
 export const duplicateTarget: Transform<
   DuplicateTargetPayload,

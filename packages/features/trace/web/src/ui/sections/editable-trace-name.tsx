@@ -17,17 +17,6 @@ export type EditableTraceNameProps = {
 
 /**
  * Read-only trace name with a pencil affordance and double-click to edit.
- *
- * Validation rules mirror the server schema (TRACE_NAME_MIN_LENGTH /
- * MAX_LENGTH from the trace contract) — keeping them in lockstep so the user
- * gets immediate inline feedback while typing AND the server still rejects bad
- * input on its own. Server-side `ValidationError`s come back via tRPC's
- * `domainError` payload; we surface them in a toast and keep the editor open so
- * the user can correct the value.
- *
- * The fallback case (trace has no name yet) still allows editing — we seed the
- * input with empty text so renaming a freshly arrived trace works exactly like
- * renaming a labelled one.
  */
 export function EditableTraceName({
   projectId,

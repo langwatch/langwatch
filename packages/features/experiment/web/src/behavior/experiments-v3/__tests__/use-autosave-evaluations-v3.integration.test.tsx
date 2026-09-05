@@ -1,8 +1,7 @@
 /**
+ * Tests for autosave functionality of evaluation state. Verifies that changes to the
+ * evaluation workspace are persisted to the database.
  * @vitest-environment jsdom
- *
- * Tests for autosave functionality of evaluation state.
- * Verifies that changes to the evaluation workspace are persisted to the database.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

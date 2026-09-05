@@ -1,9 +1,7 @@
 /**
+ * The tint on the turn under review: what it wraps, what it leaves out, and why the
+ * room it takes around the turn costs the layout nothing.
  * @vitest-environment jsdom
- *
- * The tint on the turn under review: what it wraps, what it leaves out, and why
- * the room it takes around the turn costs the layout nothing. See
- * packages/features/annotation/specs/annotation-queue-workflow.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

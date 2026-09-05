@@ -1,9 +1,6 @@
 /**
- * Shared, bounded cache for the synchronous bootstrap fit. Sibling components
- * cannot share `useMemo`, and polling rebuilds column objects each second.
- *
- * The key folds only evidence read by the fit, not potentially large judge
- * reasoning, so unchanged responses reuse the result while new verdicts do not.
+ * Shared, bounded cache for the synchronous bootstrap fit. Sibling components cannot
+ * share `useMemo`, and polling rebuilds column objects each second.
  */
 
 import { useMemo } from "react";
@@ -36,10 +33,6 @@ const hashInto = (hash: number, text: string): number => {
 
 /**
  * Identifies the fit this column would produce.
- *
- * Excludes `reasoning` deliberately: it is by far the largest field on a
- * verdict, the fit never reads it, and a judge cannot reword it without also
- * changing one of the fields that ARE folded in.
  */
 const signatureOf = (column: BatchComparisonColumn): string => {
   let h = 2166136261;

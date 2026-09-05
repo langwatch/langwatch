@@ -7,12 +7,9 @@ import {
 } from "@langwatch/design-system/shiki";
 
 /**
- * Resolve a fence language to a grammar that's actually ready to render.
- * Base languages are ready immediately; any other bundled language is
- * lazy-loaded on first use — we render plain "text" until its grammar
- * resolves, then re-render highlighted. Non-bundled languages stay "text",
- * so Shiki never throws "Language X not found". See
- * dev/docs/adr/027-trace-drawer-code-highlighting.md
+ * Resolve a fence language to a grammar that's actually ready to render. Base languages
+ * are ready immediately; any other bundled language is lazy-loaded on first use — we
+ * render plain "text" until its grammar resolves, then re-render highlighted.
  */
 function useResolvedShikiLang(language: string): string {
   const canonical = normalizeShikiLang(language);
@@ -40,14 +37,9 @@ function useResolvedShikiLang(language: string): string {
 }
 
 /**
- * Single Shiki-backed code block component used everywhere in the drawer.
- * Relies on the ambient `<CodeBlock.AdapterProvider>` mounted at the
- * `TraceV2DrawerShell` root so we don't spin up a per-instance adapter
- * (and a per-instance Highlighter beneath it).
- *
- * The previous `ShikiHighlight` lean variant called `codeToHtml` directly
- * — second pipeline, second cache, no ambient provider. Removed because
- * nothing imported it anyway.
+ * Single Shiki-backed code block component used everywhere in the drawer. Relies on the
+ * ambient `<CodeBlock.AdapterProvider>` mounted at the `TraceV2DrawerShell` root so we
+ * don't spin up a per-instance adapter (and a per-instance Highlighter beneath it).
  */
 export function ShikiCodeBlock({
   code,
@@ -104,13 +96,9 @@ export function ShikiCodeBlock({
             css={{
               "& pre, & code": {
                 background: "transparent !important",
-                // Bumped from 0.78/0.8em which landed at ~9 px (or
-                // as low as ~7 px when nested under a 2xs textStyle
-                // parent) — operator minimum is 10 px everywhere.
-                // Absolute `0.625rem` pins exactly there regardless of
-                // parent textStyle: no em-scaling drift up to 11–12 px
-                // in `xs` contexts, no drift down under tighter
-                // parents either.
+                // Bumped from 0.78/0.8em which landed at ~9 px (or as low as ~7 px when
+                // nested under a 2xs textStyle parent) — operator minimum is 10 px
+                // everywhere.
                 fontSize: "0.625rem",
                 lineHeight: "1.55",
                 padding: "0 !important",

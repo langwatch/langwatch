@@ -11,13 +11,9 @@ interface TraceAccordionsProps {
   selectedSpan: SpanTreeNode | null;
   activeTab: "summary" | "span";
   /**
-   * Set on the span-detail mount when the user has asked for a span
-   * (via the row's drawer, the error popover's "Open span", the URL,
-   * etc.) but the span tree hasn't resolved yet. Drives the
-   * `activeTab === "span"` fallback below: when set, we render a
-   * lightweight skeleton instead of dropping back to the trace summary,
-   * because falling back was reading as "the open-span jump didn't
-   * work" the moment the spanTree query was even slightly slow.
+   * Set on the span-detail mount when the user has asked for a span (via the row's
+   * drawer, the error popover's "Open span", the URL, etc.) but the span tree hasn't
+   * resolved yet.
    */
   selectedSpanId?: string | null;
   isSpansLoading?: boolean;
@@ -49,14 +45,8 @@ export const TraceAccordions = memo(function TraceAccordions({
       />
     );
   }
-  // Span tab + an id we haven't resolved yet + tree is still loading →
-  // render a skeleton instead of falling through to the trace summary.
-  // Without this branch, clicking "Open span" on a trace whose spans
-  // were mid-fetch landed the operator on the trace summary view, which
-  // read like the jump hadn't taken effect. Once the tree resolves but
-  // the spanId isn't in it (deleted span, stale link), we DO fall
-  // through to the summary — the operator gets a graceful "couldn't
-  // find that span" landing rather than an indefinite skeleton.
+  // Span tab + an id we haven't resolved yet + tree is still loading → render a
+  // skeleton instead of falling through to the trace summary.
   if (activeTab === "span" && selectedSpanId && isSpansLoading) {
     return (
       <Box padding={4}>

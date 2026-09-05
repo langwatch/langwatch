@@ -3,10 +3,6 @@ import { showErrorToast } from "@langwatch/ui-host/errors";
 
 /**
  * The codes that mean the run plan itself has nothing left to run.
- *
- * Both are curated rejections with the same single way out — open the plan and
- * put something runnable back in it — which is why they, and only they, get an
- * action button rather than the plain error toast.
  */
 const NOTHING_RUNNABLE_CODES = new Set([
   "suite_all_scenarios_archived",
@@ -15,17 +11,6 @@ const NOTHING_RUNNABLE_CODES = new Set([
 
 /**
  * Reports a failed `suites.run` mutation.
- *
- * Both callers of that mutation — the sidebar's `useRunSuite` and the form
- * drawer's `useSuiteRunMutation` — had the same twenty-five lines: the same
- * code pair, the same `explainHandledError` call, the same toast, the same
- * "Edit Run Plan" label. Only the way the drawer opens differed, so that is the
- * only thing left as a parameter. Two copies of a rule about which failures are
- * actionable is two chances for them to disagree about it.
- *
- * The words stay in the registry, keyed by code — nothing here authors copy.
- * What is decided here is only WHETHER this failure has a way out, which is a
- * fact about the two codes rather than a sentence about them.
  */
 export function showSuiteRunError({
   error,

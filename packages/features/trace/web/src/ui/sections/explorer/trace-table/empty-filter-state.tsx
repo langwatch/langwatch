@@ -68,12 +68,9 @@ function emptyContent({
       description: `The current range covers ${hours} hour${hours === 1 ? "" : "s"}.`,
     };
   }
-  // Else branch: not errors/conversations lens, no filters, range is
-  // days-or-more. The project has had traces at some point (otherwise
-  // the empty-state journey would have intercepted via firstMessage=
-  // false) — there just aren't any in *this* window. Action-oriented
-  // copy beats the old new-user-y "Once your app starts sending
-  // traces…" line, which read like the project had never seen data.
+  // Else branch: not errors/conversations lens, no filters, range is days-or-more. The
+  // project has had traces at some point (otherwise the empty-state journey would have
+  // intercepted via firstMessage= false) — there just aren't any in *this* window.
   return {
     title: "Nothing in this range",
     description:

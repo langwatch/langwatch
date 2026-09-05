@@ -17,15 +17,9 @@ export interface LangyExternalLinkGuard {
 }
 
 /**
- * Marks an anchor as LangWatch's own chrome: a link one of our components
- * hardcodes (the codex sign-in's "Open openai.com" button, say), as opposed
- * to a link written by the model. The guard lets marked anchors straight
- * through: the dialog exists to read destinations the AGENT wrote, and
- * stopping the product's own buttons makes them sound dangerous.
- *
- * Safe as an opt-out because model output can never carry it: the markdown
- * pipeline renders no raw HTML and emits no data attributes on anchors, so
- * the marker only exists where a LangWatch component spelled it out.
+ * Marks an anchor as LangWatch's own chrome: a link one of our components hardcodes
+ * (the codex sign-in's "Open openai.com" button, say), as opposed to a link written by
+ * the model.
  */
 export const LANGY_FIRST_PARTY_LINK_ATTRIBUTE = "data-langy-first-party-link";
 
@@ -36,16 +30,6 @@ export const langyFirstPartyLinkProps = {
 
 /**
  * One guard for every link the Langy panel renders.
- *
- * It listens at the panel root in the CAPTURE phase, so it sees a click before
- * the link's own handler does. That ordering is the point: a guard that runs
- * last is a guard anything downstream can step in front of, and the links here
- * are written by an agent working on data it was handed. Whatever card, answer
- * or affordance is added to the panel next inherits the check without knowing
- * it exists.
- *
- * It acts only on destinations that leave LangWatch. In-app links fall straight
- * through untouched, so the router keeps handling them and the panel stays put.
  */
 export function useLangyExternalLinkGuard(): LangyExternalLinkGuard {
   const [pending, setPending] = useState<LangyExternalLinkTarget | null>(null);

@@ -6,10 +6,9 @@ import type { TraceEvalResult, TraceListItem } from "../../types/trace";
 import { NO_TRACE_EVENTS } from "../../types/trace";
 
 /**
- * Conversation turn exactly as the `tracesV2.conversationContext` procedure
- * returns it (including the redaction flags), so the preview fixtures stay
- * assignable to `utils.tracesV2.conversationContext.setData`. Preview traces are
- * never redacted, so the fixtures fill the flags with their not-redacted values.
+ * Conversation turn exactly as the `tracesV2.conversationContext` procedure returns it
+ * (including the redaction flags), so the preview fixtures stay assignable to
+ * `utils.tracesV2.conversationContext.setData`.
  */
 type PreviewConversationTurn = RouterOutputs["tracesV2"]["conversationContext"]["turns"][number];
 
@@ -25,29 +24,9 @@ const NOT_REDACTED: Pick<
 };
 
 /**
- * Hand-crafted client-side sample traces. **These never round-trip
- * through OTel ingestion** — they live entirely in the browser as a
- * teaching surface for the empty state. The trace table renders them
- * just like any other rows so users can:
- *
- *   - feel out the layout, density modes, and column ordering
- *   - try filters, search, and facets against realistic content
- *   - hover/click to discover row affordances
- *
- * …all without committing real ingestion or a token. The moment the
- * project receives its first *real* trace (`project.firstMessage`
- * flips), this fixture stops being shown — see
- * `usePreviewTracesActive`.
- *
- * The shapes mirror what real Vercel AI SDK / Mastra / OpenAI Agents
- * SDK / LangChain integrations emit, so the user recognises the
- * pattern when they integrate. Span names, service names, model IDs,
- * and rough cost/latency profiles are drawn from real traces in dev,
- * with all customer content sanitised and replaced with realistic
- * fictional substitutes.
- *
- * Trace IDs are prefixed `lw-preview-` so any future drawer/data
- * lookup can short-circuit cleanly without hitting tRPC.
+ * Hand-crafted client-side sample traces. **These never round-trip through OTel
+ * ingestion** — they live entirely in the browser as a teaching surface for the empty
+ * state. The trace table renders them just like any other rows so users can:
  */
 
 const NOW = () => Date.now();
@@ -685,14 +664,8 @@ export const SAMPLE_PREVIEW_TRACES: readonly TraceListItem[] = [
 ];
 
 /**
- * Two fixtures held back from the initial render and inserted at
- * the top of the table when the empty-state journey advances to the
- * Aurora arrival stage. The first is rich (long agent run, multiple
- * models, attached eval) — that's the one the post-arrival hero
- * copy points at as "the juicy one." The second is a short
- * companion so the moment reads as "two new traces just arrived,"
- * not "one." Both have very low `ageMin` so they sort to the top of
- * the table the moment they appear.
+ * Two fixtures held back from the initial render and inserted at the top of the table
+ * when the empty-state journey advances to the Aurora arrival stage.
  */
 export const ARRIVAL_PREVIEW_TRACES: readonly TraceListItem[] = [
   // The rich one — directed click target after arrival.
@@ -755,23 +728,8 @@ export const ARRIVAL_PREVIEW_TRACES: readonly TraceListItem[] = [
 /** The rich trace — the one the post-arrival hero points at. */
 export const RICH_ARRIVAL_TRACE_ID = ARRIVAL_PREVIEW_TRACES[0]!.traceId;
 
-// ---------------------------------------------------------------------------
-// Rich drawer detail for the arrival trace.
-//
-// When the user clicks the "juicy one" in the empty-state table, the drawer
-// opens against a synthetic trace ID that has nothing in ClickHouse. To make
-// every tab render with believable content (waterfall, span list, sequence,
-// topology, conversation, evaluations) we hand-build the detail payloads
-// here and seed them into the tRPC cache via `useOpenTraceDrawer`.
-//
-// Shapes mirror the real router outputs: `TraceHeader`, `SpanTreeNode[]`,
-// `SpanDetail[]`, `EvaluationRunData[]`, and the `conversationContext`
-// procedure return value. Anything customer-specific is sanitised — IDs,
-// model names, tool names, and prompts are realistic but generic, and the
-// I/O text is reframed around the "checkout conversion dropped 18%" theme
-// so the drawer reads consistently with the row that opened it — every
-// tool fetch and LLM call narrates the same operational debug story.
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- Rich
+// drawer detail for the arrival trace.
 
 const richArrival = ARRIVAL_PREVIEW_TRACES[0]!;
 
@@ -780,14 +738,7 @@ const RICH_ARRIVAL_BASE_TS = richArrival.timestamp;
 const richTs = (offsetMs: number) => RICH_ARRIVAL_BASE_TS + offsetMs;
 
 /**
- * Span tree for the rich preview trace. The shape mirrors a Mastra agent
- * run: a root `mastra.agent.run`, a parallel research stage that fans out
- * into two LLM calls plus a couple of tool calls, then a writer stage with
- * a synthesis LLM call and a final formatter pass.
- *
- * Span types pull from the LangWatch span-type taxonomy (`agent`, `chain`,
- * `llm`, `tool`) so the waterfall, flame, span list, sequence, and
- * topology views all colour-code naturally.
+ * Span tree for the rich preview trace.
  */
 const RICH_ARRIVAL_SPAN_TREE: SpanTreeNode[] = [
   {
@@ -1593,25 +1544,8 @@ export function buildRichArrivalTraceDetail(): RichArrivalTraceDetail {
 }
 
 /**
- * Generic preview-trace detail synthesizer. Used for every sample
- * preview trace except the rich arrival one (which has hand-built
- * fixtures above). The drawer hooks (`useSpanTree`, `useSpanDetail`,
- * `useConversationContext`, `useTraceHeader`, `useTraceEvents`,
- * `useTraceEvaluations`) all have their network fetch disabled for
- * preview IDs, so without something seeded into the tRPC cache the
- * drawer just shows perpetual loading states. This builder
- * synthesises just enough — a single root span, an empty events
- * array, an empty evaluations array, and (when the trace declared a
- * conversation id) a single-turn conversation built from the trace's
- * own input/output — so every tab renders something meaningful when
- * a user clicks into any sample row.
- *
- * Span tree is intentionally trivial (one node). We could fan out
- * realistic child spans per trace like the rich-arrival fixture does,
- * but the cost (10× ~50-line span tree definitions) far outweighs the
- * value for a teaching surface — what users learn is "the drawer
- * exists and shows the span tree shape", not the exact child layout
- * of `mastra-app`. The rich arrival trace stays as the showpiece.
+ * Generic preview-trace detail synthesizer. Used for every sample preview trace except
+ * the rich arrival one (which has hand-built fixtures above).
  */
 function buildPreviewSpanDetail(trace: TraceListItem): SpanDetail {
   return {
@@ -1692,12 +1626,7 @@ function buildPreviewHeader(trace: TraceListItem): TraceHeader {
 
 function buildPreviewConversation(trace: TraceListItem): RichArrivalConversationContext | null {
   if (!trace.conversationId) return null;
-  // Synthesise a single conversation turn from the trace's own
-  // input/output. Users opening the Conversation tab on a sample
-  // trace that declares a conversationId would otherwise see "no
-  // turns found" because the conversation endpoint is gated off for
-  // preview ids — at least show them the shape with the data we
-  // have.
+  // Synthesise a single conversation turn from the trace's own input/output.
   return {
     conversationId: trace.conversationId,
     total: 1,

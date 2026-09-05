@@ -1,33 +1,6 @@
 /**
- * Follow-up suggestions: what a result is worth DOING, derived from the feature
- * map's `produces` / `consumes` relation.
- *
- * Langy's AGENTS.md forbids the model from offering next actions in prose —
- * "Would you like me to add these to a dataset?" is banned. That is the right
- * rule (a model volunteering work is how an assistant becomes exhausting), but
- * the next action is still the most valuable thing on the screen. So the offer
- * has to come from the UI, driven by the structured result, not from the model's
- * mouth.
- *
- * The feature map already knows the relation that makes an offer sensible:
- * Tracing `produces: ["traces"]`; Datasets, Analytics, Annotations and Triggers
- * each `consumes: ["traces"]`. So a trace search that found something implies,
- * with no model involvement and no second table, exactly those offers. Add a
- * feature that consumes traces to the map and the offer appears; remove one and
- * it goes.
- *
- * This module returns DATA. Two things it deliberately does not do:
- *   - It renders nothing. `LangyCapabilityRenderer` draws the chips.
- *   - It carries nothing out. A suggestion is an offer; showing one must not
- *     create, mutate or persist anything (see the spec). Where an offer LANDS —
- *     the automation drawer with the search as its subject, or the plain
- *     surface when nothing can carry it — is `follow-up-chips.ts`'s job (via the
- *     shared `logic/traceExplorerLink.ts` reader). This module answers "which
- *     offers"; that one answers "to where".
- *
- * The copy lives HERE, not in the map: "Add to a dataset" is how the Langy panel
- * words it, and the map describes features, not one view's chips.
- *
+ * Follow-up suggestions: what a result is worth DOING, derived from the feature map's
+ * `produces` / `consumes` relation.
  * @see specs/langy/langy-followup-suggestions.feature
  */
 
@@ -77,29 +50,13 @@ export const SUGGESTION_LABEL: Record<string, string> = {
 
 /**
  * Result kinds that justify NO offers, even where the map names consumers.
- *
- * An offer is only worth making when its destination can honour it. The map
- * says Experiments and Online Evaluations consume `evaluators`, which is true
- * of the FEATURES — but neither destination page can receive a specific
- * evaluator today (no builder carries one, and the index pages don't show it),
- * so an evaluator card's offers resolved to bare "Open in Experiments" /
- * "Open in Online Evaluations" chips: navigation noise pretending to be a
- * next step. The card's own "Open in Evaluators" deep link already covers
- * where the result actually lives. `prompts` is the same case: Experiments and
- * Scenarios consume prompts as features, but neither page can receive a
- * specific prompt, so a prompt listing grew "Open in Experiments" / "Open in
- * Scenarios" chips that had nothing to do with what was asked. Delete a kind
- * from this set the day a destination learns to carry it.
  */
 const UNOFFERABLE_KINDS: ReadonlySet<string> = new Set(["evaluators", "prompts"]);
 
 /**
- * The offers one settled tool result justifies: every feature that consumes a
- * resource kind this result produced, minus the feature that produced it (a
- * trace search does not offer to search traces).
- *
- * Nothing is offered on a failed call, a call still in flight, or a result that
- * found nothing — there is no "these" to act on.
+ * The offers one settled tool result justifies: every feature that consumes a resource
+ * kind this result produced, minus the feature that produced it (a trace search does
+ * not offer to search traces).
  */
 export function followUpsForResult(
   result: SettledToolResult,

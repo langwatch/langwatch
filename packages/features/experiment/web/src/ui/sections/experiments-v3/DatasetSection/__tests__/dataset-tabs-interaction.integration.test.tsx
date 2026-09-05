@@ -3,15 +3,6 @@ import "@testing-library/jest-dom/vitest";
 // @vitest-environment jsdom
 /**
  * Switch Dataset on the active dataset tab.
- *
- * PORTED FROM `platform/app/src/experiments-v3/__tests__/DatasetTabsInteraction.integration.test.tsx`
- * (#7537), whose subject moved here with the workbench. The original rendered
- * the real Choose Dataset drawer beside the tabs; that drawer now belongs to
- * the dataset family and fetches its own rows, so the assertion stops at the
- * seam the workbench owns: the menu item calls the same handler the Add menu's
- * "Select existing dataset" does, which is what opens the picker
- * (`evaluations-v3-table.tsx` binds both to `openDrawer("selectDataset")`).
- *
  * @see specs/experiments-v3/dataset-management.feature
  */
 

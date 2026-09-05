@@ -1,8 +1,7 @@
 /**
+ * The skill chip is compact by default — just the verb — and reveals its target slot
+ * and remove control only when expanded, so it never reads as a full card.
  * @vitest-environment jsdom
- *
- * The skill chip is compact by default — just the verb — and reveals its target
- * slot and remove control only when expanded, so it never reads as a full card.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

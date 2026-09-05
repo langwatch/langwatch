@@ -89,21 +89,7 @@ interface DrawerHeaderProps {
 }
 
 /**
- * Inline trace ID chip — collapsed to the first 5 chars by default so
- * it doesn't compete with the trace name, expands to the full ID on
- * hover, and reveals a copy icon at the trailing edge. Power-users can
- * still hit `Y` (overflow-menu shortcut) to copy without hovering;
- * this is for the case where they want to read the ID without leaving
- * the header.
- */
-/**
- * Trace ID chip rendered with the same Chip component the metric pills
- * use (Duration / Spans / Cost / …) so the drawer header reads as one
- * consistent strip rather than the trace ID floating with its own
- * styling. 8 chars short by default — git's short-SHA convention, long
- * enough to be uniquely scannable but still fits beside the trace name.
- * On hover the short id swaps to the full id and a copy icon appears;
- * clicking anywhere on the chip copies to the clipboard.
+ * Inline trace ID chip — collapsed to the first 5 chars by default so it doesn't compete with the trace name, expands to the full ID on hover, and reveals a copy icon at the trailing edge.
  */
 function TraceIdChip({ traceId }: { traceId: string }) {
   const short = traceId.slice(0, 8);
@@ -173,13 +159,7 @@ function TraceIdChip({ traceId }: { traceId: string }) {
 }
 
 /**
- * Trace status indicator. On error traces the chip is an interactive
- * popover: hovering opens an inline preview of the Exceptions section
- * (same trace-level message + same per-span pill row, sourced from
- * the same `rankedErrorSpans` helper), and clicking the chip itself
- * jumps the operator to the Summary tab's Exceptions accordion with
- * a brief blue pulse so the eye lands. OK traces render the dot
- * non-interactively (just the help tooltip).
+ * Trace status indicator.
  */
 function StatusChip({ trace, statusColor }: { trace: TraceHeader; statusColor: string }) {
   const selectSpan = useDrawerStore((s) => s.selectSpan);
@@ -211,18 +191,9 @@ function StatusChip({ trace, statusColor }: { trace: TraceHeader; statusColor: s
 
   const jumpToSpan = useCallback(
     (spanId: string) => {
-      // Land on the trace pane with the span selected. `setViewMode`
-      // flips the drawer to the trace-pane layout (PaneLayout); the
-      // SpanDetailPane mounts because `selectedSpanId` is now set, and
-      // the SpanTabBar highlights the selected span. The accordion-side
-      // focus-glow observer on SpanAccordions catches the follow-up
-      // `requestFocus({section: "exceptions"})` fired by
-      // ExceptionsContent and pulses the span's own Exceptions section.
-      //
-      // When the spanTree query is still in flight we'd previously fall
-      // through to the trace summary view; TraceAccordions now renders
-      // a span-shaped skeleton in that window so the jump reads as
-      // "landed, waiting for data" rather than "jump didn't take."
+      // Land on the trace pane with the span selected. `setViewMode` flips the drawer
+      // to the trace-pane layout (PaneLayout); the SpanDetailPane mounts because
+      // `selectedSpanId` is now set, and the SpanTabBar highlights the selected span.
       setViewMode("trace");
       selectSpan(spanId);
     },
@@ -329,22 +300,14 @@ const FILTERABLE_PIN_FIELDS: Record<string, string> = {
 };
 
 /**
- * Liqe field names are bare identifiers — letters, digits, dots,
- * underscores, dashes. Customer-defined metadata keys come from
- * arbitrary OTLP attributes, so a malicious or careless key can contain
- * spaces, quotes, colons, parens, etc. Injecting an unsafe key as a raw
- * field name breaks the grammar (the query becomes unparsable, or
- * worse, targets the wrong field). We restrict to a safe whitelist and
- * disable the filter affordance when the key can't round-trip.
+ * Liqe field names are bare identifiers — letters, digits, dots, underscores, dashes.
  */
 const SAFE_METADATA_KEY_RE = /^[A-Za-z0-9_.-]+$/;
 
 /**
- * Build a Liqe-style fielded query for an auto-pinned metadata value.
- * Escapes embedded quotes + backslashes in the value so things like
- * `tenant="org \"acme\""` stay parseable. Returns null when either the
- * key can't be safely round-tripped as a bare Liqe field, or the value
- * collapses to empty after escape.
+ * Build a Liqe-style fielded query for an auto-pinned metadata value. Escapes embedded
+ * quotes + backslashes in the value so things like `tenant="org \"acme\""` stay
+ * parseable.
  */
 function formatMetadataFilterQuery({ key, value }: { key: string; value: string }): string | null {
   if (!SAFE_METADATA_KEY_RE.test(key)) return null;
@@ -354,32 +317,24 @@ function formatMetadataFilterQuery({ key, value }: { key: string; value: string 
 }
 
 /**
- * Curated hoisted attribute keys we always surface when present on a trace.
- * `category` controls grouping in the pin strip — identity (who/where), run
- * (which scenario/eval invocation), tag (labels). User pins fall into the
- * "custom" bucket.
+ * Curated hoisted attribute keys we always surface when present on a trace. `category`
+ * controls grouping in the pin strip — identity (who/where), run (which scenario/eval
+ * invocation), tag (labels). User pins fall into the "custom" bucket.
  */
 interface HoistedPinDef {
   key: string;
   label: string;
   category: PinCategory;
   /**
-   * Resolve the value for this pin. Defaults to a plain attribute lookup,
-   * but pins backed by a top-level `TraceHeader` field (conversation, user,
-   * scenario run …) override this so the pill still renders when the
-   * trace-summary projection populates the top-level column but not the
-   * raw attribute.
+   * Resolve the value for this pin.
    */
   resolve?: (trace: TraceHeader) => string | null | undefined;
 }
 
 const HOISTED_AUTO_PINS: HoistedPinDef[] = [
-  // Only `Conversation` is hoisted. The legacy `Thread` chip used to live
-  // here and fell back to `conversationId` when no explicit thread was set,
-  // which produced two chips with the same value side-by-side in the
-  // header. Conversation is the canonical concept for callers; thread is
-  // an implementation detail that can still be inspected via the
-  // attributes section if it's actually set.
+  // Only `Conversation` is hoisted. The legacy `Thread` chip used to live here and fell
+  // back to `conversationId` when no explicit thread was set, which produced two chips
+  // with the same value side-by-side in the header.
   {
     key: "gen_ai.conversation.id",
     label: "Conversation",
@@ -432,12 +387,9 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
 ];
 
 /**
- * Metadata keys the auto-pin sweep leaves alone, because the metrics row one
- * line above already states them: the Model / Models pill is built from
- * `trace.models` and folds the rest behind a "+N" with the full list on hover.
- * `metadata.models` also arrives as a raw JSON array, which reads worse than
- * the pill it duplicates. A key the reviewer pins explicitly is still theirs
- * and still renders, because the user-pin check runs first.
+ * Metadata keys the auto-pin sweep leaves alone, because the metrics row one line above
+ * already states them: the Model / Models pill is built from `trace.models` and folds
+ * the rest behind a "+N" with the full list on hover.
  */
 const AUTO_PIN_SUPPRESSED_METADATA_KEYS = new Set(["metadata.model", "metadata.models"]);
 
@@ -459,12 +411,9 @@ export const DrawerHeader = memo(function DrawerHeader({
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
   const toggleSnapMaximize = useDrawerStore((s) => s.toggleSnapMaximize);
-  // The Maximize / Restore icon drives the same width snap that
-  // double-clicking the edge grip uses — `widthPx` is the actual size
-  // signal, while the boolean `isMaximized` is kept in sync for
-  // components that read it to swap the icon label. The SSR / no-window
-  // branch falls through to `toggleMaximized()` so the button still
-  // does *something* visible during hydration.
+  // The Maximize / Restore icon drives the same width snap that double-clicking the
+  // edge grip uses — `widthPx` is the actual size signal, while the boolean
+  // `isMaximized` is kept in sync for components that read it to swap the icon label.
   const handleMaximizeClick = () => {
     if (typeof window === "undefined") {
       toggleMaximized();
@@ -533,12 +482,8 @@ export const DrawerHeader = memo(function DrawerHeader({
     "langwatch.reserved.context_size_tokens",
   );
 
-  // Total tokens the model actually processed = input + output PLUS cache
-  // read + cache write. Anthropic reports `input_tokens` as the NON-cached
-  // portion, so the cache counts are additive, not a subset (which is why a
-  // raw input+output "Total" can sit below the cache rows and read as wrong).
-  // Reasoning is a subset of output, so it is not added again. Falls back to
-  // the server input+output total when no cache was reported.
+  // Total tokens the model actually processed = input + output PLUS cache read + cache
+  // write.
   const totalTokensWithCache =
     trace.totalTokens + (cacheReadTokens ?? 0) + (cacheCreationTokens ?? 0);
 
@@ -625,12 +570,9 @@ export const DrawerHeader = memo(function DrawerHeader({
       }
     };
     for (const def of HOISTED_AUTO_PINS) {
-      // The rich `Scenario run` chip (built from `useScenarioChipData`
-      // in `TraceHeaderChips`) already surfaces the scenario run id with
-      // status + criteria + click-to-open behaviour. The plain hoisted
-      // pin would render the bare run id next to it, producing two pills
-      // for the same concept — so we skip the hoisted version whenever a
-      // scenario run is attached to the trace.
+      // The rich `Scenario run` chip (built from `useScenarioChipData` in
+      // `TraceHeaderChips`) already surfaces the scenario run id with status + criteria
+      // + click-to-open behaviour.
       if (
         def.key === "scenario.run_id" &&
         (trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
@@ -660,19 +602,7 @@ export const DrawerHeader = memo(function DrawerHeader({
       });
     }
 
-    // Auto-promote `metadata.*` attribute keys onto the pin strip. This is
-    // the customer-defined metadata namespace (langwatch reserved keys
-    // like `metadata.user_id`, `metadata.thread_id`, plus anything the
-    // caller attached via the SDK's metadata field). These are exactly
-    // the fields observability-first users want to see at the top of the
-    // drawer without having to dig into the Metadata accordion — they're
-    // also (by definition) safe to surface because the customer chose to
-    // emit them as semantic context rather than as raw OTel attributes.
-    //
-    // They land in the `custom` category so they share the inline cap
-    // (MAX_INLINE_PINS) with user-pinned attributes; remaining ones still
-    // spill into the "+N pinned" popover instead of blowing out the strip
-    // for a trace that happens to carry 50 metadata keys.
+    // Auto-promote `metadata.*` attribute keys onto the pin strip.
     const seenMetadataKeys = new Set<string>();
     for (const [key, rawValue] of Object.entries(trace.attributes)) {
       if (!key.startsWith("metadata.")) continue;
@@ -685,14 +615,8 @@ export const DrawerHeader = memo(function DrawerHeader({
       // Label strips the `metadata.` prefix for readability — the strip
       // is dense and the prefix is redundant inside the per-trace context.
       const label = key.slice("metadata.".length);
-      // Auto-pinned metadata pins gain a filter affordance: clicking the
-      // filter icon scopes the trace table to traces that share this
-      // attribute key/value. We inject a Liqe-style fielded query
-      // through `applyQueryText` because there's no first-class facet
-      // for arbitrary `metadata.*` keys today — Liqe accepts unknown
-      // field names and the backend's text search treats them as
-      // attribute-key filters (same behaviour the search bar uses for
-      // hand-typed `metadata.tenant:"org-acme"` queries).
+      // Auto-pinned metadata pins gain a filter affordance: clicking the filter icon
+      // scopes the trace table to traces that share this attribute key/value.
       const filterQuery = formatMetadataFilterQuery({ key, value });
       out.push({
         pin: { source: "attribute", key, label },
@@ -805,14 +729,8 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   const { refresh: handleRefresh, isRefreshing } = useTraceRefresh(trace.traceId);
 
-  // Title fallback chain: explicit traceName attribute → root span name (the
-  // server populates `trace.name` from it) → trace ID prefix as a last
-  // resort. The fallback is rendered muted so the reader can tell at a
-  // glance that no semantic name was set rather than reading the ID hex
-  // as if it were the title. We detect the ID-fallback case by comparing
-  // against a prefix of the trace ID — server-side projection drops the
-  // span name into `trace.name` for unnamed traces, but for traces with
-  // no spans at all the same field falls through to the trace ID itself.
+  // Title fallback chain: explicit traceName attribute → root span name (the server
+  // populates `trace.name` from it) → trace ID prefix as a last resort.
   const { titleText, titleIsFallback } = useMemo(() => {
     const explicit = trace.traceName?.trim();
     if (explicit) return { titleText: explicit, titleIsFallback: false };
@@ -844,18 +762,9 @@ export const DrawerHeader = memo(function DrawerHeader({
     chipDefs,
     10,
   );
-  // Pins: auto-pins (identity/run/tag) always inline. Custom + metadata
-  // pins inline up to MAX_INLINE_PINS — the rest still spill into the
-  // overflow popover so a pathological 200-pin trace can't blow out the
-  // header. The strip itself already wraps to multiple rows
-  // (`flexWrap="wrap"` on the HStack below), so a cap of 12 lets typical
-  // metadata-heavy traces breathe across 2-3 wrapped rows without
-  // hiding anything the user expected to see.
-  //
-  // Previous behaviour was a cap of 3 with overflow — which the customer
-  // (Trace Explorer power user) called out specifically: pinning 5
-  // metadata fields left them looking at three pills plus a "+2 pinned"
-  // chip, with no indication of what they'd asked to see.
+  // Pins: auto-pins (identity/run/tag) always inline. Custom + metadata pins inline up
+  // to MAX_INLINE_PINS — the rest still spill into the overflow popover so a
+  // pathological 200-pin trace can't blow out the header.
   const MAX_INLINE_PINS = 12;
   const pinResult = renderPinPills(categorizedPins, removePin, {
     maxCustomInline: MAX_INLINE_PINS,

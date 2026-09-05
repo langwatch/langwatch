@@ -1,13 +1,5 @@
 /**
- * What a run is configured with, and how one configuration is told from
- * another.
- *
- * A configuration is the scope, the targets, the repeat count and the
- * simulation models. Identity is wider than plan identity: one plan that ran
- * twice with different parameter overrides or a different repeat count holds
- * two configurations, and both are offered again. The note is never part of a
- * configuration, so it is neither stored here nor carried back.
- *
+ * What a run is configured with, and how one configuration is told from another.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -22,10 +14,6 @@ import type { SuiteScope, SuiteTarget } from "@langwatch/suite-contract";
 
 /**
  * What a run covers, as the dialog holds it.
- *
- * The stored scope names no scenarios, because a plan keeps its hand-picked list
- * in its own `scenarioIds`. The dialog needs the list inside the rule, so two
- * hand-picked scopes over different scenarios are two scopes rather than one.
  */
 export type RunScope =
   | { mode: "all" }
@@ -41,9 +29,6 @@ export function toSuiteScope(scope: RunScope): SuiteScope {
 
 /**
  * A list of every test suite reads as "all scenarios".
- *
- * Without this, ticking every suite by hand lands on a different scope from
- * Run all, and the two offer each other no history.
  */
 export function normaliseRunScope({
   scope,
@@ -79,9 +64,6 @@ export type RunConfigurationEntry = {
   runParameters: RunParameterValues;
   /**
    * Whether a run of this configuration carried a note.
-   *
-   * The fact, never the note. A run plan that takes a note takes one every
-   * run, and the text changes every run.
    */
   usesNote?: boolean;
   /** Newest-first ordering, and the age the row reads. */
@@ -90,9 +72,6 @@ export type RunConfigurationEntry = {
 
 /**
  * Targets in a stable order, whichever order they were picked in.
- *
- * The order is the one the run plan stores, so the name, the dropdown rows and
- * the columns of the run detail read the targets the same way.
  */
 export function sortTargets(targets: readonly SuiteTarget[]): SuiteTarget[] {
   return [...targets].sort((left, right) =>
@@ -102,11 +81,6 @@ export function sortTargets(targets: readonly SuiteTarget[]): SuiteTarget[] {
 
 /**
  * What the targets are called, in sorted order.
- *
- * A target is named after its agent. The same agent appearing more than once
- * is named with the parameters that differ between its targets, so "dev-agent
- * · model=gpt-5 vs dev-agent · model=gpt-5-mini" tells the two apart and a
- * value both share stays out of the name.
  */
 export function sortedTargetLabels({
   targets,
@@ -139,11 +113,6 @@ export function scopeKeyOf(scope: RunScope): string {
 
 /**
  * The identity of a configuration.
- *
- * The recipe is the server's, so the string the dialog builds and the string
- * the server builds for the same configuration are one string. The parameters
- * join the key, which is what makes two runs of one plan two entries when they
- * used different overrides.
  */
 export function configurationKeyOf({
   configuration,
@@ -167,9 +136,6 @@ export function configurationKeyOf({
 
 /**
  * The derived run name: the scope, then the targets it goes against.
- *
- * "Refunds dev-agent vs prod-agent". A run with nothing chosen yet is named
- * after its scope alone.
  */
 export function deriveRunName({
   scopeLabel,
@@ -185,9 +151,6 @@ export function deriveRunName({
 
 /**
  * What a target that the project no longer offers reads as.
- *
- * A configuration outlives the agent it ran against, and the id of a removed
- * agent means nothing to the person reading the row.
  */
 function removedLabel(target: SuiteTarget): string {
   return target.type === "prompt" ? "a removed prompt" : "a removed agent";
@@ -231,10 +194,6 @@ function factsOf({
 
 /**
  * What tells one entry from another that carries the same plan name.
- *
- * Only the facts that differ inside a group of entries sharing a name are
- * worth reading, so an entry that is alone under its name reads its targets
- * and nothing more.
  */
 export function describeConfigurations({
   entries,
@@ -270,9 +229,6 @@ export function describeConfigurations({
 
 /**
  * The configurations of one scope, newest first, one per configuration.
- *
- * Entries of the same configuration collapse onto the newest of them, so a
- * scope run nightly with one setup offers one line rather than thirty.
  */
 export function configurationsForScope({
   entries,

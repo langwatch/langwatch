@@ -1,11 +1,5 @@
 /**
  * The message a live run is waiting for, drawn where it will land.
- *
- * Three dots move in the bubble of whoever speaks next, so a run between two
- * messages reads as one still being written rather than one that stopped. It
- * is drawn only when the next message is known: while the judge reads the
- * conversation the drawer shows nothing, because the run may already be over.
- *
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 

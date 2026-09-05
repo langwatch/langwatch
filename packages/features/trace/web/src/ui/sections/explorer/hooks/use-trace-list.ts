@@ -19,11 +19,8 @@ export interface TraceListResult {
 }
 
 /**
- * Trace list with side effects: pulse-highlight new arrivals + dim while
- * switching view, plus each row's events and annotations merged in from their
- * own reads. Use `useTraceListQuery` directly when you only need the data and
- * totals (no side-effects, no events, no annotations). Both hooks share the
- * same React Query cache key, so they're free to compose.
+ * Trace list with side effects: pulse-highlight new arrivals + dim while switching
+ * view, plus each row's events and annotations merged in from their own reads.
  */
 export function useTraceList(): TraceListResult {
   const query = useTraceListQuery();

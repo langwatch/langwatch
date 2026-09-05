@@ -1,23 +1,6 @@
 /**
+ * The annotations host provider, and the two readings it derives rather than forwards.
  * @vitest-environment jsdom
- *
- * The annotations host provider, and the two readings it derives rather than
- * forwards.
- *
- * WHAT IS DERIVED, AND WHY IT IS PINNED HERE:
- *
- * - `isOwnPersonalWorkspace` decides whether handing rows to a dataset has to
- *   ask first. It is a column on the TEAM crossed with who is signed in, not a
- *   grant, and `personalWorkspaceFeatures.get` answers NOT_FOUND for anybody
- *   else's workspace — so answering it wrong in either direction is visible:
- *   `true` gates a reader out of their own hand-off, `false` sends a read that
- *   refuses for everyone who is not on their own personal project.
- * - The send confirmation's LINK. The shared feedback capability carries a
- *   title and a description and no action, so a notice that has one is rendered
- *   on the Design System toaster's own action trigger instead. Everything
- *   without one still goes through the capability, which is what keeps the
- *   code-keyed copy deciding the words a customer reads.
- *
  * Spec: packages/features/annotation/specs/annotations-list-selection.feature
  */
 

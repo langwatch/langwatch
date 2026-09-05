@@ -14,14 +14,6 @@ import {
 
 /**
  * Model picker for the scenario user-simulator and judge roles.
- *
- * Mirrors the Edit-default-models drawer UX: a "Default model" entry sits at
- * the top (the project's resolved scenarios.user_simulator / scenarios.judge
- * model) and is selected whenever the field is left unset (null). Picking it
- * clears the override so the run follows the project default; picking a
- * concrete model pins it for this scenario / run plan.
- *
- * `value === null` means "follow the default"; a string is an explicit pin.
  */
 export function SimulationModelSelect({
   label,

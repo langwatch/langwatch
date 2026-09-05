@@ -3,19 +3,6 @@ import "@testing-library/jest-dom/vitest";
 // @vitest-environment jsdom
 /**
  * The picker that adds a column to an evaluation.
- *
- * PORTED WITH THE DRAWER from
- * `platform/app/src/components/targets/__tests__/TargetTypeSelectorDrawer.test.tsx`,
- * whose subject was deleted in `cc91631cd8` while both openers — the
- * Evaluations table's "+" and the Run Evaluation button — kept writing the
- * address. The single mock that named a platform module now names
- * `@langwatch/ui-drawer`; the router mock is gone, because nothing in the
- * drawer reaches a router any more.
- *
- * TWO CARDS THE ORIGINAL NEVER COVERED are covered here — comparison and
- * evaluator — because the comparison card is the one whose navigation differs
- * from the other three, and an untested difference is what drifts.
- *
  * @see specs/experiments-v3/target-type-selector.feature
  */
 

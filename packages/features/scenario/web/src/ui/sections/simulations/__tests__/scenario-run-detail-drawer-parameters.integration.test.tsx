@@ -1,9 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The run detail drawer shows the parameter values the run resolved, and shows
- * no such section for a run that resolved none.
- *
  * @see specs/scenarios/scenario-run-parameters.feature
  * @see specs/scenarios/secret-run-parameters.feature
  */

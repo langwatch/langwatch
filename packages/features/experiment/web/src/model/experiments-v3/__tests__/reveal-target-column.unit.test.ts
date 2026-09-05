@@ -1,9 +1,7 @@
 /**
+ * A column Langy adds lands past the right edge of a wide workbench, so without this the reader watched a saved,
+ * real change happen off screen and read the whole step as nothing happening.
  * @vitest-environment jsdom
- *
- * A column Langy adds lands past the right edge of a wide workbench, so
- * without this the reader watched a saved, real change happen off screen and
- * read the whole step as nothing happening.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { revealTargetColumn } from "../reveal-target-column";

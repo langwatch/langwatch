@@ -16,16 +16,8 @@ export interface UseTextTranslationResult {
 }
 
 /**
- * Shared translate-to-English state for trace-drawer surfaces (Summary
- * input/output panels, conversation turns). Wraps the same
- * `translate.translate` mutation the legacy messages view uses, so
- * model-config failures surface through the same typed-error toasts
- * (missing model popup, provider disabled, AI call failed) raised by the
- * global tRPC interceptor. Translations are cached against the source
- * texts — toggling back and forth never refetches; new source texts
- * invalidate the cache.
- *
- * See specs/traces-v2/message-translation.feature.
+ * Shared translate-to-English state for trace-drawer surfaces (Summary input/output
+ * panels, conversation turns).
  */
 export function useTextTranslation({
   texts,
@@ -34,12 +26,9 @@ export function useTextTranslation({
 }): UseTextTranslationResult {
   const { project } = useOrganizationTeamProject();
   const translateAPI = api.translate.translate.useMutation();
-  // Active state is keyed to the source signature rather than a boolean:
-  // when the content changes under the same mounted hook (e.g. stepping
-  // to the next trace re-renders the same memoized viewer), a stale
-  // boolean would keep the button on "Show original" while the screen
-  // already shows the new original — the key comparison resets it
-  // automatically.
+  // Active state is keyed to the source signature rather than a boolean: when the content changes under the same mounted hook (e.g.
+  // stepping to the next trace re-renders the same memoized viewer), a stale boolean would keep the button on "Show original" while the
+  // screen already shows the new original — the key comparison resets it automatically.
   const [activeFor, setActiveFor] = useState<string | null>(null);
   // react-query v4's shared MutationObserver only tracks the LAST
   // `mutateAsync`, so `translateAPI.isPending` under-reports when several

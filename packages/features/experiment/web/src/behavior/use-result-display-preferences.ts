@@ -1,10 +1,5 @@
 /**
  * Result-display preferences for the batch evaluation results table.
- *
- * Row height persists across sessions — density is a reading preference,
- * not tied to any one run. Field visibility deliberately does not: a field
- * hidden on a previous visit should never silently explain "no results" on
- * a different run, so it always starts from the defaults.
  */
 import { useCallback, useState } from "react";
 import { useLocalStorage } from "usehooks-ts";

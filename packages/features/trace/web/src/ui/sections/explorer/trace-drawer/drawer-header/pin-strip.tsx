@@ -50,19 +50,16 @@ export interface PinRenderResult {
 
 interface RenderOptions {
   /**
-   * Maximum number of *custom* (user-pinned) pills shown inline. The rest
-   * collapse into the overflow popover so a user with 20 pinned attributes
-   * doesn't blow out the strip. Auto-hoisted pins (identity/run/tag) are
-   * always inline — they're a bounded set we know is glanceable.
+   * Maximum number of *custom* (user-pinned) pills shown inline. The rest collapse into
+   * the overflow popover so a user with 20 pinned attributes doesn't blow out the
+   * strip.
    */
   maxCustomInline?: number;
 }
 
 /**
- * Render the pin pills as `(inline, overflow)` — auto-pins always render
- * inline with intra-category dividers. Custom pins are inlined up to
- * `maxCustomInline`; the remainder roll into an overflow popover chip so
- * the strip can't run away from a power user.
+ * Render the pin pills as `(inline, overflow)` — auto-pins always render inline with
+ * intra-category dividers.
  */
 export function renderPinPills(
   pins: CategorizedPin[],

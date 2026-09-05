@@ -1,11 +1,5 @@
 /**
  * Hook for deriving mappings and sources in evaluations context.
- *
- * When the drawer is opened from evaluations V3, this hook provides:
- * - availableSources derived from the active dataset
- * - inputMappings derived from the target's mappings for the active dataset
- *
- * This enables the drawer to reactively update when the active dataset changes.
  */
 
 import { useMemo } from "react";
@@ -31,7 +25,6 @@ type UseEvaluationMappingsResult = {
 
 /**
  * Hook to get reactive mappings and sources for a target in evaluations context.
- *
  * @param targetId - The target ID to get mappings for. If undefined, returns empty data.
  * @returns Reactive mappings and sources that update when the active dataset changes.
  */

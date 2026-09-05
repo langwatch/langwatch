@@ -1,11 +1,5 @@
 /**
  * The briefing design system.
- *
- * One place for the fixed shapes, sizes, spacing, type, and colour of every
- * Langy-home card, so the briefing, the overview, and the setup rail stay
- * consistent and calm. The rule the whole system follows: the wireframe grid,
- * a hairline border, and ONE restrained warm accent — dialled down, never in
- * your face. Components import from here; they don't invent their own values.
  */
 
 /** The display voice — self-hosted Sentient, with the panel's fallbacks. */
@@ -94,29 +88,6 @@ export const GAP = { section: 3, card: 3.5, row: 2 } as const;
 
 /**
  * ── Card taxonomy ───────────────────────────────────────────────────────────
- *
- * Every card Langy renders in the conversation is one of five INTENTS, ordered
- * by attention weight — how much of the reader's attention the card is allowed
- * to take. The intent fixes the material: sizing, surface, border emphasis,
- * whether the warm accent is spent, and the default status-dot tone. `LangyCard`
- * reads a variant from here and renders it, so a card's weight is a data
- * decision made once, not re-invented per component.
- *
- *   activity  (1) — a small piece of work is happening. The quietest thing a
- *                   card can be: an inline status line, not a box.
- *   progress  (2) — the thing you asked for is under way. A live receipt on a
- *                   hairline surface, a live amber dot while it runs.
- *   change    (3) — something was created, updated, or removed. A settled
- *                   receipt: hairline surface, a status dot naming the outcome.
- *   ask       (4) — Langy needs a decision from you. Leans in with the warm
- *                   accent border + wash; an action row is expected.
- *   spotlight (5) — Langy is showing you something worth full attention. The
- *                   heaviest card: the panel material, surface tone, a serif
- *                   title, generous padding.
- *
- * The one rule the ramp holds: warmth is earned. Only `ask` and `spotlight`
- * spend the amber accent — a wall of warm cards would read as noise, so the two
- * lower-weight receipts stay on the quiet neutral hairline.
  */
 export const CARD_INTENTS = ["activity", "progress", "change", "ask", "spotlight"] as const;
 
@@ -220,29 +191,13 @@ export const CARD_TAXONOMY = {
 
 /**
  * ── HDR / Display-P3 accent (task #25) ──────────────────────────────────────
- *
- * The amber accent is Langy's one warm colour; on a wide-gamut (Display-P3)
- * screen the sRGB orange clips well short of the amber the brand actually wants.
- * These give the accent its wide-gamut form WITH an sRGB fallback, so a P3
- * display shows the fuller amber and an sRGB display shows the exact same colour
- * it always did.
- *
- * Consumed two ways, both keeping the fallback FIRST so a non-P3 renderer takes
- * it and ignores the `color(display-p3 …)` it cannot parse:
- *   - `p3Layers(fallback, p3)` returns the pair as an array for Emotion's
- *     fallback-value form (`css={{ background: p3Layers(a, b) }}`);
- *   - the CSS utility classes in langy-theme.css (`.langy-accent-wash`,
- *     `.langy-accent-ring`) declare the same pair for className consumers.
- *
- * AI_ACCENT_P3 is the amber in P3 (≈ #ED8926 → color(display-p3 0.89 0.53 0.17)).
  */
 export const AI_ACCENT_P3 = "color(display-p3 0.929 0.537 0.149)" as const;
 
 /**
- * Emotion fallback-value pair: `[fallback, enhanced]`. Emotion emits both
- * declarations for the property, last-wins, so a P3 renderer paints `enhanced`
- * and every other renderer keeps `fallback`. Use in a raw Emotion `css` object,
- * never a Chakra responsive style prop (which reads an array as breakpoints).
+ * Emotion fallback-value pair: `[fallback, enhanced]`. Emotion emits both declarations
+ * for the property, last-wins, so a P3 renderer paints `enhanced` and every other
+ * renderer keeps `fallback`.
  */
 export function p3Layers(fallback: string, enhanced: string): [string, string] {
   return [fallback, enhanced];

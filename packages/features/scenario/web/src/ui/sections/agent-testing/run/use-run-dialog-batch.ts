@@ -1,18 +1,4 @@
 /**
- * How a run starts.
- *
- * Every entry point queues the same way: a name and a configuration go to the
- * server, which resolves the name onto a run plan. A run of one scenario is an
- * ordinary run plan too, named after that scenario and the agent it goes
- * against, so running the same pair again stacks a second run on the same plan
- * and the plan grows a trend.
- *
- * A refusal the server can name reads inside the dialog. Only failures with
- * nothing structured to say fall back to a toast.
- *
- * A run that is queued closes the dialog first and opens the drawer after,
- * never both at once: see `run` below.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/features/agent-testing/live-single-scenario-run.feature
  * @see specs/suites/run-plan-identity-by-name.feature
@@ -40,10 +26,9 @@ type RunAttempt = {
 };
 
 /**
- * Holds the identity of the run the person is trying to queue. A failed
- * attempt keeps its identity, so a retry of the same request deduplicates on
- * the server instead of queueing a second batch. A queued run drops it, so
- * the next run is a new batch.
+ * Holds the identity of the run the person is trying to queue. A failed attempt keeps
+ * its identity, so a retry of the same request deduplicates on the server instead of
+ * queueing a second batch. A queued run drops it, so the next run is a new batch.
  */
 function useRunAttempt() {
   const attemptRef = useRef<RunAttempt | null>(null);
@@ -75,10 +60,6 @@ export type BatchRunInput = RunDialogSubmitInput & {
 
 /**
  * The one scenario a run covers, when a hand-picked scope names exactly one.
- *
- * A run of one scenario opens straight into the run drawer, and the row it was
- * started from remembers the agent it went against. Everything else about it
- * is an ordinary plan run.
  */
 function soleScenarioOf(scope: RunScope): string | null {
   if (scope.mode !== "scenarios" || scope.scenarioIds.length !== 1) return null;
@@ -87,10 +68,6 @@ function soleScenarioOf(scope: RunScope): string | null {
 
 /**
  * Remembers the agent the run went against.
- *
- * The dialog opens on the last agent of the whole page, and a scenario row
- * opens on the last agent of that scenario, so a run of one scenario writes
- * both.
  */
 function rememberTarget({
   projectId,
@@ -112,10 +89,6 @@ function rememberTarget({
 
 /**
  * What the caller learns once a plan run is queued.
- *
- * The run set is the plan's own, so the drawer and the runs rail read the run
- * back under that plan. A run of one scenario also names it and the agent, so
- * the drawer can open on the run before the run has an id.
  */
 function runStartedInfoOf({
   batchRunId,
@@ -142,11 +115,6 @@ function runStartedInfoOf({
 
 /**
  * Queues a run under the name the dialog holds.
- *
- * This is the one path every entry point takes: the server resolves the name,
- * joins the plan of that name or creates one, writes the configuration onto it
- * and runs it. Nothing is read off a test suite row, which is what keeps a
- * suite a pure grouping.
  */
 function useQueuePlanRun(input: BatchRunInput) {
   const runPlan = api.suites.runPlan.useMutation();

@@ -3,12 +3,7 @@ import { Box } from "@chakra-ui/react";
 import React from "react";
 
 /**
- * Renders a vendor mark at a fixed size, dark-mode safe. Wrapper-level (not
- * fixed in the SVGs themselves) because the icon components are shared
- * across surfaces that render on different backgrounds — inverting only the
- * monochrome ones here keeps brand-coloured marks untouched. The caller
- * decides which marks are monochrome: flat near-black fills vanish on the
- * dark theme, brand-coloured marks read fine in both modes.
+ * Renders a vendor mark at a fixed size, dark-mode safe.
  */
 export function IconGlyph({
   icon,

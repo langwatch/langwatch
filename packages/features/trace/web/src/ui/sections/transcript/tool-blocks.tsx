@@ -34,19 +34,8 @@ export function OpenAIToolCallCard({
 }
 
 /**
- * Unified tool call card — pairs an Anthropic-style `tool_use` with its
- * `tool_result` (when one is available) into a single, compact, neutral
- * card. Collapsed by default: just one line showing the tool name and a
- * primary-arg summary (e.g. `Read · /path/to/file.txt`). Expanded shows
- * the full arguments table and the result body in two stacked sections.
- *
- * Visual choices:
- *   • Neutral surface (bg.subtle / border.muted) — no orange. Tools are
- *     supporting context, not the conversation, so they shouldn't shout.
- *   • Errors get a red accent (border + label only) so they still stand
- *     out without painting the entire chain in alarm colors.
- *   • Single header for both call + result so the eye groups them as one
- *     operation. No more two-card "wall" per turn.
+ * Unified tool call card — pairs an Anthropic-style `tool_use` with its `tool_result`
+ * (when one is available) into a single, compact, neutral card.
  */
 export function ToolPairCard({
   name,

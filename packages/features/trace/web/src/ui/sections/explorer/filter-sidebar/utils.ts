@@ -58,26 +58,17 @@ export function formatCount(count: number): string {
 }
 
 /**
- * How many of a facet's values actually have matching traces — the number
- * shown in the section header's value-count badge.
- *
- * A categorical section keeps its default-value scaffolding visible even at
- * zero hits (STATUS always lists OK / Error / Warning; spanType lists the full
- * type set) so any of them is one click away to filter on. The badge, though,
- * should answer "how many of these values are present in the data right now?",
- * so it counts only `count > 0`. Without this, STATUS reads "3" while only OK
- * has traces. The zero-count rows stay in the list — this only changes the
- * tally. The "(none)" toggle row isn't a FacetItem, so it's never counted.
+ * How many of a facet's values actually have matching traces — the number shown in the
+ * section header's value-count badge.
  */
 export function countPresentValues(items: readonly { count: number }[]): number {
   return items.reduce((n, item) => (item.count > 0 ? n + 1 : n), 0);
 }
 
 /**
- * Compact count — K above a thousand, rounded integer below. Shared base
- * for the token / span formatters, which only differ in the unit suffix
- * appended on top. Kept unit-less so each facet can stamp its own
- * ("12.3K tok", "8 spans", "575/s").
+ * Compact count — K above a thousand, rounded integer below. Shared base for the token
+ * / span formatters, which only differ in the unit suffix appended on top. Kept
+ * unit-less so each facet can stamp its own ("12.3K tok", "8 spans", "575/s").
  */
 const compactCount = (v: number) =>
   v >= TOKEN_K ? `${(v / TOKEN_K).toFixed(1)}K` : String(Math.round(v));

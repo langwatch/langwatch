@@ -1,21 +1,5 @@
 /**
  * The plan a turn is following, folded from the agent's `todowrite` tool parts.
- *
- * ── WHY THIS EXISTS ─────────────────────────────────────────────────────────
- * Langy's agent keeps a todo list with the `todowrite` tool for multi-step work
- * (AGENTS.md, "How you work"). opencode's `todowrite` is a WHOLE-LIST REWRITE
- * per call —
- * `{ todos: [{ content, status }] }`, status ∈ pending | in_progress | completed
- * | cancelled — so the plan already crosses the wire as ordinary tool input and
- * lands durable on the message (each call is a `tool-todowrite` part carrying its
- * input). The panel MIRRORS that list as a live checklist. Nothing is scraped
- * from prose; the tool IS the plan (see the killed `[langy:progress:*]` sentinels
- * in message-content.tsx for why prose protocols are not an option here).
- *
- * This module is the pure, JSX-free fold: a message's tool parts → the latest
- * plan snapshot + the OTHER tool calls attributed to the plan item that was
- * running when each one started. Same "derive from what ran, never from
- * narration" precedent as `githubProgressFromToolParts`; degrades gracefully.
  */
 
 import { z } from "zod";
@@ -115,11 +99,9 @@ function tryReadPartInput(part: unknown): unknown {
 }
 
 /**
- * Parse a `todowrite` input into a normalised item list, shape-tolerant of the
- * two ways the todos can arrive (`{ todos: [...] }` or a bare array) and of a
- * status the tool never promised. Items without a non-empty content string are
- * dropped — a checklist row with no text is worse than one fewer row. Returns
- * null when there is nothing list-shaped to read.
+ * Parse a `todowrite` input into a normalised item list, shape-tolerant of the two ways
+ * the todos can arrive (`{ todos: [...] }` or a bare array) and of a status the tool
+ * never promised.
  */
 export function parseTodoList(input: unknown): LangyPlanItem[] | null {
   const parsedContainer = todoContainerSchema.safeParse(input);
@@ -152,26 +134,16 @@ function normaliseItem(item: { content: string; status: string }): LangyPlanItem
 }
 
 /**
- * Fold a message's tool parts into the plan it was following, or null when the
- * agent never maintained a todo list (⇒ no checklist, today's rendering).
- *
- * The LATEST full list wins: `todowrite` rewrites the whole list every call, so
- * the last valid snapshot is the plan.
- *
- * The plan is the checklist and nothing else. The calls a step made are not
- * filed under it: the transcript already carries every call where it happened
- * (logic/langyTranscript.ts), and a card cannot be in the transcript and inside
- * the checklist at the same time without being read twice.
+ * Fold a message's tool parts into the plan it was following, or null when the agent
+ * never maintained a todo list (⇒ no checklist, today's rendering).
  */
 export function langyPlan(
   message: { parts: readonly unknown[] },
   opts?: {
     /**
-     * The manager's typed plan snapshot for the LIVE turn (capped + truncated).
-     * When present it is PREFERRED over parsing the raw todowrite parts — the
-     * client then enforces the same caps the manager did. Attribution still
-     * derives from the message's todowrite snapshots (by content). Absent (old
-     * turns, history) ⇒ Phase-1 tool-part parsing.
+     * The manager's typed plan snapshot for the LIVE turn (capped + truncated). When
+     * present it is PREFERRED over parsing the raw todowrite parts — the client then
+     * enforces the same caps the manager did.
      */
     overrideItems?: Array<{ content: string; status: string }> | null;
   },

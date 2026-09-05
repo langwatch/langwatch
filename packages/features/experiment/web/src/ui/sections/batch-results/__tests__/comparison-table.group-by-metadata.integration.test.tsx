@@ -2,18 +2,7 @@ import "@testing-library/jest-dom/vitest";
 
 // @vitest-environment jsdom
 /**
- * Issue #4632 — group ComparisonTable rows by a dataset-entry metadata
- * field. User-perspective integration tests; see
- * specs/experiments/group-results-by-metadata.feature for scenarios.
- *
- * The picker and the table are two components: `GroupRowsButton` sits in
- * the results toolbar and owns the selection, `ComparisonTable` renders
- * whatever `groupBy` it is handed. Tests about the dropdown therefore
- * render both through the `GroupableComparison` harness below; tests
- * about rendering drive the table directly with a `groupBy` prop.
- *
- * URL persistence is verified at the BatchEvaluationResults level + in
- * the browser.
+ * Issue #4632 — group ComparisonTable rows by a dataset-entry metadata field.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

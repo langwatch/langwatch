@@ -1,10 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for SetCard component.
- *
- * Tests the UI treatment for internal vs user-created sets.
- *
+ * @vitest-environment jsdom
  * @see specs/scenarios/internal-set-namespace.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

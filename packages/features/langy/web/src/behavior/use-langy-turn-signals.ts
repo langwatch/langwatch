@@ -33,18 +33,6 @@ export interface LangyTurnSignals {
 
 /**
  * Single consumer point for the live turn's granular streaming signals.
- *
- * `status_reported` / `progress_reported` are classified ephemeral by the
- * backend (ADR-046): they never hit the event_log. They ride the durable token
- * buffer (as `status` / `progress` entries), which the `langy.onTurnStream`
- * subscription relays; the custom `ChatTransport` peels them off the stream —
- * they are not message parts — and writes them to the store, which this hook
- * reads. So `StreamingStatusLine` lights up with no component change.
- *
- * `metrics`/`segment` are not yet emitted by the agent (the milestone entry
- * carries no numeric rollup), so they stay null — the status line renders on
- * status/progress alone. `isCatchingUp` is likewise unused now (the buffer's
- * tail replay is instant over the subscription).
  */
 export function useLangyTurnSignals(_conversationId: string | null): LangyTurnSignals {
   const status = useLangyStore((s) => s.turnStatus);

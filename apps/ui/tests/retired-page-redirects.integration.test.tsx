@@ -1,21 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Addresses that used to be served by a page whose whole body was a redirect.
- * The forwarding is a row in the packaged route table now, so what is asserted
- * here is the address the reader ends on when the REAL table is mounted in a
- * router: every page key is stubbed, every redirect descriptor is the one the
- * application ships, and the match ranking is React Router's own. A dropped
- * row, a retargeted row or a destination the table no longer serves shows up
- * as a reader landing somewhere else.
- *
- * These cases were written against the redirect page components
- * (`pages/[project]/messages/**`, `pages/[project]/traces/[trace]`,
- * `pages/ops/queues`), which are deleted. The scenarios they bind are
- * unchanged; only what serves them moved.
- *
- * Specs: specs/traces-v2/default-drawer-routing.feature
- *        specs/ops/ops-dashboard-density.feature
+ * @vitest-environment jsdom
  */
 
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../src/behavior/ui-page-loaders";
@@ -72,10 +57,6 @@ function open(address: string) {
 
 /**
  * Asserts the whole address — path, query and hash — the reader ends on.
- *
- * Waiting for the final address rather than for "anything but the start" is
- * what makes a chained forward (`/admin` -> `/ops/backoffice` -> its default
- * resource) assert on where the reader actually stops.
  */
 async function expectLands({ from, at }: { from: string; at: string }) {
   const router = open(from);

@@ -1,17 +1,7 @@
 /**
+ * Vite reads an `optimizeDeps.include` entry as a chain: each package after a `>` is
+ * looked up as a dependency of the one before it, not of the application.
  * @vitest-environment node
- *
- * Vite reads an `optimizeDeps.include` entry as a chain: each package after a
- * `>` is looked up as a dependency of the one before it, not of the
- * application. `apps/ui` does not depend on Shiki — `@langwatch/design-system`
- * does — so the bare names the list used to carry described a dependency graph
- * that does not exist, and Vite answered with five "Failed to resolve
- * dependency" errors on every boot and pre-bundled none of it.
- *
- * What is checked here is that graph: every link in every chain is a
- * dependency the manifest at the previous link actually declares.
- *
- * Corresponds to specs/setup/dev-stack-boot-noise.feature.
  */
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
@@ -40,11 +30,6 @@ function declaredBy(manifest: Manifest): string[] {
 
 /**
  * Where `name`'s manifest is, looked up from the package that named it.
- *
- * By path rather than through `require.resolve`, because a package whose
- * `exports` map does not list "./package.json" — the design system is one —
- * cannot be resolved that way at all, and the manifest is exactly what this
- * needs to read.
  */
 function manifestFileOf(name: string, fromManifest: string): string {
   // Through the symlink first: pnpm links a package into its dependent's

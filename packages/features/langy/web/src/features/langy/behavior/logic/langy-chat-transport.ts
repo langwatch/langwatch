@@ -5,29 +5,18 @@ import { trpcClient } from "../../../../behavior/langy-api";
 
 /**
  * What a tRPC subscription hands back.
- *
- * `@trpc/server/observable` is where the name lives, and ADR-004 seals
- * `@trpc/server` off from a web package — the rule fires on the import
- * declaration without checking `importKind`, so `import type` is rejected too.
- * One method is the whole surface either side of the wire uses.
  */
 type Unsubscribable = { unsubscribe: () => void };
 
 /**
- * The per-turn request inputs the transport owns. Sourcing them HERE (from the
- * panel's live state via a getter), rather than from the AI-SDK per-send `body`,
- * is what fixes the regenerate 400: `regenerate()` carries no body, but the
- * transport still has the projectId + context, so a re-drive is a valid request.
+ * The per-turn request inputs the transport owns.
  */
 export interface LangyTurnRequestContext {
   projectId: string;
   conversationId: string | null;
   /**
    * The conversation id a panel-open warm minted ahead of the first message
-   * (specs/langy/langy-worker-prewarm.feature). Only consulted when there is
-   * no active conversation: the create call adopts it so the first turn lands
-   * on the worker the warm already booted, instead of spawning under a fresh
-   * server-minted id.
+   * (specs/langy/langy-worker-prewarm.feature).
    */
   pendingConversationId?: string | null;
   modelOverride?: string;
@@ -36,29 +25,23 @@ export interface LangyTurnRequestContext {
 }
 
 /**
- * A live signal routed out-of-band (not a message part): status/progress/
- * milestone/reasoning tick the status line + thinking line; `plan` mirrors the
- * manager's typed plan snapshot into the store, which the plan card prefers over
- * parsing the raw `todowrite` tool part.
+ * A live signal routed out-of-band (not a message part): status/progress/ milestone/reasoning tick the status
+ * line + thinking line; `plan` mirrors the manager's typed plan snapshot into the store, which the plan card
+ * prefers over parsing the raw `todowrite` tool part.
  */
 export type LangyTurnSignalEntry =
   | (Extract<LangyStreamEntry, { type: "status" }> & {
       /**
-       * The status arrived BEFORE this stream produced any output — the
-       * manager's readiness placeholder for silence ("Starting Langy…",
-       * "Thinking…"). The panel suppresses a readiness status once the answer
-       * is visible: a replayed stream re-delivers it after text is already on
-       * screen, and a placeholder under the reply reads as a contradiction.
+       * The status arrived BEFORE this stream produced any output — the manager's
+       * readiness placeholder for silence ("Starting Langy…", "Thinking…").
        */
       readiness?: boolean;
     })
   | Extract<LangyStreamEntry, { type: "progress" | "milestone" | "reasoning" | "plan" }>;
 
 /**
- * How a turn stream terminated. "end" is the genuine end-of-turn frame — the
- * answer is complete, so the caller may retire in-flight UI immediately.
- * "closed" is a silent close (the subscription completed without an end frame —
- * e.g. a quiet worker); the durable fold remains the only truth there.
+ * How a turn stream terminated. "end" is the genuine end-of-turn frame — the answer is
+ * complete, so the caller may retire in-flight UI immediately.
  */
 export type LangyTurnSettleReason = "end" | "error" | "closed";
 
@@ -84,11 +67,8 @@ export interface LangyChatTransportDeps {
   /** Fired when a turn stream terminates — the reconcile trigger. */
   onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   /**
-   * Every wire entry, unfiltered and before any interpretation — the tap the
-   * developer drawer's tape records from. Deliberately a plain observer: it
-   * cannot alter dispatch, and it runs on entries this transport otherwise
-   * swallows (status, milestone), because "the UI showed nothing" and "the
-   * server sent nothing" are the two answers it exists to tell apart.
+   * Every wire entry, unfiltered and before any interpretation — the tap the developer
+   * drawer's tape records from.
    */
   onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
 }
@@ -100,35 +80,13 @@ interface StartTurnResponse {
 }
 
 /**
- * A custom AI-SDK `ChatTransport` for Langy. `sendMessages` starts the turn via
- * the `langy.createConversation` / `langy.continueConversation` tRPC mutations —
- * which return only `{conversationId, turnId}` — then bridges the
- * `langy.onTurnStream` tRPC subscription into the `ReadableStream<UIMessageChunk>`
- * `useChat` expects. Same chunk contract the old `attachTurnStream` produced, so
- * every parts renderer is unchanged.
- *
- * Create vs continue is one operation split by whether we already hold a
- * conversation id: no id yet ⇒ `createConversation` (mints the id + emits the
- * semantically-first `conversation_started`); an id ⇒ `continueConversation`.
- *
- * A rejected mutation throws its typed domain error to `useChat().error`, which
- * `readLangyTrpcError`/`explainLangyError` render as a proper card.
- *
- * Status/progress/milestone entries are NOT emitted as message parts (nothing
- * consumes `data-langy-*`); they go to `onSignal` and light up the status line
- * through the store. The durable truth is reloaded by the `messages` query when
- * `onTurnSettled` fires.
+ * A custom AI-SDK `ChatTransport` for Langy.
  */
 export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTransport<UIMessage> {
   return {
     async sendMessages(options) {
       const ctx = deps.getContext();
-      // A create carries THIS send and nothing else. The useChat state can still
-      // hold the previous conversation when the user starts a new chat
-      // mid-stream, and anything else in it seeds the new conversation, and the
-      // title generated from it, with the old exchange. Every user message was
-      // the same failure with the answers stripped out: the old questions still
-      // went through.
+      // A create carries THIS send and nothing else.
       const lastUserMessage = options.messages.findLast((message) => message.role === "user");
       const turnInput = {
         // One logical send, one identity: minted fresh on every sendMessages
@@ -210,13 +168,8 @@ function subscribeTurnStream({
 
   return new ReadableStream<UIMessageChunk>({
     start(controller) {
-      // The prose of a turn is not one block: it is the paragraphs written
-      // between the calls. A single text id held open for the whole turn made
-      // every delta land in the SAME part, so the message's parts said "all the
-      // text, then all the tools" whatever order they arrived in, and the panel
-      // had no way to draw a card between two paragraphs. A run is opened by
-      // the first delta after a tool and closed when the next tool starts, so
-      // the parts array is the turn's own order.
+      // The prose of a turn is not one block: it is the paragraphs written between the
+      // calls.
       let openTextId: string | null = null;
       let closed = false;
 
@@ -245,12 +198,7 @@ function subscribeTurnStream({
       controller.enqueue({ type: "start" });
 
       // The manager emits a readiness status ("Starting Langy…") into the cold window
-      // (worker tool prep produces no frames for many seconds). It is a
-      // placeholder for SILENCE, so the first real output — text, a tool, the
-      // model's reasoning — retires it; without this the status line would
-      // outrank the thinking line (and its reasoning glimpse) for the whole
-      // turn. Cleared once: statuses the agent reports mid-turn keep today's
-      // behavior.
+      // (worker tool prep produces no frames for many seconds).
       let sawOutput = false;
       const clearColdStartStatus = () => {
         if (sawOutput) return;

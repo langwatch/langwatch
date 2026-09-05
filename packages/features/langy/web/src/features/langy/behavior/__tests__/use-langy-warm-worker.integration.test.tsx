@@ -1,14 +1,7 @@
 /**
+ * The panel-open pre-warm hook (specs/langy/langy-worker-prewarm.feature): fires the `langy.warmWorker` mutation on the panel-open rising edge and on conversation change, at most once per
+ * (project, conversation) while open, holds the returned id as `pendingConversationId` (never the active id), and surfaces nothing on failure.
  * @vitest-environment jsdom
- *
- * The panel-open pre-warm hook (specs/langy/langy-worker-prewarm.feature):
- * fires the `langy.warmWorker` mutation on the panel-open rising edge and on
- * conversation change, at most once per (project, conversation) while open,
- * holds the returned id as `pendingConversationId` (never the active id), and
- * surfaces nothing on failure. The tRPC mutation is mocked; the store is the
- * real one. Visibility gating is the panel's mount gate, covered by
- * ProjectLangyLayout.integration.test.tsx, a user without Langy never mounts
- * the panel, so this hook never runs for them.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import { act } from "react";

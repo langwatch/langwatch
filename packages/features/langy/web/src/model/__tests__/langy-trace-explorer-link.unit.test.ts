@@ -49,12 +49,9 @@ describe("parseTraceSearchCommand", () => {
     });
 
     describe("when the agent nests one quoting level inside another", () => {
-      // Observed live against the real agent: it wrote
-      // `-q "\"override codes\""`, and reading `\"` as a closing quote
-      // recovered `\override` — the phrase truncated at the space and a stray
-      // backslash in the query. The Explorer then searched for something the
-      // agent never searched for, which is the failure this module exists to
-      // prevent.
+      // Observed live against the real agent: it wrote `-q "\"override codes\""`, and
+      // reading `\"` as a closing quote recovered `\override` — the phrase truncated at
+      // the space and a stray backslash in the query.
       it("reads an escaped double quote as data, not as the end of the value", () => {
         expect(
           parseTraceSearchCommand(

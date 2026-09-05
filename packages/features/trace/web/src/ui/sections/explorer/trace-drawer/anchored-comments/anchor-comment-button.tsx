@@ -12,15 +12,6 @@ import { AnchorCommentThread } from "./anchor-comment-thread";
 
 /**
  * Whether a control with no room for a label is on screen right now.
- *
- * - `always`: the surface has room for it at rest.
- * - `hidden`: revealed by the row it sits on, which tracks its own hover.
- * - `on-row-hover`: revealed by the attribute row around it, the way the copy
- *   action beside it already behaves. A glyph on every row at rest would make
- *   a dense table noisier to read, which is the one thing that table is for.
- * - `on-block-hover`: revealed by the message block around it, for the same
- *   reason: a transcript is prose, and a glyph beside every paragraph of it
- *   competes with the words.
  */
 export type AnchorCommentReveal = "always" | "hidden" | "on-row-hover" | "on-block-hover";
 
@@ -43,15 +34,8 @@ interface AnchorCommentButtonProps {
 }
 
 /**
- * The comment affordance for one part of a trace: how many comments it carries,
- * and the way to read them and add another.
- *
- * Carries its label in words wherever there is room. On the waterfall row and
- * the attribute row there is none, so it names the row it acts on instead, the
- * way those rows' delete and pin actions already do.
- *
- * A reader who may not write annotations is offered no way in, but still reads
- * what is there: the count opens the thread with no composer under it.
+ * The comment affordance for one part of a trace: how many comments it carries, and the
+ * way to read them and add another.
  */
 export function AnchorCommentButton({
   traceId,
@@ -193,12 +177,8 @@ const DenseTrigger = forwardRef<
     reveal: AnchorCommentReveal;
   } & React.ComponentProps<typeof Button>
 >(function DenseTrigger({ count, label, reveal, onClick, ...triggerProps }, ref) {
-  // Both reveal modes keep the control off screen until its row is under the
-  // cursor, and they get there differently. The waterfall row tracks its own
-  // hover in a store, so the control can be taken out of the tab order while it
-  // is invisible and put back when the row reveals it. The attribute row leaves
-  // it to CSS, which nothing can read back, so that one stays reachable the way
-  // the copy action beside it already is.
+  // Both reveal modes keep the control off screen until its row is under the cursor,
+  // and they get there differently.
   const isSuppressed = reveal === "hidden";
   const isFaded = reveal !== "always";
   return (

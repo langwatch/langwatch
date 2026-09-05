@@ -39,12 +39,8 @@ const SPAN_TAB_BAR_HEIGHT_PX = 38;
 // Kept in sync with `ContextHeader` paddingY in `ConversationContext.tsx`.
 const CTX_HEADER_HEIGHT_PX = 36;
 
-// `contentRef` is attached to the inner row-wrapper Box inside the
-// scroll container (so `scrollHeight` doesn't get inflated by the
-// container's clientHeight). The scroll container itself has a
-// vertical paddingY={3} (6 * 2 = 24px) which the inner ref doesn't
-// see — add it back here so the pane's natural height is
-// `header + scroll-container-padding + content`.
+// `contentRef` is attached to the inner row-wrapper Box inside the scroll container (so
+// `scrollHeight` doesn't get inflated by the container's clientHeight).
 const CTX_SCROLL_VPAD_PX = 24;
 
 // Pixel ceiling for the ctx pane's default / max height. Content shorter
@@ -55,16 +51,8 @@ const CTX_SCROLL_VPAD_PX = 24;
 const CTX_MAX_HEIGHT_PX = 500;
 
 /**
- * Renders the trace drawer body as a stack of independently sized,
- * scrollable panels — Chrome DevTools "Network → Headers / Preview"
- * model.
- *
- * Per operator feedback, only the optional **Conversation Context**
- * panel is wrapped in a `<Pane>` (it gets a real titled header bar
- * with a collapse chevron). The **Visualization** and **Details**
- * panels carry no extra Pane chrome — their own tab strips
- * (VizPlaceholder's viz-tab row and SpanTabBar respectively) are the
- * chrome. The Details collapse affordance lives inside SpanTabBar.
+ * Renders the trace drawer body as a stack of independently sized, scrollable panels —
+ * Chrome DevTools "Network → Headers / Preview" model.
  */
 export function PaneLayout({
   trace,
@@ -82,15 +70,7 @@ export function PaneLayout({
   const paneState = useDrawerStore((s) => s.paneState);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
 
-  // Conversation context pane slot only exists for genuinely multi-turn
-  // conversations. `ConversationContext` itself returns null for
-  // single-turn threads, so without this gate the ctx Panel would sit
-  // there as an empty band (the Panel sizes itself, not its content).
-  // The hook hits the same cached query the component uses, so the two
-  // reads always agree. While loading we keep the slot mounted (the
-  // strip shows its loading header) — it unmounts only once the count
-  // resolves to ≤1. autoSaveId restores the body group's sizes across
-  // that remount.
+  // Conversation context pane slot only exists for genuinely multi-turn conversations.
   const ctx = useConversationContext(trace.conversationId, trace.traceId);
   const hasConversation = !!trace.conversationId && (ctx.isLoading || ctx.total > 1);
   const ctxState = paneState.conversationContext;
@@ -102,15 +82,9 @@ export function PaneLayout({
   const ctxContentRef = useRef<HTMLDivElement>(null);
   const ctxHeaderRef = useRef<HTMLDivElement>(null);
 
-  // Mouse-capture leak guard. If the operator drags a resize handle
-  // off the browser window and releases the mouse out there, the
-  // pointerup never fires inside the document and react-resizable-
-  // panels' internal drag state stays "active". On return, the next
-  // click on the "Show details" button (or any other sibling) is
-  // intercepted by the still-tracking drag and looks dead. Synthesize
-  // a window-level pointerup whenever we regain focus or detect
-  // mouse movement with no buttons pressed — both signals mean any
-  // drag should be over.
+  // Mouse-capture leak guard. If the operator drags a resize handle off the browser
+  // window and releases the mouse out there, the pointerup never fires inside the
+  // document and react-resizable- panels' internal drag state stays "active".
   useEffect(() => {
     const flushDrag = () => {
       try {
@@ -139,12 +113,9 @@ export function PaneLayout({
   // make the next expand land on a hairline-thin pane).
   const lastExpandedContentPx = useRef<number | null>(null);
 
-  // Ctx Panel collapsed size has to equal the ContextHeader pixel height
-  // so the collapsed strip sits flush with the body Panel — no trailing
-  // empty band beneath the chevron. Same pattern as detailCollapsedSize.
-  // Ctx Panel max size caps drag at the measured content height so the
-  // user can't pull the divider down past the rows that exist
-  // (operator feedback: "shouldn't be able to make it as tall as I want").
+  // Ctx Panel collapsed size has to equal the ContextHeader pixel height so the
+  // collapsed strip sits flush with the body Panel — no trailing empty band beneath the
+  // chevron. Same pattern as detailCollapsedSize.
   const [ctxCollapsedSize, setCtxCollapsedSize] = useState<number>(6);
   const [ctxMaxSize, setCtxMaxSize] = useState<number>(45);
   useEffect(() => {
@@ -159,14 +130,9 @@ export function PaneLayout({
       // than a guessed pixel constant, so density / font changes flow
       // through automatically.
       const headerPx = headerEl?.offsetHeight ?? CTX_HEADER_HEIGHT_PX;
-      // `contentRef` is on a naturally-sized wrapper INSIDE the
-      // scroll container. `scrollHeight` is the rows' actual height
-      // — independent of the Panel's current pixel height, which is
-      // what stops the slow-drag feedback loop.
-      // Total natural pane height = header + scroll-container padding
-      // + content. When collapsed the body isn't rendered so we fall
-      // back to the cached last-expanded value to keep the max-cap
-      // stable across collapse/expand cycles.
+      // `contentRef` is on a naturally-sized wrapper INSIDE the scroll container.
+      // `scrollHeight` is the rows' actual height — independent of the Panel's current
+      // pixel height, which is what stops the slow-drag feedback loop.
       const bodyPx = contentEl?.scrollHeight ?? 0;
       const fullPx = bodyPx > 0 ? headerPx + CTX_SCROLL_VPAD_PX + bodyPx : headerPx;
       if (!ctxState.collapsed && bodyPx > 0) {
@@ -207,21 +173,13 @@ export function PaneLayout({
     };
   }, [hasConversation, ctxState.collapsed]);
 
-  // The Details panel's collapsed size has to equal the SpanTabBar's
-  // pixel height in vertical layout so collapsing leaves the tab row
-  // flush at the drawer bottom — no trailing empty band. In horizontal
-  // layout the panel goes to 0 (fully hidden); a "Show details" button
-  // in the viz panel's tab row re-exposes it. react-resizable-panels
-  // only accepts percentages, so we measure the PanelGroup's actual
-  // size along the relevant axis and convert.
+  // The Details panel's collapsed size has to equal the SpanTabBar's pixel height in
+  // vertical layout so collapsing leaves the tab row flush at the drawer bottom — no
+  // trailing empty band.
   const vizDetailGroupRef = useRef<HTMLDivElement>(null);
   const [detailCollapsedSize, setDetailCollapsedSize] = useState<number>(6);
-  // In horizontal split, the detail panel has a pixel floor — `minSize`
-  // is a percentage in react-resizable-panels, so we measure the group's
-  // current width and convert. 200px keeps the chip rows / accordion
-  // sections legible even when the operator has yanked the divider as
-  // far right as possible. Vertical split doesn't need a pixel floor —
-  // there the panel always occupies the full drawer width.
+  // In horizontal split, the detail panel has a pixel floor — `minSize` is a percentage
+  // in react-resizable-panels, so we measure the group's current width and convert.
   const DETAIL_MIN_HORIZONTAL_PX = 200;
   const [detailMinSize, setDetailMinSize] = useState<number>(20);
   useEffect(() => {
@@ -253,12 +211,9 @@ export function PaneLayout({
     return () => observer.disconnect();
   }, [layout]);
 
-  // Whenever the measured `ctxMaxSize` shrinks below the Panel's
-  // current size — e.g., content got shorter, or the persisted
-  // autoSaveId restored a value from a wider state — clamp the Panel
-  // down. react-resizable-panels' `maxSize` prop is enforced on drag
-  // but not always on rehydration / dynamic prop change, so this
-  // makes the cap stick.
+  // Whenever the measured `ctxMaxSize` shrinks below the Panel's current size — e.g., content got shorter, or the persisted autoSaveId
+  // restored a value from a wider state — clamp the Panel down. react-resizable-panels' `maxSize` prop is enforced on drag but not always
+  // on rehydration / dynamic prop change, so this makes the cap stick.
   useEffect(() => {
     const handle = ctxPanelRef.current;
     if (!handle) return;
@@ -278,13 +233,7 @@ export function PaneLayout({
     }
     if (!ctxState.collapsed && handle.isCollapsed()) {
       handle.expand();
-      // After expanding, snap to the actual content height. Layout
-      // settles over multiple frames — especially when we got here
-      // via a tab switch (the ConversationContext subtree was just
-      // remounted), the first rAF can land on an intermediate size
-      // where only some rows have laid out. We re-measure across a
-      // few frames and bump the target up whenever the content turns
-      // out taller than what we previously resized to.
+      // After expanding, snap to the actual content height.
       const snap = (attempt: number) => {
         const h = ctxPanelRef.current;
         if (!h || h.isCollapsed()) return;
@@ -319,13 +268,7 @@ export function PaneLayout({
   // instead of `handle.expand()`'s library default (which could blow
   // the panel up to 60–70% on wide screens).
   const lastExpandedDetailSize = useRef<number | null>(null);
-  // Drive the library state from the store, defensively. Don't trust
-  // `handle.isCollapsed()` as the only signal — after a drag-past-min
-  // collapse the library can land in a hybrid state where the panel
-  // size is at `collapsedSize` but `isCollapsed()` returns false (or
-  // vice versa), and the next click on "Show details" then becomes
-  // a no-op. Compare the pixel size too: anything below the expected
-  // expanded floor is treated as "needs expanding".
+  // Drive the library state from the store, defensively.
   useEffect(() => {
     const handle = detailPanelRef.current;
     if (!handle) return;
@@ -361,12 +304,9 @@ export function PaneLayout({
       width="100%"
       minHeight={0}
       minWidth={0}
-      // No edge border here — the visible 1px separator lives in
-      // PaneResizeBar so the hover-to-blue affordance can paint over
-      // the entire separator without being obscured by an underlying
-      // panel border. Was: borderRightWidth/borderBottomWidth here
-      // (the panel border doubled with the bar line under the old
-      // overlay-based handle).
+      // No edge border here — the visible 1px separator lives in PaneResizeBar so the
+      // hover-to-blue affordance can paint over the entire separator without being
+      // obscured by an underlying panel border.
       bg={{ base: "bg.surface", _dark: "bg.panel" }}
     >
       <IsolatedErrorBoundary
@@ -428,21 +368,9 @@ export function PaneLayout({
       ? `${PANE_GROUP_STORAGE_PREFIX}:viz-detail:h`
       : `${PANE_GROUP_STORAGE_PREFIX}:viz-detail:v`;
 
-  // `width/height: 100%` instead of `flex: 1` — react-resizable-panels'
-  // `Panel` renders as `<div style="flex: <size> 1 0px">` with no
-  // `display: flex`, so a `flex: 1` child collapses to 0 height inside
-  // the body Panel of the ctx-body group. Explicit 100% works in both
-  // contexts (Flex parent in the no-ctx branch, plain Panel parent in
-  // the ctx branch).
-  // After the trace-view redesign the SpanDetail pane only mounts when
-  // a span is selected. With no selection the waterfall takes the full
-  // pane width — the user gets a clean, distraction-free trace view
-  // until they ask for a specific span. Clicking any span flips
-  // `selectedSpanId`, which re-mounts the PanelGroup with the detail
-  // half attached. `react-resizable-panels` recreates its sizing state
-  // on every children-shape change, so we vary `autoSaveId` between
-  // the two shapes to keep saved sizes separate for each mode and
-  // avoid silently inheriting widths from one into the other.
+  // `width/height: 100%` instead of `flex: 1` — react-resizable-panels' `Panel` renders
+  // as `<div style="flex: <size> 1 0px">` with no `display: flex`, so a `flex: 1` child
+  // collapses to 0 height inside the body Panel of the ctx-body group.
   const hasSpanSelection = selectedSpanId != null;
   const vizDetailGroup = (
     <Box
@@ -465,14 +393,8 @@ export function PaneLayout({
             {vizPanel}
           </Panel>
           <PanelResizeHandle
-            // `hitAreaMargins` extends the library's own pointer
-            // hit-area (and cursor coverage) past the visible handle.
-            // Using the library's mechanism instead of our own overlay
-            // ensures one cursor across the whole drag zone — our old
-            // overlay used `col-resize`/`row-resize` while the library
-            // forces `*{cursor: ew-resize !important}` globally inside
-            // its hit area, which read as two different cursors in
-            // adjacent slivers.
+            // `hitAreaMargins` extends the library's own pointer hit-area (and cursor
+            // coverage) past the visible handle.
             hitAreaMargins={{ coarse: 15, fine: 8 }}
           >
             <PaneResizeBar orientation={layout} />
@@ -491,12 +413,9 @@ export function PaneLayout({
             // state lands exactly on the SpanTabBar height — no trailing
             // empty band below the tab row.
             collapsedSize={detailCollapsedSize}
-            // Library-driven collapse/expand mirrors the store so a
-            // drag past `minSize` is the SAME state as clicking the
-            // "Hide details" button: the pane disappears AND the
-            // "Show details" affordance on the viz tab row appears.
-            // Without these the chevron / button wouldn't show because
-            // the store still thought the pane was expanded.
+            // Library-driven collapse/expand mirrors the store so a drag past `minSize`
+            // is the SAME state as clicking the "Hide details" button: the pane
+            // disappears AND the "Show details" affordance on the viz tab row appears.
             onCollapse={() => {
               if (!useDrawerStore.getState().paneState.spanDetail.collapsed) {
                 togglePaneCollapsed("spanDetail");
@@ -553,24 +472,13 @@ export function PaneLayout({
             id="ctx"
             order={1}
             defaultSize={ctxState.collapsed ? ctxCollapsedSize : ctxMaxSize}
-            // `minSize` is the floor in the EXPANDED state. Setting
-            // it strictly above `collapsedSize` gives the library a
-            // clean snap region — dragging into the gap between the
-            // two snaps to collapsedSize (firing onCollapse), instead
-            // of leaving the pane parked at some sub-header height
-            // that the chevron can't reconcile.
+            // `minSize` is the floor in the EXPANDED state.
             minSize={Math.max(ctxCollapsedSize + 4, 12)}
             maxSize={ctxMaxSize}
             collapsible
             collapsedSize={ctxCollapsedSize}
-            // Library-driven collapse/expand fires when the operator
-            // drags the divider across the `collapsedSize` threshold.
-            // Without these the drag-to-resize gesture would update
-            // the Panel's pixel size but leave the store stuck on the
-            // pre-drag state — the chevron would say "open" while the
-            // pane was collapsed, and the next chevron click would
-            // appear to no-op (it's "already" in the state the store
-            // thinks it should reach).
+            // Library-driven collapse/expand fires when the operator drags the divider
+            // across the `collapsedSize` threshold.
             onCollapse={() => {
               if (!useDrawerStore.getState().paneState.conversationContext.collapsed) {
                 togglePaneCollapsed("conversationContext");
@@ -597,31 +505,14 @@ export function PaneLayout({
 }
 
 /**
- * The visible separator between two panels AND the drag hit zone in a
- * single element — no pseudo-elements, no nested layers. The element
- * is the line: 1px wide (or tall) `border`, an outer transparent strip
- * that's wider so the cursor target is forgiving. Cursor lives on the
- * outer Box so there's exactly one "I'm a divider" hit reported by the
- * browser, no matter where the user lands inside the strip.
- */
-/**
- * Visible 1px separator. The hit zone + cursor are handled by
- * `PanelResizeHandle` itself via `hitAreaMargins` — no transparent
- * overlay needed. The line lights up blue on hover/drag using the
- * library-set `data-resize-handle-state` attribute on the parent
- * (values: `hover` | `drag` | `inactive`), so the user gets a clear
- * "this is grabbable" affordance matching the waterfall surface.
+ * The visible separator between two panels AND the drag hit zone in a single element — no pseudo-elements, no nested layers.
  */
 function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
   const isHorizontal = orientation === "horizontal";
   return (
-    // Single 1px element that IS the visible separator — claiming
-    // exactly 1px of layout space is cheaper and more reliable than
-    // a 0-area parent with a sub-pixel absolutely-positioned child
-    // (which rounded to 0px in some browsers, making the separator
-    // disappear in spots). The hit area is handled by the
-    // PanelResizeHandle's `hitAreaMargins` — this Box only needs to
-    // be a visible 1px line.
+    // Single 1px element that IS the visible separator — claiming exactly 1px of layout space is cheaper and
+    // more reliable than a 0-area parent with a sub-pixel absolutely-positioned child (which rounded to 0px in
+    // some browsers, making the separator disappear in spots).
     <Box
       width={isHorizontal ? "1px" : "100%"}
       height={isHorizontal ? "100%" : "1px"}

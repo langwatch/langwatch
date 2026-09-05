@@ -1,10 +1,6 @@
 /**
- * The geometry behind the home page's send: where the travelling composer
- * starts, where it has to land, and the warm mass that rides behind it.
- *
- * Kept out of the hook and out of React so the arithmetic can be tested
- * without a panel, a page or a browser.
- *
+ * The geometry behind the home page's send: where the travelling composer starts, where
+ * it has to land, and the warm mass that rides behind it.
  * Spec: specs/home/langy-home-morph.feature
  */
 
@@ -53,18 +49,6 @@ export function midpointRect(origin: MorphRect, destination: MorphRect): MorphRe
 
 /**
  * Read an element's rect as if the panel around it were at rest.
- *
- * The panel stays MOUNTED when closed — closing is a transform, not an
- * unmount — so its layout box is already the open one and only the transform
- * is in the way. Measuring straight through that transform is the documented
- * hazard: the docked panel is pushed a full panel-width to the right, and the
- * floating one carries a scale as well, so a rect read while closed describes
- * somewhere the composer will never be.
- *
- * So neutralise the transform for exactly one read and put it back. Framer
- * owns that inline style and rewrites it on its next frame, so the restore is
- * belt and braces rather than the thing that keeps it correct: what matters is
- * that nothing paints in between, and nothing can, because this is synchronous.
  */
 export function readRectAtRest(element: HTMLElement): MorphRect {
   const panelRoot = element.closest<HTMLElement>(`[${PANEL_ROOT_ATTR}]`);

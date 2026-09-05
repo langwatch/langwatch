@@ -21,22 +21,8 @@ type ApplyServerVersion = (update: {
 }) => void;
 
 /**
- * True when this tab's own save is going to settle the version it just heard
- * about, so the signal is not news and acting on it only gets in the way.
- *
- * A save in flight is usually the very write the signal announces, and its
- * response carries the truth: the new version, or the stale error. Unsaved
- * edits mean a save is on its way for the same reason — autosave arms on every
- * change. Bannering instead of waiting told the reader their work clashed with
- * "somewhere else" while Langy was driving THIS tab, seconds before their own
- * save landed and settled it.
- *
- * An autosave that ERRORED is the case where nothing is coming. A failed
- * attempt schedules no retry, so the workbench stays dirty with no answer on
- * the way, and treating that as "wait" would leave the tab silent for as long
- * as the reader makes no further edit. Once autosave has stood down the signal
- * is the only word there is, whether it stood down on an error or on a refusal
- * (which stands it down and marks the workbench stale).
+ * True when this tab's own save is going to settle the version it just heard about, so
+ * the signal is not news and acting on it only gets in the way.
  */
 function thisTabWillAnswerFirst(isDirty: boolean): boolean {
   const state = useEvaluationsV3Store.getState();
@@ -75,9 +61,6 @@ const rememberMissedVersion = ({
 
 /**
  * What the page does about a version somebody else announced.
- *
- * `ignore` covers two different reasons to do nothing: the version is not
- * newer than the one held, or this tab is about to write a newer one itself.
  */
 type VersionAction = "ignore" | "adopt" | "banner" | "remember" | "reload";
 
@@ -109,10 +92,6 @@ const decideVersionAction = ({
 
 /**
  * Pulls, then runs the rule again over whatever was announced while it ran.
- *
- * Running the rule again rather than reloading outright: the pull that just
- * finished may already carry the newer version, and the workbench may have
- * gone dirty while it ran.
  */
 const pullThenApplyMissed = async ({
   serverVersion,
@@ -136,25 +115,12 @@ const pullThenApplyMissed = async ({
 
 /**
  * True when this page started the run that wrote the version.
- *
- * That run's bump is the one write carrying nothing the page does not already
- * have, so the page takes the version instead of reading it as a stranger's.
  */
 const isOwnRunVersion = (runId: string | undefined): boolean =>
   Boolean(runId && useEvaluationsV3Store.getState().runsStartedHere?.includes(runId));
 
 /**
  * Takes a version this page's own run wrote, and carries on saving.
- *
- * A run writes its cells into the saved state, which advances the counter. The
- * page already holds every cell that run produced, because it streamed them, so
- * there is nothing to reload and nothing to warn about. What there IS is the
- * reader's other edits, still inside the autosave debounce: treating this bump
- * as somebody else's write stands autosave down and loses them.
- *
- * Taking the version is the part that matters. A page that only skipped the
- * warning would keep sending the version it had, and the next save would be
- * refused for exactly the same reason one save later.
  */
 const adoptOwnRunVersion = (serverVersion: number): void => {
   const store = useEvaluationsV3Store.getState();
@@ -169,11 +135,6 @@ const adoptOwnRunVersion = (serverVersion: number): void => {
 
 /**
  * Pulls the server state in, swallowing the failure.
- *
- * No one asked for this pull, so nothing is lost when it fails and a toast
- * would interrupt the user for work they did not start. The page keeps the
- * version it has, and the next update signal or the next time the tab becomes
- * visible tries again.
  */
 const pullQuietly = async ({
   reload,
@@ -216,14 +177,7 @@ const useApplyServerVersion = ({
   reloadRef.current = reloadFromServer;
   const reloadingRef = useRef(false);
   /**
-   * The newest version announced while a reload was already running, and who
-   * wrote it.
-   *
-   * One agent turn that duplicates a target, writes its prompt and runs it is
-   * three saves in a row. Dropping the later signals outright left the page on
-   * whatever the in-flight fetch happened to bring back: if it had left the
-   * server before the new target was written, the page never learned that
-   * target existed and its cells read "No output yet" until a manual reload.
+   * The newest version announced while a reload was already running, and who wrote it.
    */
   const missedRef = useRef<MissedVersion | undefined>(undefined);
 
@@ -278,10 +232,6 @@ const useApplyServerVersion = ({
 
 /**
  * The broadcast payload, or undefined when the frame is not one to act on.
- *
- * The frame arrives as a string on some transports and as an object on others,
- * and a frame this page does not understand is not a failure worth reporting:
- * the next signal, or the next time the tab becomes visible, tries again.
  */
 const parseUpdateSignal = (event: unknown): ExperimentUpdateSignal | undefined => {
   if (!event) return undefined;
@@ -372,10 +322,6 @@ const useVisibilityVersionProbe = ({
 /**
  * Keeps an open workbench current with the server (specs/langy/
  * langy-ui-actions-fallback.feature).
- *
- * Two signals feed the same rule: the `experiment_updated` broadcast (a save
- * landed, whoever wrote it) and a version probe when the tab becomes visible
- * again.
  */
 export function useWorkbenchUpdateListener({
   projectId,

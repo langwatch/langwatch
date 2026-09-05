@@ -1,10 +1,6 @@
 /**
- * The one dialog that names a test suite, opened from the rail, from the name
- * above the scenarios table and from the day-zero empty state.
- *
- * It is one dialog and not two because creating and renaming ask the same
- * question. Which of the two it is reads off the suite it was opened on.
- *
+ * The one dialog that names a test suite, opened from the rail, from the name above the
+ * scenarios table and from the day-zero empty state.
  * @see specs/features/agent-testing/suites-rail.feature
  */
 

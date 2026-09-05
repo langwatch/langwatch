@@ -11,23 +11,9 @@ import {
 import { useVerboseRelativeTime } from "../../../../utils/use-relative-time";
 
 /**
- * Shared hover popover for the TIME / SINCE / TIMESTAMP columns. Surfaces
- * the same timestamp through every useful lens so users don't have to
- * switch columns to see "how long ago" vs "wall-clock" vs "ISO for log
- * queries":
- *
- *   - Verbose relative ("3 days ago") — dominant headline
- *   - Local / UTC / ISO as a tidy horizontal label→value grid
- *   - Day of week + IANA zone footer (supporting metadata)
- *
- * Read-only — the columns themselves (Time / Since / Timestamp) are the
- * format choice; the card surfaces every form at once, it doesn't switch
- * anything.
- *
- * Modelled on `TracePreviewHoverCard` so it inherits the same open/close
- * delay + portal/positioner contract. Children render as the trigger;
- * `placement` defaults to bottom-start because most time cells live in
- * the leftmost column.
+ * Shared hover popover for the TIME / SINCE / TIMESTAMP columns. Surfaces the same
+ * timestamp through every useful lens so users don't have to switch columns to see "how
+ * long ago" vs "wall-clock" vs "ISO for log queries":
  */
 interface TimeHoverCardProps {
   timestamp: number;
@@ -59,12 +45,9 @@ export const TimeHoverCard: React.FC<TimeHoverCardProps> = ({
             background="bg.panel"
             boxShadow="lg"
             overflow="hidden"
-            // Trap clicks/mousedown inside the popover so selecting
-            // timestamp text to copy doesn't bubble up to the row's click
-            // handler and open the trace drawer. The hover card sits over
-            // the cell which is inside a clickable `<tr>` — without these
-            // stop-prop handlers any interaction inside the card pops the
-            // drawer open the moment the user lets go.
+            // Trap clicks/mousedown inside the popover so selecting timestamp text to
+            // copy doesn't bubble up to the row's click handler and open the trace
+            // drawer.
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -77,13 +60,9 @@ export const TimeHoverCard: React.FC<TimeHoverCardProps> = ({
 };
 
 /**
- * Body content. Hierarchy:
- *   1. Relative time — the dominant headline (why the user opened this)
- *   2. Local / UTC / ISO label→value grid (reference, secondary)
- *   3. Day-of-week + zone footer (quiet supporting metadata)
- *
- * The verbose-relative header re-renders precisely at the next minute /
- * hour / day boundary via `useVerboseRelativeTime` — no 1Hz polling.
+ * Body content. Hierarchy: 1. Relative time — the dominant headline (why the user
+ * opened this) 2. Local / UTC / ISO label→value grid (reference, secondary) 3.
+ * Day-of-week + zone footer (quiet supporting metadata)
  */
 const TimeHoverCardBody: React.FC<{ timestamp: number }> = ({ timestamp }) => {
   const viewerZone = resolveViewerTimeZone();
@@ -148,12 +127,7 @@ const TimeHoverCardBody: React.FC<{ timestamp: number }> = ({ timestamp }) => {
 };
 
 /**
- * Single label→value row in the timestamp grid. The label sits in a
- * fixed-width column so all values left-align cleanly — this is the key
- * change from the old stacked-vertically style, which repeated the
- * ALL-CAPS micro-label treatment three times in a row and made the block
- * feel noisy. Horizontal alignment reads as a table, which is exactly
- * what it is.
+ * Single label→value row in the timestamp grid.
  */
 const Row: React.FC<{ label: string; value: string; mono?: boolean }> = ({
   label,

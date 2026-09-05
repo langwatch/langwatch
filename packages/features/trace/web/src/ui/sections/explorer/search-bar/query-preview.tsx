@@ -16,11 +16,8 @@ interface Segment {
 }
 
 /**
- * Renders a query string with the same coloured token decoration used by the
- * live search bar — keeps the docs and the editor visually in lockstep.
- *
- * Reuses `buildDecorationPlan` from the editor's highlight extension so the
- * docs can never drift from what `liqe` actually parses.
+ * Renders a query string with the same coloured token decoration used by the live
+ * search bar — keeps the docs and the editor visually in lockstep.
  */
 export const QueryPreview: React.FC<QueryPreviewProps> = ({ query, size = "sm" }) => {
   const segments = useMemo(() => buildSegments(query), [query]);

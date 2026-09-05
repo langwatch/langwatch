@@ -11,14 +11,9 @@ import {
 import { useLangyStore } from "../../../../../index";
 
 /**
- * The inspector's tape: four lanes on one ring, recorded only while armed, and
- * a REPLAY of the durable lane through the shared reducers — the scrubber's
- * "fold at that moment" is exactly this function over a tape prefix.
- *
- * Every record is stamped with its conversation at record time — its own
- * attribution when it carries one, the store's active conversation otherwise —
- * so the drawer can scope its VIEWS to the open conversation while the ring
- * keeps recording globally.
+ * The inspector's tape: four lanes on one ring, recorded only while armed, and a REPLAY
+ * of the durable lane through the shared reducers — the scrubber's "fold at that
+ * moment" is exactly this function over a tape prefix.
  */
 
 const turnAccepted = (id: string, createdAt: number) => ({

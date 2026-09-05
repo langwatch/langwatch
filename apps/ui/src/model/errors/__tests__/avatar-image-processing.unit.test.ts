@@ -93,13 +93,9 @@ describe("avatar upload refusals", () => {
   describe("when the caller changes their photo too often", () => {
     /** @scenario Changing the photo too often is refused with a wait, not an unknown error */
     it("reads as a wait rather than the generic unknown state", () => {
-      // Through `serialize()`, because the serialised form is the only one a
-      // client ever sees — a live `HandledError` carries `reasons` as `Error`s
-      // and never reaches the browser. Building it from the real class rather
-      // than a literal keeps the class in the assertion: a typo in its `code`
-      // fails here instead of quietly degrading to the unknown state in front
-      // of a customer. `tips` and `docsUrl` are optional on the wire and
-      // required on the shape, so absent becomes empty.
+      // Through `serialize()`, because the serialised form is the only one a client
+      // ever sees — a live `HandledError` carries `reasons` as `Error`s and never
+      // reaches the browser.
       const wire = new UserAvatarRateLimitedError().serialize();
       const explained = explainHandledError({
         code: wire.code,

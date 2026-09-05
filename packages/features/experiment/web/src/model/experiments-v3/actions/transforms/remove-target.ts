@@ -5,9 +5,6 @@ import type { Transform } from "./types";
 
 /**
  * A removed target must also leave every comparison that names it as a variant.
- * A phantom variant renders nothing in the comparison form, so there is no way
- * to drop it from the UI, and the orchestrator then resolves zero cells for
- * that comparison forever with no error anywhere.
  */
 const dropVariant = <T extends { comparison?: { variants: string[] } }>({
   carrier,
@@ -28,12 +25,8 @@ const dropVariant = <T extends { comparison?: { variants: string[] } }>({
 
 /**
  * Remove a target and every reference to it: its own column, its bucket in each
- * evaluator's mappings, any other target's mapping that read its output, and
- * its slot in any comparison.
- *
- * An id the workbench does not hold is refused rather than reported as a
- * removal, so a caller that misnamed a column learns it instead of reading
- * "the column is gone" and moving on.
+ * evaluator's mappings, any other target's mapping that read its output, and its slot
+ * in any comparison.
  */
 export const removeTarget: Transform<RemoveTargetPayload, { targetId: string }> = ({
   state,

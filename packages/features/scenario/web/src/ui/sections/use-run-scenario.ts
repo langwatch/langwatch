@@ -41,15 +41,6 @@ interface RunScenarioParams {
 
 /**
  * Builds the way out that opens a finished run.
- *
- * Returns undefined when there is no run to open, and when the caller supplied
- * no `onRunFailed` handler — a button that does nothing when clicked is worse
- * than no button. `ScenarioFormDrawer` is such a caller.
- *
- * `run` rather than `onClick`, which is the shape `ScenarioFailureNotice.action`
- * takes: two of the three outcomes below are failures and report through the
- * host, and only the third — a run that finished and did not pass — is a toast
- * this file raises itself.
  */
 function buildViewRunAction({
   label,
@@ -74,19 +65,6 @@ function buildViewRunAction({
 
 /**
  * Reports a poll result that is not a success.
- *
- * The three cases are genuinely different events, and saying so is the point of
- * this module: a run that did not pass produced an outcome, a run that errored
- * produced nothing, and a timeout means nothing became visible at all. Lives
- * outside the hook so the run callback stays about running the scenario.
- *
- * ONE OUTCOME, TWO CHANNELS, and the split is the distinction above rather than
- * a compromise. A run that finished and did not pass is a RESULT: no error
- * framing, and the feedback port has nothing to say it with — `succeeded` and
- * `failed` are its two channels and neither means "it finished, and the answer
- * was no". So that one stays a `warning` notice raised here. The other two are
- * failures, and go through the host, where they pick up the application's copy
- * rules, its duration and its trace id.
  */
 function reportRunOutcome({
   result,
@@ -195,14 +173,7 @@ export function useRunScenario({
 
         setIsPolling(true);
         const result = await pollForScenarioRun({
-          // The poll asks for the same input up to 60 times over 30s. Under the
-          // app-wide staleTime (30_000, see utils/api.tsx) every call after the
-          // first would be answered from the first one's cached result, so the
-          // loop would never see the run start and would always time out.
-          // retry:false is equally load-bearing — fetchQuery only defaults
-          // retry off when it is undefined, and the app defines it globally, so
-          // one failing request would otherwise burn the entire budget on
-          // backoff inside a single attempt.
+          // The poll asks for the same input up to 60 times over 30s.
           fetchBatchRunData: (pollParams) =>
             utils.scenarios.getBatchRunData.fetch(pollParams, {
               staleTime: 0,

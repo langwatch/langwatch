@@ -3,30 +3,8 @@ import * as path from "path";
 import { chromium } from "playwright";
 
 /**
- * Captures the 5 IngestionTemplate v1 docs screenshots end-to-end against a
- * running dev stack (http://localhost:5560). Saves PNGs to
- * `~/Projects/pr-screenshots/ingestion-templates/` (the shared image-hosting
- * repo); push from there to update Mintlify references.
- *
- * Prerequisites:
- *   1. Dev stack running: `make quickstart`
- *   2. e2e/auth.json exists — run `npx tsx e2e/save-auth-state.ts` once
- *      to capture rogerio's session interactively (or any persona that has a
- *      personal project + at least one IngestionTemplate binding installed
- *      with traces visible at /me/traces).
- *   3. The persona has clicked Connect on at least claude_code so the install
- *      drawer can be re-opened to capture Surface 3 (or uninstall first to
- *      capture the empty drawer state).
- *
- * Usage:
- *   npx tsx apps/ui/e2e/capture-ingestion-templates-screenshots.ts
- *
- * Output (5 files):
- *   - me-settings-personal-otlp-panel.png
- *   - me-trace-ingest-tile-grid.png
- *   - me-install-drawer-claude-code.png
- *   - me-traces-claude-code-trace-detail.png
- *   - me-traces-detail-tokens-model-cost.png
+ * Captures the 5 IngestionTemplate v1 docs screenshots end-to-end against a running dev
+ * stack (http://localhost:5560).
  */
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5560";
 const OUTPUT_DIR =

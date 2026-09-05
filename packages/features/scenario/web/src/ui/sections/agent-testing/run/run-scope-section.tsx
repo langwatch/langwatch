@@ -1,12 +1,5 @@
 /**
  * What a run covers, asked only where it is actually being chosen.
- *
- * A run started from a scenario, a test suite or Run all already knows its
- * scope, so this block is drawn for the New run plan entry point alone.
- *
- * A scope is a rule rather than a list: a run scoped to test suites or to
- * labels picks up a scenario written tomorrow without being opened again.
- *
  * @see specs/suites/run-plan-dynamic-scopes.feature
  * @see specs/features/agent-testing/run-dialog.feature
  */

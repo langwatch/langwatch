@@ -18,10 +18,9 @@ import {
 } from "../../model/langy-wave-motion";
 
 /**
- * Draws the panel fold from Langy's activity, never pointer movement. Ambient
- * states ease through one motion vector; success, failure and status gestures
- * are bounded overlays. The animation runs only while active, and reduced
- * motion renders a static resting curve.
+ * Draws the panel fold from Langy's activity, never pointer movement. Ambient states
+ * ease through one motion vector; success, failure and status gestures are bounded
+ * overlays.
  */
 
 // Points sampled down the rope. More points = a smoother curve at more cost per
@@ -62,9 +61,8 @@ interface WaveState {
 
 /**
  * The OPEN seam curve — just the sampled line, threaded through a Catmull-Rom →
- * cubic-bezier conversion so the discrete samples read as one smooth line rather
- * than a polyline. Used for the stroked seam and the fibre pulse (which needs an
- * open path so its travelling dash never wanders onto the closing edges).
+ * cubic-bezier conversion so the discrete samples read as one smooth line rather than a
+ * polyline.
  */
 function ropeCurve(pts: RopePoint[]): string {
   const at = (i: number) => pts[Math.max(0, Math.min(pts.length - 1, i))]!;
@@ -94,14 +92,6 @@ function ropePath(pts: RopePoint[], w: number, h: number): string {
 
 /**
  * Build one frame of the rope from the smoothed motion vector.
- *
- * Absolute amplitudes stay small, but no longer so small that working states are
- * indistinguishable from rest. At full streaming energy the wind peaks around
- * 3% of the panel width and idle sits near a tenth of that: the resting fold is
- * still a shape you only notice breathing if you look for it, while a turn in
- * flight is unmistakably moving. The short component also runs a shorter
- * wavelength (11 vs 9) so high flutter reads as a WIGGLE rather than a second,
- * slower swell riding the first.
  */
 function sampleRope(
   w: number,
@@ -184,10 +174,9 @@ export function LangyWave({
    */
   statusActive: boolean;
   /**
-   * The narrow docked sidebar. The fold still reads fully — same seam, same
-   * fibre — but the broad tone fills over-power the tall empty column, so
-   * `compact` softens ONLY those fills (see `.langy-wave--compact`). The seam
-   * stays full-strength so the fold never reads as "switched off".
+   * The narrow docked sidebar. The fold still reads fully — same seam, same fibre — but
+   * the broad tone fills over-power the tall empty column, so `compact` softens ONLY
+   * those fills (see `.langy-wave--compact`).
    */
   compact?: boolean;
   reduceMotion: boolean;
@@ -237,12 +226,9 @@ export function LangyWave({
       fiberRef.current?.setAttribute("d", curve);
     };
 
-    // The seam glitter, drawn as a pulse of light travelling DOWN the fibre: a
-    // second copy of the seam stroked bright, with a single short dash (the
-    // pulse) and a long dark gap, its offset advanced each frame so the dash
-    // runs down the line. Opacity rides the eased glitter energy, so it blooms
-    // while a status label is up and fades to nothing at rest. `h + 120` is the
-    // seam's y-span (it overshoots the panel by 60px top and bottom).
+    // The seam glitter, drawn as a pulse of light travelling DOWN the fibre: a second
+    // copy of the seam stroked bright, with a single short dash (the pulse) and a long
+    // dark gap, its offset advanced each frame so the dash runs down the line.
     const FIBER_DASH = 42;
     const FIBER_PEAK = 0.5;
     const applyFiber = (h: number) => {
@@ -288,13 +274,8 @@ export function LangyWave({
       return () => resizeObserver.disconnect();
     }
 
-    // The rope reacts to Langy's ACTIVITY and nothing else: not the cursor, and
-    // — deliberately — not menus, popovers, selects or focus either. An earlier
-    // version slid the whole rope aside whenever an overlay opened (a leftover
-    // from the Split experiment); that read as the fold "reacting to the wrong
-    // thing" the instant a user opened a dropdown, so it's gone. Overlays portal
-    // onto <body>, above the panel, and simply sit over the quietly-drifting
-    // fold.
+    // The rope reacts to Langy's ACTIVITY and nothing else: not the cursor, and —
+    // deliberately — not menus, popovers, selects or focus either.
     let raf = 0;
     const tick = (now: number) => {
       const w = el.clientWidth;

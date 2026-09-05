@@ -41,11 +41,9 @@ type FormData = {
 };
 
 /**
- * Drawer for creating a new workflow-based agent.
- * Features:
- * - Creates a new workflow from the blank template
- * - Creates an agent linked to the new workflow
- * - Navigates to the workflow studio for editing
+ * Drawer for creating a new workflow-based agent. Features: - Creates a new workflow
+ * from the blank template - Creates an agent linked to the new workflow - Navigates to
+ * the workflow studio for editing
  */
 export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
   const { project } = useOrganizationTeamProject();

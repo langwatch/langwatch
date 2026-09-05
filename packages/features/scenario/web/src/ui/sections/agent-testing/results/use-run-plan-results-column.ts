@@ -1,8 +1,6 @@
 /**
- * The wiring behind the results column: permissions, view mode, cancellation,
- * export and the run dialog, plus the header line for the selected run and
- * the settings that run was started with.
- *
+ * The wiring behind the results column: permissions, view mode, cancellation, export and the run dialog, plus the
+ * header line for the selected run and the settings that run was started with.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
@@ -59,12 +57,6 @@ const NO_RUNS: ScenarioRunData[] = [];
 
 /**
  * What the settings row calls whoever started a run.
- *
- * The roster is asked for only when a name is actually wanted: a run the
- * reader started, one started through a key, and one with no person behind it
- * all name themselves. The query is the one the other non-admin member
- * pickers read, so the roster is usually already in cache.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 function useRunStartedByLabel(actor: RunActor | null): string | null {

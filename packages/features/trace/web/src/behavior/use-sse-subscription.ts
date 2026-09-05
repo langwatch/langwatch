@@ -3,12 +3,6 @@ import type { TRPCClientError } from "@trpc/client";
 import { useEffect, useRef, useState } from "react";
 /**
  * The router type a tRPC client error is typed by.
- *
- * `~/server/api/root`'s `AppRouter` is the application's mounted router and a
- * browser package may not name it — it does not exist until a process
- * instantiates it. Nothing below reads a procedure off the type: it is a phantom
- * parameter on `TRPCClientError`, so the loosest router shape tRPC accepts is
- * exactly as informative here and costs no import.
  */
 type AppRouter = any;
 

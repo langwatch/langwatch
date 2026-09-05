@@ -1,9 +1,6 @@
 /**
+ * The scenario dialog of the Agent Testing page: what it asks, what its footer holds, what its chips open, and what Save and Run does.
  * @vitest-environment jsdom
- *
- * The scenario dialog of the Agent Testing page: what it asks, what its
- * footer holds, what its chips open, and what Save and Run does.
- *
  * @see specs/features/agent-testing/cases-table.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

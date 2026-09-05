@@ -19,10 +19,6 @@ export type IOAction = {
 
 /**
  * The toolbar actions a panel offers, in render order.
- *
- * Each action keeps its real component mounted even while collapsed, so
- * popover wiring and permission gates live in one place and picking the
- * action out of the overflow menu clicks the same control.
  */
 function buildIOActions({
   translation,
@@ -97,11 +93,7 @@ function buildIOActions({
 }
 
 /**
- * Which annotation actions this reader gets, and where "Open in Playground"
- * points.
- *
- * The annotation gate mirrors AnchorCommentButton's own: writers always get
- * the action, readers only when there is something to read.
+ * Which annotation actions this reader gets, and where "Open in Playground" points.
  */
 function useIOActionGates({
   fieldAnchor,

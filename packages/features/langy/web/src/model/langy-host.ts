@@ -1,16 +1,5 @@
 /**
  * What the Langy dock asks of the application it is mounted in.
- *
- * ONE PORT FOR THE WHOLE FAMILY, the shape every family since governance has
- * written. Everything the dock used to read off `useOrganizationTeamProject`,
- * `useRouter`, `useRequiredSession` and the toaster arrives through these
- * methods, which is what let twenty-three thousand lines of Langy move with
- * their `api.langy.x.useQuery` call sites unchanged.
- *
- * `featureFlag` is here rather than on a hook of its own because the dock reads
- * three flags and each one is a tri-state: `undefined` means "not answered
- * yet", and a panel that flashed a capability off while the answer arrived
- * would be worse than one that waits.
  */
 
 import { createContext, useContext } from "react";
@@ -119,12 +108,6 @@ export function useOptionalLangyHost(): LangyHostPort | undefined {
 
 /**
  * The three universal scope tiers, as `langyMakeDefaultOffer` reads them.
- *
- * `~/server/scopes/scope.types` is the application's server-side contract for
- * the scope picker and carries a Zod schema a browser package has no use for.
- * The tier union is the only half this family reads, and it is stated here so
- * the offer's copy ("make this the default for the whole organization") stays
- * checked. See ADR-021 for why the storage enums stay per table.
  */
 export const SCOPE_TIERS = ["ORGANIZATION", "TEAM", "PROJECT"] as const;
 export type ScopeTier = (typeof SCOPE_TIERS)[number];

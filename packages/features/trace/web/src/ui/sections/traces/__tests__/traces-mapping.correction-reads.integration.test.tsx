@@ -1,12 +1,6 @@
 /**
+ * The reviewer's corrections are opt-in per read, and only the dataset path opts in.
  * @vitest-environment jsdom
- *
- * The reviewer's corrections are opt-in per read, and only the dataset path
- * opts in. The mapping reads the conversation behind the traces it is mapping
- * for its thread_* columns, so that read has to follow the traces it was handed
- * rather than always asking for corrections: an evaluator is set up against the
- * captured trace.
- * See specs/traces-v2/trace-edit-overlay.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";

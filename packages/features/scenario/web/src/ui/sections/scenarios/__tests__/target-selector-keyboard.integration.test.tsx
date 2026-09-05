@@ -1,9 +1,6 @@
 /**
+ * The agent rows of the target picker read to the keyboard: the Tab key reaches them and Enter picks the one that has the focus.
  * @vitest-environment jsdom
- *
- * The agent rows of the target picker read to the keyboard: the Tab key
- * reaches them and Enter picks the one that has the focus.
- *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

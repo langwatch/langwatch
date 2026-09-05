@@ -1,13 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the "events" field mapping dropdown in TracesMapping.
- *
- * Like spans and evaluations, it must offer every event type the project
- * tracked in the last 30 days, not just the ones on the currently loaded
- * trace(s). Event types come from a separate bounded source
- * (useProjectEventTypes, backed by the analytics event-type filter options),
- * which this test mocks. These tests render the real component tree.
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

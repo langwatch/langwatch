@@ -5,11 +5,7 @@ import {
 import type { EvalSummary } from "../../types/trace";
 
 /**
- * Per-status tag rendering for the Evals accordion cards. Sourced from
- * the shared evaluation-results maps so dot / tag colours can't drift
- * out of step with the trace-list `EvalChip`, the v2 drawer header
- * chip, or the v3 EvaluatorChip — three surfaces that all need to
- * agree on "this verdict reads as X".
+ * Per-status tag rendering for the Evals accordion cards.
  */
 function buildStatusTone(parsed: keyof typeof EVALUATION_STATUS_COLORS, label: string) {
   return {
@@ -51,20 +47,9 @@ export function isNoVerdict(status: EvalSummary["status"]): boolean {
 }
 
 /**
- * Whether the evaluator answered with a category and nothing else — a label,
- * no numeric score, no pass/fail. `langevals/llm_category` is the archetype:
- * it classifies ("resolved", "escalated") rather than judging.
- *
- * Such a run reaches the UI carrying a `pass` status and a score of `0`, both
- * of which are stand-ins the mapping invents for absent fields rather than
- * anything the evaluator reported. A card that shows them says the run passed
- * with a score of zero, which is untrue twice, and buries the category. So
- * these render as the category alone.
- *
- * `scoreType` is the discriminator rather than `score`, because by this point
- * `score` is one of those stand-ins: `scoreType` is derived from the raw
- * evaluation and is `categorical` exactly when it reported a label and neither
- * a number nor a verdict.
+ * Whether the evaluator answered with a category and nothing else — a label, no numeric
+ * score, no pass/fail. `langevals/llm_category` is the archetype: it classifies
+ * ("resolved", "escalated") rather than judging.
  */
 export function isCategoryOnly(eval_: EvalEntry): boolean {
   return (

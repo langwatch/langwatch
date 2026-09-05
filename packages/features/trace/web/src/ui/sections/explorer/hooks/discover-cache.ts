@@ -1,18 +1,5 @@
 /**
  * Per-project cache of the last successful `tracesV2.discover` response.
- *
- * Keeps the facet sidebar useful from the first paint on every visit
- * after the first one — instead of seeding a "loading" sidebar with
- * synthesised defaults and then popping in real data 1–2 seconds later,
- * the sidebar renders the previous session's descriptors immediately
- * and quietly swaps in the live response once it lands.
- *
- * The cache is keyed by `projectId` and expires after {@link TTL_MS} so
- * a project whose schema has drifted (new evaluators added, attributes
- * deprecated) eventually shows the real shape rather than stale data
- * forever. Cleared completely if the localStorage payload won't parse
- * — better to fall through to the live query than crash on a corrupt
- * persisted state.
  */
 import type { RouterOutputs } from "../../trace-api";
 

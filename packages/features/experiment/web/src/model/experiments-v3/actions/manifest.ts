@@ -41,15 +41,6 @@ import {
 
 /**
  * Every action the evaluations workbench exposes, in one table.
- *
- * Imported by the browser store and by the server executor, so it stays free of
- * anything either side cannot load: zod schemas, the pure transforms, and
- * types. No React, no zustand, no Prisma, no tRPC.
- *
- * `backend` says who carries the action out:
- * - "transform": the pure state transform named in `transform`.
- * - "read": answered from state, nothing is written.
- * - "run": handed to the execution pipeline.
  */
 export type WorkbenchActionBackend = "transform" | "read" | "run";
 
@@ -59,14 +50,6 @@ export type WorkbenchActionDefinition = {
   requiredPermission: AuthzPermission;
   /**
    * Wall-clock budget for one execution, claim window included.
-   *
-   * The transform itself is a pure state edit that finishes in microseconds,
-   * and these were once budgeted as such. A browser-handled action now SAVES
-   * before it answers, so the budget has to cover a round trip to the server,
-   * and one second did not: the dispatch gave up on an action the page had
-   * already carried out, the agent read the timeout as "it did not happen",
-   * and retrying left a second column beside the one that was made. A run is
-   * bounded by the evaluation pipeline instead.
    */
   executeBudgetMs?: number;
   backend: WorkbenchActionBackend;
@@ -74,10 +57,8 @@ export type WorkbenchActionDefinition = {
 };
 
 /**
- * Writes gate on `experiments:update` — the workbench state is the experiment's
- * saved document. Reading gates on `experiments:view`. Starting a run gates on
- * `evaluations:create`, the same grain the experiments-v3 run route requires,
- * because a run spends provider budget rather than editing a document.
+ * Writes gate on `experiments:update` — the workbench state is the experiment's saved
+ * document. Reading gates on `experiments:view`.
  */
 export const WORKBENCH_ACTIONS = {
   "workbench.duplicateTarget": {

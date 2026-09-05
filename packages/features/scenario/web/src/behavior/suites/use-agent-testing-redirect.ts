@@ -1,12 +1,5 @@
 /**
  * Sends a simulations address to Agent Testing when the project reads it.
- *
- * A saved link, a link the scenario library printed before the project moved
- * to Agent Testing, or one an older CLI derived, all name the v1 page. With
- * the release flag on the project reads Agent Testing, so the v1 page sends
- * the reader to the Agent Testing address that shows the same thing instead
- * of rendering. With the flag off nothing changes.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { useEffect } from "react";

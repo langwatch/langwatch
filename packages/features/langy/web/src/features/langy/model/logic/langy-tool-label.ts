@@ -4,29 +4,6 @@ import { resolveCapabilityProgress } from "../capabilities/capability-registry";
 
 /**
  * What a tool call is DOING, in human words.
- *
- * ── THE BUG THIS EXISTS TO KILL ────────────────────────────────────────────
- * The cards used to be labelled from the tool's TYPE. So a call to opencode's
- * `skill` tool rendered a card that said "SKILL / Skill", and a `bash` call
- * running `langwatch trace search` rendered "BASH / Coding…". Both are the same
- * mistake twice: the name of the mechanism where the name of the ACT belongs.
- * Neither told the user anything, and "Coding" was not even true.
- *
- * The intent was never in the tool's name. It was always one field down, in its
- * INPUT — the command, the skill, the path. So that is what we read.
- *
- * ── THE NORMALISATION THAT MAKES THE WHOLE KIT WORK ────────────────────────
- * The server's CLI envelope rewrites `bash("langwatch trace search")` to the
- * typed name `langwatch.trace.search`, but only on the DURABLE event. The tool
- * part the browser streams is still a bare `bash`. That is why capability cards
- * were not rendering either: nothing downstream could see that the shell call
- * WAS a trace search.
- *
- * `effectiveToolName` closes that gap client-side, before anything else looks at
- * the frame. A shell call carrying a LangWatch command becomes the command it
- * is, and then every existing mapping — the capability registry, the pending
- * card, the settled card — lights up on its own. One normalisation, not a
- * special case per surface.
  */
 
 /** Tool names that mean "run a shell command" (mirrors the server's envelope). */
@@ -55,14 +32,6 @@ export function shellCommandOf(name: string, input: unknown): string | undefined
 
 /**
  * The command an input carries, whatever the call is NAMED.
- *
- * A LangWatch call reaches the panel under two names: live it is still
- * `bash("langwatch trace search …")`, and durably the server envelope has
- * renamed it `langwatch.trace.search`. Only the name changes, and both keep the
- * command in their input. Reading the input rather than the name is what keeps
- * a replayed turn as specific as the live one: without it, a reopened
- * conversation showed two `langwatch trace search` calls as two identical
- * "Searched traces" rows, and which one returned nothing was unanswerable.
  */
 export function commandOf(input: unknown): string | undefined {
   return readString(input, COMMAND_KEYS);
@@ -70,10 +39,6 @@ export function commandOf(input: unknown): string | undefined {
 
 /**
  * The name a tool frame should be TREATED as.
- *
- * A shell call running a LangWatch CLI command is not a shell call — it is that
- * capability, and the rest of the kit already knows how to draw it. Everything
- * else keeps its own name.
  */
 export function effectiveToolName(name: string, input: unknown): string {
   const command = shellCommandOf(name, input);
@@ -161,26 +126,6 @@ function humanize(name: string): string {
 
 /**
  * The one line of a skill's description that belongs on a card.
- *
- * A skill's `description` frontmatter is written for two readers at once: the
- * public skill directory, and the model deciding whether to route to it. So it
- * runs to several sentences and typically ends with an instruction aimed
- * squarely at the agent —
- *
- *   "Deep-dive diagnosis of how your AI agent behaves in production. Explores
- *    LangWatch analytics and traces end to end to map failure patterns,
- *    dissatisfied users, token cost hotspots, edge cases, behavior changes, and
- *    outliers, then delivers an HTML report where every finding links to real
- *    example traces. Use when you want to truly understand what your agent is
- *    doing in production."
- *
- * Dropped whole into a 400px panel that is three lines of paragraph above the
- * answer the user actually asked for, and its last sentence is routing guidance
- * for the model being shown to a human. Cards get the first sentence, and never
- * a "Use when…" clause.
- *
- * The catalogue's `summary` is deliberately left intact — the `/` palette shows
- * the full description, which is exactly where the long form belongs.
  */
 export function skillCardDetail(summary: string): string | undefined {
   const trimmed = summary.trim();

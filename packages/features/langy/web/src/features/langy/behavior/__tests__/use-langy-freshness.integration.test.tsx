@@ -1,17 +1,7 @@
 /**
+ * Snapshot-then-fold-the-tail (ADR-059 §2/§3) driven through the REAL coordinator: the Zustand store, the shared `@langwatch/langy` reducers and the dev log all run for real — only the tRPC
+ * boundary (`langy.conversationEventsAfter`, `langy.messages`) and the SSE listener are mocked, which is what makes these integration tests rather than unit tests.
  * @vitest-environment jsdom
- *
- * Snapshot-then-fold-the-tail (ADR-059 §2/§3) driven through the REAL
- * coordinator: the Zustand store, the shared `@langwatch/langy` reducers and
- * the dev log all run for real — only the tRPC boundary
- * (`langy.conversationEventsAfter`, `langy.messages`) and the SSE listener are
- * mocked, which is what makes these integration tests rather than unit tests.
- *
- * What they protect is the contract between a signal's cursor and the local
- * fold's position. The signal carries NO conversation content, so the client
- * has to decide from cursors alone what it is missing, fetch exactly that, and
- * fold it exactly once — whether it is opening cold, was mid-load, dropped a
- * signal, got a whole burst as one signal, or was away entirely.
  */
 import {
   LANGY_CONVERSATION_EVENT_TYPES,

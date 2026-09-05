@@ -293,12 +293,8 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
   });
 
   describe("regex fallback — comparison-range alternative", () => {
-    // The regex fallback fires when liqe's parser fails (mid-typing,
-    // dangling AND, unmatched paren). Without the comparison-range
-    // alternative, typing `duration:>1000 AND` left the comparison
-    // token unhighlighted, so users saw the numeric facet "stop
-    // working" mid-edit. These tests exercise the fallback path
-    // specifically by giving it queries that don't parse.
+    // The regex fallback fires when liqe's parser fails (mid-typing, dangling AND,
+    // unmatched paren).
     it("recognises `duration:>1000 AND` (regex fallback) as a single token", () => {
       const plan = buildDecorationPlan("duration:>1000 AND");
       const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
@@ -333,14 +329,8 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
 
   describe("operator matrix — range form (KNOWN BUG)", () => {
     it("`cost:[1 TO 10]` decoration is BROKEN — liqe's Tag.location for ranges starts at `[` and has no `end`", () => {
-      // KNOWN BUG: liqe gives a Tag-with-RangeExpression a location of
-      // `{ start: 5 }` (the `[` offset) with NO `end` field. The
-      // highlighter reads `tag.location.end` directly and produces a
-      // decoration of `{ from: 5, to: NaN }` — visually nothing renders,
-      // OR the chip extends to end-of-doc depending on the browser.
-      // Pinned so we notice if liqe ever fixes this OR we add a
-      // workaround in walkAst (e.g. `tag.expression.location.end` for
-      // RangeExpression). The widget tokens have the same defect.
+      // KNOWN BUG: liqe gives a Tag-with-RangeExpression a location of `{ start: 5 }`
+      // (the `[` offset) with NO `end` field.
       const plan = buildDecorationPlan("cost:[1 TO 10]");
       const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots).toHaveLength(1);
@@ -434,15 +424,9 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
   });
 
   describe("partial typing — chip evolution one keystroke at a time", () => {
-    // Pin the per-keystroke decoration plan as a user types `status:error`.
-    // Each step is what the editor would render BETWEEN keystrokes — used
-    // by the user to decide whether to keep typing. If any of these change,
-    // the SearchBar's typing UX changes too.
-    //
-    // NB: liqe parses `status:` as a Tag with EmptyExpression — so a chip
-    // appears as soon as the colon lands, even though there's no value
-    // yet. The widget's `data-value` is omitted (value: null). The user
-    // sees a half-built chip while typing the value.
+    // Pin the per-keystroke decoration plan as a user types `status:error`. Each step
+    // is what the editor would render BETWEEN keystrokes — used by the user to decide
+    // whether to keep typing.
     it.each([
       // [partial input, expected token slots, expected widgets]
       ["s", 0, 0],

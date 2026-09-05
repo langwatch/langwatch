@@ -1,13 +1,5 @@
 /**
- * VersionHistoryButton - the workbench's version history, anchored to its own
- * button.
- *
- * Sits beside the results button in the workbench header. The history is a
- * short list a reader checks and leaves, so it opens as a popover on the
- * button rather than as a drawer over the workbench: the setup the versions
- * describe stays on screen behind it, and closing it costs nothing. The list
- * scrolls inside the popover, so a long history never pushes the popover past
- * the window.
+ * VersionHistoryButton - the workbench's version history, anchored to its own button.
  */
 import { Button, Text } from "@chakra-ui/react";
 import { History } from "lucide-react";

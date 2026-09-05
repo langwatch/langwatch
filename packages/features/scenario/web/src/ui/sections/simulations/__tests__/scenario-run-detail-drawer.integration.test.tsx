@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The wide run detail drawer: the judge results beside the conversation when
- * the window allows, stacked under it when it does not, and the version the
- * run used in the header. The classic drawer stays as it is.
- *
- * @see specs/features/agent-testing/side-by-side-run-drawer.feature
- * @see specs/scenarios/scenario-version-on-runs.feature
- * @see specs/features/agent-testing/case-version-history.feature
+ * @see specs/features/agent-testing/side-by-side-run-drawer.feature, specs/scenarios/scenario-version-on-runs.feature,
+ *   specs/features/agent-testing/case-version-history.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen, within } from "@testing-library/react";

@@ -16,19 +16,6 @@ export function skeletonMessageCount(messageCount: number | null): number {
 
 /**
  * The shape of a conversation that has not arrived yet.
- *
- * Restoring is not the same as starting fresh: the panel remembered WHICH
- * conversation was open, so it knows before the messages land that there is
- * one. Rendering the empty state's "How can I help?" in that window painted an
- * invitation over a conversation the reader had already had, then swapped it
- * out a beat later — Langy looking like it had forgotten them. This holds the
- * column instead, in roughly the shape the messages will take: a narrow
- * question on the right, a wider answer on the left.
- *
- * `count` comes from the recents list's message count, so the placeholder
- * occupies about the space the real thread will and the card does not resize
- * underneath it. Decorative — `aria-hidden`, with the live region that
- * announces the loaded conversation left to do the talking.
  */
 export function ConversationSkeleton({ count, dense = false }: { count: number; dense?: boolean }) {
   const reduceMotion = useReducedMotion();

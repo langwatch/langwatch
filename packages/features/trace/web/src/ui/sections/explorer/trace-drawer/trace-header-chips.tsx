@@ -40,10 +40,6 @@ interface TraceHeaderChipsProps {
 
 /**
  * Renders the trace-drawer header chip strip.
- *
- * Pulls plain data from `useTraceHeaderChips` and turns it into `ChipDef[]`
- * with rendered tooltip JSX. Splitting keeps the hook in `.ts`-land
- * (CLAUDE.md: "Hooks return state and callbacks, never JSX").
  */
 export function TraceHeaderChips({
   trace,
@@ -64,10 +60,9 @@ export function TraceHeaderChips({
 }
 
 /**
- * Hook variant of `TraceHeaderChips`: returns the resolved `ChipDef[]` so
- * callers can inline-render alongside other content (e.g. unified context
- * strip in the drawer header) instead of being forced through `ChipBar`.
- * Always run `useAnnotationsChip` so hook order stays stable across renders.
+ * Hook variant of `TraceHeaderChips`: returns the resolved `ChipDef[]` so callers can
+ * inline-render alongside other content (e.g. unified context strip in the drawer
+ * header) instead of being forced through `ChipBar`.
  */
 export function useTraceHeaderChipDefs(
   trace: TraceHeader,
@@ -89,10 +84,8 @@ export function useTraceHeaderChipDefs(
 }
 
 /**
- * Header chip listing annotations on this trace + every other turn in the
- * same conversation. Hidden when there are zero. Click to peek at the list and
- * land in the Conversation view, where each annotation reads beside the turn
- * it is about and can be edited there.
+ * Header chip listing annotations on this trace + every other turn in the same
+ * conversation. Hidden when there are zero.
  */
 function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
   const conversation = useConversationTurns(trace.conversationId ?? null);
@@ -188,10 +181,9 @@ function buildChipDef(
 }
 
 /**
- * Combined service+origin chip. Primary value is the service name (the more
- * specific signal); origin is appended as a small caption. The popover
- * shows both with their own filter buttons so the trace table can be
- * scoped to either independently.
+ * Combined service+origin chip. Primary value is the service name (the more specific
+ * signal); origin is appended as a small caption. The popover shows both with their own
+ * filter buttons so the trace table can be scoped to either independently.
  */
 function buildServiceChipDef(data: Extract<TraceHeaderChipData, { kind: "service" }>): ChipDef {
   return {
@@ -542,10 +534,7 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
 }
 
 /**
- * Tiny inline "no verdict" badge for the eval chip's value slot. Matches
- * the visual language of the EvalCard's status tag (tinted bg, leading
- * icon, uppercase letter-spaced label) so the same status reads the same
- * way at every scale: chip → list pill → card header.
+ * Tiny inline "no verdict" badge for the eval chip's value slot.
  */
 function NoVerdictMicroBadge({ icon, label }: { icon: typeof LuCircleSlash; label: string }) {
   return (

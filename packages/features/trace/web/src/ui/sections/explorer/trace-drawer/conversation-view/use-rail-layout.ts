@@ -41,12 +41,8 @@ const WIDE_LAYOUT: RailLayout = {
 };
 
 /**
- * The rail's shape for a given pane width, biased towards keeping it beside
- * the turn: the message column is squeezed and the rail is slimmed before
- * either of them moves.
- *
- * A width of 0 means nothing has been measured yet, which resolves to the
- * wide layout so the first paint matches the common case.
+ * The rail's shape for a given pane width, biased towards keeping it beside the turn:
+ * the message column is squeezed and the rail is slimmed before either of them moves.
  */
 export function resolveRailLayout(paneWidth: number): RailLayout {
   if (paneWidth <= 0) return WIDE_LAYOUT;
@@ -60,17 +56,9 @@ export function resolveRailLayout(paneWidth: number): RailLayout {
 }
 
 /**
- * Whether the conversation has a rail at all. Nothing reserves room for one
- * until there is a card or a composer to hold, which is what keeps an
- * un-annotated conversation reading exactly as it did before the rail existed.
- *
- * Both message layouts get one. Markdown does not: it renders the whole thread
- * as one document, so there are no turns for a rail to sit beside.
- *
- * The composer is checked against this conversation's turns rather than just
- * "some composer is open": the queue page and the trace drawer can each be
- * showing a conversation at the same time, and only the one being annotated
- * should change shape.
+ * Whether the conversation has a rail at all. Nothing reserves room for one until there
+ * is a card or a composer to hold, which is what keeps an un-annotated conversation
+ * reading exactly as it did before the rail existed.
  */
 export function isRailActive({
   layout,
@@ -107,15 +95,7 @@ export function threadColumnMaxWidth({
 }
 
 /**
- * Track the conversation scroller's width and resolve the rail's shape from
- * it. One ResizeObserver for the whole conversation, throttled to a frame, and
- * state only ever set on a real flip so a resize that changes nothing cannot
- * feed itself another layout pass.
- *
- * The scroller is handed in through `setScroller` and held as state, so the
- * observer attaches whenever the element does. A conversation swaps between a
- * virtualized and a plain scroller as its turn count crosses the threshold,
- * and a ref would leave the second one unmeasured for the rest of its life.
+ * Track the conversation scroller's width and resolve the rail's shape from it.
  */
 export function useRailLayout(): {
   layout: RailLayout;

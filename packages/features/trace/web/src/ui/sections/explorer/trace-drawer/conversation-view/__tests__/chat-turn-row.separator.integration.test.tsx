@@ -1,11 +1,7 @@
 /**
+ * The per-turn separator ledger is decluttered: the cryptic model abbreviation and the raw input→output token
+ * count are gone and the relative time carries an explicit "ago".
  * @vitest-environment jsdom
- *
- * The per-turn separator ledger is decluttered: the cryptic model
- * abbreviation and the raw input→output token count are gone and the relative
- * time carries an explicit "ago". The "Xs gap" divider between turns is kept —
- * a long pause since the previous turn is worth surfacing. See
- * specs/traces-v2/conversation-turn-ledger.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -1,10 +1,6 @@
 /**
+ * The one-shot `?org=<slug>` switch, driven through the real router and the real remembered selection: what the address carries decides which organization the page is about, and the parameter never survives the visit.
  * @vitest-environment jsdom
- *
- * The one-shot `?org=<slug>` switch, driven through the real router and the
- * real remembered selection: what the address carries decides which
- * organization the page is about, and the parameter never survives the visit.
- *
  * Spec: specs/ai-gateway/governance/org-query-param-switch.feature
  */
 

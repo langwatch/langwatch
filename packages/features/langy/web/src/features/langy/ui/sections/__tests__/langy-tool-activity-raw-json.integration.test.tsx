@@ -6,11 +6,8 @@ import type { UIMessage } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
 /**
- * The raw tool payload is never shown by default — not even in developer
- * mode. It sits behind the `{}` toggle, which itself exists only in developer
- * mode. The regression: the JSON block rode the CARD's expansion state, so a
- * completed card's auto-opened receipt dumped `{ "tool": … }` into the chat
- * without the toggle ever being clicked.
+ * The raw tool payload is never shown by default — not even in developer mode. It sits
+ * behind the `{}` toggle, which itself exists only in developer mode.
  */
 
 const devModeRef = { current: true };

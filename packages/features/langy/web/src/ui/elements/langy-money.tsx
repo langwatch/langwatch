@@ -1,16 +1,5 @@
 /**
  * A money value that is readable at a glance and exact on demand.
- *
- * `$0.41456935` is what the raw number looks like, and it is unreadable — the
- * eye has to count digits to find the decimal point, and nine of them carry no
- * information for a human comparing two figures. But rounding to `$0.41` and
- * throwing the rest away is wrong too: sub-cent costs are the norm for a single
- * trace, and at that scale the digits ARE the value.
- *
- * So both. The rounded figure is what you read; the exact one is one hover (or
- * one tap) away, and is what gets copied. Semantically this is an abbreviation
- * of a longer value, which is exactly what `<abbr>` means, so the title lands on
- * the right element for screen readers and native tooltips alike.
  */
 import { chakra } from "@chakra-ui/react";
 

@@ -9,13 +9,6 @@ const REPO_ROOT = path.resolve(__dirname, "../../../../../../../../..");
 
 /**
  * The catalogue must match the IMAGE, not our memory of it.
- *
- * This has been wrong twice and both times a test like this would have caught it
- * on the commit that broke it: once the list promised 13 tools that did not
- * exist, and once it offered 1 skill when the worker installs 14. The list is
- * only ever as trustworthy as its derivation, so this re-derives from disk — via
- * the Dockerfile's own COPY set — and fails if the committed catalogue has
- * drifted from what the worker actually gets.
  */
 describe("given the Langy skill catalogue", () => {
   describe("when the image's skill directories are re-read from disk", () => {

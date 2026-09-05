@@ -19,10 +19,8 @@ const metricStats = (avg: number, count: number) => ({
 });
 
 /**
- * The verdict is the one thing in this feature a reader acts on, so these pin
- * the shapes where it previously stated something the run did not support.
- * Each came out of an adversarial audit and each fails without its fix.
- *
+ * The verdict is the one thing in this feature a reader acts on, so these pin the
+ * shapes where it previously stated something the run did not support.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 
@@ -151,13 +149,8 @@ describe("computeLeaderboardVerdict — claims it must not make", () => {
 
 describe("the verdict on a field that broke into groups that never met", () => {
   /**
-   * Two islands: {a,b} traded wins closely, {c,d} did not, and no row ever
-   * put an islander against the other island. The whole fixture goes through
-   * the real fit — no hand-built leaderboard — because the failure was
-   * invisible at that level: the between-island gap is a pure artifact of
-   * `normalizeToGeometricMean`, every bootstrap replicate re-applies the same
-   * normalisation, so the DIFFERENCE interval comes out tight and the
-   * interval test read it as a confident separation.
+   * Two islands: {a,b} traded wins closely, {c,d} did not, and no row ever put an
+   * islander against the other island.
    */
   const twoIslands = () =>
     computeBTLeaderboard({

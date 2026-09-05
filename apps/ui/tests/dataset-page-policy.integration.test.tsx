@@ -1,25 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * What the two Datasets addresses are actually behind, proved by mounting them.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice a
- * loader that names the wrong grant — which is the failure that refuses a reader
- * the platform page admitted, or admits one it refused. So this file loads the
- * real loaders, mounts what they hand back under a session that answers
- * precisely, and reads the result.
- *
- * The screens themselves are faked, and so is the transport the host provider
- * reads the organization graph over. What is under test is the policy the
- * frontend feature wraps each screen in, and loading a whole page over a live
- * tRPC client to assert a refusal would test the screen instead.
- *
- * THE TWO KEYS DIFFER, and that is the point of covering both: the list page was
- * `withPermissionGuard("datasets:view")` and the detail page was wrapped in no
- * guard at all — it read `hasPermission` only to decide whether to offer the Run
- * experiment button. A deep link into one dataset has always opened for anyone
- * who could reach the project.
- *
+ * @vitest-environment jsdom
  * Spec: specs/datasets/datasets-list-page.feature
  */
 

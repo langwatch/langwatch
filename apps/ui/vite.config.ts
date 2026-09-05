@@ -56,19 +56,6 @@ const API_TARGET =
 
 /**
  * The dev TLS credentials, when the developer supplies a pair.
- *
- * `platform/app` generated a pair here with `selfsigned` when none was
- * configured, so `LANGWATCH_DEV_HTTP2=1` was zero-setup. That import is gone,
- * and not as a simplification: `selfsigned` cannot be loaded in this workspace
- * at all. Two copies of `@peculiar/asn1-schema` are installed, so
- * `@peculiar/asn1-rsa` registers against one schema store and reads from the
- * other, and `import("selfsigned")` throws `Cannot get schema for
- * 'AlgorithmIdentifier'` before any code of ours runs. Importing it from a Vite
- * config therefore fails the config load outright — with HTTP/2 off as much as
- * on — which is why the old config could not be loaded either.
- *
- * `DEV_HTTPS_CERT` + `DEV_HTTPS_KEY` still work, and generation comes back with
- * one root `pnpm-workspace.yaml` override that collapses the duplicate.
  */
 function loadDevHttpsCredentials(): { cert: Buffer; key: Buffer } | null {
   if (!USE_HTTP2) return null;
@@ -86,19 +73,8 @@ function loadDevHttpsCredentials(): { cert: Buffer; key: Buffer } | null {
   return null;
 }
 
-// object-inspect's index.js does `var inspectCustom = require('./util.inspect')`
-// and the package.json sets `"browser": { "./util.inspect.js": false }`. Vite
-// turns `false` into a Proxy stub that throws on ANY property access — which
-// breaks object-inspect's `typeof inspectCustom.custom === 'symbol'` defensive
-// check (it expected `false` → empty `{}`, but vite gives a throwing stub).
-// Result before this plugin: the SPA failed to mount and threw `Cannot access
-// ".custom" in client code` in the command-bar chunk.
-//
-// Fix: intercept the relative `./util.inspect` import from inside object-inspect
-// and route it to our noop module. Vite's `resolve.alias` can't catch this
-// because the alias key would have to match the relative specifier, but only
-// from one specific importer. A `resolveId` plugin with an importer check is
-// the right tool.
+// object-inspect's index.js does `var inspectCustom = require('./util.inspect')` and
+// the package.json sets `"browser": { "./util.inspect.js": false }`.
 function patchObjectInspectBrowserStub(): Plugin {
   const noopPath = path.resolve(here, "./vite/noop-module.cjs");
   return {
@@ -142,11 +118,8 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       : undefined;
 
   // Diagnostic: when Vite hot-restarts on a config change, the https block is
-  // re-evaluated but in-process TLS state can land in a broken pair (server
-  // listening, TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`). This log
-  // makes the post-restart scheme observable in `server.log`, so a "blank page
-  // after editing config" failure mode is easy to diagnose without digging into
-  // TLS errors.
+  // re-evaluated but in-process TLS state can land in a broken pair (server listening,
+  // TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`).
   if (command === "serve") {
     if (USE_HTTP2) {
       console.log(
@@ -200,38 +173,25 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       rollupOptions: {
         output: {
           manualChunks(id: string) {
-            // Shiki chunk-splitting lives in the Design System's
-            // `shiki-chunking` module (dependency-free) so its guard test can
-            // exercise the real logic. It keeps the core + base grammars/themes
-            // eager and splits the other ~340 grammars into lazy chunks —
-            // removing the ~9.5 MB raw / 1.66 MB gzip eager Shiki chunk that
-            // used to load on every page. See that file for the boot-cycle
-            // rationale.
+            // Shiki chunk-splitting lives in the Design System's `shiki-chunking`
+            // module (dependency-free) so its guard test can exercise the real logic.
             return shikiManualChunk(id);
           },
         },
       },
     },
     experimental: {
-      // ADR-086: the base for content-hashed assets is chosen at container start,
-      // not build time — one image serves self-host same-origin and SaaS from a
-      // commit-prefixed CDN. Emit every JS-referenced asset URL as a call to the
-      // runtime resolver defined by the served HTML shell
-      // (src/model/ui-asset-base.ts); keep CSS-referenced assets relative to the
-      // CSS file (which lives under the same base, so fonts/images resolve on the
-      // CDN); leave HTML entry refs base-absolute for the server to rewrite;
-      // leave public/ assets same-origin.
+      // ADR-086: the base for content-hashed assets is chosen at container start, not
+      // build time. JS-referenced assets call the runtime resolver
+      // (src/model/ui-asset-base.ts); CSS-referenced assets stay relative to the CSS
+      // file; HTML entry refs stay base-absolute for the server to rewrite; public/
+      // assets stay same-origin.
       renderBuiltUrl(filename, { type, hostType }) {
         if (type === "public") return undefined;
         if (hostType === "js") {
-          // Self-defaulting so the built bundle is usable even when the server
-          // hasn't injected the resolver: `vite preview`, the boot-smoke, and any
-          // raw-`dist/` static server fall back to same-origin ("/"+path). Read
-          // via `globalThis` (defined in the main document AND in Web Worker
-          // scopes, where `window` is undefined) so a worker chunk degrades to
-          // same-origin instead of throwing. The server sets
-          // `globalThis.__lwAssetUrl` to the CDN prefixer when LANGWATCH_ASSET_BASE
-          // is configured.
+          // Self-defaulting so the built bundle is usable even when the server hasn't
+          // injected the resolver: `vite preview`, the boot-smoke, and any raw-`dist/`
+          // static server fall back to same-origin ("/"+path).
           return {
             runtime: `(globalThis.${UI_ASSET_URL_GLOBAL}||function(p){return "/"+p})(${JSON.stringify(
               filename,
@@ -255,16 +215,9 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           // server appends on every request, so watching one turns each page
           // load into a full-reload loop.
           "**/server*.log",
-          // Working files agents keep under .claude/tmp, per the repo
-          // convention. A dev-server log teed there reloads the page on every
-          // request, same trap as above under a different name. Agent
-          // worktrees also live under .claude/worktrees, and chokidar
-          // matches ignore globs against full paths, so from a worktree
-          // root any pattern containing .claude/worktrees matches every
-          // file in the tree and blinds the watcher entirely. From a
-          // worktree only .claude/tmp is ignored (worktrees do not nest);
-          // from the main root the entire .claude tree, nested worktree
-          // copies included, stays ignored as before.
+          // Working files agents keep under .claude/tmp, per the repo convention. A
+          // dev-server log teed there reloads the page on every request, same trap as
+          // above under a different name.
           ...(process.cwd().includes("/.claude/") ? ["**/.claude/tmp/**"] : ["**/.claude/**"]),
         ],
         // Docker-on-macOS bind mounts don't surface inotify events reliably,
@@ -293,23 +246,11 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
             },
           }
         : {}),
-      // Proxy API requests to the Hono backend (PORT + 1000). `ws: true`
-      // forwards WebSocket upgrades for the tRPC WS transport at /api/trpc-ws.
-      //
-      // The MCP routes (/mcp, /sse, /messages, /oauth/*, /.well-known/oauth-*)
-      // are registered directly on the API process's Node HTTP server (NOT
-      // mounted under /api), so they need explicit proxy entries here for
-      // external MCP clients (e.g. Claude Code adding the LangWatch MCP
-      // server in dev) to reach them via the canonical FRONTEND_PORT. The
-      // production server listens on a single port so this splitting is
-      // dev-only.
+      // Proxy API requests to the Hono backend (PORT + 1000). `ws: true` forwards
+      // WebSocket upgrades for the tRPC WS transport at /api/trpc-ws.
       proxy: {
         // The tRPC WS transport enforces a same-origin allowlist (built from
-        // NEXTAUTH_URL) and fail-closes on a missing/mismatched Origin. The
-        // catch-all `/api` proxy below sets `changeOrigin: true`, which rewrites
-        // the WS handshake Origin so the backend sees a null/foreign origin and
-        // rejects every upgrade — silently breaking all WS-backed workbench
-        // state. A dedicated, earlier entry keeps the browser's real Origin.
+        // NEXTAUTH_URL) and fail-closes on a missing/mismatched Origin.
         "/api/trpc-ws": {
           target: API_TARGET,
           changeOrigin: false,
@@ -343,12 +284,9 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
-        // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
-        // /mcp/authorize frontend page route, sending it to the API server,
-        // which has no dev-mode page fallback. server.proxy regexes test against
-        // the full req.url (path + query), so the optional "(?:\?.*)?" is
-        // required or a query-bearing request like "/mcp?sessionId=..." falls
-        // through to the frontend instead.
+        // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the /mcp/authorize frontend page route, sending it to the API server, which has
+        // no dev-mode page fallback. server.proxy regexes test against the full req.url (path + query), so the optional "(?:\?.*)?" is required or a
+        // query-bearing request like "/mcp?sessionId=..." falls through to the frontend instead.
         "^/mcp(?:\\?.*)?$": {
           target: API_TARGET,
           changeOrigin: true,

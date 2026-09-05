@@ -1,10 +1,5 @@
 /**
  * Agent Testing: one page with the scenarios and the results in tabs.
- *
- * The page is the only mount point of the live-run subscription and of the
- * scenario editor, and every move inside it is a shallow address push, so a run
- * keeps streaming while a person moves between suites, plans and tabs.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 
@@ -28,11 +23,6 @@ import { RunPlanDialogHost } from "./run/run-plan-dialog-host";
 
 /**
  * How many scenarios and how many run plans the tabs count.
- *
- * Both kinds of suite are read, because the read is shared with the Results
- * tab, but only the run plans are counted: a test suite is a group of
- * scenarios and never a row of the Test Runs list, so counting it put a number
- * beside "Results" that no row under it accounted for.
  */
 function useTabCounts(projectId: string) {
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -60,11 +50,6 @@ export function AgentTestingPage() {
 
 /**
  * The period control's host, bridged from this family's own.
- *
- * `PeriodSelector` is `@langwatch/analytics-web`'s and reads the address
- * through the workflow host it was published against. Mounted here, at the top
- * of the page, so the whole board sees one address and a test that mocks this
- * package's router mocks one router.
  */
 function AgentTestingBoard() {
   const { project } = useOrganizationTeamProject();

@@ -1,12 +1,7 @@
 /**
+ * The Expansions switches as the Add to Dataset drawer actually composes them, beside
+ * the preview table.
  * @vitest-environment jsdom
- *
- * The Expansions switches as the Add to Dataset drawer actually composes them,
- * beside the preview table. A field hands its own id to every control under it,
- * so a field wrapped around both halves gave every switch and every preview
- * checkbox the same id, and a click on a switch went wherever that id resolved
- * first. Rendering the mapping on its own cannot see that.
- * See specs/datasets/add-to-dataset-span-mapping.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { Dataset, DatasetColumns } from "@langwatch/dataset-contract";
@@ -83,10 +78,9 @@ const DATASET = {
 } as unknown as Dataset;
 
 /**
- * One switch, by the name it announces. Chakra's Switch is a label wrapping a
- * hidden checkbox, so it reaches the accessibility tree as a checkbox named
- * after its own words. A switch that borrowed a field's id announces the
- * field's label instead and cannot be found here at all.
+ * One switch, by the name it announces. Chakra's Switch is a label wrapping a hidden
+ * checkbox, so it reaches the accessibility tree as a checkbox named after its own
+ * words.
  */
 const switchNamed = (name: string) => screen.getByRole<HTMLInputElement>("checkbox", { name });
 

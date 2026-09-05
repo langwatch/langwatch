@@ -19,10 +19,9 @@ export function useCyclingVerb(
   active: boolean,
   verbs: readonly string[],
   /**
-   * Dwell time per verb. Surfaces that crossfade the swap (rather than cutting)
-   * want longer, so the text settles and is readable before it is replaced —
-   * otherwise the next verb arrives mid-animation. Defaults to the original
-   * 1800ms, so existing callers are unaffected.
+   * Dwell time per verb. Surfaces that crossfade the swap (rather than cutting) want
+   * longer, so the text settles and is readable before it is replaced — otherwise the
+   * next verb arrives mid-animation.
    */
   intervalMs: number = DEFAULT_INTERVAL_MS,
 ): string {

@@ -1,19 +1,10 @@
 /**
  * The provider key a model string names.
- *
- * `~/utils/modelProviderHelpers` stays with the credential FORM it exists for —
- * masking, probing and partial writes are the settings family's, and none of
- * that travelled. This is the one line of it this family reads.
  */
 const getProviderFromModel = (model: string): string => model.split("/")[0] ?? "";
 
 /**
  * Discriminated state for the project's default model configuration.
- *
- * - ok: true — default model has a configured, enabled provider
- * - no-providers — no model providers enabled at all
- * - no-default — project has no default model set
- * - stale-default — default model's provider is disabled
  */
 export type DefaultModelState =
   | { ok: true }
@@ -23,9 +14,6 @@ export type DefaultModelState =
 
 /**
  * Derives the default model state from provider settings and project config.
- *
- * Returns ok:true during loading (when providers is undefined or empty but
- * hasEnabledProviders is true) to avoid flashing error banners prematurely.
  */
 export function getDefaultModelState({
   hasEnabledProviders,

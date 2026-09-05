@@ -1,9 +1,7 @@
 /**
+ * The error id is the only technical detail a customer ever sees, and on the anonymous
+ * share surface it is the only handle they have to quote to support.
  * @vitest-environment jsdom
- *
- * The error id is the only technical detail a customer ever sees, and on the
- * anonymous share surface it is the only handle they have to quote to support.
- * So the interesting cases here are the ones where copying it does NOT work.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

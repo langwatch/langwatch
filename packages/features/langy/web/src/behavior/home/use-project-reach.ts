@@ -11,20 +11,6 @@ export interface ProjectReachResult extends ProjectReach {
 
 /**
  * How far into the product this project has got.
- *
- * THE PROJECT HOME KEEPS ITS OWN, deliberately. The home's copy asks the same
- * question through the home's own host and transport
- * (`@langwatch/project-web/screens/home`); this one is the panel's, asked
- * through Langy's. Two families, two ports, one question — which is the port
- * model working rather than a duplication to fold: neither package may import
- * the other's transport, and the answer is a read either can make for itself.
- *
- * Reads the SAME query the onboarding checklist does, deliberately: React
- * Query dedupes it, so asking here costs nothing, and the checklist and the
- * home page's asks can never disagree about whether the project has data.
- *
- * `simulations` counts as experiments alongside datasets, because both are
- * things a "compare my last two runs" ask can actually land on.
  */
 export function useProjectReach(): ProjectReachResult {
   const { project } = useOrganizationTeamProject({

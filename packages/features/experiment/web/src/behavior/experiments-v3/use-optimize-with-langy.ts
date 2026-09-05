@@ -8,14 +8,9 @@ import type { TargetConfig } from "../../model/experiments-v3/types";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 
 /**
- * The "Optimize this prompt" handoff: choose the experiment chip the page
- * already offers, absorb the target's prompt as picked context, and hand
- * Langy an auto-sent ask. The chips ride along because `askLangy` keeps
- * `chosenChipIds` (arm, absorb, ask is the ordinary order of the gesture);
- * the cost gate lives in the skill's own ask-before-spending rule, not here.
- *
- * Returns undefined while the UI-action channel is flagged off, which is
- * what hides the menu item.
+ * The "Optimize this prompt" handoff: choose the experiment chip the page already
+ * offers, absorb the target's prompt as picked context, and hand Langy an auto-sent
+ * ask.
  */
 type OptimizeHandler = ({ target, name }: { target: TargetConfig; name: string }) => void;
 

@@ -1,9 +1,6 @@
 /**
+ * Integration tests for ExternalSetDetailPanel: a run row opens the drawer rather than navigating to a page of its own.
  * @vitest-environment jsdom
- *
- * Integration tests for ExternalSetDetailPanel: a run row opens the drawer
- * rather than navigating to a page of its own.
- *
  * @see specs/features/suites/suite-bugfixes-1956.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

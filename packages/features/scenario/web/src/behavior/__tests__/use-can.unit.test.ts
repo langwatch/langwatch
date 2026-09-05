@@ -1,16 +1,7 @@
 /**
+ * The client half of ADR-092 §5: `can()` answers from the server's effective set, applying the same hierarchy the
+ * engine does, and it FAILS CLOSED whenever it has no set to answer from.
  * @vitest-environment jsdom
- *
- * The client half of ADR-092 §5: `can()` answers from the server's effective
- * set, applying the same hierarchy the engine does, and it FAILS CLOSED
- * whenever it has no set to answer from.
- *
- * The loading half is the trap. This query is disabled until there is an
- * organization or a project to ask about, and a disabled query has no answer
- * (`isPending`) without being in flight — so the hook reports TanStack Query
- * v5's `isLoading` (`isPending && isFetching`), which means "a fetch this
- * hook actually started has not answered yet". The test renders the hook and
- * reads its answers; it does not assert on source text.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

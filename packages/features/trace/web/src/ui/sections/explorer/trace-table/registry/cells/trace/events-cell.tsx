@@ -13,10 +13,9 @@ type Density = "compact" | "comfortable";
 const VISIBLE_BADGES = 3;
 
 /**
- * The cell's four states, in the order it decides between them: pending while
- * the page's events are still coming, unavailable if they never did, the empty
- * marker for a trace that recorded none, and otherwise a badge per event name.
- * The first two exist so the empty marker only ever means "recorded nothing".
+ * The cell's four states, in the order it decides between them: pending while the
+ * page's events are still coming, unavailable if they never did, the empty marker for a
+ * trace that recorded none, and otherwise a badge per event name.
  */
 function renderEvents({ row, density }: { row: TraceListItem; density: Density }) {
   const textStyle = density === "compact" ? "xs" : "sm";

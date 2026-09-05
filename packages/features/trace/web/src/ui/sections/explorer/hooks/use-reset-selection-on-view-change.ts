@@ -2,12 +2,8 @@ import { useEffect, useRef } from "react";
 import { useFilterStore, useSelectionStore, useViewStore } from "../../../../index";
 
 /**
- * Clears the bulk-selection set whenever the meaning of a row could shift
- * underneath the user — filter expression, time range, or active lens.
- *
- * Selection deliberately persists across pagination, sort, density, and
- * column visibility because those don't change *which* traces are shown,
- * only how they're presented.
+ * Clears the bulk-selection set whenever the meaning of a row could shift underneath
+ * the user — filter expression, time range, or active lens.
  */
 export function useResetSelectionOnViewChange(): void {
   const queryText = useFilterStore((s) => s.debouncedQueryText);

@@ -57,10 +57,9 @@ export const LLM_ROW_HEIGHT = 40;
 export const GROUP_ROW_HEIGHT = 36;
 
 /**
- * LLM spans (second line: model) and named tool spans (second line: tool)
- * render as two-line rows at `LLM_ROW_HEIGHT`. The virtualizer's height
- * estimator and `TreeRow`'s rendering must agree on this predicate or
- * rows overlap.
+ * LLM spans (second line: model) and named tool spans (second line: tool) render as
+ * two-line rows at `LLM_ROW_HEIGHT`. The virtualizer's height estimator and `TreeRow`'s
+ * rendering must agree on this predicate or rows overlap.
  */
 export function isTwoLineSpan(span: Pick<SpanTreeNode, "type" | "model" | "toolName">): boolean {
   return (span.type === "llm" && span.model != null) || span.toolName != null;
@@ -70,10 +69,9 @@ export const INDENT_PX = 20;
 export const MIN_TREE_WIDTH = 200;
 export const DEFAULT_TREE_PCT = 0.38;
 /**
- * Below this drawer width, the timeline/flame-graph panel is dropped
- * entirely and the span list takes the full width — the list is normally
- * more useful, and a narrow timeline pane (bars a few px wide, a divider,
- * truncated labels) is not.
+ * Below this drawer width, the timeline/flame-graph panel is dropped entirely and the
+ * span list takes the full width — the list is normally more useful, and a narrow
+ * timeline pane (bars a few px wide, a divider, truncated labels) is not.
  */
 export const COLLAPSE_TIMELINE_BELOW_PX = 638;
 export const MIN_BAR_PX = 3;
@@ -117,11 +115,8 @@ export function getSpanPalette(type: string | null | undefined): string {
 }
 
 /**
- * Resolved Chakra color token (e.g. `"purple.solid"`) for a span/group bar —
- * the timeline pane's counterpart to `getSpanPalette`. Skill runs get the
- * same purple accent as their tree-row twin (`isSkillSpan`), so the two
- * halves of a waterfall row never disagree; everything else falls back to
- * `SPAN_TYPE_COLORS`.
+ * Resolved Chakra color token (e.g. `"purple.solid"`) for a span/group bar — the
+ * timeline pane's counterpart to `getSpanPalette`.
  */
 export function getSpanBarColor(
   type: string | null | undefined,

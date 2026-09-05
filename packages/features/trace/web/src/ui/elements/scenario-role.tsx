@@ -1,18 +1,5 @@
 /**
  * Render-only role overrides for traces emitted under the Scenario SDK.
- *
- * In a Scenario run the chat data flips relative to a normal trace: the
- * `user` role messages are produced by an LLM driving the conversation as
- * the simulated user, and the `assistant` role messages are emitted by the
- * agent under test. Reading that raw trace feels backwards — the agent
- * (the subject of the trace) shows up as "assistant" while the simulator
- * shows up as "user".
- *
- * This helper visually swaps user ↔ assistant sides in the v2 trace drawer
- * so the agent reads as the trace's "user" (left/blue) and the simulator
- * reads as the "assistant" (right/purple, marked with a flask icon to
- * signal it isn't a real human). The underlying chat payloads, exports,
- * and parsing stay untouched.
  */
 import { type ReactNode, useEffect } from "react";
 import type { IconType } from "react-icons";

@@ -2,12 +2,6 @@ import "@testing-library/jest-dom/vitest";
 
 /**
  * Integration tests for BatchRunsSidebar component
- *
- * Verifies that experiment runs are displayed newest-first in the sidebar
- * while preserving chronological "Run #N" numbering (Run #1 = oldest).
- *
- * Regression test for: https://github.com/langwatch/langwatch/issues/2418
- *
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

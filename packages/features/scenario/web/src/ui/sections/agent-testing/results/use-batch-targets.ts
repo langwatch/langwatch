@@ -1,18 +1,6 @@
 /**
- * The targets one run went against, in the order and the colours the run
- * detail draws them.
- *
- * A target is an agent and its parameters, so the same agent can appear
- * twice in one run. Each target is read off the runs themselves: the key the
- * platform stamped, the reference id behind it and the parameter overrides,
- * so an old run that carried only a reference id reads as one target the
- * way it always did.
- *
- * The order is the sorted order of the run dialog, rebuilt from the same
- * sort key, so the columns of the run keep the order the rows had. The
- * colour is the position, so a target reads in one colour on the dialog, on
- * the table, on the charts and in the runs rail.
- *
+ * The targets one run went against, in the order and the colours the run detail draws
+ * them.
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
@@ -128,9 +116,6 @@ function targetFactsOf(run: ScenarioRunData): {
 
 /**
  * The targets of a batch, sorted and coloured.
- *
- * A run that names no target at all is left out: it has no column to stand
- * in, and a batch of such runs reads as it did before targets existed.
  */
 export function batchTargetsOf({
   scenarioRuns,

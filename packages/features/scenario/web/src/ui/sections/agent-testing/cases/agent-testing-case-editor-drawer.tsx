@@ -1,11 +1,4 @@
 /**
- * URL-routed wrapper of the Agent Testing scenario editor drawer.
- *
- * The drawer reads its target from the address bar, so a shared link, a
- * browser back and a Save & Run flow all resolve to the same open drawer.
- * The Save & Run callback is registered by the page through flow callbacks
- * so the page can open the run drawer after the editor closes.
- *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/run-plan-editor.feature
  * @see dev/docs/best_practices/drawers.md

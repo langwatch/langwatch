@@ -1,9 +1,7 @@
 /**
+ * Integration tests for the ThinkingIndicator component. Verifies the three-dot
+ * animated indicator renders correctly with proper alignment and accessibility.
  * @vitest-environment jsdom
- *
- * Integration tests for the ThinkingIndicator component.
- * Verifies the three-dot animated indicator renders correctly
- * with proper alignment and accessibility.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

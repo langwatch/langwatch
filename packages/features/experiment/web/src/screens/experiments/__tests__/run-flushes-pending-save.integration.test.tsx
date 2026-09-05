@@ -1,19 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * A run must not start while this tab still holds an unsaved edit.
- *
- * A run writes its results back as a new version. So an edit the agent just
- * made, still sitting on the autosave debounce, is a version behind before the
- * first cell lands, and the save that follows is refused as out of date. That
- * is the failure the sibling suite describes: the duplicated column existed in
- * one tab and could never be saved after the run.
- *
- * `stale-page-refuses-agent-actions.integration.test.tsx` covers the transform
- * actions, which persist before they answer. This one covers `workbench.run`,
- * which has nothing of its own to answer with and must flush what is already
- * pending.
- *
+ * @vitest-environment jsdom
  * @see specs/langy/langy-ui-actions.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

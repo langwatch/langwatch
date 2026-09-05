@@ -7,13 +7,6 @@ import { handOffSearchToLangy } from "./search-langy-handoff";
 
 /**
  * Does Langy own the search bar's ask affordance — and the handoff when it does.
- *
- * Both gates, on purpose: `useShowLangy` (rollout + membership + `langy:view`)
- * is what mounts the panel at all, and `useCanAskLangy` (`langy:create`) is
- * what lets a queued question actually send. Offering the handoff on either
- * alone would be a door into a panel that doesn't render, or a composer whose
- * every send 403s. When either says no, the search bar keeps the inline Ask AI
- * composer instead — the affordance downgrades, it never goes dead.
  */
 export function useAskLangyFromSearch(): {
   /** Langy owns the ask affordance for this user; false keeps inline Ask AI. */

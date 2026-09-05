@@ -1,8 +1,6 @@
 /**
- * Signals that tell us a trace came from a coding agent running in a real
- * terminal — the cue to offer the Terminal view. These come off the trace /
- * span attributes at the wiring site (`service.name`, `langwatch.origin`, and
- * the `terminal.type` span attribute, e.g. `xterm-256color`).
+ * Signals that tell us a trace came from a coding agent running in a real terminal —
+ * the cue to offer the Terminal view.
  */
 export interface TerminalOriginSignals {
   serviceName?: string | null;
@@ -28,12 +26,9 @@ const CODING_AGENT_SERVICE_MARKERS = [
 ] as const;
 
 /**
- * True when the trace looks like a coding-agent terminal session. Any one of:
- * the service is a known coding-agent CLI, the origin is a coding agent, or a
- * `terminal.type` was reported at all (that attribute is only set by a
- * terminal). Kept permissive on purpose — the Terminal view degrades
- * gracefully on non-ANSI output, so a false positive just shows clean
- * monospace text.
+ * True when the trace looks like a coding-agent terminal session. Any one of: the
+ * service is a known coding-agent CLI, the origin is a coding agent, or a
+ * `terminal.type` was reported at all (that attribute is only set by a terminal).
  */
 export function isTerminalOrigin(signals: TerminalOriginSignals): boolean {
   const service = (signals.serviceName ?? "").toLowerCase();

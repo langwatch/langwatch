@@ -35,10 +35,9 @@ function describeEdit({
 }
 
 /**
- * The comments written in this pass, reported apart from the correction because
- * they are on a different clock: each one was saved as it was written, so none
- * of them is waiting on Save and none of them is at risk from Discard. A pass
- * that has produced none says nothing rather than reporting a zero.
+ * The comments written in this pass, reported apart from the correction because they
+ * are on a different clock: each one was saved as it was written, so none of them is
+ * waiting on Save and none of them is at risk from Discard.
  */
 function CommentsWritten({ count }: { count: number }) {
   if (count === 0) return null;
@@ -82,11 +81,7 @@ function useTraceEditDraft() {
 }
 
 /**
- * Whether the session in the store is the one being saved. The drawer can move
- * to another trace at any moment, including while the stored correction is read
- * back, and what it leaves behind belongs to wherever it went: writing that
- * under this trace's id would attribute one trace's correction to another. The
- * refusal is logged, not shown, because nothing on screen asked for it.
+ * Whether the session in the store is the one being saved.
  */
 function holdsSessionFor(traceId: string): boolean {
   if (useTraceEditStore.getState().editingTraceId === traceId) return true;
@@ -121,14 +116,9 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
   });
 
   /**
-   * Moves the session onto the correction as it stands right now. The one
-   * adopted when editing started can be minutes old (a suggestion saved in
-   * between writes the same record), and building on a stale one would drop
-   * whatever was stored since. Two people saving in the same instant still
-   * race, and the last write wins; a reviewer racing themselves does not.
-   *
-   * Answers false when the read failed, which is the one case where writing on
-   * top of an unknown baseline would lose someone else's correction.
+   * Moves the session onto the correction as it stands right now. The one adopted when
+   * editing started can be minutes old (a suggestion saved in between writes the same
+   * record), and building on a stale one would drop whatever was stored since.
    */
   const rebaseOntoStoredCorrection = useCallback(
     async ({ projectId }: { projectId: string }) => {
@@ -174,13 +164,9 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
 }
 
 /**
- * The strip that says the trace is being annotated, what the pass has produced
- * so far, and how to finish. Rendered between the header and the panes for as
- * long as annotation mode is on.
- *
- * The two halves of the pass are reported apart because they are saved apart:
- * the correction is a draft this bar writes, and every comment is already
- * stored.
+ * The strip that says the trace is being annotated, what the pass has produced so far,
+ * and how to finish. Rendered between the header and the panes for as long as
+ * annotation mode is on.
  */
 export function EditModeBar({ traceId }: { traceId: string }) {
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
@@ -285,10 +271,6 @@ export function EditModeBar({ traceId }: { traceId: string }) {
 
 /**
  * The one question asked for every way of leaving an unsaved correction.
- *
- * It names the corrections outright. A reviewer who has just left eight
- * comments and reads "discard your changes" has no way of knowing the comments
- * are not what is at risk, so the prompt says so.
  */
 function DiscardTraceEditsDialog({
   open,

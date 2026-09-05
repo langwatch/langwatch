@@ -1,10 +1,6 @@
 /**
+ * The Expansions switches.
  * @vitest-environment jsdom
- *
- * The Expansions switches. Each one is a switch about its own expansion, and
- * turning them all off is an answer the reader is allowed to give: a mapping
- * with nothing expanded is the one that keeps a row per trace.
- * See specs/datasets/add-to-dataset-span-mapping.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen } from "@testing-library/react";
@@ -78,10 +74,9 @@ function lastReportedExpansions(): string[] {
 }
 
 /**
- * The mapping as its real hosts render it: they hold the mapping in state and
- * hand it straight back down, so every change the mapping reports comes back to
- * it as its own input. Rendering it uncontrolled hides anything that goes wrong
- * on that round trip, which is where turning an expansion off used to be undone.
+ * The mapping as its real hosts render it: they hold the mapping in state and hand it
+ * straight back down, so every change the mapping reports comes back to it as its own
+ * input.
  */
 function ControlledMapping({
   mapping,

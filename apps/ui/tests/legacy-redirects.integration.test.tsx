@@ -1,18 +1,6 @@
 /**
+ * The gateway moved from /settings/gateway/* to /gateway/*.
  * @vitest-environment jsdom
- *
- * The gateway moved from /settings/gateway/* to /gateway/*. These tests run the
- * REAL redirect descriptors the packaged route table mounts
- * (`uiLegacyRedirectRoutes`) plus the table's own `/gateway` row, materialised
- * through the same function the application uses, inside a memory router, so
- * what is asserted is the address the user ends on: sub-path, query and hash
- * intact, history entry replaced.
- *
- * It lives here rather than in `platform/app` because every descriptor it
- * exercises is this package's. The bare `/gateway` row is why it moved when it
- * did: it was a page component whose whole body was a `router.replace`, and it
- * is a redirect row now, so there is no page left in `platform/app` to import.
- *
  * Spec: specs/navigation/gateway-url-move.feature
  */
 

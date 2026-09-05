@@ -1,23 +1,5 @@
 /**
  * What the deployment is, as this package reads it.
- *
- * `~/hooks/usePublicEnv` composed two halves: the STATIC one, read out of the
- * `langwatch-public-config` meta tag the web boot boundary injects, and a
- * per-viewer one the `publicEnv` procedure answers. The static half came from
- * `@langwatch/ui/public-config`, and `@langwatch/ui` IS `apps/ui` — a feature
- * package that named it would close a cycle back onto the application that
- * mounts it. So the reader is here, narrowed to the two keys this family
- * actually reads.
- *
- * `BASE_HOST` is the ingestion endpoint every Integrate snippet prints and
- * `DEMO_PROJECT_SLUG` is what the Langy gate compares a project against.
- * Neither is a secret and both are already in the document by the time any
- * trace surface renders.
- *
- * THE META NAME AND THE TWO FIELD NAMES ARE A RESTATEMENT and carry the
- * alignment obligation the data-governance snapshots record: rename one in
- * `apps/ui/src/model/public-config.ts` without renaming it here and the
- * snippets print an empty endpoint.
  */
 
 import { useMemo } from "react";
@@ -43,11 +25,6 @@ function decodeBase64Url(value: string): string {
 
 /**
  * The two static facts, or empty when the shell did not inject them.
- *
- * The application's reader THROWS on a missing meta tag, which is right for a
- * boot boundary and wrong here: a test that mounts one trace surface should not
- * have to stage a document, and an endpoint the reader can copy is worth less
- * than a page that renders. So a missing tag reads as "unknown deployment".
  */
 export function readTracePublicEnvironment(): TracePublicEnvironment {
   if (typeof document === "undefined") return { BASE_HOST: "" };
@@ -80,11 +57,6 @@ type PublicEnvReading = {
 
 /**
  * The deployment, with or without the per-viewer half.
- *
- * The two overloads the application hook carried are gone: every call site in
- * this family reads the static half only, and the one procedure read is kept so
- * a caller that asks for capabilities still gets them off the same cache entry
- * the application's own `api.publicEnv` query uses.
  */
 export function usePublicEnv(options: { includeCapabilities?: boolean } = {}): PublicEnvReading {
   const includeCapabilities = options.includeCapabilities ?? false;

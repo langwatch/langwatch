@@ -5,11 +5,9 @@ import { Dialog } from "@langwatch/design-system/studio-dialog";
 import type { MakeDefaultWritePlan } from "../../model/logic/langy-make-default-offer";
 
 /**
- * The "make it the default?" ask that follows a model pick in the composer,
- * for users who can manage the scope the current Langy default lives at (see
- * `langyMakeDefaultOffer`). The pick already took effect for this
- * conversation either way — the dialog only decides whether it becomes the
- * default for everyone under that scope.
+ * The "make it the default?" ask that follows a model pick in the composer, for users
+ * who can manage the scope the current Langy default lives at (see
+ * `langyMakeDefaultOffer`).
  */
 export function LangyMakeDefaultDialog({
   plan,

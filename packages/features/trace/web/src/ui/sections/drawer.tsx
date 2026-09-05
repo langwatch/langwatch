@@ -12,10 +12,9 @@ import { CloseButton } from "../elements/close-button";
 import { IsolatedErrorBoundary } from "./isolated-error-boundary";
 
 /**
- * Context to provide a margin-top offset to all Drawer.Content descendants.
- * Used by CurrentDrawer in the studio to push drawers below the header bar.
- * Works with portaled content because React context follows the React tree,
- * not the DOM tree.
+ * Context to provide a margin-top offset to all Drawer.Content descendants. Used by
+ * CurrentDrawer in the studio to push drawers below the header bar. Works with portaled
+ * content because React context follows the React tree, not the DOM tree.
  */
 const DrawerOffsetContext = React.createContext<{ marginTop?: number }>({});
 export const DrawerOffsetProvider = DrawerOffsetContext.Provider;
@@ -25,10 +24,9 @@ interface DrawerContentProps extends ChakraDrawer.ContentProps {
   portalRef?: React.RefObject<HTMLElement>;
   offset?: ChakraDrawer.ContentProps["padding"];
   /**
-   * Set to `false` to disable the inline error boundary that wraps
-   * children. By default, a render-time crash inside a drawer body shows
-   * an inline error panel — it does NOT close the drawer or take down the
-   * page. Opt out only if you have a more specific outer boundary already.
+   * Set to `false` to disable the inline error boundary that wraps children. By
+   * default, a render-time crash inside a drawer body shows an inline error panel — it
+   * does NOT close the drawer or take down the page.
    */
   withErrorBoundary?: boolean;
   /** Optional scope label shown by the error fallback. */
@@ -52,26 +50,16 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     const marginTopProp =
       rest.marginTop ?? (contextMarginTop ? `${contextMarginTop}px` : undefined);
 
-    // Only the DOCKED (sidebar) Langy holds the right edge as the drawer's
-    // companion; the drawer then yields, sliding further left to leave the panel
-    // its slot plus a strip of space between the two cards. The drawer keeps its
-    // own slide-in, but the docked companion sits above it (higher z-index) so
-    // the drawer slides in from BEHIND it. When Langy is FLOATING it dodges to
-    // the left instead (see LangyPanel), so the drawer keeps the full right edge
-    // and does NOT yield. Reactive, so closing the panel or switching layout
-    // mid-drawer returns the drawer to the edge.
+    // Only the DOCKED (sidebar) Langy holds the right edge as the drawer's companion;
+    // the drawer then yields, sliding further left to leave the panel its slot plus a
+    // strip of space between the two cards.
     // Spec: specs/langy/langy-panel-layout.feature
     const isLangyDockedCompanion = useLangyStore((s) => s.isOpen && s.panelMode === "sidebar");
     const langyYieldMarginEnd = isLangyDockedCompanion
       ? `${8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`
       : undefined;
 
-    // Floating Langy dodges to the left when a drawer opens. Hold the drawer's
-    // entrance back until the panel has fully cleared out, so the sequence reads
-    // as Langy going first and the drawer following — the two moving in lockstep
-    // read as one clumsy jump.
-    // FROZEN at mount: the drawer that triggered the dodge gets the delay; a
-    // drawer opened later (panel already parked) enters normally.
+    // Floating Langy dodges to the left when a drawer opens.
     const isLangyOpenFloating = useLangyStore((s) => s.isOpen && s.panelMode === "floating");
     const [staggerBehindFloatingLangy] = React.useState(() => isLangyOpenFloating);
     const langyStaggerEnter = staggerBehindFloatingLangy
@@ -128,13 +116,6 @@ export const DrawerCloseTrigger = React.forwardRef<
 
 /**
  * Wrapper around Chakra's Drawer.Root with safe defaults for nested drawers.
- *
- * - `modal={false}`: Prevents focus trap from stealing input in child drawers.
- * - `closeOnInteractOutside={false}`: Prevents parent from closing when
- *   interacting with a child drawer.
- * - `preventScroll={false}`: Default to allowing background scrolling.
- *
- * All defaults can be overridden by passing props explicitly.
  */
 export type AppDrawerSize = NonNullable<ChakraDrawer.RootProps["size"]> | "2xl";
 

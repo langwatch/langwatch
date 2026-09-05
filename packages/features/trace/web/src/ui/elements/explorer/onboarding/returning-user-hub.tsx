@@ -7,12 +7,7 @@ interface HubOption {
   label: string;
   icon: typeof Sparkles;
   /**
-   * Stage to jump into when this option is picked. Aim at the *narrative
-   * entry point* rather than the climax — picking the drawer tour lands
-   * at `postArrival` so the user clicks the highlighted row themselves
-   * and the rest of the drawer beats fall out naturally, exactly like
-   * a first-time visit. The hub just chooses which beat to start from;
-   * the rest of the journey machinery stays on its single code path.
+   * Stage to jump into when this option is picked.
    */
   target: StageId;
 }
@@ -40,12 +35,9 @@ interface ReturningUserHubProps {
 }
 
 /**
- * Welcome screen for users who've completed the onboarding journey at
- * least once. Instead of making them sit through the linear narrative
- * again, we offer a small hub of "help me with that bit" jumps.
- *
- * Three cards in a single row, icon + label only — descriptions and
- * arrow chrome were noise once the user already knows the product.
+ * Welcome screen for users who've completed the onboarding journey at least once.
+ * Instead of making them sit through the linear narrative again, we offer a small hub
+ * of "help me with that bit" jumps.
  */
 export function ReturningUserHub({ onJump }: ReturningUserHubProps): React.ReactElement {
   return (

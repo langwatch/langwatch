@@ -1,28 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * What each Ops address is actually behind, proved by mounting it.
- *
- * `ui-page-guard.unit.test.tsx` pins the guard's ordering; neither it nor a
- * routes test would notice a loader that names the wrong grant — which is the
- * failure that admits a reader the platform shell refused. That failure matters
- * more here than for any family before it: the Backoffice reads and writes every
- * tenant's rows, and `platform/app` gated it on a SEPARATE admin check
- * (`api.user.isAdmin`) precisely so that widening operator access could never
- * widen it. This file loads the real loaders, mounts what they hand back under a
- * session that answers precisely, and reads the result.
- *
- * The screens themselves are faked, and so is the transport the host provider
- * reads the organization graph over. What is under test is the policy the
- * frontend feature wraps a screen in, and loading thirteen thousand lines of
- * Chakra over a live tRPC client to assert a refusal would test the screen
- * instead.
- *
- * `ops:view` and `ops:manage` are the two platform-tier grants the authz
- * registry declares (`ops.actions = ["view", "manage"]`, `scopes:
- * ["platform"]`). They carry the platform shells' two policies one for one:
- * `OpsPageShell`'s live operator probe and `BackofficeShell`'s admin check.
- *
+ * @vitest-environment jsdom
  * Spec: packages/features/ops/specs/admin.feature
  */
 
@@ -224,10 +202,7 @@ describe("given the Backoffice, which reads every tenant's rows", () => {
   });
 
   /**
-   * THE DECOUPLING, PROVED. `BackofficeShell`'s docblock asked for exactly this
-   * — "if that scope ever broadens beyond admins, Backoffice stays strictly
-   * admin-only" — and a page move that quietly collapsed the two checks into
-   * one would have handed every operator the whole customer table.
+   * THE DECOUPLING, PROVED.
    */
   describe("when an operator without the admin grant opens it", () => {
     it.each([

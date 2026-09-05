@@ -40,13 +40,6 @@ function classifyError(error: unknown, traceId: string | undefined): ErrorKind {
 
 /**
  * The chrome for each kind — icon and tone only.
- *
- * The words used to live here too, and they contradicted the registry: this
- * file told the customer a missing trace had "aged out of retention, or the
- * link points to a different project" while `trace_not_found` says "it may
- * still be arriving. Traces take a few seconds to appear." Both were on screen
- * in different places for the same failure, and the local one won. One code,
- * one set of words — `explainAnyError` supplies them now.
  */
 const KIND_CONFIG: Record<
   ErrorKind,
@@ -75,11 +68,6 @@ const NO_SELECTION_DESCRIPTION = "Pick a trace from the table to see its details
 
 /**
  * The line under the headline.
- *
- * `no-selection` has no error and never will, so it keeps its local string.
- * Otherwise the registry's words win — except for an unregistered `not-found`,
- * where the generic "we've been notified" would contradict a headline that has
- * already said exactly what happened.
  */
 function describeKind(kind: ErrorKind, explanation: ErrorExplanation): string {
   if (kind === "no-selection") return NO_SELECTION_DESCRIPTION;

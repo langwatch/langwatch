@@ -39,9 +39,8 @@ const col = createColumnHelper<TraceListItem>();
 
 /**
  * The trailing "+" column def: fixed-width, non-reorderable, non-sortable,
- * non-resizable. Its body cells are empty (no registry cell is keyed to
- * ADD_COLUMN_ID, so the registry renders nothing); only the header carries
- * the picker trigger.
+ * non-resizable. Its body cells are empty (no registry cell is keyed to ADD_COLUMN_ID,
+ * so the registry renders nothing); only the header carries the picker trigger.
  */
 export const addColumnColumnDef: ColumnDef<TraceListItem, any> = col.display({
   id: ADD_COLUMN_ID,

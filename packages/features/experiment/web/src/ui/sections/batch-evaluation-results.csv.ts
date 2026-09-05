@@ -1,12 +1,5 @@
 /**
  * CSV Export utilities for batch evaluation results
- *
- * Generates CSV files from BatchEvaluationData with the new V3-style layout:
- * - Dataset columns
- * - Target output columns (one per target)
- * - Cost and duration per target
- * - Evaluator results per target (score, passed, details)
- * - Comparison verdicts per comparison evaluator (winner, candidates, reasoning)
  */
 
 import numeral from "numeral";
@@ -54,25 +47,14 @@ const formatBoolean = (value: boolean | null | undefined): string => {
 const TIE_WINNER = "tie";
 
 /**
- * Written when the judge answered but named a candidate this run does not
- * know. Kept apart from a tie on purpose: a tie is evidence shared between the
- * candidates, an unplaceable answer is no evidence at all, and reporting it as
- * a tie hands the reader a result nobody produced.
+ * Written when the judge answered but named a candidate this run does not know.
  */
 const UNRESOLVED_WINNER = "unresolved";
 
 /**
- * Written when a comparison produced no winner: the two judge passes named
- * different winners, the judge answered without naming one, or the row had too
- * few candidate outputs to compare at all.
- *
- * One token for all of them because the stored row cannot tell them apart: the
- * SDKs report `inconclusive` and `skipped` as distinct verdicts but record both
- * under the same batch status, so naming either one here would be a guess. The
- * reasoning cell beside it says which happened, in the judge's own words.
- *
- * These used to export as three empty cells, which read exactly like a row with
- * no comparison result at all, and dropped the explanation with them.
+ * Written when a comparison produced no winner: the two judge passes named different
+ * winners, the judge answered without naming one, or the row had too few candidate
+ * outputs to compare at all.
  */
 const NO_VERDICT_WINNER = "no_verdict";
 
@@ -99,11 +81,8 @@ const formatComparisonWinner = (
 };
 
 /**
- * The candidates the judge actually compared on this row, which can be a
- * strict subset of the comparison's variants when a target produced no output
- * for the row. Empty when the verdict carries no candidates: naming the
- * column-wide variant list instead would assert a matchup that may never have
- * happened.
+ * The candidates the judge actually compared on this row, which can be a strict subset
+ * of the comparison's variants when a target produced no output for the row.
  */
 const formatComparisonCandidates = (
   column: BatchComparisonColumn,
@@ -336,12 +315,6 @@ export const buildCsvData = (
 
 /**
  * Generate CSV content string from BatchEvaluationData.
- *
- * The formula guard is applied here rather than in `buildCsvData`: the builders
- * return the values as they are so callers can assert on content, and the
- * apostrophe belongs to the file, not to the data. Both halves need it — the
- * dataset columns and the evaluator names in the header row are named by
- * whoever set the experiment up.
  */
 export const generateCsvContent = (data: BatchEvaluationData): string => {
   const { headers, rows } = buildCsvData(data);

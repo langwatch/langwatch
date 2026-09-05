@@ -1,14 +1,6 @@
 /**
  * @vitest-environment jsdom
  */
-/**
- * The per-turn steps strip in the conversation view.
- *
- * A Claude Code turn is an agentic loop — model, tool, model, tool, answer — and
- * the thread's two bubbles show only its ends. These pin the two properties that
- * make the strip worth having: it reveals the loop, and it costs nothing until
- * you ask for it (a long thread must not fire a span query per turn).
- */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

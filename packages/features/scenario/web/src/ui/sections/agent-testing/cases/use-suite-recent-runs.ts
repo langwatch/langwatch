@@ -1,18 +1,6 @@
 /**
- * The recent runs that covered a scenario of one test suite, read for the list
- * under the scenarios table.
- *
- * A run belongs to the run plan it was started under, and a run of one
- * scenario is a plan of its own, so a list keyed on a plan named after the
- * suite would miss most of what the suite has run. The list is keyed on the
- * scenarios instead: every batch of the period that ran one of them, whatever
- * plan it belongs to, and each row carries the plan so the reader can tell two
- * of them apart and the row can open the run under the plan that holds it.
- *
- * The read is asked for only when the list is opened. The Scenarios tab is an
- * authoring surface, so a suite that nobody opens the list on downloads no
- * runs at all.
- *
+ * The recent runs that covered a scenario of one test suite, read for the list under
+ * the scenarios table.
  * @see specs/features/agent-testing/cases-table.feature
  */
 

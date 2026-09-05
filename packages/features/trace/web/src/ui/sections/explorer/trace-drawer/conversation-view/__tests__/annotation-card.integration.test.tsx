@@ -1,10 +1,7 @@
 /**
+ * What an annotation carries and how it reads beside its turn: the rating, the scores and why they were given,
+ * who left it (including the ones that came in over the API), and the correction it suggested.
  * @vitest-environment jsdom
- *
- * What an annotation carries and how it reads beside its turn: the rating, the
- * scores and why they were given, who left it (including the ones that came in
- * over the API), and the correction it suggested. Only the author gets an edit
- * affordance. See specs/traces-v2/annotation-rail.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

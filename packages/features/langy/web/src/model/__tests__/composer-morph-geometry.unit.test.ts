@@ -1,11 +1,6 @@
 /**
+ * The geometry the home page's send depends on, and in particular the one hazard that would silently ruin it: measuring the panel's composer while the panel is still closed, and so landing the travelling copy wherever the closed transform happens to have put it.
  * @vitest-environment jsdom
- *
- * The geometry the home page's send depends on, and in particular the one
- * hazard that would silently ruin it: measuring the panel's composer while the
- * panel is still closed, and so landing the travelling copy wherever the closed
- * transform happens to have put it.
- *
  * Spec: specs/home/langy-home-morph.feature
  */
 import { afterEach, describe, expect, it } from "vitest";
@@ -59,11 +54,9 @@ describe("midpointRect", () => {
 
 describe("readRectAtRest", () => {
   /**
-   * jsdom has no layout, so `getBoundingClientRect` is stubbed on the element
-   * itself and made to answer differently depending on whether its panel is
-   * still wearing the closed transform. That is exactly the real behaviour
-   * being guarded: a browser returns the TRANSFORMED box, so reading through a
-   * closed panel describes somewhere the composer will never be.
+   * jsdom has no layout, so `getBoundingClientRect` is stubbed on the element itself
+   * and made to answer differently depending on whether its panel is still wearing the
+   * closed transform.
    */
   const mountPanel = ({ closedOffset }: { closedOffset: number }) => {
     const panel = document.createElement("div");

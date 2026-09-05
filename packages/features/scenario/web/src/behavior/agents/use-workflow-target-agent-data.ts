@@ -22,14 +22,8 @@ function extractWorkflowInputs(dsl: StudioWorkflow | undefined): Variable[] {
 }
 
 /**
- * Resolves a workflow-type agent target's linked workflow and its real
- * mapping-surface inputs, for AgentWorkflowTargetEditorDrawer.
- *
- * A failed or still-unresolved lookup must not fall back to the synthetic
- * "input" field — that fallback is only valid once we know for a fact the
- * workflow loaded successfully and genuinely declares zero entry inputs.
- * Otherwise a user could map and save against a field ("input") that may
- * not exist on the real (unloaded) workflow.
+ * Resolves a workflow-type agent target's linked workflow and its real mapping-surface
+ * inputs, for AgentWorkflowTargetEditorDrawer.
  */
 export function useWorkflowTargetAgentData({
   agentId,

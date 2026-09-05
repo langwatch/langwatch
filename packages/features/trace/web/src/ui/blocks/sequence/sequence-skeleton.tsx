@@ -2,10 +2,7 @@ import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
 import { SkeletonHeader } from "../../elements/sequence/skeleton-header";
 
 /**
- * Minimal placeholder for the sequence diagram while its chunk + Mermaid
- * are loading. Chakra's <Skeleton> brings the shimmer; we just stand up the
- * silhouette of a sequence diagram (a row of participant boxes + a few
- * lifeline + signal hints) so the eye knows what's coming.
+ * Minimal placeholder for the sequence diagram while its chunk + Mermaid are loading.
  */
 export function SequenceSkeleton() {
   return (

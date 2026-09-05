@@ -3,8 +3,6 @@ import "@testing-library/jest-dom/vitest";
 // @vitest-environment jsdom
 /**
  * Tests for ComparisonCharts component
- *
- * Tests per-evaluator charts, metrics selector, and X-axis grouping.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

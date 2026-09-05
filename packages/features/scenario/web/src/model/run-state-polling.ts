@@ -1,11 +1,5 @@
 /**
  * Polling cadence for the run detail drawer's getRunState query.
- *
- * A finished run never changes, so its drawer must not poll at all.
- * Live (or not-yet-visible) runs poll fast only while the SSE event stream
- * is down — when connected, SSE invalidations deliver updates and polling
- * drops to a slow safety net.
- *
  * @see specs/suites/simulations-performance.feature
  */
 

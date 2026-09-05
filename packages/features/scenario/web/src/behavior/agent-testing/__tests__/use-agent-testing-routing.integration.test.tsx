@@ -1,10 +1,6 @@
 /**
+ * The address holds the whole state of the Agent Testing page, and every move inside the page is a shallow push into the one catch-all route, so the page never remounts.
  * @vitest-environment jsdom
- *
- * The address holds the whole state of the Agent Testing page, and every move
- * inside the page is a shallow push into the one catch-all route, so the page
- * never remounts.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { cleanup, renderHook } from "@testing-library/react";

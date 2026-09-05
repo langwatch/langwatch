@@ -1,10 +1,7 @@
 /**
+ * The Context Size column: how full the window already was when the trace's first model
+ * call ran.
  * @vitest-environment jsdom
- *
- * The Context Size column: how full the window already was when the trace's
- * first model call ran. It sits next to Tokens and means something different,
- * so the cell says so on hover rather than leaving a reader to assume it is
- * another sum.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

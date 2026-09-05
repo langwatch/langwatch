@@ -1,15 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Unit tests for the useNewScenarioFlow hook.
- *
- * Covers:
- * - Inline welcome visibility (zero scenarios, not dismissed)
- * - Welcome modal on "New Scenario" click (not yet dismissed)
- * - Proceed from welcome persists welcomeSeen
- * - Skip welcome when already seen (localStorage)
- * - Skip welcome when scenarios exist
- * - Dismiss welcome modal via onOpenChange
+ * @vitest-environment jsdom
  */
 import { act, renderHook } from "@testing-library/react";
 import { useNewScenarioFlow } from "../../index";

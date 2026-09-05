@@ -7,12 +7,9 @@ import { Popover } from "@langwatch/design-system/popover";
 import { ColumnPickerContent } from "./column-picker-content";
 
 /**
- * Toolbar entry point to the column picker. The picker body
- * (`ColumnPickerContent`) is shared with the trailing "+" column header in
- * the table, so both surfaces stay in lockstep.
- *
- * `compact` drops the dropdown chevron when the toolbar is squeezed, leaving
- * just the columns glyph (the tooltip + click behaviour are unchanged).
+ * Toolbar entry point to the column picker. The picker body (`ColumnPickerContent`) is
+ * shared with the trailing "+" column header in the table, so both surfaces stay in
+ * lockstep.
  */
 export const ColumnsDropdown: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   return (

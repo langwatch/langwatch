@@ -10,28 +10,6 @@ import { useLangyStore } from "../../../../index";
 
 /**
  * A step that couldn't run because the plan ran out — and the way to change it.
- *
- * This REPLACES the generic failure card rather than sitting beside it. The
- * failure the user hit produced three tellings of one event (a red card, an
- * "unconfirmed" card, and a paragraph), and the red one was wrong anyway: it
- * read the 403 and said "Your access in this project doesn't cover this action",
- * sending them to check permissions when the truth was that their plan includes
- * three scenarios and all three were in use.
- *
- * A hybrid of three cards in the taxonomy, because it is doing all three jobs:
- * the RESULT card's material and its plain statement of fact (what the plan
- * includes, what is in use), the PROPOSAL's single primary action, and the ASK
- * card's "Needs you" eyebrow. `spotlight` is the intent it lands on — the full
- * panel material, the serif title, the generous padding — because the taxonomy
- * reserves that weight for what deserves the reader's whole attention, and a
- * turn that stopped because the plan ran out is the one card in a conversation
- * that qualifies.
- *
- * WHO gets the CTA is the point. Changing a plan is `organization:manage` — the
- * permission the subscription mutations themselves check
- * (`@langwatch/enterprise-billing-server`, the `subscription.*` transport) — so
- * anyone else is told plainly whom to ask instead. Handing them a button into a page that will refuse them is a
- * dead end dressed up as a way forward.
  */
 export function LangyPlanLimitCard({ presentation }: { presentation: LangyToolErrorPresentation }) {
   const limit = presentation.limit!;

@@ -1,13 +1,7 @@
 /**
+ * A new chat exists to be written in: starting one hands the composer keyboard focus so the reader can type at once, without a second gesture.
  * @vitest-environment jsdom
- *
- * A new chat exists to be written in: starting one hands the composer keyboard
- * focus so the reader can type at once, without a second gesture.
- *
  * Spec: specs/langy/langy-navigation-persistence.feature
- *
- * Boundary mock: the model picker, whose own dependency chain is irrelevant to
- * a test about focus.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";

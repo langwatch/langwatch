@@ -1,14 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for ScenarioFormDrawer deferred persistence.
- *
- * Verifies that:
- * - Opening the drawer without a scenarioId does not create a DB record
- * - First save creates the record and transitions to edit mode
- * - Subsequent saves update the existing record
- * - Closing without saving abandons the draft
- *
+ * @vitest-environment jsdom
  * @see specs/scenarios/scenario-deferred-persistence.feature
  */
 
@@ -694,10 +686,6 @@ describe("<ScenarioFormDrawer/>", () => {
 
   /**
    * specs/scenarios/scenario-editor-loading-state.feature
-   *
-   * The reported symptom: on first load the fields sat empty for seconds with
-   * nothing to say they were still coming, so the drawer read as a scenario
-   * with no name and no criteria.
    */
   describe("when opened on an existing scenario that has not loaded yet", () => {
     beforeEach(() => {
@@ -792,10 +780,6 @@ describe("<ScenarioFormDrawer/>", () => {
 
   /**
    * specs/scenarios/scenario-editor-loading-state.feature
-   *
-   * A failed read ends the wait without a record. Treated as loaded, the
-   * drawer hands back an editable blank form over a scenario that exists,
-   * and the save that follows creates a second one.
    */
   describe("when the existing scenario could not be read", () => {
     beforeEach(() => {
@@ -840,10 +824,6 @@ describe("<ScenarioFormDrawer/>", () => {
 
   /**
    * specs/scenarios/scenario-editor-loading-state.feature
-   *
-   * The read is disabled until the project resolves, and a disabled query
-   * reports itself as not loading. Taken at its word, that window hands back
-   * the blank form the placeholder exists to prevent.
    */
   describe("when the project is not known yet", () => {
     /** @scenario "The editor waits for the project too" */
@@ -864,10 +844,6 @@ describe("<ScenarioFormDrawer/>", () => {
 
   /**
    * specs/scenarios/scenario-editor-loading-state.feature
-   *
-   * A read that fails after one succeeded still holds the record it read, and
-   * the person may be part way through editing it. The error state is for
-   * having nothing to show, not for every failure.
    */
   describe("when a later read of a loaded scenario fails", () => {
     /** @scenario "A failed background read keeps the scenario on screen" */

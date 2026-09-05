@@ -2,11 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useLangyStore } from "../behavior/langy.store";
 
 /**
- * The id a panel-open warm mints is held as `pendingConversationId` so the
- * first send adopts the conversation whose worker is already booting. It is
- * spent by that send: the create path reads it whenever no conversation is
- * active, so an id left behind would send the NEXT new chat's first message
- * into the previous conversation.
+ * The id a panel-open warm mints is held as `pendingConversationId` so the first send
+ * adopts the conversation whose worker is already booting.
  */
 describe("langyStore pending conversation id", () => {
   beforeEach(() => {

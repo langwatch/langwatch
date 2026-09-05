@@ -1,10 +1,7 @@
 /**
- * Preserve a Langy trace search when crossing from the CLI grammar into the
- * Explorer's liqe URL fragment. Free text is quoted so field-like text remains
- * free text. Named windows stay absolute; the unnamed CLI default stays a
- * rolling day. Origins remain an OR group. The CLI limit cannot be represented
- * by the Explorer fragment, so the destination may contain the same result set
- * plus later rows.
+ * Preserve a Langy trace search when crossing from the CLI grammar into the Explorer's
+ * liqe URL fragment. Free text is quoted so field-like text remains free text. Named
+ * windows stay absolute; the unnamed CLI default stays a rolling day.
  */
 
 // The Explorer's own value-quoting rule. Imported rather than reimplemented so
@@ -32,33 +29,11 @@ const TRACE_EXPLORER_LENS = "all-traces";
 /**
  * The window `trace search` covers when the agent named none — the CLI's own
  * `oneDayAgo` default (`cli/commands/traces/search.ts`).
- *
- * This is carried as the Explorer's ROLLING preset, which is the one place this
- * module deliberately breaks its own absolute-times rule, because here the rule
- * would produce the less faithful link. The absolute rule exists for a search
- * whose window the agent PINNED: re-computing that against `now` on arrival
- * would silently move it. A default-window search pinned nothing — it asked for
- * "the last day", rolling, and the honest translation of a rolling window is a
- * rolling window.
- *
- * The alternative is worse in both directions: we do not know the wall-clock
- * time the search ran (the card's input carries flags, not a timestamp), so an
- * absolute window here would have to be anchored to the CLICK, quietly claiming
- * a precision we don't have. And emitting nothing at all — what this module did
- * before — drops the user into the Explorer's own 30d default, widening a
- * one-day question into a thirty-day one and changing every count on the page.
  */
 const CLI_DEFAULT_WINDOW_PRESET = "24h";
 
 /**
  * Recover the search the agent actually ran.
- *
- * The CLI envelope records the tool call under `langwatch.trace.search` but
- * leaves the tool INPUT as opencode's original shell payload — `{ command:
- * "langwatch trace search …" }` — because it only ever needed the resource and
- * the verb. So the flags have to come back out of the command string. A
- * structured input (the older MCP transport, and the gallery's fixtures) is
- * accepted too.
  */
 export function readTraceSearchQuery(input: unknown): TraceSearchQuery {
   if (!input || typeof input !== "object") return {};
@@ -130,18 +105,8 @@ export function parseTraceSearchCommand(command: string): TraceSearchQuery {
 }
 
 /**
- * The whole search as ONE liqe expression — every narrowing the CLI applied,
- * in the grammar the Explorer reads.
- *
- * Both destinations go through here, which is the point: the Explorer link and
- * the automation's subject have to denote the same set of traces, and the only
- * way to guarantee that is for there to be one expression rather than two
- * built alike. It is also where a dropped filter shows up as a WIDER result
- * set, never a narrower one — `--origin` used to be parsed by nobody and the
- * link silently searched every origin in the project.
- *
- * Null when the search narrowed nothing, so callers can tell "no filter" from
- * "a filter that happens to be empty".
+ * The whole search as ONE liqe expression — every narrowing the CLI applied, in the
+ * grammar the Explorer reads.
  */
 export function buildExplorerQuery(search: TraceSearchQuery): string | null {
   const clauses: string[] = [];
@@ -149,16 +114,7 @@ export function buildExplorerQuery(search: TraceSearchQuery): string | null {
   const query = search.query?.trim();
   if (query) clauses.push(asFreeTextTerm(query));
 
-  // `--origin a,b` means "from a OR from b". Spelled the way the Explorer's own
-  // filter sidebar spells a multi-value facet — `(origin:a OR origin:b)` — via
-  // the same `escapeValue` it uses, so a value needing quotes gets them by the
-  // Explorer's rule rather than by a second one invented here.
-  // Trim before use, not just before the emptiness test: this is a public
-  // function and callers can hand it a raw array. Filtering on `origin.trim()`
-  // while quoting the untrimmed value let `" evaluation "` through as
-  // `origin:" evaluation "` — a padded facet value that matches nothing, which
-  // is the one direction this module must never fail in (a lost filter widens
-  // the result set; an unmatchable one empties it).
+  // `--origin a,b` means "from a OR from b".
   const origins = search.origins?.map((origin) => origin.trim()).filter((origin) => origin !== "");
   if (origins && origins.length > 0) {
     const group = origins.map((origin) => `origin:${escapeValue(origin)}`).join(" OR ");
@@ -172,34 +128,14 @@ export function buildExplorerQuery(search: TraceSearchQuery): string | null {
 }
 
 /**
- * What an ABSENT window means for a given caller — which is not the same
- * question for every caller, and answering it wrong invents a filter.
- *
- *   "cli-last-24h"  the search came from `langwatch trace search`, whose own
- *                   default is the last day (`cli/commands/traces/search.ts`).
- *                   Stating no window there is a positive fact about the data:
- *                   it WAS the last 24h, and the link should say so rather than
- *                   drop the user into the Explorer's 30d default.
- *
- *   "unknown"       the search came from somewhere with no such guarantee —
- *                   an ADR-060 derived-card `explore` hint, for one, which the
- *                   model authors as `{ origin: "evaluation" }` with no dates
- *                   and no claim about when the underlying data is from. A card
- *                   summarising last quarter would link to a 24h window and show
- *                   an empty page.
- *
- * DEFAULT IS `"unknown"`, deliberately: a caller that forgets to say gets the
- * Explorer's own default, which is a SUPERSET the user can see through. The
- * opposite mistake — a silently invented window — hides the rows they came for,
- * and that is the one failure this module must not produce.
+ * What an ABSENT window means for a given caller — which is not the same question for
+ * every caller, and answering it wrong invents a filter.
  */
 export type UnstatedWindow = "cli-last-24h" | "unknown";
 
 /**
- * The Explorer's fragment for this search: the default lens, plus whatever
- * survived of the query and the window. Shared by every link out of a trace
- * search, so the Explorer behind a drawer and the Explorer behind the card's
- * own button are always showing the same result set.
+ * The Explorer's fragment for this search: the default lens, plus whatever survived of
+ * the query and the window.
  */
 function explorerFragment(search: TraceSearchQuery, unstatedWindow: UnstatedWindow): string {
   const fragmentParams = new URLSearchParams();
@@ -220,31 +156,13 @@ function explorerFragment(search: TraceSearchQuery, unstatedWindow: UnstatedWind
     // carries that guarantee, which is why the caller has to state it.
     fragmentParams.set("preset", CLI_DEFAULT_WINDOW_PRESET);
   }
-  // Exactly ONE bound named falls through deliberately, carrying no window at
-  // all. The CLI defaults the two ends INDEPENDENTLY (`search.ts`: absent start
-  // → now-24h, absent end → now), so a half-named window is [namedStart, now] or
-  // [now-24h, namedEnd] — neither of which is the 24h default. Claiming 24h for
-  // `--start-date` three months back would NARROW a link to a hundredth of what
-  // the agent searched, and a link that narrows is the one failure this module
-  // must not produce: a lost filter shows the user a superset they can see
-  // through, an invented one hides rows they came to find. We cannot reconstruct
-  // the missing end without knowing when the search ran, so we assert nothing
-  // and let the Explorer's own default stand.
+  // Exactly ONE bound named falls through deliberately, carrying no window at all.
   const fragmentQuery = fragmentParams.toString();
   return fragmentQuery ? `${TRACE_EXPLORER_LENS}?${fragmentQuery}` : TRACE_EXPLORER_LENS;
 }
 
 /**
  * The deep link into the Trace Explorer, carrying the agent's query.
- *
- * With a `traceId`, the link ALSO opens that trace's drawer on arrival — the
- * same URL-routed drawer the trace table opens (`drawer.open=traceV2Details`),
- * so a row on the card and a row in the table lead to exactly the same place.
- * The drawer params ride in the query string; the Explorer's own state rides in
- * the fragment. They don't collide.
- *
- * Null without a project slug, so callers hide the control rather than link
- * somewhere broken.
  */
 export function buildTraceExplorerHref({
   projectSlug,
@@ -281,22 +199,6 @@ export function buildTraceExplorerHref({
 
 /**
  * Open the automation drawer with the agent's search as the alert's SUBJECT.
- *
- * `initialFilterQuery` is the drawer's existing ADR-043 seed — the exact prop
- * the Trace Explorer's own Automate button passes (`AutomateButton.tsx`,
- * `initialSource: "trace"` + the current filter text), riding the same
- * `drawer.*` URL params every drawer opens from (`CurrentDrawer` spreads them
- * as props). The free text goes in as a quoted liqe literal, so what was free
- * text to the CLI stays free text to the automation's matcher — the same
- * fidelity rule `q` obeys on the Explorer link.
- *
- * Null without any narrowing at all (no query, no origin filter): a bare
- * search has no subject to alert on, and the caller must offer plain
- * navigation instead of a carried label that lies.
- *
- * Lands on the Trace Explorer carrying the same fragment as every other link
- * out of the search, so behind the drawer — and after it closes — the user is
- * looking at the very traces the alert would match.
  */
 export function buildAutomationHref({
   projectSlug,
@@ -321,10 +223,8 @@ export function buildAutomationHref({
 }
 
 /**
- * Wrap text as a liqe QUOTED LITERAL, which parses as an `ImplicitField` tag and
- * so compiles to a free-text match — the same thing the CLI's `--query` does.
- * Without the quotes, `status:error` would parse as a field filter and the user
- * would land on a different result set than the card showed them.
+ * Wrap text as a liqe QUOTED LITERAL, which parses as an `ImplicitField` tag and so
+ * compiles to a free-text match — the same thing the CLI's `--query` does.
  */
 export function asFreeTextTerm(text: string): string {
   return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
@@ -338,23 +238,9 @@ function splitFlag(token: string): [string, string | undefined] {
 }
 
 /**
- * Split a shell command into tokens, honouring single and double quotes — the
- * agent writes `--query 'checkout failed'`, and splitting on whitespace would
- * turn that into two flags and a stray word.
- *
- * BACKSLASH ESCAPES ARE PART OF THAT, not a refinement of it. The agent composes
- * its command as a string and routinely nests one quoting level inside another —
- * `-q "\"override codes\""` is a shape observed live. Reading `\"` as a plain
- * closing quote ends the token early, so `-q "\"override codes\""` recovered as
- * `\override`: the phrase silently truncated at the space AND carrying a stray
- * backslash. That is the exact failure this module exists to prevent — a link
- * that quietly searches for something other than what the agent searched for —
- * so the escapes are honoured with the same rules a POSIX shell uses:
- *
- *   unquoted        `\X` is a literal X (the backslash is the escape, not data)
- *   double-quoted   only `\" \\ \$ \`` are escapes; any other backslash is
- *                   literal data, exactly as `sh` treats it
- *   single-quoted   nothing escapes, not even a backslash — the shell's own rule
+ * Split a shell command into tokens, honouring single and double quotes — the agent
+ * writes `--query 'checkout failed'`, and splitting on whitespace would turn that into
+ * two flags and a stray word.
  */
 function tokenize(command: string): string[] {
   const tokens: string[] = [];
@@ -438,9 +324,7 @@ function readInt(value: unknown): number | undefined {
 /**
  * The CLI's comma-separated `--origin`, split the way the CLI itself splits it
  * (`cli/commands/traces/origin-filter.ts`). An array is accepted too, for the
- * structured transport. Undefined when nothing usable survived, so an empty or
- * whitespace-only flag reads as "no origin filter" rather than as a filter
- * matching nothing.
+ * structured transport.
  */
 function readOrigins(value: unknown): string[] | undefined {
   const raw = Array.isArray(value) ? value : [value];

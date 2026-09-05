@@ -1,12 +1,6 @@
 /**
+ * The Langy host answers "is this the demo project" from the deployment's own config leaf (`demoProjectSlug`) — the one fact a feature package may not read itself (ADR-101).
  * @vitest-environment jsdom
- *
- * The Langy host answers "is this the demo project" from the deployment's
- * own config leaf (`demoProjectSlug`) — the one fact a feature package may
- * not read itself (ADR-101). Every Langy surface downstream (the panel's
- * visibility gate, the project home hero, the command bar hand-off) reads
- * this one answer rather than comparing the slug again.
- *
  * Spec: specs/security/api-endpoint-authorization.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

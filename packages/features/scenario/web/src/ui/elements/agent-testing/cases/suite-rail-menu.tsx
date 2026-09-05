@@ -1,12 +1,5 @@
 /**
  * The row menu of one test suite in the rail.
- *
- * The recent runs of the suite hang off it as a submenu, holding the same runs
- * the button above the table holds, narrowed to the scenarios of this suite.
- *
- * Every action carries the icon it carries in the scenario row menu, so the
- * same action reads the same way wherever the tab offers it.
- *
  * @see specs/features/agent-testing/suites-rail.feature
  * @see dev/docs/best_practices/row-actions-overflow-menu.md
  */

@@ -1,16 +1,7 @@
 /**
+ * Include / exclude affordance on a facet value row. The row body includes (or clears)
+ * a value; a trailing `−` excludes it.
  * @vitest-environment jsdom
- *
- * Include / exclude affordance on a facet value row. The row body includes
- * (or clears) a value; a trailing `−` excludes it. This decouples "exclude"
- * from the hidden include→exclude cycle so a single deliberate click does
- * each — see specs/traces-v2/search.feature, rule "Facet value rows expose
- * include and exclude directly".
- *
- * Bound at the component-contract level: the store's NOT-clause behaviour
- * (`excludeFacet`) is unit-tested separately in
- * stores/__tests__/filterStore.unit.test.ts; here we verify the row routes
- * body clicks to `onToggle` and the `−` to `onExclude`.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

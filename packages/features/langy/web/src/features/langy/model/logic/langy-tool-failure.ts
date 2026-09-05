@@ -1,28 +1,5 @@
 /**
  * Reading a failed tool frame into card copy.
- *
- * A tool frame reports its failure as ONE string — the CLI's `--format json`
- * document if we are lucky, arbitrary stderr if we are not — and several cards
- * need the same answer out of it. So the reading lives here, once, and the
- * components only draw the result.
- *
- * Three levels, and the card must say something useful at every one:
- *
- *   1. PARSED AND KNOWN. The document named a failure this module has copy for
- *      (an access denial, a plan limit). The headline is that copy; the code
- *      still rides underneath as visible detail.
- *   2. PARSED, CODE UNKNOWN. The headline is the platform's own sentence — it
- *      was written for a user and is more specific than anything derivable here
- *      — and the code names itself underneath.
- *   3. UNPARSEABLE. Whatever text there is, shown. A card that knows the cause
- *      and declines to say it is the failure being fixed here.
- *
- * The code is NEVER the headline. `resource_limit_exceeded` is our vocabulary,
- * not the customer's (dev/docs/best_practices/copywriting.md), so the headline
- * says the project's plan includes 3 scenarios and all 3 are in use, and the
- * code sits below it in mono where it can be selected, searched and pasted into
- * a support thread.
- *
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A failure keeps its structure all the way to the card"
  */
@@ -54,18 +31,12 @@ export interface LangyToolErrorPresentation {
   title: string;
   message: string;
   /**
-   * The one specific fact behind the message — the access that was missing, the
-   * field that was wrong. A DETAIL, deliberately: it is the answer to "which
-   * one?", not the headline, because the headline has to make sense to someone
-   * who has never seen our permission names.
+   * The one specific fact behind the message — the access that was missing, the field
+   * that was wrong.
    */
   detail?: string;
   /**
    * The platform's own discriminant, shown verbatim.
-   *
-   * Present whenever the failure carried one, INCLUDING the codes this module
-   * has no copy for — a code that names itself beats "This step couldn't be
-   * completed", which is what an unmapped failure used to render as.
    */
   code?: string;
   /**
@@ -160,10 +131,6 @@ const ACTION_WORDS: Record<string, string> = {
 
 /**
  * `scenarios:manage` → "manage scenarios".
- *
- * Our permission names are internal vocabulary, so they never headline a card.
- * They do answer the one question the user has next — access to WHAT? — so the
- * reading of them belongs in a detail line, in plain words.
  */
 function humanPermission(permission: unknown): string | undefined {
   if (typeof permission !== "string") return undefined;
@@ -176,16 +143,6 @@ function humanPermission(permission: unknown): string | undefined {
 
 /**
  * The codes that mean "your credential does not carry this".
- *
- * A WHITELIST, and it used to be a status check — `httpStatus === 403` — which
- * is how a plan limit came to be reported as a permissions problem. 403 is the
- * platform's word for "no", and it says no for several different reasons: the
- * key lacks the permission, the plan lacks the allowance, a guardrail blocked
- * the content. Only the first of those is about access, and only the first has
- * a sentence written for whoever holds the credential ("API Key does not grant
- * required permission: scenarios:manage") rather than for the person reading
- * the panel. Every other 403 keeps its own sentence, which is both honest and
- * more specific than anything this module could substitute.
  */
 const ACCESS_DENIAL_CODES = new Set([
   "api_key_permission_denied",
@@ -198,10 +155,6 @@ const ACCESS_DENIAL_CODES = new Set([
 
 /**
  * The codes that mean "your plan does not include any more of these".
- *
- * Carries `{ limitType, current, max }`. A set rather than a single literal
- * because the seat limits are the only capped resources left, and a second
- * code would join here rather than fork the rendering.
  */
 const PLAN_LIMIT_CODES = new Set(["resource_limit_exceeded"]);
 
@@ -249,16 +202,6 @@ function limitSentence(limit: LangyToolFailureLimit): string {
 
 /**
  * What to SAY about a failure.
- *
- * An access denial and a plan limit get copy of our own, for the same reason in
- * both cases: the platform's sentence is written for somebody else. The denial's
- * names an API key the reader never issued and a permission in our vocabulary;
- * the limit's ends in an absolute URL to a settings page the reader may not even
- * be allowed to open, which the card replaces with a real action. Everything
- * else keeps the platform's own sentence, including the infrastructure failures:
- * it was written for a user, it is more specific than anything derivable here,
- * and replacing it would lose information the person reading the card actually
- * wants ("socket hang up" beats "something went wrong").
  */
 function describeFailure(domain: CliHandledError): {
   message: string;
@@ -276,21 +219,7 @@ function describeFailure(domain: CliHandledError): {
   }
 
   if (isAccessDenial(domain)) {
-    // ONE sentence for the fact, one for what to do. It used to say "Your
-    // access in this project doesn't cover this action." and then, underneath,
-    // "Needs permission to manage scenarios." — the same fact twice at two
-    // altitudes — and then a third line telling the reader to re-create an API
-    // key, which is advice for somebody who is not here.
-    //
-    // "You can't X here", not "you don't have permission to X". The difference
-    // matters and the response cannot settle it: the platform checks
-    // `effective = key ∩ user`, and a denial means the INTERSECTION was empty.
-    // That is usually the caller genuinely lacking the permission, but it is
-    // also what a key whose candidate list omits a permission the caller DOES
-    // hold looks like — a bug on our side, and one we have shipped. The wire
-    // carries `{ permission }` and nothing that separates the two, so the
-    // card states the consequence, which is true
-    // either way, rather than a cause it cannot substantiate.
+    // ONE sentence for the fact, one for what to do.
     const needed = humanPermission(domain.meta.permission);
     return {
       message: needed
@@ -324,20 +253,13 @@ export function presentLangyToolError({
   const raw = rawFailureText(errorText);
   const domain = readStructuredError(errorText);
 
-  // Level 3. No document, so no code — but there is usually TEXT, and the text
-  // is the only thing left that knows anything. Showing it beats "This step
-  // couldn't be completed", which tells the reader nothing and tells support
-  // less. Matching our own English on the way past was tried and removed: it
-  // pins the copy to a regex, breaks the moment the sentence is reworded, and
-  // hides the real defect (whoever dropped the document) instead of fixing it.
+  // Level 3. No document, so no code — but there is usually TEXT, and the text is the
+  // only thing left that knows anything. Showing it beats "This step couldn't be
+  // completed", which tells the reader nothing and tells support less.
   if (!domain) {
-    // ...unless the text is a traceback. A traceback is the engine talking to
-    // itself: a file path, a line number and an exception class from inside a
-    // process, none of it written for a reader
-    // (dev/docs/best_practices/error-handling.md). Its most quotable line reads
-    // exactly like a detail sentence, so `firstLine` lifted
-    // "json.decoder.JSONDecodeError: ..." into a card body. The body stays the
-    // plain sentence and the whole text keeps its place behind the disclosure.
+    // ...unless the text is a traceback. A traceback is the engine talking to itself: a
+    // file path, a line number and an exception class from inside a process, none of it
+    // written for a reader (dev/docs/best_practices/error-handling.md).
     const detail = raw && !isEngineTraceback(raw) ? firstLine(raw) : undefined;
     return {
       title: `${title} failed`,
@@ -368,18 +290,9 @@ export function presentLangyToolError({
     code: domain.code,
     ...(limit ? { limit } : {}),
     ...(isTerminalFailure(domain) ? { terminal: true } : {}),
-    // The platform's own next steps (ADR-045's remediation channel), shown as
-    // written — paraphrasing them here would put the card out of step with the
-    // docs they are pinned to.
-    //
-    // But only when they are addressed to THIS reader. That channel is authored
-    // for an API consumer holding their own key, and it shows: an access denial
-    // comes back saying "re-create the API key with the required scope", linked
-    // to the API-keys reference. Nobody chatting in this panel issued a key —
-    // Langy mints its own — so that is a line of advice for somebody who is not
-    // here, sitting on a card that was already saying enough. A field arriving
-    // on the wire is not a reason to render it; whether it helps the person
-    // reading THIS surface is.
+    // The platform's own next steps (ADR-045's remediation channel), shown as written —
+    // paraphrasing them here would put the card out of step with the docs they are
+    // pinned to.
     ...(remediationApplies && domain.suggestions?.length ? { tips: domain.suggestions } : {}),
     ...(remediationApplies && docsUrl ? { docsUrl } : {}),
     ...(traceId ? { traceId } : {}),
@@ -390,10 +303,9 @@ export function presentLangyToolError({
 }
 
 /**
- * The marks of a stack trace, in the two languages the tools we run are written
- * in. Any one of them is enough: a truncated traceback keeps its frames without
- * its header, and a process that printed only the exception line still printed
- * an exception line.
+ * The marks of a stack trace, in the two languages the tools we run are written in. Any
+ * one of them is enough: a truncated traceback keeps its frames without its header, and
+ * a process that printed only the exception line still printed an exception line.
  */
 const TRACEBACK_SIGNALS = [
   /^\s*Traceback \(most recent call last\)/m,

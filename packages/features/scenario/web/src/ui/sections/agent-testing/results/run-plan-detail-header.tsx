@@ -1,32 +1,5 @@
 /**
- * The top line of an open run plan: which run is on screen on the left, and
- * everything a person can do with the plan on the right, all on one row.
- *
- * The name of the plan is not here: it reads as the page title while the plan
- * is open, so this line can stay on the run itself.
- *
- * A set that runs from code is not a plan anyone wrote, so it carries neither
- * "Edit run plan" nor Run. Export lives in the overflow menu, so the line ends
- * on the two actions the prototype draws.
- *
- * "Show run settings" turns on the block under this line that says what the
- * run was configured with. It is off until it is asked for, so nothing pushes
- * the results down on a page a person opened to read them.
- *
- * The line holds one row whatever the note says. The run summary takes the
- * space the actions leave and cuts the note with an ellipsis, so the actions
- * keep the same place on a run with a note and on a run without one. On a
- * window too narrow even for the actions alone the line breaks, and the
- * actions stay at its right end.
- *
- * How long ago the run started is not on this line. The runs rail beside it
- * already says that for every run, and the settings block says it again with
- * the date, so a third copy on the line the results start from says nothing
- * new.
- *
- * The back control is not here: it lives in the runs rail, beside the list it
- * goes back to.
- *
+ * The top line of an open run plan: which run is on screen on the left, and everything a person can do with the plan on the right, all on one row.
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */
@@ -44,9 +17,6 @@ import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-butt
 
 /**
  * What the run control reads.
- *
- * The page shows a run that already happened, of a plan that already exists,
- * so the action it offers is to run that plan once more.
  */
 export const RUN_AGAIN_LABEL = "Run again";
 
@@ -78,12 +48,6 @@ export type RunPlanDetailHeaderProps = {
 
 /**
  * Which run is on screen: its number, how it went and the note it carries.
- *
- * How it went reads beside the name, where a person looks first. The number
- * and the pass block always read in full; the note is the one part that gives
- * space back, because it is the one part a person can read in a tooltip. Once
- * the note is down to nothing the group stops at what is left, and the line
- * breaks rather than cutting the pass block in half.
  */
 function RunSummary({ run }: { run: RunPlanDetailRun }) {
   return (

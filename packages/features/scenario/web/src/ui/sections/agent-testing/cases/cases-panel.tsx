@@ -1,10 +1,5 @@
 /**
- * The right half of the Scenarios tab: the suite that is open, the scenarios in
- * it, and the way into a recent run of it.
- *
- * The panel is a view over what it is given, so the reads and the writes stay
- * in TestCasesTab and every rule here can be read on its own.
- *
+ * The right half of the Scenarios tab: the suite that is open, the scenarios in it, and the way into a recent run of it.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/page-structure.feature
  */

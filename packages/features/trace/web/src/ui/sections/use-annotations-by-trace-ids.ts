@@ -5,12 +5,9 @@ import { api, type RouterOutputs } from "./trace-api";
 export type AnnotationByTrace = RouterOutputs["annotation"]["getByTraceIds"][number];
 
 /**
- * tRPC v10 sends queries as GET, so the trace-id array rides in the URL.
- * A whole page of filtered traces (100+ ids) blows past the batch link's
- * 4000-char ceiling and tRPC throws "Input is too big for a single
- * dispatch". Chunk the ids into URL-safe batches and fan them out with
- * `useQueries`, then flatten — so the caller sees one list regardless of
- * how many traces it asked about, with no upper bound on the count.
+ * tRPC v10 sends queries as GET, so the trace-id array rides in the URL. A whole page
+ * of filtered traces (100+ ids) blows past the batch link's 4000-char ceiling and tRPC
+ * throws "Input is too big for a single dispatch".
  */
 const CHUNK_SIZE = 50;
 
@@ -31,13 +28,6 @@ export interface UseAnnotationsByTraceIdsResult {
 
 /**
  * Annotations for a set of traces.
- *
- * Reads the comments about the traces themselves by default: a surface that
- * answers per trace across a page of them, the annotations list say, must not
- * change what it says because a reviewer marked six spans of one trace. A
- * surface that carries everything said about a trace, its own comments or a
- * dataset's annotations column, passes `anchor: "all"` and gets the anchored
- * ones too.
  */
 export function useAnnotationsByTraceIds({
   projectId,
@@ -52,12 +42,8 @@ export function useAnnotationsByTraceIds({
   keepPreviousData?: boolean;
   anchor?: "trace" | "all";
 }): UseAnnotationsByTraceIdsResult {
-  // Dedupe before chunking: duplicate ids spanning chunks would fetch the
-  // same annotations twice and double them in `data` after the flatMap.
-  //
-  // Sort too. The chunk contents are the query key, so two consumers reading
-  // the same traces in different orders would otherwise key differently and
-  // each fetch its own copy of the same annotations.
+  // Dedupe before chunking: duplicate ids spanning chunks would fetch the same
+  // annotations twice and double them in `data` after the flatMap.
   const uniqueTraceIds = useMemo(() => Array.from(new Set(traceIds)).sort(), [traceIds]);
 
   // Stable chunk identity so `useQueries` doesn't refetch every render.

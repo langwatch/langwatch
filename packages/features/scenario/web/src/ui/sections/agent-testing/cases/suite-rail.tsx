@@ -1,11 +1,5 @@
 /**
- * The rail on the left of the Scenarios tab: the test suites of the project,
- * then the sets that run from code.
- *
- * The rail is a view over what it is given. Every action it offers is a
- * callback, so the reading of the address and the writing of the data both
- * stay in the panel that owns them.
- *
+ * The rail on the left of the Scenarios tab: the test suites of the project, then the sets that run from code.
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */

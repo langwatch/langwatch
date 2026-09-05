@@ -4,11 +4,7 @@ import type { TraceListItem } from "../../types/trace";
 import { type ConversationGroup, sortConversationGroups } from "../conversation-groups";
 
 /**
- * Regression coverage for the conversation lens sort. `manualSorting` means
- * `sortConversationGroups` is the ONLY ordering path, so every column the
- * capability marks sortable must have a matching accessor — otherwise the
- * sort silently no-ops and the table shows a chevron that doesn't reorder
- * (the `started` / `lastTurn` columns regressed exactly this way).
+ * Regression coverage for the conversation lens sort.
  */
 
 const stubTrace = {} as unknown as TraceListItem;

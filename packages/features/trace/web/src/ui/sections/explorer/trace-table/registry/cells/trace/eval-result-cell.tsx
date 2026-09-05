@@ -10,13 +10,7 @@ import { dash } from "../../../../../../elements/explorer/trace-table/registry/c
 type Density = "compact" | "comfortable";
 
 /**
- * One per-evaluator eval column cell. Renders the chosen field of the
- * evaluator's latest run on the trace — Score (with a status-coloured
- * dot), Verdict (Pass / Fail), or Label (the categorical text) — and an
- * em-dash when the trace has no run or the chosen field has no value.
- *
- * Colour and score formatting come from `getEvalChipDisplay` so this cell
- * never drifts from the `EvalChip` summary badges or the drawer header.
+ * One per-evaluator eval column cell.
  */
 const EvalResultCellView: React.FC<{
   row: TraceListItem;

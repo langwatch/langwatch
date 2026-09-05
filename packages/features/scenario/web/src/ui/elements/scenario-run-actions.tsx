@@ -30,10 +30,9 @@ interface ScenarioRunActionsProps {
 }
 
 /**
- * Compact action cluster for the run detail drawer header, matching the
- * Traces V2 drawer: ghost icon buttons for the high-frequency actions
- * (run again, edit) and one overflow menu absorbing the secondary ones,
- * so the title keeps the row's width.
+ * Compact action cluster for the run detail drawer header, matching the Traces V2
+ * drawer: ghost icon buttons for the high-frequency actions (run again, edit) and one
+ * overflow menu absorbing the secondary ones, so the title keeps the row's width.
  */
 export function ScenarioRunActions({
   scenario,

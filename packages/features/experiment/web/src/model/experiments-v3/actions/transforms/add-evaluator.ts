@@ -13,11 +13,6 @@ export const newEvaluatorId = () => `evaluator_${nanoid(8)}`;
 
 /**
  * Refuses an evaluator that carries a `comparison` config it cannot own.
- *
- * The payload schema states the same rule, so an action goes no further than
- * its own validation. This is the belt for every caller that reaches a state
- * edit without that schema: the store's own `addEvaluator` and
- * `updateEvaluator` take a typed `EvaluatorConfig` straight from the UI.
  */
 export const assertComparisonColumnAllowed = (evaluator: {
   id?: string;
@@ -39,10 +34,6 @@ export const assertComparisonColumnAllowed = (evaluator: {
 
 /**
  * Append an evaluator and wire it up.
- *
- * Evaluators are global: one evaluator grades every target, so auto-mapping
- * runs across datasets x targets. Mappings on the payload always win —
- * inference only fills gaps.
  */
 export const attachEvaluator = ({
   state,
@@ -69,19 +60,9 @@ export const attachEvaluator = ({
 };
 
 /**
- * A caller-supplied id has to be free. Two evaluators under one id make the
- * mappings and the scores filed against it ambiguous, and the table could not
- * say which one a score column belongs to.
- *
- * Blank is not an id: an empty or whitespace-only string is read as "no id
- * given" and gets a generated one, so it can never reach state and make every
- * later lookup match the wrong evaluator.
- *
- * The name lands in `localEvaluatorConfig.name`, which is where the chips, the
- * projection and the run's own errors already read a workbench name from. A
- * name alone overrides no settings: the execution side reads
- * `localEvaluatorConfig?.settings`, which stays undefined here and falls
- * through to the database config the way it does for an unnamed evaluator.
+ * A caller-supplied id has to be free. Two evaluators under one id make the mappings
+ * and the scores filed against it ambiguous, and the table could not say which one a
+ * score column belongs to.
  */
 export const addEvaluator: Transform<AddEvaluatorPayload, { evaluatorId: string }> = ({
   state,

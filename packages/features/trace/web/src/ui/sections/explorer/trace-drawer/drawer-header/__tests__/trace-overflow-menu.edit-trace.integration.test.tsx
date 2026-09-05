@@ -1,12 +1,6 @@
 /**
+ * Who is offered the annotation pass.
  * @vitest-environment jsdom
- *
- * Who is offered the annotation pass. The overflow menu is where a reviewer
- * reaches for "Edit trace", and it is the only place the action is offered
- * on a trace that is being read, so the permission and the share view are gated
- * here. The header hands the menu its own `readOnly`, which is what a public
- * share page renders with.
- * See specs/traces-v2/trace-edit-mode.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -91,9 +85,7 @@ const renderMenu = ({
 
 /**
  * Chakra v3 Menu (Ark) needs the full pointer chain to open in jsdom; a native
- * `Element.click()` leaves it `data-state="closed"`. Waiting on an item that is
- * always offered is what proves the menu opened, so that an assertion about an
- * item being absent cannot pass on a menu that never opened.
+ * `Element.click()` leaves it `data-state="closed"`.
  */
 const openMenu = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole("button", { name: /more actions/i }));

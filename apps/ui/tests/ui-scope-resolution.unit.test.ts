@@ -1,16 +1,6 @@
 /**
- * The scope rules, carried over from the application's
- * `useOrganizationTeamProject` and asserted the same way its own tests assert
- * them.
- *
- * A page's organization, team and project decide what every write on it lands
- * in — model provider credentials above all — so a second, slightly different
- * answer is a tenancy bug rather than a cosmetic difference. These cases are
- * the application's: the personal-workspace ordering, the team-membership
- * ordering, the stickiness rules and the healing write-back, restated against
- * the pure resolution this package harvested them into. The cases the original
- * never covered — reserved slugs, the demo project, the guarded writes — are
- * marked where they appear.
+ * The scope rules, carried over from the application's `useOrganizationTeamProject` and
+ * asserted the same way its own tests assert them.
  */
 
 import { describe, expect, it } from "vitest";
@@ -353,9 +343,6 @@ describe("given a member of one team in an organization that has several", () =>
 
   /**
    * The predicate the page body gates on, restated here rather than imported.
-   * What the resolution has to produce is not merely "a team" but one the
-   * caller can be shown a page for, and an independent statement of that is
-   * what makes the assertion mean anything.
    */
   function chromeWouldRefuse({
     team,

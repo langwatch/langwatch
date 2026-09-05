@@ -1,17 +1,7 @@
 /**
+ * The composer's availability is a DERIVATION of the recorded turn (ADR-059 §4): recorded events fold through the shared `foldLangyConversationTurn` reducer into the store's local turn projection, the projection composes with the turn-phase machine, and the composer reads that one value.
  * @vitest-environment jsdom
- *
- * The composer's availability is a DERIVATION of the recorded turn (ADR-059
- * §4): recorded events fold through the shared `foldLangyConversationTurn`
- * reducer into the store's local turn projection, the projection composes with
- * the turn-phase machine, and the composer reads that one value. Nothing here
- * pokes `turnPhase` directly — the only inputs are durable events, exactly as
- * the freshness coordinator delivers them from the tail read.
- *
  * Spec: specs/langy/langy-event-sourced-frontend.feature
- *
- * Boundary mocks: the shared model pill. The store, the fold, and the
- * composer are all real.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

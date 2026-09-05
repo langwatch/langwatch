@@ -1,12 +1,6 @@
 /**
- * The targets of a comparison, one row each: a colour dot, the agent, its
- * parameter line, and an x.
- *
- * The section stands in for the agent section and the parameter section
- * while the run is a comparison. A row takes the colour of its place in the
- * sorted target list, which is the order the run detail colours its columns
- * by, so one target reads in one colour on both surfaces.
- *
+ * The targets of a comparison, one row each: a colour dot, the agent, its parameter
+ * line, and an x.
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 

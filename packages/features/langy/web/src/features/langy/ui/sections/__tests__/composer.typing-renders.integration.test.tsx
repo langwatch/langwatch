@@ -1,18 +1,6 @@
 /**
+ * Typing in the composer must re-render only the input row.
  * @vitest-environment jsdom
- *
- * Typing in the composer must re-render only the input row. The draft lives in
- * the langy store, so a keystroke updates it; when the whole composer read the
- * draft, every character rebuilt the context menu, the model picker combobox
- * (portal, positioner and all its rows, even closed) and the sigil tooltips —
- * measured at ~580 component renders per character in the browser. The model
- * pill is the canary here: it must not render again because a character was
- * typed.
- *
- * The second block pins the behavior that moved WITH the draft subscription
- * into the input row: Enter sends the draft, and `/` at a word boundary opens
- * the skills palette instead of typing a slash.
- *
  * @see specs/langy/langy-composer-feedback-and-cards.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

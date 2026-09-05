@@ -1,8 +1,6 @@
 /**
- * What the results column reads while it has nothing to show: the read that
- * failed, the read that is still going, the window that holds no run, and the
- * run the address names before its first scenario has reported.
- *
+ * What the results column reads while it has nothing to show: the read that failed, the read that is still going,
+ * the window that holds no run, and the run the address names before its first scenario has reported.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
@@ -73,11 +71,9 @@ export function NoRunInPeriod({
 }
 
 /**
- * The address names a run the window does not hold. A link opened right after
- * a run was started lands here before the first scenario has reported, and
- * the run then reads as one that is coming, not as one that happened in the
- * past. The live updates fill the column in as the scenarios report. The
- * period button stays, for the reader who opened an old link instead.
+ * The address names a run the window does not hold. A link opened right after a run was
+ * started lands here before the first scenario has reported, and the run then reads as
+ * one that is coming, not as one that happened in the past.
  */
 export function WaitingForFirstRun({
   period,

@@ -1,12 +1,5 @@
 /**
  * The docked sidebar's width.
- *
- * A lean default: slim enough to read as a quiet companion rather than a
- * second pane, still wide enough that a trace table, a diff or a capability
- * card can breathe (380px forces everything into a column of two-word lines,
- * so we stay clear of that floor). The dock runs narrower than the floating
- * card: floating OVERLAYS the page, so its width is free; the dock takes its
- * width FROM the page for as long as it is open.
  * Spec: specs/langy/langy-panel-layout.feature
  */
 export const SIDEBAR_PANEL_WIDTH = 392;
@@ -22,41 +15,23 @@ export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH;
 export const LANGY_DOCK_GAP = 12;
 
 /**
- * The app shell's header-bar height. The shell's content cards, and the
- * docked panel, which joins them as a second card, start below this line.
- * DashboardLayout derives its own viewport math from the same constant, so
- * the two cannot drift apart.
+ * The app shell's header-bar height. The shell's content cards, and the docked panel,
+ * which joins them as a second card, start below this line. DashboardLayout derives its
+ * own viewport math from the same constant, so the two cannot drift apart.
  */
 export const APP_HEADER_HEIGHT = 56;
 
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
 /**
- * The drawer-vs-floating-Langy choreography, both directions sequenced on the
- * same stagger so the two cards never fight over the right edge:
- *
- * OPENING, Langy goes first. The floating panel starts its dodge to the left
- * immediately; the drawer's entrance is held back this long so the panel has
- * fully cleared out (its 240ms move plus a beat) before the drawer slides in.
- *
- * CLOSING, the drawer goes first. The dodge releases only this long after the
- * drawer state clears, covering the drawer's exit animation, so the panel
- * glides back to its right corner over an already-empty edge.
+ * The drawer-vs-floating-Langy choreography, both directions sequenced on the same
+ * stagger so the two cards never fight over the right edge:
  */
 export const LANGY_DODGE_STAGGER_MS = 450;
 
 /**
- * The spring a Langy surface moves on when it is being PLACED somewhere new,
- * as opposed to opening or closing.
- *
- * Deliberately slower than open/close. Switching between the dock and the
- * floating companion changes both the page's reserved gutter and the panel's
- * geometry; treating that as one spring makes it feel picked up and placed,
- * rather than a sidebar disappearing while a card pops in elsewhere.
- *
- * Lives here, not in LangyPanel, because it is no longer only the panel's:
- * the home page's composer travels to the panel's floor on this same spring,
- * so the two morphs read as one family. One definition, or they drift.
+ * The spring a Langy surface moves on when it is being PLACED somewhere new, as opposed
+ * to opening or closing.
  */
 export const PANEL_LAYOUT_TRANSITION = {
   type: "spring",
@@ -66,11 +41,8 @@ export const PANEL_LAYOUT_TRANSITION = {
 } as const;
 
 /**
- * The floating card's symmetric viewport inset (a rounded card with a small,
- * SYMMETRIC inset on every side). One definition, shared by everything that
- * hangs off the card's edge: the inspector drawer (so the two can't drift a
- * pixel apart) and the minimised peek (which rests on the same horizontal
- * position, so sinking and rising never side-step).
+ * The floating card's symmetric viewport inset (a rounded card with a small, SYMMETRIC
+ * inset on every side).
  */
 export const FLOATING_PANEL_INSET = 12;
 
@@ -106,22 +78,11 @@ export const INSPECTOR_WIDTH = 380;
 
 /**
  * How far the inspector slides UNDER the panel's left edge.
- *
- * Butted up exactly against the panel, the drawer's own rounded right corners
- * stayed visible as two little notches against the panel's straight edge — the
- * pair read as two cards that happened to be touching. Tucking it a few pixels
- * behind (the panel sits at a higher z-index and paints over it) buries the
- * seam, so the drawer reads as something the panel pulled out of itself.
  */
 export const INSPECTOR_TUCK = 10;
 
 /**
  * The inspector's placement box, per panel layout.
- *
- * ONE derivation for both modes, so the drawer always mirrors the panel it
- * hangs off: same top and bottom edges (floating: the measured panel height,
- * bottom-anchored on the same inset; docked: the same header-to-floor span the
- * dock claims), and the seam edge landing exactly under the panel's left edge.
  */
 export interface LangyInspectorFrame {
   /** Offset from the viewport's right edge to the drawer's right edge. */
@@ -184,25 +145,6 @@ export function resolveInspectorFrame({
 
 /**
  * The floating card's resting floor, in px.
- *
- * The card is deliberately short at rest and GROWS with its conversation, so
- * an empty thread is a compact card rather than a tall stub. The sizes are
- * steps, not a curve: nothing (340), a card holding a turn (410), a card
- * holding a thread (520).
- *
- * `expectedMessageCount` is what the card has to hold — the messages it has,
- * or, while a remembered conversation's history is still loading, the count
- * the recents list already knows is coming. Sizing from the loaded messages
- * alone made a restored conversation open on the empty floor and step up as
- * its history landed, which is the same bounce the high-water mark exists to
- * prevent — just moved to the moment of opening.
- */
-/**
- * The steps were tuned against plain prose answers, where a short turn really
- * is short. A turn that ends in a CARD — an error, a capability result — needs
- * appreciably more room than one line of text, and at the old floors the card
- * filled the card: composer hard against it, nothing breathing. Every step is
- * a little taller so the panel always opens with somewhere to put an answer.
  */
 export const LANGY_FLOATING_FLOOR_EMPTY_PX = 380;
 export const LANGY_FLOATING_FLOOR_TURN_PX = 480;

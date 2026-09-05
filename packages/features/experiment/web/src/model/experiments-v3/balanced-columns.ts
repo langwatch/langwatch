@@ -1,21 +1,7 @@
 /**
- * Pick a column count for the comparison variant grid so the rows come out
- * even. A `Wrap` reflows ragged — twelve variants land as 4/4/3/1, and the
- * lone trailing card reads as a mistake rather than a layout.
- *
- * Above four variants the grid is always three or four columns wide. Four
- * cards is the most that stays readable at drawer width, and two columns
- * turns a long list into a tall narrow strip (ten variants as 2/2/2/2/2
- * rather than 4/4/2).
- *
- * A column count that divides the variants exactly wins, since every row is
- * then full (12 -> 4/4/4, 9 -> 3/3/3). Otherwise we take the count whose
- * last row is fullest (7 -> 4/3, not 3/3/1), preferring four on a tie so the
- * grid stays wide rather than tall.
- *
- * A trailing row of one is unavoidable when the count is one more than a
- * multiple of both three and four (13, 25, ...). Nothing to do about that
- * short of an uneven grid, which is the thing we're removing.
+ * Pick a column count for the comparison variant grid so the rows come out even. A
+ * `Wrap` reflows ragged — twelve variants land as 4/4/3/1, and the lone trailing card
+ * reads as a mistake rather than a layout.
  */
 const CANDIDATE_COLUMNS: number[] = [4, 3];
 

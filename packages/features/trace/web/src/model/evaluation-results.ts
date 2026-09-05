@@ -4,17 +4,8 @@ import {
 } from "@langwatch/handled-error";
 
 /**
- * Parsed evaluation result with status information.
- * Used for rendering evaluation results in UI components.
- *
- * Status meanings:
- * - pending: Not yet executed
- * - running: Currently executing
- * - passed: Explicitly passed (passed=true)
- * - failed: Explicitly failed (passed=false)
- * - processed: Completed but no pass/fail (score-only evaluators)
- * - error: Execution error
- * - skipped: Intentionally skipped
+ * Parsed evaluation result with status information. Used for rendering evaluation
+ * results in UI components.
  */
 export type ParsedEvaluationResult = {
   status: "pending" | "running" | "passed" | "failed" | "processed" | "error" | "skipped";
@@ -31,9 +22,6 @@ function readSerializedDomainError(candidate: unknown): SerializedHandledError |
 
 /**
  * Parses an unknown evaluation result into a typed structure.
- * Handles boolean results, objects with passed/score/label/details fields,
- * and error states.
- *
  * @param result - The raw evaluation result (can be boolean, object, or undefined)
  * @returns Parsed evaluation result with status and optional score/label/details
  */
@@ -124,11 +112,9 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
 };
 
 /**
- * Status indicator colors for evaluation results — single source of
- * truth for dots, popover accents, score-bar fills, and any other
- * "one colour per status" rendering across the trace list, the v2
- * drawer header, the Evals accordion cards, and the v3 evaluator
- * chips. Update here and every surface follows.
+ * Status indicator colors for evaluation results — single source of truth for dots, popover accents, score-bar
+ * fills, and any other "one colour per status" rendering across the trace list, the v2 drawer header, the Evals
+ * accordion cards, and the v3 evaluator chips.
  */
 export const EVALUATION_STATUS_COLORS = {
   pending: "gray.400",
@@ -147,11 +133,9 @@ export const EVALUATION_STATUS_COLORS = {
 } as const;
 
 /**
- * Tag rendering pairs for evaluation statuses — bg / fg combinations
- * tuned for readability on light surfaces, used by the Evals accordion
- * card's status pill and any future "filled chip" surface. Always
- * derived from the same enum as `EVALUATION_STATUS_COLORS` so the
- * dot colour and the tag colour can't drift out of step.
+ * Tag rendering pairs for evaluation statuses — bg / fg combinations tuned for
+ * readability on light surfaces, used by the Evals accordion card's status pill and any
+ * future "filled chip" surface.
  */
 export const EVALUATION_STATUS_TONES = {
   pending: { bg: "gray.subtle", fg: "fg.muted" },
@@ -190,17 +174,13 @@ export const getStatusLabel = (status: ParsedEvaluationResult["status"]): string
 
 /**
  * Shape of any of the evaluation result variants we display as chips.
- * Tolerates the slightly different status enums used by the legacy
- * v1 trace summary (`pass`/`fail`/`warning`) and the v3 evaluator
- * runner (`passed`/`failed`/`processed`/`running`/`pending`).
  */
 export interface EvalChipInput {
   name?: string | null;
   /**
-   * Alias for `name` matching the trace-list `TraceEvalResult` shape
-   * (which mirrors the ClickHouse `EvaluatorName` column). The drawer
-   * header chip passes `name`; the trace list passes a TraceEvalResult
-   * directly. Accept both so neither surface has to remember to remap.
+   * Alias for `name` matching the trace-list `TraceEvalResult` shape (which mirrors the
+   * ClickHouse `EvaluatorName` column). The drawer header chip passes `name`; the trace
+   * list passes a TraceEvalResult directly.
    */
   evaluatorName?: string | null;
   evaluatorId?: string | null;
@@ -227,13 +207,8 @@ export interface EvalChipInput {
   passed?: boolean | null;
   /**
    * What kind of verdict the evaluator produced, where the caller knows.
-   * `"categorical"` means it answered with a label and neither a number
-   * nor a pass/fail — see {@link EvalChipDisplay.categoryLabel}.
-   *
-   * Worth passing wherever it is known, because `score` alone cannot carry
-   * the distinction: some callers substitute `0` for a score the evaluator
-   * never produced, and a chip reading that as a real zero reports a
-   * failing-looking verdict nobody returned.
+   * `"categorical"` means it answered with a label and neither a number nor a pass/fail
+   * — see {@link EvalChipDisplay.categoryLabel}.
    */
   scoreType?: "numeric" | "boolean" | "categorical" | null;
 }
@@ -255,10 +230,9 @@ export interface EvalChipDisplay {
   /** Whether the verdict is "no real score" (skipped or error). */
   noVerdict: boolean;
   /**
-   * Color-coded pass/fail label when the evaluator returned an explicit
-   * boolean verdict (not a numeric score). `null` for numeric / skipped /
-   * error, and for a categorising evaluator, which passed no judgement to
-   * label.
+   * Color-coded pass/fail label when the evaluator returned an explicit boolean verdict
+   * (not a numeric score). `null` for numeric / skipped / error, and for a categorising
+   * evaluator, which passed no judgement to label.
    */
   passLabel: { text: string; color: string } | null;
   /**
@@ -312,10 +286,9 @@ export function formatEvalScoreText(score: number | boolean | null | undefined):
 }
 
 /**
- * Resolve any evaluation result variant into the chip-display contract.
- * Centralized so the trace-table chip, the drawer header chip and any
- * future surface (Evals accordion list, etc.) render identical visuals
- * for the same input.
+ * Resolve any evaluation result variant into the chip-display contract. Centralized so
+ * the trace-table chip, the drawer header chip and any future surface (Evals accordion
+ * list, etc.) render identical visuals for the same input.
  */
 export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
   const status = normalizeEvalStatus(input);
@@ -340,16 +313,9 @@ export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
 }
 
 /**
- * A categorising evaluator's verdict IS its label. Return it so callers can
- * show it where the score and the pass/fail would go: both are stand-ins
- * invented for fields it never filled, and printing them claims a run that
- * scored zero and passed.
- *
- * A caller that knows its `scoreType` is believed over `score`, because its
- * `score` may be one of those stand-ins. A caller that doesn't know is read
- * off the raw fields: a label with neither a score nor a verdict beside it
- * came from an evaluator that only categorised. A boolean score is a verdict,
- * so it never reads as a category no matter what it is labelled.
+ * A categorising evaluator's verdict IS its label. Return it so callers can show it
+ * where the score and the pass/fail would go: both are stand-ins invented for fields it
+ * never filled, and printing them claims a run that scored zero and passed.
  */
 function resolveCategoryLabel({
   input,

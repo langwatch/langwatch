@@ -1,11 +1,5 @@
 /**
  * Which target columns a run renders.
- *
- * A run stores the whole board in its Targets snapshot, so a run scoped to one
- * column still declares its siblings. The results page reads that snapshot, so
- * without a filter it draws a column per declared target and the ones the run
- * never executed show no output, no latency and no score.
- *
  * @see specs/batch-evaluation-results/target-column-identity.feature
  */
 import { describe, expect, it } from "vitest";

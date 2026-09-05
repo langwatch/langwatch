@@ -1,15 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * An agent's edit has to be on the server before the agent is told it worked.
- *
- * The agent reads a successful UI action as "the document now says this", and
- * its next step is a server-side one that reads the SAVED document. On the
- * ordinary 1.5s autosave debounce, a duplicated column lived only in the tab
- * that ran it: the run that followed computed from a document without it, the
- * results write came back as a newer version, and the pending save was then
- * refused as out of date. The column could never be saved after that.
- *
  * @see specs/langy/langy-ui-actions.feature
  *   ("An action the browser ran is saved before the agent is told it worked")
  */

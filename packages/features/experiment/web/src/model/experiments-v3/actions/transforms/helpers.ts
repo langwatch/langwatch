@@ -57,9 +57,6 @@ export const requireDataset = ({
 
 /**
  * A dataset whose rows and columns this layer may edit.
- *
- * Saved datasets are refused: their records live in the database and are
- * written through the dataset API, which also owns the pending-changes queue.
  */
 export const requireInlineDataset = ({
   state,

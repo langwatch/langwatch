@@ -1,30 +1,6 @@
 /**
- * ComparisonWinnerCell - Renders the per-row comparison verdict in the
- * comparison column-target's cell (#5100 follow-up, generalized to N
- * candidates in #5101).
- *
- * Each row shows THREE things — the biggest-value framing per dogfood
- * ("what was right, and why"):
- *   1. `Winner: <variant name>` badge (per-variant color, gray for tie).
- *   2. The winning variant's actual output text ("What was right") in a
- *      bordered-left callout.
- *   3. The judge's reasoning text ("Why") in muted color.
- *
- * The cell names only the winner. With ten candidates an "A vs B vs C" chain
- * buries the one name the reader is looking for.
- *
- * The whole cell renders in a collapsed view by default (fixed max-height
- * + fade overlay at the bottom) with a Portal-based "expand to read all"
- * behaviour on click — same pattern BatchTargetCell already uses for
- * long prompt / agent outputs so the table reads as one cohesive design.
- *
- * A row with no comparison result at all renders a subtle dash so the column
- * width is preserved and the table doesn't reflow between reruns. A row that
- * has a result but no winner is not that: it reads "No verdict" and shows the
- * account of why, text the page used to throw away. Most of those rows were
- * judged twice, which makes that account the most expensive text on the page;
- * a row with too few candidate outputs to compare reaches the same state with
- * no judge call behind it.
+ * ComparisonWinnerCell - Renders the per-row comparison verdict in the comparison
+ * column-target's cell (#5100 follow-up, generalized to N candidates in #5101).
  */
 
 import { Badge, Box, HStack, Portal, Text, VStack } from "@chakra-ui/react";
@@ -45,15 +21,6 @@ type WinnerVisual = {
   label: string;
   /**
    * What the reader is meant to take from the badge at a glance:
-   *
-   * - `green`  a winner, named.
-   * - `gray`   a tie, and the fallback for a winner this snapshot cannot
-   *   place. Both are muted for the same reason: neither points at a
-   *   candidate the reader can go and look at.
-   * - `orange` no verdict. Deliberately not the tie's gray: those two share a
-   *   null winner id, and painting them alike puts the distinction back out
-   *   of reach of anyone reading the page rather than querying it. Orange and
-   *   not red, because the row is unresolved rather than broken.
    */
   colorPalette: "green" | "gray" | "orange";
 };

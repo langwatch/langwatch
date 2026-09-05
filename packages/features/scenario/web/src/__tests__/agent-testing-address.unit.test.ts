@@ -1,8 +1,6 @@
 /**
- * Every simulations address has an Agent Testing address that shows the same
- * thing. These pin the mapping the v1 page follows when the project reads
- * Agent Testing.
- *
+ * Every simulations address has an Agent Testing address that shows the same thing.
+ * These pin the mapping the v1 page follows when the project reads Agent Testing.
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { describe, expect, it } from "vitest";

@@ -1,9 +1,7 @@
 /**
+ * Commenting on one attribute row: what the comment is recorded against, what the
+ * composer offers on it, and the rows that offer no comment at all.
  * @vitest-environment jsdom
- *
- * Commenting on one attribute row: what the comment is recorded against, what
- * the composer offers on it, and the rows that offer no comment at all.
- * See specs/traces-v2/anchored-comments.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

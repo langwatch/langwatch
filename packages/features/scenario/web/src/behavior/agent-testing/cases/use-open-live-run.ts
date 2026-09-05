@@ -1,11 +1,5 @@
 /**
  * Opens one run of a scenario in the wide run detail drawer.
- *
- * This is the single place the Scenarios tab opens a run from, whether the
- * run just started or finished days ago. A run that has no id yet opens on
- * its batch: the drawer watches the batch until the run appears and then
- * streams the conversation in live.
- *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/live-single-scenario-run.feature
  */

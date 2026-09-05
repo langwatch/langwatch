@@ -4,10 +4,6 @@ import { useViewStore } from "../view.store";
 /**
  * `reorderColumns(from, to)` is the move primitive that powers both the
  * move-up/move-down buttons and the DnD handler in `VisibleOrderStrip`.
- * Out-of-range or no-op indices must leave state untouched (the strip
- * wires it up with `columnOrder.indexOf(...)` which returns -1 for
- * unknown ids — a -1 must not delete the head of the order). Successful
- * moves splice-and-reinsert and mark the active lens as a draft.
  */
 
 const seedOrder = (columnOrder: string[]) => {

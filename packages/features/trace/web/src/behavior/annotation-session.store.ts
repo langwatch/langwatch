@@ -11,13 +11,6 @@ interface AnnotationSessionState {
 
 /**
  * How many comments the reviewer has written in the pass they are in.
- *
- * A comment is saved the moment it is written, so it never shows up in the
- * correction's unsaved summary and the mode bar would otherwise report "no
- * changes yet" to a reviewer who has just left five of them. Counting the
- * writes is what lets the bar say what the pass has produced without pretending
- * the comments are part of the draft: they are not, and Save and Discard must
- * keep speaking about the correction alone.
  */
 export const useAnnotationSessionStore = create<AnnotationSessionState>((set) => ({
   savedCount: 0,

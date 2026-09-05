@@ -16,12 +16,6 @@ interface PollForRunParams {
 
 /**
  * The server contract, not a local restatement of it.
- *
- * `BatchRunDataResult` is derived from `runDataSchema`, so a change to the
- * wire shape lands here as a compile error instead of drifting silently. An
- * earlier hand-rolled version of this type declared `status?: string`, which
- * hid the fact that the server always sends a `ScenarioRunStatus` and forced a
- * cast in the classifier below.
  */
 type FetchBatchRunData = (params: PollForRunParams) => Promise<BatchRunDataResult>;
 
@@ -39,20 +33,8 @@ export type PollResult =
     };
 
 /**
- * Classifies a terminal run status into how the caller should report it, or
- * null when the run is still going.
- *
- * The distinction is the point: a run that executed and did not pass produced
- * an outcome — criteria, reasoning, a transcript — and belongs in front of the
- * user as a result. A run that errored or was cancelled produced nothing.
- * Collapsing the two tells people to go debug infrastructure that is healthy.
- *
- * STALLED is still handled for stored rows predating the stall watchdog, which
- * now terminates such runs as ERROR (see scenario-event.enums.ts).
- *
- * The table is exhaustive over `ScenarioRunStatus` with no index signature, so
- * adding a status to the enum is a compile error here until it is classified.
- * Mirrors the exhaustive-switch rule in `scenario-run-category.ts`.
+ * Classifies a terminal run status into how the caller should report it, or null when
+ * the run is still going.
  */
 const TERMINAL_STATUS_OUTCOME: Record<ScenarioRunStatus, "run_failed" | "run_error" | null> = {
   [ScenarioRunStatus.FAILED]: "run_failed",
@@ -67,36 +49,14 @@ const TERMINAL_STATUS_OUTCOME: Record<ScenarioRunStatus, "run_failed" | "run_err
 };
 
 function classifyTerminalStatus(status: ScenarioRunStatus): "run_failed" | "run_error" | null {
-  // The `?? null` is not dead code. tRPC does not runtime-validate its output,
-  // so a status added to the server after this client shipped arrives here
-  // unclassified, and the compile-time exhaustiveness above cannot see it.
-  //
-  // null makes the caller fall through to "a run exists, hand it back", not to
-  // a timeout — the loop only keeps polling while no run is visible at all.
-  // That is the right read for an unknown status: it could be a new active
-  // state or a new failure state and we cannot tell which, so we show the user
-  // the run and let the run page report the truth. Classifying it as an error
-  // instead would put a red "the scenario encountered an error" toast on a
-  // healthy run, which is the bug this module was fixed for.
+  // The `?? null` is not dead code. tRPC does not runtime-validate its output, so a
+  // status added to the server after this client shipped arrives here unclassified, and
+  // the compile-time exhaustiveness above cannot see it.
   return TERMINAL_STATUS_OUTCOME[status] ?? null;
 }
 
 /**
  * Polls for a scenario run to be available.
- *
- * Returns when:
- * - RUN_STARTED exists (scenarioRunId available) -> success (frontend can show progress)
- * - FAILED status -> run_failed with scenarioRunId (ran, did not pass)
- * - ERROR/CANCELLED/STALLED status -> run_error with scenarioRunId (could not run)
- * - Timeout reached -> error without scenarioRunId
- *
- * The frontend run page handles showing progress and messages as they arrive,
- * so we don't need to wait for messages here.
- *
- * `fetchBatchRunData` MUST bypass any client-side cache: this loop calls it
- * with an identical input on every attempt, so a cached fetcher answers every
- * attempt with whatever the first one saw and the loop can never observe the
- * run appearing. See the call site in `useRunScenario`.
  */
 export async function pollForScenarioRun({
   fetchBatchRunData,

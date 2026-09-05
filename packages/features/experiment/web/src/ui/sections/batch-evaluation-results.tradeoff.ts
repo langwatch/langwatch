@@ -1,22 +1,5 @@
 /**
  * The trade-off chart's conclusion, in words (#5103).
- *
- * A scatter carrying three metrics answers "what does this cost me?" only
- * after the reader has done the comparing. The comparing has an exact answer,
- * so it is done in `computeParetoDominance` and stated here; the chart is
- * then confirmation rather than the source.
- *
- * Two things this deliberately will not say:
- *
- *   - Nothing, when nothing is dominated. "No variant is beaten outright" is
- *     a real result — it means the field is a genuine trade-off and the call
- *     is the reader's — and staying silent would make an informative outcome
- *     indistinguishable from a check that never ran.
- *
- *   - "Beaten outright", when quality was the only comparable dimension.
- *     With no cost or duration recorded, dominance degenerates into the score
- *     ordering the leaderboard already shows, and dressing that up as a
- *     trade-off verdict would imply the run weighed things it never saw.
  */
 
 import type { ParetoDominance, TradeoffDimension } from "./batch-evaluation-results.pareto";

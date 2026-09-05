@@ -1,8 +1,6 @@
 /**
- * BatchTargetCell - Displays a target's output and evaluator results in the batch results table
- *
- * This is a read-only version for displaying historical evaluation results.
- * For the interactive workbench version, see experiments-v3/components/TargetSection/target-cell.tsx
+ * BatchTargetCell - Displays a target's output and evaluator results in the batch
+ * results table
  */
 
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
@@ -29,11 +27,9 @@ type BatchTargetCellProps = {
   /** Target output data for this row */
   targetOutput: BatchTargetOutput;
   /**
-   * Evaluator ids we shouldn't render generic score chips for — comparison
-   * evaluators surface via the dedicated Winner column (#5100 follow-up),
-   * so their raw `label`+`score` chip (e.g. `target_XYZ 1.00`) reads as
-   * duplicate noise and confused users during dogfooding. The Set is the
-   * single source of truth passed down from the transform step.
+   * Evaluator ids we shouldn't render generic score chips for — comparison evaluators surface via the dedicated
+   * Winner column (#5100 follow-up), so their raw `label`+`score` chip (e.g. `target_XYZ 1.00`) reads as
+   * duplicate noise and confused users during dogfooding.
    */
   suppressedEvaluatorIds?: Set<string>;
   /** Whether to render the target's output (default true) */

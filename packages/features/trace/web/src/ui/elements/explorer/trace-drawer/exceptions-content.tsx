@@ -11,12 +11,8 @@ interface ExceptionsContentProps {
   /** Click handler for a span pill — jumps the drawer to that span. */
   onSelectSpan?: (spanId: string) => void;
   /**
-   * Optional sibling-callback fired alongside `onSelectSpan` so the
-   * Exceptions section pulses + scrolls into view when the operator
-   * jumps via a pill. The chip popover wires this to re-fire the
-   * header chip's focus pipeline; the accordion-embedded variant wires
-   * it to re-pulse the section the operator is already viewing so the
-   * eye lands back on the row that owns the selected span.
+   * Optional sibling-callback fired alongside `onSelectSpan` so the Exceptions section
+   * pulses + scrolls into view when the operator jumps via a pill.
    */
   onFocusSection?: () => void;
   /**
@@ -30,17 +26,8 @@ interface ExceptionsContentProps {
 }
 
 /**
- * Shared visual for the trace-level error summary + per-span jump
- * buttons. The trace drawer surfaces this block in two places:
- *
- *   1. The `Exceptions` accordion on the Summary tab (comfortable).
- *   2. A hover popover anchored to the header `Error` chip (compact).
- *
- * Keeping the two paths in one component means the popover stays in
- * lockstep with the accordion: the same span ordering, the same red
- * tone, the same chip shape. A second customer report that "the
- * header link doesn't take me anywhere useful" stops being plausible
- * once both surfaces share rendering.
+ * Shared visual for the trace-level error summary + per-span jump buttons. The trace
+ * drawer surfaces this block in two places:
  */
 export function ExceptionsContent({
   error,

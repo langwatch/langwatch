@@ -29,13 +29,7 @@ const LANGY_PROMPTS = [
 ] as const;
 
 /**
- * A Langy-styled ask surface anchored over the search bar — so the question
- * is typed at the top of the trace explorer, next to the traces it is about,
- * instead of over in the docked panel. Same portal/rect mechanics as
- * {@link FloatingAiBar}; on Enter the question hands off to the Langy panel
- * and this bar dissolves. The SearchBar only mounts it while the Langy panel
- * is closed — an open panel is already the place to type.
- *
+ * A Langy-styled ask surface anchored over the search bar — so the question is typed at the top of the trace explorer, next to the traces it is about, instead of over in the docked panel.
  * Spec: specs/traces-v2/search.feature ("The search bar's ask affordance
  * belongs to Langy when Langy is available").
  */

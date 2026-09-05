@@ -16,10 +16,9 @@ import {
 } from "../../../index";
 
 /**
- * Round-5 refined the 9-group AI-observability taxonomy into 12 finer
- * sub-groups (Cost split into Cost / Latency / Volume; Prompts split out of
- * Custom) so the three facet perspectives have meaningful lead groups. These
- * tests pin the new structure + the perspectives so neither silently drifts.
+ * Round-5 refined the 9-group AI-observability taxonomy into 12 finer sub-groups (Cost
+ * split into Cost / Latency / Volume; Prompts split out of Custom) so the three facet
+ * perspectives have meaningful lead groups.
  */
 describe("FACET_GROUPS configuration", () => {
   it("declares each section key in exactly one group", () => {

@@ -40,11 +40,6 @@ export type UseExecuteEvaluationReturn = {
   isAborting: boolean;
   /**
    * Start execution with given scope.
-   *
-   * `onRunStarted` fires as soon as the run has an id, before any cell lands.
-   * A caller that has to ANSWER with the run id (the assistant's UI action)
-   * cannot wait for the whole run, and the id is only minted once the stream
-   * opens.
    */
   execute: (
     scope?: ExecutionScope,
@@ -62,13 +57,6 @@ export type UseExecuteEvaluationReturn = {
 
 /**
  * The SSE error frame, in the envelope the error layer already reads.
- *
- * `readHandledError` and `showErrorToast` take the tRPC shape — the handled
- * payload under `data.error`, the trace id beside it under `data.traceId` —
- * so presenting the frame's two fields under those names is all it takes to
- * get registry copy for a coded failure and, for one we couldn't name, the
- * generic unknown state PLUS the copyable error id (ADR-045). Without the
- * trace id that second case tells the customer, and support, nothing at all.
  */
 const asHandledEnvelope = (event: { domainError?: SerializedHandledError; traceId?: string }) => ({
   data: { error: event.domainError, traceId: event.traceId },
@@ -123,9 +111,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
   /**
    * Write one target's output into the store.
-   *
-   * The fold itself is `execution/results-fold.ts`; what stays here is the store
-   * write, so the same cell arithmetic can be run and asserted without a store.
    */
   const updateTargetOutput = useCallback(
     (
@@ -246,12 +231,9 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
 
         case "error": {
-          // Every `error` frame is built by `mapThrownErrorEvent`: a handled
-          // failure carries its code on `domainError`, an unhandled one carries
-          // the unnamed-failure marker and a trace id, and neither carries the
-          // thrown error's own words. So the words here are the client's:
-          // registry copy for a code, our own fallback for a failure nobody
-          // could name.
+          // Every `error` frame is built by `mapThrownErrorEvent`: a handled failure carries its code on
+          // `domainError`, an unhandled one carries the unnamed-failure marker and a trace id, and neither
+          // carries the thrown error's own words.
           const envelope = asHandledEnvelope(event);
           const detail = describeError({
             error: envelope,

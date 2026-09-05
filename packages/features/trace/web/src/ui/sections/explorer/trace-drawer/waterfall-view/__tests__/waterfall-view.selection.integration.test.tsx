@@ -1,10 +1,7 @@
 /**
+ * Bringing the selected span's row into view, which is what makes naming a span from a comment worth anything,
+ * and what the waterfall does with a comment whose span the trace no longer has.
  * @vitest-environment jsdom
- *
- * Bringing the selected span's row into view, which is what makes naming a span
- * from a comment worth anything, and what the waterfall does with a comment
- * whose span the trace no longer has.
- * See specs/traces-v2/anchored-comments.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -188,10 +185,8 @@ function renderWaterfall({
 }
 
 /**
- * jsdom lays nothing out, and a virtualized list with a zero-height viewport
- * renders no rows and scrolls nowhere. Give every element a viewport so the
- * waterfall behaves as it does on screen, and capture the scroll it asks for,
- * which jsdom itself does not implement.
+ * jsdom lays nothing out, and a virtualized list with a zero-height viewport renders no
+ * rows and scrolls nowhere.
  */
 const VIEWPORT_HEIGHT_PX = 400;
 const SCROLLABLE_HEIGHT_PX = 2000;

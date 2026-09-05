@@ -1,18 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The workbench tells the Langy panel what it is doing.
- *
- * The panel's status line may only say things that are true when it says
- * them, so with no tool running and no tokens arriving it falls back to a verb
- * that claims nothing. Filming the optimization loop is what made the cost
- * plain: minutes of "Cooking…" over a page that was running a column the
- * whole time, because nothing carried the page's own progress the few feet to
- * the panel.
- *
- * What matters here is the handover, not the words: the page writes what it is
- * doing, and stops writing when it stops doing it.
- *
+ * @vitest-environment jsdom
  * @see specs/langy/langy-page-activity-narration.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

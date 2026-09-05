@@ -1,10 +1,6 @@
 /**
+ * Commenting on one message of a transcript.
  * @vitest-environment jsdom
- *
- * Commenting on one message of a transcript. The block's key is what the
- * comment is stored against, so the same message is found again when the
- * transcript is read back and a message that was rewritten is not.
- * See specs/traces-v2/anchored-comments.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

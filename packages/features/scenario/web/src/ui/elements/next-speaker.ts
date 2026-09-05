@@ -1,12 +1,5 @@
 /**
  * Who the drawer is waiting for, read from the conversation so far.
- *
- * A run alternates between the simulated user and the agent under test, and
- * the judge reads the conversation after every agent message. So the last
- * message says what comes next: after a user message the agent answers, and
- * after an agent message the judge speaks, which may end the run. The judge
- * is not drawn as a message, so a run waiting on it has no next speaker.
- *
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 

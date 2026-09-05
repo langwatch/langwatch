@@ -1,10 +1,7 @@
 /**
+ * useFacetSearch wires the per-facet value search to tracesV2.facetValues: it forwards the typed `prefix`, gates the query on a project + a
+ * facetKey, and is the shared engine behind useAttributeValues (which delegates to it with no prefix and limit 30).
  * @vitest-environment jsdom
- *
- * useFacetSearch wires the per-facet value search to tracesV2.facetValues:
- * it forwards the typed `prefix`, gates the query on a project + a facetKey,
- * and is the shared engine behind useAttributeValues (which delegates to it
- * with no prefix and limit 30). See specs/traces-v2/search.feature.
  */
 
 import { renderHook } from "@testing-library/react";

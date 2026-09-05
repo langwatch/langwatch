@@ -1,11 +1,5 @@
 /**
- * The label of one action in a menu of the Scenarios tab: an icon, then the
- * words.
- *
- * The suites rail and the scenario rows offer the same actions, so the icon of
- * an action is named once here and both menus read it. An action means the
- * same thing wherever it is offered, and it looks the same too.
- *
+ * The label of one action in a menu of the Scenarios tab: an icon, then the words.
  * @see dev/docs/best_practices/row-actions-overflow-menu.md
  */
 

@@ -29,10 +29,6 @@ const NO_ANCHORED_ANNOTATIONS: AnnotationByTrace[] = [];
 
 /**
  * What the rail itself starts: a comment about the turn's reply.
- *
- * Every new comment names its target, and the reply is what a remark beside the
- * turn is about unless the reviewer picks the message explicitly, which they do
- * from the message itself.
  */
 function commentOnTheReply({
   traceId,
@@ -53,15 +49,6 @@ function commentOnTheReply({
 
 /**
  * One turn's annotations, in the column beside it.
- *
- * The whole area is a target for starting an annotation on this turn, the way
- * the annotation queue's gutter has always been: click anywhere the cards are
- * not and the composer opens here. Cards claim their own clicks so reading one
- * never starts a second annotation.
- *
- * Comments about the turn come first and comments about its parts after, so the
- * reader meets the remark about the whole answer before the remarks about the
- * steps that produced it.
  */
 export function TurnAnnotationRail({
   traceId,
@@ -139,11 +126,6 @@ export function TurnAnnotationRail({
 
 /**
  * Re-opening a comment that is already there.
- *
- * Editing keeps the comment on the part it was left on: the composer that opens
- * is the composer for that part. A correction starts from the side it is about,
- * so an edit whose stored text has not come back yet still starts from what
- * that side said.
  */
 function reopenComment({
   annotation,
@@ -169,12 +151,6 @@ function reopenComment({
 
 /**
  * The draft this rail holds the composer for.
- *
- * A comment written here is about the turn as a whole or about one of its two
- * sides, which are the turn's own input and output. A comment about anything
- * narrower belongs to the surface where that part is read. The one exception is
- * a card in this rail being edited: that composer takes the card's place, and
- * the card is here because the comment is on this turn.
  */
 function resolveRailDraft({
   draft,

@@ -7,22 +7,6 @@ const EMPTY: { value: string; label?: string; count: number }[] = [];
 
 /**
  * Server-side search over a single facet's distinct values.
- *
- * Queries `tracesV2.facetValues` with the typed `prefix` so a value can be
- * found among ALL of a facet's distinct values — not just the preloaded
- * top-N the discover payload shipped. This is what lets a high-cardinality
- * facet (models, users, services, trace names, labels) surface a value
- * beyond #50.
- *
- * Server search is categorical-only (this is the canonical statement of that
- * rule — callers just point here): valid for CATEGORICAL facets (and
- * `attribute.*`), because `facetValues` throws for range facets. Callers
- * therefore gate `enabled` — the sidebar passes it only from the categorical
- * render branch (`serverValueSearch`); the value picker only once the resolved
- * descriptor is categorical.
- *
- * Also the shared engine behind {@link useAttributeValues}, which delegates
- * here with no prefix to lazy-load an attribute's top values.
  */
 export function useFacetSearch({
   facetKey,

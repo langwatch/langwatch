@@ -1,9 +1,5 @@
 /**
  * Unit tests for evaluatorEditorCallbacks factory.
- *
- * Tests that:
- * - onLocalConfigChange(config) calls updateTarget with localEvaluatorConfig
- * - onLocalConfigChange(undefined) clears localEvaluatorConfig
  */
 
 import { describe, expect, it, vi } from "vitest";

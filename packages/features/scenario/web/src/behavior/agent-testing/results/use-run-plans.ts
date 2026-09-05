@@ -1,11 +1,6 @@
 /**
- * The run plans of the open project, read from the two places a plan lives:
- * the stored run plans, and the external sets a code run writes into.
- *
- * A test suite is a group of scenarios, so it is never a row of the Test Runs
- * list. Its rows are read all the same, because a plan whose scope names test
- * suites reads them by name.
- *
+ * The run plans of the open project, read from the two places a plan lives: the stored
+ * run plans, and the external sets a code run writes into.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

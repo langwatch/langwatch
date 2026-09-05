@@ -1,26 +1,7 @@
 /**
+ * Coverage for the event drilldown (specs/traces-v2/search.feature, Rule "Event rows
+ * drill down into their metric values").
  * @vitest-environment jsdom
- *
- * Coverage for the event drilldown (specs/traces-v2/search.feature, Rule
- * "Event rows drill down into their metric values"):
- * - metric values render from the discover payload (`item.eventMetrics`)
- *   with their counts — the component fires no query of its own;
- * - metric-group headers strip the `event.metrics.` storage prefix for
- *   display while clicks keep the full key;
- * - clicking a value on an ALREADY-ACTIVE event row emits exactly one
- *   top-level `event.attribute.event.metrics.<key>` toggle — never a group
- *   mutation (the cross-event AND collision, once two different events are
- *   both active, is a documented, accepted limitation);
- * - clicking a value on an INACTIVE event row adds the `event:<type>`
- *   anchor first, so the metric clause never lands unscoped;
- * - a predefined event's opaque codes read as words ("-1" shows as "thumbs
- *   down") while the click still emits the stored string; every metric
- *   without a human name shows exactly what ingest wrote;
- * - an event carrying no metrics renders nothing to expand into;
- * - active values read their include/exclude state from the AST;
- * - driven against the real filter store, one click yields
- *   "event:x AND event.attribute...:v" and cycling the value back off leaves
- *   the bare "event:x" anchor behind (the accepted limitation).
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -254,10 +235,8 @@ describe("EventDrilldown", () => {
   });
 
   /**
-   * Every case above hands `toggleFacet` a `vi.fn()` and asserts the
-   * arguments, which proves what the component ASKS for but never what the
-   * query BECOMES. These two drive the real store, so the assertion is the
-   * text a user would read in the search bar.
+   * Every case above hands `toggleFacet` a `vi.fn()` and asserts the arguments, which
+   * proves what the component ASKS for but never what the query BECOMES.
    */
   describe("given the drilldown drives the real filter store", () => {
     const renderAgainstStore = () => {

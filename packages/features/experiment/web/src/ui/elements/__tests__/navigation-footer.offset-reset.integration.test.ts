@@ -1,15 +1,6 @@
 /**
+ * Offset-mode lists must return to the first page whenever the result set they are counting into changes.
  * @vitest-environment jsdom
- *
- * Offset-mode lists must return to the first page whenever the result set they
- * are counting into changes.
- *
- * The sibling file already covers this, but it mounts at `pageOffset=0`, so a
- * reset that stopped happening still looked correct — 0 stays 0 either way.
- * These start deep in the list, which is the only place the reset is visible.
- * The experiments list and the audit log both page this way against Prisma
- * `skip`; a stale offset there shows an empty page or skips rows outright.
- *
  * @see specs/traces/pagination-controls.feature
  */
 import { act, renderHook } from "@testing-library/react";

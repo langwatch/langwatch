@@ -1,13 +1,7 @@
 /**
- * What this package serves itself: `createUiApplication` merges the host's
- * install over this standing declaration. Sits at the features root — this
- * registry and the package entry are the only places allowed to import a
- * feature.
- *
- * Also the drawer half `installed-ui-drawers.ts` used to own on its own:
- * `installUiFeatures` merges every feature's `drawers` the same way it
- * merges `loaders`, and this is where the composed registry, the open
- * rewrite rule and the drawer hooks now live.
+ * What this package serves itself: `createUiApplication` merges the host's install over
+ * this standing declaration. Sits at the features root — this registry and the package
+ * entry are the only places allowed to import a feature.
  */
 
 import { createDrawerPreloader, installDrawerOpenRewrite, useDrawer } from "@langwatch/ui-drawer";
@@ -113,22 +107,13 @@ export const installedUiDrawers = installedUiFeatures.drawers;
 export type UiInstalledDrawer = keyof typeof installedUiDrawers;
 
 /**
- * The one rule the framework takes as an install: every trace open lands on
- * the Trace Explorer drawer, whichever name the call site spelled.
- *
- * Registered at module scope rather than from a component, because the rule
- * has to be in force for a `traceDetails` open that happens before anything
- * the chrome renders has mounted — a deep link, or a notification the
- * reader followed.
+ * The one rule the framework takes as an install: every trace open lands on the Trace
+ * Explorer drawer, whichever name the call site spelled.
  */
 installDrawerOpenRewrite(routeTraceDrawerForV2);
 
 /**
  * The navigator, told which registry it is addressing.
- *
- * `openDrawer("evaluatorHistory", { evaluatorId })` is checked against the
- * drawer's own props at the call site, which is what `platform/app` got
- * from `keyof typeof drawers` and what a composed registry keeps.
  */
 export const useUiDrawer = () => useDrawer<typeof installedUiDrawers>();
 

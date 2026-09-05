@@ -20,10 +20,9 @@ export interface FormatSubmode<Submode extends string = string> {
 export interface FormatSubmodeGroup<Submode extends string = string> {
   value: Submode;
   /**
-   * Method syntax on purpose: it makes the parameter bivariant, so a handler
-   * that accepts only its own submode union still fits a group typed with the
-   * wider `string`. Every value it can receive comes from `options` below,
-   * which the same caller declares.
+   * Method syntax on purpose: it makes the parameter bivariant, so a handler that
+   * accepts only its own submode union still fits a group typed with the wider
+   * `string`.
    */
   onChange(value: Submode): void;
   options: readonly FormatSubmode<Submode>[];
@@ -70,9 +69,6 @@ function optionLabel(option: FormatOption<string>): string {
 
 /**
  * The pill: the active format in words, and the caret that opens the menu.
- *
- * Rendered under `Menu.Trigger asChild`, which clones this and hands it the
- * menu's own props and ref, so both are forwarded through.
  */
 const FormatSelectTrigger = forwardRef<
   // `Flex` types its ref as a div even with `as="button"`.
@@ -128,12 +124,9 @@ function FormatSubmodeStrip({ submodes }: { submodes: FormatSubmodeGroup }) {
 }
 
 /**
- * Compact single-control picker for view formats (Pretty / Text / JSON /
- * Markdown, flat / JSON, thread / bubbles / markdown): the active format
- * reads in the pill with a caret, and the alternatives live in the menu it
- * opens. Replaces a row of segments so the toolbar keeps one footprint no
- * matter how many formats a panel offers. When the active option carries
- * `submodes`, their icon toggles render inside the pill, after the caret.
+ * Compact single-control picker for view formats (Pretty / Text / JSON / Markdown, flat
+ * / JSON, thread / bubbles / markdown): the active format reads in the pill with a
+ * caret, and the alternatives live in the menu it opens.
  */
 export function FormatSelect<Value extends string>({
   value,

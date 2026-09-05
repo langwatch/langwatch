@@ -1,11 +1,6 @@
 /**
+ * The `langwatch.api_key.id` metadata row in the trace drawer: label trimmed to `langwatch.api_key`, value resolved from the ApiKey row id to the key's name and linked to that key on the settings page.
  * @vitest-environment jsdom
- *
- * The `langwatch.api_key.id` metadata row in the trace drawer: label trimmed to
- * `langwatch.api_key`, value resolved from the ApiKey row id to the key's name
- * and linked to that key on the settings page. The name is resolved one id at
- * a time so an ordinary member sees it, not only key administrators.
- *
  * Spec: specs/traces-v2/api-key-attribute.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -3,10 +3,7 @@ import { describe, expect, it } from "vitest";
 import { bootstrapMeanCI } from "@langwatch/experiment-web";
 
 /**
- * The horizontal arm of the trade-off chart's error cross. It has to mean the
- * same thing as the vertical one — "where the true mean lies" — or the glyph
- * is two different statements wearing one shape.
- *
+ * The horizontal arm of the trade-off chart's error cross.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 

@@ -1,8 +1,5 @@
 /**
  * TableSkeleton - Loading skeleton for batch evaluation tables
- *
- * Displays a placeholder table with animated skeleton cells
- * while data is being loaded.
  */
 import { Box, Card, Skeleton } from "@chakra-ui/react";
 

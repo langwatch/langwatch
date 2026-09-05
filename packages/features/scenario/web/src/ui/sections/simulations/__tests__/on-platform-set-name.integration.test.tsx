@@ -1,10 +1,6 @@
 /**
+ * Pins the on-platform (internal) run set's display treatment: it always reads with a friendly name, and v1 keeps the name it shows today while the v2 surface renames it on its own side.
  * @vitest-environment jsdom
- *
- * Pins the on-platform (internal) run set's display treatment: it always
- * reads with a friendly name, and v1 keeps the name it shows today while the
- * v2 surface renames it on its own side.
- *
  * @see specs/suites/internal-run-set-surface.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -1,9 +1,7 @@
 /**
+ * Verifies that EmptyFilterState only renders when the data is truly empty (not
+ * fetching, not showing previous-key stale data).
  * @vitest-environment jsdom
- *
- * Verifies that EmptyFilterState only renders when the data is truly empty
- * (not fetching, not showing previous-key stale data). During in-flight
- * transitional fetches the lens body renders instead of the empty surface.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

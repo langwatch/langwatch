@@ -1,9 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * One run plan: the runs in the rail, and the results of the selected run as
- * a table or as the classic grid.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */
@@ -948,10 +944,9 @@ describe("<RunPlanDetail/>", () => {
   });
 
   /**
-   * One batch of three runs of one scenario against one target, started with
-   * one parameter and both simulation models named. The repeat count is the
-   * number of runs sharing a scenario and a target, so three runs is a repeat
-   * count of three.
+   * One batch of three runs of one scenario against one target, started with one
+   * parameter and both simulation models named. The repeat count is the number of runs
+   * sharing a scenario and a target, so three runs is a repeat count of three.
    */
   function configuredBatch(
     langwatch: Record<string, unknown> = {

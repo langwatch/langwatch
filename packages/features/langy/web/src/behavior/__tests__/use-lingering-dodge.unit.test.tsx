@@ -1,8 +1,6 @@
 /**
+ * The dodge-release cadence of the floating Langy surfaces: engage the moment a drawer arrives, let go only a beat after it has left.
  * @vitest-environment jsdom
- *
- * The dodge-release cadence of the floating Langy surfaces: engage the moment
- * a drawer arrives, let go only a beat after it has left.
  * Spec: specs/langy/langy-panel-layout.feature
  */
 import { act, renderHook } from "@testing-library/react";

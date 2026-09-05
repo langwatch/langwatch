@@ -7,12 +7,6 @@ import { useFilterStore, useViewStore } from "../../../../index";
 
 /**
  * Lifts the composer's detail rows out of a handled error's `meta`.
- *
- * `meta` is a per-code contract, and this is the reader end of the one
- * `ai_query_provider_error` declares — provider, model, status, the provider's
- * own reason and the query the model last produced. Nothing here is copy: it
- * fills the "View details" disclosure an operator opens when the registry's
- * remediation wasn't enough. Untrusted, so every field is checked.
  */
 function readAiErrorDetails(
   meta: Record<string, unknown> | undefined,
@@ -66,18 +60,9 @@ interface UseAiTraceActionResult {
 }
 
 /**
- * Glue between the generic `AiPromptInput` and the trace-specific stores.
- * Handles the tRPC `aiAction` mutation, error capture, and dispatching the
- * resulting action against `filterStore` / `viewStore`. Each consumer can
- * pick which actions it wants to support via `mode`.
- *
- * - `filter` mode forces the action into `apply_query` regardless of what
- *   the model returned (the lens name is dropped, only the query is
- *   applied). Use this in the search bar.
- * - `lens` mode always creates a lens with the model's name (or "Untitled
- *   lens" if the model only returned a filter). Use this in CreateLens
- *   popovers.
- * - `auto` lets the model pick — current search bar behaviour.
+ * Glue between the generic `AiPromptInput` and the trace-specific stores. Handles the
+ * tRPC `aiAction` mutation, error capture, and dispatching the resulting action against
+ * `filterStore` / `viewStore`.
  */
 export function useAiTraceAction({
   mode = "auto",
@@ -115,12 +100,7 @@ export function useAiTraceAction({
       // Apply the query first so the resulting view is filtered (also so
       // that lens creation captures the right snapshot).
       applyQueryText(result.query);
-      // Pin the user's natural-language prompt against the produced
-      // query. Next time the user enters AI mode, if the URL query is
-      // still this exact string, the search bar reads the prompt back
-      // out of the store instead of seeding the composer with the
-      // (already-displayed) generated query — they get to keep editing
-      // their original wording rather than start from the syntax.
+      // Pin the user's natural-language prompt against the produced query.
       if (lastSubmittedProjectIdRef.current && lastSubmittedPromptRef.current) {
         recordAiTranslation({
           projectId: lastSubmittedProjectIdRef.current,
@@ -139,16 +119,8 @@ export function useAiTraceAction({
     onError: (e) => {
       if (cancelledRef.current) return;
       // Every failure arrives here now — the AI-search failure itself
-      // (`ai_query_provider_error`), a `model_not_configured`, a permission
-      // rejection, a network blip. Keep the handled code when there is one:
-      // it is documented as the branching + telemetry key, and forcing
-      // `"unknown"` meant the composer could never act on a cause it had been
-      // handed (no "Review model providers" link on a provider failure, no
-      // way to tell "pick a model" apart from "the model misbehaved").
-      //
-      // The error itself rides along as `cause` so the renderer resolves its
-      // words through `explainAnyError` — which covers the handled payload,
-      // a procedure's authored message, and the generic unknown state alike.
+      // (`ai_query_provider_error`), a `model_not_configured`, a permission rejection,
+      // a network blip.
       const handled = readHandledError(e);
       setError({
         code: handled?.code ?? "unknown",

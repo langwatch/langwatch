@@ -143,51 +143,27 @@ interface FacetManagerPopoverProps {
   /** Switch a numeric facet between its slider and tick-list presentation. */
   setNumericMode: (args: { field: string; mode: NumericMode }) => void;
   /**
-   * Optional controlled-open prop. When set, the popover ignores its
-   * internal `open` state and mirrors the caller's value (and reports
-   * changes via `onOpenChange`). Used so the sidebar's text trigger and
-   * any future external opener can drive the same popover instance.
+   * Optional controlled-open prop. When set, the popover ignores its internal `open`
+   * state and mirrors the caller's value (and reports changes via `onOpenChange`).
    */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   /**
-   * When set, the popover renders a labelled text Button as its
-   * trigger instead of the default settings-icon IconButton. Drops the
-   * tooltip in this mode — the label itself explains the action. Used
-   * by the sidebar header where the new "Configure" CTA replaced the
-   * old floating bottom-right button.
+   * When set, the popover renders a labelled text Button as its trigger instead of the
+   * default settings-icon IconButton. Drops the tooltip in this mode — the label itself
+   * explains the action.
    */
   triggerLabel?: string;
   /**
-   * Explicit override for whether the "shown / total" count chip renders
-   * on the labelled trigger. When omitted, falls back to the internal
-   * sidebar-width heuristic. The sidebar passes a value that also weighs
-   * the other header buttons competing for the same row, so the chip
-   * yields only when the header is genuinely tight — not at a fixed wide
-   * width that left a dead band where the count vanished too early.
+   * Explicit override for whether the "shown / total" count chip renders on the
+   * labelled trigger. When omitted, falls back to the internal sidebar-width heuristic.
    */
   showCount?: boolean;
 }
 
 /**
- * One-stop "edit which facets are in my sidebar" picker, opened from
- * the sidebar header.
- *
- * The inline affordances (hover-X on a section, per-group "+ Add facet")
- * cover ad-hoc edits but leave users without an overview of what's on
- * vs. off — audit feedback was "I can't tell what I'm missing." This
- * picker walks every key the backend returned and renders one Checkbox
- * per key, grouped by the FACET_GROUPS taxonomy so the structure
- * mirrors the sidebar itself.
- *
- * Layout uses a hard-clamped body height ({BODY_MAX_HEIGHT}px) instead
- * of a `vh`-relative `maxHeight` on Popover.Content — Chakra's popover
- * positioning logic measures the trigger and slots the floating panel
- * around it, but if the content has only a `maxHeight` constraint and
- * no internal scroll boundary, the popover renders at its natural
- * height (taller than the viewport) and Floating UI flips it to a
- * position where it overflows the top of the screen. Boxing the
- * scrollable area to a fixed pixel ceiling stops that.
+ * One-stop "edit which facets are in my sidebar" picker, opened from the sidebar
+ * header.
  */
 const BODY_MAX_HEIGHT_PX = 360;
 
@@ -287,13 +263,8 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
         if (!e.open) setQuery("");
       }}
       positioning={{
-        // `bottom-start` (popover's left edge anchored under the
-        // trigger's left edge) so the panel extends INTO the trace
-        // list rather than into the main app menu. The sidebar is
-        // ~260px wide and the popover ~280px, so `bottom-end` rendered
-        // the panel leftward — it covered the navigation chrome and
-        // obscured part of the sidebar itself. Anchoring left-start
-        // keeps the panel visually inside the trace-explorer surface.
+        // `bottom-start` (popover's left edge anchored under the trigger's left edge)
+        // so the panel extends INTO the trace list rather than into the main app menu.
         placement: "bottom-start",
         flip: true,
         overflowPadding: 8,
@@ -612,18 +583,9 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
     </Popover.Root>
   );
 
-  // Both trigger variants get the same styled tooltip as their sidebar-header
-  // siblings — text + Kbd shortcut, bottom-placed — so the header reads as one
-  // consistent set of controls. The labelled "Configure" trigger previously
-  // relied on a bare native `title`, which looked and behaved differently from
-  // the IconButton tooltips beside it (the inconsistency users flagged).
-  //
-  // Tooltip wraps a Box that *contains* the Popover — not the Popover.Trigger
-  // directly. Both `Tooltip` and `Popover.Trigger` use `asChild` ref
-  // forwarding, and when they stack on the same node they fight over the slot,
-  // leaving the popover with no measurable anchor (it lands at the viewport's
-  // top-left). Splitting the chains via a host Box gives each component its own
-  // ref target. Same pattern as CreateLensButton.
+  // Both trigger variants get the same styled tooltip as their sidebar-header siblings
+  // — text + Kbd shortcut, bottom-placed — so the header reads as one consistent set of
+  // controls.
   return (
     <Tooltip
       positioning={{ placement: "bottom" }}

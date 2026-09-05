@@ -1,12 +1,6 @@
 /**
+ * Closing the trace drawer, against the real drawer stack.
  * @vitest-environment jsdom
- *
- * Closing the trace drawer, against the real drawer stack. The drawer mounts
- * from its own store rather than from the URL, so the shared stack can be
- * describing something else entirely by the time the reader closes it, and
- * walking back through a stack that is not about this drawer is what used to
- * bring a drawer the reader had already left back on screen.
- * See specs/traces-v2/drawer-stacking.feature.
  */
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

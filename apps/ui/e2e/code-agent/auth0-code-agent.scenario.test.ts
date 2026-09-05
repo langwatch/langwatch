@@ -1,27 +1,5 @@
-// LangWatch scenario proving a custom CODE AGENT can call an API behind
-// Auth0 machine-to-machine auth. langwatch/langwatch#6337.
-//
-// The agent under test is NOT a mock and NOT hand-rolled HTTP: it is the real
-// SerializedCodeAgentAdapter — the exact class the on-platform scenario worker
-// uses to execute a code-agent target — pointed at a live nlpgo service, which
-// runs the committed example Python (services/nlpgo/app/engine/blocks/
-// codeblock/examples/auth0_code_agent.py) through the production runner.
-//
-// Two layers, per the e2e/langy convention:
-//   Layer 1 — an LLM judge grades the conversation: the agent's answer must
-//     carry a fact that ONLY exists behind the auth wall.
-//   Layer 2 — in-test assertions on what the stub endpoints RECEIVED: the
-//     client-credentials request, the minted Bearer token on the downstream
-//     call, and the run-unique client secret appearing nowhere in the
-//     conversation.
-//
-// PREREQUISITES:
-//   - nlpgo running:  SERVER_ADDR=:5599 go run ./cmd/service nlpgo   (repo root)
-//   - OPENAI_API_KEY in the environment (judge + user simulator)
-//
-// RUN:
-//   cd apps/ui/e2e/code-agent
-//   NLP_SERVICE_URL=http://127.0.0.1:5599 npx vitest run auth0-code-agent.scenario.test.ts --reporter=verbose
+// LangWatch scenario proving a custom CODE AGENT can call an API behind Auth0
+// machine-to-machine auth. langwatch/langwatch#6337.
 
 import { readFileSync } from "node:fs";
 import * as http from "node:http";
@@ -198,12 +176,9 @@ describe("Auth0-protected custom code agent as a scenario target", () => {
       script: [scenario.user("where is my order #1042?"), scenario.agent(), scenario.judge()],
     });
 
-    // Layer 2 FIRST — the deterministic wire-level assertions run before the
-    // judge gate, so ordinary LLM-judge non-determinism can never mask (or be
-    // blamed for) a real regression in the credential exchange.
-    //
-    // Layer 2a — the token endpoint received a real client-credentials
-    // exchange with the seeded identity.
+    // Layer 2 FIRST — the deterministic wire-level assertions run before the judge
+    // gate, so ordinary LLM-judge non-determinism can never mask (or be blamed for) a
+    // real regression in the credential exchange.
     expect(received.tokenRequests.length).toBeGreaterThan(0);
     const tokenReq = received.tokenRequests[0]!;
     expect(tokenReq.grant_type).toBe("client_credentials");
@@ -214,12 +189,8 @@ describe("Auth0-protected custom code agent as a scenario target", () => {
     // Layer 2b — the downstream call carried the exact token minted this run.
     expect(received.apiAuthHeaders).toContain(`Bearer ${MINTED_TOKEN}`);
 
-    // Layer 2c — the agent's answer carries the protected fact, and the
-    // transcript does not carry the secret. NOTE: the no-secret check here is
-    // a sanity check, not leak evidence — no code path in this test could put
-    // the secret into `result.messages`, so it cannot fail on its own. The
-    // load-bearing leak assertions live in the Go tests (stdout / stderr /
-    // traceback of the actual execution).
+    // Layer 2c — the agent's answer carries the protected fact, and the transcript does
+    // not carry the secret.
     const transcript = JSON.stringify(result.messages ?? []);
     expect(transcript).toContain("Rotterdam");
     expect(transcript).not.toContain(CLIENT_SECRET);

@@ -20,12 +20,9 @@ function warmKey({
 }
 
 /**
- * Forget every fresh-chat warm this project fired. A conversation taking over
- * (a send adopted the fresh chat, or the user opened an existing one) consumes
- * them, so the next fresh chat in this open is a NEW conversation with a new
- * mint. Without this, the new-chat button after a first warm sent no warm at
- * all, and the first message cold-started while the earlier warm worker sat
- * idle.
+ * Forget every fresh-chat warm this project fired. A conversation taking over (a send
+ * adopted the fresh chat, or the user opened an existing one) consumes them, so the
+ * next fresh chat in this open is a NEW conversation with a new mint.
  */
 function forgetFreshWarms({ fired, projectId }: { fired: Set<string>; projectId: string }): void {
   const freshPrefix = `${projectId}::`;
@@ -78,11 +75,7 @@ function holdPendingConversation({
 }
 
 /**
- * Send one claimed warm. Bumps the generation so only THIS warm's answer may
- * hold the pending id: two warms can be in flight at once (a model switch
- * fires a second while the first is still going), and answers can land out of
- * order, so without the generation check an older fresh-chat mint could
- * overwrite a newer one.
+ * Send one claimed warm.
  */
 function fireWarm({
   mutate,
@@ -145,28 +138,9 @@ function fireWarm({
 }
 
 /**
- * Pre-warm the Langy worker when the panel is the strongest signal a message
- * is coming (specs/langy/langy-worker-prewarm.feature): on the panel-open
- * rising edge, and again whenever the panel points at a different conversation
- * while open. Fires the `langy.warmWorker` mutation at most once per
- * (projectId, conversation-or-fresh) while the panel stays open; closing and
- * reopening re-arms (the server probe makes a re-warm on a live worker a
- * cheap no-op).
- *
- * For a fresh chat the mutation returns the server-minted conversation id,
- * stored as the panel's `pendingConversationId` so the first send adopts the
- * conversation whose worker is already booting, never as the active id,
- * because nothing durable exists under it yet.
- *
- * Strictly fire-and-forget: no loading state, no toast, no error surface. A
- * warm failure is the cold start the user would have had anyway, and the
- * first real message is where errors get their proper cards.
- *
- * Visibility gating is the panel's MOUNT gate: `ProjectLangyLayout` renders
- * the sidecar only when `useShowLangy` passes, so this hook never runs for a
- * user without Langy, it must only ever be called from inside that gate.
- * (The server's own access gate on the mutation is the authoritative check
- * either way.)
+ * Pre-warm the Langy worker when the panel is the strongest signal a message is coming
+ * (specs/langy/langy-worker-prewarm.feature): on the panel-open rising edge, and again
+ * whenever the panel points at a different conversation while open.
  */
 export function useLangyWarmWorker({
   projectId,
@@ -183,27 +157,15 @@ export function useLangyWarmWorker({
   conversationId: string | null;
   /**
    * The id an earlier fresh-chat warm minted and the first send will adopt.
-   * A fresh-chat re-arm (the model changed, the panel flipped through an
-   * active conversation and back) warms THIS id again instead of minting
-   * another: the server's probe answers alive for its running worker, so the
-   * re-warm is a cheap no-op instead of a new conversation id, a new session
-   * key and a new worker filling the pool.
    */
   pendingConversationId: string | null;
   /**
-   * True while a turn is running on this panel. No warm fires then: the
-   * worker is provably alive, and a warm racing a live turn (a mid-stream
-   * model switch re-arms one with the NEW picker model) asks the manager for
-   * a worker the running turn does not match. When the turn settles the
-   * effect re-runs and any pending warm fires against a quiet pool.
+   * True while a turn is running on this panel.
    */
   turnInFlight: boolean;
   /**
-   * The model the composer's picker shows, passed as the warm's override so
-   * the warmed worker's signature matches the turn the user is about to send.
-   * Pass null until the model queries have settled (or when no model is
-   * configured), a warm on a model the picker then snaps away from would
-   * boot a worker the turn cannot reuse.
+   * The model the composer's picker shows, passed as the warm's override so the warmed
+   * worker's signature matches the turn the user is about to send.
    */
   model: string | null;
 }): void {

@@ -1,15 +1,4 @@
 /**
- * The run dialog: one question, the agent to be tested, and chips that add a
- * note, parameter overrides, or a prompt in place of the agent.
- *
- * The target used last time is preselected, so a repeat run is one click. For
- * a test suite the confirmed target is written onto the suite row, so the next
- * run of that suite preselects it on any browser.
- *
- * A refusal the server can name (no target, everything archived, an unknown
- * parameter) reads inside the dialog and the dialog stays open. Only failures
- * with nothing structured to say fall back to a toast.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/suites/run-notes.feature
  * @see specs/suites/test-suite-run-plan-reuse.feature

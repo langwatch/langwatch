@@ -1,17 +1,6 @@
 /**
+ * An assistant reply with nothing visible renders a quiet empty state.
  * @vitest-environment jsdom
- *
- * An assistant reply with nothing visible renders a quiet empty state. When
- * THIS browser stopped the turn (ADR-078), that state must say "Interrupted"
- * rather than "No content": the user halted the answer two seconds ago, and
- * "No content" reads like the panel lost it. The store carries the fact as
- * `interruptedConversationId` — set by a dispatched stop, cleared by the next
- * send — and the panel forwards it for the trailing assistant message.
- *
- * Boundary mocks: the derived-card renderers load the router, project hook,
- * tRPC client and recharts transitively, and the Markdown renderer reaches for
- * the workflow studio's router.
- *
  * Spec: specs/langy/langy-stop-and-resume.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

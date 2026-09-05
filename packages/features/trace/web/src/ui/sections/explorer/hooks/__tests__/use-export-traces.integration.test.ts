@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the useExportTraces hook.
- *
- * Tests dialog state management and export trigger behavior.
- * Network calls (fetch) are mocked at external boundaries.
- * tRPC subscription for progress is mocked via the api module.
- *
+ * @vitest-environment jsdom
  * @see specs/traces/trace-export.feature
  */
 import { act, renderHook } from "@testing-library/react";

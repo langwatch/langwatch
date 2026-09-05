@@ -3,26 +3,14 @@ import { LuLayers } from "react-icons/lu";
 import { Chip } from "../../../../elements/explorer/trace-drawer/chip";
 
 /**
- * Attribute the ingestion path stamps on a trace whose trace id LangWatch
- * minted because the emitter sent no trace context at all. Read as a literal
- * string (not a shared constant) so this UI never takes a build dependency on
- * the ingestion module that produces it.
- *
- * Keyed ONLY on the trace-level marker: a real trace can carry a single
- * context-less record whose SPAN id we minted (`langwatch.span.synthetic`),
- * and that must never make the whole trace read as synthetic.
+ * Attribute the ingestion path stamps on a trace whose trace id LangWatch minted
+ * because the emitter sent no trace context at all.
  */
 const SYNTHETIC_TRACE_ATTR = "langwatch.trace.synthetic";
 const DERIVED_FROM_ATTR = "langwatch.trace.derived_from";
 
 /**
- * Badge shown on traces LangWatch assembled itself. Some tools ship their
- * records with no trace of their own (a logs exporter running without a
- * traces exporter), so LangWatch groups those records into one trace by a
- * shared key (a session or conversation id). The badge tells the reader the
- * grouping is LangWatch's, not the tool's, and names the key it grouped by.
- *
- * Renders nothing for ordinary traces.
+ * Badge shown on traces LangWatch assembled itself.
  */
 export function SyntheticTraceBadge({ attributes }: { attributes: Record<string, string> }) {
   if (attributes[SYNTHETIC_TRACE_ATTR] !== "true") return null;

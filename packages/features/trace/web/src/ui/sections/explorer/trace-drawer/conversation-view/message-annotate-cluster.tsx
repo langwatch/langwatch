@@ -49,15 +49,6 @@ const ACTION_COPY = {
 
 /**
  * The actions on one message of a turn, revealed by hovering it.
- *
- * Sits in the message's label row rather than floating over the text: a
- * positioned overlay on a message that can be one line or forty either covers
- * prose or drifts away from it. In flow it stays where the label is, which is
- * the one part of a message whose position is known.
- *
- * Each action asks for the permission its own work needs. Reading a
- * conversation in a language the reviewer does not speak is reading, so
- * Translate is offered to everyone; annotating is not.
  */
 export function MessageAnnotateCluster({
   target,

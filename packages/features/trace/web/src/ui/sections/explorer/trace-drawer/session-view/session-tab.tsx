@@ -11,13 +11,6 @@ interface SessionTabProps {
 
 /**
  * The Session tab's data boundary.
- *
- * Two keyed seeks of the pre-folded SESSION row (ADR-056): the trace resolves
- * its session through `coding_agent_trace_sessions`, and the session row
- * already spans every trace of the run — the fold merged them at ingest,
- * which is the whole reason the aggregate exists. The alternative is every
- * reader (the app, the CLI, the MCP server) re-walking hundreds of spans to
- * count the same things.
  */
 export function SessionTab({ projectId, traceId, occurredAtMs }: SessionTabProps) {
   const query = api.tracesV2.codingAgentSession.useQuery(
@@ -46,12 +39,8 @@ export function SessionTab({ projectId, traceId, occurredAtMs }: SessionTabProps
     );
   }
 
-  // Null is the NORMAL answer for an ordinary LLM trace: the fold writes no row
-  // for one. The tab is offered for every coding-agent trace, but only Claude
-  // Code sessions are summarised today (the projection has one adapter), so
-  // landing here means either a Claude session that hasn't finished folding
-  // yet, or another agent that has no summary at all, so the copy must not
-  // promise one that will never come.
+  // Null is the NORMAL answer for an ordinary LLM trace: the fold writes no row for
+  // one.
   if (!query.data) {
     return (
       <Centered>

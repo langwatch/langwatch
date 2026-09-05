@@ -22,12 +22,9 @@ export function AccordionShell({
 }
 
 /**
- * Accordion triggers pin at `top: 0` of their scroll container. In the
- * new pane layout the `SpanTabBar` lives **outside** the accordions'
- * scroll container — it's part of the Span Detail pane's header chrome.
- * Older versions of this file offset by the tab-bar height because
- * the bar shared the same scroll surface, which left a visible
- * empty band above each sticky section.
+ * Accordion triggers pin at `top: 0` of their scroll container. In the new pane layout
+ * the `SpanTabBar` lives **outside** the accordions' scroll container — it's part of
+ * the Span Detail pane's header chrome.
  */
 const SPAN_TAB_BAR_HEIGHT_PX = 0;
 
@@ -66,10 +63,8 @@ export function Section({
    */
   open?: boolean;
   /**
-   * When set, emits `data-spotlight=<value>` on the accordion item so the
-   * drawer's show-once spotlight system can anchor to this section. Pass
-   * only when the section actually has content — anchor presence in the
-   * DOM is the spotlight's display condition.
+   * When set, emits `data-spotlight=<value>` on the accordion item so the drawer's
+   * show-once spotlight system can anchor to this section.
    */
   spotlightAnchor?: string;
 }) {
@@ -115,26 +110,15 @@ export function Section({
         borderColor={{ base: "gray.200", _dark: "border.muted" }}
         transition="background 120ms ease, color 120ms ease"
         _hover={{ bg: "bg.softHover", color: "fg" }}
-        // Open state keeps the same white bg AND the same `fg.muted`
-        // title color as closed — operator feedback: promoting the
-        // title color on expand made the "INPUT AND OUTPUT" labels
-        // look heavier than their collapsed siblings, breaking the
-        // calm read of the section list. The chevron rotation alone
-        // signals state. A 1px bottom border still slips in so the
-        // trigger reads as the open section's own header band.
+        // Open state keeps the same white bg AND the same `fg.muted` title color as closed — operator
+        // feedback: promoting the title color on expand made the "INPUT AND OUTPUT" labels look heavier than
+        // their collapsed siblings, breaking the calm read of the section list.
         _open={{
           borderBottomWidth: "1px",
           borderBottomColor: { base: "gray.200", _dark: "border.muted" },
         }}
         cursor="pointer"
-        // Each trigger pins flush with the SpanTabBar (no per-section
-        // offset). The previous "Notion-style" stacking multiplied a
-        // per-section index against the trigger height, which left a
-        // visible gap above later sections whenever an earlier section
-        // had already scrolled out of view — `position: sticky` only
-        // pins within the Accordion.Item, so collapsed/scrolled-past
-        // sections never actually occupy the space the offset reserved
-        // for them. Same-top sticky gives a clean replacement on scroll.
+        // Each trigger pins flush with the SpanTabBar (no per-section offset).
         position="sticky"
         top={`${SPAN_TAB_BAR_HEIGHT_PX}px`}
         zIndex={1}

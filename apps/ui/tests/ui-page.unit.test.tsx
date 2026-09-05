@@ -1,19 +1,6 @@
 /**
+ * The one page helper every route file composes through.
  * @vitest-environment jsdom
- *
- * The one page helper every route file composes through. What it pins is the
- * wrapping order the route docblocks used to defend one by one: host
- * outermost, guard innermost around the screen — and that a key with neither
- * a grant nor a flag mounts no guard at all.
- *
- * There is no settings-layout layer in this helper. `NavigationShell` draws
- * the settings sidebar for every matched `/settings` or `/ops` address on
- * its own (`resolveShellRoute`'s `isSettingsRoute` is a path test, not a
- * per-page opt-in); a second, page-level settings layout used to wrap the
- * same pages in a duplicate sidebar. See
- * packages/navigation/web/src/ui/sections/__tests__/settings-shell.integration.test.tsx
- * for the one sidebar this composition now relies on.
- *
  * Spec: specs/ui/ui-page-composition.feature
  */
 

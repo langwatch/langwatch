@@ -1,13 +1,7 @@
 /**
- * @vitest-environment jsdom
- *
  * The dock's room is reserved by exactly one party.
- *
+ * @vitest-environment jsdom
  * Spec: specs/langy/langy-panel-layout.feature
- *
- * Boundary mocks: the project/host context, `@ai-sdk/react`, the model picker
- * (an unrelated dependency chain), and the Langy API surface (an in-memory
- * tRPC-shaped double). The panel, the store and the header are all real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

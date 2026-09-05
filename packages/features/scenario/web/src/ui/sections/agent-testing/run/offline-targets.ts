@@ -1,12 +1,5 @@
 /**
- * The connected agents a run is pointed at that no process is holding
- * (ADR-128).
- *
- * A run against an offline agent is refused when it starts, so the dialog
- * says so before the person presses Run. The words are the ones the refusal
- * itself uses, read from the code-keyed registry, so the warning and the
- * error never drift apart.
- *
+ * The connected agents a run is pointed at that no process is holding (ADR-128).
  * @see specs/features/agents/connected-agents-ui.feature
  */
 

@@ -13,10 +13,9 @@ import type { ProposalHandlers } from "./message-content";
 import { type LangyContextChip, type LangyUiActionHandlers } from "../../../../index";
 
 /**
- * Per-page registration surface for Langy (proposal handlers + precise page
- * context). Panel/composer/conversation UI STATE does NOT live here — that is
- * the `useLangyStore` singleton. This context carries only the things a page
- * registers on mount and clears on unmount, so they follow the page.
+ * Per-page registration surface for Langy (proposal handlers + precise page context).
+ * Panel/composer/conversation UI STATE does NOT live here — that is the `useLangyStore`
+ * singleton.
  */
 interface LangyContextValue {
   // A ref, not state: pages re-derive their handlers object on most
@@ -29,19 +28,14 @@ interface LangyContextValue {
   registerHandlers: (handlers: ProposalHandlers, opts?: { experimentSlug?: string }) => void;
   clearHandlers: () => void;
   /**
-   * Precise page-context chips a page has declared (see
-   * `useRegisterLangyPageContext`). Most context is derived from the route by
-   * `useLangyPageContext`; this is the escape hatch for context the URL can't
-   * express (a selected prompt / dashboard with its human name).
+   * Precise page-context chips a page has declared (see `useRegisterLangyPageContext`).
    */
   pageContext: LangyContextChip[];
   registerPageContext: (items: LangyContextChip[]) => void;
   clearPageContext: () => void;
   /**
    * The UI actions the CURRENT page can execute for the agent, kind → handler
-   * (specs/langy/langy-ui-actions.feature). A ref for the same reason
-   * `proposalHandlersRef` is one: pages re-derive the table on most renders,
-   * and the panel only reads it when a `ui` stream entry arrives.
+   * (specs/langy/langy-ui-actions.feature).
    */
   actionHandlersRef: RefObject<LangyUiActionHandlers>;
   registerActions: (handlers: LangyUiActionHandlers) => void;
@@ -140,9 +134,7 @@ export function useRegisterLangyHandlers(
 
 /**
  * Optional hook for pages that expose live UI actions to the agent
- * (specs/langy/langy-ui-actions.feature). Registers on mount, clears on
- * unmount, so navigating away leaves the agent's dispatches unclaimed — which
- * is exactly the signal the server's fallback path keys on.
+ * (specs/langy/langy-ui-actions.feature).
  */
 export function useRegisterLangyActions(handlers: LangyUiActionHandlers) {
   const { registerActions, clearActions } = useLangy();
@@ -153,11 +145,9 @@ export function useRegisterLangyActions(handlers: LangyUiActionHandlers) {
 }
 
 /**
- * Optional hook for pages to declare precise Langy context the route can't
- * express — a selected prompt or dashboard with its human name. Registers on
- * mount, clears on unmount, so the chip follows the page. Route-derivable
- * context (experiment / trace / dataset) needs no call: `useLangyPageContext`
- * reads it from the URL.
+ * Optional hook for pages to declare precise Langy context the route can't express — a
+ * selected prompt or dashboard with its human name. Registers on mount, clears on
+ * unmount, so the chip follows the page.
  */
 export function useRegisterLangyPageContext(items: LangyContextChip[]) {
   const { registerPageContext, clearPageContext } = useLangy();

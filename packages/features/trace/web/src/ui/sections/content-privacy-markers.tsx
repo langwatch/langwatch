@@ -7,17 +7,9 @@ import NextLink from "../elements/next-link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
- * Generic, per-category read-time privacy markers for a span's content. Every
- * content category (input, output, system instructions, tool calls) is marked
- * the same way so an absent or hidden category never reads as missing
- * instrumentation:
- *
- * - dropped: removed by a privacy policy at ingestion, not stored, unrecoverable.
- * - restricted (hidden): stored but hidden from this viewer; names who can see.
- * - restricted (visible to you): the viewer is in the audience, so the content
- *   shows, with a marker telling them it is limited to that audience.
- *
- * Categories that are plainly captured and visible render nothing.
+ * Generic, per-category read-time privacy markers for a span's content. Every content
+ * category (input, output, system instructions, tool calls) is marked the same way so
+ * an absent or hidden category never reads as missing instrumentation:
  */
 
 type Category = keyof ContentPrivacy;
@@ -36,10 +28,7 @@ interface MarkerCopy {
 }
 
 /**
- * The marker copy for one category's status, or null when there is nothing to
- * mark. `skipRestricted` suppresses the restricted-hidden marker for categories
- * whose hidden state already renders inline (input/output, via RedactedField),
- * leaving the dropped marker and the in-audience badge.
+ * The marker copy for one category's status, or null when there is nothing to mark.
  */
 function markerFor(
   category: Category,
@@ -121,12 +110,6 @@ const PrivacyMarker: React.FC<MarkerCopy> = ({ icon, label, tooltip }) => {
  * Renders the privacy markers for the given categories (defaults to all four).
  * Categories with nothing to mark render nothing, so the block is invisible for
  * ordinary captured content.
- *
- * `framed` wraps the markers in a subtle bordered panel so a standalone block
- * (e.g. the span I/O section's system-instructions / tool-calls markers, which
- * have no inline content slot of their own) reads as an intentional, contained
- * redaction state instead of cramped italic text butting against the rows
- * below.
  */
 export const ContentPrivacyMarkers: React.FC<{
   privacy?: ContentPrivacy | null;
@@ -173,10 +156,9 @@ export const ContentPrivacyMarkers: React.FC<{
 };
 
 /**
- * Warns that strict redaction of names and locations did not run for a span, so
- * the content may still contain them — the pattern-based identifiers (emails,
- * cards, IDs) were still removed. Surfaces the gap instead of letting partially
- * redacted content read as fully scrubbed.
+ * Warns that strict redaction of names and locations did not run for a span, so the
+ * content may still contain them — the pattern-based identifiers (emails, cards, IDs)
+ * were still removed.
  */
 export const PiiIncompleteNotice: React.FC<{
   incomplete?: boolean | null;

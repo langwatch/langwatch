@@ -1,13 +1,6 @@
 /**
- * The providers that need router context, in the order they have always
- * nested, and the browser instrumentation that runs beside them.
- *
- * The instrumentation behaviours live in this package and read nothing from
- * the environment themselves; this is the one place that resolves the public
- * configuration and hands it to each of them, in the order they have always
- * run in. The command bar, the toaster, the footer, the public-configuration
- * reader and the navigation write points still belong to the composing
- * application and arrive installed.
+ * The providers that need router context, in the order they have always nested, and the
+ * browser instrumentation that runs beside them.
  */
 
 import posthog from "posthog-js";

@@ -55,10 +55,9 @@ function formatResultsForCopy(results: unknown): string {
 const SECRET_VALUE_MASK = "••••••••";
 
 /**
- * Whole-conversation view in Trace Explorer: every trace of this run carries
- * the scenario.run_id attribute, so a scenarioRun:"<id>" search shows the
- * full conversation. Same #<lens>?q= fragment contract as the command bar's
- * trace links.
+ * Whole-conversation view in Trace Explorer: every trace of this run carries the
+ * scenario.run_id attribute, so a scenarioRun:"<id>" search shows the full
+ * conversation. Same #<lens>?q= fragment contract as the command bar's trace links.
  */
 function useOpenRunInTraces({
   projectSlug,
@@ -77,10 +76,9 @@ function useOpenRunInTraces({
 }
 
 /**
- * Everything the run detail drawer knows about one run: the live state, the
- * streamed messages, the scenario record, and the actions on it. Shared by
- * the classic drawer and the Agent Testing variant so the two layouts read
- * the same run the same way.
+ * Everything the run detail drawer knows about one run: the live state, the streamed
+ * messages, the scenario record, and the actions on it. Shared by the classic drawer
+ * and the Agent Testing variant so the two layouts read the same run the same way.
  */
 export function useScenarioRunDetail({
   scenarioRunId,

@@ -32,22 +32,6 @@ export function tracePartitionHint(startedAt: unknown): number | null {
 
 /**
  * Opens a turn's trace in the drawer, ready to be corrected.
- *
- * The conversation is a thread of traces, and a correction is about one of
- * them, so the drawer lands on that trace's own summary rather than on the
- * thread the reviewer just came from. Transiently, because reading a
- * conversation is not a decision to stop reading conversations.
- *
- * Who moves first depends on whether the drawer is on screen. Closed, the
- * link states the whole intent (which trace, and that it opens for editing)
- * and the drawer's URL hydrator opens it; seeding the store instead would
- * mount the drawer a frame before the URL names it, and the hydrator reads
- * that frame as "the URL has no drawer, close it". Open, the store moves
- * first and the URL follows, the same order every other in-drawer transition
- * uses: landing a URL that asks for state the store does not hold yet puts
- * the shell's URL sync one commit ahead of the page-level hydrator, and the
- * sync strips the edit flag in the same breath the hydrator grants it, the
- * two rewriting the URL against each other without ever converging.
  */
 export function openTraceEditorFromConversation({
   openDrawer,

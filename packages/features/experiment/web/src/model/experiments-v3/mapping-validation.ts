@@ -1,8 +1,5 @@
 /**
  * Mapping Validation Utility for Evaluations V3
- *
- * Provides functions to detect missing mappings for targets and evaluators.
- * Used to show validation alerts and highlight fields that need attention.
  */
 
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
@@ -46,10 +43,6 @@ export type PromptTemplateMessage = {
 
 /**
  * Resolves the variables a prompt target's saved template consumes.
- *
- * Only asked for prompt targets that carry no local draft. Returns undefined
- * when the template is not loaded, and the target then has nothing that can be
- * proven required.
  */
 export type PromptTemplateFieldsLookup = (target: TargetConfig) => Set<string> | undefined;
 
@@ -79,8 +72,6 @@ export type WorkbenchValidationResult = {
 
 /**
  * Extract fields used in a prompt's message content.
- * Fields are referenced using {{fieldName}} syntax.
- *
  * @param content - The prompt message content
  * @returns Set of field names used in the content
  */
@@ -95,17 +86,6 @@ export const extractFieldsFromContent = (content: string): Set<string> => {
 };
 
 /**
- * The variables a prompt template consumes.
- *
- * A `{{variable}}` reference in any message counts, the system message
- * included: the engine renders the system prompt from the same variable map as
- * the rest of the template (`buildMessages`, engine.go).
- *
- * A template with no user or assistant message consumes every declared input
- * instead. With no turn to render, the engine folds the scalar inputs into a
- * single user turn (`composeUserPrompt`, engine.go), so each declared input
- * reaches the model and needs a value.
- *
  * @param messages - The template messages, system message included
  * @param declaredFieldIds - The variables the prompt declares
  * @returns Set of variables the template consumes
@@ -174,10 +154,6 @@ const resolveUsedFields = (
 };
 
 /**
- * Get all fields that a target consumes.
- * For prompts, the template decides (see getFieldsUsedByPromptTemplate).
- * For code targets, all inputs are consumed.
- *
  * @param target - The target to check
  * @param options - Resolves the saved template of an undrafted prompt target
  * @returns Set of field identifiers that are used
@@ -192,28 +168,8 @@ export const getUsedFields = (
 // ============================================================================
 
 /**
- * Check if a target has all required mappings for a dataset.
- *
- * Validation rules vary by target type:
- *
- * **Prompts:**
- * - A mapping is required if the field is BOTH consumed by the template AND in inputs
- * - Fields only used but not listed ("Undefined variables") are NOT required
- * - A declared field the template does not consume is never required
- * - With no template at hand, nothing is required
- *
- * **HTTP Agents:**
- * - All fields are OPTIONAL (no individual field is required)
- * - BUT at least ONE field must have a mapping
- * - This allows flexibility in what data to send to the HTTP endpoint
- *
- * **Code/Other Agents:**
- * - All inputs are required (must have mappings)
- *
- * @param target - The target to validate
- * @param datasetId - The dataset to validate against
- * @param options - Resolves the saved template of an undrafted prompt target
- * @returns Validation result with missing mappings
+ * Validates `target`'s mappings against `datasetId`, returning every mapping its
+ * fields still need.
  */
 export const getTargetMissingMappings = (
   target: TargetConfig,
@@ -381,19 +337,7 @@ export const getTargetMissingMappings = (
   };
 };
 
-/**
- * Check if a target is short of a mapping it needs to run.
- *
- * Drives the alert icon on the column header and the per-column play button,
- * so it answers the same question the run buttons ask: can this target run as
- * configured. Advisory misses, such as a declared variable the template never
- * consumes, are not missing mappings the user can act on and are excluded.
- *
- * @param target - The target to check
- * @param datasetId - The dataset to check against
- * @param options - Resolves the saved template of an undrafted prompt target
- * @returns true if a mapping the target needs is absent
- */
+/** Whether `target` is still missing a mapping it needs against `datasetId`. */
 export const targetHasMissingMappings = (
   target: TargetConfig,
   datasetId: string,
@@ -460,13 +404,7 @@ const validateMappingsCore = (
 };
 
 /**
- * Check if mappings are valid given explicit field definitions.
- * Use this when you already have the field definitions and don't need to look them up.
- *
- * @param requiredFields - List of required field names
- * @param optionalFields - List of optional field names
- * @param mappings - The current mappings (field -> mapping)
- * @returns Validation result
+ * Validates `mappings` against a plain list of required/optional field names.
  */
 export const validateEvaluatorMappingsWithFields = (
   requiredFields: string[],
@@ -486,10 +424,9 @@ const isDefinedOutsideTheCatalog = (evaluatorType: string): boolean =>
   evaluatorType === "workflow";
 
 /**
- * What to report for a built-in evaluator with no catalog entry: it cannot run
- * whatever the mappings say, so the evaluator itself is the finding. Calling
- * the mappings complete would let the row be queued against an evaluator that
- * is not there.
+ * What to report for a built-in evaluator with no catalog entry: it cannot run whatever
+ * the mappings say, so the evaluator itself is the finding. Calling the mappings
+ * complete would let the row be queued against an evaluator that is not there.
  */
 const unavailableEvaluatorResult = (evaluatorType: string): EvaluatorValidationResult => ({
   isValid: false,
@@ -503,18 +440,8 @@ const unavailableEvaluatorResult = (evaluatorType: string): EvaluatorValidationR
 });
 
 /**
- * Check if an evaluator has all required mappings for a specific target and dataset.
- *
- * Validation rules:
- * 1. ALL required fields MUST have mappings
- * 2. Optional fields MAY have mappings
- * 3. BUT if ALL fields (required + optional) are empty, that's also invalid
- *    (at least one field must be mapped)
- *
- * @param evaluator - The evaluator to validate
- * @param datasetId - The dataset to validate against
- * @param targetId - The target to validate against
- * @returns Validation result with missing mappings
+ * Validates `evaluator`'s mappings against `datasetId`/`targetId`, returning every
+ * mapping its fields still need.
  */
 export const getEvaluatorMissingMappings = (
   evaluator: EvaluatorConfig,
@@ -524,14 +451,9 @@ export const getEvaluatorMissingMappings = (
   const missingMappings: MissingMapping[] = [];
   const targetMappings = evaluator.mappings[datasetId]?.[targetId] ?? {};
 
-  // Comparison evaluator chips: the high-level ComparisonConfigForm replaces
-  // the per-row mappings UI, writing its config to `evaluator.comparison`
-  // instead of `evaluator.mappings`. Validate against that config directly —
-  // otherwise the evaluator's required field ("candidates") never gets an
-  // `evaluator.mappings` entry and is permanently reported missing, which
-  // forces every Run / Rerun / Run-on-all-rows click to reopen the config
-  // editor instead of executing. Mirrors the analogous target-level exemption
-  // in getTargetMissingMappings.
+  // Comparison evaluator chips: the high-level ComparisonConfigForm replaces the
+  // per-row mappings UI, writing its config to `evaluator.comparison` instead of
+  // `evaluator.mappings`.
   const comparison = toComparisonConfig(evaluator);
   if (comparison) {
     // Filter empty slots, not just array length — see the analogous comment
@@ -620,12 +542,7 @@ export const getEvaluatorMissingMappings = (
 };
 
 /**
- * Check if an evaluator has any missing mappings for a target.
- *
- * @param evaluator - The evaluator to check
- * @param datasetId - The dataset to check against
- * @param targetId - The target to check against
- * @returns true if there are missing required mappings
+ * Whether `evaluator` is still missing a required mapping against `datasetId`/`targetId`.
  */
 export const evaluatorHasMissingMappings = (
   evaluator: EvaluatorConfig,
@@ -641,15 +558,8 @@ export const evaluatorHasMissingMappings = (
 // ============================================================================
 
 /**
- * Validate all targets and evaluators in the workbench.
- * Returns the first invalid entity found (useful for opening the right drawer).
- *
- * @param targets - All targets in the workbench
- * @param evaluators - All evaluators in the workbench
- * @param activeDatasetId - The currently active dataset
- * @param promptTemplateFields - Resolves the saved template of an undrafted
- *   prompt target
- * @returns Validation result with first invalid entity
+ * Validates every target and evaluator in the workbench against `activeDatasetId`,
+ * returning the first invalid entity found.
  */
 export const validateWorkbench = ({
   targets,
@@ -696,12 +606,7 @@ export const validateWorkbench = ({
 };
 
 /**
- * Get all missing mappings for all targets (used for batch display).
- *
- * @param targets - All targets to check
- * @param datasetId - The dataset to check against
- * @param options - Resolves the saved template of an undrafted prompt target
- * @returns Map of targetId -> missing mappings
+ * Maps each of `targets` to its own missing mappings against `datasetId`.
  */
 export const getAllTargetMissingMappings = (
   targets: TargetConfig[],

@@ -1,10 +1,6 @@
 /**
- * One connected agent in full: what it accepts, which processes hold it, and
- * a way to call it once (ADR-128).
- *
- * The name, the environment and the parameters come from the process that
- * registered them, so the drawer reads them and writes nothing.
- *
+ * One connected agent in full: what it accepts, which processes hold it, and a way to
+ * call it once (ADR-128).
  * @see specs/features/agents/connected-agents-ui.feature
  */
 

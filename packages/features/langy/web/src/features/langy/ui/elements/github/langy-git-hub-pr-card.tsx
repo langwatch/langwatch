@@ -1,26 +1,5 @@
 /**
  * In-chat pull-request card.
- *
- * Driven by the `github.open_pr` TOOL PART the turn processor writes after
- * `gh pr create` settles — enriched from the GitHub API with the user's own
- * token, off the PR identity the command's stdout gave us.
- *
- * It is NOT scraped from the assistant's reply any more. That was the last place
- * in Langy's UI steered by regexing the model's text, and it had the usual three
- * faults: the model could mangle the URL, omit it, or merely MENTION a PR it had
- * never opened and get a card for it. A tool part cannot lie, it carries
- * structure, and it is persisted with the message — so this card survives a
- * refresh, which the prose card never did.
- *
- * DEGRADES HONESTLY. `owner/repo#number` and the URL always exist (stdout). The
- * rich half — title, branches, author, diff stat — is optional, because the
- * GitHub lookup can fail for reasons that say nothing about the PR (an expired
- * token, a repo gone private, a rate limit). When it does, the card shows what we
- * know rather than a half-populated lie, or an error where a PR should be.
- *
- * Visuals live inside the Langy card kit: a hairline border on a subtle ground,
- * no shadow, semantic tokens only.
- *
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";

@@ -1,17 +1,5 @@
 /**
  * That a procedure dispatched by name lands in the cache everything else reads.
- *
- * These assertions were `platform/app`'s, on the Agents host adapter that owned
- * this dispatcher before the family moved. They are about the seam rather than
- * the family, so they move with the seam: `BrowserUiRpc` is now the one place in
- * `apps/ui` that turns a procedure path into a React Query entry, and any screen
- * too wide for a typed procedure map goes through it.
- *
- * They assert the SHARING rather than the shape of the key. A key whose encoding
- * is right but which nothing else reaches is the bug, not the fix: the original
- * defect keyed reads under `["agent-ui", path, input]`, which shares no prefix
- * with any tRPC key, so an invalidation on either side was invisible to the
- * other and the symptom was stale UI that looked random.
  */
 
 import { trpcQueryFilter, trpcQueryKey } from "@langwatch/platform-api-client";

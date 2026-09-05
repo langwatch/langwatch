@@ -1,10 +1,5 @@
 /**
  * The state and the writes of the scenario editor.
- *
- * The editor is one dialog with one draft in it. It reads the stored scenario when
- * it opens on one, and it saves with the version it read, so a save over
- * somebody else's newer save is refused rather than written.
- *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/scenarios/scenario-versioning.feature
  */
@@ -96,10 +91,9 @@ export type CaseEditorState = {
 };
 
 /**
- * The draft the dialog holds. It is seeded once per scenario the dialog opens on,
- * so a background refetch cannot overwrite what somebody is typing, and the
- * version it was seeded from travels with it so a save cannot refer to a
- * newer one.
+ * The draft the dialog holds. It is seeded once per scenario the dialog opens on, so a
+ * background refetch cannot overwrite what somebody is typing, and the version it was
+ * seeded from travels with it so a save cannot refer to a newer one.
  */
 function useCaseDraft({
   open,

@@ -7,10 +7,9 @@ interface SidebarResizeHandleProps {
   /** Called with the new width while dragging (continuous). */
   onResize: (width: number) => void;
   /**
-   * Called once when the drag ends (pointer-up or pointer-cancel).
-   * Lets callers do the heavy work (e.g. localStorage persistence)
-   * once at the end instead of on every `onResize` frame, which
-   * jitters the resize.
+   * Called once when the drag ends (pointer-up or pointer-cancel). Lets callers do the
+   * heavy work (e.g. localStorage persistence) once at the end instead of on every
+   * `onResize` frame, which jitters the resize.
    */
   onResizeEnd?: () => void;
   /** Min before the drag commits a collapse instead of a resize. */
@@ -22,12 +21,9 @@ interface SidebarResizeHandleProps {
 }
 
 /**
- * 1px right-edge separator with a forgiving hit zone + drag-to-resize.
- * Mirrors the drawer's `PaneResizeBar` affordance: invisible 4px strip,
- * 1px visible line that lights blue on hover / drag via the
- * `data-resize-handle-state` attribute. Dragging past `collapseBelow`
- * commits a collapse instead of a sub-threshold width — same UX as the
- * trace v2 drawer panels.
+ * 1px right-edge separator with a forgiving hit zone + drag-to-resize. Mirrors the
+ * drawer's `PaneResizeBar` affordance: invisible 4px strip, 1px visible line that
+ * lights blue on hover / drag via the `data-resize-handle-state` attribute.
  */
 export function SidebarResizeHandle({
   currentWidth,

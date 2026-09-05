@@ -1,8 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for "All Runs" default selection on the Suites page.
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/all-runs-default-open.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

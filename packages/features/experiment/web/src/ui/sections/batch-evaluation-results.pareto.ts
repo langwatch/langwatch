@@ -1,11 +1,6 @@
 /**
- * Pareto dominance across quality, cost and speed. A variant wins only when it
- * is no worse on every usable dimension and better on at least one.
- *
- * Quality uses the verdict's distinguishability test; cost and speed use a
- * paired per-row mean-difference interval. Missing intervals are ties, not
- * average comparisons. Every ranked variant must have enough data for a
- * dimension, and degenerate quality scores are excluded.
+ * Pareto dominance across quality, cost and speed. A variant wins only when it is no
+ * worse on every usable dimension and better on at least one.
  */
 
 import type {
@@ -24,9 +19,7 @@ export type DominanceEdge = {
   loserId: string;
   /**
    * Dimensions the winner is strictly better on. The rest of
-   * `ParetoDominance.dimensions` are ties — never losses, or this would not
-   * be an edge. Reported so the sentence can name what was actually won
-   * rather than implying a clean sweep.
+   * `ParetoDominance.dimensions` are ties — never losses, or this would not be an edge.
    */
   strictlyBetterOn: TradeoffDimension[];
 };
@@ -71,18 +64,6 @@ const usableMean = (stats: { avg: number; count: number } | null | undefined): n
 
 /**
  * Cost and speed: the interval of the mean paired per-row difference.
- *
- * This is the real test. A pair with no interval means the paired test RAN AND
- * DECLINED — the two shared too few rows to compare — so the run cannot tell
- * them apart on this dimension.
- *
- * There used to be a fallback here that compared the two overall averages
- * against a flat 5% threshold. It judged anyway, by a cruder test, in exactly
- * the case where the averages are least trustworthy, and it was also dead:
- * `VariantMetrics` declares the difference maps non-optional and
- * `computeVariantMetrics` is the only thing that builds one, so no production
- * caller could ever reach it. Ten tests in this module's suite were passing
- * against it.
  */
 const comparePairedMetric = ({
   metrics,
@@ -151,10 +132,6 @@ const everyVariantRecorded = ({
 
 /**
  * The dimensions this run may state dominance on.
- *
- * Every ranked variant must have the metric, or the dimension is dropped.
- * Comparing a pair that happens to have cost while another pair does not
- * would make dominance depend on which rows happened to record a price.
  */
 const comparableDimensions = ({
   ranked,

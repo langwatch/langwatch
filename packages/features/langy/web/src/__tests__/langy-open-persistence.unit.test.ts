@@ -3,16 +3,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useLangyStore } from "../behavior/langy.store";
 
 /**
- * A refresh must put the user back where they were: the panel open or closed as
- * they left it, in the layout they chose, on the conversation they had open.
- *
- * The conversation is the subtle one. It persists as a PAIR — the id and the
- * SCOPE it belongs to (user, organization, project) — because the store is a
- * module singleton that survives the per-project panel remount, and because
- * localStorage belongs to the browser rather than to whoever is signed in. An id
- * alone would follow the user somewhere it does not exist, or somewhere it does
- * exist and does not belong to them.
- *
+ * A refresh must put the user back where they were: the panel open or closed as they
+ * left it, in the layout they chose, on the conversation they had open.
  * Spec: specs/langy/langy-navigation-persistence.feature.
  */
 const readPersisted = (): Record<string, unknown> => {

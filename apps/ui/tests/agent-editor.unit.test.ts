@@ -1,16 +1,5 @@
 /**
  * What `openAgentEditor` writes — the Agents host's one composed value.
- *
- * The code, HTTP and workflow editors belong to `@langwatch/scenario-web` and
- * are registered by the simulations feature, whose host they read, so the
- * screen names one and this writes the address that opens it.
- *
- * Getting that address wrong is silent in both directions: a missing
- * `drawer.agentId` opens an empty editor, and a LEFTOVER one from a previous
- * drawer opens the editor on the agent the reader looked at before this one.
- * `openDrawer` clears every `drawer.*` key for exactly that reason, and this
- * has to as well.
- *
  * Spec: specs/agents/agent-management.feature
  */
 

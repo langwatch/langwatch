@@ -16,18 +16,6 @@ type TurnLedger = Pick<
 
 /**
  * Reads a single fetched trace as one conversation turn.
- *
- * The conversation view is fed by `tracesV2.list`, whose query language has no
- * trace-id field, so a trace that belongs to no thread cannot be asked for as a
- * one-turn conversation. The host fetches that trace on its own and hands the
- * turn over instead (`ConversationView.fallbackTurns`), which is how a
- * threadless trace still reads as a conversation rather than as an empty one.
- *
- * The turn carries what the conversation actually renders: the text either
- * side of it, the separator's ledger, and its error state. Everything a list
- * row would have folded from spans (models, evaluations, events, sizes) is
- * absent from a single fetched trace, so it is left empty rather than guessed
- * at.
  */
 export function legacyTraceToTurn(trace: Trace): TraceListItem {
   const metadata = trace.metadata;

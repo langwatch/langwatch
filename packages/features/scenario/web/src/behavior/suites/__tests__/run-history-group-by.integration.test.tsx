@@ -1,10 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for group-by functionality in the run history UI.
- *
- * Tests the group-by selector in RunHistoryFilters and GroupRow rendering.
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/run-history-group-by.feature - @integration scenarios
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

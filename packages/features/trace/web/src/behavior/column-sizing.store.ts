@@ -2,11 +2,9 @@ import { create } from "zustand";
 import { z } from "zod";
 
 /**
- * Per-lens column-width overrides. Keyed by `${lensId}:${rowKind}` so the
- * "all-traces" lens with the trace row kind doesn't collide with the
- * conversations lens (same column ids — `duration`, `cost` — but a
- * different layout). Persisted to localStorage so widths survive page
- * reloads.
+ * Per-lens column-width overrides. Keyed by `${lensId}:${rowKind}` so the "all-traces"
+ * lens with the trace row kind doesn't collide with the conversations lens (same column
+ * ids — `duration`, `cost` — but a different layout).
  */
 export type ColumnSizing = Record<string, number>;
 
@@ -57,12 +55,7 @@ function load(): Record<string, ColumnSizing> {
 }
 
 /**
- * Debounce the localStorage write. `columnResizeMode: "onChange"` fires
- * setSizing on every mousemove during a drag — without throttling we
- * synchronously JSON-stringify and rewrite the entire blob ~60×/sec,
- * which shows up as visible jitter while resizing. Coalesce into one
- * write per idle frame; the in-memory store updates immediately so the
- * UI still reflects the latest width with zero perceived lag.
+ * Debounce the localStorage write.
  */
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingPersist: Record<string, ColumnSizing> | null = null;

@@ -1,10 +1,8 @@
 import { create } from "zustand";
 
 /**
- * The connection lifecycle the live-updates subscription reports, mirrored
- * here so the store does not have to reach into the application's SSE hook
- * for a four-member union. The hook's own `ConnectionState` is the same set;
- * a value flows from there into `setSseConnectionState` unchanged.
+ * The connection lifecycle the live-updates subscription reports, mirrored here so the
+ * store does not have to reach into the application's SSE hook for a four-member union.
  */
 export type SseConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
@@ -14,15 +12,6 @@ const LEGACY_LIVE_UPDATES_BOOL_KEY = "langwatch:traces-v2:live-updates-enabled:v
 
 /**
  * Three-state live update preference.
- *
- * - `live`: SSE on, table auto-refreshes as updates arrive (the historic
- *   "enabled" behaviour).
- * - `ask`: SSE on so the `(N new)` pill knows when new rows exist, but
- *   the table does NOT auto-refresh. The user opts in by clicking the
- *   pill — avoids the list jumping under the cursor mid-read. Reuses
- *   the same floating pill the scrolled-list overlay shows in live
- *   mode, so there is one and only one "new rows available" affordance.
- * - `paused`: SSE off entirely — no updates, no pill, no polling.
  */
 export type LiveUpdatesMode = "live" | "ask" | "paused";
 

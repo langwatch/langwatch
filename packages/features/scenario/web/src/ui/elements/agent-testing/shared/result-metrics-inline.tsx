@@ -1,8 +1,5 @@
 /**
  * What a run cost, beside a result: "6.3s · $0.0042".
- *
- * A run with neither number renders nothing, so a row never carries an empty
- * separator.
  */
 import { Text } from "@chakra-ui/react";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";

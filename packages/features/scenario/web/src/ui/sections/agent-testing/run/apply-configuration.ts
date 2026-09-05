@@ -1,9 +1,5 @@
 /**
  * Putting a stored configuration back into the run dialog.
- *
- * Shared by the two ways one arrives: picked from the run name dropdown, and
- * seeded when the dialog opens on the newest configuration of its scope.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -29,10 +25,6 @@ function isComparison(targets: readonly SuiteTarget[]): boolean {
 
 /**
  * The rows a stored comparison comes back as, each with its own overrides.
- *
- * A configuration stored before targets carried their own overrides holds
- * them at run level, copied onto every target, so a target without any reads
- * the run-level ones.
  */
 function compareRowsOf({
   targets,
@@ -61,14 +53,8 @@ function secretRowsOf(primary: SuiteTarget | undefined): ParameterRow[] {
 }
 
 /**
- * Puts a configuration back into the dialog, opening the blocks it used and
- * folding away the ones it did not.
- *
- * The note text is left alone: it belongs to one run, not to a configuration.
- * A configuration that took a note before opens the note block ready and
- * empty, because the run plan takes a note every run and its words change
- * every run. The block only ever opens this way: a note somebody is already
- * writing is never taken away.
+ * Puts a configuration back into the dialog, opening the blocks it used and folding
+ * away the ones it did not.
  */
 export function applyConfigurationTo({
   entry,

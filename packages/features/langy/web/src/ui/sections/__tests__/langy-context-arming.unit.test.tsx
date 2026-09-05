@@ -1,11 +1,7 @@
 /**
+ * Arming is a MODE, and a mode has to be hard to enter by accident and trivial to
+ * leave. These are the ways it could go wrong: - `#` is a character.
  * @vitest-environment jsdom
- *
- * Arming is a MODE, and a mode has to be hard to enter by accident and trivial
- * to leave. These are the ways it could go wrong:
- *   - `#` is a character. Typing it into the composer or a search box must type
- *     it, not light up the page.
- *   - Escape must only be swallowed when it actually disarmed something.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, render } from "@testing-library/react";
@@ -117,17 +113,7 @@ describe("useLangyContextArming", () => {
 
 /**
  * The gesture has to work from where the user actually is.
- *
- * The arming listener lived inside a subtree the layer only rendered while the
- * Langy panel was OPEN, so pressing `#` anywhere else did nothing whatsoever —
- * no highlight, no hint, no error. The peek made that the common case rather
- * than the edge one: a minimised panel reads as closed, which is how Langy sits
- * most of the time.
- *
- * Mounted through the REAL layer, not the hook: mounting the hook directly is
- * exactly what let the bug through, because the hook was never the broken part.
  */
-/** The layer paints real chrome once armed, so it needs the design system. */
 function renderLayer() {
   return render(
     <ChakraProvider value={defaultSystem}>

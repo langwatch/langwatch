@@ -1,11 +1,5 @@
 /**
  * BatchRunsSidebar - Sidebar component showing list of evaluation runs
- *
- * Modern design matching the prompt playground sidebar style:
- * - No borders on the sidebar itself
- * - Items have rounded corners that don't touch edges
- * - Two-line Apple Notes style layout
- * - formatTimeAgo for relative dates
  */
 import {
   Alert,

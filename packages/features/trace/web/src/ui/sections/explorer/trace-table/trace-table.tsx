@@ -27,10 +27,9 @@ interface TableShell {
   isFetching: boolean;
   isTransitioning: boolean;
   /**
-   * A failed read has no rows either, and it must never be told as "nothing
-   * matched": that sends someone off widening a filter to find data the
-   * filter was never the problem with. Carried here so the shell can say so
-   * before the empty state gets the chance.
+   * A failed read has no rows either, and it must never be told as "nothing matched":
+   * that sends someone off widening a filter to find data the filter was never the
+   * problem with.
    */
   isError: boolean;
   error: unknown;
@@ -57,14 +56,9 @@ const tracesShell = (list: Omit<TableShell, "itemNoun" | "maxPageSize">): TableS
 });
 
 /**
- * What the table shell shows before it has rows to show: the failure if the
- * read failed, the empty state if it genuinely came back empty, and null when
- * there is a table to render.
- *
- * The order is the point. A failed read has no rows either, and reporting it
- * as "nothing matched" sends someone off widening a filter that was never the
- * problem. Emptiness is only trusted once nothing is in flight and no stale
- * previous-key rows are standing in, or the empty state flashes mid-fetch.
+ * What the table shell shows before it has rows to show: the failure if the read
+ * failed, the empty state if it genuinely came back empty, and null when there is a
+ * table to render.
  */
 function shellPlaceholder(shell: TableShell): React.ReactNode | null {
   if (shell.isError) {

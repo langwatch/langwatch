@@ -2,18 +2,9 @@ import type { TraceLogRecordDto } from "@langwatch/trace-contract";
 import { type CodingAgentEvent, normalizeEventName } from "@langwatch/coding-agent-contract";
 
 /**
- * A one-line, human summary for a log record whose `event.name` is one of the
- * canonical coding-agent events — the same vocabulary `coding-agent-transcript
- * .derivation.ts` normalizes across Claude Code, opencode, Codex, Gemini CLI
- * and Copilot. Returns null for a log we don't have a name for, so the Logs
- * section falls back to a generic attribute dump rather than a misleading
- * label.
- *
- * Deliberately exhaustive over `CodingAgentEvent` (not a subset) — the
- * transcript derivation only renders the events worth putting IN a
- * conversation replay (a `tool_decision` the user accepted is redundant with
- * its span, so the transcript drops it); a span's raw Logs section has no
- * such reason to hide anything it actually received.
+ * A one-line, human summary for a log record whose `event.name` is one of the canonical
+ * coding-agent events — the same vocabulary `coding-agent-transcript .derivation.ts`
+ * normalizes across Claude Code, opencode, Codex, Gemini CLI and Copilot.
  */
 export function summarizeLogEvent(log: TraceLogRecordDto): string | null {
   const event = normalizeEventName(log.attributes["event.name"]);
@@ -155,10 +146,8 @@ function formatCount(raw: string): string {
 export type LogEventTone = "danger" | "warning" | "neutral";
 
 /**
- * A quick-glance outcome colour for a coding-agent log event — the same tone
- * vocabulary SessionView's Signals use elsewhere in this drawer. Lets a
- * denied tool call or a failed result read at a glance in the Logs section
- * instead of requiring a read through the attribute table underneath.
+ * A quick-glance outcome colour for a coding-agent log event — the same tone vocabulary
+ * SessionView's Signals use elsewhere in this drawer.
  */
 export function logEventTone(log: TraceLogRecordDto): LogEventTone {
   const event = normalizeEventName(log.attributes["event.name"]);

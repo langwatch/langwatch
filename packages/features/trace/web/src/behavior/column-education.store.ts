@@ -1,15 +1,8 @@
 import { create } from "zustand";
 
 /**
- * Tracks whether the column-reorder education dialog has been shown
- * (or explicitly dismissed) so it only fires once per browser. The
- * dialog appears the first time the operator attempts to drag a
- * column header in the v2 trace table; the v2 table doesn't support
- * native drag-reorder yet, so without education the drag attempt
- * silently does nothing and the user concludes "the columns just
- * aren't reorderable" — wrong. The dialog teaches that columns are
- * managed from the Columns dropdown / Configure popover, with a small
- * preview of where that lives.
+ * Tracks whether the column-reorder education dialog has been shown (or explicitly
+ * dismissed) so it only fires once per browser.
  */
 interface ColumnEducationState {
   isOpen: boolean;
@@ -60,9 +53,7 @@ export const useColumnEducationStore = create<ColumnEducationState>((set) => ({
 }));
 
 /**
- * Pixel movement threshold past which we consider a mousedown on a
- * column header to be a *drag attempt*. Small enough that a casual
- * intent reads as "I want to move this," large enough that a sloppy
- * click on a sortable header doesn't trigger the dialog every time.
+ * Pixel movement threshold past which we consider a mousedown on a column header to be
+ * a *drag attempt*.
  */
 export const COLUMN_DRAG_THRESHOLD_PX = 6;

@@ -1,11 +1,5 @@
 /** @vitest-environment jsdom */
 /**
- * Every link out of a Langy card.
- *
- * Clicking "Open in Scenarios" reloaded the whole product: the cards rendered
- * plain anchors, a plain anchor is a real browser navigation, and a real
- * navigation takes the panel, the conversation and any streaming turn with it.
- *
  * @see specs/langy/langy-capability-cards.feature
  *      "A card's links never reload the app"
  */

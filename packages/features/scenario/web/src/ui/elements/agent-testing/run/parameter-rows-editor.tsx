@@ -1,11 +1,5 @@
 /**
  * The parameter overrides of a run, as one row per parameter.
- *
- * A row holds a key, a value and a lock. The lock hides the value while it is
- * typed and keeps it out of everything the suite writes down, so a credential
- * and a plain value sit in the same list. The secrets the scenarios declare are
- * rows of that list too: their key is fixed and their value is required.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

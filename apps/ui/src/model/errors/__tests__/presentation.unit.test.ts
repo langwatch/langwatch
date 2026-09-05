@@ -37,11 +37,7 @@ const shape = (overrides: Partial<HandledErrorShape> = {}): HandledErrorShape =>
 
 describe("ALL_CODES", () => {
   /**
-   * `codes.generated.ts` is written by `cmd/herrgen`. A regeneration that
-   * emitted an empty object would leave every cross-cutting loop below
-   * iterating nothing and reporting a pass — the exhaustive `satisfies` in
-   * `presentation.ts` would go quiet at the same time, since a `Record` over
-   * `never` is satisfied by anything.
+   * `codes.generated.ts` is written by `cmd/herrgen`.
    */
   it("covers the generated code sets, not just the hand-written one", () => {
     expect(
@@ -335,17 +331,7 @@ describe("explainHandledError", () => {
 
     /** @scenario "An unrecognised code renders no prose at all" */
     it("renders nothing from meta.message for a code it has no entry for", () => {
-      // The inverse of what this asserted before. An unrecognised code is the
-      // branch with the least standing to render a sentence: the client has no
-      // entry for it, so it cannot say which service minted it, whether the
-      // prose was written for a customer, or whether it is a provider body
-      // relayed through a hop nobody can see. Rendering it anyway is how an
-      // upstream's words — and whatever they quote — reach LangWatch's own
-      // error chrome unread.
-      //
-      // Empty is the correct answer: callers fall back to the server's first
-      // remediation tip, then to the generic line and a trace id. The fix for a
-      // code that lands here often is to give it an entry.
+      // The inverse of what this asserted before.
       const { description, isRegistered } = explainHandledError(
         shape({
           code: "some_future_code",
@@ -442,10 +428,8 @@ describe("explainHandledError", () => {
     });
 
     /**
-     * `fieldErrors` keys come off the wire, so they reach a bare index lookup
-     * as untrusted input. `constructor` resolved to `Object` — truthy, so it
-     * passed the label filter — and the customer read "There's a problem with
-     * function Object() { [native code] }".
+     * `fieldErrors` keys come off the wire, so they reach a bare index lookup as
+     * untrusted input.
      */
     it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
       "declines %s as a field name rather than resolving it on the prototype",
@@ -515,17 +499,9 @@ describe("explainHandledError", () => {
 
   describe("given a validation error with no field to attach", () => {
     /**
-     * `unrecognized_keys` is the one zod issue whose message is built from the
-     * SCHEMA's identifiers rather than from anything the customer typed, and it
-     * is reported with an empty `path` — so `flatten()` files it under
-     * `formErrors`, where `USER_VISIBLE_FIELDS` never sees it. Editing any
-     * saved automation showed the customer `Unrecognized keys: "action",
-     * "triggerKind", "customGraphId"`: three internal command-schema keys off a
-     * form that shows none of them.
-     *
-     * The meta is produced by a real parse rather than by typing zod's sentence
-     * out here, so a zod release that rewords it reopens the leak loudly
-     * instead of quietly.
+     * `unrecognized_keys` is the one zod issue whose message is built from the SCHEMA's identifiers rather than
+     * from anything the customer typed, and it is reported with an empty `path` — so `flatten()` files it under
+     * `formErrors`, where `USER_VISIBLE_FIELDS` never sees it.
      */
     const unrecognizedKeysMeta = () => {
       const parsed = z
@@ -580,10 +556,9 @@ describe("explainHandledError", () => {
 
   describe("given a node failure carrying the upstream's status", () => {
     /**
-     * The engine attaches `meta.upstreamStatus` for every node code that can
-     * have one. Without reading it, an expired key, a rate limit and a
-     * provider outage all read identically — and only one of the three is
-     * something the customer can act on.
+     * The engine attaches `meta.upstreamStatus` for every node code that can have one.
+     * Without reading it, an expired key, a rate limit and a provider outage all read
+     * identically — and only one of the three is something the customer can act on.
      */
     it.each([
       ["llm_error", 401, /API key/i],
@@ -609,10 +584,8 @@ describe("explainHandledError", () => {
 
   describe("given an evaluator that failed on a rejected key", () => {
     /**
-     * Two producers, two spellings: the experiments-v3 mapper sets
-     * `reason: "auth_failed"`, the langevals HTTP client attaches only
-     * `meta.httpStatus`. Reading one meant half of these said "try running it
-     * again" — advice that cannot work on a rejected key.
+     * Two producers, two spellings: the experiments-v3 mapper sets `reason:
+     * "auth_failed"`, the langevals HTTP client attaches only `meta.httpStatus`.
      */
     it.each([
       ["the mapper's reason", { reason: "auth_failed" }],
@@ -686,18 +659,6 @@ describe("explainHandledError", () => {
 
       /**
        * Codes allowed to echo one specific meta field, with the reason.
-       *
-       * Narrower than {@link ALLOWED_ECHOES}: an exemption that applies to
-       * every code is a hole, and `meta.message` is the field a relayed Go
-       * service can write, so it is named per code and nowhere else.
-       *
-       * Every entry left here is prose LangWatch AUTHORED. `llm_upstream_error`
-       * used to sit alongside them as the one admitted relay — the model
-       * provider's own rejection, on the grounds that it is the same sentence
-       * the provider's SDK shows its caller. That is true only for the caller
-       * who owns the key; for a mediated call the caller is us, and OpenAI
-       * writes rejected keys into exactly this field. It echoes nothing now, so
-       * the list is once again only our own words.
        */
       const ALLOWED_PER_CODE: Record<string, Set<string>> = {
         // `reason` is the sentence parameter-spec.ts wrote for this exact
@@ -730,13 +691,6 @@ describe("explainHandledError", () => {
 
       /**
        * Values ANY registry entry may echo, each with its reason.
-       *
-       * An exemption is a decision, so it is written down rather than
-       * expressed as an absence from the poison list — the previous version of
-       * this test asserted against four hand-picked strings, which meant the
-       * three entries that DO render meta verbatim (`syntaxError`,
-       * `recipient`, `channel`) were never checked at all and the test
-       * reported a coverage it didn't have.
        */
       const ALLOWED_ECHOES: Record<string, string> = {
         // The user typed this filter field themselves; naming it back is the

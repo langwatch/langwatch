@@ -49,25 +49,12 @@ const decodeCursor = (scrollId: string | null): CursorInfo | null => {
 };
 
 /**
- * How a list walks its pages. Declared by the caller rather than inferred from
- * the URL, because inferring it is what broke trace pagination: with the mode
- * read off `!!scrollId`, the first page of a cursor list looked like an offset
- * list, so "next" from page one wrote a `pageOffset` the trace API does not
- * read and silently re-served page one (#6808).
- *
- * - `cursor` — keyset paging via `scrollId`. Trace search: offset paging was
- *   dropped in the ClickHouse migration and a non-zero `pageOffset` is now
- *   rejected at the boundary.
- * - `offset` — real `pageOffset` paging, honoured by the server. The
- *   experiments list pages this way against Prisma `skip`, and is the only
- *   caller that does. (The audit log renders the footer component but drives
- *   it from its own offset state and handlers, so the mode never reaches it.)
+ * How a list walks its pages.
  */
 export type PaginationMode = "cursor" | "offset";
 
 /**
  * Custom hook for managing navigation footer state and logic.
- *
  * @param mode - see {@link PaginationMode}. Defaults to `offset`, which is the
  *   behaviour every caller had before the mode existed.
  */
@@ -252,16 +239,7 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
   );
 
   /**
-   * Hook to update total hits from TRPC query result
    * @param traceGroups - TRPC query result
-   */
-  /**
-   * Takes the two facts it reads rather than a tRPC result type.
-   *
-   * `platform/app` typed the parameter as `UseTRPCQueryResult<…, AppRouter>`,
-   * which needed the application's mounted router. What this actually reads is
-   * `isFetched` and `data.totalHits`, so that is what it asks for — and a real
-   * query result still satisfies it structurally.
    */
   const useUpdateTotalHits = (queryResult: {
     isFetched?: boolean;
@@ -363,12 +341,8 @@ export function MessagesNavigationFooter({
 
   const isCursorMode = mode === "cursor";
 
-  // A cursor URL can be opened cold — shared, bookmarked, or refreshed — and
-  // the walked-cursor stack only exists in the session that walked it. Keying
-  // "previous" on the counter left that user with a dead button on a page they
-  // could plainly see was not the first. It is keyed on the cursor in the URL
-  // instead: with nothing walked, `prevPage` drops the cursor and returns to
-  // the first page, which is the only place keyset paging can go back to.
+  // A cursor URL can be opened cold — shared, bookmarked, or refreshed — and the
+  // walked-cursor stack only exists in the session that walked it.
   const isPrevDisabled = isCursorMode ? !isPastFirstPage : pageOffset === 0;
   // Cold-opened, the counter says 1 while the list shows some later page, so
   // the position is genuinely unknown rather than known-to-be-one. Saying so is

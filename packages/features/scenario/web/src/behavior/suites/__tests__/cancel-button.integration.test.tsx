@@ -1,14 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for cancel buttons on scenario run rows and batch headers.
- *
- * Tests the display and interaction of cancel buttons:
- * - Individual cancel button appears only for cancellable statuses
- * - Cancel All button appears when there are cancellable runs
- * - Cancelled runs do not show cancel buttons
- * - Click handlers fire correctly
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

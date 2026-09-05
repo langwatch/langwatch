@@ -1,18 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// A unit test living beside the e2e scenarios it serves, deliberately: it
-// exercises the RUNNER, not a scenario, so it must not need a live agent, a
-// judge, or a browser. The `.unit.test.ts` suffix keeps it in the unit run —
-// `vitest.config.ts` excludes `*.scenario.test.ts`, not this directory.
-//
-// What is pinned here is the `beforeRetry` contract. The retry replays the
-// WHOLE scenario, so a scenario whose write cannot simply be repeated (the
-// motivating case is deletion) rebuilds its world state through this hook.
-// Getting the ORDER wrong — replaying before re-seeding — would leave the
-// second attempt asking Langy to delete something that is already gone and
-// fail the judge for work the first attempt did correctly. That is a silent,
-// intermittent failure that only appears when infrastructure flakes, which is
-// exactly the kind of thing no scenario run would reliably catch.
+// A unit test living beside the e2e scenarios it serves, deliberately: it exercises the
+// RUNNER, not a scenario, so it must not need a live agent, a judge, or a browser.
 
 const scenarioRun = vi.hoisted(() => vi.fn());
 const isTransient = vi.hoisted(() => vi.fn());

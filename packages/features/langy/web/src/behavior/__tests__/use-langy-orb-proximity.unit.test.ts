@@ -5,18 +5,6 @@ import { useLangyOrbProximity } from "../use-langy-orb-proximity";
 
 /**
  * The proximity effect binds to the orb NODE, and the orb is not always there.
- *
- * The launcher stays mounted for the whole session and merely renders null
- * while the panel is open, so the node the hook bound to disappears and comes
- * back as a DIFFERENT element. The effect keys on `[enabled]` alone, which is
- * why `enabled` has to fall while the panel is open: without that the window
- * listeners stay bound to the old node, the rAF keeps writing styles into a
- * detached element (retaining it), and the glow is dead for the rest of the
- * session because nothing ever rebinds.
- *
- * So the two properties pinned here are exactly the ones the panel relies on:
- * disabling really lets go, and re-enabling binds to whatever node the ref
- * holds NOW.
  */
 
 /** A stand-in orb with a real box, so the proximity maths has something to bite on. */

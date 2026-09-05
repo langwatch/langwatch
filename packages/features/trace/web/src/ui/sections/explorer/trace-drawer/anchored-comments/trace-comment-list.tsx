@@ -27,10 +27,6 @@ interface TraceCommentListProps {
 
 /**
  * Every comment on the trace, each one saying what it is about.
- *
- * This is the one list that holds all of them at once, so it is where a comment
- * whose part the trace no longer has still reads: it says so, and offers no
- * jump, rather than pointing the reader at whatever now sits at that id.
  */
 export function TraceCommentList({
   traceId,

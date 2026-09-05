@@ -134,10 +134,7 @@ function QueueDialogHeader({ intent }: { intent: "add" | "move" }) {
 }
 
 /**
- * Sends traces to people or annotation queues for review. Shared by every
- * surface that can hand traces over: the trace table's selection bar and the
- * trace drawer's overflow menu.
- *
+ * Sends traces to people or annotation queues for review.
  * Spec: specs/traces-v2/bulk-actions.feature ("Send selected traces to an
  * annotation queue").
  */

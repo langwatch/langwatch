@@ -1,14 +1,6 @@
 /**
+ * Agent-driven page control, at the panel: a `ui` entry on the live turn stream reaches the page's own handler through a claim, and the rollout flag is what closes that channel.
  * @vitest-environment jsdom
- *
- * Agent-driven page control, at the panel: a `ui` entry on the live turn
- * stream reaches the page's own handler through a claim, and the rollout flag
- * is what closes that channel. Boundary mocks mirror
- * langy-panel.docked-companion-header.integration.test.tsx (useChat captures
- * the real transport; `behavior/langy-api` is a hand-rolled double at the
- * network boundary) plus the host's `featureFlag`, which the test drives per
- * flag key.
- *
  * @see specs/langy/langy-ui-actions.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

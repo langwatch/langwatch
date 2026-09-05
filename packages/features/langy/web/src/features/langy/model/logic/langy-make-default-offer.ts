@@ -2,20 +2,8 @@ import type { ModelDefaultEffective } from "@langwatch/model-provider-contract";
 import type { ScopeTier } from "../../../../model/langy-host";
 
 /**
- * Whether picking a model in the composer earns the "make it the default?"
- * ask, and exactly what a yes would write.
- *
- * The offer follows the default it would replace: it goes to the SCOPE the
- * current Langy default is configured at, and only to a user who can manage
- * that scope — an org-level default asks an org admin, a team- or
- * project-level one asks whoever manages that team or project. No configured
- * default (the resolver inferred one from an enabled provider) means there is
- * nothing to move, so no ask. Picking the default itself asks nothing.
- *
- * Pure decision, no I/O: the panel feeds it the resolved default it already
- * holds and the permission answers, and maps the returned plan onto the
- * matching mutation (`setFeatureOverrideForScope` for a feature-level
- * default, `setRoleAssignmentForScope` for a role-level one).
+ * Whether picking a model in the composer earns the "make it the default?" ask, and
+ * exactly what a yes would write.
  */
 export interface MakeDefaultWritePlan {
   kind: "feature-override" | "role-default";

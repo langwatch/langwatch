@@ -1,8 +1,7 @@
 /**
+ * Which ids the thread's one events read asks for. The turns are the source, and the
+ * same trace appearing twice among them is still one id to read.
  * @vitest-environment jsdom
- *
- * Which ids the thread's one events read asks for. The turns are the source,
- * and the same trace appearing twice among them is still one id to read.
  */
 
 import { renderHook } from "@testing-library/react";

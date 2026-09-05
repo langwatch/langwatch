@@ -1,10 +1,5 @@
 /**
- * The durable catch-up shared by the freshness signal and the history poll:
- * bring the local turn fold to a target cursor by fetching and folding the
- * event tail. Two drivers, one mechanism — which is why a dead SSE
- * connection no longer freezes a mid-turn panel: the poll keeps handing
- * fresher cursors to the same catch-up.
- *
+ * The durable catch-up shared by the freshness signal and the history poll: bring the local turn fold to a target cursor by fetching and folding the event tail.
  * @see specs/langy/langy-frontend-realtime.feature
  *      "A tab whose live stream dropped still converges on the turn"
  */

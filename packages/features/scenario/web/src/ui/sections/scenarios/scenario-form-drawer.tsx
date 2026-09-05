@@ -119,14 +119,8 @@ export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "
 }
 
 /**
- * Drawer container for scenario create/edit form.
- * Two-column layout: form on left, help sidebar on right.
- * Bottom bar with Quick Test and Save and Run.
- *
- * When opened without a scenarioId (new scenario flow), the first save
- * creates the record and transitions to edit mode by updating the URL
- * with the new scenarioId. This prevents the double-save bug where
- * subsequent saves would create duplicates.
+ * Drawer container for scenario create/edit form. Two-column layout: form on left, help
+ * sidebar on right. Bottom bar with Quick Test and Save and Run.
  */
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
@@ -198,11 +192,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     setFlowCallbacks("workflowSelector", { onSave: onAgentSaved });
     /**
      * The agent type selector is OPENED BY ADDRESS, not mounted here.
-     *
-     * It is `@langwatch/agent-web`'s drawer and needs that family's host above
-     * it, which a scenario component cannot mount; the composing application
-     * registers it under this name, so writing the address is all this drawer
-     * ever needed. The gateway family drew the same line for the same reason.
      */
     openDrawer("agentTypeSelector");
   }, [handleTargetChange, openDrawer]);
@@ -219,26 +208,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     { projectId: project?.id ?? "", id: scenarioId ?? "" },
     { enabled: !!project && !!scenarioId },
   );
-  // Editing an existing scenario means the fields are empty until the query
-  // answers. Without this the drawer renders a complete, blank form, which
-  // reads as "the scenario has no name and no criteria" rather than "not
-  // loaded yet", and the person who just asked an agent to write it cannot
-  // tell the difference.
-  //
-  // The project is part of the wait. The read stays disabled until the project
-  // resolves, and a disabled query does not report itself as loading, so
-  // `isScenarioLoading` alone leaves that window uncovered and shows the blank
-  // form it exists to prevent.
+  // Editing an existing scenario means the fields are empty until the query answers.
   const isHydrating = !!scenarioId && (!project || isScenarioLoading);
-  // A read that fails ends the wait without producing a record, so the form
-  // would come back with every field at its default. That is the blank form
-  // the skeleton exists to prevent, and worse: the fields are editable, so
-  // the person can fill in what looks like their scenario and save it.
-  //
-  // Only when there is no record to show. A background refetch that fails
-  // keeps the record it read before, and the form the person is typing in
-  // stays as it is rather than being replaced by an error with their edits
-  // inside it.
+  // A read that fails ends the wait without producing a record, so the form would come
+  // back with every field at its default.
   const hasReadFailed = !!scenarioId && isScenarioReadFailed && !scenario;
   // The version this form is editing. A save sends it as the expected
   // version, so a save over somebody else's newer save is refused rather
@@ -513,13 +486,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
     try {
       await form.submit(async (data) => {
-        // skipTransition: don't open the edit-mode drawer mid-save — we're
-        // navigating away to /simulations next, so the create→edit URL push
-        // would race with our redirect (lw#3586 F11). The whole `await` is
-        // also why the redirect itself MUST be the only router.push that
-        // fires after — `onClose()` does its own router.push inside
-        // closeDrawer, and back-to-back router.push calls get coalesced
-        // (the cleanup push wins, the redirect gets dropped silently).
+        // skipTransition: don't open the edit-mode drawer mid-save — we're navigating
+        // away to /simulations next, so the create→edit URL push would race with our
+        // redirect (lw#3586 F11).
         const savedScenario = await handleSave({
           data,
           skipTransition: true,
@@ -804,9 +773,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
 /**
  * The form with the test suite field filled from the project.
- *
- * Only the Agent Testing editor reads the test suite list, and it reads it here
- * rather than in the drawer, so every other surface never asks for it.
  */
 function ScenarioFormWithSuites({
   defaultValues,
@@ -840,12 +806,6 @@ function ScenarioFormWithSuites({
 
 /**
  * Says the scenario changed since it was loaded, and offers the reload.
- *
- * The refused save wrote nothing, so nothing is lost by leaving the form as
- * it is. Reloading is the destructive choice: it replaces the form with the
- * newer version, and the edits in it go with it. The button says so, so the
- * person can copy what they typed before pressing it.
- *
  * @see specs/scenarios/scenario-versioning.feature
  */
 function StaleVersionNotice({
@@ -883,11 +843,6 @@ function StaleVersionNotice({
 
 /**
  * Stands in for the form when the scenario could not be read.
- *
- * The alternative is the form at its defaults, which invites the person to
- * retype a scenario that already exists, and the save would have created a
- * second copy of it. Copy comes from the code-keyed registry like every other
- * error surface; the way forward is to read it again.
  */
 function ScenarioReadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   return (
@@ -907,9 +862,6 @@ function ScenarioReadError({ error, onRetry }: { error: unknown; onRetry: () => 
 
 /**
  * Stands in for the form while an existing scenario is being read.
- *
- * Shaped like the form it replaces (name, situation, criteria) so the drawer
- * does not reflow when the real fields arrive.
  */
 function ScenarioFormSkeleton() {
   return (
@@ -955,10 +907,7 @@ function FooterLabels({ form }: { form: ScenarioFormController }) {
 }
 
 /**
- * The declared parameter names, next to the labels, as the way into their
- * editor. Names are not removed here: a name can be read as "params.NAME" by
- * the situation, the criteria and the target, so removing one is a decision
- * taken in the editor with the rest of the declaration in view.
+ * The declared parameter names, next to the labels, as the way into their editor.
  */
 function FooterParameters({ form, onOpen }: { form: ScenarioFormController; onOpen: () => void }) {
   const parameters = useWatch({ control: form.control, name: "parameters" });

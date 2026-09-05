@@ -3,13 +3,9 @@ import { useLangyStore } from "../../../../../index";
 import { syncLangyAfterDefaultModelWrite } from "../coding-default-sync";
 
 /**
- * The client-side follow-up to any server-side default-model write (a codex
- * connect with defaults, or the settings drawer saving the Default Models
- * config): refresh the default-model caches and keep the composer's model
- * pill on the default it was already following, without ever hijacking an
- * explicit user pick.
- * Specs: specs/model-providers/codex-account-provider.feature,
- *        specs/langy/langy-model-selection.feature
+ * The client-side follow-up to any server-side default-model write (a codex connect with defaults, or the
+ * settings drawer saving the Default Models config): refresh the default-model caches and keep the composer's
+ * model pill on the default it was already following, without ever hijacking an explicit user pick.
  */
 
 const OLD_DEFAULT = "openai/gpt-5.5";

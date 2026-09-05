@@ -1,12 +1,7 @@
 /**
+ * Regression test: a range facet whose span is smaller than 1 (cost in dollars, e.g. $0 – $0.004) crashed at mount because SimpleSlider fell back to zag-js's default
+ * `step: 1`, tripping its min/max/step invariant ("The configured `min`, `max`, `step` or `minStepsBetweenThumbs` values are invalid").
  * @vitest-environment jsdom
- *
- * Regression test: a range facet whose span is smaller than 1 (cost in
- * dollars, e.g. $0 – $0.004) crashed at mount because SimpleSlider fell
- * back to zag-js's default `step: 1`, tripping its min/max/step
- * invariant ("The configured `min`, `max`, `step` or
- * `minStepsBetweenThumbs` values are invalid"). The test mounts the real
- * slider so the crash path actually executes.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

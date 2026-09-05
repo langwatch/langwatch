@@ -28,12 +28,7 @@ import { ReturningUserHub } from "../../../elements/explorer/onboarding/returnin
 import { StaticHero } from "../../../blocks/explorer/onboarding/static-hero";
 import { TypewriterHero } from "../../../blocks/explorer/onboarding/typewriter-hero";
 
-// Was 8s — too punchy. The highlighted row is *the* invitation moment of
-// the whole journey, and 8s reads as "tap or we'll do it for you" rather
-// than "explore at your own pace." 14s gives the user time to actually
-// read the heading + subhead, notice the row glimmer, hover, and click
-// because they want to — auto-open is a fallback for genuinely
-// disengaged users, not the default path.
+// Was 8s — too punchy.
 const POST_ARRIVAL_AUTO_OPEN_MS = 14000;
 
 const INTEGRATE_KEY = "I";
@@ -41,25 +36,13 @@ const SKIP_KEY = "K";
 
 /**
  * Empty-state onboarding for the new Traces page.
- *
- * Hero copy and stage transitions are driven entirely from
- * `onboardingJourneyConfig.ts` — this component reads the current
- * stage from the store, looks up its definition, and renders
- * heading / subhead / optional CTA. Auto-advance, manual-CTA and
- * typewriter-driven advance all flow through here. Tweak the
- * journey by editing the config file, not this component.
  */
 export function TracesEmptyOnboarding(): React.ReactElement {
   const { project, organization } = useOrganizationTeamProject();
   const [drawerOpen, setDrawerOpen] = useState(false);
   /**
-   * The density value the user last clicked during `densityIntro`,
-   * or `null` if they haven't clicked anything yet. The density
-   * cards do double duty as the advance affordance: the first
-   * click on a card sets the density and stamps it here; clicking
-   * the *same* card again (now showing a `Continue →` chip in
-   * place of `Selected ✓`) advances the journey. Resets whenever
-   * we leave the spotlight stage.
+   * The density value the user last clicked during `densityIntro`, or `null` if they
+   * haven't clicked anything yet.
    */
   const [pickedDensityThisStage, setPickedDensityThisStage] = useState<Density | null>(null);
   const setSetupDismissedForProject = useOnboardingStore((s) => s.setSetupDismissedForProject);
@@ -86,12 +69,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
     if (!stageDef.showDensitySpotlight) setPickedDensityThisStage(null);
   }, [stage, stageDef.showDensitySpotlight]);
 
-  // Auto-advance for stages with `holdMs + next`. Typewriter stages
-  // advance themselves once their text finishes typing (see
-  // TypewriterHero). Pause while the IntegrateDrawer is open so the
-  // marquee beats (aurora arrival, postArrival nudge) don't fire
-  // behind it — the user comes back from the drawer to a stage they
-  // never actually saw, which feels broken.
+  // Auto-advance for stages with `holdMs + next`. Typewriter stages advance themselves
+  // once their text finishes typing (see TypewriterHero).
   useEffect(() => {
     if (drawerOpen) return;
     if (stageDef.typewriter) return;
@@ -143,24 +122,15 @@ export function TracesEmptyOnboarding(): React.ReactElement {
   // (The body data attribute that drives the drawer/sidebar glow
   // CSS now lives in `OnboardingHost` via `BodyStageAttribute`.)
 
-  // Mark the journey completed the first time the user reaches the
-  // outro beat. That flag flips the welcome screen on subsequent
-  // visits into a small "where do you want help?" hub instead of
-  // forcing them through the linear narrative again. We persist via
-  // localStorage (see `markJourneyCompleted`) so it survives unmount
-  // and reload; the journey itself still resets per visit.
+  // Mark the journey completed the first time the user reaches the outro beat. That
+  // flag flips the welcome screen on subsequent visits into a small "where do you want
+  // help?" hub instead of forcing them through the linear narrative again.
   useEffect(() => {
     if (stage === "outro") markJourneyCompleted();
   }, [stage]);
 
-  // Auto-open the highlighted rich-arrival trace if the user
-  // doesn't click within `POST_ARRIVAL_AUTO_OPEN_MS`. The whole
-  // postArrival stage is set up to nudge the click — copy says
-  // "click the highlighted row," the row glimmers blue, the
-  // cursor flips to a pointer — but if the user genuinely never
-  // engages we just open the drawer for them so the journey
-  // completes its arc instead of stalling. A real click before
-  // the timer fires cancels the auto-open via cleanup.
+  // Auto-open the highlighted rich-arrival trace if the user doesn't click within
+  // `POST_ARRIVAL_AUTO_OPEN_MS`.
   const openTraceDrawer = useOpenTraceDrawer();
   useEffect(() => {
     if (stage !== "postArrival") return;
@@ -188,12 +158,9 @@ export function TracesEmptyOnboarding(): React.ReactElement {
     }
   }, [stage, currentDrawer, setStage]);
 
-  // If the user closes the trace drawer mid-`drawerOverview` (Esc /
-  // X / click outside), drop them back to `postArrival` so the
-  // highlighted row pulses again — re-opening any sample row lands
-  // them back in `drawerOverview`. Without this, closing the drawer
-  // would strand the user on a hero pointing at "the substance"
-  // with nothing on the right.
+  // If the user closes the trace drawer mid-`drawerOverview` (Esc / X / click outside),
+  // drop them back to `postArrival` so the highlighted row pulses again — re-opening
+  // any sample row lands them back in `drawerOverview`.
   useEffect(() => {
     if (stage !== "drawerOverview") return;
     if (currentDrawer !== "traceV2Details") {
@@ -211,15 +178,9 @@ export function TracesEmptyOnboarding(): React.ReactElement {
     }
   }, [stage, currentDrawer, closeDrawer]);
 
-  // The slice chapter (serviceSegue + facetsReveal) points at the
-  // facet sidebar — the store needs to be uncollapsed (not just the
-  // visual width), otherwise FilterSidebar renders icon-only mode
-  // and the user sees a strip of unclickable icons. We drive
-  // setSidebarCollapsed directly so every consumer (toggle button,
-  // keyboard shortcut, FilterSidebar internals) sees a consistent
-  // state. We track whether *we* uncollapsed it so we only restore
-  // on exit when we were the cause; if the user had it expanded
-  // already, we leave it alone.
+  // The slice chapter (serviceSegue + facetsReveal) points at the facet sidebar — the
+  // store needs to be uncollapsed (not just the visual width), otherwise FilterSidebar
+  // renders icon-only mode and the user sees a strip of unclickable icons.
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
   const sidebarUncollapsedByJourney = useRef(false);
   const isSliceStage = stage === "serviceSegue" || stage === "facetsReveal";
@@ -283,15 +244,9 @@ export function TracesEmptyOnboarding(): React.ReactElement {
         align="center"
         gap={4}
         width="full"
-        // Left-anchored hero (drawer-overview chapter) was 380px and
-        // the subhead — "Conversation, spans, evals — it's all in
-        // here. Take your time, then we'll wrap up." — wrapped into
-        // a squashed three-line block. 460px gives the subhead room
-        // to breathe on two lines while still leaving the
-        // drawer-anchored padding logic in `EmptyStateOverlay` enough
-        // slack on narrower viewports (the Flex container's
-        // paddingRight = viewport - drawerLeft caps the visible
-        // canvas, so this maxWidth only kicks in when there's space).
+        // Left-anchored hero (drawer-overview chapter) was 380px and the subhead —
+        // "Conversation, spans, evals — it's all in here. Take your time, then we'll
+        // wrap up." — wrapped into a squashed three-line block.
         maxWidth={
           stageDef.heroLayout === "left"
             ? "460px"
@@ -326,13 +281,9 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             </motion.div>
           ) : stageDef.heading ? (
             <motion.div
-              // Including `replayToken` in the key is what makes the
-              // Replay button work: bumping the token forces this
-              // node to remount, which in turn restarts the
-              // typewriter (or the static hero's enter animation)
-              // even when the heading text and stage haven't
-              // changed. Stage transitions still get clean exits
-              // because the heading text changes alongside.
+              // Including `replayToken` in the key is what makes the Replay button work: bumping the token
+              // forces this node to remount, which in turn restarts the typewriter (or the static hero's
+              // enter animation) even when the heading text and stage haven't changed.
               key={`${stageDef.heading}__${replayToken}`}
               initial={{ opacity: 0, y: 4 }}
               // `dimHero` (currently `auroraArrival`) drops the hero
@@ -673,19 +624,9 @@ export function TracesEmptyOnboarding(): React.ReactElement {
 }
 
 /**
- * Visible countdown for the postArrival auto-click. Renders a small
- * "We'll open it for you in {n}s" line so the user understands the
- * journey will advance even if they don't click — it stops feeling
- * like the tour stalled. Mounts only during `postArrival` (the
- * caller gates this); when it unmounts the timer goes with it.
- *
- * The component owns its own `setInterval` and re-mounts whenever
- * postArrival re-enters (Back button → re-forward, replayStage,
- * etc.), so the countdown always starts fresh from `totalMs` even
- * though the orchestrator's auto-open `setTimeout` resets the same
- * way. They don't share a clock — they share a constant — but both
- * stop the moment the stage changes, so visible progress and actual
- * fire never drift more than a tick.
+ * Visible countdown for the postArrival auto-click. Renders a small "We'll open it for
+ * you in {n}s" line so the user understands the journey will advance even if they don't
+ * click — it stops feeling like the tour stalled.
  */
 const PostArrivalCountdown: React.FC<{ totalMs: number }> = ({ totalMs }) => {
   const [remainingMs, setRemainingMs] = useState(totalMs);

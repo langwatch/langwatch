@@ -1,8 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * The Test Runs list: every run plan of a project, and what its last run said.
- *
+ * @vitest-environment jsdom
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -115,9 +113,6 @@ function renderRows(
 
 /**
  * The run plans of a project, built the way the Results tab builds them.
- *
- * `test suites` are the test suites: never rows of the list, but named by a plan
- * whose scope points at them.
  */
 function plansOf({
   plans = [],

@@ -1,8 +1,5 @@
 /**
  * SingleRunTable - Table component for displaying a single evaluation run
- *
- * Displays dataset columns followed by target columns with inline evaluator chips.
- * Target headers include summary statistics.
  */
 
 import { Box, HStack, Text } from "@chakra-ui/react";

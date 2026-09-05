@@ -1,23 +1,5 @@
 /**
  * Browser QA for the experiment-archive PR (feat/experiment-archive).
- *
- * Drives a headless Chromium against a dev server, signs up a real user,
- * seeds an org/team/project + experiment via Prisma, then exercises the
- * archive flow two ways:
- *
- *   1. Direct tRPC HTTP POST to experiments.deleteExperiment with the
- *      browser's real session cookie + CSRF context. Proves the wire-level
- *      mutation works for an authenticated user.
- *   2. Screenshots of the evaluations page before / after the archive call,
- *      proving the surface user sees.
- *
- * Then asserts in Postgres that the row STILL exists with archivedAt set
- * and the slug renamed.
- *
- * Run via:
- *   DATABASE_URL=postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_db?schema=public \
- *     BASE_URL=http://localhost:5571 \
- *     pnpm exec tsx e2e/experiment-archive-dogfood.ts
  */
 
 import { existsSync } from "node:fs";

@@ -1,11 +1,6 @@
 /**
- * The browser entry must import the global stylesheet, or none of it ships:
- * the Inter `@font-face` `@import`, the link/box-sizing reset, and every
- * other rule in `styles/globals.scss` that the design-system theme tokens
- * do not carry. `platform/app`'s `main.tsx` had this import; the port to
- * `apps/ui/src/ui.entrypoint.tsx` carried the stylesheet but not the
- * import, so the SPA rendered with no fonts and no reset.
- *
+ * The browser entry must import the global stylesheet, or none of it ships: the Inter `@font-face` `@import`, the link/box-sizing reset,
+ * and every other rule in `styles/globals.scss` that the design-system theme tokens do not carry.
  * Spec: specs/ui/global-styles.feature
  */
 

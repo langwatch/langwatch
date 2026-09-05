@@ -1,16 +1,5 @@
 /**
  * What to call each workbench action while the page carries it out.
- *
- * The panel's status line may only say things that are true when it says
- * them, so with no tool running and no tokens arriving it falls back to a
- * verb that claims nothing ("Cooking…"). While Langy drives this page that
- * fallback is the weakest available truth: the page is applying a named
- * action and knows which one.
- *
- * Present participle, no trailing ellipsis (the line adds its own), and
- * written for the reader rather than the caller: "Duplicating the column",
- * not "workbench.duplicateTarget". A kind with no entry narrates nothing,
- * which leaves the line exactly as it was.
  */
 export const WORKBENCH_ACTION_NARRATION: Record<string, string> = {
   "workbench.duplicateTarget": "Duplicating the column",

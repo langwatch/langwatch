@@ -1,11 +1,5 @@
 /**
  * One evaluation run, as a sample trace carries it.
- *
- * Declared in `~/server/app-layer/evaluations/types`, which a browser package
- * may not reach. Only the onboarding sample descriptors name it — the rows the
- * empty state shows before a project has ingested anything — so the shape is
- * what those rows state, with the alignment obligation the data-governance
- * snapshots record.
  */
 
 export type EvaluationRunData = {

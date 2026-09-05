@@ -1,16 +1,5 @@
 /**
  * ComparisonLeaderboardChart - compact Bradley-Terry ranking card (#5103).
- *
- * Sibling of WinRateChart in the same metrics row — same card treatment,
- * same width, same target colors — but ranks variants by Bradley-Terry
- * score (transitive, opponent-strength-aware) rather than a raw win tally.
- * Only meaningful once naive win-rate risks being non-transitive, so this
- * mounts starting at 3 variants; below that WinRateChart already tells the
- * whole story.
- *
- * The compact card can't show a leaderboard's full detail (confidence
- * intervals, the win-matrix, cost/duration tradeoffs) — the expand button
- * opens the full view in a drawer (specs/experiments/comparison-leaderboard.feature).
  */
 import { Box, HStack, IconButton, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
@@ -48,17 +37,6 @@ const MAX_COMPACT_BARS = 4;
 
 /**
  * The score printed at the end of each bar.
- *
- * Hand-placed rather than `position="right"`, because recharts anchors that
- * to a NEGATIVE bar's outer (left) end — which grows toward the category
- * labels. The lowest-scoring variant is both the longest negative bar and
- * the one with the widest label, so it collided with its own name and
- * rendered as unreadable overlapping text ("…f184.51").
- *
- * One rule for both signs instead: sit just past the rect's right edge.
- * For a positive bar that is its tip; for a negative bar it is the zero
- * line, so the label always grows into the empty middle of the plot and can
- * never reach the axis.
  */
 function ScoreValueLabel(props: {
   x?: number | string;
@@ -273,16 +251,7 @@ export function ComparisonLeaderboardChart({
 
   const bars = buildCompactBars({ leaderboard, column, targetColors });
 
-  // The conclusion, on the card itself. Bars alone leave the reader to
-  // eyeball whether the tallest one is meaningfully ahead, which is exactly
-  // the judgement the confidence intervals exist to make — and the tallest
-  // bar is frequently NOT a winner the run can defend.
-  //
-  // Shares formatLeaderboardHeadline with the drawer rather than phrasing it
-  // again here. Two copies drift, and the card's copy had already lost the
-  // cheaper-tied-alternative case — so a run whose answer was "ship the one
-  // that costs 75% less" read as a flat "too close to call" until you opened
-  // the drawer.
+  // The conclusion, on the card itself.
   const variantNames = useMemo(
     () => Object.fromEntries(column.variants.map((v) => [v.id ?? "", v.name])),
     [column.variants],

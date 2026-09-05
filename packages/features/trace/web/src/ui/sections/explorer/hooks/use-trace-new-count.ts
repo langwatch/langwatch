@@ -53,16 +53,8 @@ export function useTraceNewCount(): TraceNewCountResult {
     setIntervalMs(FAST_MS);
   }, [fastPollRequestedAt]);
 
-  // Reset to fast polling when tab becomes visible again. What we
-  // refetch depends on the operator's live-updates mode:
-  //
-  //   live   — full refresh: list + discover + newCount, so the table
-  //            reflects whatever arrived while we were away.
-  //   ask    — newCount only; the user explicitly opted *out* of
-  //            silent list merges, so we just update the (N new) pill
-  //            and let them click it to commit.
-  //   paused — do nothing; "no updates, no pill, no polling" per the
-  //            store's contract.
+  // Reset to fast polling when tab becomes visible again. What we refetch depends on
+  // the operator's live-updates mode:
   const trpcUtils = api.useUtils();
   const prevVisibleRef = useRef(isVisible);
   useEffect(() => {

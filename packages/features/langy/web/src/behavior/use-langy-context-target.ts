@@ -11,69 +11,13 @@ import {
 
 /**
  * Declare "I am a thing Langy can take as context".
- *
- * Prefer the `<LangyContextTarget>` COMPONENT over this hook — it can be used
- * inline inside a `.map()`, where a hook cannot. Reach for the hook directly
- * only when the target's root is a component you already own and you'd rather
- * spread props than nest an element (the trace table's virtualized row does
- * exactly this: its root is a <tbody> the virtualizer measures).
- *
- * HOW IT BEHAVES, and every clause here is a correction of an earlier cut:
- *
- *   Nothing happens until the page is ARMED — `#`; see
- *   `useLangyContextArming`. That gate is the correction. The first version
- *   swallowed clicks in the capture phase whenever the panel was open, and that
- *   made every row on the page un-openable the moment you asked Langy a
- *   question — the page stopped being the page. The version after it went the
- *   other way and painted nothing ever, which made the whole mechanism
- *   undiscoverable. A mode fixes both: outside it a trace row opens its drawer
- *   exactly as it always did; inside it, a click means "give this to Langy",
- *   the page says so, and one keystroke ends it.
- *
- *   Armed, targets light up and can be clicked OR dragged onto the panel. The
- *   affordance button is also a real button, rendered ONCE for the whole page in
- *   a portal by the layer, floated over whichever target you're hovering. Not a
- *   pseudo-element and not a node inside the target — on a <tbody> either one
- *   generates an anonymous table box and breaks the row's geometry, which is
- *   precisely what broke the trace table's expanded rows.
- *
- *   A REVEAL (`#trace` → "Show traces on this page") is the same offer, made
- *   briefly and by request rather than held open by a mode. It therefore carries
- *   the same behaviour: a revealed target lights up, can be clicked or dragged
- *   into context, and gets the same floating button. It used to light up and do
- *   nothing, which made the palette's own promise — "anything that lights up can
- *   be added as context" — a lie for the 2.6s it was on screen.
- *
- * ZERO COST WHEN DISARMED, and that is a hard requirement, not a nicety. The
- * property being preserved is precisely: NOTHING THE USER CAN SEE OR CLICK.
- *   - `targetProps` carries no className (so no CSS rule can match), no visual
- *     state attribute, no inline style, no handlers, and is not draggable.
- *   - the ONE thing it does carry once the target is registered is
- *     `data-langy-target` — an id, invisible, inert, matched by no stylesheet
- *     rule and by no listener. It is how the panel finds the element it is
- *     pointing at: hovering a context chip in the composer shines a light on the
- *     card it names, and that is not the picking mode, it is reading the list
- *     you already have. Locating an element cannot depend on the user first
- *     arming the page, or the spotlight can never fire.
- *   - with Langy closed the registration effect early-returns too, so the store
- *     stays empty, the attribute is absent, and the layer attaches no listeners.
- *   - the highlight is an `outline` / inset shadow, both defined never to affect
- *     layout — so even when it IS on, nothing on the page moves by a pixel.
- * The one residual cost is a zustand subscription per target whose selectors
- * return booleans: they re-run on store writes and re-render on almost none.
- *
- * Pass `null` to opt out without breaking the rules of hooks (a skeleton row, a
- * drawer with no trace loaded yet).
  */
 export interface LangyContextTargetProps {
   className?: string;
   style?: CSSProperties;
   /**
    * The layer finds targets by this attribute — no ref, so it never fights the
-   * virtualizer (which already owns the trace row's ref). Present for as long as
-   * the target is REGISTERED, which is wider than "lit": the panel → page
-   * spotlight has to be able to find a card the user has not armed the page for.
-   * Inert on its own — no rule in the stylesheet matches it.
+   * virtualizer (which already owns the trace row's ref).
    */
   "data-langy-target"?: string;
   /** Drives the whole visual: `near` | `hover` | `added`. Absent = invisible. */
@@ -84,10 +28,9 @@ export interface LangyContextTargetProps {
   draggable?: boolean;
   onDragStart?: (event: DragEvent<HTMLElement>) => void;
   /**
-   * Only while the target is offered — and capture, deliberately. Offered, a
-   * click means "add this", so it has to be taken before the row's own handler
-   * opens a drawer. Outside that the prop is absent and the element behaves
-   * exactly as it did before Langy existed.
+   * Only while the target is offered — and capture, deliberately. Offered, a click
+   * means "add this", so it has to be taken before the row's own handler opens a
+   * drawer.
    */
   onClickCapture?: (event: MouseEvent<HTMLElement>) => void;
 }
@@ -125,26 +68,14 @@ export function useLangyContextTarget(
   const chipRef = target?.ref;
   const enabled = target?.enabled ?? true;
 
-  // NOT gated on the panel being open. The arming gesture works whether Langy
-  // is open, peeking or shut (see LangyContextTargetLayer), and half of that
-  // fix is worthless without this half: with the panel closed the page armed,
-  // said "click anything highlighted", and then registered no targets at all —
-  // so the mode announced itself over a page where nothing could light up and
-  // nothing could be clicked. You reach for something on the page BEFORE you
-  // go and talk about it, which is exactly when the panel is not open.
+  // NOT gated on the panel being open.
   const isActive = enabled && !!id && !!kind && !!label;
 
   const register = useLangyContextTargetStore((state) => state.register);
   const unregister = useLangyContextTargetStore((state) => state.unregister);
 
-  // "Added" means the composer is actually SHOWING this chip — which covers the
-  // ones Langy auto-derived from the route / open drawer, not just the ones the
-  // user picked. So the trace you already have open reads as added instead of
-  // inviting you to add it a second time.
-  //
-  // All three selectors return booleans, so the store's churn (rows mounting as
-  // you scroll, proximity recomputing as the pointer moves) re-renders only the
-  // handful of targets whose answer actually changed.
+  // "Added" means the composer is actually SHOWING this chip — which covers the ones
+  // Langy auto-derived from the route / open drawer, not just the ones the user picked.
   const isAdded = useLangyContextTargetStore((state) =>
     isActive && id ? state.activeChipIds.has(id) : false,
   );
@@ -234,10 +165,7 @@ export function useLangyContextTarget(
 
 /**
  * The shimmer's phase offset, and it is load-bearing: it is the whole difference
- * between a shimmer FIELD and a rainbow barcode. Targets sharing one animation
- * start on the same frame and drift in lockstep; hashed per id, they drift out
- * of phase, like light moving on water. Stable across renders, so the shimmer
- * never restarts mid-cycle.
+ * between a shimmer FIELD and a rainbow barcode.
  */
 function shimmerStyleFor(id: string): CSSProperties {
   return {

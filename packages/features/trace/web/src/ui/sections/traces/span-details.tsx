@@ -21,9 +21,6 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { RenderInputOutput } from "./render-input-output";
 
 /**
- * Displays detailed information about a trace span, including metadata, timing, tokens, cost, and input/output.
- * Single Responsibility: Render comprehensive span details with conditional playground navigation.
- *
  * @param props - Component props
  * @param props.span - The span object containing trace data
  * @param props.project - The project context (maintained for API compatibility)

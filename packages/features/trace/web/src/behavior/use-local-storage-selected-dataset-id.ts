@@ -1,18 +1,5 @@
 /**
  * The dataset the reader last added rows to, remembered per browser.
- *
- * Recovered from `platform/app/src/hooks/useLocalStorageSelectedDataSetId.ts`,
- * deleted in `cc91631cd8`. Two things did not travel with it and neither is a
- * loss: `usehooks-ts`, which this package does not depend on and whose whole
- * contribution was a `useState` over one key, and the cross-hook sync that came
- * with it — one component reads this, so there is nobody to sync with.
- *
- * THE READ-BACK IS VALIDATED, which is the part worth keeping. A remembered id
- * outlives the dataset it names: archived, or belonging to a project the reader
- * has since left. Writing one back unchecked leaves the picker pointed at a
- * dataset the project does not have, and the submit that follows fails for a
- * reason the reader cannot see. So a write asks whether the dataset is still
- * there and clears the memory when it is not.
  */
 
 import { createLogger } from "@langwatch/observability";

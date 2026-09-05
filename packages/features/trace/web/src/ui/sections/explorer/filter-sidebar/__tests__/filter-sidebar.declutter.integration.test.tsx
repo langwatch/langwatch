@@ -1,10 +1,7 @@
 /**
+ * The sidebar declutter pass: the "Find a facet" finder button is gone, and a "More…" button below the facet list
+ * opens the same Configure popover the header trigger drives (via the shared facetManagerOpen state).
  * @vitest-environment jsdom
- *
- * The sidebar declutter pass: the "Find a facet" finder button is gone, and a
- * "More…" button below the facet list opens the same Configure popover the
- * header trigger drives (via the shared facetManagerOpen state).
- * See specs/traces-v2/filter-bar-interactions.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

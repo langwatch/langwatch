@@ -1,28 +1,5 @@
 /**
  * Langy's conversation history, as a FULL VIEW inside the panel.
- *
- * It used to be a 340px popover hanging off the header's History icon. In a
- * panel that is itself only ~420px wide, that meant a small floating list on top
- * of the conversation it was covering — a window inside a window, with the chat
- * showing round the edges of the thing you were trying to read. History is not a
- * quick pick from a menu; it is a place you go. So the list now REPLACES the
- * message column (the same swap the card gallery and the inline model setup
- * already do), and the header's History control toggles you in and out.
- *
- * WHY NOT `Combobox` ANY MORE: the popover was built on Ark's `Combobox`
- * specifically to get listbox keyboard semantics — roving focus,
- * `aria-activedescendant`, ↑/↓ to move, Enter to select — which you otherwise
- * have to hand-roll inside a `Menu`. A full-height view needs none of that: the
- * rows are ordinary buttons in a scroll container, so Tab order, Enter/Space and
- * screen-reader list semantics all come from the platform. Fighting Ark to
- * render a permanently-open combobox inline would have been more machinery for
- * less correctness. (`LangyModelPill` still uses the combobox, where it belongs:
- * that one really is a value picker in a popover.)
- *
- * Results are keyset-paginated and title search runs on the server. The list
- * renders one bounded page at a time and lets the user explicitly load older
- * rows; past a threshold the rows virtualize so a deliberately deep history
- * cannot put thousands of nodes in the DOM.
  */
 import {
   Box,
@@ -68,10 +45,9 @@ type ChatGroup = "Today" | "Yesterday" | "This week" | "Older";
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
 /**
- * The day bucket a conversation's last activity falls in. Same start-of-day
- * arithmetic as `formatLangyConversationDate`, coarser buckets: rows sort
- * newest-first, so equal buckets are always contiguous and each one can carry
- * a single header.
+ * The day bucket a conversation's last activity falls in. Same start-of-day arithmetic
+ * as `formatLangyConversationDate`, coarser buckets: rows sort newest-first, so equal
+ * buckets are always contiguous and each one can carry a single header.
  */
 function chatGroupFor(timestampMs: number, nowMs = Date.now()): ChatGroup {
   if (!Number.isFinite(timestampMs) || timestampMs <= 0) return "Older";
@@ -99,11 +75,8 @@ interface ChatItem {
 }
 
 /**
- * A render-stable wrapper for a handler prop: the returned function's identity
- * never changes, and calling it reaches the latest handler. This is what lets
- * the memoized rows below skip re-rendering when the panel above re-renders
- * with fresh inline closures — a page of thirty rows re-rendered three times
- * over on every list refresh without it (profiled at ~8ms per row).
+ * A render-stable wrapper for a handler prop: the returned function's identity never
+ * changes, and calling it reaches the latest handler.
  */
 function useStableHandler<A extends unknown[], R>(handler: (...args: A) => R): (...args: A) => R {
   const ref = useRef(handler);
@@ -362,16 +335,6 @@ export function RecentChatsView({
 
 /**
  * The scrolling body of the list.
- *
- * Recents are keyset-paginated, but a person can deliberately load many pages.
- * Once that happens, keep the actual DOM bounded while preserving the same rows
- * and row actions for everything on screen.
- *
- * The non-virtual path (the common case) groups rows under quiet day headers;
- * rows in Today/Yesterday drop their own date, since the header already says
- * it. The virtual path stays a flat list — absolute-positioned rows cannot
- * interleave headers without measuring them too — so there every row keeps its
- * date, which is what `showDate` tells the row.
  */
 function ChatRows({
   items,

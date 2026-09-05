@@ -15,12 +15,8 @@ interface RefreshUIState {
   isReplacingData: boolean;
   setReplacingData: (value: boolean) => void;
   /**
-   * True between an explicit `refresh()` call (refresh button, "N new"
-   * pill acknowledge, tab-return refresh) and that refetch settling.
-   * The aurora ribbon keys off this so background refetches — SSE
-   * invalidations when a span arrives or a trace updates — don't play
-   * the full arrival animation; those get the subtle per-row pulse
-   * instead.
+   * True between an explicit `refresh()` call (refresh button, "N new" pill
+   * acknowledge, tab-return refresh) and that refetch settling.
    */
   refreshRequested: boolean;
   /** Internal latch: an in-flight fetch has been observed since the
@@ -29,11 +25,7 @@ interface RefreshUIState {
   /** Mark an explicit, user-initiated refresh. */
   requestRefresh: () => void;
   /**
-   * Feed the live isFetching signal into the request lifecycle. The
-   * request only clears after a fetch has been SEEN and then ended —
-   * covering the gap between `requestRefresh()` and React Query
-   * actually flipping isFetching, where clearing early would kill the
-   * aurora before it started.
+   * Feed the live isFetching signal into the request lifecycle.
    */
   observeFetching: (fetching: boolean) => void;
 }

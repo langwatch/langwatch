@@ -19,17 +19,8 @@ export const withoutPlaceholderTraceIds = (traceIds: string[]): string[] =>
   traceIds.filter((traceId) => !isPlaceholderTraceId(traceId));
 
 /**
- * Synthetic `TraceListItem` rows that drive the loading skeleton via
- * the real `TraceLensBody`. The goal is to render the exact same row /
- * cell / addon tree the user will see once data lands so the column
- * widths, paddings, heights, and addon presence all match — no
- * layout jump on transition.
- *
- * Field values are intentionally meaningful enough that addons whose
- * `shouldRender` predicates check for non-null fields (e.g. the IO
- * preview addon) still trigger; the actual content rendered inside is
- * swapped for skeleton bars by `RegistryRow` when its `isLoading` prop
- * is set.
+ * Synthetic `TraceListItem` rows that drive the loading skeleton via the real
+ * `TraceLensBody`.
  */
 export function buildTracePlaceholderRows(count: number): TraceListItem[] {
   return Array.from({ length: count }, (_, i) => ({

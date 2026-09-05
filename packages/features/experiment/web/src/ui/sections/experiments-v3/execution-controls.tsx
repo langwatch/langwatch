@@ -16,11 +16,6 @@ type ExecutionControlsProps = {
 
 /**
  * ExecutionControls - Run/Stop button with progress indicator.
- *
- * Displays:
- * - "Evaluate" button when idle
- * - "Stop" button with progress when running
- * - Completion state after execution
  */
 export function ExecutionControls({
   isReady = true,

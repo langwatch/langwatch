@@ -144,12 +144,9 @@ function MessageContentImpl({
   // message is left alone: the relay already ruled on its fences.
   const isRecorded = (message.metadata as { recorded?: boolean } | undefined)?.recorded === true;
 
-  // A turn is a sequence, so it renders as one: the paragraphs and the calls in
-  // the order the parts carry, rather than every card in a pile above the whole
-  // reply joined underneath. Each answer run keeps the block channel's own
-  // ordering inside it (ADR-060 §1); each activity run is the same
-  // LangyActivityParts spine that used to render the message's tool parts all
-  // at once.
+  // A turn is a sequence, so it renders as one: the paragraphs and the calls in the
+  // order the parts carry, rather than every card in a pile above the whole reply
+  // joined underneath.
   const runs = useMemo(
     () => (isUser ? [] : langyTranscriptRuns(message.parts)),
     [isUser, message.parts],
@@ -157,31 +154,18 @@ function MessageContentImpl({
   const lastActivityRunIndex = runs.findLastIndex((run) => run.kind === "activity");
 
   // The agent's `question` TOOL call, mapped onto the choices contract
-  // (langyQuestionTool.ts) and rendered through the same card path a stamped
-  // choices block takes. Derived from the tool parts like the PR/progress
-  // cards — and on the STREAMING path too, deliberately: the tool waits on
-  // the user mid-turn, so a card that only appeared once the turn settled
-  // would hide the very thing the turn is waiting for.
+  // (langyQuestionTool.ts) and rendered through the same card path a stamped choices
+  // block takes.
   const questionCards = useMemo(
     () => (isUser ? [] : message.parts.flatMap((part) => questionToolCardParts(part))),
     [isUser, message.parts],
   );
 
-  // The connect card is NOT sniffed out of the assistant's prose any more. A
-  // missing GitHub connection is a structured `langy_github_not_connected` domain
-  // error raised from the tool stream (the control plane sees the agent reach for
-  // `gh` with no token), and LangyPanel renders the card off that. Reading the
-  // model's text for `[langy:connect-github]` meant trusting it to say the magic
-  // words — so it could forget, paraphrase, or say them on a turn that never
-  // touched GitHub.
+  // The connect card is NOT sniffed out of the assistant's prose any more.
 
-  // The PR-flow progress card, derived from the message's TOOL PARTS — the same
-  // parts the tool cards render from. `git push` IS the push; we no longer ask
-  // the model to print `[langy:progress:pushed]` next to it and then regex the
-  // reply. Two things get better: an errored command no longer marks its step
-  // complete (a rejected push has not pushed), and the card SURVIVES A REFRESH —
-  // the sentinels were stripped before the message was persisted, so it never
-  // used to.
+  // The PR-flow progress card, derived from the message's TOOL PARTS — the same parts
+  // the tool cards render from. `git push` IS the push; we no longer ask the model to
+  // print `[langy:progress:pushed]` next to it and then regex the reply.
   const progressEvents = isUser ? [] : githubProgressFromToolParts(message.parts);
 
   // Strip the hidden [langy:feedback:...] directive: when present, Langy asked
@@ -202,14 +186,8 @@ function MessageContentImpl({
   // still gives the blur-reveal while `isStreaming`.
 
   const proposals = extractProposals(message);
-  // The PR cards, read off the message's TOOL PARTS — not scraped from the
-  // model's text. This was the LAST thing in Langy's UI steered by regexing the
-  // assistant's prose: any github.com/…/pull/N URL in the reply drew a card, so
-  // the model could mangle the URL, omit it, or merely MENTION a PR it never
-  // opened and get a card for it. The tool part is written by the control plane
-  // from `gh pr create`'s own stdout, is persisted with the message (so the card
-  // survives a refresh), and skips a `gh pr create` that FAILED — a PR that did
-  // not open must never render as one that did.
+  // The PR cards, read off the message's TOOL PARTS — not scraped from the model's
+  // text.
   const prs = isUser ? [] : githubPrsFromToolParts(message.parts);
   // Tool-call activity for the assistant turn: activity cards, each labelled by
   // what the call is DOING ("Searching traces", "Using the GitHub skill"), plus
@@ -217,26 +195,16 @@ function MessageContentImpl({
   // something to render" so a turn whose only output is a running tool or a
   // settled card (no prose yet) still surfaces it.
   const showsActivity = isUser ? false : hasLangyActivity(message);
-  // The plan checklist, folded from the turn's `todowrite` tool parts. It is
-  // the steps only — the work itself is in the transcript, where it happened.
-  // On the LIVE streaming turn the manager's typed snapshot (store) is
-  // preferred over raw parsing, so the client honours the same caps the manager
-  // applied, and LangyPanel holds the checklist above the composer rather than
-  // letting it scroll away with the top of a long turn.
-  // Completed messages do not need to subscribe to the mutable live-turn
-  // snapshot. Keeping that subscription on every historical answer made one
-  // plan tick reconcile the full transcript.
+  // The plan checklist, folded from the turn's `todowrite` tool parts. It is the steps
+  // only — the work itself is in the transcript, where it happened.
   const livePlan = useLangyStore((s) => (isStreaming ? s.turnPlan : null));
   const plan = isUser
     ? null
     : langyPlan(message, isStreaming ? { overrideItems: livePlan } : undefined);
   const hasActivityRecord = showsActivity || Boolean(plan);
-  // Reasoning-summary headlines ("Planning task execution strategy") are the
-  // model's thinking, not its answer — on a settled turn they fold into the
-  // completed-actions receipt instead of standing as loose bold paragraphs
-  // above the reply (and the last one no longer glues onto the reply's first
-  // word). Live turns keep streaming untouched; the fold happens at settle,
-  // the same moment the rest of the process record collapses.
+  // Reasoning-summary headlines ("Planning task execution strategy") are the model's thinking, not its answer —
+  // on a settled turn they fold into the completed-actions receipt instead of standing as loose bold paragraphs
+  // above the reply (and the last one no longer glues onto the reply's first word).
   const reasoningFold =
     isUser || isStreaming
       ? { titles: [], text }
@@ -276,13 +244,8 @@ function MessageContentImpl({
     // claim a slot in the column's gap, pushing the status line down mid
     // startup. The working lines below own the live edge until content lands.
     if (isStreaming) return null;
-    // A settled assistant turn with nothing visible to say, either the model
-    // spent the whole turn reasoning or the user stopped it before any text
-    // arrived. Name the emptiness quietly rather than rendering a reply that
-    // is not there (a failed turn never appends an assistant message, the
-    // error card owns that surface). When THIS browser stopped the turn, say
-    // that instead — the user did it two seconds ago, and "No content" reads
-    // like the panel lost their answer.
+    // A settled assistant turn with nothing visible to say, either the model spent the
+    // whole turn reasoning or the user stopped it before any text arrived.
     return (
       <Text
         fontSize="langyAnswer"
@@ -472,17 +435,8 @@ interface AnswerBlockContext {
 }
 
 /**
- * One run of the reply: the prose between two calls, with any card blocks
- * stamped into it.
- *
- * The live turn takes the streaming path (the forming ```langy-card fence
- * previews through the SAME validation the relay stamps with at settle,
- * ADR-060 §7); a settled run renders its stamped blocks where they sat, and a
- * settled run of a turn nobody stamped reads its own fences.
- *
- * The answer wears the theme's answer tokens (langyTheme.ts): half a step
- * smaller than the user's `sm` bubble and a step dimmer than `fg`, so a glance
- * separates "what I said" from "what it said".
+ * One run of the reply: the prose between two calls, with any card blocks stamped into
+ * it.
  */
 function AnswerRun({
   parts,
@@ -548,11 +502,9 @@ function AnswerRun({
 }
 
 /**
- * The settled answer, rendered in the reply's own order (ADR-060 §1): one
- * flat dispatch per segment type — prose, derived card, failed disclosure —
- * mirroring the registry idiom the capability cards use. Every card sits in
- * its own error boundary so one bad payload costs one card, never the
- * answer.
+ * The settled answer, rendered in the reply's own order (ADR-060 §1): one flat dispatch
+ * per segment type — prose, derived card, failed disclosure — mirroring the registry
+ * idiom the capability cards use.
  */
 function AnswerWithCards({
   segments,

@@ -1,20 +1,5 @@
 /**
  * Where the rows of the Results tab come from.
- *
- * This is the only place that knows the source. Everything above it reads the
- * group rows, the totals and the named rows, so a change to the read is a
- * change to this file and to nothing that renders.
- *
- * Two reads, one filter. `getResultsOverview` folds in the database and
- * answers the group rows and every number of the stat strip; `getResultAtoms`
- * answers a bounded page of atoms for the drill-down, which is the flat list
- * and the runs behind an opened row. Both take the same filter, so no control
- * on the page can move one number without moving the rest.
- *
- * The overview is not derived from the atom page. A page holds whatever fitted
- * inside its cap, and a total added up from it would read as the total of
- * everything while being the total of a part.
- *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
@@ -52,10 +37,6 @@ import type { RunPlan } from "../../../../behavior/agent-testing/results/run-pla
 
 /**
  * How often the reads refresh while the live stream is down.
- *
- * The stream is what normally moves a running run on this page. This is the
- * fallback, so it is slow enough to cost little and quick enough that a person
- * watching a run does not think the page has stopped.
  */
 const RESULTS_POLL_MS = 10_000;
 
@@ -99,11 +80,6 @@ export type UseResultGroupsResult = {
 
 /**
  * The two lists a drill-down narrows on, from the rows that are open.
- *
- * Both narrow rather than widen: an open row asks for its own runs, and a
- * filter already cutting those ids must keep cutting them. An intersection
- * that comes out empty is asked for as empty, which reads as nothing rather
- * than as everything.
  */
 function narrowTo({ opened, asked }: { opened: string[]; asked: string[] }): string[] {
   if (asked.length === 0) return opened;
@@ -130,12 +106,6 @@ export type UseResultGroupsArgs = {
 
 /**
  * The window and the filters, as the shape both reads take.
- *
- * A relative window sends no end. Its end is pinned at mount, so sending it
- * would filter on "started before the page loaded" and a run beginning while
- * someone watches would never appear, on the page whose job is watching runs
- * happen. A window a person picked by hand does send one: they asked for that
- * window, and it must not drift.
  */
 function useResultsScope({
   projectId,
@@ -164,9 +134,6 @@ function useResultsScope({
 
 /**
  * The drill-down's own scope: the shared filter, narrowed to the opened rows.
- *
- * It narrows rather than widens. An open row asks for its own runs, and a
- * filter already cutting those ids must keep cutting them.
  */
 function narrowDrillScope({
   scope,
@@ -196,10 +163,6 @@ function narrowDrillScope({
 
 /**
  * The two reads, both taking the same filter.
- *
- * The drill-down is asked for only when something is drilling into: the flat
- * list, or the runs behind an opened row. The plan grouping never opens a row
- * in place, so it asks for no atoms at all.
  */
 function useResultsReads({
   scope,
@@ -281,9 +244,6 @@ function useNamedRows({
 
 /**
  * The runs behind each opened group, keyed by that group's key.
- *
- * Only the two groupings that open a row in place hold any: the others ask for
- * no atoms, so there is nothing to key.
  */
 function groupRowsByKey({
   rows,
@@ -306,11 +266,6 @@ function groupRowsByKey({
 
 /**
  * The rows of the Run plan grouping, quiet plans included.
- *
- * A quiet plan still has a row, so a plan someone is worried about does not
- * vanish the moment it stops running. It stands down only while a filter is
- * narrowing the question, where a row matching nothing is noise rather than
- * reassurance.
  */
 function buildPlanRows({
   plans,
@@ -343,10 +298,6 @@ function buildPlanRows({
 
 /**
  * The option lists of the filter row.
- *
- * Every list is built from the project rather than from the window, so a
- * filter never hides its own way back: an option built from what the page
- * already cut away cannot be chosen to undo the cut.
  */
 function useResultFilterOptions({
   scenarios,
@@ -448,11 +399,8 @@ function useTargetParameters({
 }
 
 /**
- * Every name a target key can read under: the project's agents and prompts,
- * and the agent names the runs from code reported.
- *
- * A platform name always wins. A stored agent must read the same wherever it
- * is listed, whatever a run happened to report for it.
+ * Every name a target key can read under: the project's agents and prompts, and the
+ * agent names the runs from code reported.
  */
 function useTargetNames({
   targetNames,
@@ -513,11 +461,8 @@ function useTargetNaming({
 }
 
 /**
- * What the page reads off the agents and the prompts of the project: the name
- * a target key stands for, and the kind of agent behind it.
- *
- * A target key carries the parameters of the target as well as the id, so the
- * kind is read off the reference id inside it.
+ * What the page reads off the agents and the prompts of the project: the name a target
+ * key stands for, and the kind of agent behind it.
  */
 function useTargetReads() {
   const targetIdentities = useTargetIdentityMap();

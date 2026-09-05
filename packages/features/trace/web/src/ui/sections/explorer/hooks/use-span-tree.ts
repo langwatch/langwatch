@@ -38,12 +38,9 @@ export function useSpanTreeCanonical() {
   const treeQuery = useQuery({
     queryKey: spanTreeQueryKey(queryArgs),
     queryFn: spanTreeQueryFn({ utils, queryClient, input: queryArgs }),
-    // Disable the real fetch when the traceId is a preview-mode
-    // synthetic — `useOpenTraceDrawer` has already seeded the cache
-    // with hand-crafted span data; firing a real request would just
-    // return empty and clobber the seed. A shared trace carries its
-    // spans in the share payload, so there is nothing to walk and no
-    // authenticated endpoint to walk it with.
+    // Disable the real fetch when the traceId is a preview-mode synthetic —
+    // `useOpenTraceDrawer` has already seeded the cache with hand-crafted span data;
+    // firing a real request would just return empty and clobber the seed.
     enabled: isReady && !shared,
     staleTime: 300_000,
     gcTime: 1_800_000,
@@ -51,16 +48,9 @@ export function useSpanTreeCanonical() {
     refetchOnWindowFocus: true,
   });
 
-  // Live updates arrive as deltas merged into the assembled tree, never as a
-  // re-walk: re-running the tree query would restart the whole page walk —
-  // `ceil(N/500)` sequential requests on exactly the huge live traces paging
-  // exists for. This is the single update path for both SSE states; only the
-  // trigger differs (SSE event vs. interval, see `refetchInterval` below).
-  //
-  // `placeholderData: keepPreviousData` means `data` can briefly be the
-  // PREVIOUS trace's tree right after a trace switch — its high-water mark
-  // would make the delta poll skip this trace's spans, so wait for current
-  // data.
+  // Live updates arrive as deltas merged into the assembled tree, never as a re-walk:
+  // re-running the tree query would restart the whole page walk — `ceil(N/500)`
+  // sequential requests on exactly the huge live traces paging exists for.
   const tree = treeQuery.isPlaceholderData ? undefined : treeQuery.data;
   const deltaQuery = api.tracesV2.spanTreeDelta.useQuery(
     {
@@ -68,13 +58,9 @@ export function useSpanTreeCanonical() {
       sinceUpdatedAtMs: tree !== undefined ? spanTreeDeltaSinceMs(tree) : 0,
     },
     {
-      // Gated on the walk having FINISHED, not merely on `tree` being
-      // defined: progressive publishing sets the cache entry after page 1, so
-      // a mid-walk poll would take its high-water mark from a partial tree and
-      // ask for every span after it — one response of up to
-      // MAX_LIGHT_SPAN_READ_ROWS, i.e. exactly the unbounded fetch paging
-      // exists to avoid. Until the walk lands, the main query is the source of
-      // truth (and its retries have no high-water mark to poll from anyway).
+      // Gated on the walk having FINISHED, not merely on `tree` being defined: progressive publishing sets the cache entry after page
+      // 1, so a mid-walk poll would take its high-water mark from a partial tree and ask for every span after it — one response of up
+      // to MAX_LIGHT_SPAN_READ_ROWS, i.e. exactly the unbounded fetch paging exists to avoid.
       enabled: isReady && isLive && !shared && tree !== undefined && !treeQuery.isFetching,
       // Only when SSE can't push. With SSE up, `useTraceFreshness` invalidates
       // this query per `span.stored` batch, which refetches it on the spot.
@@ -101,12 +87,7 @@ export function useSpanTreeCanonical() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deltaUpdatedAt]);
 
-  // One catch-up delta when SSE comes back. While it was down the interval
-  // was doing the polling; once it reconnects the interval stops and updates
-  // arrive as events — but a span that landed between the final poll and the
-  // reconnect produces no event of its own, so without this it would sit
-  // unseen until the next unrelated batch (or forever, on a trace that just
-  // finished). The high-water mark makes this exact, not a re-walk.
+  // One catch-up delta when SSE comes back.
   const wasSseConnected = useRef(sseConnected);
   useEffect(() => {
     const reconnected = sseConnected && !wasSseConnected.current;
@@ -125,15 +106,8 @@ export function useSpanTreeCanonical() {
 }
 
 /**
- * Both readings of the span tree from one read: the trace as captured, and the
- * trace as the reader sees it. A caller that needs each of them (the drawer
- * scaffold, whose header counts captured spans while its panes render corrected
- * ones) takes them from here rather than instantiating the query twice, which
- * would put a second observer on the live delta poll for the same data.
- *
- * The correction is applied to the query's result and never written back into
- * the cache, so the delta poll's high-water mark keeps tracking what was
- * actually ingested.
+ * Both readings of the span tree from one read: the trace as captured, and the trace as
+ * the reader sees it.
  */
 export function useSpanTreeWithCaptured() {
   const captured = useSpanTreeCanonical();

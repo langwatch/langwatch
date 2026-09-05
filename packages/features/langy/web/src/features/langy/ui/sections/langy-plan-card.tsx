@@ -1,24 +1,5 @@
 /**
  * The plan checklist — what a multi-step turn said it would do, and where it is.
- *
- * The checklist is the steps and nothing else. It used to nest each step's tool
- * cards under it, which put the same card in two places once the transcript
- * started carrying every call where it happened (logic/langyTranscript.ts). The
- * rules the design plan sets, minus the nesting:
- *
- *   - completed → green check, one line;
- *   - in-progress → pulsing dot + the brand shimmer;
- *   - pending → dimmed, no dot;
- *   - cancelled → struck through, dimmed, and NOT counted toward the total.
- *
- * While the turn runs the card is open and LangyPanel holds it above the
- * composer, so a plan does not scroll away on the long turns that have one. It
- * folds to a compact receipt — progress plus the current step — once the turn
- * settles; clicking it either way pins the reader's choice. A
- * settled-but-incomplete turn (a failure/handoff) freezes honestly: nothing
- * pulses and no step is invented.
- *
- * Reduced motion: the pulse and the shimmer sweep drop to a static treatment.
  */
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
@@ -50,22 +31,14 @@ export function LangyPlanCard({
   plan: LangyPlan;
   /**
    * The turn's folded reasoning-summary headlines (logic/langyReasoningTitles).
-   * When a plan ran, this card IS the settled turn's process record, so the
-   * headlines ride its expanded checklist the same way they ride the
-   * completed-actions receipt: quiet rows that claim thought, not work.
    */
   reasoningTitles?: string[];
   /** The live, in-flight turn — only then does the current step pulse. */
   isStreaming?: boolean;
 }) {
   const reduce = useReducedMotion();
-  // While the turn runs, the card is OPEN: the reader is watching work happen,
-  // and every command the agent ran is nested in here. Closed, a turn that
-  // spent four minutes running twenty commands showed one line and a wall of
-  // narration with nothing between the paragraphs — and once the last step
-  // completed there was no current step left to show either. A settled turn in
-  // a scrolled-back transcript is a status receipt again, with the checklist
-  // one click away. Either way the reader's own click wins from then on.
+  // While the turn runs, the card is OPEN: the reader is watching work happen, and
+  // every command the agent ran is nested in here.
   const [cardOpenOverride, setCardOpenOverride] = useState<boolean | null>(null);
   const cardOpen = cardOpenOverride ?? isStreaming;
   const currentItem = plan.currentIndex >= 0 ? plan.items[plan.currentIndex] : undefined;
@@ -128,11 +101,6 @@ export function LangyPlanCard({
 
 /**
  * The compact "PLAN · 3 OF 7 DONE" status and detail toggle.
- *
- * The count is DONE out of total — never "N left". "Left" counted the step
- * currently running, so "0 of 4 · 4 left" sat above a list where only three
- * steps looked outstanding, and the numbers read as wrong. "Done" agrees with
- * the checked boxes below it by definition.
  */
 function PlanOverline({
   completed,

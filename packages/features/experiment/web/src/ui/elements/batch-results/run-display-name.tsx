@@ -5,9 +5,6 @@ const RUN_NAME_SEPARATOR = " · ";
 
 /**
  * Rich app presentation for a run display name.
- *
- * String construction belongs to Experiment web. This adapter only gives the
- * generated id muted Chakra styling when there is no commit message.
  */
 export function RunDisplayName({
   commitMessage,

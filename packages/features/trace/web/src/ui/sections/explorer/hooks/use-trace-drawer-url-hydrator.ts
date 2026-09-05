@@ -10,17 +10,8 @@ import { enterTraceEditMode, exitTraceEditMode } from "../utils/trace-edit-mode"
 
 /**
  * One-way URL → drawer store sync. Lives at the page level so the
- * `<TraceV2DrawerShell>` mount decision can read the store directly
- * (synchronous on click) instead of waiting for the URL push to
- * round-trip through React Router. Deep links + browser back/forward
- * still feed the store via this hook.
- *
- * Without this, clicking a row had to wait for `router.push` to
- * complete before `CurrentDrawer` saw `drawer.open=traceV2Details`
- * and mounted the shell — visible as a beat between click and the
- * drawer sliding in. With the store as the source of truth and the
- * URL only a serialization, the shell can mount the same render the
- * click ran in.
+ * `<TraceV2DrawerShell>` mount decision can read the store directly (synchronous on
+ * click) instead of waiting for the URL push to round-trip through React Router.
  */
 export function useTraceDrawerUrlHydrator(): void {
   const { currentDrawer, openDrawer, closeDrawer } = useDrawer();
@@ -62,17 +53,9 @@ export function useTraceDrawerUrlHydrator(): void {
 }
 
 /**
- * Browser history must not throw away work. A link from before the correction
- * was started says nothing about the correction, so following it back would
- * drop an unsaved one with no way to get it back.
- *
- * The reviewer is asked instead, and the question lives in the edit bar, which
- * only exists while the drawer is mounted. Parking the exit on its own would
- * park it on a dialog that just unmounted. So the drawer's link is re-asserted
- * first, and the parked exit closes it for real once the reviewer says they are
- * done with the correction.
- *
- * Returns whether the close was held back.
+ * Browser history must not throw away work. A link from before the correction was
+ * started says nothing about the correction, so following it back would drop an unsaved
+ * one with no way to get it back.
  */
 function keepDrawerForUnsavedEdit({
   openDrawer,
@@ -103,10 +86,7 @@ function keepDrawerForUnsavedEdit({
 }
 
 /**
- * Brings the edit session in line with what the link asks for. The one case
- * that is not a straight assignment is browser history: going back to a URL
- * from before the reviewer started editing would drop an unsaved correction,
- * so a dirty session stays open and the URL sync re-asserts the parameter.
+ * Brings the edit session in line with what the link asks for.
  */
 function syncEditMode({
   traceId,

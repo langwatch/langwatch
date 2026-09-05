@@ -6,23 +6,8 @@ import { walkAST } from "@langwatch/trace-contract";
 import { useFilterStore } from "../../../../index";
 
 /**
- * Empty-state companion that breaks the active query down into removable
- * chips so a user can drop individual pieces without retyping the whole
- * thing. Shipped because we saw users typing junk into the search bar
- * (e.g. "Ω AND status:error") and being unable to figure out *why*
- * results were empty — the search bar showed the full string, the
- * sidebar showed a count of 1 active facet, but the noisy "Ω" was
- * invisible in both. This panel surfaces every clause as a chip so the
- * mistake is removable in one click.
- *
- * Predicate rendering rules:
- *   - Fielded tags  ("field:value") → chip with × that calls
- *     `removeFacet(field, value)`.
- *   - Range tags    ("duration:>1000") → chip with × that calls
- *     `removeField(field)` (range removal is whole-field, not per-bound,
- *     in the existing filterStore API).
- *   - Free-text     (ImplicitField literal) → chip with × that nukes
- *     just the offending token via `removeFreeText(value)`.
+ * Empty-state companion that breaks the active query down into removable chips so a
+ * user can drop individual pieces without retyping the whole thing.
  */
 interface BreakdownEntry {
   /** Stable id within the chip list — `${field}:${value}:${kind}`. */

@@ -1,12 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration test for ScenarioMessageRenderer's content coercion.
- *
- * Pins the renderer/extractor coercion parity: when the python-sdk sends
- * `content` as a Python `repr(list)` string (single quotes, None/True/False
- * keywords), the renderer must walk it the same way the stored-objects
- * extractor does instead of dumping the raw repr blob into the bubble.
+ * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -253,15 +247,8 @@ describe("<ScenarioMessageRenderer/>", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // #4138 — post-extraction `input_audio` URL shape.
-  //
-  // After server-side stored-objects extraction, an `input_audio` part is
-  // rewritten from inline `{data, format}` to `{url: "/api/files/<id>",
-  // mimeType}` (content-extractor.ts). These pin that the renderer plays the
-  // url-shape turn through MediaPart's native <audio> in BOTH the grid and
-  // drawer variants, and degrades gracefully for an unrenderable shape.
-  // -------------------------------------------------------------------------
+  // ------------------------------------------------------------------------- #4138 —
+  // post-extraction `input_audio` URL shape.
   describe("when an assistant audio message arrives in the post-extraction url shape (#4138)", () => {
     const urlShapeMessage = {
       id: "msg_audio_url_shape",
@@ -298,12 +285,9 @@ describe("<ScenarioMessageRenderer/>", () => {
 
   describe("when a media part has an unsupported mimeType (#4138 graceful fallback)", () => {
     /**
-     * A media part whose mimeType is not an `audio/`/`image/`/`video/` type
-     * resolves to the binary category in MediaPart, which renders a
-     * download-link fallback (media-part-binary) rather than a broken <audio>
-     * element. This guards the unhappy shape — a graceful fallback node, never
-     * a broken/empty media element — for a file the renderer cannot play
-     * inline (e.g. an externalized blob with a non-media content type).
+     * A media part whose mimeType is not an `audio/`/`image/`/`video/` type resolves to
+     * the binary category in MediaPart, which renders a download-link fallback
+     * (media-part-binary) rather than a broken <audio> element.
      */
     it("renders a graceful binary fallback, not a broken audio element", () => {
       renderWith([
@@ -394,17 +378,8 @@ describe("<ScenarioMessageRenderer/>", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // #4698 — text-first part ordering + audio-only + assistant=left.
-  //
-  // The production SDK emits assistant voice turns text-FIRST
-  // (`[text, input_audio]`); every pre-existing collapse fixture is audio-first
-  // (`[input_audio, text]`). The collapse guard is order-independent (filters
-  // by kind, not index), so both orderings must produce exactly one bubble
-  // with the text as the transcript. Alignment (assistant=left, user=right) is
-  // asserted via the `data-align` test affordance because Chakra's `align`
-  // prop compiles to an atomic CSS class jsdom's getComputedStyle cannot read.
-  // -------------------------------------------------------------------------
+  // ------------------------------------------------------------------------- #4698 —
+  // text-first part ordering + audio-only + assistant=left.
   describe("when an assistant voice turn carries audio + a sibling text transcript (#4698)", () => {
     const orderings: Array<{
       label: string;

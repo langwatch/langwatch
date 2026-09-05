@@ -5,22 +5,6 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
  * A small toolbar that arrives with the pointer, on a surface of its own.
- *
- * Kept out of the way until the thing it belongs to is hovered: a conversation
- * that showed every turn's actions at all times would read as chrome with a
- * transcript in it. An opaque panel rather than bare words, so the revealed
- * actions read as a toolbar floating over the message or the separator instead
- * of as text printed on top of it.
- *
- * The keyboard reaches it by landing on one of its own actions, which is what
- * brings it out for a reader who has no pointer. Something else in the same
- * group holding focus does not: a ticked session checkbox keeps its focus long
- * after the pointer has moved on, and the actions are meant to leave with the
- * pointer.
- *
- * `isHeld` keeps the cluster on screen regardless of the pointer, for as long
- * as what it started is still going: the control the reviewer clicked must not
- * vanish from under them.
  */
 export const HoverActionCluster = forwardRef<
   HTMLDivElement,
@@ -86,10 +70,9 @@ export function HoverActionButton({
   /** What the pointer is told the action does. */
   tooltip: string;
   /**
-   * The name the action answers to, when the word on it is not enough to tell
-   * it from the same action on the other message. Left unset the word itself is
-   * the name, which is what a toggle needs: its label already says which of the
-   * two states it is in.
+   * The name the action answers to, when the word on it is not enough to tell it from
+   * the same action on the other message. Left unset the word itself is the name, which
+   * is what a toggle needs: its label already says which of the two states it is in.
    */
   accessibleName?: string;
   isActive?: boolean;

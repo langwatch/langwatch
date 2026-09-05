@@ -1,14 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * A project that reads Agent Testing is sent there from every simulations
- * address, so a saved link and a link an older SDK printed both land on the
- * page the project uses. With the flag off the v1 pages open as they did.
- *
- * The router and org/project scope are host-backed now (ScenarioHostPort,
- * ADR-004) rather than `~/utils/compat/next-router` /
- * `~/hooks/useOrganizationTeamProject` mocks.
- *
  * @see specs/features/agent-testing/page-structure.feature
  * @see specs/suites/new-simulations-callout.feature
  */

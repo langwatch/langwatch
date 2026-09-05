@@ -13,22 +13,6 @@ const dotPulse = keyframes`
 
 /**
  * The one card primitive for Langy's conversation, driven by INTENT.
- *
- * A card names what it is doing — a small piece of work, progress on your
- * request, a change that landed, a question for you, something worth your full
- * attention — and the intent alone fixes the material (see `CARD_TAXONOMY`).
- * Every bespoke card composes THIS so the whole kit reads as one weight ramp
- * rather than five components each picking their own border and padding.
- *
- * The five intents, quietest to loudest:
- *   activity  — an inline status line, no box.
- *   progress  — a live receipt on a hairline surface, an amber dot while it runs.
- *   change    — a settled receipt, a status dot naming the outcome.
- *   ask       — leans in with the warm accent; expects an action row.
- *   spotlight — the panel material, a serif title, full attention.
- *
- * The accent is earned: only `ask` and `spotlight` spend it. `spotlight` renders
- * the real panel material (LangyPanelSurface); the rest are plain hairline boxes.
  */
 export function LangyCard({
   intent,

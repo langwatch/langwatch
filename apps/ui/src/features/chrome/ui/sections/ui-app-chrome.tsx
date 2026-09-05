@@ -24,11 +24,9 @@ export default function UiAppChrome() {
 }
 
 /**
- * Everything that must be inside the host: `useNavigationTracking` keeps
- * the product memory and Settings-entry page current, which the sidebar's
- * "Back to {product}" entry reads, and the `?org=` switch runs here because
- * every org-scoped page (`/me`, `/settings/*`, `/gateway/*`) is served under
- * this route.
+ * Everything that must be inside the host: `useNavigationTracking` keeps the product memory and Settings-entry
+ * page current, which the sidebar's "Back to {product}" entry reads, and the `?org=` switch runs here because
+ * every org-scoped page (`/me`, `/settings/*`, `/gateway/*`) is served under this route.
  */
 function UiAppChromeBody() {
   useNavigationTracking();

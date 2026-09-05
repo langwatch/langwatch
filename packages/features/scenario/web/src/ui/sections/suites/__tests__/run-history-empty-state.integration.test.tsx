@@ -1,8 +1,6 @@
 /**
- * @vitest-environment jsdom
- *
  * Integration tests for the RunHistoryPanel empty state in the single-suite view.
- *
+ * @vitest-environment jsdom
  * @see specs/features/suites/suite-empty-state.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

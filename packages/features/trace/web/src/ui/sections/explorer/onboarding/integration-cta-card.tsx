@@ -15,10 +15,9 @@ import { IntegrateDrawer } from "./integrate-drawer";
 const SNOOZE_DURATION_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
- * Returns true when the integration CTA card should be visible for the
- * given project. Conditions:
- *   - project has no real traces yet
- *   - card has not been dismissed within the last 14 days
+ * Returns true when the integration CTA card should be visible for the given project.
+ * Conditions: - project has no real traces yet - card has not been dismissed within the
+ * last 14 days
  */
 export function useIntegrationCTAVisible({
   projectId,
@@ -42,13 +41,9 @@ export function useIntegrationCTAVisible({
 }
 
 /**
- * Inline CTA card that sits in the trace table area when the project has
- * no real traces. Encourages the user to integrate their code without
- * replacing the table — sample data rows are visible behind/below it.
- *
- * Dismissed state is persisted per-project with a 14-day snooze so the
- * card reappears as a reminder. Clicking "Integrate" opens the full
- * `IntegrateDrawer`.
+ * Inline CTA card that sits in the trace table area when the project has no real
+ * traces. Encourages the user to integrate their code without replacing the table —
+ * sample data rows are visible behind/below it.
  */
 export const IntegrationCTACard: React.FC = () => {
   const { project } = useOrganizationTeamProject();
