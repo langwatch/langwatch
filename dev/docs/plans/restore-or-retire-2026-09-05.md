@@ -1,6 +1,8 @@
 # Restore or retire: behaviour the lift left behind
 
-Status: open rulings, 2026-09-05. Each row is a scenario (or group) whose test
+Status: RULED 2026-09-05 12:30 by Alex: **restore everything**. No behaviour main has may be lost on this branch. The only retirements admitted are rows whose behaviour was already replaced or already executed on main itself (marked "retire" below with the reason); every other row is a restore lane. Cross-feature web imports: named `surfaces/<id>` entries, oxlint admits `screens/*` and `surfaces/*`. The core-to-enterprise UI slot seam is to be built.
+
+Original framing: Each row is a scenario (or group) whose test
 bound on `origin/main` but whose behaviour is absent on
 `feat/strict-feature-layout-v0`. The port lanes did not write tests for these
 and did not delete the scenarios. Two outcomes per row: **restore** the
