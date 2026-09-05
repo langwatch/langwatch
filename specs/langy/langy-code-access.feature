@@ -152,6 +152,20 @@ Feature: Langy asks how to reach the customer's code, once
       And it still says to decide routine things without asking
 
     @unit
+    Scenario: A branch name is picked from the names the folder already has
+      Given the code changes skill
+      When its branching step is read
+      Then it says to list the existing langy branches first
+      And it says to pick a name that is not among them, so one checkout is enough
+
+    @unit
+    Scenario: A pull request body of more than one line goes in a file
+      Given the code changes skill
+      When its pull request step is read
+      Then it says to write the body to a file and pass it with --body-file
+      And it bans the shell quoting that puts escaped newlines on the permission card
+
+    @unit
     Scenario: The pull request title is the commit subject
       Given the code changes skill
       When its pull request step is read

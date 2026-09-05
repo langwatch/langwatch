@@ -111,6 +111,22 @@ describe("the code-changes skill", () => {
       expect(rendered).toContain("Decide routine things yourself");
     });
 
+    /** @scenario "A branch name is picked from the names the folder already has" */
+    it("lists the langy branches the folder has before it names a new one", () => {
+      const rendered = codeChangesSkill();
+      expect(rendered).toContain('git branch --list "langy/*"');
+      expect(rendered).toContain("pick one that is not among them");
+    });
+
+    /** @scenario "A pull request body of more than one line goes in a file" */
+    it("writes a multi-line body to a file instead of quoting it in the shell", () => {
+      const rendered = codeChangesSkill();
+      expect(rendered).toContain("--body-file");
+      expect(rendered).toContain("A body of more than one line goes in a file");
+      expect(rendered).toContain(".langwatch/pr-body.md");
+      expect(rendered).toContain("never build it with the shell's");
+    });
+
     /** @scenario "The pull request title is the commit subject" */
     it("takes the pull request title from the commit subject and bans adjectives", () => {
       const rendered = codeChangesSkill();
