@@ -77,10 +77,12 @@ fi
 LIMIT_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=eighty bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
 LIMIT_STATUS=$?
 
-if [[ $LIMIT_STATUS -eq 2 ]]; then
+if [[ $LIMIT_STATUS -eq 2 ]] && printf '%s\n' "$LIMIT_OUTPUT" \
+  | grep -q 'DOCS_PROSE_MAX_PARAGRAPH_WORDS must be a whole number, got: eighty'; then
   check "a paragraph limit that is not a whole number is refused" yes
 else
   check "a paragraph limit that is not a whole number is refused" no
+  echo "Status: $LIMIT_STATUS"
   echo "Output: $LIMIT_OUTPUT"
 fi
 
