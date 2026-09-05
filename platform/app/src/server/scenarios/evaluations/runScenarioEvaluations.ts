@@ -493,6 +493,54 @@ async function evaluateAttachment({
 }
 
 /**
+ * The context every attachment of one run is graded against: the run's own
+ * messages and spans, the scenario's text and field values, and the trace an
+ * evaluator that reads one is handed. The spans are loaded only when an
+ * attachment reads the trace.
+ */
+async function buildRunContext({
+  deps,
+  payload,
+  scenario,
+  attachments,
+  runState,
+  isFinalAttempt,
+}: {
+  deps: RunScenarioEvaluationsDeps;
+  payload: ScenarioEvaluationsJobPayload;
+  scenario: Pick<Scenario, "situation" | "criteria" | "fields">;
+  attachments: readonly EvaluatorAttachment[];
+  runState: ScenarioRunState | null;
+  isFinalAttempt: boolean;
+}): Promise<RunContext> {
+  const { tenantId: projectId, scenarioRunId } = payload;
+  const traceIds = [
+    ...new Set([...payload.traceIds, ...(runState?.traceIds ?? [])]),
+  ];
+  const spans = attachmentsReadTrace(attachments)
+    ? await loadSpans({ deps, tenantId: projectId, traceIds })
+    : [];
+  const lastTraceId = traceIds.at(-1);
+  return {
+    projectId,
+    scenarioRunId,
+    run: {
+      messages: runState?.messages ?? [],
+      spans,
+      hasTraces: traceIds.length > 0,
+    },
+    scenario: {
+      situation: scenario.situation,
+      criteria: scenario.criteria,
+      fields: parseScenarioFieldValues(scenario.fields),
+    },
+    lastTraceId,
+    trace: traceForEvaluation({ projectId, traceId: lastTraceId, spans }),
+    isFinalAttempt,
+  };
+}
+
+/**
  * Runs the evaluators of one finished run and records the results.
  *
  * On any attempt but the last, a trace that has not arrived throws
@@ -537,30 +585,14 @@ export async function runScenarioEvaluations({
     deps.runs.getRunState({ tenantId: projectId, scenarioRunId }),
   ]);
 
-  const traceIds = [
-    ...new Set([...payload.traceIds, ...(runState?.traceIds ?? [])]),
-  ];
-  const spans = attachmentsReadTrace(attachments)
-    ? await loadSpans({ deps, tenantId: projectId, traceIds })
-    : [];
-  const lastTraceId = traceIds.at(-1);
-  const context: RunContext = {
-    projectId,
-    scenarioRunId,
-    run: {
-      messages: runState?.messages ?? [],
-      spans,
-      hasTraces: traceIds.length > 0,
-    },
-    scenario: {
-      situation: scenario.situation,
-      criteria: scenario.criteria,
-      fields: parseScenarioFieldValues(scenario.fields),
-    },
-    lastTraceId,
-    trace: traceForEvaluation({ projectId, traceId: lastTraceId, spans }),
+  const context = await buildRunContext({
+    deps,
+    payload,
+    scenario,
+    attachments,
+    runState,
     isFinalAttempt,
-  };
+  });
 
   const evaluations: ScenarioEvaluationResult[] = [];
   for (const attachment of attachments) {

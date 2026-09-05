@@ -124,6 +124,31 @@ function classifyUnjudgedResults({
 }
 
 /**
+ * The results envelope the finished event carries.
+ *
+ * Infrastructure callers (stall watchdog, cancel-grace) supply a bare `error`
+ * and no verdict; they get the same failure-results envelope the in-process
+ * failure path writes, so the reason is recorded on the event. Caller-supplied
+ * results win, but a run that failed before any judging reports its raw
+ * failure as the reasoning, so those are classified on the way in rather than
+ * stored as a stack.
+ */
+function resolveFinishResults({
+  data,
+}: {
+  data: FinishRunCommandData;
+}): SimulationResults | undefined {
+  const cancelled = data.status === ScenarioRunStatus.CANCELLED;
+  if (data.results) {
+    return classifyUnjudgedResults({ results: data.results, cancelled });
+  }
+  if (data.error !== undefined) {
+    return buildFailureResults({ cancelled, error: data.error });
+  }
+  return undefined;
+}
+
+/**
  * Command handler for finishing a simulation run.
  *
  * Emits the RunFinished event with event-carried state (ECST): identity
@@ -154,24 +179,7 @@ export class FinishRunCommand
     const { scenarioRunId } = data;
 
     const ecst = await this.backfillEcstFields(tenantIdStr, data);
-
-    // Infrastructure callers (stall watchdog, cancel-grace) supply a bare
-    // `error` and no verdict; synthesize the same failure-results envelope
-    // the in-process failure path writes, so the reason is recorded on the
-    // event rather than lost. Caller-supplied `results` win, but a run that
-    // failed before any judging reports its raw failure as the reasoning, so
-    // those are classified on the way in rather than stored as a stack.
-    const results = data.results
-      ? classifyUnjudgedResults({
-          results: data.results,
-          cancelled: data.status === ScenarioRunStatus.CANCELLED,
-        })
-      : data.error !== undefined
-        ? buildFailureResults({
-            cancelled: data.status === ScenarioRunStatus.CANCELLED,
-            error: data.error,
-          })
-        : undefined;
+    const results = resolveFinishResults({ data });
 
     const eventData: SimulationRunFinishedEventData = {
       scenarioRunId,
