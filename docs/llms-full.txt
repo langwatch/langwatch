@@ -2218,7 +2218,9 @@ Authorization: Bearer vk-lw-<ULID>
 Content-Type: multipart/form-data
 ```
 
-Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. Use one field name or the other. A form that sends files under both answers `400`, because each field orders its own parts and there is no order between the two fields. The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. A part this list does not name is dropped rather than sent to the provider; `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
+Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. Use one field name or the other. A form that sends files under both answers `400`, because each field orders its own parts and there is no order between the two fields.
+
+The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. A part this list does not name is dropped rather than sent to the provider; `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
 
 ```bash
 curl https://gateway.langwatch.ai/v1/images/edits \
@@ -3957,7 +3959,9 @@ A leaked provider credential is a different problem. Rotate that one in the prov
 | Revoke | Every request answers `403 virtual_key_revoked`. The key is dead and cannot come back | The secret is publicly exposed |
 | Rotate | Keeps working for 24 hours, then fails | The secret left a trusted boundary but is not exposed, and callers need time to pick up the new one |
 
-Disable and revoke contain the leak as soon as the change reaches every gateway pod. The control plane writes a change event, and a pod that receives it stops serving the key on the next request, in about 10 seconds. A pod that cannot reach the control plane serves the cached key for longer: up to the token expiry of 15 minutes, and past it to the hard cap set by `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, six hours by default. Read [Step 3](#step-3-stop-the-traffic) for the three paths and their timings, and report containment against the slowest one that applies.
+Disable and revoke contain the leak as soon as the change reaches every gateway pod. The control plane writes a change event, and a pod that receives it stops serving the key on the next request, in about 10 seconds.
+
+A pod that cannot reach the control plane serves the cached key for longer: up to the token expiry of 15 minutes, and past it to the hard cap set by `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, six hours by default. Read [Step 3](#step-3-stop-the-traffic) for the three paths and their timings, and report containment against the slowest one that applies.
 
 Rotate leaves the old secret working for a day, so it is a rollover tool rather than a containment tool.
 
@@ -5548,7 +5552,9 @@ You need:
   </Step>
 
   <Step title="Paste the credentials and pick the scope">
-    Fill the credential fields for that provider, then pick the scopes the credential serves. A provider is attached to the organization, to a team, to a project, or to several of these at once. A virtual key reaches every provider attached to its own scope and to the scopes above it, so a key on a project reaches that project's providers, its team's and the organization's. Which of them serves a request is the routing policy's order, and the fallback priority below when the key has no policy.
+    Fill the credential fields for that provider, then pick the scopes the credential serves. A provider is attached to the organization, to a team, to a project, or to several of these at once.
+
+    A virtual key reaches every provider attached to its own scope and to the scopes above it, so a key on a project reaches that project's providers, its team's and the organization's. Which of them serves a request is the routing policy's order, and the fallback priority below when the key has no policy.
 
     Scope is fixed after you save. To move a credential to another scope, delete it and create it again.
 
@@ -5694,7 +5700,9 @@ On the control plane, the spend processing pipeline turns the commands into ledg
 
 The auth cache keeps each resolved key's JWT and config in memory, keyed by a hash of the presented key. A hit costs no control plane call.
 
-The cache serves a stale entry when the control plane cannot be reached. After the JWT expires, a refresh that fails for a transport reason (network error, timeout, 5xx) extends the entry by the soft bump and keeps serving, up to the hard grace past the JWT expiry. A `401`, `403` or `404` from the control plane evicts the entry at once. A key with its own expiration date is refused past that date with `virtual_key_expired` without a control plane call.
+The cache serves a stale entry when the control plane cannot be reached. After the JWT expires, a refresh that fails for a transport reason (network error, timeout, 5xx) extends the entry by the soft bump and keeps serving, up to the hard grace past the JWT expiry.
+
+A `401`, `403` or `404` from the control plane evicts the entry at once. A key with its own expiration date is refused past that date with `virtual_key_expired` without a control plane call.
 
 The config part of the entry (credentials, routing chain, budgets) has its own TTL. Past it, the gateway re-fetches the config in the background with the stored `ETag`, so a config that has not changed costs a `304`.
 
@@ -8582,7 +8590,11 @@ The spend record is what budgets debit from. It holds the organization, project,
 
 The gateway does not write request or response bodies to its logs. The access log records the fields in the table above and no headers.
 
-The gateway builds the upstream request itself and injects the real provider credential, so the credential your client sent is not the one the provider sees. On the Gemini passthrough lane it drops `Authorization`, `X-Api-Key` and `X-Goog-Api-Key` from what it forwards. Do not send a virtual key on `Xi-Api-Key` to a `/v1beta` path. The gateway accepts that header as a virtual key, and the passthrough lane forwards it to Google, which puts your gateway credential in a provider's request logs. Use `Authorization` or `X-Goog-Api-Key` on `/v1beta`. `Xi-Api-Key` is for the ElevenLabs routes, which do not use this lane. `X-LangWatch-End-User-Id`, `X-Litellm-End-User-Id` and `X-LangWatch-Metadata` are read and then deleted at the edge, so they do not travel either.
+The gateway builds the upstream request itself and injects the real provider credential, so the credential your client sent is not the one the provider sees. On the Gemini passthrough lane it drops `Authorization`, `X-Api-Key` and `X-Goog-Api-Key` from what it forwards.
+
+Do not send a virtual key on `Xi-Api-Key` to a `/v1beta` path. The gateway accepts that header as a virtual key, and the passthrough lane forwards it to Google, which puts your gateway credential in a provider's request logs. Use `Authorization` or `X-Goog-Api-Key` on `/v1beta`. `Xi-Api-Key` is for the ElevenLabs routes, which do not use this lane.
+
+`X-LangWatch-End-User-Id`, `X-Litellm-End-User-Id` and `X-LangWatch-Metadata` are read and then deleted at the edge, so they do not travel either.
 
 <Warning>One self-hosted debug switch overrides this. `LW_LOG_MESSAGE_BODY=1` writes the full request body of `/v1/messages` and `/v1/responses` to the gateway log at info level, including prompts. Use it to reproduce a provider rejection, then turn it off.</Warning>
 
@@ -9449,7 +9461,9 @@ Expected:
 
 `version` carries the `ENVIRONMENT` value, `local` unless you set it.
 
-This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it. The default ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. A deployment that sets `ingress.path: /` publishes every route, the probes included, and can reach `/healthz` that way.
+This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it.
+
+The default ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. A deployment that sets `ingress.path: /` publishes every route, the probes included, and can reach `/healthz` that way.
 
 ## 3. The gateway reaches the control plane
 
@@ -16813,15 +16827,27 @@ Your agent can read all of this back. See [Explore your usage with your own agen
 
 ### Attribute sessions to pull requests
 
-The general model, both reporting channels and their limits, is covered on [Repository and PR attribution](/coding-agents/repository-and-pr-attribution). The Codex specifics live here. `langwatch instrument codex` installs a hook pair, and Codex fires it when the session starts and again at the end of every turn, so the session reports the directory it is working in each time and a `cd` inside the session is picked up at the next turn boundary. The declared channel still carries weight: it lands the moment the agent runs it, mid-turn, without waiting for a turn to end, and it covers a session on a machine where the hooks were never approved, because Codex asks the user to review each new hook before it runs one.
+The general model, both reporting channels and their limits, is covered on [Repository and PR attribution](/coding-agents/repository-and-pr-attribution). The Codex specifics live here.
 
-The agent moves the attribution itself. `langwatch ingest context`, run from inside a checkout, declares that repository and branch for the running session, and the session's pull requests reflect every branch it declares. This is what makes a long-lived session work: a standing review agent that runs from a scratch directory and reviews one checkout after another executes the command inside each checkout, and each review lands on its pull request. `langwatch instrument codex` installs a short instruction in `$CODEX_HOME/AGENTS.md`, which is `~/.codex/AGENTS.md` unless you set `CODEX_HOME` yourself. It tells every session to do this when it switches repository, branch or worktree, so the agent does not need to be taught per machine. `langwatch logout` removes the instruction, and your own content in that file is never touched.
+`langwatch instrument codex` installs a hook pair, and Codex fires it when the session starts and again at the end of every turn, so the session reports the directory it is working in each time and a `cd` inside the session is picked up at the next turn boundary.
+
+The declared channel still carries weight: it lands the moment the agent runs it, mid-turn, without waiting for a turn to end, and it covers a session on a machine where the hooks were never approved, because Codex asks the user to review each new hook before it runs one.
+
+The agent moves the attribution itself. `langwatch ingest context`, run from inside a checkout, declares that repository and branch for the running session, and the session's pull requests reflect every branch it declares.
+
+This is what makes a long-lived session work: a standing review agent that runs from a scratch directory and reviews one checkout after another executes the command inside each checkout, and each review lands on its pull request.
+
+`langwatch instrument codex` installs a short instruction in `$CODEX_HOME/AGENTS.md`, which is `~/.codex/AGENTS.md` unless you set `CODEX_HOME` yourself. It tells every session to do this when it switches repository, branch or worktree, so the agent does not need to be taught per machine. `langwatch logout` removes the instruction, and your own content in that file is never touched.
 
 The command finds the session itself. Codex keeps the transcript of a session open for as long as the session runs, and it starts the shell that runs the command, so the command looks up its own chain of parent processes and takes the session from the codex process it is running under. The lookup is exact: several codex sessions can work at the same time on one machine, and each one declares for itself.
 
 If the process chain cannot be read, a restrictive sandbox being the usual reason, the command falls back to reading which session wrote to its transcript most recently. That reading cannot tell two sessions apart when both are working at the same moment, so in that case it declares no session and prints one line asking you to name the session. `--agent codex --session-id <id>` names one exactly, and always wins over both.
 
-Codex's default sandbox blocks both the reading of the process chain and network access, so under it the command falls back to the transcript reading and cannot send the record itself. It queues the declaration instead and says so in one line. The next turn delivers it: Codex runs the LangWatch session report from its own process, outside the sandbox, so the report goes out even when the agent's shell has no network. A queued declaration is sent after the report's own directory, which makes the declared checkout the session's current one. It is dropped unsent if it waits more than an hour, because the agent has by then usually switched to other work.
+Codex's default sandbox blocks both the reading of the process chain and network access, so under it the command falls back to the transcript reading and cannot send the record itself. It queues the declaration instead and says so in one line.
+
+The next turn delivers it: Codex runs the LangWatch session report from its own process, outside the sandbox, so the report goes out even when the agent's shell has no network.
+
+A queued declaration is sent after the report's own directory, which makes the declared checkout the session's current one. It is dropped unsent if it waits more than an hour, because the agent has by then usually switched to other work.
 
 For the full per-turn traces of a review to land on the pull request too, a fresh `codex` session inside a worktree of the pull request's branch is still the most complete setup:
 
@@ -16857,7 +16883,9 @@ codex
 
 `wire_api` must be `"responses"`: Codex no longer accepts `"chat"`, and the gateway serves the Responses API at `/v1/responses`. A bare `gpt-*`, `o1-*`, `o3-*` or `o4-*` model name routes to your OpenAI credential. Write `provider/model`, for example `azure/<deployment>`, to reach another provider, or map a name on the virtual key. See [Model naming](/ai-gateway/model-naming) and [Model aliases](/ai-gateway/model-aliases).
 
-The same rule decides what a long-lived session reports. A session resumed across days keeps the directory it was first started in, and commands that reach into a checkout from somewhere else, such as `git -C <repo>` or a `cd` inside a subshell, do not move it. So a standing review agent that lives in a scratch directory reports no repository, no branch and no pull request, no matter how many pull requests it reviews. Give such an agent a fresh `codex` session inside a worktree of the pull request's branch for each review:
+The same rule decides what a long-lived session reports. A session resumed across days keeps the directory it was first started in, and commands that reach into a checkout from somewhere else, such as `git -C <repo>` or a `cd` inside a subshell, do not move it.
+
+So a standing review agent that lives in a scratch directory reports no repository, no branch and no pull request, no matter how many pull requests it reviews. Give such an agent a fresh `codex` session inside a worktree of the pull request's branch for each review:
 
 ```bash
 git -C <repo> fetch origin <branch>
@@ -16865,7 +16893,9 @@ git -C <repo> worktree add -B <branch> <repo>/.claude/worktrees/<name> origin/<b
 cd <repo>/.claude/worktrees/<name> && codex
 ```
 
-`-B` points the local branch at the ref the fetch just updated, so an old local copy of the branch does not decide what the agent reviews. Git refuses the `worktree add` if the branch is already checked out somewhere else: start `codex` in that worktree instead of making a second one. A pull request from a fork has no branch on `origin`. For one of those, fetch `refs/pull/<number>/head` from `origin` and use `FETCH_HEAD` in place of `origin/<branch>`, and keep `-B <branch>` at the name of the pull request's own branch so the attribution still matches.
+`-B` points the local branch at the ref the fetch just updated, so an old local copy of the branch does not decide what the agent reviews. Git refuses the `worktree add` if the branch is already checked out somewhere else: start `codex` in that worktree instead of making a second one.
+
+A pull request from a fork has no branch on `origin`. For one of those, fetch `refs/pull/<number>/head` from `origin` and use `FETCH_HEAD` in place of `origin/<branch>`, and keep `-B <branch>` at the name of the pull request's own branch so the attribution still matches.
 
 Claude Code sessions can switch natively instead, with the EnterWorktree tool. Codex has no equivalent, so the restart is the way. See [the Claude Code page](/integration/tools/integrations/claude-code#attribute-sessions-to-pull-requests) for the Claude Code rules.
 
@@ -16873,9 +16903,15 @@ Claude Code sessions can switch natively instead, with the EnterWorktree tool. C
 
 Content reaches LangWatch on one path only, and you can turn that path off. Codex's own OpenTelemetry export carries no conversation content; the `notify` program LangWatch installs does send it. Read both parts below before you decide.
 
-The OpenTelemetry export carries two signals. The trace exporter reports each turn with the model, the tokens and the timing. The event exporter reports the facts of the session: each tool run with its name, duration and result, each prompt as a length without its text, tool approvals and denials, and the time to the first token. LangWatch enables both, and the session view is built from them. Neither signal includes the prompt text, the tool output or the answer, and no Codex setting turns that content on. So the `[otel]` block alone gives you usage numbers and no record of what was said.
+The OpenTelemetry export carries two signals. The trace exporter reports each turn with the model, the tokens and the timing. The event exporter reports the facts of the session: each tool run with its name, duration and result, each prompt as a length without its text, tool approvals and denials, and the time to the first token.
 
-Codex does write the whole conversation to a transcript on your machine, and each turn there records the trace that Codex reported it under. `langwatch codex` and `langwatch instrument codex` register a small program on the Codex `notify` setting, which Codex runs after each completed turn. That program reads the turn from the transcript and records it against the same trace, so a session you started with a plain `codex` still shows what was said. It also reports the repository and branch the session worked in, read from the same transcript, which is what connects the session to its pull request. This is the path that carries content, and LangWatch installs it unless you say otherwise. A `notify` program of your own keeps running: LangWatch calls it after its own.
+LangWatch enables both, and the session view is built from them. Neither signal includes the prompt text, the tool output or the answer, and no Codex setting turns that content on. So the `[otel]` block alone gives you usage numbers and no record of what was said.
+
+Codex does write the whole conversation to a transcript on your machine, and each turn there records the trace that Codex reported it under.
+
+`langwatch codex` and `langwatch instrument codex` register a small program on the Codex `notify` setting, which Codex runs after each completed turn. That program reads the turn from the transcript and records it against the same trace, so a session you started with a plain `codex` still shows what was said.
+
+It also reports the repository and branch the session worked in, read from the same transcript, which is what connects the session to its pull request. This is the path that carries content, and LangWatch installs it unless you say otherwise. A `notify` program of your own keeps running: LangWatch calls it after its own.
 
 To collect the usage numbers and no content, remove the `notify` setting from `~/.codex/config.toml` and keep the `[otel]` block. Tokens, cost, model, timing, tool counts and prompt lengths continue.
 
@@ -38590,7 +38626,9 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 
 `GET /api/webhooks/v1/events?from=&to=&type=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
 
-`from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has, cold storage included, to serve one page. A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with the canonical `400` this surface answers every validation failure with, naming the offending parameter.
+`from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has, cold storage included, to serve one page.
+
+A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with the canonical `400` this surface answers every validation failure with, naming the offending parameter.
 
 `GET /api/webhooks/v1/events/{id}` reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
 

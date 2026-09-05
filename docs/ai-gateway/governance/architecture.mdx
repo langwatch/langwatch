@@ -72,7 +72,9 @@ On the control plane, the spend processing pipeline turns the commands into ledg
 
 The auth cache keeps each resolved key's JWT and config in memory, keyed by a hash of the presented key. A hit costs no control plane call.
 
-The cache serves a stale entry when the control plane cannot be reached. After the JWT expires, a refresh that fails for a transport reason (network error, timeout, 5xx) extends the entry by the soft bump and keeps serving, up to the hard grace past the JWT expiry. A `401`, `403` or `404` from the control plane evicts the entry at once. A key with its own expiration date is refused past that date with `virtual_key_expired` without a control plane call.
+The cache serves a stale entry when the control plane cannot be reached. After the JWT expires, a refresh that fails for a transport reason (network error, timeout, 5xx) extends the entry by the soft bump and keeps serving, up to the hard grace past the JWT expiry.
+
+A `401`, `403` or `404` from the control plane evicts the entry at once. A key with its own expiration date is refused past that date with `virtual_key_expired` without a control plane call.
 
 The config part of the entry (credentials, routing chain, budgets) has its own TTL. Past it, the gateway re-fetches the config in the background with the stored `ETag`, so a config that has not changed costs a `304`.
 

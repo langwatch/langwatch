@@ -969,7 +969,9 @@ Agents must ask the user for permission first, then pass `--user-approved`. Secr
 
 ## The background daemon
 
-Non-interactive invocations (an agent piping output, CI, any call whose stdin/stdout/stderr is not a TTY) are served by a warm background daemon instead of paying node's cold start on every call. Interactive (terminal) invocations always run in-process and are unaffected, as are commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `instrument`, `report`, the `claude`/`codex`/`copilot`/`code`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and long-running flags (`--follow`, `--watch`). Windows is excluded too: the daemon is not supported there, so on Windows every invocation runs in-process.
+Non-interactive invocations (an agent piping output, CI, any call whose stdin/stdout/stderr is not a TTY) are served by a warm background daemon instead of paying node's cold start on every call.
+
+Interactive (terminal) invocations always run in-process and are unaffected, as are commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `instrument`, `report`, the `claude`/`codex`/`copilot`/`code`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and long-running flags (`--follow`, `--watch`). Windows is excluded too: the daemon is not supported there, so on Windows every invocation runs in-process.
 
 What to know:
 
