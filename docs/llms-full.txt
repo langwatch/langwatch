@@ -4,19 +4,15 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 # FILE: ./introduction.mdx
 
 ---
-title: "LangWatch: The Complete LLMOps Platform"
-description: "Accelerate your agent development lifecycle with comprehensive observability, evaluations and agent testing. Open-source platform, with over 3k stars on GitHub."
+title: "The open-source platform for AI in production"
+description: "Trace, test, route and govern every LLM call in your company, from your own agents to the coding assistants your engineers use."
 sidebarTitle: Introduction
-keywords: langwatch, llm, ai, observability, evaluation, prompt optimization, llmops, open-source, github
+keywords: langwatch, llm, ai, observability, evaluation, agent testing, prompt management, coding agents, ai gateway, ai governance, llmops, open-source, github
 ---
 
-<Frame>
-  <img
-    className="block"
-    src="/images/langwatch-quick-preview.gif"
-    alt="LangWatch Quick Preview"
-  />
-</Frame>
+<video controls autoPlay muted loop playsInline width="100%">
+  <source src="/media/videos/introduction.webm" type="video/webm" />
+</video>
 
 
 ## Quick Start
@@ -40,10 +36,6 @@ The fastest way to set up your agent with LangWatch and get started is by using 
   </Card>
 </CardGroup>
 
-<Tip>
-  **Don't have an agent yet?** Use [Better Agents](/better-agents/overview) to scaffold a new agent project.
-</Tip>
-
 ## What is LangWatch?
 
 LangWatch is the **open-source** LLMOps platform that helps teams collaboratively debug, analyze, and iterate on their LLM applications. All platform features are natively integrated to accelerate the development workflow.
@@ -54,52 +46,92 @@ LangWatch provides the missing operations platform for AI applications. Every LL
 
 ## What LangWatch Does
 
+LangWatch has four areas, and you can use each one on its own.
+
 <CardGroup cols={2}>
-  <Card title="Observability" description="Track every LLM call, tool usage, and user interaction with detailed traces." icon="chart-network" href="/observability/overview" />
-  <Card title="Evaluations" description="Test quality with experiments, monitor production, guard against harm." icon="square-check" href="/evaluations/overview" />
-  <Card title="Agent Testing" description="Test agent behavior in multi-turn conversations with a simulated user." icon="masks-theater" href="/agent-testing/overview" />
-  <Card title="Prompt Management" description="Version, test, and optimize prompts collaboratively." icon="code" href="/prompt-management/overview" />
-  <Card title="AI Gateway" description="Governed, observable, sub-millisecond-overhead OpenAI- and Anthropic-compatible endpoint for every LLM call in your org. Personal IDE keys, budgets, routing policies, anomaly detection." icon="route" href="/ai-gateway/overview" />
-  <Card title="AI Governance" description="One control plane above the gateway: per-user workspaces, ingestion sources, anomaly rules, OCSF/SIEM export, compliance architecture. The admin home for rolling LangWatch out company-wide." icon="shield-halved" href="/ai-governance/overview" />
+  <Card title="LLM Ops" icon="chart-network" href="/observability/overview">
+    Everything you need to ship and improve an LLM application:
+
+    - [Observability](/observability/overview): every LLM call, tool call and user interaction as a trace.
+    - [Evaluations](/evaluations/overview): experiments on datasets, and monitors on production traffic.
+    - [Agent Testing](/agent-testing/overview): multi-turn conversations against your agent with a simulated user.
+    - [Prompt Management](/prompt-management/overview): versioned prompts your code loads at runtime.
+  </Card>
+  <Card title="Coding Agents" icon="terminal" href="/coding-agents/overview">
+    What Claude Code, Codex, Copilot, Gemini CLI and opencode do and cost, per session, per pull request and per team, with privacy controls for the people who use them.
+  </Card>
+  <Card title="LangWatch AI Gateway" icon="route" href="/ai-gateway/overview">
+    One OpenAI and Anthropic compatible endpoint for every LLM call in the company. Your provider keys, including Azure and Bedrock, stay in LangWatch. Each caller gets a virtual key with its own budget, and every request lands as a trace.
+  </Card>
+  <Card title="AI Governance" icon="shield-halved" href="/ai-governance/overview">
+    An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
+  </Card>
 </CardGroup>
 
 ## Where to Start?
 
-Setting up the full process of online tracing, prompt management, production evaluations, and offline evaluations requires some time. Start with what matters most for your use case.
+Start with the area that matches what you are working on today. You can add the others later from the same account.
 
 <CardGroup cols={2}>
   <Card
-    title="Just Getting Started?"
-    description="Start with basic tracing to understand what's happening in your LLM applications."
+    title="Trace your LLM application"
+    description="Send your first trace with the Python or TypeScript SDK, then add evaluations and prompt management."
     icon="rocket"
     href="/integration/quick-start"
     arrow
     horizontal
   />
   <Card
-    title="Already Instrumented?"
-    description="Add prompt management and evaluation to optimize your existing setup."
-    icon="wrench"
-    href="/prompt-management/overview"
+    title="Track your coding agents"
+    description="Connect Claude Code, Codex or another coding agent in one command and see its sessions and cost."
+    icon="terminal"
+    href="/coding-agents/overview"
     arrow
     horizontal
   />
   <Card
-    title="Production Ready?"
-    description="Set up comprehensive monitoring, alerts, and cost tracking for production."
-    icon="chart-line"
-    href="/observability/overview"
+    title="Route LLM calls through the gateway"
+    description="Create a virtual key, point your base URL at LangWatch and send a request."
+    icon="route"
+    href="/ai-gateway/quickstart"
     arrow
     horizontal
   />
   <Card
-    title="Research & Development?"
-    description="Use datasets, experiments, and evaluation tools for systematic testing."
-    icon="flask"
-    href="/evaluations/overview"
+    title="Govern AI use across the company"
+    description="See every AI tool in use, who uses it, and set anomaly rules."
+    icon="shield-halved"
+    href="/ai-governance/overview"
     arrow
     horizontal
   />
+</CardGroup>
+
+## Open Source
+
+LangWatch is open core. You can self-host the Apache 2.0 core, and LangWatch Cloud runs the same codebase, with no separate community build.
+
+Enterprise features, such as multi-source governance ingestion and anomaly detection, need a paid plan and have their own license under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee). See [Open-core licensing](/ai-governance/open-core-licensing) for the full split.
+
+<CardGroup cols={2}>
+  <Card
+    title="langwatch/langwatch on GitHub"
+    icon="github"
+    href="https://github.com/langwatch/langwatch"
+    arrow
+    horizontal
+  >
+    The full platform, the SDKs and the docs, in one repository.
+  </Card>
+  <Card
+    title="Self-host LangWatch"
+    icon="server"
+    href="/self-hosting/overview"
+    arrow
+    horizontal
+  >
+    Run LangWatch on your own infrastructure with Docker or Helm.
+  </Card>
 </CardGroup>
 
 LangWatch Cloud has a free plan: [sign up](https://app.langwatch.ai) to create a project.
@@ -2186,7 +2218,11 @@ Authorization: Bearer vk-lw-<ULID>
 Content-Type: multipart/form-data
 ```
 
-Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. Use one field name or the other: a form carrying files under both gets a `400`, because the parts state an order inside each field and none across them. The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. A part this list does not name is dropped rather than sent to the provider; `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
+Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`.
+
+Use one field name or the other. A form carrying files under both gets a `400`, because the parts state an order inside each field and none across them.
+
+The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. The gateway drops any part that is not in this list, rather than sending it to the provider. `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
 
 ```bash
 curl https://gateway.langwatch.ai/v1/images/edits \

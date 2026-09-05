@@ -1,0 +1,90 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/agenttest/agenttest.webm",
+  "output": "../../../../.claude/tmp/video/hero/beat3.webm",
+  "fps": 30,
+  "page": {
+    "width": 1440,
+    "height": 900
+  },
+  "size": {
+    "width": 1664,
+    "height": 1040
+  },
+  "frame": {
+    "background": "backgrounds/default.webp",
+    "fit": "native"
+  },
+  "quality": {
+    "crf": 38,
+    "cpuUsed": 2
+  },
+  "cut": {
+    "speed": 2,
+    "segments": [
+      [
+        8.0,
+        16.4
+      ],
+      [
+        30.0,
+        36.5
+      ],
+      [
+        52.5,
+        55.5
+      ]
+    ]
+  },
+  "cursor": {
+    "start": {
+      "x": 700,
+      "y": 470
+    }
+  },
+  "beats": [
+    {
+      "tRaw": 7.66,
+      "x": 319,
+      "y": 196,
+      "zoom": 1,
+      "note": "the test suites, and the scenarios inside one of them"
+    },
+    {
+      "tRaw": 12.19,
+      "x": 1361,
+      "y": 137,
+      "zoom": 1.9,
+      "zoomAt": {
+        "x": 1230,
+        "y": 130
+      },
+      "hold": 0.15,
+      "pause": {
+        "before": 0.8,
+        "after": 0.7
+      },
+      "note": "Run suite, a corner, so it earns the zoom"
+    },
+    {
+      "tRaw": 15.87,
+      "x": 932,
+      "y": 650,
+      "zoom": 1,
+      "note": "run three scenarios against checkout-prod, the camera lets go of the dialog"
+    },
+    {
+      "tRaw": 32.92,
+      "x": 771,
+      "y": 219,
+      "zoom": 1,
+      "pause": {
+        "before": 0.6
+      },
+      "note": "all three are running, open one of them while it still is"
+    },
+    {
+      "tRaw": 38.0,
+      "hide": true
+    }
+  ]
+}

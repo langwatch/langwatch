@@ -299,3 +299,21 @@ the cursor is sharp at any size. Point `cursor.arrow` and `cursor.pointer` at
 other files to change them, and set `cursor.hotspot` when the new artwork puts
 its tip somewhere else. The hotspot is a fraction of the artwork's own box:
 `{ "x": 0.293, "y": 0.175 }` is the arrow's tip.
+
+## Joined clips
+
+The introduction hero is four beats with a full-frame title card in front of
+each. Every beat has its own timeline (`timelines/introduction-beat*.json`),
+polished on its own into `.claude/tmp/video/hero/`. `hero/make-cards.sh` draws
+the cards over `backgrounds/default.webp` with rsvg-convert, and
+`hero/join-hero.sh` joins cards and beats with an xfade (1.2 s on the card,
+0.4 s fade). The cards are joined after the polish step on purpose: spliced
+into a take, the polish step would draw them as a window on a background.
+
+```bash
+for t in docs/scripts/video/timelines/introduction-beat*.json; do
+  node docs/scripts/video/polish-recording.mjs "$t"
+done
+bash docs/scripts/video/hero/make-cards.sh
+bash docs/scripts/video/hero/join-hero.sh
+```
