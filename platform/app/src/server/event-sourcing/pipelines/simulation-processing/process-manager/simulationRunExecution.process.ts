@@ -506,6 +506,41 @@ export const handleRunEvaluated: EventHandler<
   return { state: recorded, nextWakeAt: currentWake(state) };
 };
 
+/**
+ * The wake of a run waiting on its evaluators. Past the deadline the
+ * evaluated event never came: the grading job was lost outright, since a job
+ * that runs records a result for every evaluator on its final attempt.
+ * Recording one errored result per evaluator hands the decision to the gate:
+ * a required evaluator fails the run, an optional one leaves the judge's
+ * verdict.
+ */
+function wakeEvaluating(
+  state: SimulationRunExecutionProcessState,
+  ctx: Parameters<
+    WakeHandler<
+      SimulationRunExecutionProcessState,
+      SimulationRunExecutionIntents
+    >
+  >[1],
+) {
+  const finishedAtMs = state.finishedAtMs ?? ctx.now;
+  if (ctx.now - finishedAtMs < EVALUATION_DEADLINE_MS) {
+    return { state, nextWakeAt: finishedAtMs + EVALUATION_DEADLINE_MS };
+  }
+  return {
+    state: { ...state, phase: "terminal" as const, pendingEvaluators: null },
+    nextWakeAt: null,
+    intents: [
+      ctx.intents.record_evaluations(recordEvaluationsLostKey(ctx.key), {
+        scenarioRunId: ctx.key,
+        projectId: ctx.projectId,
+        evaluators: state.pendingEvaluators ?? [],
+        details: EVALUATION_LOST_DETAILS,
+      }),
+    ],
+  };
+}
+
 export const simulationRunExecutionWake: WakeHandler<
   SimulationRunExecutionProcessState,
   SimulationRunExecutionIntents
@@ -545,27 +580,7 @@ export const simulationRunExecutionWake: WakeHandler<
   }
 
   if (state.phase === "evaluating") {
-    const finishedAtMs = state.finishedAtMs ?? ctx.now;
-    if (ctx.now - finishedAtMs >= EVALUATION_DEADLINE_MS) {
-      // The evaluated event never came: the grading job was lost outright,
-      // since a job that runs records a result for every evaluator on its
-      // final attempt. Recording one errored result per evaluator hands the
-      // decision to the gate: a required evaluator fails the run, an optional
-      // one leaves the judge's verdict.
-      return {
-        state: { ...state, phase: "terminal", pendingEvaluators: null },
-        nextWakeAt: null,
-        intents: [
-          ctx.intents.record_evaluations(recordEvaluationsLostKey(ctx.key), {
-            scenarioRunId: ctx.key,
-            projectId: ctx.projectId,
-            evaluators: state.pendingEvaluators ?? [],
-            details: EVALUATION_LOST_DETAILS,
-          }),
-        ],
-      };
-    }
-    return { state, nextWakeAt: finishedAtMs + EVALUATION_DEADLINE_MS };
+    return wakeEvaluating(state, ctx);
   }
 
   // queued | running

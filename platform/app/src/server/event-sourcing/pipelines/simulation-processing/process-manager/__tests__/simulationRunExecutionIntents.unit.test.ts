@@ -163,7 +163,9 @@ describe("createFinishRunHandler", () => {
   it("reports the terminal outcome through the pipeline commands", async () => {
     const finishRun = vi.fn().mockResolvedValue(undefined);
     const run = createFinishRunHandler(
-      makeDeps({ commands: () => ({ finishRun }) }),
+      makeDeps({
+        commands: () => ({ finishRun, recordEvaluations: vi.fn() }),
+      }),
     );
     const payload: FinishRunIntent = {
       scenarioRunId: RUN_ID,
@@ -186,7 +188,9 @@ describe("createFinishRunHandler", () => {
   it("omits error when the intent carries none", async () => {
     const finishRun = vi.fn().mockResolvedValue(undefined);
     const run = createFinishRunHandler(
-      makeDeps({ commands: () => ({ finishRun }) }),
+      makeDeps({
+        commands: () => ({ finishRun, recordEvaluations: vi.fn() }),
+      }),
     );
 
     await run(

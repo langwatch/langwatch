@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 import {
+  type GatedVerdict,
   gatedStatus,
   gatedVerdict,
 } from "~/server/scenarios/scenario-evaluation-gate";
@@ -320,6 +321,55 @@ export function finishedStatusOf({
   if (explicit && isTerminalStatus(explicit)) return explicit;
   if (verdict === "success") return "SUCCESS";
   return "FAILURE";
+}
+
+/**
+ * The status and verdict a run is stored with when it finishes.
+ *
+ * A run whose suite or plan attached evaluators, and whose results have not
+ * been recorded, is stored PENDING_EVALUATION with the judge's verdict until
+ * the evaluated event lands and the gate writes the terminal status.
+ *
+ * An evaluated event that folded before the finished one (business time can
+ * land it first) already recorded the results, so the gate runs here on the
+ * judge's verdict, and the stored status and verdict match what the evaluated
+ * handler stores in the other order. A run that sends its own evaluations is
+ * stored as sent: the code that ran it applied its gate.
+ */
+function settledOnFinish({
+  state,
+  judgeStatus,
+  verdict,
+  hasOwnEvaluations,
+  attachmentCount,
+}: {
+  state: SimulationRunStateData;
+  judgeStatus: string;
+  verdict: GatedVerdict | null;
+  hasOwnEvaluations: boolean;
+  attachmentCount: number;
+}): { status: string; verdict: string | null } {
+  if (!hasOwnEvaluations && state.Evaluations.length > 0) {
+    const gated = gatedVerdict({
+      evaluations: state.Evaluations,
+      judgeVerdict: verdict ?? undefined,
+    });
+    return {
+      status: gatedStatus({ status: judgeStatus, verdict: gated }),
+      verdict: gated ?? verdict,
+    };
+  }
+  const awaitsEvaluations = runAwaitsEvaluations({
+    status: judgeStatus,
+    hasOwnEvaluations,
+    attachmentCount,
+  });
+  return {
+    status: awaitsEvaluations
+      ? ScenarioRunStatus.PENDING_EVALUATION
+      : judgeStatus,
+    verdict,
+  };
 }
 
 /**
@@ -655,39 +705,19 @@ export class SimulationRunStateFoldProjection
       explicitStatus: event.data.status,
       verdict,
     });
-    const hasOwnEvaluations = results?.evaluations != null;
-    // An evaluated event that folded before this one (business time can land
-    // it first) already recorded the results, so the gate runs here, on the
-    // judge's verdict, and the stored status and verdict match what the
-    // evaluated handler stores in the other order. A run that sends its own
-    // evaluations is stored as sent: the code that ran it applied its gate.
-    const recordedFirst = !hasOwnEvaluations && state.Evaluations.length > 0;
-    const gated = recordedFirst
-      ? gatedVerdict({
-          evaluations: state.Evaluations,
-          judgeVerdict: verdict ?? undefined,
-        })
-      : undefined;
-    // The run owes results when its suite or plan attached evaluators and
-    // nothing has recorded them. It is stored PENDING_EVALUATION until the
-    // evaluated event lands and the gate writes the terminal status.
-    const awaitsEvaluations =
-      !recordedFirst &&
-      runAwaitsEvaluations({
-        status: judgeStatus,
-        hasOwnEvaluations,
-        attachmentCount: event.data.evaluators?.attachments.length ?? 0,
-      });
+    const settled = settledOnFinish({
+      state,
+      judgeStatus,
+      verdict,
+      hasOwnEvaluations: results?.evaluations != null,
+      attachmentCount: event.data.evaluators?.attachments.length ?? 0,
+    });
 
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      Status: awaitsEvaluations
-        ? ScenarioRunStatus.PENDING_EVALUATION
-        : recordedFirst
-          ? gatedStatus({ status: judgeStatus, verdict: gated })
-          : judgeStatus,
-      Verdict: gated ?? verdict,
+      Status: settled.status,
+      Verdict: settled.verdict,
       Reasoning: results?.reasoning ?? null,
       MetCriteria: results?.metCriteria ?? [],
       UnmetCriteria: results?.unmetCriteria ?? [],
