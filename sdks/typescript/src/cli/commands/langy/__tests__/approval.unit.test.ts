@@ -144,7 +144,7 @@ describe("the box the selector draws", () => {
     expect(drawn).toContainEqual(
       expect.stringContaining("3. No, and tell Langy what to do instead"),
     );
-    expect(drawn.join("\n")).toContain("Enter to confirm");
+    expect(drawn.join("\n")).toContain("Enter or a number to answer");
     for (const line of drawn) expect(line.length).toBe(79);
   });
 
@@ -222,17 +222,35 @@ describe("given a permission selector open in the terminal", () => {
   });
 
   describe("when a digit is pressed", () => {
-    it("moves the marker there and waits for Enter", async () => {
-      const { screen, keys, prompt } = open();
+    const digits: Array<[string, "allow_pattern" | "allow_once" | "deny"]> = [
+      ["1", "allow_pattern"],
+      ["2", "allow_once"],
+      ["3", "deny"],
+    ];
+    for (const [digit, decision] of digits) {
+      describe(`when it is ${digit}`, () => {
+        /** @scenario "A number answers at once" */
+        it(`answers ${decision} without waiting for Enter`, async () => {
+          const { screen, keys, prompt } = open();
 
-      keys.press({ name: "3", sequence: "3" });
-      expect(screen.drawn.find((line) => line.includes("❯"))).toContain(
-        "3. No, and tell Langy",
-      );
-      expect(screen.drawn.length).toBeGreaterThan(0);
+          keys.press({ name: digit, sequence: digit });
 
-      keys.press({ name: "return" });
-      await expect(prompt.answer).resolves.toEqual({ decision: "deny" });
+          await expect(prompt.answer).resolves.toEqual({ decision });
+          expect(screen.drawn).toEqual([]);
+        });
+      });
+    }
+
+    describe("when it names no option", () => {
+      it("leaves the question on the screen", async () => {
+        const { screen, keys, prompt } = open();
+
+        keys.press({ name: "9", sequence: "9" });
+
+        expect(screen.drawn.length).toBeGreaterThan(0);
+        keys.press({ name: "escape" });
+        await expect(prompt.answer).resolves.toEqual({ decision: "deny" });
+      });
     });
   });
 

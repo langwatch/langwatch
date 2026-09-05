@@ -160,7 +160,7 @@ export function approvalCardFor({
 export const MAX_BOX_WIDTH = 100;
 
 const HINT =
-  "Enter to confirm · ↑↓ to choose · Esc to deny · or answer on the card in LangWatch";
+  "Enter or a number to answer · ↑↓ to choose · Esc to deny · or answer on the card in LangWatch";
 
 /**
  * The box, as the lines it occupies.
@@ -377,10 +377,13 @@ export function askApproval({
       default:
         break;
     }
+    // A number answers on its own, the way a coding agent's own permission
+    // dialog does: the option it names is the option that is taken.
     const digit = Number(key.name ?? key.sequence ?? "");
     if (Number.isInteger(digit) && digit >= 1 && digit <= card.options.length) {
       selected = digit - 1;
       paint();
+      confirm();
     }
   });
 

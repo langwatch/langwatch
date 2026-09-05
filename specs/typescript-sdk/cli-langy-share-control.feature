@@ -209,6 +209,13 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And the next matching command asks again
 
     @unit
+    Scenario: A number answers at once
+      Given a permission selector open in the terminal
+      When I press 1, 2 or 3
+      Then that option is answered at once, with no Enter after it
+      And the arrow keys still move the highlight for Enter to confirm
+
+    @unit
     Scenario: Denying reads one line of text and sends it back to Langy
       Given a permission selector open in the terminal
       When I choose the third option and type what Langy should do instead
