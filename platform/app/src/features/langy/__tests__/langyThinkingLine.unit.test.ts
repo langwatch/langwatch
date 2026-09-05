@@ -64,6 +64,32 @@ describe("langyThinkingLine", () => {
     });
   });
 
+  describe("given a card holding the turn and a folder shared from a terminal", () => {
+    /** @scenario "The panel names the terminal while the ask is open there too" */
+    it("names the terminal as well, because the same ask is open there", () => {
+      const line = langyThinkingLine({
+        messages: [user, assistant([])],
+        elapsedMs: 1_000,
+        awaitingAnswer: true,
+        terminalConnected: true,
+      });
+
+      expect(line?.text).toBe("Answer on the card above or in the terminal.");
+      expect(line?.tone).toBe("waiting");
+    });
+
+    it("names only the card when no folder is shared", () => {
+      const line = langyThinkingLine({
+        messages: [user, assistant([])],
+        elapsedMs: 1_000,
+        awaitingAnswer: true,
+      });
+
+      expect(line?.text).toBe(LANGY_AWAITING_ANSWER_LINE);
+      expect(line?.text).not.toContain("terminal");
+    });
+  });
+
   describe("given a turn where NOTHING has happened", () => {
     /** The 97-second lie, in one test. */
     it("never invents work — it says the workspace is being prepared", () => {

@@ -2385,6 +2385,12 @@ function LangyPanel({
     { enabled: !!projectId && !!activeConversationId },
   );
 
+  // The folder is shared from a terminal, so the ask that is holding the turn
+  // is open there as well. The waiting line and the composer then name both
+  // places: the developer is looking at the terminal, and sending them to the
+  // browser costs them the flow they came for (ADR-129).
+  const terminalConnected = localWorkspace.data?.connected === true;
+
   const answerQuestion = api.langy.answerQuestion.useMutation();
 
   /**
@@ -3568,6 +3574,10 @@ function LangyPanel({
                                   // about a turn that is waiting on the
                                   // reader (ADR-129).
                                   awaitingAnswer={awaitingAnswer}
+                                  // The ask is open in the terminal that
+                                  // shares the folder too, so the line names
+                                  // both places rather than only the card.
+                                  terminalConnected={terminalConnected}
                                   // Everything the turn has produced so far.
                                   // The line's escalation clock restarts on
                                   // it, so it measures silence rather than
@@ -3758,6 +3768,7 @@ function LangyPanel({
                     addableChips={addableChips}
                     onAddChip={chooseChip}
                     awaitingAnswer={awaitingAnswer}
+                    terminalConnected={terminalConnected}
                   />
                 </Box>
               </>

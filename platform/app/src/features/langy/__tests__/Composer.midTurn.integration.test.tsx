@@ -27,7 +27,7 @@ const IDLE_PLACEHOLDER = "Ask Langy or describe what you want…";
 
 function renderComposer(
   onSend: (input: string) => void,
-  over: { awaitingAnswer?: boolean } = {},
+  over: { awaitingAnswer?: boolean; terminalConnected?: boolean } = {},
 ) {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -82,6 +82,24 @@ describe("given a Langy turn is in flight", () => {
         screen.getByPlaceholderText("Answer the card above to keep going."),
       ).toBeTruthy();
       expect(screen.queryByPlaceholderText(MID_TURN_PLACEHOLDER)).toBeNull();
+    });
+
+    /** @scenario "The panel names the terminal while the ask is open there too" */
+    it("names the terminal as well when a folder is shared from one", () => {
+      useLangyStore.setState({ turnPhase: "active" });
+      renderComposer(() => {}, {
+        awaitingAnswer: true,
+        terminalConnected: true,
+      });
+
+      expect(
+        screen.getByPlaceholderText(
+          "Answer on the card above or in the terminal.",
+        ),
+      ).toBeTruthy();
+      expect(
+        screen.queryByPlaceholderText("Answer the card above to keep going."),
+      ).toBeNull();
     });
   });
 

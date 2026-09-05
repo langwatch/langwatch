@@ -1,3 +1,4 @@
+import { LANGY_ANSWER_HERE_OR_TERMINAL } from "./langyLocalWaits";
 import { describeToolCall, effectiveToolName } from "./langyToolLabel";
 
 /**
@@ -321,6 +322,7 @@ export function langyThinkingLine({
   workerReady = false,
   pageActivity = null,
   awaitingAnswer = false,
+  terminalConnected = false,
 }: {
   messages: ThinkingMessage[];
   /**
@@ -355,6 +357,11 @@ export function langyThinkingLine({
    */
   awaitingAnswer?: boolean;
   /**
+   * A folder is shared from a terminal, so the ask that is holding the turn is
+   * open there as well and either place answers it.
+   */
+  terminalConnected?: boolean;
+  /**
    * A panel-open warm proved this conversation's worker alive before the send
    * (`warmed: true` from `langy.warmWorker`). A first message then skips the
    * startup ladder — the workspace it would claim to be preparing already
@@ -372,7 +379,9 @@ export function langyThinkingLine({
   //    tool IS the card.
   if (awaitingAnswer) {
     return {
-      text: LANGY_AWAITING_ANSWER_LINE,
+      text: terminalConnected
+        ? LANGY_ANSWER_HERE_OR_TERMINAL
+        : LANGY_AWAITING_ANSWER_LINE,
       tone: "waiting",
       allowWhimsy: false,
     };

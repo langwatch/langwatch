@@ -58,6 +58,7 @@ export function LangyThinkingLine({
   hasLiveReasoning = false,
   workerReady = false,
   awaitingAnswer = false,
+  terminalConnected = false,
   activityKey = "",
 }: {
   messages: UIMessage[];
@@ -73,6 +74,11 @@ export function LangyThinkingLine({
    * line says that instead of escalating toward "Langy may be stuck".
    */
   awaitingAnswer?: boolean;
+  /**
+   * A folder is shared from a terminal, so the ask that holds the turn is open
+   * there too and the line says both places.
+   */
+  terminalConnected?: boolean;
   /**
    * The model's ephemeral reasoning is streaming right now. Reasoning deltas
    * never become message parts, so without this signal a reasoning-but-no-prose
@@ -118,6 +124,7 @@ export function LangyThinkingLine({
     workerReady,
     pageActivity,
     awaitingAnswer,
+    terminalConnected,
   });
 
   // Whimsy ONLY where the truth signal permits it — i.e. the model is genuinely

@@ -557,17 +557,15 @@ describe("given an approved control request", () => {
     });
 
     /** @scenario "Connecting starts the next turn on its own" */
-    it("starts one turn that names the folder and the machine, and not the path", async () => {
+    it("starts one turn that carries nothing the card already shows", async () => {
       const key = await approvedSessionKey(podA);
       const { cli } = await shareFolder(podA, key);
       await expect.poll(() => startedTurns.length, { timeout: 5_000 }).toBe(1);
 
       // The card beside this line already carries the whole path, the machine
-      // and the branch. Saying all three again filled the panel with the same
+      // and the branch. Saying any of it again filled the panel with the same
       // sentence twice.
-      expect(startedTurns[0]?.text).toBe(
-        "Local folder connected: acme-app on rogerio-mbp",
-      );
+      expect(startedTurns[0]?.text).toBe("Local folder connected");
       expect(startedTurns[0]?.idempotencyKey).toMatch(/^local-connect:lcr_/);
 
       cli.close();

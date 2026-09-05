@@ -21,6 +21,18 @@ import type { LangyTurnToolCall, LangyTurnWait } from "@langwatch/langy";
 /** The wait states a card can be in, durable and live alike. */
 export type LangyWaitStatus = "pending" | "answered" | "expired" | "cancelled";
 
+/**
+ * What the panel says while a card waits and a folder is shared from a
+ * terminal.
+ *
+ * The same ask is open in that terminal, which is where the developer is
+ * looking, so a line that sent them to the browser cost them the flow they
+ * came for. One sentence, used by the waiting line and by the composer, so
+ * the two can never disagree.
+ */
+export const LANGY_ANSWER_HERE_OR_TERMINAL =
+  "Answer on the card above or in the terminal.";
+
 /** The decisions a permission card records. */
 export type LangyPermissionDecision = "allow_once" | "allow_pattern" | "deny";
 

@@ -407,7 +407,7 @@ export class LocalControlSessionCore {
         projectId: session.projectId,
         conversationId: session.conversationId,
         userId: session.userId,
-        text: connectMessage(workspace.workspace, session.hostname),
+        text: connectMessage(),
         idempotencyKey: `local-connect:${session.requestId}`,
       });
     } catch (error) {
@@ -760,17 +760,14 @@ export function grantedPatterns(frame: PermissionRequiredFrame): string[] {
 /**
  * The message the connected folder starts the next turn with.
  *
- * The folder NAME, not its path. The code access card above this line already
- * carries the whole path, the machine and the branch, and a message that
- * repeated all three filled a third of the panel with the same sentence twice.
- * The model reads the path off the workspace facts the code access tool hands
- * it, so nothing is lost by saying it once.
+ * Four words, and no facts. The code access card sits directly above this line
+ * and already carries the whole path, the machine and the branch, so a line
+ * that named the folder again said the same thing twice, one bubble apart. The
+ * model reads the path, the machine and the branch off the workspace facts the
+ * code access tool hands it, so nothing is lost.
  */
-export function connectMessage(
-  workspace: { name: string; root: string },
-  hostname: string,
-): string {
-  return `Local folder connected: ${workspace.name || workspace.root} on ${hostname}`;
+export function connectMessage(): string {
+  return "Local folder connected";
 }
 
 /**

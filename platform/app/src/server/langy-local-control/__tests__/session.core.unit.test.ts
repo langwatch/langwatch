@@ -118,20 +118,6 @@ describe("disconnectMessage", () => {
         ),
       ).toBe("Local folder disconnected: acme-app on rogerio-mbp");
     });
-
-    it("names the folder the way the connect line does", () => {
-      const workspace = {
-        name: "acme-app",
-        root: "/Users/dev/Projects/acme-app",
-      };
-
-      expect(disconnectMessage(workspace, "rogerio-mbp")).toBe(
-        connectMessage(workspace, "rogerio-mbp").replace(
-          "connected",
-          "disconnected",
-        ),
-      );
-    });
   });
 
   describe("when the folder has no name", () => {
@@ -139,6 +125,15 @@ describe("disconnectMessage", () => {
       expect(
         disconnectMessage({ name: "", root: "/srv/checkout" }, "build-box"),
       ).toBe("Local folder disconnected: /srv/checkout on build-box");
+    });
+  });
+});
+
+describe("connectMessage", () => {
+  describe("when the folder connects under the code access card", () => {
+    /** @scenario "The line that says the folder connected repeats nothing from the card" */
+    it("says only that the local folder is connected", () => {
+      expect(connectMessage()).toBe("Local folder connected");
     });
   });
 });

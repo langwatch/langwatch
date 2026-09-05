@@ -30,6 +30,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangySkill } from "~/shared/langy/langySkills";
 import { describeChipContext } from "../logic/langyChipContext";
+import { LANGY_ANSWER_HERE_OR_TERMINAL } from "../logic/langyLocalWaits";
 import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
 import { type LangyContextChip, useLangyStore } from "../stores/langyStore";
 import { LangyComposerPalette, type PaletteMode } from "./LangyComposerPalette";
@@ -97,6 +98,14 @@ export const MID_TURN_PLACEHOLDER =
 export const AWAITING_ANSWER_PLACEHOLDER =
   "Answer the card above to keep going.";
 
+/**
+ * The same, while a folder is shared from a terminal: the ask is open there
+ * too, and either place answers it. One sentence for the composer and the
+ * waiting line alike (`LANGY_ANSWER_HERE_OR_TERMINAL`).
+ */
+export const AWAITING_ANSWER_TERMINAL_PLACEHOLDER =
+  LANGY_ANSWER_HERE_OR_TERMINAL;
+
 // Shown under every composer, in every variant and at every viewport height. A
 // notice about what happens to what you type only does its job where you type,
 // so it is not gated on the layout the way the tagline below it is.
@@ -132,6 +141,7 @@ function ComposerImpl({
   onAddChip,
   placeholder = COMPOSER_PLACEHOLDER,
   awaitingAnswer = false,
+  terminalConnected = false,
   cardRef,
 }: {
   /** The model Langy will use for the next send. "" = let the server pick. */
@@ -168,6 +178,11 @@ function ComposerImpl({
    * line must not say Langy is working: it is not, it is waiting for them.
    */
   awaitingAnswer?: boolean;
+  /**
+   * A folder is shared from a terminal, so the ask that holds the turn is open
+   * there too and the placeholder names both places.
+   */
+  terminalConnected?: boolean;
 }) {
   const floating = variant === "floating";
   const hero = variant === "hero";
@@ -409,6 +424,7 @@ function ComposerImpl({
             disabled={disabled}
             placeholder={placeholder}
             awaitingAnswer={awaitingAnswer}
+            terminalConnected={terminalConnected}
             onSend={onSend}
             onStop={onStop}
             openPalette={openPalette}
@@ -573,6 +589,7 @@ const ComposerInputRow = memo(function ComposerInputRow({
   disabled,
   placeholder,
   awaitingAnswer,
+  terminalConnected,
   onSend,
   onStop,
   openPalette,
@@ -582,6 +599,7 @@ const ComposerInputRow = memo(function ComposerInputRow({
   disabled: boolean;
   placeholder: string;
   awaitingAnswer: boolean;
+  terminalConnected: boolean;
   onSend: (input: string) => void;
   onStop: () => void;
   openPalette: (mode: PaletteMode) => void;
@@ -637,7 +655,9 @@ const ComposerInputRow = memo(function ComposerInputRow({
         // for the wait (ADR-129).
         placeholder={
           awaitingAnswer
-            ? AWAITING_ANSWER_PLACEHOLDER
+            ? terminalConnected
+              ? AWAITING_ANSWER_TERMINAL_PLACEHOLDER
+              : AWAITING_ANSWER_PLACEHOLDER
             : turnActive
               ? MID_TURN_PLACEHOLDER
               : placeholder
