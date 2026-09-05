@@ -321,8 +321,19 @@ export class LocalControlGateway {
     if (outcome === "replaced") {
       logger.info(
         { conversationId: live.session.conversationId },
-        "a newer connection holds this conversation, this socket stops refreshing the folder",
+        "a newer connection holds this conversation, this socket is retired",
       );
+      // Retired, not merely quiet. A socket that only stopped refreshing stayed
+      // subscribed to the conversation and kept receiving the newer folder's
+      // work; the call fence in the core refuses it, and this closes it.
+      live.released = true;
+      this.send(live.socket, {
+        type: "disconnect",
+        protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
+        reason: "Another folder is now shared with this conversation.",
+      });
+      await this.detach(live);
+      live.socket.close(POLICY_VIOLATION_CLOSE_CODE, "replaced");
     }
   }
 

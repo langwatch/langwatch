@@ -452,10 +452,30 @@ export class LocalControlSessionCore {
     });
   }
 
+  /**
+   * Is this connection still the folder of its conversation?
+   *
+   * Registering a second folder overwrites presence but cannot reach into the
+   * pod that holds the first one's socket, so both were subscribed to the same
+   * conversation channel and both received every call: a write landed in two
+   * checkouts, and either machine's answer could become the tool result. The
+   * presence record's instance id is the generation, and this is the fence.
+   *
+   * A record that is simply GONE is not evidence of being superseded: a
+   * heartbeat that lapsed under load writes itself back, and refusing a result
+   * on that would lose an answer the developer's machine really produced. Only
+   * a record naming a DIFFERENT instance retires this connection.
+   */
+  private async isCurrentConnection(session: ControlSession): Promise<boolean> {
+    const workspace = await this.presence.read(session.conversationId);
+    return !workspace || workspace.instanceId === session.instanceId;
+  }
+
   /** The command line started the call. */
   async ack(session: ControlSession, callId: string): Promise<void> {
     const call = await this.dispatcher.read(callId);
     if (call?.conversationId !== session.conversationId) return;
+    if (!(await this.isCurrentConnection(session))) return;
     await this.dispatcher.ack(callId);
   }
 
@@ -470,6 +490,14 @@ export class LocalControlSessionCore {
   async result(session: ControlSession, frame: ResultFrame): Promise<void> {
     const call = await this.dispatcher.read(frame.callId);
     if (call?.conversationId !== session.conversationId) return;
+    // A folder that was replaced must not answer the folder that replaced it.
+    if (!(await this.isCurrentConnection(session))) {
+      logger.info(
+        { callId: frame.callId, conversationId: session.conversationId },
+        "a result arrived from a connection a newer folder replaced, refused",
+      );
+      return;
+    }
     await this.dispatcher.result({ callId: frame.callId, frame });
   }
 
@@ -521,6 +549,7 @@ export class LocalControlSessionCore {
     const call = await this.dispatcher.read(frame.callId);
     if (!call || call.conversationId !== session.conversationId) return;
     if (!call.waitId) return;
+    if (!(await this.isCurrentConnection(session))) return;
     try {
       await this.waits.answer({
         waitId: call.waitId,
@@ -687,6 +716,9 @@ export class LocalControlSessionCore {
     if ("call" in parsed) {
       const call = await this.dispatcher.read(parsed.call);
       if (!call || call.conversationId !== session.conversationId) return;
+      // The channel is the conversation's, not this connection's, so a folder
+      // that a newer one replaced still hears every call written for it.
+      if (!(await this.isCurrentConnection(session))) return;
       send({
         type: "call",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,

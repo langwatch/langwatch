@@ -1279,3 +1279,83 @@ describe("given a command line that reconnects while a command still runs", () =
     });
   });
 });
+
+describe("given a folder replaced by a newer one", () => {
+  describe("when the newer folder is the one the panel shows", () => {
+    /** @scenario "A folder replaced by a newer one stops receiving work" */
+    it("retires the replaced connection, and refuses the results it sends", async () => {
+      const key = await approvedSessionKey(podA);
+      const old = await shareFolder(podA, key, { instanceId: "lci_old" });
+      // Another machine shares a folder with the same conversation, on the
+      // other pod, so the two connections hold two subscriptions.
+      const fresh = await shareFolder(podB, key, { instanceId: "lci_new" });
+
+      // The replaced connection is told what happened and closed, rather than
+      // left subscribed to the conversation it no longer holds.
+      const told = await old.cli.next("disconnect");
+      expect(told.reason).toBe(
+        "Another folder is now shared with this conversation.",
+      );
+      await old.cli.closed();
+
+      const call = await podA.runtime.dispatcher.start({
+        projectId,
+        conversationId,
+        turnId,
+        call: {
+          tool: "local_write",
+          params: { path: "app.py", content: "x = 1" },
+        },
+        timeoutMs: 60_000,
+      });
+      const delivered = await fresh.cli.next("call");
+      expect(delivered.call).toMatchObject({ callId: call.callId });
+
+      // And the replaced generation cannot answer the newest folder's call,
+      // whichever pod its frame reaches.
+      await podA.core.result(
+        {
+          instanceId: "lci_old",
+          conversationId,
+          projectId,
+          userId,
+          requestId: `lcr_${ns}`,
+          apiKeyId: "key_old",
+          workspaceName: "acme-app",
+          hostname: "rogerio-mbp",
+          connectedAt: Date.now(),
+          workspace: workspaceInfo(),
+        },
+        {
+          type: "result",
+          protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
+          callId: call.callId,
+          ok: true,
+          text: "written on the machine that was replaced",
+        },
+      );
+      expect((await podA.runtime.dispatcher.read(call.callId))?.state).not.toBe(
+        "done",
+      );
+
+      // The folder the panel shows still answers it.
+      fresh.cli.send({
+        type: "result",
+        callId: call.callId,
+        ok: true,
+        text: "written",
+      });
+      await expect
+        .poll(
+          async () => (await podA.runtime.dispatcher.read(call.callId))?.state,
+          {
+            timeout: 5_000,
+          },
+        )
+        .toBe("done");
+
+      fresh.cli.close();
+      await fresh.cli.closed();
+    });
+  });
+});
