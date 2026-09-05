@@ -185,6 +185,7 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
 
   const codingAgentFeature = composeCodingAgentFeature({
     infrastructure,
+    defaultRetentionDays: 90,
     peers: {
       projects,
       github: {} as unknown as GithubService,

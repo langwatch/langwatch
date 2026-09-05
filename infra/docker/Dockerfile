@@ -99,8 +99,14 @@ COPY apps/tasks ./apps/tasks
 # packages import `langwatch` from the SDK working copy, so the SDK's dist has
 # to exist before vite resolves it, and `@langwatch/hosted-mcp-server` imports
 # `@langwatch/mcp-server`, whose dist the API needs at boot. Both are reached
-# through the api/worker filters, not the ui one — apps/api and apps/worker
-# declare no `build` of their own and run from source through tsx.
+# through the api/worker filters, not the ui one. apps/api declares no `build`
+# of its own and runs from source through tsx; apps/worker's `build` emits ONE
+# artifact — dist/server/scenario-child-process.cjs, the pre-compiled scenario
+# child. The worker itself still runs from source, but the child is a fresh
+# process per simulation, so it is spawned as `node` on that bundle rather than
+# `pnpm exec tsx` on a TypeScript tree (tsx is a devDependency and the --prod
+# install below drops it, so the bundle is the only supported path in an image).
+# @see specs/scenarios/pre-compiled-child-process.feature
 RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
 
 # Remove dev dependencies — not needed at runtime, and on the order of a
@@ -190,6 +196,8 @@ COPY --from=builder /app/sdks/typescript ./sdks/typescript
 # in hundreds.
 COPY --from=builder /app/packages ./packages
 # The worker executable runs from source through tsx, the way apps/api does.
+# Whole, not just src/: `dist/server/scenario-child-process.cjs` is built above
+# and is what a scenario run spawns.
 COPY --from=builder /app/apps/worker ./apps/worker
 # The task runner. Runs from source through tsx, like apps/api and apps/worker.
 COPY --from=builder /app/apps/tasks ./apps/tasks

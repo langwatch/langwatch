@@ -13,6 +13,7 @@ import type { AgentService } from "@langwatch/agent-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiAuditPort } from "../../../api-request.policy";
 import {
@@ -353,6 +354,7 @@ function composeApplication(
     peers: { datasets, modelProviders },
     nlpServiceUrl: "http://127.0.0.1:5561",
     secretDecryptor: { decrypt: (value) => `decrypted:${value}` },
+    payloadStaging: AbsentPayloadStagingAdapter.create(),
   });
   const evaluators = composeEvaluatorService({
     infrastructure,

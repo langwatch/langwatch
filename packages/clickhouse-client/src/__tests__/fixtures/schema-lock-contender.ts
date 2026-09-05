@@ -4,7 +4,7 @@
  * entries mean it does not. Args: <lockPath> <journalPath> <id> <holdMs>
  */
 import { appendFileSync } from "node:fs";
-import { createSchemaLock } from "../../schema-lock";
+import { ClickHouseSchemaLock } from "../../schema-lock";
 
 async function main(): Promise<void> {
   const [lockPath, journalPath, id, holdMs] = process.argv.slice(2);
@@ -14,7 +14,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const lock = createSchemaLock({
+  const lock = ClickHouseSchemaLock.create({
     lockPath,
     waitTimeoutMs: 30_000,
     pollIntervalMs: 5,

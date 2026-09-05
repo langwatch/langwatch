@@ -7,12 +7,7 @@ import {
   type ProcessObservability,
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
-import {
-  ResourceScope,
-  runShutdownPhases,
-  ShutdownPhaseTimeoutError,
-  type ShutdownPhase,
-} from "@langwatch/runtime-composition";
+import { GracefulShutdown, ResourceScope } from "@langwatch/runtime-composition";
 import { resolveWorkerConfig, type WorkerConfig } from "./platform/config/worker.config";
 
 const DRAIN_PHASE_TIMEOUT_MS = 60_000;
@@ -150,49 +145,36 @@ export class WorkerProcess {
 
   private async closeProcess(terminating: boolean): Promise<void> {
     // Named phases on one runner, so a teardown that hangs is abandoned with
-    // its name in the log rather than holding the whole shutdown open. The
-    // backstop sits above any pod grace period: it is a last resort, not the
-    // drain budget itself.
-    const drain: ShutdownPhase = {
-      name: "application-drain",
-      timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
-      run: () => this.application.drain(),
-    };
-    const releases: ShutdownPhase[] = [
-      {
+    // its name in the log. The backstop sits above any pod grace period.
+    // `terminating` + `drainPhase` is what stops a timed-out drain from having
+    // ClickHouse, Redis and Prisma closed underneath it — the runner's rule.
+    const shutdown = GracefulShutdown.create({
+      logger: this.observability.logger,
+      terminating,
+    })
+      .phase({
+        name: "application-drain",
+        drainPhase: true,
+        timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
+        run: () => this.application.drain(),
+      })
+      .phase({
         name: "telemetry",
         timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
         run: () => this.observability.shutdown(),
-      },
-      {
+      })
+      .phase({
         name: "application-resources",
         timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
         run: () => this.application.closeResources(),
-      },
-      {
+      })
+      .phase({
         name: "process-resources",
         timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
         run: () => this.resources.close(),
-      },
-    ];
+      });
 
-    const logger = this.observability.logger;
-    const drainError = await runShutdownPhases({ phases: [drain], logger });
-
-    // A timed-out drain is STILL RUNNING, so closing ClickHouse, Redis and
-    // Prisma under it is the severing this sequence exists to prevent: a
-    // terminating process leaves those handles to teardown. A drain that merely
-    // THREW has finished, and its connections still close.
-    if (terminating && drainError instanceof ShutdownPhaseTimeoutError) {
-      logger.info(
-        { phase: drain.name },
-        "drain outran its budget and is still running; leaving connections to process teardown",
-      );
-      return;
-    }
-
-    const releaseError = await runShutdownPhases({ phases: releases, logger });
-    const firstError = drainError ?? releaseError;
+    const firstError = await shutdown.run();
     if (firstError) throw firstError;
   }
 }

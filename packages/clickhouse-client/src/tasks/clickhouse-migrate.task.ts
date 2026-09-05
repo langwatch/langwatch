@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import { acquireClickHouseSchemaLock } from "../schema-lock";
+import { ClickHouseSchemaLock } from "../schema-lock";
 import { parseRoutingTable } from "../tenancy";
 import { runMigrations } from "./goose.migration-runner";
 import { reconcileTTL } from "./ttl.reconciler";
@@ -51,6 +51,7 @@ export class ClickHouseMigrateTask extends Task {
   private constructor(
     private readonly config: ClickHouseMigrationTaskConfig,
     private readonly executor: GooseClickHouseMigrationExecutor,
+    private readonly lock: ClickHouseSchemaLock,
   ) {
     super();
   }
@@ -58,22 +59,27 @@ export class ClickHouseMigrateTask extends Task {
   static create({
     source,
     executor = new GooseClickHouseMigrationExecutor(),
+    lock = ClickHouseSchemaLock.create(),
   }: {
     source: Record<string, string | undefined>;
     executor?: GooseClickHouseMigrationExecutor;
+    /** The schema mutex this run takes. Constructed here so the file it contends for is a decision of this task, not of the shared client. */
+    lock?: ClickHouseSchemaLock;
   }): ClickHouseMigrateTask {
-    return new ClickHouseMigrateTask(resolveClickHouseMigrationTaskConfig(source), executor);
+    return new ClickHouseMigrateTask(resolveClickHouseMigrationTaskConfig(source), executor, lock);
   }
 
   /** Test seam: construct directly from an already-resolved config. */
   static createFromConfig({
     config,
     executor = new GooseClickHouseMigrationExecutor(),
+    lock = ClickHouseSchemaLock.create(),
   }: {
     config: ClickHouseMigrationTaskConfig;
     executor?: GooseClickHouseMigrationExecutor;
+    lock?: ClickHouseSchemaLock;
   }): ClickHouseMigrateTask {
-    return new ClickHouseMigrateTask(config, executor);
+    return new ClickHouseMigrateTask(config, executor, lock);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -92,7 +98,7 @@ export class ClickHouseMigrateTask extends Task {
     // second migrator overlapping this one reads and writes a schema partway
     // through being rebuilt, which surfaces as a wrong number rather than an
     // error and repairs itself moments later.
-    const release = await acquireClickHouseSchemaLock();
+    const release = await this.lock.acquire();
     try {
       const migratedUrls = new Set<string>();
       if (this.config.sharedUrl !== undefined) {

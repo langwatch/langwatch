@@ -40,6 +40,7 @@ import {
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
+import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-server";
 import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import type {
@@ -859,6 +860,55 @@ export type ApiMailConfig = Readonly<{
   mailer: MailerConfiguration;
 }>;
 
+/** The credentials the NLP Lambda sweep reaches the account with. */
+export type ApiNlpLambdaFleetConfig = Readonly<{
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+}>;
+
+/**
+ * `LANGWATCH_NLP_LAMBDA_CONFIG` is one JSON blob describing the studio's Lambda
+ * deployment; only the three fields the sweep needs are projected. A malformed
+ * or absent value leaves the sweep uncomposed rather than failing boot.
+ */
+const nlpLambdaFleetSchema = z.object({
+  AWS_REGION: z.string().min(1),
+  AWS_ACCESS_KEY_ID: z.string().min(1),
+  AWS_SECRET_ACCESS_KEY: z.string().min(1),
+});
+
+function resolveNlpLambdaFleetConfig(
+  source: Readonly<Record<string, unknown>>,
+): ApiNlpLambdaFleetConfig | undefined {
+  const raw = source.LANGWATCH_NLP_LAMBDA_CONFIG;
+  if (typeof raw !== "string" || raw.trim() === "") return undefined;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    configLogger().warn(
+      { envVar: "LANGWATCH_NLP_LAMBDA_CONFIG" },
+      "Ignoring an unparseable NLP Lambda configuration; the Lambda cleanup cron is not composed",
+    );
+    return undefined;
+  }
+  const fields = nlpLambdaFleetSchema.safeParse(parsed);
+  if (!fields.success) {
+    configLogger().warn(
+      { envVar: "LANGWATCH_NLP_LAMBDA_CONFIG" },
+      "NLP Lambda configuration names no region or credentials; the Lambda cleanup cron is not composed",
+    );
+    return undefined;
+  }
+  return {
+    region: fields.data.AWS_REGION,
+    accessKeyId: fields.data.AWS_ACCESS_KEY_ID,
+    secretAccessKey: fields.data.AWS_SECRET_ACCESS_KEY,
+  };
+}
+
 export type ApiConfig = Readonly<
   Omit<ApiConfigProjection, "authz" | "browserSession" | "infrastructure" | "mail" | "shutdown"> & {
     authz: ApiAuthzConfig;
@@ -886,6 +936,17 @@ export type ApiConfig = Readonly<
      * other means exactly that.
      */
     otlpMetrics: OtlpMetricsExportOptions;
+    /**
+     * The retention a tenant's data is stamped with when no override exists in
+     * its scope cascade. Read HERE and nowhere else: three compositions used
+     * to resolve it from `process.env` at module scope.
+     */
+    platformDefaultRetentionDays: number;
+    /**
+     * The AWS account the studio's per-project NLP Lambda functions live in,
+     * or nothing where the deployment fronts the engine with none.
+     */
+    nlpLambdaFleet: ApiNlpLambdaFleetConfig | undefined;
     shutdown: ApiShutdownConfig;
   }
 >;
@@ -916,6 +977,8 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       telemetry: resolveTelemetryConfiguration(source),
       serviceName: value.serviceName,
     }),
+    platformDefaultRetentionDays: resolvePlatformDefaultRetentionDays(environmentStrings(source)),
+    nlpLambdaFleet: resolveNlpLambdaFleetConfig(source),
     authz: {
       // The platform app's exact rule, so one variable means one thing across
       // the deployment rather than one thing per tier.

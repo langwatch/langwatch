@@ -84,6 +84,12 @@ export type SimulationCancelRun = z.infer<typeof simulationCancelRunSchema>;
 export const simulationDeleteRunSchema = simulationRunIdentitySchema;
 export type SimulationDeleteRun = z.infer<typeof simulationDeleteRunSchema>;
 
+/** The connected agent instance that answered a run, reported by the child. */
+export const simulationRecordAgentInstanceSchema = simulationRunIdentitySchema.extend({
+  agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }),
+});
+export type SimulationRecordAgentInstance = z.infer<typeof simulationRecordAgentInstanceSchema>;
+
 export const simulationComputeRunMetricsSchema = simulationRunIdentitySchema.extend({
   traceId: z.string(),
   metrics: z

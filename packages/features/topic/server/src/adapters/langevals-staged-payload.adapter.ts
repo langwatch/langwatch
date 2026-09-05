@@ -72,30 +72,23 @@ export type LangevalsStagedPayloadConfig = {
 export class LangevalsStagedPayloadAdapter {
   static create(input: {
     config: LangevalsStagedPayloadConfig;
-    staging?: LangevalsPayloadStagingPort | undefined;
+    /**
+     * Where an over-threshold body is parked. REQUIRED: a deployment with no
+     * object storage composes a refusing implementation, so an oversized
+     * payload is named rather than silently posted inline into the 6 MB cap.
+     */
+    staging: LangevalsPayloadStagingPort;
   }): LangevalsStagedPayloadAdapter {
     return new LangevalsStagedPayloadAdapter(input.config, input.staging);
   }
 
   private constructor(
     private readonly config: LangevalsStagedPayloadConfig,
-    private readonly staging: LangevalsPayloadStagingPort | undefined,
+    private readonly staging: LangevalsPayloadStagingPort,
   ) {}
 
   post(opts: StagedFetchOptions): Promise<Response> {
     return postStagedLangevalsPayload(opts, this.config, this.staging);
-  }
-}
-
-/** The deployment configured staging but composed nowhere to stage to. */
-export class LangevalsPayloadStagingUnavailableError extends Error {
-  constructor(bytes: number, thresholdBytes: number) {
-    super(
-      `A ${bytes}-byte langevals payload is over this deployment's ${thresholdBytes}-byte ` +
-        "staging threshold, but no payload staging was composed. Configure object " +
-        "storage for staging, or unset the threshold to post every payload inline.",
-    );
-    this.name = "LangevalsPayloadStagingUnavailableError";
   }
 }
 
@@ -117,7 +110,7 @@ function maxBytesForKind(kind: LangevalsCallKind, config: LangevalsStagedPayload
 async function postStagedLangevalsPayload(
   opts: StagedFetchOptions,
   config: LangevalsStagedPayloadConfig,
-  staging: LangevalsPayloadStagingPort | undefined,
+  staging: LangevalsPayloadStagingPort,
 ): Promise<Response> {
   const { url, body, projectId, kind, headers = {}, signal } = opts;
 
@@ -154,10 +147,6 @@ async function postStagedLangevalsPayload(
       body: serialized,
       ...(signal ? { signal } : {}),
     });
-  }
-
-  if (!staging) {
-    throw new LangevalsPayloadStagingUnavailableError(bytes, threshold);
   }
 
   const ttlSeconds = config.stagingTtlSeconds;

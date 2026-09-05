@@ -80,7 +80,6 @@ export {
   type StagedLangevalsPayload,
 } from "./ports/langevals-payload-staging.port";
 export {
-  LangevalsPayloadStagingUnavailableError,
   LangevalsStagedPayloadAdapter,
   PayloadTooLargeError,
   type LangevalsCallKind,

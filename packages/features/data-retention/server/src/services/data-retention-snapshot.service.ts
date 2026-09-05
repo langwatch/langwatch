@@ -54,6 +54,16 @@ export type DataRetentionSnapshotServiceOptions = Readonly<{
   policy: Pick<DataRetentionPolicyService, "canConfigureRetention">;
 }>;
 
+type OrganizationDirectory = Awaited<
+  ReturnType<DataRetentionDirectoryPort["listOrganizationDirectory"]>
+>;
+
+/** Reading a scope: whether this caller may see its row, and what the scope is called. */
+type RetentionScopeLens = {
+  canRead(scopeType: RetentionScopeTarget["scopeType"], scopeId: string): boolean;
+  nameOf(scopeType: RetentionScopeTarget["scopeType"], scopeId: string): string;
+};
+
 export class DataRetentionSnapshotService {
   static create(options: DataRetentionSnapshotServiceOptions): DataRetentionSnapshotService {
     return new DataRetentionSnapshotService(options);
@@ -66,46 +76,71 @@ export class DataRetentionSnapshotService {
     actor: RetentionActor;
   }): Promise<RetentionPolicySnapshot> {
     const { projectId, actor } = input;
-    const { directory, permissions, retention, policy } = this.options;
+    const { directory, retention } = this.options;
 
     const effective = await retention.getResolvedForProject({ projectId });
     const lineage = await directory.tryGetProjectLineage({ projectId });
     const organizationId = lineage?.organizationId ?? null;
-    const organizationName = lineage?.organizationName ?? null;
-    const userId = actor.userId;
 
     if (!organizationId) {
-      // Personal-account project (no organization or team): only its own
-      // PROJECT scope, and no organization means no paid plan and no overrides.
-      const decided = userId
-        ? await permissions.canUpdateProjects({
-            userId,
-            organizationId: null,
-            projectIds: [projectId],
-          })
-        : new Map<string, boolean>();
-      const canWrite = decided.get(projectId) === true;
-
-      return {
-        projectId,
-        effective,
-        rules: [],
-        available: {
-          organization: null,
-          teams: [],
-          projects: canWrite
-            ? [
-                {
-                  id: projectId,
-                  name: lineage?.name ?? projectId,
-                  teamId: lineage?.teamId ?? "",
-                },
-              ]
-            : [],
-        },
-        canConfigureRetention: false,
-      };
+      return this.personalAccountSnapshot({ projectId, effective, lineage, userId: actor.userId });
     }
+
+    return this.organizationSnapshot({
+      projectId,
+      actor,
+      effective,
+      organizationId,
+      organizationName: lineage?.organizationName ?? null,
+    });
+  }
+
+  /**
+   * Personal-account project (no organization or team): only its own PROJECT scope, and no
+   * organization means no paid plan and no overrides.
+   */
+  private async personalAccountSnapshot(input: {
+    projectId: string;
+    effective: ResolvedRetention;
+    lineage: { name: string; teamId: string | null } | null;
+    userId: string | null | undefined;
+  }): Promise<RetentionPolicySnapshot> {
+    const { projectId, effective, lineage, userId } = input;
+    const decided = userId
+      ? await this.options.permissions.canUpdateProjects({
+          userId,
+          organizationId: null,
+          projectIds: [projectId],
+        })
+      : new Map<string, boolean>();
+    const canWrite = decided.get(projectId) === true;
+
+    return {
+      projectId,
+      effective,
+      rules: [],
+      available: {
+        organization: null,
+        teams: [],
+        projects: canWrite
+          ? [{ id: projectId, name: lineage?.name ?? projectId, teamId: lineage?.teamId ?? "" }]
+          : [],
+      },
+      canConfigureRetention: false,
+    };
+  }
+
+  /** The snapshot for a project inside an organization: its rules and its writable scopes. */
+  private async organizationSnapshot(input: {
+    projectId: string;
+    actor: RetentionActor;
+    effective: ResolvedRetention;
+    organizationId: string;
+    organizationName: string | null;
+  }): Promise<RetentionPolicySnapshot> {
+    const { projectId, actor, effective, organizationId, organizationName } = input;
+    const { directory, permissions, retention, policy } = this.options;
+    const userId = actor.userId;
 
     const [organizationDirectory, rows, canManageOrganization, canConfigureRetention] =
       await Promise.all([
@@ -116,11 +151,6 @@ export class DataRetentionSnapshotService {
           : Promise.resolve(false),
         policy.canConfigureRetention({ organizationId, actor }),
       ]);
-
-    const projectTeamId: Record<string, string> = {};
-    for (const project of organizationDirectory.projects) {
-      projectTeamId[project.id] = project.teamId;
-    }
 
     const [teamManage, projectUpdate] = await Promise.all([
       userId
@@ -139,52 +169,26 @@ export class DataRetentionSnapshotService {
         : Promise.resolve(new Map<string, boolean>()),
     ]);
 
-    const teamName = new Map(organizationDirectory.teams.map((team) => [team.id, team.name]));
-    const projectName = new Map(
-      organizationDirectory.projects.map((project) => [project.id, project.name]),
-    );
-
-    const canReadScope = (
-      scopeType: RetentionScopeTarget["scopeType"],
-      scopeId: string,
-    ): boolean => {
-      if (scopeType === "ORGANIZATION") {
-        return canManageOrganization;
-      }
-
-      if (scopeType === "TEAM") {
-        return teamManage.get(scopeId) === true;
-      }
-
-      return projectUpdate.get(scopeId) === true;
-    };
-
-    const scopeName = (scopeType: RetentionScopeTarget["scopeType"], scopeId: string): string => {
-      if (scopeType === "ORGANIZATION") {
-        return organizationName ?? scopeId;
-      }
-
-      if (scopeType === "TEAM") {
-        return teamName.get(scopeId) ?? scopeId;
-      }
-
-      return projectName.get(scopeId) ?? scopeId;
-    };
-
-    const rules: RetentionRule[] = rows
-      .filter((row) => canReadScope(row.scopeType, row.scopeId))
-      .map((row) => ({
-        scopeType: row.scopeType,
-        scopeId: row.scopeId,
-        name: scopeName(row.scopeType, row.scopeId),
-        category: row.category,
-        retentionDays: row.retentionDays,
-      }));
+    const lens = this.scopeLens({
+      organizationDirectory,
+      organizationName,
+      canManageOrganization,
+      teamManage,
+      projectUpdate,
+    });
 
     return {
       projectId,
       effective,
-      rules,
+      rules: rows
+        .filter((row) => lens.canRead(row.scopeType, row.scopeId))
+        .map((row) => ({
+          scopeType: row.scopeType,
+          scopeId: row.scopeId,
+          name: lens.nameOf(row.scopeType, row.scopeId),
+          category: row.category,
+          retentionDays: row.retentionDays,
+        })),
       available: {
         organization: canManageOrganization
           ? { id: organizationId, name: organizationName ?? organizationId }
@@ -197,6 +201,46 @@ export class DataRetentionSnapshotService {
           .map(({ id, name, teamId }) => ({ id, name, teamId })),
       },
       canConfigureRetention,
+    };
+  }
+
+  /** Who may read a scope's override row, and what that scope is called on the page. */
+  private scopeLens(input: {
+    organizationDirectory: OrganizationDirectory;
+    organizationName: string | null;
+    canManageOrganization: boolean;
+    teamManage: ReadonlyMap<string, boolean>;
+    projectUpdate: ReadonlyMap<string, boolean>;
+  }): RetentionScopeLens {
+    const { organizationDirectory, organizationName, canManageOrganization } = input;
+    const teamName = new Map(organizationDirectory.teams.map((team) => [team.id, team.name]));
+    const projectName = new Map(
+      organizationDirectory.projects.map((project) => [project.id, project.name]),
+    );
+
+    return {
+      canRead: (scopeType, scopeId) => {
+        if (scopeType === "ORGANIZATION") {
+          return canManageOrganization;
+        }
+
+        if (scopeType === "TEAM") {
+          return input.teamManage.get(scopeId) === true;
+        }
+
+        return input.projectUpdate.get(scopeId) === true;
+      },
+      nameOf: (scopeType, scopeId) => {
+        if (scopeType === "ORGANIZATION") {
+          return organizationName ?? scopeId;
+        }
+
+        if (scopeType === "TEAM") {
+          return teamName.get(scopeId) ?? scopeId;
+        }
+
+        return projectName.get(scopeId) ?? scopeId;
+      },
     };
   }
 }

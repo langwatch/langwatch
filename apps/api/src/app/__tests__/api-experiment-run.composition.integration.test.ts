@@ -3,6 +3,7 @@
  */
 import type { AgentService, Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
+import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
 import type {
   AuthzGetDecisionInput,
   AuthzScopeLineageResult,
@@ -304,6 +305,7 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
     peers: { datasets, modelProviders },
     nlpServiceUrl: NLP_SERVICE_URL,
     secretDecryptor: { decrypt: (value) => `decrypted:${value}` },
+    payloadStaging: AbsentPayloadStagingAdapter.create(),
   });
   const evaluators = composeEvaluatorService({
     infrastructure,

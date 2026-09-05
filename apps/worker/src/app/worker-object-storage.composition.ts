@@ -1,9 +1,15 @@
 import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ResourceScope } from "@langwatch/runtime-composition";
+import { S3Client } from "@aws-sdk/client-s3";
 import {
+  AbsentPayloadStagingAdapter,
   AzureBlobStoredObjectDriverAdapter,
   AzureBlobCredentialsAdapter,
+  PayloadStagingPort,
+  PayloadStagingS3TargetPort,
+  S3PayloadStagingAdapter,
+  type PayloadStagingS3Target,
 } from "@langwatch/stored-object-server";
 import type {
   StoredObjectStorageDriver,
@@ -41,6 +47,13 @@ export type WorkerObjectStorage = {
    * driver rather than reaching through the registry's scheme dispatch.
    */
   azureConfig: WorkerStorageConfig["azure"];
+  /**
+   * Where an oversized outbound payload is parked while the call carrying it is
+   * in flight. Published here because this composition already owns the
+   * deployment's S3 routing; the features that stage take it as a required
+   * collaborator and refuse by name when it is the absent one.
+   */
+  payloadStaging: PayloadStagingPort;
 };
 
 /**
@@ -124,7 +137,59 @@ export function createWorkerObjectStorage(options: {
     projects,
   }).createRuntime();
 
-  return { runtime, aws, projects, azureConfig: storage.azure, ...(globalS3 ? { globalS3 } : {}) };
+  const payloadStaging = globalS3
+    ? S3PayloadStagingAdapter.create({
+        targets: WorkerPayloadStagingS3Targets.create({ projects, global: globalS3, aws }),
+      })
+    : AbsentPayloadStagingAdapter.create();
+
+  return {
+    runtime,
+    aws,
+    projects,
+    azureConfig: storage.azure,
+    payloadStaging,
+    ...(globalS3 ? { globalS3 } : {}),
+  };
+}
+
+/**
+ * The bucket and connection a project's STAGED payloads go to: the same BYOC
+ * routing the object store uses, so a tenant's oversized body is parked in the
+ * tenant's own bucket rather than the deployment's.
+ */
+class WorkerPayloadStagingS3Targets extends PayloadStagingS3TargetPort {
+  static create(options: {
+    projects: WorkerProjectS3SourcePort;
+    global: WorkerProjectS3Target;
+    aws: AwsClientProcessRuntime;
+  }): WorkerPayloadStagingS3Targets {
+    return new WorkerPayloadStagingS3Targets(options.projects, options.global, options.aws);
+  }
+
+  private constructor(
+    private readonly projects: WorkerProjectS3SourcePort,
+    private readonly global: WorkerProjectS3Target,
+    private readonly aws: AwsClientProcessRuntime,
+  ) {
+    super();
+  }
+
+  async resolve(projectId: string): Promise<PayloadStagingS3Target> {
+    const target = (await this.projects.tryGet(projectId)) ?? this.global;
+    return {
+      bucket: target.bucket,
+      client: new S3Client({
+        ...this.aws.build({
+          region: target.region,
+          targetHost: target.endpoint ?? "s3.amazonaws.com",
+          endpoint: target.endpoint,
+          staticCredentials: target.credentials,
+        }),
+        forcePathStyle: true,
+      }),
+    };
+  }
 }
 
 /**

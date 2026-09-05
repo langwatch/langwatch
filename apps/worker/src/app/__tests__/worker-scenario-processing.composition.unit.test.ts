@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
 import { describe, expect, it } from "vitest";
 import {
   createWorkerScenarioProcessing,
@@ -243,6 +244,7 @@ describe("given a worker deciding whether it can execute simulations", () => {
       const named: string[] = [];
 
       const prerequisites = resolveWorkerScenarioExecutionPrerequisites({
+        payloadStaging: AbsentPayloadStagingAdapter.create(),
         config: {
           serviceName: "worker",
           nodeEnvironment: "test",

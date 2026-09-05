@@ -1,17 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  installShutdownHandlers,
-  runGracefulShutdown,
-  type ShutdownPhase,
-} from "../src/graceful-shutdown";
-import { clearTelemetryFlushes, registerTelemetryFlush } from "../src/shutdown-telemetry";
+import { describe, expect, it, vi } from "vitest";
+import { GracefulShutdown, type ShutdownPhase } from "../src/graceful-shutdown";
 
 function silentLogger() {
   return { info: vi.fn(), error: vi.fn() };
 }
-
-// The registry is process-global, so a test that registers must reset.
-afterEach(() => clearTelemetryFlushes());
 
 const SIGNALS = ["SIGTERM", "SIGINT"] as const;
 
@@ -35,7 +27,7 @@ function borrowSignalListeners(): () => void {
   };
 }
 
-describe("runGracefulShutdown", () => {
+describe("GracefulShutdown", () => {
   describe("given several teardown phases", () => {
     describe("when a shutdown runs", () => {
       /** @scenario Shutdown phases run in order, never concurrently */
@@ -51,15 +43,12 @@ describe("runGracefulShutdown", () => {
         });
         const exit = vi.fn() as unknown as (code: number) => never;
 
-        await runGracefulShutdown({
-          signal: "SIGTERM",
-          logger: silentLogger(),
-          exit,
-          phases: [phase("a", 15), phase("b", 5)],
-        });
+        const shutdown = GracefulShutdown.create({ logger: silentLogger(), exit })
+          .phase(phase("a", 15))
+          .phase(phase("b", 5));
+        await shutdown.run({ signal: "SIGTERM" });
 
         expect(order).toEqual(["a:start", "a:end", "b:start", "b:end"]);
-        expect(exit).toHaveBeenCalledWith(0);
       });
 
       /** @scenario A failing phase does not skip the phases after it */
@@ -68,79 +57,79 @@ describe("runGracefulShutdown", () => {
         const logger = silentLogger();
         const exit = vi.fn() as unknown as (code: number) => never;
 
-        await runGracefulShutdown({
-          signal: "SIGTERM",
-          logger,
-          exit,
-          phases: [
-            {
-              name: "websockets",
-              run: () => {
-                throw new Error("ws close blew up");
-              },
+        const firstError = await GracefulShutdown.create({ logger, exit })
+          .phase({
+            name: "websockets",
+            run: () => {
+              throw new Error("ws close blew up");
             },
-            { name: "app", run: () => void ran.push("app") },
-          ],
-        });
+          })
+          .phase({ name: "app", run: () => void ran.push("app") })
+          .run({ signal: "SIGTERM" });
 
         expect(ran).toEqual(["app"]);
+        expect(firstError).toBeInstanceOf(Error);
         expect(logger.error).toHaveBeenCalledWith(
           expect.objectContaining({ phase: "websockets" }),
           expect.any(String),
         );
-        expect(exit).toHaveBeenCalledWith(0);
       });
 
       // Telemetry has to describe the shutdown, so it flushes after the work
       // is drained — not on a signal handler of its own, which is what the
       // metrics provider and the langwatch SDK each used to do. The SDK went
       // further and called process.exit(0) when its flush resolved, ending the
-      // process a second or two into a drain entitled to the full budget.
+      // process a second or two into a drain entitled to the full budget. It is
+      // a phase the observability composition adds, not a global registry.
       /** @scenario Telemetry flushes after the work, and never ends the process itself */
-      it("runs registered telemetry flushes last", async () => {
+      it("runs a telemetry flush phase last and exits exactly once", async () => {
+        const restore = borrowSignalListeners();
         const order: string[] = [];
         const exit = vi.fn() as unknown as (code: number) => never;
-        registerTelemetryFlush({
-          name: "sdk",
-          run: async () => void order.push("telemetry"),
-        });
+        try {
+          GracefulShutdown.create({ logger: silentLogger(), exit })
+            .phase({ name: "app", run: () => void order.push("app") })
+            .phase({ name: "telemetry:sdk", run: async () => void order.push("telemetry") })
+            .installSignalHandlers();
 
-        await runGracefulShutdown({
-          signal: "SIGTERM",
-          logger: silentLogger(),
-          exit,
-          phases: [{ name: "app", run: () => void order.push("app") }],
-        });
+          process.emit("SIGTERM");
+          await vi.waitFor(() => expect(exit).toHaveBeenCalled());
 
-        expect(order).toEqual(["app", "telemetry"]);
-        // Exactly once, by the runner, after everything — not by a provider.
-        expect(exit).toHaveBeenCalledTimes(1);
-        expect(exit).toHaveBeenCalledWith(0);
+          expect(order).toEqual(["app", "telemetry"]);
+          // Exactly once, by the runner, after everything — not by a provider.
+          expect(exit).toHaveBeenCalledTimes(1);
+          expect(exit).toHaveBeenCalledWith(0);
+        } finally {
+          restore();
+        }
       });
 
       /** @scenario A failing telemetry flush does not fail the shutdown */
       it("logs a failing flush and still exits zero", async () => {
+        const restore = borrowSignalListeners();
         const exit = vi.fn() as unknown as (code: number) => never;
         const logger = silentLogger();
-        registerTelemetryFlush({
-          name: "sdk",
-          run: async () => {
-            throw new Error("collector unreachable");
-          },
-        });
+        try {
+          GracefulShutdown.create({ logger, exit })
+            .phase({
+              name: "telemetry:sdk",
+              run: async () => {
+                throw new Error("collector unreachable");
+              },
+            })
+            .installSignalHandlers();
 
-        await runGracefulShutdown({
-          signal: "SIGTERM",
-          logger,
-          exit,
-          phases: [],
-        });
+          process.emit("SIGTERM");
+          await vi.waitFor(() => expect(exit).toHaveBeenCalled());
 
-        expect(logger.error).toHaveBeenCalledWith(
-          expect.objectContaining({ phase: "telemetry:sdk" }),
-          expect.any(String),
-        );
-        expect(exit).toHaveBeenCalledWith(0);
+          expect(logger.error).toHaveBeenCalledWith(
+            expect.objectContaining({ phase: "telemetry:sdk" }),
+            expect.any(String),
+          );
+          expect(exit).toHaveBeenCalledWith(0);
+        } finally {
+          restore();
+        }
       });
 
       // The finding that made this necessary: wsHandle.close() resolves only
@@ -155,20 +144,14 @@ describe("runGracefulShutdown", () => {
           const logger = silentLogger();
           const exit = vi.fn() as unknown as (code: number) => never;
 
-          const done = runGracefulShutdown({
-            signal: "SIGTERM",
-            logger,
-            exit,
-            deadlineMs: 60_000,
-            phases: [
-              {
-                name: "websockets",
-                timeoutMs: 1_000,
-                run: () => new Promise<void>(() => {}),
-              },
-              { name: "app", run: () => void ran.push("app") },
-            ],
-          });
+          const done = GracefulShutdown.create({ logger, exit, deadlineMs: 60_000 })
+            .phase({
+              name: "websockets",
+              timeoutMs: 1_000,
+              run: () => new Promise<void>(() => {}),
+            })
+            .phase({ name: "app", run: () => void ran.push("app") })
+            .run({ signal: "SIGTERM" });
 
           await vi.advanceTimersByTimeAsync(1_000);
           await done;
@@ -178,7 +161,6 @@ describe("runGracefulShutdown", () => {
             expect.objectContaining({ phase: "websockets" }),
             expect.any(String),
           );
-          expect(exit).toHaveBeenCalledWith(0);
         } finally {
           vi.useRealTimers();
         }
@@ -191,21 +173,15 @@ describe("runGracefulShutdown", () => {
           const exit = vi.fn() as unknown as (code: number) => never;
           const logger = silentLogger();
 
-          const done = runGracefulShutdown({
-            signal: "SIGTERM",
-            logger,
-            exit,
-            deadlineMs: 1_000,
-            phases: [
-              {
-                name: "hangs",
-                // Longer than the process deadline, so the watchdog is what
-                // fires rather than the phase timeout.
-                timeoutMs: 60_000,
-                run: () => new Promise<void>(() => {}),
-              },
-            ],
-          });
+          const done = GracefulShutdown.create({ logger, exit, deadlineMs: 1_000 })
+            .phase({
+              name: "hangs",
+              // Longer than the process deadline, so the watchdog is what
+              // fires rather than the phase timeout.
+              timeoutMs: 60_000,
+              run: () => new Promise<void>(() => {}),
+            })
+            .run({ signal: "SIGTERM" });
 
           await vi.advanceTimersByTimeAsync(1_000);
 
@@ -226,9 +202,61 @@ describe("runGracefulShutdown", () => {
       });
     });
   });
-});
 
-describe("installShutdownHandlers", () => {
+  describe("given a drain phase that never finishes", () => {
+    describe("when the process is terminating", () => {
+      // The scenario itself is bound by the worker process test; this pins the
+      // class option that implements it.
+      it("gives up on the drain and leaves the later releases alone", async () => {
+        vi.useFakeTimers();
+        try {
+          const released: string[] = [];
+          const done = GracefulShutdown.create({ logger: silentLogger(), terminating: true })
+            .phase({
+              name: "drain",
+              drainPhase: true,
+              timeoutMs: 1_000,
+              run: () => new Promise<void>(() => {}),
+            })
+            .phase({ name: "connections", run: () => void released.push("connections") })
+            .run();
+
+          await vi.advanceTimersByTimeAsync(1_000);
+
+          expect(await done).toBeUndefined();
+          expect(released).toEqual([]);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when the process is staying up", () => {
+      it("releases the handles anyway", async () => {
+        vi.useFakeTimers();
+        try {
+          const released: string[] = [];
+          const done = GracefulShutdown.create({ logger: silentLogger() })
+            .phase({
+              name: "drain",
+              drainPhase: true,
+              timeoutMs: 1_000,
+              run: () => new Promise<void>(() => {}),
+            })
+            .phase({ name: "connections", run: () => void released.push("connections") })
+            .run();
+
+          await vi.advanceTimersByTimeAsync(1_000);
+          await done;
+
+          expect(released).toEqual(["connections"]);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+  });
+
   describe("given handlers are installed", () => {
     describe("when a second signal arrives mid-shutdown", () => {
       // Kubernetes sends SIGTERM and an impatient operator adds Ctrl-C on top.
@@ -240,12 +268,9 @@ describe("installShutdownHandlers", () => {
         let runs = 0;
         const exit = vi.fn() as unknown as (code: number) => never;
         try {
-          installShutdownHandlers((signal) => ({
-            signal,
-            logger: silentLogger(),
-            exit,
-            phases: [{ name: "count", run: () => void runs++ }],
-          }));
+          GracefulShutdown.create({ logger: silentLogger(), exit })
+            .phase({ name: "count", run: () => void runs++ })
+            .installSignalHandlers();
 
           process.emit("SIGTERM");
           process.emit("SIGINT");

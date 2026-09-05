@@ -1,16 +1,9 @@
 export {
-  installShutdownHandlers,
-  runGracefulShutdown,
-  runShutdownPhases,
-  type RunGracefulShutdownOptions,
+  GracefulShutdown,
+  type GracefulShutdownOptions,
   type ShutdownLogger,
   type ShutdownPhase,
   ShutdownPhaseTimeoutError,
+  type ShutdownSignalHost,
 } from "./graceful-shutdown";
 export { type ResourceCloser, ResourceScope } from "./resource-scope";
-export {
-  clearTelemetryFlushes,
-  registerTelemetryFlush,
-  telemetryFlushes,
-  type TelemetryFlush,
-} from "./shutdown-telemetry";

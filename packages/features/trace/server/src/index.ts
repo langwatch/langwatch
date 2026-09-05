@@ -299,13 +299,16 @@ export {
 } from "./ports/trace-spool-storage.port";
 export {
   MAX_SPOOL_BYTES,
-  SPOOL_REF_V2,
   SpoolDestinationUnsupportedError,
-  SpoolStreamTooLargeError,
   TraceSpoolService,
   type TraceSpoolIdentity,
   type TraceSpoolServiceOptions,
 } from "./services/trace-spool.service";
+export { SPOOL_REF_V2 } from "./rules/trace-spool-location.rules";
+export {
+  StreamTooLargeError,
+  TraceStreamBufferService,
+} from "./services/trace-stream-buffer.service";
 export { TraceSpanSpoolAdapter } from "./adapters/trace-span-spool.adapter";
 export {
   ClickHouseTracePayloadReaderAdapter,

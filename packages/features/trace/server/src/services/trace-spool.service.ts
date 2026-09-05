@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-import type { Readable } from "node:stream";
 import type { Logger } from "@langwatch/observability";
 import {
   mintStoredObjectUri,
@@ -10,6 +8,13 @@ import {
   TraceSpoolStoragePort,
   type TraceSpoolObjectStore,
 } from "../ports/trace-spool-storage.port";
+import {
+  assertLegacySpoolKeyBelongsTo,
+  buildSpoolObjectPath,
+  isLegacySpoolRef,
+  SPOOL_REF_V2,
+} from "../rules/trace-spool-location.rules";
+import { TraceStreamBufferService } from "./trace-stream-buffer.service";
 
 /**
  * Cap on a spool object read. The spool holds one over-threshold command, and
@@ -20,27 +25,6 @@ import {
 export const MAX_SPOOL_BYTES = 50 * 1024 * 1024;
 
 /**
- * Prefix for all transient spool objects, kept at the TOP of the object path
- * (above the tenant segment) so a bucket/container lifecycle rule can match it
- * with a plain prefix filter. S3 lifecycle prefix filters cannot wildcard a
- * leading tenant segment, so `{projectId}/trace-blobs/spool/…` would be
- * unexpirable and orphans would accumulate forever. Do not reorder.
- */
-const SPOOL_KEY_PREFIX = "trace-blobs/spool";
-
-/**
- * Marker carried by a spooled command instead of a storage path.
- *
- * The v1 format put the raw object key in the command and the read path parsed
- * the tenant id back out of that string to pick a bucket — so whoever could
- * influence the queue message could steer a read at another tenant's object.
- * v2 carries no location at all: `getSpool`/`deleteSpool` re-derive it from the
- * command's own trusted `tenantId` + span ids, exactly as `putSpool` derived it
- * (the same discipline `TieredBlobStore`'s `BlobRef` follows).
- */
-export const SPOOL_REF_V2 = "spool:v2";
-
-/**
  * Raised when the project's storage destination cannot host the spool. Distinct
  * from a storage failure so the fail-open warn can say "this deployment has no
  * spool" rather than implying an outage the operator should go chase.
@@ -49,137 +33,6 @@ export class SpoolDestinationUnsupportedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "SpoolDestinationUnsupportedError";
-  }
-}
-
-/**
- * Raised when a stream exceeds {@link MAX_SPOOL_BYTES}.
- *
- * The application reads the spool through a shared `streamToBuffer` utility in
- * `~/utils`. A feature package has no such utility module to reach for and the
- * cap is the whole point of the helper, so the bounded read lives beside the
- * one caller that needs it rather than becoming a new shared surface.
- */
-export class SpoolStreamTooLargeError extends Error {
-  constructor(maxBytes: number) {
-    super(`Stream exceeds ${maxBytes} bytes`);
-    this.name = "StreamTooLargeError";
-  }
-}
-
-async function streamToBuffer(stream: Readable, maxBytes: number): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for await (const chunk of stream) {
-    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Buffer);
-    total += buf.length;
-    if (total > maxBytes) {
-      stream.destroy();
-
-      throw new SpoolStreamTooLargeError(maxBytes);
-    }
-
-    chunks.push(buf);
-  }
-
-  return Buffer.concat(chunks);
-}
-
-/**
- * Ids that are safe to use verbatim as one path segment: the normal case, since
- * OTLP ids normalise to hex. Excludes `.` and `..` explicitly — both match the
- * character class but are directory references, not names.
- */
-const SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]+$/;
-
-/**
- * Reduces one id to a single path component.
- *
- * Percent-encoding is NOT sufficient on its own. It survives URI construction,
- * but a filesystem driver's `parseFileUri` round-trips through
- * `decodeURIComponent`, which turns `..%2F..%2F` straight back into `../../`
- * before `mkdir`/`writeFile` see it — so an id of `../../…` escaped the object
- * root entirely. `idSchema` accepts arbitrary strings, so anyone able to ingest
- * a span could pick that path.
- *
- * Anything outside the safe class is replaced by a hash of the id rather than
- * escaped: a hash cannot contain a separator or a `..` no matter what decodes
- * it downstream, and it stays deterministic, so the read and delete paths
- * re-derive the identical location. Ordinary hex ids are untouched and remain
- * legible in a bucket listing.
- */
-function safePathSegment(id: string): string {
-  if (SAFE_PATH_SEGMENT.test(id) && id !== "." && id !== "..") {
-    return id;
-  }
-
-  return createHash("sha256").update(id, "utf8").digest("hex");
-}
-
-/**
- * Builds the transient spool object path. The ONLY place the shape is encoded.
- */
-function buildSpoolObjectPath({
-  projectId,
-  traceId,
-  spanId,
-}: {
-  projectId: string;
-  traceId: string;
-  spanId: string;
-}): string {
-  return [
-    SPOOL_KEY_PREFIX,
-    safePathSegment(projectId),
-    safePathSegment(traceId),
-    safePathSegment(spanId),
-  ].join("/");
-}
-
-/**
- * True when `spoolRef` has the shape of a v1 reference — a raw object key
- * minted before this deployment. Commands already queued when the new code
- * rolls out still carry these, so both formats must resolve for one release.
- *
- * Matched by prefix rather than by "not v2": treating every unrecognised string
- * as a v1 key would send it to the raw bucket+key read below, which is the very
- * dereference this change exists to remove. An unrecognised reference instead
- * falls through to the v2 path, where the location is derived and the reference
- * ignored.
- *
- * TODO(langwatch/langwatch-saas#837): drop the v1 branch one release after this
- * ships. By then no in-flight command can still carry a v1 ref — the spool's
- * own lifecycle expiry is 3 days, so nothing can resolve one after that.
- */
-function isLegacySpoolRef(spoolRef: string): boolean {
-  return spoolRef.startsWith(`${SPOOL_KEY_PREFIX}/`);
-}
-
-/**
- * Extracts the projectId segment from a v1 spool key.
- *
- * The caller must check it against the command's authenticated tenant before
- * dereferencing — see {@link assertLegacySpoolKeyBelongsTo}.
- */
-function projectIdFromLegacySpoolKey(spoolRef: string): string {
-  return spoolRef.split("/")[SPOOL_KEY_PREFIX.split("/").length] ?? "";
-}
-
-/**
- * Refuses a v1 key whose tenant segment is not the tenant the command was
- * authenticated as.
- *
- * The v1 format is the one place a location still travels inside the command,
- * so it is the one place a tampered reference could still steer a read. Pinning
- * it to the command's own tenant keeps the compatibility window from reopening
- * the hole the v2 format closes.
- */
-function assertLegacySpoolKeyBelongsTo(spoolRef: string, projectId: string): void {
-  const keyProjectId = projectIdFromLegacySpoolKey(spoolRef);
-  if (keyProjectId !== projectId) {
-    throw new Error(
-      `Refusing to read spool object: reference names tenant "${keyProjectId}" but the command is authenticated as "${projectId}".`,
-    );
   }
 }
 
@@ -292,7 +145,7 @@ export class TraceSpoolService {
 
     const { uri, objectStore } = await this.mintSpoolUri({ ...identity, purpose: "access" });
 
-    return streamToBuffer(await objectStore.get(uri), MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.streamToBuffer(await objectStore.get(uri), MAX_SPOOL_BYTES);
   }
 
   /**
@@ -408,7 +261,7 @@ export class TraceSpoolService {
   private async getLegacySpool(spoolRef: string, projectId: string): Promise<Buffer> {
     const body = await this.legacyObjects().read({ projectId, key: spoolRef });
 
-    return streamToBuffer(body, MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.streamToBuffer(body, MAX_SPOOL_BYTES);
   }
 
   private legacyObjects(): TraceSpoolLegacyObjectPort {

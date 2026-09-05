@@ -28,8 +28,8 @@ import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 import {
   AnalyticsSavedWorkbenchChartPolicyAdapter,
   DashboardApp,
-  mapDashboardSavedWorkbenchChartError,
   PostgresDashboardAdapter,
+  SavedWorkbenchChartErrorsAdapter,
   WorkbenchAccessPort,
   WorkbenchAwareGraphVisibilityAdapter,
   type DashboardGraphAlertLookup,
@@ -222,7 +222,7 @@ describeWithDatabase("given the saved-chart tRPC surface this process mounts", (
           },
         }),
         admitDefinition: (_ctx, input) => input.definition,
-        mapError: (error) => mapDashboardSavedWorkbenchChartError(error),
+        mapError: SavedWorkbenchChartErrorsAdapter.mapDashboardSavedWorkbenchChartError,
       },
     });
   }

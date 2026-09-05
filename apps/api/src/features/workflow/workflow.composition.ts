@@ -13,6 +13,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
+  NlpPayloadStagingPort,
   ModelProviderWorkflowStudioDslAdapter,
   PostgresWorkflowAdapter,
   PrismaWorkflowAgentMappingAdapter,
@@ -102,9 +103,18 @@ export function composeWorkflowRuntime(options: {
   nlpServiceUrl: string | undefined;
   /** The cipher a project's run environment is decrypted with. */
   secretDecryptor: WorkflowEnvironmentDecryptor | undefined;
+  /**
+   * Where an oversized invoke body is parked. Required: on an ARN target the
+   * body cap is 6 MB, so a deployment with no object storage must refuse by
+   * name rather than post over it.
+   */
+  payloadStaging: NlpPayloadStagingPort;
 }): ApiWorkflowRuntime {
   const nlpRuntime: WorkflowNlpRuntimePort = options.nlpServiceUrl
-    ? HttpWorkflowNlpRuntimeAdapter.create({ serviceUrl: options.nlpServiceUrl })
+    ? HttpWorkflowNlpRuntimeAdapter.create({
+        serviceUrl: options.nlpServiceUrl,
+        staging: options.payloadStaging,
+      })
     : UnconfiguredWorkflowNlpRuntimeAdapter.create();
 
   const workflows: WorkflowService = PostgresWorkflowAdapter.create({

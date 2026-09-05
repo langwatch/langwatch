@@ -6,13 +6,13 @@ import {
   TraceSpoolStoragePort,
   type TraceSpoolObjectStore,
 } from "../../ports/trace-spool-storage.port";
+import { SPOOL_REF_V2 } from "../../rules/trace-spool-location.rules";
 import {
   MAX_SPOOL_BYTES,
-  SPOOL_REF_V2,
   SpoolDestinationUnsupportedError,
-  SpoolStreamTooLargeError,
   TraceSpoolService,
 } from "../trace-spool.service";
+import { StreamTooLargeError } from "../trace-stream-buffer.service";
 
 /**
  * The object path, the reference marker and the read cap are a wire format between two
@@ -155,7 +155,7 @@ describe("TraceSpoolService", () => {
       it("aborts the read", async () => {
         storage.store.body = Readable.from([Buffer.alloc(MAX_SPOOL_BYTES + 1)]);
 
-        await expect(service().getSpool(identity)).rejects.toBeInstanceOf(SpoolStreamTooLargeError);
+        await expect(service().getSpool(identity)).rejects.toBeInstanceOf(StreamTooLargeError);
       });
 
       it("caps at fifty mebibytes", () => {

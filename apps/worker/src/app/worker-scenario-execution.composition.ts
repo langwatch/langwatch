@@ -49,6 +49,7 @@ import {
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
+  NlpPayloadStagingPort,
   PostgresWorkflowAdapter,
   PrismaWorkflowProjectEnvironmentAdapter,
   UnconfiguredWorkflowNlpRuntimeAdapter,
@@ -90,6 +91,8 @@ export type WorkerScenarioExecutionCompositionInput = Readonly<{
   redis: RedisConnection | null | undefined;
   resolveClickHouseClient: EventingClickHouseClientResolver | undefined;
   defaultRetentionDays: number;
+  /** Where an oversized NLP invoke body is parked; the absent one refuses by name. */
+  payloadStaging: NlpPayloadStagingPort;
   absence?: WorkerScenarioExecutionAbsenceReportPort;
 }>;
 
@@ -105,6 +108,7 @@ export type WorkerScenarioExecutionPrerequisites = Readonly<{
   langwatchEndpoint: string;
   nlpServiceUrl: string;
   encryptionKey: string;
+  payloadStaging: NlpPayloadStagingPort;
 }>;
 
 /**
@@ -138,6 +142,7 @@ export function resolveWorkerScenarioExecutionPrerequisites(
     langwatchEndpoint,
     nlpServiceUrl,
     encryptionKey,
+    payloadStaging: options.payloadStaging,
   };
 }
 
@@ -208,6 +213,7 @@ export type WorkerScenarioPrefetcherPrerequisites = Pick<
   | "langwatchEndpoint"
   | "nlpServiceUrl"
   | "encryptionKey"
+  | "payloadStaging"
 >;
 
 /**
@@ -263,7 +269,10 @@ export function createWorkerScenarioExecutionPrefetcher(input: {
     datasets: PostgresDatasetAdapter.create({ database: prisma }).build(),
     modelProviders: deps.modelProviders,
     nlpRuntime: deps.nlpServiceUrl
-      ? HttpWorkflowNlpRuntimeAdapter.create({ serviceUrl: deps.nlpServiceUrl })
+      ? HttpWorkflowNlpRuntimeAdapter.create({
+          serviceUrl: deps.nlpServiceUrl,
+          staging: deps.payloadStaging,
+        })
       : UnconfiguredWorkflowNlpRuntimeAdapter.create(),
     projectEnvironment: PrismaWorkflowProjectEnvironmentAdapter.create({
       database: prisma,

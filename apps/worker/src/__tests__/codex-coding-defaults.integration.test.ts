@@ -24,6 +24,7 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
+import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
 import { CODEX_DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { SimulationService, type TargetConfig } from "@langwatch/scenario-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
@@ -255,6 +256,7 @@ describe.skipIf(!databaseUrl)(
 
       prerequisites = {
         config,
+        payloadStaging: AbsentPayloadStagingAdapter.create(),
         connection: connection!,
         modelProviders,
         projects: tenancy.projects,

@@ -641,6 +641,7 @@ describe("given an API process that composed the real observability collaborator
         composeApiTraceReadStack({
           prisma,
           resolveClickHouseClient: clickHouse.resolveClient,
+          defaultRetentionDays: 90,
           authz: testAuthz(),
           projects: {
             tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),

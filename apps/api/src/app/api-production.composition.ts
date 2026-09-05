@@ -1,4 +1,3 @@
-import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-server";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
@@ -164,14 +163,6 @@ import {
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { UsageService } from "@langwatch/entitlement-server";
 
-/**
- * The retention a tenant's data is stamped with when no override exists in its
- * scope cascade. Resolved rather than written down, so a local stack can lower
- * it through `LANGWATCH_DEFAULT_RETENTION_DAYS`; the resolver refuses that
- * variable outside development and test, where lowering it would silently
- * expire customer data.
- */
-const PLATFORM_DEFAULT_RETENTION_DAYS = resolvePlatformDefaultRetentionDays(process.env);
 import {
   composeApiModelProviders,
   LoggedApiModelProviderAbsence,
@@ -207,6 +198,7 @@ import {
 } from "../features/monitor/monitor.composition";
 import {
   composeStoredObjectFeature,
+  DeferredPayloadStagingAdapter,
   LoggedApiStoredObjectAbsence,
   refusingStoredObjectFeature,
   type ComposedStoredObjectFeature,
@@ -384,7 +376,8 @@ import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse";
 import { ApiHandlerManagedSession } from "./api-handler-managed-session";
 import { createApiProcessRestFeatures } from "../app-rest/app-rest.process-features";
 import type { CronRestPorts } from "../features/cron/cron-rest";
-import { cleanupOldLambdas } from "../features/cron/cleanup-old-lambdas";
+import type { NlpLambdaCleanupService } from "@langwatch/workflow-server";
+import { composeNlpLambdaCleanup } from "../features/cron/cron.composition";
 import {
   composeApiPackagedRest,
   LoggedApiPackagedRestAbsence,
@@ -738,6 +731,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedLangyInternalSecret: string | undefined;
   /** The shared bearer the internal cron family authenticates its caller with, or none. */
   private composedCronApiKey: string | undefined;
+  /** The studio-Lambda sweep the destructive cron route runs, where one is configured. */
+  private composedNlpLambdaCleanup: NlpLambdaCleanupService | undefined;
   /**
    * Whether this deployment is the hosted product, held from `compose` for the
    * same reason the Langy secret is: the instance-provisioning family reads it
@@ -2349,9 +2344,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composeCron(): CronRestPorts | undefined {
     const secret = this.composedCronApiKey;
     if (!secret) return undefined;
+    const cleanup = this.composedNlpLambdaCleanup;
     return {
       internalSecret: () => secret,
-      cleanupOldLambdas: () => cleanupOldLambdas(),
+      cleanupOldLambdas: async () => {
+        if (!cleanup) {
+          throw new Error(
+            "This deployment composed no per-project NLP Lambda account, so there is nothing to sweep.",
+          );
+        }
+        await cleanup.sweep();
+      },
     };
   }
 
@@ -2563,6 +2566,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.composedQueueRedis = queueInfrastructure?.redis;
     this.composedLangyInternalSecret = options.config.langyInternalSecret;
     this.composedCronApiKey = options.config.cronApiKey;
+    this.composedNlpLambdaCleanup = composeNlpLambdaCleanup(options.config.nlpLambdaFleet);
     return {
       instanceAdminKey: () => instanceAdminKey.read(),
       rateLimit: (request) => this.rateLimiter.consume(request),
@@ -2784,7 +2788,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // config: defaulting to the adapter's shorter value would silently
       // shorten every project's window on a deployment that never changed a
       // setting.
-      defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      defaultRetentionDays: options.config.platformDefaultRetentionDays,
       // The SAME Redis the queue owns, and the SAME ClickHouse the charted
       // reads run on: the meter counts the rows the explorer reads.
       redis: queueInfrastructure?.redis ?? null,
@@ -2861,7 +2865,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The senders the root registered, shared with the Langy feature: one
       // registration per definition, whatever composes over it.
       pipelines: this.composedAgentPipelines,
-      defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      defaultRetentionDays: options.config.platformDefaultRetentionDays,
       processName: options.config.serviceName,
       report: LoggedApiScenarioAbsence.create(createLogger(options.config.serviceName)),
     });
@@ -2914,6 +2918,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         composeApiTraceReadStack({
           prisma: database.client,
           resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+          defaultRetentionDays: options.config.platformDefaultRetentionDays,
           authz,
           projects: tenancy.projects,
           plans: this.resolvePlanProvider(options),
@@ -3133,6 +3138,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
     this.composedCodingAgent = composeCodingAgentFeature({
       infrastructure,
+      defaultRetentionDays: options.config.platformDefaultRetentionDays,
       peers: {
         projects: tenancy.projects,
         github: this.resolveGithub(options, database.client, queueInfrastructure, tenancy),
@@ -3504,6 +3510,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       peers: { datasets, modelProviders },
       nlpServiceUrl: options.config.infrastructure.execution.nlpServiceUrl,
       secretDecryptor: encryption,
+      // The SAME object storage the file store writes bytes into: a staged
+      // invoke body and a stored object belong in one tenant's bucket, and a
+      // second connection would be a second answer to "which bucket".
+      payloadStaging: DeferredPayloadStagingAdapter.create(
+        () => this.composedStoredObject.payloadStaging,
+      ),
     });
     this.composedWorkflowRuntime = workflowRuntime;
     const evaluators = composeEvaluatorService({

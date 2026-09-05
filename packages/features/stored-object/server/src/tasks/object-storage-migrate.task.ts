@@ -17,6 +17,7 @@ import {
   ObjectStorageMigrationService,
   type ObjectStorageMigrationDeps,
 } from "../services/object-storage-migration.service";
+import { createMigrationStorageEndpoint } from "../services/object-storage-migration-transfer.service";
 import {
   MigrationCutoverRedisAuditAdapter,
   type MigrationCutoverRedisConfig,
@@ -212,12 +213,12 @@ export function createMigrationTask({
   s3Driver: StoredObjectStorageDriver;
 }): ObjectStorageMigrationService {
   const endpoints = {
-    s3: ObjectStorageMigrationService.createStorageEndpoint({
+    s3: createMigrationStorageEndpoint({
       provider: "s3",
       driver: s3Driver,
       bucket: config.s3.bucket,
     }),
-    azure: ObjectStorageMigrationService.createStorageEndpoint({
+    azure: createMigrationStorageEndpoint({
       provider: "azure",
       driver: AzureBlobStoredObjectDriverAdapter.create(toAzureCredentials(config)),
       accountName: config.azure.accountName,

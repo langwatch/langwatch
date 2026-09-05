@@ -8,7 +8,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createSchemaLock } from "../schema-lock";
+import { ClickHouseSchemaLock } from "../schema-lock";
 
 let lockPath: string;
 
@@ -33,7 +33,7 @@ describe("given nobody holds the schema lock", () => {
   describe("when a suite acquires it", () => {
     /** @scenario "Acquiring the lock records the holder and releasing frees it" */
     it("writes the holder's pid and frees the path on release", async () => {
-      const lock = createSchemaLock({ lockPath });
+      const lock = ClickHouseSchemaLock.create({ lockPath });
 
       const release = await lock.acquire();
 
@@ -47,7 +47,7 @@ describe("given nobody holds the schema lock", () => {
 
     /** @scenario "Acquiring the lock records the holder and releasing frees it" */
     it("ignores a second call to the same release", async () => {
-      const lock = createSchemaLock({ lockPath });
+      const lock = ClickHouseSchemaLock.create({ lockPath });
 
       const release = await lock.acquire();
       release();
@@ -62,7 +62,7 @@ describe("given the lock is already held by this process", () => {
   describe("when the same process acquires it again", () => {
     /** @scenario "A suite holding the lock can still replay a migration" */
     it("grants it immediately and frees it only on the outermost release", async () => {
-      const lock = createSchemaLock({ lockPath, waitTimeoutMs: 500 });
+      const lock = ClickHouseSchemaLock.create({ lockPath, waitTimeoutMs: 500 });
 
       const outer = await lock.acquire();
       const inner = await lock.acquire();
@@ -85,7 +85,7 @@ describe("given another live process holds the lock", () => {
       // This process is alive by definition, so a foreign token under this
       // pid is a holder that will never be recovered.
       writeForeignLock({ pid: process.pid, token: randomUUID() });
-      const lock = createSchemaLock({
+      const lock = ClickHouseSchemaLock.create({
         lockPath,
         waitTimeoutMs: 60,
         pollIntervalMs: 10,
@@ -104,7 +104,7 @@ describe("given the process that held the lock is gone", () => {
     /** @scenario "A lock left by a killed run is recovered" */
     it("recovers the abandoned lock and takes it", async () => {
       writeForeignLock({ pid: DEAD_PID, token: randomUUID() });
-      const lock = createSchemaLock({
+      const lock = ClickHouseSchemaLock.create({
         lockPath,
         waitTimeoutMs: 2_000,
         pollIntervalMs: 10,
@@ -126,7 +126,7 @@ describe("given the process that held the lock is gone", () => {
       // exact owner. Only one waiter can create it, which is what stops two
       // recoveries from both unlinking the path.
       writeFileSync(`${lockPath}.recovery.${abandonedToken}`, "");
-      const lock = createSchemaLock({
+      const lock = ClickHouseSchemaLock.create({
         lockPath,
         waitTimeoutMs: 60,
         pollIntervalMs: 10,
@@ -150,7 +150,7 @@ describe("given the process that held the lock is gone", () => {
       // waiter has decided the abandoned holder is gone, and a live holder
       // takes the lock before the claim can remove it.
       let handedOver = false;
-      const lock = createSchemaLock({
+      const lock = ClickHouseSchemaLock.create({
         lockPath,
         waitTimeoutMs: 120,
         pollIntervalMs: 10,
@@ -173,7 +173,7 @@ describe("given the lock was taken away from its holder", () => {
   describe("when that holder releases", () => {
     /** @scenario "A holder that lost the lock says so instead of freeing someone else's" */
     it("refuses to unlink a lock a different holder owns", async () => {
-      const lock = createSchemaLock({ lockPath });
+      const lock = ClickHouseSchemaLock.create({ lockPath });
       const release = await lock.acquire();
 
       writeForeignLock({ pid: process.pid, token: randomUUID() });

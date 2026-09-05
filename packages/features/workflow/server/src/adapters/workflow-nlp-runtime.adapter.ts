@@ -95,7 +95,12 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
     fetch?: typeof fetch;
     /** Composed only where the engine is reached by ARN; see the transport. */
     lambda?: NlpLambdaInvokePort | undefined;
-    staging?: NlpPayloadStagingPort | undefined;
+    /**
+     * Where an oversized invoke body is parked. REQUIRED: a deployment with no
+     * object storage composes the refusing adapter, so an over-threshold
+     * payload is named rather than posted into the Lambda body cap.
+     */
+    staging: NlpPayloadStagingPort;
     stagingConfig?: NlpInvokeStagingConfig | undefined;
   }): HttpWorkflowNlpRuntimeAdapter {
     return new HttpWorkflowNlpRuntimeAdapter(options);
@@ -108,7 +113,7 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
       serviceUrl: string;
       fetch?: typeof fetch;
       lambda?: NlpLambdaInvokePort | undefined;
-      staging?: NlpPayloadStagingPort | undefined;
+      staging: NlpPayloadStagingPort;
       stagingConfig?: NlpInvokeStagingConfig | undefined;
     },
   ) {
@@ -119,7 +124,7 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
       // threshold, so an ARN target cannot silently re-expose the 6 MiB cap.
       config: options.stagingConfig ?? DEFAULT_INVOKE_STAGING_CONFIG,
       ...(options.lambda ? { lambda: options.lambda } : {}),
-      ...(options.staging ? { staging: options.staging } : {}),
+      staging: options.staging,
       ...(options.fetch ? { fetch: options.fetch } : {}),
     });
   }

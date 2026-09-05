@@ -24,11 +24,7 @@ import {
   ObservabilityApiRequestFailureCaptureAdapter,
 } from "./api-process.lifecycle";
 import { ApiRequestPolicy } from "./api-request.policy";
-import {
-  runShutdownPhases,
-  type ShutdownLogger,
-  type ShutdownPhase,
-} from "@langwatch/runtime-composition";
+import { GracefulShutdown, type ShutdownLogger } from "@langwatch/runtime-composition";
 import type { Hono } from "hono";
 import { trace } from "@opentelemetry/api";
 
@@ -179,8 +175,8 @@ export async function closeApiProcessResources(options: {
   // queue drain is entitled to the whole budget — so they carry a backstop
   // above any pod grace period rather than the ten seconds a teardown gets.
   const drain = DRAIN_PHASE_TIMEOUT_MS;
-  const phases: ShutdownPhase[] = [
-    {
+  const shutdown = GracefulShutdown.create({ logger: options.logger ?? SILENT_SHUTDOWN_LOGGER })
+    .phase({
       name: "http-listener",
       // The listener's own ceiling, which sits above the grace it hands out,
       // so the runner never abandons the phase before the reap it leads into.
@@ -188,29 +184,32 @@ export async function closeApiProcessResources(options: {
         ? { timeoutMs: options.listener.closePhaseTimeoutMs }
         : {}),
       run: async () => void (await options.listener?.close()),
-    },
-    {
+    })
+    .phase({
       name: "feature-drain",
       timeoutMs: drain,
       run: async () => void (await options.featureDrain?.drain()),
-    },
-    {
+    })
+    .phase({
       name: "graph-drain",
       timeoutMs: drain,
       run: async () => void (await options.graph?.drain()),
-    },
-    {
+    })
+    // Telemetry flushes while the request diagnostics it describes still
+    // exist, and it is a phase this composition adds rather than something a
+    // provider registers into the runner behind its back.
+    .phase({
       name: "telemetry",
       timeoutMs: drain,
       run: async () => void (await options.observability.shutdown()),
-    },
-    { name: "graph-close", timeoutMs: drain, run: async () => void (await options.graph?.close()) },
-  ];
+    })
+    .phase({
+      name: "graph-close",
+      timeoutMs: drain,
+      run: async () => void (await options.graph?.close()),
+    });
 
-  const firstError = await runShutdownPhases({
-    phases,
-    logger: options.logger ?? SILENT_SHUTDOWN_LOGGER,
-  });
+  const firstError = await shutdown.run();
   if (firstError) throw firstError;
 }
 

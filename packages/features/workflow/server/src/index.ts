@@ -117,3 +117,10 @@ export {
   type WorkflowRunRestCredential,
   type WorkflowRunRestPorts,
 } from "./transport/api-rest/workflow-run.api";
+export { NlpLambdaFleetPort, type NlpLambdaFunction } from "./ports/nlp-lambda-fleet.port";
+export { AwsNlpLambdaFleetAdapter } from "./adapters/aws.nlp-lambda-fleet.adapter";
+export {
+  NLP_LAMBDA_NAME_PREFIX,
+  NlpLambdaCleanupService,
+  type NlpLambdaCleanupReport,
+} from "./services/nlp-lambda-cleanup.service";

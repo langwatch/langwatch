@@ -24,6 +24,8 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.1080.0",
+    "@aws-sdk/client-lambda": "^3.1080.0",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",

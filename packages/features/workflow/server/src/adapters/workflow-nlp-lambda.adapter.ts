@@ -68,7 +68,7 @@ export class NlpInvokeTransport {
     target: string;
     config: NlpInvokeStagingConfig;
     lambda?: NlpLambdaInvokePort | undefined;
-    staging?: NlpPayloadStagingPort | undefined;
+    staging: NlpPayloadStagingPort;
     /** Injected so a test drives the wire without a listener. */
     fetch?: typeof fetch;
   }): NlpInvokeTransport {
@@ -80,7 +80,7 @@ export class NlpInvokeTransport {
       target: string;
       config: NlpInvokeStagingConfig;
       lambda?: NlpLambdaInvokePort | undefined;
-      staging?: NlpPayloadStagingPort | undefined;
+      staging: NlpPayloadStagingPort;
       fetch?: typeof fetch;
     },
   ) {}
@@ -176,7 +176,7 @@ export class NlpInvokeTransport {
   }): Promise<StagedNlpPayload | undefined> {
     const { projectId, body, path } = input.request;
     const staging = this.options.staging;
-    if (!staging || projectId === undefined || body === undefined) return undefined;
+    if (projectId === undefined || body === undefined) return undefined;
 
     const threshold =
       this.options.config.stagingThresholdBytes ?? INVOKE_STAGING_THRESHOLD_BYTES_DEFAULT;

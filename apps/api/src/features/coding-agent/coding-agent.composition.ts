@@ -1,4 +1,3 @@
-import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-server";
 /**
  * `codingAgents.*` — what the coding agents did inside a tenant's projects — composed as
  * its own feature.
@@ -29,15 +28,6 @@ import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-tr
 import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections";
 import { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount";
 
-/**
- * The retention a tenant's data is stamped with when no override exists in its
- * scope cascade. Resolved rather than written down, so a local stack can lower
- * it through `LANGWATCH_DEFAULT_RETENTION_DAYS`; the resolver refuses that
- * variable outside development and test, where lowering it would silently
- * expire customer data.
- */
-const PLATFORM_DEFAULT_RETENTION_DAYS = resolvePlatformDefaultRetentionDays(process.env);
-
 /** The other services and stores one project's coding agents are read over. */
 export type CodingAgentPeers = Readonly<{
   /** The project directory the tenancy graph composed. */
@@ -66,6 +56,8 @@ export type ComposedCodingAgentFeature = Readonly<{
 export function composeCodingAgentFeature(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: CodingAgentPeers;
+  /** The retention a projected session is stamped with, from the process's config. */
+  defaultRetentionDays: number;
 }): ComposedCodingAgentFeature {
   const app = composeCodingAgentApp(options);
   const ports = codingAgentPorts(options.peers);
@@ -123,12 +115,13 @@ function codingAgentPorts(peers: CodingAgentPeers): CodingAgentTrpcPorts {
 function composeCodingAgentApp(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: CodingAgentPeers;
+  defaultRetentionDays: number;
 }): CodingAgentApp {
   const { peers } = options;
   const runtime = CodingAgentRuntime.create({
     projections: CodingAgentProjectionPersistenceAdapter.create({
       clickHouse: peers.clickHouse,
-      retention: { defaultTraceRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS },
+      retention: { defaultTraceRetentionDays: options.defaultRetentionDays },
     }),
     github: peers.github,
     projects: peers.projects,

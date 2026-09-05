@@ -1,4 +1,3 @@
-import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-server";
 import type { Protections } from "@langwatch/trace-contract";
 /**
  * The ClickHouse trace READ stack, composed from this process's own graph.
@@ -136,6 +135,8 @@ export type ApiTraceReadStackOptions = Readonly<{
   filterConditions?: TraceLegacyFilterConditions | undefined;
   /** Names a refusal, so a stand-in says which process reached it. */
   processName: string;
+  /** The retention a summary row falls back to, from the process's config. */
+  defaultRetentionDays: number;
 }>;
 
 /**
@@ -570,7 +571,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
         repository: resolve
           ? TraceSummaryClickHouseRepository.create({
               resolveClient: resolve as never,
-              defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+              defaultRetentionDays: this.options.defaultRetentionDays,
             })
           : new NullTraceSummaryRepository(),
         fullResolutionDeps: { spanStorageRepository, ...blobResolutionDeps },
@@ -746,15 +747,6 @@ class UnrecomputedTraceFullIo extends TraceFullIoPort {
     return { input: null, output: null };
   }
 }
-
-/**
- * The retention a tenant's data is stamped with when no override exists in its
- * scope cascade. Resolved rather than written down, so a local stack can lower
- * it through `LANGWATCH_DEFAULT_RETENTION_DAYS`; the resolver refuses that
- * variable outside development and test, where lowering it would silently
- * expire customer data.
- */
-const PLATFORM_DEFAULT_RETENTION_DAYS = resolvePlatformDefaultRetentionDays(process.env);
 
 const PROMPT_ATTR_KEYS = [
   "langwatch.prompt.id",
@@ -989,4 +981,3 @@ function refuseAll<T>(refuse: (capability: string) => Error, capability: string)
 }
 
 /** The platform default retention, kept beside the composition that states it. */
-export const API_TRACE_DEFAULT_RETENTION_DAYS = PLATFORM_DEFAULT_RETENTION_DAYS;

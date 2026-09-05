@@ -12,7 +12,9 @@ import {
   StoredObjectOwnerResolver,
   StoredObjectService,
 } from "@langwatch/stored-object-contract";
+import { S3Client } from "@aws-sdk/client-s3";
 import {
+  AbsentPayloadStagingAdapter,
   AzureBlobStoredObjectDriverAdapter,
   LocalFilesystemStoredObjectDriverAdapter,
   PrometheusStoredObjectsTelemetryAdapter,
@@ -25,6 +27,10 @@ import {
   StoredObjectsClickHousePort,
   ClickHouseStoredObjectsRepository,
   StoredObjectsService,
+  PayloadStagingPort,
+  PayloadStagingS3TargetPort,
+  S3PayloadStagingAdapter,
+  type PayloadStagingS3Target,
   type StoredObjectS3Target,
   type StoredObjectsClickHouseClient,
   AzureBlobCredentialsAdapter,
@@ -83,6 +89,12 @@ export type ComposedStoredObjectFeature = Readonly<{
    * vertical's extractor externalises.
    */
   bytes: StoredObjectsService;
+  /**
+   * Where an oversized outbound payload is parked while the call carrying it
+   * is in flight. Published here because this feature owns the deployment's S3
+   * access; the features that stage take it as a required collaborator.
+   */
+  payloadStaging: PayloadStagingPort;
   /** Released with the process: the pooled outbound handlers the S3 clients share. */
   close(): Promise<void>;
 }>;
@@ -97,6 +109,7 @@ export function composeStoredObjectFeature(
     router: (mount) => createStoredObjectTrpcRouter(mount),
     app: composed.app,
     bytes: composed.bytes,
+    payloadStaging: composed.payloadStaging,
     close: () => composed.close(),
   };
 }
@@ -120,6 +133,9 @@ export function refusingStoredObjectFeature(): ComposedStoredObjectFeature {
     router: (mount) => createStoredObjectTrpcRouter(mount),
     app: refuse<StoredObjectApp>(),
     bytes: refuse<StoredObjectsService>(),
+    // Named rather than absent: a payload over the staging threshold refuses
+    // with a code the caller can act on instead of being posted inline.
+    payloadStaging: AbsentPayloadStagingAdapter.create(),
     close: async () => undefined,
   };
 }
@@ -152,7 +168,12 @@ class ApiStoredObjectUnavailableError extends HandledError {
 function composeStoredObjects(
   options: StoredObjectFeatureCollaborators,
   logger: Pick<Logger, "warn">,
-): { app: StoredObjectApp; bytes: StoredObjectsService; close(): Promise<void> } {
+): {
+  app: StoredObjectApp;
+  bytes: StoredObjectsService;
+  payloadStaging: PayloadStagingPort;
+  close(): Promise<void>;
+} {
   const { storage } = options;
   if (!options.resolveClickHouseClient) options.report?.absent("clickhouse");
 
@@ -216,6 +237,15 @@ function composeStoredObjects(
       owners: ApiStoredObjectOwnerAbsence.create(logger),
     }),
     bytes: service,
+    payloadStaging: storage.s3.bucket
+      ? S3PayloadStagingAdapter.create({
+          targets: ApiPayloadStagingS3Targets.create({
+            targets,
+            defaultBucket: storage.s3.bucket,
+            aws,
+          }),
+        })
+      : AbsentPayloadStagingAdapter.create(),
     close: () => aws.close(),
   };
 }
@@ -307,6 +337,67 @@ class ApiStoredObjectS3Targets extends StoredObjectS3TargetPort {
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return null;
     return this.storage.routes.get(organizationId) ?? null;
+  }
+}
+
+/**
+ * The staging port a caller composed BEFORE the object store gets. The
+ * execution graph is built ahead of the byte store, so the port is handed over
+ * at composition time and resolved on first use rather than captured early.
+ */
+export class DeferredPayloadStagingAdapter extends PayloadStagingPort {
+  static create(resolve: () => PayloadStagingPort): DeferredPayloadStagingAdapter {
+    return new DeferredPayloadStagingAdapter(resolve);
+  }
+
+  private constructor(private readonly resolve: () => PayloadStagingPort) {
+    super();
+  }
+
+  stage(
+    input: Parameters<PayloadStagingPort["stage"]>[0],
+  ): ReturnType<PayloadStagingPort["stage"]> {
+    return this.resolve().stage(input);
+  }
+}
+
+/**
+ * The bucket and connection a project's STAGED payloads go to. The same
+ * routing the object store uses, so a BYOC tenant's oversized body is parked
+ * in the tenant's own bucket rather than the deployment's.
+ */
+class ApiPayloadStagingS3Targets extends PayloadStagingS3TargetPort {
+  static create(options: {
+    targets: ApiStoredObjectS3Targets;
+    defaultBucket: string;
+    aws: AwsClientProcessRuntime;
+  }): ApiPayloadStagingS3Targets {
+    return new ApiPayloadStagingS3Targets(options.targets, options.defaultBucket, options.aws);
+  }
+
+  private constructor(
+    private readonly targets: ApiStoredObjectS3Targets,
+    private readonly defaultBucket: string,
+    private readonly aws: AwsClientProcessRuntime,
+  ) {
+    super();
+  }
+
+  async resolve(projectId: string): Promise<PayloadStagingS3Target> {
+    const target = await this.targets.resolve(projectId);
+    const bucket = (await this.targets.tryBucket(projectId)) ?? this.defaultBucket;
+    return {
+      bucket,
+      client: new S3Client({
+        ...this.aws.build({
+          region: target.region,
+          targetHost: target.endpoint ?? "s3.amazonaws.com",
+          endpoint: target.endpoint,
+          staticCredentials: target.credentials,
+        }),
+        forcePathStyle: true,
+      }),
+    };
   }
 }
 

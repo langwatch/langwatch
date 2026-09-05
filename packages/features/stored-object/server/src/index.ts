@@ -158,3 +158,13 @@ export {
   GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
 } from "./adapters/group-queue.object-storage-migration.adapter";
+export { PayloadStagingPort, type StagedPayload } from "./ports/payload-staging.port";
+export {
+  PayloadStagingS3TargetPort,
+  S3PayloadStagingAdapter,
+  type PayloadStagingS3Target,
+} from "./adapters/s3.payload-staging.adapter";
+export {
+  AbsentPayloadStagingAdapter,
+  PayloadStagingUnavailableError,
+} from "./adapters/absent.payload-staging.adapter";

@@ -4,6 +4,7 @@ import type { RunSecretCiphertext } from "./run-secret-ciphertext";
 import type {
   ChildProcessJobData,
   ExecutionContext,
+  ScenarioAgentInstance,
   TargetConfig,
 } from "./scenario-execution-data";
 
@@ -90,4 +91,14 @@ export abstract class ScenarioExecutionService {
   ): Promise<ScenarioExecutionPrefetchResult>;
   abstract prepare(input: ScenarioExecutionPrefetchInput): ScenarioExecutionPreparation;
   abstract finishUnsuccessfulRun(input: ScenarioUnsuccessfulExecutionInput): Promise<void>;
+  /**
+   * Records the connected agent instance that answered a finished run, in the
+   * reserved `langwatch` namespace of the run metadata. Nothing else on the
+   * run changes: not its status, not its verdict, not its other metadata.
+   */
+  abstract recordAgentInstance(input: {
+    projectId: string;
+    scenarioRunId: string;
+    agentInstance: ScenarioAgentInstance;
+  }): Promise<void>;
 }
