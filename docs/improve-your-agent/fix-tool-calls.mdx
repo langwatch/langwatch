@@ -37,15 +37,15 @@ The agent comes back with a change to the tool contract. When you review it, the
 4. **One tool per job.** Merge a tool that needs three calls to return one answer into one call, or add a second tool next to it that returns the answer in one step.
 5. **The harness caps the retries**, so after the second failure on the same tool the agent escalates or asks the user instead of trying a third time.
 
-For example, the difference in the tool itself:
+For example, the same tool before and after the first three changes on the list, the accepted values in the description, an error message that names them and validation at the boundary:
 
-```python
+```python title="Before"
 def check_return_eligibility(order_id: str, reason: str) -> str:
     """Check if an order can be returned."""
     ...
 ```
 
-```python
+```python title="After"
 REASONS = ("defective", "incorrect_item", "not_as_expected", "remorse")
 
 def check_return_eligibility(order_id: str, reason: str) -> str:
