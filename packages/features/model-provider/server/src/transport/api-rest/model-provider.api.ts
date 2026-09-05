@@ -1,5 +1,5 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { CustomModelList } from "../../adapters/custom-model-list.adapter";
+import { CustomModelList } from "../../rules/custom-model-list.rules";
 import { createLogger } from "@langwatch/observability";
 import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { MiddlewareHandler } from "hono";

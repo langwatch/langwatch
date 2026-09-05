@@ -10,7 +10,7 @@ import {
   organizationMigrates,
 } from "../ops.system-migration-cohort";
 import { RedisMigrationLeaseRepository } from "../repositories/redis/redis.migration-lease.repository";
-import { PrismaOrganizationTenantSource } from "../repositories/prisma/prisma.organization-tenant-source.repository";
+import { PrismaOrganizationTenantSourceRepository } from "../repositories/prisma/prisma.organization-tenant-source.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "../repositories/prisma/prisma.system-migration-enrollment.repository";
 import { PrismaSystemMigrationStateRepository } from "../repositories/prisma/prisma.system-migration-state.repository";
 
@@ -41,9 +41,11 @@ export class PostgresSystemMigrationsAdapter {
 
   async runPass({ signal }: { signal?: AbortSignal }): Promise<MigrationPassSummary> {
     const isSaaS = this.options.isSaaS();
-    const state = new PrismaSystemMigrationStateRepository(this.options.database);
-    const lease = new RedisMigrationLeaseRepository(this.options.redis);
-    const enrollments = new PrismaSystemMigrationEnrollmentRepository(this.options.database);
+    const state = PrismaSystemMigrationStateRepository.create({ prisma: this.options.database });
+    const lease = RedisMigrationLeaseRepository.create({ redis: this.options.redis });
+    const enrollments = PrismaSystemMigrationEnrollmentRepository.create({
+      prisma: this.options.database,
+    });
 
     const migrations = this.released({ migrations: this.options.migrations(), isSaaS });
     const cohort = await this.cohort({ isSaaS, enrollments, migrations });
@@ -51,7 +53,7 @@ export class PostgresSystemMigrationsAdapter {
     return new SystemMigrationRunnerService({
       state,
       lease,
-      tenants: new PrismaOrganizationTenantSource(this.options.database),
+      tenants: PrismaOrganizationTenantSourceRepository.create({ prisma: this.options.database }),
       cohort,
       migrations,
     }).runPass({ signal });

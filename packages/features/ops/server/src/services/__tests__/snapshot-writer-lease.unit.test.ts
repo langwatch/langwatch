@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { OpsMetricsCollector } from "../ops-metrics-collector.service";
+import { OpsMetricsCollectorService } from "../ops-metrics-collector.service";
 import type { OpsSnapshotService } from "@langwatch/ops-contract";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture";
 
@@ -89,7 +89,7 @@ const makeSnapshots = (isHeld: boolean): OpsSnapshotService => ({
 const makeWriter = (held: boolean) => {
   const ops = makeOps();
   const snapshots = makeSnapshots(held);
-  const collector = new OpsMetricsCollector({
+  const collector = OpsMetricsCollectorService.create({
     redis: redisStub as any,
     ops,
     snapshots,
@@ -152,7 +152,7 @@ describe("snapshot writer lease gate", () => {
       // peaks and chart buffer are frozen at zero.
       const redis = makeRedisHoldingState(FLEET_STATE);
       const snapshots = makeSnapshots(true);
-      const collector = new OpsMetricsCollector({
+      const collector = OpsMetricsCollectorService.create({
         redis: redis as any,
         ops: makeOps(),
         snapshots,
@@ -178,7 +178,7 @@ describe("snapshot writer lease gate", () => {
       // Publishing stale numbers blanks the chart for one cycle; persisting
       // them destroys the fleet's only copy.
       const redis = makeRedisHoldingState(FLEET_STATE);
-      const collector = new OpsMetricsCollector({
+      const collector = OpsMetricsCollectorService.create({
         redis: redis as any,
         ops: makeOps(),
         snapshots: makeSnapshots(true),
@@ -203,7 +203,7 @@ describe("snapshot writer lease gate", () => {
       // exists nowhere but in its own memory.
       const snapshots = makeSnapshots(true);
       (snapshots.writeDetail as ReturnType<typeof vi.fn>).mockResolvedValue(false);
-      const collector = new OpsMetricsCollector({
+      const collector = OpsMetricsCollectorService.create({
         redis: redisStub as any,
         ops: makeOps(),
         snapshots,

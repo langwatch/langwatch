@@ -260,10 +260,12 @@ function composeEventExplorer(options: OpsFeatureCollaborators): OpsEventExplore
   const client = options.eventLogClient;
   if (!client) return unavailableOperatorRuntime<OpsEventExplorer>("the event-log explorer");
 
-  return new EventExplorerService(
-    new EventExplorerClickHouseRepository(client),
-    EventingOpsIntrospectionAdapter.create(() => options.eventing?.definitions ?? []),
-  );
+  return EventExplorerService.create({
+    repo: EventExplorerClickHouseRepository.create({ client }),
+    introspection: EventingOpsIntrospectionAdapter.create(
+      () => options.eventing?.definitions ?? [],
+    ),
+  });
 }
 
 /**

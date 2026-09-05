@@ -16,11 +16,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzService } from "@langwatch/authz-contract";
-import { ModelProviderCommandService } from "../model-provider-command.service";
-import { ModelProviderAuthorizationService } from "../model-provider-authorization.service";
-import { ModelProviderWriteAuthorizationService } from "../model-provider-write-authorization.service";
-import { ModelProviderScopeService } from "../model-provider-scope.service";
-import { PrismaModelProviderRepository } from "../../repositories/prisma/prisma.model-provider.repository";
+import { ModelProviderCommandService } from "../services/model-provider-command.service";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service";
+import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository";
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,
@@ -33,11 +33,16 @@ import {
   type TenancyFixture,
 } from "./support/model-provider-integration.support";
 
-const alwaysPermitAuthz = { getDecision: async () => ({ permitted: true }) } as unknown as AuthzService;
+const alwaysPermitAuthz = {
+  getDecision: async () => ({ permitted: true }),
+} as unknown as AuthzService;
 
 describe.skipIf(!DB_URL)("ModelProviderCommandService.delete (real Postgres)", () => {
   const prisma: PrismaClient = createTestPrismaClient();
-  const repository = PrismaModelProviderRepository.create(prisma, new IdentityModelProviderCredentialCodec());
+  const repository = PrismaModelProviderRepository.create(
+    prisma,
+    new IdentityModelProviderCredentialCodec(),
+  );
   const scopes = ModelProviderScopeService.create({
     projects: new PrismaProjects(prisma),
     organizations: {} as never,

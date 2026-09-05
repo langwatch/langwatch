@@ -37,7 +37,6 @@ export type {
 } from "./ports/model-provider.port";
 export {
   EncryptedModelProviderCredentialAdapter,
-  readCustomKeys,
   type CustomKeysRead,
 } from "./adapters/encrypted.model-provider-credential.adapter";
 export {
@@ -48,8 +47,6 @@ export {
 export {
   HttpModelProviderCredentialProbeAdapter,
   UnavailableModelProviderCredentialProbeAdapter,
-  validateKeyWithCustomUrl,
-  validateProviderApiKey,
 } from "./adapters/http.model-provider-credential-probe.adapter";
 export {
   CodexAccountService,
@@ -61,14 +58,13 @@ export {
 export {
   AI_CALL_FAILED_CAUSE,
   AiCallFailedError,
-  wrapAiCall,
+  AiCallFailureService,
 } from "./services/ai-call-failure.service";
-export { compileSafeRegex, isSafeRegex } from "./services/model-cost-regex-safety.service";
-export { getModelLimits } from "./services/model-limits.service";
+export { ModelCostRegexSafetyService } from "./services/model-cost-regex-safety.service";
+export { ModelLimitsService } from "./services/model-limits.service";
 export {
-  deriveUnmappedCostSuggestion,
+  ModelCostPreviewService,
   PREVIEW_WINDOW_DAYS,
-  previewCostRuleMatchingSpans,
   type ModelCostPreviewSpanReader,
   type ModelCostRuleReader,
 } from "./services/model-cost-preview.service";
@@ -80,13 +76,12 @@ export {
 export { PrefixedModelProviderIdAdapter } from "./adapters/prefixed.model-provider-id.adapter";
 export { VercelAiModelTranslationAdapter } from "./adapters/vercel-ai.model-translation.adapter";
 export {
-  getVercelAIModel,
   ModelProviderExecutionHandleService,
   type ModelProviderExecutionHandleInput,
   type ModelProviderExecutionHandleOptions,
 } from "./services/model-provider-execution-handle.service";
 export { ModelProviderKeysService } from "./services/model-provider-keys.service";
-export { resolveMaxTokensCeiling } from "./adapters/resolve-max-tokens-ceiling.adapter";
+export { resolveMaxTokensCeiling } from "./rules/max-tokens-ceiling.rules";
 export { ModelProviderExecutionAdapter } from "./adapters/model-provider-execution.adapter";
 export {
   getModelMetadataForFrontend,
@@ -100,7 +95,7 @@ export {
   prepareLitellmParams,
   toLegacyExecutionProvider,
   toLegacyProviderSummary,
-} from "./adapters/legacy-model-provider.adapter";
+} from "./rules/legacy-model-provider.rules";
 export {
   ModelProviderApp,
   type ModelProviderAppDependencies,
@@ -130,15 +125,9 @@ export {
   type PlaygroundRestSession,
 } from "./transport/api-rest/playground.api";
 
-export {
-  migrateCustomModelsRow,
-  migrateModelProviderKeysRow,
-} from "./services/model-provider-legacy-migration.service";
+export { ModelProviderLegacyMigrationService } from "./services/model-provider-legacy-migration.service";
 
-export {
-  ModelProviderCredentialsMigrateTask,
-  modelProviderCredentialCipherFromEnv,
-} from "./tasks/model-provider-credentials-migrate.task";
+export { ModelProviderCredentialsMigrateTask } from "./tasks/model-provider-credentials-migrate.task";
 export { ModelProviderCustomModelsMigrateTask } from "./tasks/model-provider-custom-models-migrate.task";
 export type {
   ModelProviderMigrationDatabase,

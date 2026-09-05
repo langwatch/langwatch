@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ModelProviderExecution } from "@langwatch/model-provider-contract";
-import { toLegacyExecutionProvider } from "../legacy-model-provider.adapter";
+import { toLegacyExecutionProvider } from "../legacy-model-provider.rules";
 
 describe("toLegacyExecutionProvider", () => {
   it("preserves execution credentials, scope, deployment, and custom-model metadata", () => {

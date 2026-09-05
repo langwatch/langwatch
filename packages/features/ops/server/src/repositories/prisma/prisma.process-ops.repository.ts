@@ -48,7 +48,11 @@ function escapeLike(term: string): string {
  * reads and every write stay on guarded Prisma queries that carry projectId.
  */
 export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  static create({ prisma }: { prisma: PrismaClient }): ProcessOpsPrismaRepository {
+    return new ProcessOpsPrismaRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {}
 
   async countByProcessName(params: {
     now: number;

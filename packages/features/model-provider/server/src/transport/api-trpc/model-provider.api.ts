@@ -32,7 +32,7 @@
  * specs/model-providers/model-default-config-cascade.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { CustomModelList } from "../../adapters/custom-model-list.adapter";
+import { CustomModelList } from "../../rules/custom-model-list.rules";
 import {
   modelDefaultConfigDeleteTrpcInputSchema,
   modelDefaultConfigSaveTrpcInputSchema,

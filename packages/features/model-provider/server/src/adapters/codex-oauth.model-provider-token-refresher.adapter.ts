@@ -79,6 +79,29 @@ interface CodexOAuthTokens {
  * land on any server instance.
  */
 export class CodexAccountService {
+  /** Account id, email and plan from the id-token JWT (no verification —
+   *  the token came straight from the issuer over TLS and is only used for
+   *  display + the account-id request header, exactly as the codex CLI does). */
+  static decodeCodexClaims(idToken: string): CodexClaims {
+    const parts = idToken.split(".");
+    const payload = parts[1];
+    if (!payload) return { accountId: "", email: "", plan: "" };
+    try {
+      const json = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Record<
+        string,
+        unknown
+      >;
+      const auth = (json["https://api.openai.com/auth"] ?? {}) as Record<string, unknown>;
+      return {
+        accountId: typeof auth.chatgpt_account_id === "string" ? auth.chatgpt_account_id : "",
+        email: typeof json.email === "string" ? json.email : "",
+        plan: typeof auth.chatgpt_plan_type === "string" ? auth.chatgpt_plan_type : "",
+      };
+    } catch {
+      return { accountId: "", email: "", plan: "" };
+    }
+  }
+
   private readonly issuer: string;
 
   constructor(
@@ -223,7 +246,7 @@ export class CodexAccountService {
   }
 
   private toKeys(tokens: CodexOAuthTokens): CodexTokenKeys {
-    const claims = decodeCodexClaims(tokens.idToken);
+    const claims = CodexAccountService.decodeCodexClaims(tokens.idToken);
     return {
       CODEX_ACCESS_TOKEN: tokens.accessToken,
       CODEX_REFRESH_TOKEN: tokens.refreshToken,
@@ -291,29 +314,6 @@ export interface CodexClaims {
   accountId: string;
   email: string;
   plan: string;
-}
-
-/** Account id, email and plan from the id-token JWT (no verification —
- *  the token came straight from the issuer over TLS and is only used for
- *  display + the account-id request header, exactly as the codex CLI does). */
-export function decodeCodexClaims(idToken: string): CodexClaims {
-  const parts = idToken.split(".");
-  const payload = parts[1];
-  if (!payload) return { accountId: "", email: "", plan: "" };
-  try {
-    const json = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Record<
-      string,
-      unknown
-    >;
-    const auth = (json["https://api.openai.com/auth"] ?? {}) as Record<string, unknown>;
-    return {
-      accountId: typeof auth.chatgpt_account_id === "string" ? auth.chatgpt_account_id : "",
-      email: typeof json.email === "string" ? json.email : "",
-      plan: typeof auth.chatgpt_plan_type === "string" ? auth.chatgpt_plan_type : "",
-    };
-  } catch {
-    return { accountId: "", email: "", plan: "" };
-  }
 }
 
 /**

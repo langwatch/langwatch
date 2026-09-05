@@ -22,7 +22,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   BugReportRateLimitedError,
-  submitBugReport,
+  BugReportIntakeService,
 } from "../../../services/bug-report-intake.service";
 import type {
   BugReportNotifierPort,
@@ -290,7 +290,11 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
       // tests, and returns before touching any transport.
       const fetchSpy = vi.spyOn(globalThis, "fetch");
       try {
-        const { id } = await submitBugReport({
+        const { id } = await BugReportIntakeService.create({
+          reports: repository,
+          rateLimiter: inMemoryRateLimiter(),
+          notifier: silentNotifier(),
+        }).submit({
           input: {
             source: "cli",
             kind: "summary",
@@ -298,9 +302,6 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
             summary: "stored fine",
           },
           callerKey: `noslack-${testNamespace}`,
-          reports: repository,
-          rateLimiter: inMemoryRateLimiter(),
-          notifier: silentNotifier(),
         });
         trackReport(id);
         const stored = await prisma.bugReport.findUnique({ where: { id } });
@@ -349,7 +350,11 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
       const rateLimiter = inMemoryRateLimiter();
       const callerKey = `ratelimit-${testNamespace}`;
       const submitOnce = () =>
-        submitBugReport({
+        BugReportIntakeService.create({
+          reports: repository,
+          rateLimiter,
+          notifier: silentNotifier(),
+        }).submit({
           input: {
             source: "cli",
             kind: "summary",
@@ -357,9 +362,6 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
             summary: "spam",
           },
           callerKey,
-          reports: repository,
-          rateLimiter,
-          notifier: silentNotifier(),
         });
 
       for (let i = 0; i < 10; i++) {
@@ -368,7 +370,11 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
       }
       await expect(submitOnce()).rejects.toThrow(BugReportRateLimitedError);
 
-      const other = await submitBugReport({
+      const other = await BugReportIntakeService.create({
+        reports: repository,
+        rateLimiter,
+        notifier: silentNotifier(),
+      }).submit({
         input: {
           source: "cli",
           kind: "summary",
@@ -376,9 +382,6 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
           summary: "fine",
         },
         callerKey: `other-${testNamespace}`,
-        reports: repository,
-        rateLimiter,
-        notifier: silentNotifier(),
       });
       trackReport(other.id);
     });
@@ -388,14 +391,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     /** @scenario "The team is notified on Slack for each new report" */
     it("passes the stored report to the notifier", async () => {
       const notified: BugReport[] = [];
-      const { id } = await submitBugReport({
-        input: {
-          source: "mcp",
-          kind: "summary",
-          title: `${testNamespace} notified`,
-          summary: "notify me",
-        },
-        callerKey: `notify-${testNamespace}`,
+      const { id } = await BugReportIntakeService.create({
         reports: repository,
         rateLimiter: inMemoryRateLimiter(),
         notifier: {
@@ -403,6 +399,14 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
             notified.push(report);
           },
         },
+      }).submit({
+        input: {
+          source: "mcp",
+          kind: "summary",
+          title: `${testNamespace} notified`,
+          summary: "notify me",
+        },
+        callerKey: `notify-${testNamespace}`,
       });
       trackReport(id);
       expect(notified).toHaveLength(1);
@@ -414,14 +418,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   describe("when the team alert fails", () => {
     /** @scenario "Slack failures never fail the report intake" */
     it("stores the report and succeeds anyway", async () => {
-      const { id } = await submitBugReport({
-        input: {
-          source: "cli",
-          kind: "summary",
-          title: `${testNamespace} slack down`,
-          summary: "still stored",
-        },
-        callerKey: `slackdown-${testNamespace}`,
+      const { id } = await BugReportIntakeService.create({
         reports: repository,
         rateLimiter: inMemoryRateLimiter(),
         notifier: {
@@ -429,6 +426,14 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
             throw new Error("slack unavailable");
           },
         },
+      }).submit({
+        input: {
+          source: "cli",
+          kind: "summary",
+          title: `${testNamespace} slack down`,
+          summary: "still stored",
+        },
+        callerKey: `slackdown-${testNamespace}`,
       });
       trackReport(id);
       const stored = await prisma.bugReport.findUnique({ where: { id } });

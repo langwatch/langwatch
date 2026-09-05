@@ -10,10 +10,7 @@ import {
   ModelTranslationPort,
   type ModelProviderIdService,
 } from "../ports/model-provider.port";
-import {
-  PrismaModelCostRepository,
-  requireModelCostDatabase,
-} from "../repositories/prisma/prisma.model-cost.repository";
+import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository";
 import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository";
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository";
 import { ModelProviderService } from "../services/model-provider.service";
@@ -52,7 +49,9 @@ export class PostgresModelProviderAdapter {
       codexTokenRefresher: this.options.codexTokenRefresher,
       connectionRateLimiter: this.options.connectionRateLimiter,
       defaults: PrismaModelDefaultRepository.create(this.options.database),
-      costs: PrismaModelCostRepository.create(requireModelCostDatabase(this.options.database)),
+      costs: PrismaModelCostRepository.create(
+        PrismaModelCostRepository.requireModelCostDatabase(this.options.database),
+      ),
       catalog: this.options.catalog,
       authorization: this.options.authorization,
       translation: this.options.translation,

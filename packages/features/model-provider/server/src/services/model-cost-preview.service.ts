@@ -23,7 +23,7 @@ import {
   type ModelCostRate,
 } from "@langwatch/model-provider-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import { compileSafeRegex } from "./model-cost-regex-safety.service";
+import type { ModelCostRegexSafetyService } from "./model-cost-regex-safety.service";
 
 /**
  * How far back the preview looks for spans. Wide enough to catch models that
@@ -129,121 +129,133 @@ function storedRate(cost: ModelCost): ModelCostRate {
   };
 }
 
-/**
- * Previews which of the project's recently-seen models (and sample spans) a
- * cost rule's regex would match.
- */
-export async function previewCostRuleMatchingSpans({
-  spans,
-  input,
-}: {
-  spans: ModelCostPreviewSpanReader;
-  input: CostRulePreviewInput;
-}): Promise<CostRuleMatchingSpansPreview> {
-  if (!compileSafeRegex(input.regex)) {
-    throw new ValidationError("Invalid or unsafe regular expression");
+export class ModelCostPreviewService {
+  static create({
+    regexSafety,
+  }: {
+    regexSafety: ModelCostRegexSafetyService;
+  }): ModelCostPreviewService {
+    return new ModelCostPreviewService(regexSafety);
   }
 
-  const candidate = candidateRate(input);
-  const fromMs = Date.now() - PREVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-  const stats = await spans.getModelUsageStats({
-    tenantId: input.projectId,
-    fromMs,
-    limit: MAX_DISTINCT_MODELS,
-  });
+  private constructor(private readonly regexSafety: ModelCostRegexSafetyService) {}
 
-  const matchedModels: CostRuleMatchingSpansPreview["matchedModels"] = [];
-  const unmatchedModels: CostRuleMatchingSpansPreview["unmatchedModels"] = [];
-  for (const stat of stats) {
-    if (matchModelCost(stat.model, [candidate])) {
-      matchedModels.push(stat);
-    } else if (unmatchedModels.length < MAX_UNMATCHED_MODELS) {
-      unmatchedModels.push({ model: stat.model, spanCount: stat.spanCount });
+  /**
+   * Previews which of the project's recently-seen models (and sample spans) a
+   * cost rule's regex would match.
+   */
+  async previewCostRuleMatchingSpans({
+    spans,
+    input,
+  }: {
+    spans: ModelCostPreviewSpanReader;
+    input: CostRulePreviewInput;
+  }): Promise<CostRuleMatchingSpansPreview> {
+    if (!this.regexSafety.compileSafeRegex(input.regex)) {
+      throw new ValidationError("Invalid or unsafe regular expression");
     }
-  }
 
-  let sampleSpans: CostRulePreviewSampleSpan[] = [];
-  if (matchedModels.length > 0) {
-    const rows = await spans.getRecentSpansByModels({
+    const candidate = candidateRate(input);
+    const fromMs = Date.now() - PREVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const stats = await spans.getModelUsageStats({
       tenantId: input.projectId,
-      models: matchedModels.map((m) => m.model),
       fromMs,
-      perModelLimit: PER_MODEL_SAMPLE_LIMIT,
-      limit: MAX_SAMPLE_SPANS,
+      limit: MAX_DISTINCT_MODELS,
     });
-    sampleSpans = rows.map((row) => {
-      const hasTokenUsage =
-        row.inputTokens !== null ||
-        row.outputTokens !== null ||
-        row.cacheReadTokens !== null ||
-        row.cacheCreationTokens !== null;
 
-      return {
-        ...row,
-        exampleCost: !hasTokenUsage
-          ? null
-          : (estimateCost({
-              rate: candidate,
-              inputTokens: row.inputTokens ?? 0,
-              outputTokens: row.outputTokens ?? 0,
-              cacheReadTokens: row.cacheReadTokens ?? 0,
-              cacheCreationTokens: row.cacheCreationTokens ?? 0,
-              cacheCreation1hTokens: row.cacheCreation1hTokens ?? 0,
-              inputAudioTokens: 0,
-              outputAudioTokens: 0,
-            }) ?? null),
-      };
-    });
+    const matchedModels: CostRuleMatchingSpansPreview["matchedModels"] = [];
+    const unmatchedModels: CostRuleMatchingSpansPreview["unmatchedModels"] = [];
+    for (const stat of stats) {
+      if (matchModelCost(stat.model, [candidate])) {
+        matchedModels.push(stat);
+      } else if (unmatchedModels.length < MAX_UNMATCHED_MODELS) {
+        unmatchedModels.push({ model: stat.model, spanCount: stat.spanCount });
+      }
+    }
+
+    let sampleSpans: CostRulePreviewSampleSpan[] = [];
+    if (matchedModels.length > 0) {
+      const rows = await spans.getRecentSpansByModels({
+        tenantId: input.projectId,
+        models: matchedModels.map((m) => m.model),
+        fromMs,
+        perModelLimit: PER_MODEL_SAMPLE_LIMIT,
+        limit: MAX_SAMPLE_SPANS,
+      });
+      sampleSpans = rows.map((row) => {
+        const hasTokenUsage =
+          row.inputTokens !== null ||
+          row.outputTokens !== null ||
+          row.cacheReadTokens !== null ||
+          row.cacheCreationTokens !== null;
+
+        return {
+          ...row,
+          exampleCost: !hasTokenUsage
+            ? null
+            : (estimateCost({
+                rate: candidate,
+                inputTokens: row.inputTokens ?? 0,
+                outputTokens: row.outputTokens ?? 0,
+                cacheReadTokens: row.cacheReadTokens ?? 0,
+                cacheCreationTokens: row.cacheCreationTokens ?? 0,
+                cacheCreation1hTokens: row.cacheCreation1hTokens ?? 0,
+                inputAudioTokens: 0,
+                outputAudioTokens: 0,
+              }) ?? null),
+        };
+      });
+    }
+
+    return {
+      windowDays: PREVIEW_WINDOW_DAYS,
+      totalMatchedSpans: matchedModels.reduce((sum, m) => sum + m.spanCount, 0),
+      matchedModels,
+      sampleSpans,
+      unmatchedModels,
+    };
   }
 
-  return {
-    windowDays: PREVIEW_WINDOW_DAYS,
-    totalMatchedSpans: matchedModels.reduce((sum, m) => sum + m.spanCount, 0),
-    matchedModels,
-    sampleSpans,
-    unmatchedModels,
-  };
-}
+  /**
+   * Whether a span's detail view should suggest creating a model cost mapping:
+   * the span names a model and carries token usage, yet no cost was computed for
+   * it AND no stored rule matches the model. The last check keeps the suggestion
+   * off spans that pre-date a rule the reader already created.
+   */
+  async deriveUnmappedCostSuggestion({
+    costs,
+    projectId,
+    model,
+    cost,
+    promptTokens,
+    completionTokens,
+  }: {
+    costs: ModelCostRuleReader;
+    projectId: string;
+    model: string | null;
+    cost: number | null | undefined;
+    promptTokens: number | null | undefined;
+    completionTokens: number | null | undefined;
+  }): Promise<{ model: string } | null> {
+    if (!model) {
+      return null;
+    }
 
-/**
- * Whether a span's detail view should suggest creating a model cost mapping:
- * the span names a model and carries token usage, yet no cost was computed for
- * it AND no stored rule matches the model. The last check keeps the suggestion
- * off spans that pre-date a rule the reader already created.
- */
-export async function deriveUnmappedCostSuggestion({
-  costs,
-  projectId,
-  model,
-  cost,
-  promptTokens,
-  completionTokens,
-}: {
-  costs: ModelCostRuleReader;
-  projectId: string;
-  model: string | null;
-  cost: number | null | undefined;
-  promptTokens: number | null | undefined;
-  completionTokens: number | null | undefined;
-}): Promise<{ model: string } | null> {
-  if (!model) {
-    return null;
+    if (cost != null) {
+      return null;
+    }
+
+    const hasTokens = (promptTokens ?? 0) > 0 || (completionTokens ?? 0) > 0;
+    if (!hasTokens) {
+      return null;
+    }
+
+    const stored = await costs.listCosts({ projectId });
+    const rates = [...stored.map(storedRate), ...costs.staticCostRates()];
+    if (matchModelCost(model, rates)) {
+      return null;
+    }
+
+    return { model };
   }
-
-  if (cost != null) {
-    return null;
-  }
-
-  const hasTokens = (promptTokens ?? 0) > 0 || (completionTokens ?? 0) > 0;
-  if (!hasTokens) {
-    return null;
-  }
-
-  const stored = await costs.listCosts({ projectId });
-  const rates = [...stored.map(storedRate), ...costs.staticCostRates()];
-  if (matchModelCost(model, rates)) {
-    return null;
-  }
-
-  return { model };
 }

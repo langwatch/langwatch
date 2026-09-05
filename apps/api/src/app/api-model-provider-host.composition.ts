@@ -13,15 +13,13 @@
  * package's real `isSafeRegex` here rather than anything conservative.
  */
 import {
+  AiCallFailureService,
   CodexAccountService,
-  getModelLimits,
   HttpModelProviderCredentialProbeAdapter,
-  isSafeRegex,
-  previewCostRuleMatchingSpans,
+  ModelCostPreviewService,
+  ModelCostRegexSafetyService,
+  ModelLimitsService,
   SsrfModelProviderEgressAdapter,
-  validateKeyWithCustomUrl,
-  validateProviderApiKey,
-  wrapAiCall,
   type ModelCostPreviewSpanReader,
   type ModelProviderEgressPolicy,
   type LlmModelCostTrpcPorts,
@@ -87,9 +85,13 @@ class ApiComposedModelProviderHost extends ApiModelProviderHostPort {
   > {
     return {
       validateProviderApiKey: (provider, customKeys) =>
-        validateProviderApiKey(provider, customKeys, this.egress()),
+        HttpModelProviderCredentialProbeAdapter.validateProviderApiKey(
+          provider,
+          customKeys,
+          this.egress(),
+        ),
       validateKeyWithCustomUrl: (input) =>
-        validateKeyWithCustomUrl({
+        HttpModelProviderCredentialProbeAdapter.validateKeyWithCustomUrl({
           ...input,
           environment: this.options.environment,
           egress: this.egress(),
@@ -101,9 +103,12 @@ class ApiComposedModelProviderHost extends ApiModelProviderHostPort {
 
   costRules(): LlmModelCostTrpcPorts {
     const processName = this.options.processName;
+    const regexSafety = ModelCostRegexSafetyService.create();
+    const modelLimits = ModelLimitsService.create();
+    const preview = ModelCostPreviewService.create({ regexSafety });
     return {
-      isSafeRegex,
-      getModelLimits,
+      isSafeRegex: (pattern) => regexSafety.isSafeRegex(pattern),
+      getModelLimits: (model) => modelLimits.getModelLimits(model),
       previewMatchingSpans: ({ spans, input }) => {
         // The reader is the trace read stack's, carried through the
         // application as an opaque handle: only a process that composed one
@@ -114,13 +119,14 @@ class ApiComposedModelProviderHost extends ApiModelProviderHostPort {
         if (!isPreviewSpanReader(spans)) {
           return Promise.reject(new ApiCostPreviewUnavailableError(processName));
         }
-        return previewCostRuleMatchingSpans({ spans, input });
+        return preview.previewCostRuleMatchingSpans({ spans, input });
       },
     };
   }
 
   translate(): TranslateTrpcPorts {
-    return { wrapAiCall };
+    const failures = AiCallFailureService.create();
+    return { wrapAiCall: (feature, call) => failures.wrapAiCall(feature, call) };
   }
 }
 

@@ -1,6 +1,6 @@
 import type { ChainableCommander } from "ioredis";
 import { describe, expect, it } from "vitest";
-import { execWithNoScriptRecovery } from "../queue.repository";
+import { QueueRedisRepository } from "../queue.repository";
 
 /**
  * A pipeline whose queued commands all come back NOSCRIPT — what Redis returns
@@ -22,19 +22,19 @@ const noScript = (): [Error | null, unknown] => [
   null,
 ];
 
-describe("execWithNoScriptRecovery", () => {
+describe("QueueRedisRepository.execWithNoScriptRecovery", () => {
   describe("given every queued command came back NOSCRIPT", () => {
     describe("when the batch is resolved", () => {
       it("re-runs each one and returns what the re-run produced", async () => {
         const reran: number[] = [];
 
-        const results = await execWithNoScriptRecovery(
-          pipelineReturning([noScript(), noScript()]),
-          async (index) => {
+        const results = await QueueRedisRepository.execWithNoScriptRecovery({
+          pipeline: pipelineReturning([noScript(), noScript()]),
+          rerun: async (index) => {
             reran.push(index);
             return index === 0 ? 1 : 5;
           },
-        );
+        });
 
         // Without this the bulk paths report "nothing to do" on a cold cache:
         // an operator's "unblock everything" silently does nothing.
@@ -52,13 +52,13 @@ describe("execWithNoScriptRecovery", () => {
       it("re-runs only those, leaving the ones that already ran alone", async () => {
         const reran: number[] = [];
 
-        const results = await execWithNoScriptRecovery(
-          pipelineReturning([[null, 1], noScript(), [null, 0]]),
-          async (index) => {
+        const results = await QueueRedisRepository.execWithNoScriptRecovery({
+          pipeline: pipelineReturning([[null, 1], noScript(), [null, 0]]),
+          rerun: async (index) => {
             reran.push(index);
             return 9;
           },
-        );
+        });
 
         // A NOSCRIPT is returned BEFORE the script body executes, so an entry
         // reporting it provably did not run and re-running cannot double-apply.
@@ -80,13 +80,13 @@ describe("execWithNoScriptRecovery", () => {
         const connectionLost: [Error | null, unknown] = [new Error("Connection is closed."), null];
         let wasRerun = false;
 
-        const results = await execWithNoScriptRecovery(
-          pipelineReturning([connectionLost]),
-          async () => {
+        const results = await QueueRedisRepository.execWithNoScriptRecovery({
+          pipeline: pipelineReturning([connectionLost]),
+          rerun: async () => {
             wasRerun = true;
             return 1;
           },
-        );
+        });
 
         // Ambiguous failures (a reset after send) may or may not have executed,
         // so leaving them alone is the conservative choice.
@@ -99,12 +99,12 @@ describe("execWithNoScriptRecovery", () => {
   describe("given a re-run itself throws", () => {
     describe("when the batch is resolved", () => {
       it("reports it as that entry's error instead of rejecting the batch", async () => {
-        const results = await execWithNoScriptRecovery(
-          pipelineReturning([noScript()]),
-          async () => {
+        const results = await QueueRedisRepository.execWithNoScriptRecovery({
+          pipeline: pipelineReturning([noScript()]),
+          rerun: async () => {
             throw new Error("still unreachable");
           },
-        );
+        });
 
         expect(results[0]![0]).toBeInstanceOf(Error);
         expect((results[0]![0] as Error).message).toBe("still unreachable");
@@ -115,10 +115,10 @@ describe("execWithNoScriptRecovery", () => {
   describe("given the pipeline resolved to nothing", () => {
     describe("when the batch is resolved", () => {
       it("returns an empty batch rather than null", async () => {
-        const results = await execWithNoScriptRecovery(
-          { exec: async () => null } as unknown as ChainableCommander,
-          async () => 1,
-        );
+        const results = await QueueRedisRepository.execWithNoScriptRecovery({
+          pipeline: { exec: async () => null } as unknown as ChainableCommander,
+          rerun: async () => 1,
+        });
 
         expect(results).toEqual([]);
       });

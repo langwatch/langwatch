@@ -21,10 +21,10 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
-import { ManagerExplorerService } from "../manager-explorer.service";
-import { ProcessAuditRepository } from "../../repositories/prisma/prisma.process-audit.repository";
-import { ProcessOpsPrismaRepository } from "../../repositories/prisma/prisma.process-ops.repository";
-import { OpsEventingIntrospectionPort } from "../../ports/eventing-introspection.port";
+import { ManagerExplorerService } from "../services/manager-explorer.service";
+import { ProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository";
+import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository";
+import { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -60,12 +60,12 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
 
-    fleet = new ProcessOpsPrismaRepository(prisma);
+    fleet = ProcessOpsPrismaRepository.create({ prisma });
     store = PrismaProcessStore.create({ database: prisma });
-    service = new ManagerExplorerService({
+    service = ManagerExplorerService.create({
       store,
       fleet,
-      audit: new ProcessAuditRepository(prisma),
+      audit: ProcessAuditRepository.create({ prisma }),
       introspection: new NoopIntrospection(),
     });
   });

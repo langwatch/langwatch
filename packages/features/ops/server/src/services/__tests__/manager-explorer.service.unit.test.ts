@@ -2,7 +2,7 @@ import type { ProcessStore } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ManagerExplorerService } from "../manager-explorer.service";
-import { NullProcessAuditSink } from "../../repositories/prisma/prisma.process-audit.repository";
+import { NullProcessAuditSink } from "../../ports/process-audit.sink";
 import { NullProcessOpsRepository } from "../../ports/process-ops.repository";
 import {
   OpsEventingIntrospectionPort,
@@ -26,10 +26,10 @@ class FakeIntrospection extends OpsEventingIntrospectionPort {
 }
 
 const makeService = (store: ProcessStore) =>
-  new ManagerExplorerService({
+  ManagerExplorerService.create({
     store,
     fleet: new NullProcessOpsRepository(),
-    audit: new NullProcessAuditSink(),
+    audit: NullProcessAuditSink.create(),
     introspection: new FakeIntrospection(),
   });
 

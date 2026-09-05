@@ -20,6 +20,12 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { createModelDefaultsRestApp } from "../model-defaults.api";
 
+class ApiKeyPermissionDeniedTestError extends HandledError {
+  constructor() {
+    super("api_key_permission_denied", "denied", { httpStatus: 403, fault: "customer" });
+  }
+}
+
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
     const serialized = error.serialize();
@@ -60,10 +66,7 @@ function deniedCeiling(): {
     authorizeApiKeyCeiling: ({ permission }) => {
       asked.push(permission);
       return async () => {
-        throw new HandledError("api_key_permission_denied", "denied", {
-          httpStatus: 403,
-          fault: "customer",
-        });
+        throw new ApiKeyPermissionDeniedTestError();
       };
     },
     authenticateOrganization: () => pass,

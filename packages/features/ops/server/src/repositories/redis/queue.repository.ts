@@ -25,13 +25,13 @@ import type {
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
 import { QueuePayloadDecoderPort } from "../../ports/queue-payload-decoder.port";
+import { QueueRepository } from "../queue.repository";
 import type {
   BlockedSummary,
   DlqGroupInfo,
   DrainPreview,
   JobEntry,
   ParkedTenantsPage,
-  QueueRepository,
   ReconcileResult,
 } from "../queue.repository";
 
@@ -445,37 +445,6 @@ function isClusterClient(client: IORedis | Cluster): client is Cluster {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-/**
- * Run a pipeline of cached scripts, re-running any entry the node had no cached
- * copy of.
- *
- * `queue()` sends EVALSHA with no fallback of its own — a queued command cannot
- * retry itself — so a node whose script cache is cold (restart, SCRIPT FLUSH,
- * or the first call against a fresh cluster node) fails EVERY entry in the
- * batch with NOSCRIPT. These are the bulk operator paths, so without this a
- * "drain everything" would report zero drained and quietly do nothing. Re-running
- * through `run()` both completes the work and loads the source for later calls.
- *
- * Returns the same `[err, value]` tuples `pipeline.exec()` does, so callers read
- * the results exactly as before.
- */
-export async function execWithNoScriptRecovery(
-  pipeline: ChainableCommander,
-  rerun: (index: number) => Promise<unknown>,
-): Promise<Array<[Error | null, unknown]>> {
-  const results = (await pipeline.exec()) ?? [];
-  return await Promise.all(
-    results.map(async (result, index): Promise<[Error | null, unknown]> => {
-      if (!isNoScriptResult(result)) return result;
-      try {
-        return [null, await rerun(index)];
-      } catch (err) {
-        return [err instanceof Error ? err : new Error(String(err)), null];
-      }
-    }),
-  );
-}
-
 function stripHashTag(name: string): string {
   if (name.startsWith("{") && name.endsWith("}")) {
     return name.slice(1, -1);
@@ -492,14 +461,59 @@ function resolveRetryCount(attemptRaw: string | null): number | null {
 
 // ── Repository Implementation ────────────────────────────────────────
 
-export class QueueRedisRepository implements QueueRepository {
+export class QueueRedisRepository extends QueueRepository {
   private readonly redis: IORedis | Cluster;
   private readonly payloads: QueuePayloadDecoderPort;
 
-  constructor(
+  static create({
+    redis,
+    payloads,
+  }: {
+    redis: IORedis | Cluster;
+    payloads?: QueuePayloadDecoderPort;
+  }): QueueRedisRepository {
+    return new QueueRedisRepository(redis, payloads);
+  }
+
+  /**
+   * Run a pipeline of cached scripts, re-running any entry the node had no
+   * cached copy of.
+   *
+   * `queue()` sends EVALSHA with no fallback of its own — a queued command
+   * cannot retry itself — so a node whose script cache is cold (restart,
+   * SCRIPT FLUSH, or the first call against a fresh cluster node) fails EVERY
+   * entry in the batch with NOSCRIPT. These are the bulk operator paths, so
+   * without this a "drain everything" would report zero drained and quietly do
+   * nothing. Re-running through `run()` both completes the work and loads the
+   * source for later calls.
+   *
+   * Returns the same `[err, value]` tuples `pipeline.exec()` does.
+   */
+  static async execWithNoScriptRecovery({
+    pipeline,
+    rerun,
+  }: {
+    pipeline: ChainableCommander;
+    rerun: (index: number) => Promise<unknown>;
+  }): Promise<Array<[Error | null, unknown]>> {
+    const results = (await pipeline.exec()) ?? [];
+    return await Promise.all(
+      results.map(async (result, index): Promise<[Error | null, unknown]> => {
+        if (!isNoScriptResult(result)) return result;
+        try {
+          return [null, await rerun(index)];
+        } catch (err) {
+          return [err instanceof Error ? err : new Error(String(err)), null];
+        }
+      }),
+    );
+  }
+
+  private constructor(
     redis: IORedis | Cluster,
     payloads: QueuePayloadDecoderPort = new NullQueuePayloadDecoder(),
   ) {
+    super();
     this.redis = redis;
     this.payloads = payloads;
   }
@@ -1185,9 +1199,10 @@ export class QueueRedisRepository implements QueueRepository {
       for (const args of argsByIndex) {
         unblockScript.queue(pipeline, 9, ...args);
       }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
-      );
+      const results = await QueueRedisRepository.execWithNoScriptRecovery({
+        pipeline,
+        rerun: (index) => unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
+      });
       if (results) {
         for (const [err, result] of results) {
           if (!err && result === 1) unblockedCount++;
@@ -1353,9 +1368,10 @@ export class QueueRedisRepository implements QueueRepository {
       for (const args of argsByIndex) {
         drainGroupScript.queue(pipeline, 11, ...args);
       }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        drainGroupScript.run(this.redis, 11, ...argsByIndex[index]!),
-      );
+      const results = await QueueRedisRepository.execWithNoScriptRecovery({
+        pipeline,
+        rerun: (index) => drainGroupScript.run(this.redis, 11, ...argsByIndex[index]!),
+      });
       if (!results) continue;
       for (const [err, value] of results) {
         if (err) continue;
@@ -1450,9 +1466,10 @@ export class QueueRedisRepository implements QueueRepository {
       for (const args of argsByIndex) {
         moveToDlqScript.queue(pipeline, 14, ...args);
       }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        moveToDlqScript.run(this.redis, 14, ...argsByIndex[index]!),
-      );
+      const results = await QueueRedisRepository.execWithNoScriptRecovery({
+        pipeline,
+        rerun: (index) => moveToDlqScript.run(this.redis, 14, ...argsByIndex[index]!),
+      });
       if (results) {
         for (const [err, result] of results) {
           if (!err) {
@@ -1541,9 +1558,10 @@ export class QueueRedisRepository implements QueueRepository {
       for (const args of argsByIndex) {
         replayFromDlqScript.queue(pipeline, 8, ...args);
       }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
-      );
+      const results = await QueueRedisRepository.execWithNoScriptRecovery({
+        pipeline,
+        rerun: (index) => replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
+      });
       if (results) {
         for (const [err, result] of results) {
           if (!err) {
@@ -1619,9 +1637,10 @@ export class QueueRedisRepository implements QueueRepository {
       for (const args of argsByIndex) {
         params.script.queue(pipeline, params.keyCount, ...args);
       }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        params.script.run(this.redis, params.keyCount, ...argsByIndex[index]!),
-      );
+      const results = await QueueRedisRepository.execWithNoScriptRecovery({
+        pipeline,
+        rerun: (index) => params.script.run(this.redis, params.keyCount, ...argsByIndex[index]!),
+      });
       for (const [err, result] of results ?? []) {
         if (err) continue;
         params.onResult(result);
@@ -1717,9 +1736,10 @@ export class QueueRedisRepository implements QueueRepository {
     for (const args of argsByIndex) {
       replayFromDlqScript.queue(pipeline, 8, ...args);
     }
-    const results = await execWithNoScriptRecovery(pipeline, (index) =>
-      replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
-    );
+    const results = await QueueRedisRepository.execWithNoScriptRecovery({
+      pipeline,
+      rerun: (index) => replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
+    });
 
     let redrivenCount = 0;
     const redrivenIds: string[] = [];
@@ -1779,9 +1799,10 @@ export class QueueRedisRepository implements QueueRepository {
     for (const args of argsByIndex) {
       unblockScript.queue(unblockPipeline, 9, ...args);
     }
-    const results = await execWithNoScriptRecovery(unblockPipeline, (index) =>
-      unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
-    );
+    const results = await QueueRedisRepository.execWithNoScriptRecovery({
+      pipeline: unblockPipeline,
+      rerun: (index) => unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
+    });
 
     let unblockedCount = 0;
     const unblockedIds: string[] = [];

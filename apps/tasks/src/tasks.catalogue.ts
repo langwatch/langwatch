@@ -17,7 +17,6 @@ import {
   ModelProviderCredentialsMigrateTask,
   ModelProviderCustomModelsMigrateTask,
   ModelRegistrySyncTask,
-  modelProviderCredentialCipherFromEnv,
 } from "@langwatch/model-provider-server";
 import { ProcessManagerPurgeTask } from "@langwatch/ops-server";
 import type { Task } from "@langwatch/task";
@@ -28,6 +27,7 @@ import { buildObjectStorageMigrateTask } from "./platform/object-storage-migrate
 import { buildStalledRunsBackfillTask } from "./platform/stalled-runs-backfill.composition";
 import { buildSystemMigrationsPassTask } from "./platform/system-migrations.composition";
 import type { TasksEventingInfrastructure } from "./platform/tasks-eventing.composition";
+import { modelProviderCredentialCipherFromEnv } from "./platform/model-provider-credential-cipher.composition";
 import { PrismaMigrateTask } from "./tasks/prisma-migrate.task";
 import type { TasksHost } from "./platform/tasks-host.composition";
 

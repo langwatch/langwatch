@@ -5,8 +5,12 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * Tenants for the migration runner are organizations, walked in id order so
  * a pass is stable however often it restarts.
  */
-export class PrismaOrganizationTenantSource implements TenantSource {
-  constructor(private readonly prisma: PrismaClient) {}
+export class PrismaOrganizationTenantSourceRepository implements TenantSource {
+  static create({ prisma }: { prisma: PrismaClient }): PrismaOrganizationTenantSourceRepository {
+    return new PrismaOrganizationTenantSourceRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {}
 
   async findTenantIdsAfter({
     cursor,

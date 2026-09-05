@@ -8,7 +8,6 @@ import type { CodexTokenKeys } from "@langwatch/model-provider-contract";
 import {
   CodexAccountService,
   CodexAuthError,
-  decodeCodexClaims,
 } from "../codex-oauth.model-provider-token-refresher.adapter";
 
 /** A minimal unsigned JWT with the OpenAI auth claim, base64url-encoded. */
@@ -189,9 +188,9 @@ describe("CodexAccountService", () => {
     });
   });
 
-  describe("decodeCodexClaims", () => {
+  describe("CodexAccountService.decodeCodexClaims", () => {
     it("reads account id, plan and email from the OpenAI auth claim", () => {
-      expect(decodeCodexClaims(ID_TOKEN)).toEqual({
+      expect(CodexAccountService.decodeCodexClaims(ID_TOKEN)).toEqual({
         accountId: "acct-123",
         email: "dev@example.com",
         plan: "pro",
@@ -199,7 +198,7 @@ describe("CodexAccountService", () => {
     });
 
     it("degrades to empty fields on garbage input", () => {
-      expect(decodeCodexClaims("not-a-jwt")).toEqual({
+      expect(CodexAccountService.decodeCodexClaims("not-a-jwt")).toEqual({
         accountId: "",
         email: "",
         plan: "",

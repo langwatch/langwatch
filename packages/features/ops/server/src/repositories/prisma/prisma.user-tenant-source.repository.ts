@@ -7,8 +7,12 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * can belong to many organizations or none). Same paging contract as the
  * organization source, so the generic runner drives both unchanged.
  */
-export class PrismaUserTenantSource implements TenantSource {
-  constructor(private readonly prisma: PrismaClient) {}
+export class PrismaUserTenantSourceRepository implements TenantSource {
+  static create({ prisma }: { prisma: PrismaClient }): PrismaUserTenantSourceRepository {
+    return new PrismaUserTenantSourceRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {}
 
   async findTenantIdsAfter({
     cursor,
@@ -32,11 +36,27 @@ export class PrismaUserTenantSource implements TenantSource {
  * user-rooted migration: the operator names an organization (pacing stays
  * org-driven) and the pass drives its members.
  */
-export class PrismaOrganizationMemberTenantSource implements TenantSource {
+export class PrismaOrganizationMemberTenantSourceRepository implements TenantSource {
   private readonly prisma: PrismaClient;
   private readonly organizationId: string;
 
-  constructor({ prisma, organizationId }: { prisma: PrismaClient; organizationId: string }) {
+  static create({
+    prisma,
+    organizationId,
+  }: {
+    prisma: PrismaClient;
+    organizationId: string;
+  }): PrismaOrganizationMemberTenantSourceRepository {
+    return new PrismaOrganizationMemberTenantSourceRepository({ prisma, organizationId });
+  }
+
+  private constructor({
+    prisma,
+    organizationId,
+  }: {
+    prisma: PrismaClient;
+    organizationId: string;
+  }) {
     this.prisma = prisma;
     this.organizationId = organizationId;
   }

@@ -44,7 +44,7 @@ describe.skipIf(!DB_URL)("given organizations of every eligibility kind", () => 
       guard: PrismaTenancyGuardService.create(),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
-    repository = new PrismaSystemMigrationEnrollmentRepository(prisma);
+    repository = PrismaSystemMigrationEnrollmentRepository.create({ prisma });
 
     const make = (label: string) =>
       prisma.organization.create({

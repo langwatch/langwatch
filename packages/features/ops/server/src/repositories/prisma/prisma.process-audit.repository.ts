@@ -1,48 +1,12 @@
 import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
 
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-
-export type ProcessControlAction =
-  | "process_wake_now"
-  | "process_redrive_dead_instance"
-  | "process_redrive_dead_message"
-  | "process_discard_dead_message"
-  /** Fleet-scoped acts record a pseudo-ref (`__fleet__`/`__all__`), the same
-   *  shape scheduled singletons use for their `__global__` pseudo-project;
-   *  the count moved lives in metadata. */
-  | "process_redrive_dead_letters"
-  | "process_discard_dead_letters"
-  | "process_release_lapsed_lease";
-
-export interface ProcessAuditSink {
-  append(entry: {
-    actorUserId: string;
-    action: ProcessControlAction;
-    /** Null for a fleet-scoped act, which belongs to no one process. */
-    processName: string | null;
-    /** Null for a cross-tenant act. Never a placeholder: a made-up id in
-     *  this column reads as a real project to everything that queries it. */
-    projectId: string | null;
-    processKey: string | null;
-    metadata?: Record<string, unknown>;
-  }): Promise<void>;
-  listRecent(params: { limit: number }): Promise<ProcessAuditEntryView[]>;
-}
+import { ProcessAuditSink, type ProcessControlAction } from "../../ports/process-audit.sink";
 
 const TARGET_KIND = "process_instance";
 
 /** Target of an act that names no single instance; the scope is in metadata. */
 const FLEET_TARGET_ID = "fleet";
-
-/** For app presets that run without Postgres. */
-export class NullProcessAuditSink implements ProcessAuditSink {
-  async append(): Promise<void> {
-    // no-op
-  }
-  async listRecent(): Promise<ProcessAuditEntryView[]> {
-    return [];
-  }
-}
 
 /**
  * Writes process-manager operator actions to the shared audit log, the same
@@ -50,8 +14,14 @@ export class NullProcessAuditSink implements ProcessAuditSink {
  * customer-visible effect re-emitted out of band, so "why did this deliver at
  * 03:14" must be answerable without anyone's memory.
  */
-export class ProcessAuditRepository implements ProcessAuditSink {
-  constructor(private readonly prisma: PrismaClient) {}
+export class ProcessAuditRepository extends ProcessAuditSink {
+  static create({ prisma }: { prisma: PrismaClient }): ProcessAuditRepository {
+    return new ProcessAuditRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {
+    super();
+  }
 
   async append(entry: {
     actorUserId: string;

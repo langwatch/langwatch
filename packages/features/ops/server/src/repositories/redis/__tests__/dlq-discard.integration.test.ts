@@ -60,7 +60,7 @@ describe.skipIf(!hasRedis)("DLQ discard and explicit-id redrive", () => {
       /** @scenario Discarding a DLQ group removes it and remembers the act */
       it("removes the group's entries and returns what the audit row must record", async () => {
         const { queueName, prefix } = freshQueue();
-        const repo = new QueueRedisRepository(redis);
+        const repo = QueueRedisRepository.create({ redis });
         await seedDlqGroup(prefix, "group-a", { jobs: 3, error: "HTTP 500" });
 
         const result = await repo.discardManyFromDlq({
@@ -81,7 +81,7 @@ describe.skipIf(!hasRedis)("DLQ discard and explicit-id redrive", () => {
       /** @scenario A discarded DLQ group cannot be redriven afterwards */
       it("keeps a discarded group out of every later redrive", async () => {
         const { queueName, prefix } = freshQueue();
-        const repo = new QueueRedisRepository(redis);
+        const repo = QueueRedisRepository.create({ redis });
         await seedDlqGroup(prefix, "group-a");
         await seedDlqGroup(prefix, "group-b");
 
@@ -106,7 +106,7 @@ describe.skipIf(!hasRedis)("DLQ discard and explicit-id redrive", () => {
       /** @scenario Bulk DLQ actions act on exactly what is shown */
       it("redrives only the named ids and leaves the rest dead-lettered", async () => {
         const { queueName, prefix } = freshQueue();
-        const repo = new QueueRedisRepository(redis);
+        const repo = QueueRedisRepository.create({ redis });
         await seedDlqGroup(prefix, "group-a");
         await seedDlqGroup(prefix, "group-b");
 

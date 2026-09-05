@@ -109,25 +109,6 @@ function emptyPhases(): DashboardData["phases"] {
   };
 }
 
-export function mapJobTypeToPhase(
-  jobType: string | null | undefined,
-): "commands" | "projections" | "reactions" {
-  if (!jobType) {
-    return "commands";
-  }
-
-  const lower = jobType.toLowerCase();
-  if (lower === "projection" || lower === "handler" || lower === "stateprojection") {
-    return "projections";
-  }
-
-  if (lower === "reactor" || lower === "reaction") {
-    return "reactions";
-  }
-
-  return "commands";
-}
-
 /**
  * Raw `__jobType` values become the projection-kind node names the health
  * join looks up: folds enqueue as `projection`, maps as `handler`, state
@@ -207,107 +188,6 @@ function mergeThroughput({
     .slice(-THROUGHPUT_BUFFER_SIZE);
 }
 
-export function buildPipelineTree({
-  queues,
-  seedKeys = [],
-}: {
-  queues: QueueInfo[];
-  seedKeys?: string[];
-}): PipelineNode[] {
-  const pipelineMap = new Map<
-    string,
-    Map<string, Map<string, { pending: number; active: number; blocked: number }>>
-  >();
-
-  const ensurePath = (pName: string, jType?: string, jName?: string) => {
-    if (!pipelineMap.has(pName)) {
-      pipelineMap.set(pName, new Map());
-    }
-
-    if (jType) {
-      const normalized = normalizeJobType(jType);
-      const typeMap = pipelineMap.get(pName)!;
-      if (!typeMap.has(normalized)) {
-        typeMap.set(normalized, new Map());
-      }
-
-      if (jName) {
-        const nameMap = typeMap.get(normalized)!;
-        if (!nameMap.has(jName)) {
-          nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
-        }
-      }
-    }
-  };
-
-  for (const key of seedKeys) {
-    const parts = key.split("/");
-    if (parts.length >= 1) {
-      ensurePath(parts[0]!, parts[1], parts[2]);
-    }
-  }
-
-  for (const queue of queues) {
-    for (const group of queue.groups) {
-      const pName = group.pipelineName ?? queue.displayName;
-      const jType = normalizeJobType(group.jobType ?? "default");
-      const jName = group.jobName ?? "default";
-
-      ensurePath(pName, jType, jName);
-      const nameMap = pipelineMap.get(pName)!.get(jType)!;
-      const existing = nameMap.get(jName)!;
-      existing.pending += group.pendingJobs;
-      existing.active += group.hasActiveJob ? 1 : 0;
-      existing.blocked += group.isBlocked ? 1 : 0;
-    }
-  }
-
-  const tree: PipelineNode[] = [];
-  for (const [pName, typeMap] of pipelineMap) {
-    const typeChildren: PipelineNode[] = [];
-    let pPending = 0,
-      pActive = 0,
-      pBlocked = 0;
-
-    for (const [jType, nameMap] of typeMap) {
-      const nameChildren: PipelineNode[] = [];
-      let tPending = 0,
-        tActive = 0,
-        tBlocked = 0;
-
-      for (const [jName, counts] of nameMap) {
-        nameChildren.push({ name: jName, ...counts, children: [] });
-        tPending += counts.pending;
-        tActive += counts.active;
-        tBlocked += counts.blocked;
-      }
-
-      typeChildren.push({
-        name: jType,
-        pending: tPending,
-        active: tActive,
-        blocked: tBlocked,
-        children: nameChildren,
-      });
-      pPending += tPending;
-      pActive += tActive;
-      pBlocked += tBlocked;
-    }
-
-    tree.push({
-      name: pName,
-      pending: pPending,
-      active: pActive,
-      blocked: pBlocked,
-      children: typeChildren,
-    });
-  }
-
-  tree.sort((a, b) => a.name.localeCompare(b.name));
-
-  return tree;
-}
-
 /**
  * The lease-elected snapshot writer (ADR-090).
  *
@@ -321,7 +201,7 @@ export function buildPipelineTree({
  * (`packages/features/ops/specs/pending-counter-reconcile.feature`), and stacking the snapshot
  * lease on top would make several of that spec's scenarios unreachable.
  */
-export class OpsMetricsCollector {
+export class OpsMetricsCollectorService {
   private redis: IORedis | Cluster;
   private groupQueueNames: string[] = [];
   private throughputBuffer: ThroughputPoint[] = [];
@@ -427,7 +307,156 @@ export class OpsMetricsCollector {
   /** Latest scan, held so the detail cycle can derive structure without rescanning. */
   private latestDetail: DetailSnapshot | null = null;
 
-  constructor(params: {
+  /** The one collector this process runs, once `getSingleton` has built it. */
+  private static singleton: OpsMetricsCollectorService | null = null;
+
+  static create(params: {
+    redis: IORedis | Cluster;
+    ops: OpsService;
+    snapshots?: OpsSnapshotService | null;
+    writerId?: string;
+  }): OpsMetricsCollectorService {
+    return new OpsMetricsCollectorService(params);
+  }
+
+  /** The process-wide collector, started on first call. */
+  static getSingleton(params: {
+    redis: IORedis | Cluster;
+    ops: OpsService;
+    snapshots?: OpsSnapshotService | null;
+  }): OpsMetricsCollectorService {
+    if (!OpsMetricsCollectorService.singleton) {
+      const collector = OpsMetricsCollectorService.create(params);
+      OpsMetricsCollectorService.singleton = collector;
+      collector.start().catch((err) => {
+        logger.error({ error: err }, "Failed to start ops metrics collector");
+      });
+    }
+
+    return OpsMetricsCollectorService.singleton;
+  }
+
+  static mapJobTypeToPhase(
+    jobType: string | null | undefined,
+  ): "commands" | "projections" | "reactions" {
+    if (!jobType) {
+      return "commands";
+    }
+
+    const lower = jobType.toLowerCase();
+    if (lower === "projection" || lower === "handler" || lower === "stateprojection") {
+      return "projections";
+    }
+
+    if (lower === "reactor" || lower === "reaction") {
+      return "reactions";
+    }
+
+    return "commands";
+  }
+
+  static buildPipelineTree({
+    queues,
+    seedKeys = [],
+  }: {
+    queues: QueueInfo[];
+    seedKeys?: string[];
+  }): PipelineNode[] {
+    const pipelineMap = new Map<
+      string,
+      Map<string, Map<string, { pending: number; active: number; blocked: number }>>
+    >();
+
+    const ensurePath = (pName: string, jType?: string, jName?: string) => {
+      if (!pipelineMap.has(pName)) {
+        pipelineMap.set(pName, new Map());
+      }
+
+      if (jType) {
+        const normalized = normalizeJobType(jType);
+        const typeMap = pipelineMap.get(pName)!;
+        if (!typeMap.has(normalized)) {
+          typeMap.set(normalized, new Map());
+        }
+
+        if (jName) {
+          const nameMap = typeMap.get(normalized)!;
+          if (!nameMap.has(jName)) {
+            nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
+          }
+        }
+      }
+    };
+
+    for (const key of seedKeys) {
+      const parts = key.split("/");
+      if (parts.length >= 1) {
+        ensurePath(parts[0]!, parts[1], parts[2]);
+      }
+    }
+
+    for (const queue of queues) {
+      for (const group of queue.groups) {
+        const pName = group.pipelineName ?? queue.displayName;
+        const jType = normalizeJobType(group.jobType ?? "default");
+        const jName = group.jobName ?? "default";
+
+        ensurePath(pName, jType, jName);
+        const nameMap = pipelineMap.get(pName)!.get(jType)!;
+        const existing = nameMap.get(jName)!;
+        existing.pending += group.pendingJobs;
+        existing.active += group.hasActiveJob ? 1 : 0;
+        existing.blocked += group.isBlocked ? 1 : 0;
+      }
+    }
+
+    const tree: PipelineNode[] = [];
+    for (const [pName, typeMap] of pipelineMap) {
+      const typeChildren: PipelineNode[] = [];
+      let pPending = 0,
+        pActive = 0,
+        pBlocked = 0;
+
+      for (const [jType, nameMap] of typeMap) {
+        const nameChildren: PipelineNode[] = [];
+        let tPending = 0,
+          tActive = 0,
+          tBlocked = 0;
+
+        for (const [jName, counts] of nameMap) {
+          nameChildren.push({ name: jName, ...counts, children: [] });
+          tPending += counts.pending;
+          tActive += counts.active;
+          tBlocked += counts.blocked;
+        }
+
+        typeChildren.push({
+          name: jType,
+          pending: tPending,
+          active: tActive,
+          blocked: tBlocked,
+          children: nameChildren,
+        });
+        pPending += tPending;
+        pActive += tActive;
+        pBlocked += tBlocked;
+      }
+
+      tree.push({
+        name: pName,
+        pending: pPending,
+        active: pActive,
+        blocked: pBlocked,
+        children: typeChildren,
+      });
+    }
+
+    tree.sort((a, b) => a.name.localeCompare(b.name));
+
+    return tree;
+  }
+
+  private constructor(params: {
     redis: IORedis | Cluster;
     ops: OpsService;
     snapshots?: OpsSnapshotService | null;
@@ -557,7 +586,7 @@ export class OpsMetricsCollector {
     }
 
     const treeSeedKeys = [...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths])];
-    const pipelineTree = buildPipelineTree({
+    const pipelineTree = OpsMetricsCollectorService.buildPipelineTree({
       queues: fullQueues,
       seedKeys: treeSeedKeys,
     });
@@ -778,7 +807,10 @@ export class OpsMetricsCollector {
             included: parked.tenants.length,
             total: parked.total,
           },
-          pipelineTree: buildPipelineTree({ queues, seedKeys: treeSeedKeys }),
+          pipelineTree: OpsMetricsCollectorService.buildPipelineTree({
+            queues,
+            seedKeys: treeSeedKeys,
+          }),
           phases: this.currentPhases,
           jobNameMetrics: this.currentJobNameMetrics,
           latencyWindows,
@@ -903,7 +935,7 @@ export class OpsMetricsCollector {
     const phases = emptyPhases();
     for (const q of queues) {
       for (const g of q.groups) {
-        const phase = mapJobTypeToPhase(g.jobType);
+        const phase = OpsMetricsCollectorService.mapJobTypeToPhase(g.jobType);
         phases[phase].pending += g.pendingJobs;
         phases[phase].active += g.hasActiveJob ? 1 : 0;
       }
@@ -934,7 +966,7 @@ export class OpsMetricsCollector {
       for (const g of q.groups) {
         const jobName = g.jobName ?? "unknown";
         const pipelineName = g.pipelineName ?? q.displayName;
-        const phase = mapJobTypeToPhase(g.jobType);
+        const phase = OpsMetricsCollectorService.mapJobTypeToPhase(g.jobType);
         const key = `${pipelineName}::${jobName}`;
         const existing = map.get(key);
         if (existing) {
@@ -1433,21 +1465,4 @@ export class OpsMetricsCollector {
       this.isCollecting = false;
     }
   }
-}
-
-let singleton: OpsMetricsCollector | null = null;
-
-export function getOpsMetricsCollector(params: {
-  redis: IORedis | Cluster;
-  ops: OpsService;
-  snapshots?: OpsSnapshotService | null;
-}): OpsMetricsCollector {
-  if (!singleton) {
-    singleton = new OpsMetricsCollector(params);
-    singleton.start().catch((err) => {
-      logger.error({ error: err }, "Failed to start ops metrics collector");
-    });
-  }
-
-  return singleton;
 }

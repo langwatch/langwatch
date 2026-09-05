@@ -54,9 +54,11 @@ export function composeApiOpsExplainRest(options: {
   if (!url || !apiKey) return undefined;
 
   const runtime = OpsClickHouseRuntime.create({ url, buildTime: false });
-  const service = new OpsExplainService(
-    new OpsExplainClickHouseRepository(new ApiOpsExplainClientResolver(runtime)),
-  );
+  const service = OpsExplainService.create({
+    repository: OpsExplainClickHouseRepository.create({
+      resolver: new ApiOpsExplainClientResolver(runtime),
+    }),
+  });
 
   return {
     ports: {

@@ -11,11 +11,11 @@ const REPLAY_STATUS_TTL_SECONDS = 7200;
 const REPLAY_HISTORY_MAX = 50;
 
 export class ReplayRedisRepository implements ReplayRepository {
-  private readonly redis: IORedis | Cluster;
-
-  constructor(redis: IORedis | Cluster) {
-    this.redis = redis;
+  static create({ redis }: { redis: IORedis | Cluster }): ReplayRedisRepository {
+    return new ReplayRedisRepository(redis);
   }
+
+  private constructor(private readonly redis: IORedis | Cluster) {}
 
   async getStatus(): Promise<ReplayStatus> {
     const raw = await this.redis.get(REPLAY_STATUS_KEY);

@@ -36,17 +36,14 @@ import {
   MissingAgentService,
   MissingSecretService,
 } from "../../../api.application";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
   stub,
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 import { composeOpsFeature } from "../ops.composition";
 
 const SESSION_USER = {
@@ -128,8 +125,7 @@ function composeApplication(
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: { ...stubComposedFeatures(), ops },
     infrastructure,
-    collaborators: composeApiTrpcCollaborators(testHalves(), {
-      ...stubApplicationSlices(),
+    collaborators: stubCollaborators({
       ops: ops.app,
     }),
   });

@@ -60,7 +60,7 @@ describe("EventExplorerService", () => {
     describe("when projection names match registry entries", () => {
       it("queries repo with matching aggregate types", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         await service.discoverAggregates({
           projectionNames: ["traceMetrics"],
@@ -79,7 +79,7 @@ describe("EventExplorerService", () => {
     describe("when no projection names match", () => {
       it("returns empty projections array", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         const result = await service.discoverAggregates({
           projectionNames: ["nonexistent"],
@@ -100,7 +100,7 @@ describe("EventExplorerService", () => {
             { aggregateType: "Trace", tenantId: "t2", aggregateCount: 20 },
           ]),
         });
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         const result = await service.discoverAggregates({
           projectionNames: ["traceMetrics"],
@@ -117,7 +117,7 @@ describe("EventExplorerService", () => {
     describe("when since is a date string", () => {
       it("converts to milliseconds for repo query", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         await service.discoverAggregates({
           projectionNames: ["traceMetrics"],
@@ -133,7 +133,7 @@ describe("EventExplorerService", () => {
     describe("when tenantIds are provided", () => {
       it("passes them through to repo", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         await service.discoverAggregates({
           projectionNames: ["traceMetrics"],
@@ -152,7 +152,7 @@ describe("EventExplorerService", () => {
     describe("when tenantIds are empty", () => {
       it("passes undefined to repo", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         await service.discoverAggregates({
           projectionNames: ["traceMetrics"],
@@ -173,7 +173,7 @@ describe("EventExplorerService", () => {
     describe("when tenantIds is empty", () => {
       it("passes undefined to repo", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         await service.searchAggregates({ query: "trace_abc", tenantIds: [] });
 
@@ -187,7 +187,7 @@ describe("EventExplorerService", () => {
     describe("when tenantIds has values", () => {
       it("passes them through to repo", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         await service.searchAggregates({
           query: "trace_abc",
@@ -216,7 +216,7 @@ describe("EventExplorerService", () => {
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
         });
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         const result = await service.getAggregateEvents({
           aggregateId: "a1",
@@ -241,7 +241,7 @@ describe("EventExplorerService", () => {
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
         });
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         const result = await service.getAggregateEvents({
           aggregateId: "a1",
@@ -258,7 +258,7 @@ describe("EventExplorerService", () => {
     describe("when projection not found in registry", () => {
       it("returns null state", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         const result = await service.computeProjectionState({
           aggregateId: "a1",
@@ -285,7 +285,7 @@ describe("EventExplorerService", () => {
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
         });
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         // experimentRun is in projection metadata but NOT in dejaView projections
         const result = await service.computeProjectionState({
@@ -320,7 +320,7 @@ describe("EventExplorerService", () => {
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
         });
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         const result = await service.computeProjectionState({
           aggregateId: "a1",
@@ -347,7 +347,7 @@ describe("EventExplorerService", () => {
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
         });
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         const result = await service.computeProjectionState({
           aggregateId: "a1",
@@ -393,7 +393,7 @@ describe("EventExplorerService", () => {
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
         });
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         const result = await service.computeProjectionState({
           aggregateId: "a1",
@@ -410,7 +410,7 @@ describe("EventExplorerService", () => {
     describe("when eventIndex limits events", () => {
       it("only processes events up to that index", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo, introspection);
+        const service = EventExplorerService.create({ repo, introspection });
 
         await service.computeProjectionState({
           aggregateId: "a1",

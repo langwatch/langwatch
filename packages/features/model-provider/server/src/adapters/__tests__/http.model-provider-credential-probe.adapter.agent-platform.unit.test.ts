@@ -16,7 +16,7 @@
 import { RedirectRefusedError } from "@langwatch/egress";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelProviderEgressPort } from "../../ports/model-provider.port";
-import { validateProviderApiKey as probeCredential } from "../http.model-provider-credential-probe.adapter";
+import { HttpModelProviderCredentialProbeAdapter } from "../http.model-provider-credential-probe.adapter";
 
 // The probe goes out through the guarded egress port the composition root
 // hands it rather than `global.fetch`, so that port is the seam these tests
@@ -30,7 +30,7 @@ const egress: ModelProviderEgressPort = {
 };
 
 const validateProviderApiKey = (provider: string, customKeys: Record<string, string>) =>
-  probeCredential(provider, customKeys, egress);
+  HttpModelProviderCredentialProbeAdapter.validateProviderApiKey(provider, customKeys, egress);
 
 const AGENT_PLATFORM_CREDENTIALS = {
   GEMINI_API_KEY: "AQ.AnAgentPlatformKey",

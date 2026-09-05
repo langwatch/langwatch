@@ -27,7 +27,11 @@ function parseStatus(raw: string): TenantMigrationStatus {
  * by migration name first.
  */
 export class PrismaSystemMigrationStateRepository implements SystemMigrationStateRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  static create({ prisma }: { prisma: PrismaClient }): PrismaSystemMigrationStateRepository {
+    return new PrismaSystemMigrationStateRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {}
 
   async findRecord({
     migrationName,

@@ -14,7 +14,11 @@ import type { MigrationEnrollmentRecord } from "../../services/system-migrations
  * storage facts.
  */
 export class PrismaSystemMigrationEnrollmentRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  static create({ prisma }: { prisma: PrismaClient }): PrismaSystemMigrationEnrollmentRepository {
+    return new PrismaSystemMigrationEnrollmentRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {}
 
   /**
    * Every enrollment with the names the ops page shows - the organization's,

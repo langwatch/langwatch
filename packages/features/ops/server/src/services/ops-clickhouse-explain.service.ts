@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 
-import type { OpsExplainClickHouseRepository } from "../repositories/clickhouse/clickhouse.ops-explain.repository";
+import type { OpsExplainRepository } from "../repositories/ops-explain.repository";
 import { CLICKHOUSE_GUARDRAILS } from "./ops-clickhouse-explain.core";
 
 const logger = createLogger("langwatch:ops:clickhouse:explain");
@@ -24,7 +24,11 @@ export type OpsExplainOutcome =
 export class OpsExplainService {
   private warnedAboutMissingOpsUrl = false;
 
-  constructor(private readonly repository: OpsExplainClickHouseRepository) {}
+  static create({ repository }: { repository: OpsExplainRepository }): OpsExplainService {
+    return new OpsExplainService(repository);
+  }
+
+  private constructor(private readonly repository: OpsExplainRepository) {}
 
   async explain({
     wrappedQuery,

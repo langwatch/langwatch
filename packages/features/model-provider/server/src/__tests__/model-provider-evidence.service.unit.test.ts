@@ -11,8 +11,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
-import { PostgresModelProviderEvidenceAdapter } from "../../adapters/postgres.model-provider-evidence.adapter";
-import { ModelCostProjectPort } from "../../ports/model-provider.port";
+import { PostgresModelProviderEvidenceAdapter } from "../adapters/postgres.model-provider-evidence.adapter";
+import { ModelCostProjectPort } from "../ports/model-provider.port";
 
 const PROJECT_ID = "project-1";
 const TEAM_ID = "team-1";

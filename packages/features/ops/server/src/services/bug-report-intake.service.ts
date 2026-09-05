@@ -43,82 +43,98 @@ export interface SubmitBugReportInput {
   metadata?: Record<string, string | number | boolean>;
 }
 
-export async function submitBugReport({
-  input,
-  callerKey,
-  apiToken,
-  projectIdHint,
-  apiKeys,
-  reports,
-  rateLimiter,
-  notifier,
-}: {
-  input: SubmitBugReportInput;
-  /** Rate-limit bucket for the caller (nearest-hop IP; self-asserted). */
-  callerKey: string;
-  apiToken?: string;
-  projectIdHint?: string | null;
-  apiKeys?: ApiKeyService;
-  reports: BugReportRepository;
-  rateLimiter: BugReportRateLimiterPort;
-  notifier: BugReportNotifierPort;
-}): Promise<{ id: string }> {
-  const limit = await rateLimiter.consume({
-    key: `bug-report:${callerKey}`,
-    windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
-    max: RATE_LIMIT_MAX_PER_WINDOW,
-  });
-  if (!limit.allowed) {
-    throw new BugReportRateLimitedError();
+export class BugReportIntakeService {
+  static create({
+    reports,
+    rateLimiter,
+    notifier,
+  }: {
+    reports: BugReportRepository;
+    rateLimiter: BugReportRateLimiterPort;
+    notifier: BugReportNotifierPort;
+  }): BugReportIntakeService {
+    return new BugReportIntakeService({ reports, rateLimiter, notifier });
   }
 
-  const linkedProjectId = await resolveLinkedProjectId({
+  private constructor(
+    private readonly deps: {
+      reports: BugReportRepository;
+      rateLimiter: BugReportRateLimiterPort;
+      notifier: BugReportNotifierPort;
+    },
+  ) {}
+
+  async submit({
+    input,
+    callerKey,
     apiToken,
     projectIdHint,
     apiKeys,
-  });
+  }: {
+    input: SubmitBugReportInput;
+    /** Rate-limit bucket for the caller (nearest-hop IP; self-asserted). */
+    callerKey: string;
+    apiToken?: string;
+    projectIdHint?: string | null;
+    apiKeys?: ApiKeyService;
+  }): Promise<{ id: string }> {
+    const limit = await this.deps.rateLimiter.consume({
+      key: `bug-report:${callerKey}`,
+      windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+      max: RATE_LIMIT_MAX_PER_WINDOW,
+    });
+    if (!limit.allowed) {
+      throw new BugReportRateLimitedError();
+    }
 
-  // Defense in depth: the CLI and MCP redact locally, but the endpoint is
-  // public, so a direct POST could carry raw secrets into this cross-tenant,
-  // admin-visible inbox. Pattern redaction re-runs here before persisting
-  // (no env pass: environment literals are a client-side concern).
-  const redacted = redactSubmission(input);
+    const linkedProjectId = await resolveLinkedProjectId({
+      apiToken,
+      projectIdHint,
+      apiKeys,
+    });
 
-  const report = await reports.create({
-    data: {
-      source: input.source,
-      kind: input.kind,
-      title: redacted.title,
-      summary: redacted.summary,
-      sessionData: redacted.sessionData,
-      sessionTruncated: input.sessionTruncated ?? false,
-      agent: input.agent,
-      contactEmail: input.contactEmail,
-      cliVersion: input.cliVersion,
-      linkedProjectId,
-      metadata: redacted.metadata,
-    },
-  });
+    // Defense in depth: the CLI and MCP redact locally, but the endpoint is
+    // public, so a direct POST could carry raw secrets into this cross-tenant,
+    // admin-visible inbox. Pattern redaction re-runs here before persisting
+    // (no env pass: environment literals are a client-side concern).
+    const redacted = redactSubmission(input);
 
-  logger.info(
-    {
-      reportId: report.id,
-      source: report.source,
-      kind: report.kind,
-      agent: report.agent,
-      linkedProjectId,
-    },
-    "bug report received",
-  );
+    const report = await this.deps.reports.create({
+      data: {
+        source: input.source,
+        kind: input.kind,
+        title: redacted.title,
+        summary: redacted.summary,
+        sessionData: redacted.sessionData,
+        sessionTruncated: input.sessionTruncated ?? false,
+        agent: input.agent,
+        contactEmail: input.contactEmail,
+        cliVersion: input.cliVersion,
+        linkedProjectId,
+        metadata: redacted.metadata,
+      },
+    });
 
-  try {
-    await notifier.notify({ report });
-  } catch (error) {
-    // The alert is best-effort; intake already succeeded.
-    logger.warn({ error, reportId: report.id }, "bug report Slack alert failed");
+    logger.info(
+      {
+        reportId: report.id,
+        source: report.source,
+        kind: report.kind,
+        agent: report.agent,
+        linkedProjectId,
+      },
+      "bug report received",
+    );
+
+    try {
+      await this.deps.notifier.notify({ report });
+    } catch (error) {
+      // The alert is best-effort; intake already succeeded.
+      logger.warn({ error, reportId: report.id }, "bug report Slack alert failed");
+    }
+
+    return { id: report.id };
   }
-
-  return { id: report.id };
 }
 
 function redactSubmission(input: SubmitBugReportInput): {

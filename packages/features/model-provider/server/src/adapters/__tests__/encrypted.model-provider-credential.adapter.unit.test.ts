@@ -11,10 +11,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import { ModelProviderCredentialCipherPort } from "../../ports/model-provider.port";
-import {
-  EncryptedModelProviderCredentialAdapter,
-  readCustomKeys as readWithCipher,
-} from "../encrypted.model-provider-credential.adapter";
+import { EncryptedModelProviderCredentialAdapter } from "../encrypted.model-provider-credential.adapter";
 
 /**
  * A cipher with the real one's shape and none of its cryptography: the two
@@ -35,7 +32,8 @@ class RecordedCipher extends ModelProviderCredentialCipherPort {
 
 const cipher = new RecordedCipher();
 const encrypt = (value: string): string => cipher.encrypt(value);
-const readCustomKeys = (raw: unknown) => readWithCipher(raw, cipher);
+const readCustomKeys = (raw: unknown) =>
+  EncryptedModelProviderCredentialAdapter.readCustomKeys(raw, cipher);
 
 /**
  * The three answers a stored credential bag can give.

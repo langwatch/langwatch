@@ -19,16 +19,13 @@ import {
   MissingSecretService,
 } from "../../../api.application";
 import { composeApiModelProviderHost } from "../../../app/api-model-provider-host.composition";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 import { composeModelProviderFeature } from "../model-provider.composition";
 
 const SESSION_USER = { id: "user-1", email: "sam@acme.test", role: "ADMIN" };
@@ -66,8 +63,7 @@ function composeApplication(options: { host?: ReturnType<typeof realHost> } = {}
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: { ...stubComposedFeatures(), modelProvider },
     infrastructure,
-    collaborators: composeApiTrpcCollaborators(testHalves(), {
-      ...stubApplicationSlices(),
+    collaborators: stubCollaborators({
       modelProviders: modelProvider.app,
     }),
   });

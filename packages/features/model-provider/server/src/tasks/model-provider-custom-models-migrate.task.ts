@@ -1,7 +1,7 @@
 import { getProviderModelOptions, type CustomModelEntry } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import { migrateCustomModelsRow } from "#services/model-provider-legacy-migration.service";
+import { ModelProviderLegacyMigrationService } from "#services/model-provider-legacy-migration.service";
 import type {
   ModelProviderMigrationDatabase,
   ModelProviderMigrationOutcome,
@@ -25,6 +25,7 @@ export async function runCustomModelsMigration({
   database: ModelProviderMigrationDatabase;
   registryLookup?: typeof getProviderModelOptions;
 }): Promise<ModelProviderMigrationOutcome> {
+  const migrations = ModelProviderLegacyMigrationService.create();
   const projects = await database.project.findMany({ select: { id: true } });
   logger.info({ projects: projects.length }, "Starting custom models migration");
 
@@ -38,7 +39,7 @@ export async function runCustomModelsMigration({
     });
 
     for (const row of rows) {
-      const result = migrateCustomModelsRow({
+      const result = migrations.migrateCustomModelsRow({
         row: row as {
           id: string;
           provider: string;

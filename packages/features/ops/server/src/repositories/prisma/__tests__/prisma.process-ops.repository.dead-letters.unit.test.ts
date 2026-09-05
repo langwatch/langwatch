@@ -49,7 +49,7 @@ const repoAnswering = (results: unknown[]) => {
   const queryRaw = vi.fn();
   for (const result of results) queryRaw.mockResolvedValueOnce(result);
   const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient;
-  return { repo: new ProcessOpsPrismaRepository(prisma), queryRaw };
+  return { repo: ProcessOpsPrismaRepository.create({ prisma }), queryRaw };
 };
 
 describe("ProcessOpsPrismaRepository dead-letter reads", () => {

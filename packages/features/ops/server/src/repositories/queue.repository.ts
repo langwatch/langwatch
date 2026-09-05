@@ -24,19 +24,19 @@ export type DrainPreview = OpsQueueDrainPreview;
 export type JobEntry = OpsQueueJob;
 export type ReconcileResult = OpsQueueReconcileResult;
 
-export interface QueueRepository {
-  discoverQueueNames(): Promise<string[]>;
+export abstract class QueueRepository {
+  abstract discoverQueueNames(): Promise<string[]>;
 
-  scanQueues(params: { queueNames: string[]; topN?: number }): Promise<QueueInfo[]>;
+  abstract scanQueues(params: { queueNames: string[]; topN?: number }): Promise<QueueInfo[]>;
 
-  getGroupJobs(params: {
+  abstract getGroupJobs(params: {
     queueName: string;
     groupId: string;
     page: number;
     pageSize: number;
   }): Promise<{ jobs: JobEntry[]; total: number }>;
 
-  getBlockedSummary(params: { queueNames: string[] }): Promise<BlockedSummary>;
+  abstract getBlockedSummary(params: { queueNames: string[] }): Promise<BlockedSummary>;
 
   /**
    * Enumerate tenants parked over their in-flight cap, deepest first.
@@ -46,7 +46,7 @@ export interface QueueRepository {
    * hundreds of thousands — which is exactly the case the dashboard has to
    * explain. Bounded by `maxTenants`; the reported `total` is unbounded.
    */
-  enumerateParkedTenants(params: {
+  abstract enumerateParkedTenants(params: {
     queueNames: string[];
     maxTenants: number;
   }): Promise<ParkedTenantsPage>;
@@ -58,61 +58,73 @@ export interface QueueRepository {
    * can hold hundreds of thousands of groups, and shipping those in a snapshot
    * every pod reads would recreate the size problem ADR-090 removes.
    */
-  listParkedGroups(params: {
+  abstract listParkedGroups(params: {
     queueName: string;
     tenantId: string;
     page: number;
     pageSize: number;
   }): Promise<{ groups: ParkedGroupInfo[]; total: number }>;
 
-  unblockGroup(params: { queueName: string; groupId: string }): Promise<{ wasBlocked: boolean }>;
+  abstract unblockGroup(params: {
+    queueName: string;
+    groupId: string;
+  }): Promise<{ wasBlocked: boolean }>;
 
-  unblockAll(params: { queueName: string }): Promise<{ unblockedCount: number }>;
+  abstract unblockAll(params: { queueName: string }): Promise<{ unblockedCount: number }>;
 
-  drainGroup(params: { queueName: string; groupId: string }): Promise<{ jobsRemoved: number }>;
+  abstract drainGroup(params: {
+    queueName: string;
+    groupId: string;
+  }): Promise<{ jobsRemoved: number }>;
 
-  pausePipeline(params: { queueName: string; key: string }): Promise<void>;
+  abstract pausePipeline(params: { queueName: string; key: string }): Promise<void>;
 
-  unpausePipeline(params: { queueName: string; key: string }): Promise<void>;
+  abstract unpausePipeline(params: { queueName: string; key: string }): Promise<void>;
 
-  retryBlocked(params: {
+  abstract retryBlocked(params: {
     queueName: string;
     groupId: string;
     jobId: string;
   }): Promise<{ wasBlocked: boolean }>;
 
-  listPausedKeys(params: { queueName: string }): Promise<string[]>;
+  abstract listPausedKeys(params: { queueName: string }): Promise<string[]>;
 
-  pauseTenant(params: { queueName: string; tenantId: string }): Promise<void>;
+  abstract pauseTenant(params: { queueName: string; tenantId: string }): Promise<void>;
 
-  unpauseTenant(params: { queueName: string; tenantId: string }): Promise<void>;
+  abstract unpauseTenant(params: { queueName: string; tenantId: string }): Promise<void>;
 
-  listPausedTenants(params: { queueName: string }): Promise<string[]>;
+  abstract listPausedTenants(params: { queueName: string }): Promise<string[]>;
 
-  drainTenant(params: {
+  abstract drainTenant(params: {
     queueName: string;
     tenantId: string;
     groupIdContains?: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }>;
 
-  moveToDlq(params: { queueName: string; groupId: string }): Promise<{ jobsMoved: number }>;
+  abstract moveToDlq(params: {
+    queueName: string;
+    groupId: string;
+  }): Promise<{ jobsMoved: number }>;
 
-  moveAllBlockedToDlq(params: {
+  abstract moveAllBlockedToDlq(params: {
     queueName: string;
     pipelineFilter?: string;
     errorFilter?: string;
   }): Promise<{ movedCount: number; jobsMoved: number }>;
 
-  replayFromDlq(params: { queueName: string; groupId: string }): Promise<{ jobsReplayed: number }>;
+  abstract replayFromDlq(params: {
+    queueName: string;
+    groupId: string;
+  }): Promise<{ jobsReplayed: number }>;
 
-  replayAllFromDlq(params: {
+  abstract replayAllFromDlq(params: {
     queueName: string;
     pipelineFilter?: string;
     errorFilter?: string;
   }): Promise<{ replayedCount: number; jobsReplayed: number }>;
 
   /** Redrive an explicit set of DLQ groups — the operator's shown set. */
-  redriveManyFromDlq(params: {
+  abstract redriveManyFromDlq(params: {
     queueName: string;
     groupIds: string[];
   }): Promise<{ redrivenCount: number; jobsRedriven: number }>;
@@ -121,33 +133,33 @@ export interface QueueRepository {
    * Discard an explicit set of DLQ groups: their jobs never run again.
    * Returns what the audit row must record — counts and an error sample.
    */
-  discardManyFromDlq(params: { queueName: string; groupIds: string[] }): Promise<{
+  abstract discardManyFromDlq(params: { queueName: string; groupIds: string[] }): Promise<{
     discardedCount: number;
     jobsDiscarded: number;
     lastErrors: string[];
   }>;
 
-  canaryRedrive(params: {
+  abstract canaryRedrive(params: {
     queueName: string;
     count?: number;
     pipelineFilter?: string;
   }): Promise<{ redrivenCount: number; groupIds: string[] }>;
 
-  canaryUnblock(params: {
+  abstract canaryUnblock(params: {
     queueName: string;
     count?: number;
     pipelineFilter?: string;
   }): Promise<{ unblockedCount: number; groupIds: string[] }>;
 
-  listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]>;
+  abstract listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]>;
 
-  drainAllBlockedPreview(params: {
+  abstract drainAllBlockedPreview(params: {
     queueName: string;
     pipelineFilter?: string;
     errorFilter?: string;
   }): Promise<DrainPreview>;
 
-  tryReconcileTotalPending(queueName: string): Promise<ReconcileResult | null>;
+  abstract tryReconcileTotalPending(queueName: string): Promise<ReconcileResult | null>;
 
   /**
    * The drift the most recent reconcile pass published for each named queue,
@@ -158,10 +170,18 @@ export interface QueueRepository {
    * reconciled, or the last one has aged out) is skipped rather than counted as
    * zero, so a queue that has stopped reconciling does not read as healthy.
    */
-  readPublishedPendingDrift(queueNames: string[]): Promise<number>;
+  abstract readPublishedPendingDrift(queueNames: string[]): Promise<number>;
 }
 
-export class NullQueueRepository implements QueueRepository {
+export class NullQueueRepository extends QueueRepository {
+  static create(): NullQueueRepository {
+    return new NullQueueRepository();
+  }
+
+  private constructor() {
+    super();
+  }
+
   async discoverQueueNames(): Promise<string[]> {
     return [];
   }

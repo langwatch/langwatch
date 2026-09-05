@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GroupInfo, QueueInfo } from "@langwatch/ops-contract";
-import { buildPipelineTree, mapJobTypeToPhase } from "../ops-metrics-collector.service";
+import { OpsMetricsCollectorService } from "../ops-metrics-collector.service";
 
 function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
   return {
@@ -41,10 +41,10 @@ function createQueue(overrides: Partial<QueueInfo> = {}): QueueInfo {
   };
 }
 
-describe("buildPipelineTree", () => {
+describe("OpsMetricsCollectorService.buildPipelineTree", () => {
   describe("when given empty queues and no seed keys", () => {
     it("returns empty array", () => {
-      expect(buildPipelineTree({ queues: [] })).toEqual([]);
+      expect(OpsMetricsCollectorService.buildPipelineTree({ queues: [] })).toEqual([]);
     });
   });
 
@@ -62,7 +62,7 @@ describe("buildPipelineTree", () => {
         ],
       });
 
-      const tree = buildPipelineTree({ queues: [queue] });
+      const tree = OpsMetricsCollectorService.buildPipelineTree({ queues: [queue] });
 
       expect(tree).toHaveLength(1);
       expect(tree[0]!.name).toBe("ingest");
@@ -80,7 +80,7 @@ describe("buildPipelineTree", () => {
         groups: [createGroup({ pendingJobs: 1 })],
       });
 
-      const tree = buildPipelineTree({ queues: [queue] });
+      const tree = OpsMetricsCollectorService.buildPipelineTree({ queues: [queue] });
 
       expect(tree[0]!.name).toBe("my-queue");
     });
@@ -88,7 +88,7 @@ describe("buildPipelineTree", () => {
 
   describe("when given seed keys from Redis", () => {
     it("creates nodes for known pipelines even without active groups", () => {
-      const tree = buildPipelineTree({
+      const tree = OpsMetricsCollectorService.buildPipelineTree({
         queues: [],
         seedKeys: ["analytics/fold/traceMetrics"],
       });
@@ -124,7 +124,7 @@ describe("buildPipelineTree", () => {
         ],
       });
 
-      const tree = buildPipelineTree({ queues: [q1, q2] });
+      const tree = OpsMetricsCollectorService.buildPipelineTree({ queues: [q1, q2] });
 
       expect(tree[0]!.pending).toBe(10);
     });
@@ -154,7 +154,7 @@ describe("buildPipelineTree", () => {
         ],
       });
 
-      const tree = buildPipelineTree({ queues: [queue] });
+      const tree = OpsMetricsCollectorService.buildPipelineTree({ queues: [queue] });
       const pipeline = tree[0]!;
 
       expect(pipeline.pending).toBe(3);
@@ -181,7 +181,7 @@ describe("buildPipelineTree", () => {
         ],
       });
 
-      const tree = buildPipelineTree({ queues: [queue] });
+      const tree = OpsMetricsCollectorService.buildPipelineTree({ queues: [queue] });
 
       expect(tree[0]!.name).toBe("alpha");
       expect(tree[1]!.name).toBe("zebra");
@@ -195,7 +195,7 @@ describe("buildPipelineTree", () => {
         groups: [createGroup({ pipelineName: "p", jobType: "handler", jobName: "n" })],
       });
 
-      const tree = buildPipelineTree({ queues: [queue] });
+      const tree = OpsMetricsCollectorService.buildPipelineTree({ queues: [queue] });
       expect(tree[0]!.children[0]!.name).toBe("map");
     });
 
@@ -211,7 +211,7 @@ describe("buildPipelineTree", () => {
         ],
       });
 
-      const tree = buildPipelineTree({ queues: [queue] });
+      const tree = OpsMetricsCollectorService.buildPipelineTree({ queues: [queue] });
       expect(tree[0]!.children[0]!.name).toBe("state");
     });
 
@@ -226,7 +226,7 @@ describe("buildPipelineTree", () => {
         ],
       });
 
-      const tree = buildPipelineTree({ queues: [queue] });
+      const tree = OpsMetricsCollectorService.buildPipelineTree({ queues: [queue] });
       expect(tree[0]!.children[0]!.name).toBe("fold");
     });
 
@@ -235,24 +235,24 @@ describe("buildPipelineTree", () => {
         groups: [createGroup({ pipelineName: "p", jobType: "reaction", jobName: "n" })],
       });
 
-      const tree = buildPipelineTree({ queues: [queue] });
+      const tree = OpsMetricsCollectorService.buildPipelineTree({ queues: [queue] });
       expect(tree[0]!.children[0]!.name).toBe("reactor");
     });
   });
 });
 
-describe("mapJobTypeToPhase", () => {
+describe("OpsMetricsCollectorService.mapJobTypeToPhase", () => {
   /** @scenario State projection throughput counts as projection work */
   it("counts state-projection jobs in the projections phase", () => {
-    expect(mapJobTypeToPhase("stateProjection")).toBe("projections");
+    expect(OpsMetricsCollectorService.mapJobTypeToPhase("stateProjection")).toBe("projections");
   });
 
   it("keeps folds and maps in the projections phase", () => {
-    expect(mapJobTypeToPhase("projection")).toBe("projections");
-    expect(mapJobTypeToPhase("handler")).toBe("projections");
+    expect(OpsMetricsCollectorService.mapJobTypeToPhase("projection")).toBe("projections");
+    expect(OpsMetricsCollectorService.mapJobTypeToPhase("handler")).toBe("projections");
   });
 
   it("leaves commands in the commands phase", () => {
-    expect(mapJobTypeToPhase("command")).toBe("commands");
+    expect(OpsMetricsCollectorService.mapJobTypeToPhase("command")).toBe("commands");
   });
 });

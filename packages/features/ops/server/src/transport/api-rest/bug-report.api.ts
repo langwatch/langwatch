@@ -26,7 +26,7 @@ import type {
   BugReportRateLimiterPort,
 } from "../../ports/bug-report-intake.ports";
 import type { BugReportRepository } from "../../ports/bug-report.repository";
-import { submitBugReport } from "../../services/bug-report-intake.service";
+import { BugReportIntakeService } from "../../services/bug-report-intake.service";
 
 // Headroom over the 9M-char sessionData cap: JSON escaping can inflate the
 // same characters past 10MB, and the zod 400 is the better error than a 413.
@@ -124,15 +124,17 @@ export function createBugReportsRestApp(options: {
       const apiKeys = ports.apiKeys?.();
 
       try {
-        const { id } = await submitBugReport({
+        const intake = BugReportIntakeService.create({
+          reports: ports.reports(),
+          rateLimiter: ports.rateLimiter,
+          notifier: ports.notifier,
+        });
+        const { id } = await intake.submit({
           input: parsed.data,
           callerKey: callerKey(c),
           ...(credentials ? { apiToken: credentials.token } : {}),
           ...(credentials ? { projectIdHint: credentials.projectId } : {}),
           ...(apiKeys ? { apiKeys } : {}),
-          reports: ports.reports(),
-          rateLimiter: ports.rateLimiter,
-          notifier: ports.notifier,
         });
         return c.json({ id }, 201);
       } catch (error) {

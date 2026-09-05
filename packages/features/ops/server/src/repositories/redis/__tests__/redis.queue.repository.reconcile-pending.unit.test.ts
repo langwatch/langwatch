@@ -282,7 +282,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
   beforeEach(() => {
     redis = new FakeRedis();
-    repo = new QueueRedisRepository(redis.asRedis());
+    repo = QueueRedisRepository.create({ redis: redis.asRedis() });
   });
 
   describe("given groups indexed under ready, blocked and parked", () => {

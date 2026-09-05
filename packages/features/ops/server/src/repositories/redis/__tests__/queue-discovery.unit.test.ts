@@ -32,7 +32,7 @@ describe("group queue discovery", () => {
       const redis = createRedis({
         smembers: vi.fn().mockResolvedValue(["{event-sourcing/jobs}"]),
       });
-      const repo = new QueueRedisRepository(redis as never);
+      const repo = QueueRedisRepository.create({ redis: redis as never });
 
       const names = await repo.discoverQueueNames();
 
@@ -51,7 +51,7 @@ describe("group queue discovery", () => {
           .fn()
           .mockResolvedValue(["0", ["{event-sourcing/jobs}:gq:ready"]] satisfies ScanPage),
       });
-      const repo = new QueueRedisRepository(redis as never);
+      const repo = QueueRedisRepository.create({ redis: redis as never });
 
       const names = await repo.discoverQueueNames();
 
@@ -65,7 +65,7 @@ describe("group queue discovery", () => {
     /** @scenario Discovery returns nothing without backfilling when no queues exist */
     it("returns an empty list and writes nothing to the registry", async () => {
       const redis = createRedis();
-      const repo = new QueueRedisRepository(redis as never);
+      const repo = QueueRedisRepository.create({ redis: redis as never });
 
       const names = await repo.discoverQueueNames();
 

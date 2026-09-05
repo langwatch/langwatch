@@ -1,8 +1,5 @@
 import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "@langwatch/ops-contract";
-import {
-  NullQueueAuditSink,
-  type QueueAuditSink,
-} from "../repositories/prisma/queue-audit.repository";
+import { NullQueueAuditSink, type QueueAuditSink } from "../ports/queue-audit.sink";
 import type {
   BlockedSummary,
   DlqGroupInfo,
@@ -47,7 +44,7 @@ export class QueueService {
 
   private constructor(params: { repo: QueueRepository; audit?: QueueAuditSink }) {
     this.repository = params.repo;
-    this.audit = params.audit ?? new NullQueueAuditSink();
+    this.audit = params.audit ?? NullQueueAuditSink.create();
   }
 
   static create(params: { repo: QueueRepository; audit?: QueueAuditSink }): QueueService {

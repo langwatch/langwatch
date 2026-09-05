@@ -7,7 +7,15 @@
  * Spec: specs/model-providers/model-cost-matching-spans-preview.feature
  */
 import { describe, expect, it } from "vitest";
-import { previewCostRuleMatchingSpans, type ModelCostPreviewSpanReader } from "../model-cost-preview.service";
+import {
+  ModelCostPreviewService,
+  type ModelCostPreviewSpanReader,
+} from "../model-cost-preview.service";
+import { ModelCostRegexSafetyService } from "../model-cost-regex-safety.service";
+
+const service = ModelCostPreviewService.create({
+  regexSafety: ModelCostRegexSafetyService.create(),
+});
 
 function fakeReader(overrides: {
   stats?: Array<{ model: string; spanCount: number; lastSeenMs: number }>;
@@ -37,7 +45,7 @@ function fakeReader(overrides: {
   };
 }
 
-describe("previewCostRuleMatchingSpans", () => {
+describe("ModelCostPreviewService.previewCostRuleMatchingSpans", () => {
   describe("when the regex relies on the pipeline's matching fallbacks", () => {
     /** @scenario "Matching follows the same fallbacks as cost computation" */
     it("matches a raw Bedrock inference-profile id through Bedrock normalization", async () => {
@@ -49,7 +57,7 @@ describe("previewCostRuleMatchingSpans", () => {
         tenantIdsSeen,
       });
 
-      const preview = await previewCostRuleMatchingSpans({
+      const preview = await service.previewCostRuleMatchingSpans({
         spans,
         input: { projectId: "project_1", regex: "anthropic/claude-sonnet-4-6" },
       });
@@ -83,7 +91,7 @@ describe("previewCostRuleMatchingSpans", () => {
         tenantIdsSeen,
       });
 
-      await previewCostRuleMatchingSpans({
+      await service.previewCostRuleMatchingSpans({
         spans,
         input: { projectId: "project_1", regex: "^gpt-5-mini$" },
       });

@@ -9,11 +9,11 @@ import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { latencyAllTimeKey, latencyMinuteBucketKey } from "@langwatch/ops-contract";
 import { GroupQueueProcessor } from "@langwatch/group-queue";
-import { OpsMetricsCollector } from "../ops-metrics-collector.service";
-import { OpsMetricsTestAdapter } from "./ops-metrics.fixture";
-import { RedisOpsSnapshotRepository } from "../../repositories/redis/redis.ops-snapshot.repository";
-import { DefaultOpsSnapshotService } from "../ops-snapshot-reader.service";
-import type { OpsSnapshotRedisPort } from "../../ports/ops-snapshot-redis.port";
+import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service";
+import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture";
+import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository";
+import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service";
+import type { OpsSnapshotRedisPort } from "../ports/ops-snapshot-redis.port";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;
@@ -110,7 +110,7 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
           redis as unknown as OpsSnapshotRedisPort,
         );
         const snapshots = DefaultOpsSnapshotService.create(snapshotRepository);
-        const collector = new OpsMetricsCollector({ redis, ops, snapshots });
+        const collector = OpsMetricsCollectorService.create({ redis, ops, snapshots });
         try {
           await collector.discoverQueues();
           // First collect acquires the lease and kicks the (unawaited) detail

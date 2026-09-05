@@ -3,7 +3,12 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ModelCost, ModelCostRate } from "@langwatch/model-provider-contract";
-import { deriveUnmappedCostSuggestion, type ModelCostRuleReader } from "../model-cost-preview.service";
+import { ModelCostPreviewService, type ModelCostRuleReader } from "../model-cost-preview.service";
+import { ModelCostRegexSafetyService } from "../model-cost-regex-safety.service";
+
+const preview = ModelCostPreviewService.create({
+  regexSafety: ModelCostRegexSafetyService.create(),
+});
 
 function fakeCosts({
   stored = [],
@@ -18,11 +23,11 @@ function fakeCosts({
   };
 }
 
-describe("deriveUnmappedCostSuggestion", () => {
+describe("ModelCostPreviewService.deriveUnmappedCostSuggestion", () => {
   describe("given a span whose cost was already computed", () => {
     /** @scenario Span with a computed cost shows no suggestion */
     it("returns null when a cost was already computed", async () => {
-      const suggestion = await deriveUnmappedCostSuggestion({
+      const suggestion = await preview.deriveUnmappedCostSuggestion({
         costs: fakeCosts(),
         projectId: "proj-1",
         model: "acme-internal-llm",
@@ -38,7 +43,7 @@ describe("deriveUnmappedCostSuggestion", () => {
   describe("given a span with no token usage recorded", () => {
     /** @scenario Span without token counts shows no suggestion */
     it("returns null when the span has no token usage", async () => {
-      const suggestion = await deriveUnmappedCostSuggestion({
+      const suggestion = await preview.deriveUnmappedCostSuggestion({
         costs: fakeCosts(),
         projectId: "proj-1",
         model: "acme-internal-llm",

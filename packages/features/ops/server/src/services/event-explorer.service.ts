@@ -6,7 +6,17 @@ import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspecti
 const logger = createLogger("langwatch:ops:event-explorer");
 
 export class EventExplorerService {
-  constructor(
+  static create({
+    repo,
+    introspection,
+  }: {
+    repo: EventExplorerRepository;
+    introspection: OpsEventingIntrospectionPort;
+  }): EventExplorerService {
+    return new EventExplorerService(repo, introspection);
+  }
+
+  private constructor(
     readonly repo: EventExplorerRepository,
     private readonly introspection: OpsEventingIntrospectionPort,
   ) {}

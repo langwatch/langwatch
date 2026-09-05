@@ -3,16 +3,16 @@ import {
   UsageStatsClickHouseClient,
   UsageStatsClickHouseClientResolver,
   type UsageStatsClickHouseQuery,
-} from "../../index";
+} from "../index";
 import {
   UsageStatsClickHouseRepository,
   UsageStatsProjectRepository,
   type UsageStatsProjectDatabase,
   type UsageStatsProjectCounts,
-} from "../../ports/usage-stats-worker.ports";
-import { ClickHouseUsageStatsRepository } from "../../repositories/clickhouse/clickhouse.usage-stats.repository";
-import { PrismaUsageStatsProjectRepository } from "../../repositories/prisma/prisma.usage-stats-project.repository";
-import { UsageStatsCollectionService } from "../usage-stats-collection.service";
+} from "../ports/usage-stats-worker.ports";
+import { ClickHouseUsageStatsRepository } from "../repositories/clickhouse/clickhouse.usage-stats.repository";
+import { PrismaUsageStatsProjectRepository } from "../repositories/prisma/prisma.usage-stats-project.repository";
+import { UsageStatsCollectionService } from "../services/usage-stats-collection.service";
 
 const projectCounts: UsageStatsProjectCounts = {
   projectIds: ["project-1"],

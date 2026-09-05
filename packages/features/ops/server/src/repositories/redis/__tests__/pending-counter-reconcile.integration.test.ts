@@ -27,7 +27,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
   });
 
   beforeEach(() => {
-    repo = new QueueRedisRepository(redis);
+    repo = QueueRedisRepository.create({ redis });
     queueCounter++;
     queueName = `test-recon-${queueCounter}`;
     markerKey = `${queueName}:gq:stats:pending-recon-ts`;
@@ -423,7 +423,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         // A second repository standing in for a second process. It wins no
         // marker (the first pass holds it for the rest of the window), so it
         // measures nothing of its own.
-        const otherInstance = new QueueRedisRepository(redis);
+        const otherInstance = QueueRedisRepository.create({ redis });
         expect(await otherInstance.tryReconcileTotalPending(queueName)).toBeNull();
 
         expect(await otherInstance.readPublishedPendingDrift([queueName])).toBe(95);
@@ -542,7 +542,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
           queue: second,
           jobs: 14,
           drift: -10,
-          by: new QueueRedisRepository(redis),
+          by: QueueRedisRepository.create({ redis }),
         });
         expect([a!.drift, b!.drift]).toEqual([30, -10]);
 

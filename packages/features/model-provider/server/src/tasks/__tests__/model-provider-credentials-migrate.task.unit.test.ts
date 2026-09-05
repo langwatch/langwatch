@@ -1,9 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  ModelProviderCredentialsMigrateTask,
-  modelProviderCredentialCipherFromEnv,
-} from "../model-provider-credentials-migrate.task";
+import { ModelProviderCredentialCipherPort } from "../../ports/model-provider.port";
+import { ModelProviderCredentialsMigrateTask } from "../model-provider-credentials-migrate.task";
 import type { ModelProviderMigrationDatabase } from "../model-provider-migration.shared";
+
+/** A cipher with the deployment's shape and none of its cryptography. */
+class ReversingCipher extends ModelProviderCredentialCipherPort {
+  encrypt(value: string): string {
+    return `encrypted:${value}`;
+  }
+
+  decrypt(value: string): string {
+    return value.replace(/^encrypted:/, "");
+  }
+}
 
 function emptyDatabase(): ModelProviderMigrationDatabase {
   return {
@@ -16,7 +25,7 @@ describe("ModelProviderCredentialsMigrateTask", () => {
   describe("given a database with no projects and a configured key", () => {
     it("is named model-provider-migrate-credentials and runs to completion", async () => {
       const database = emptyDatabase();
-      const cipher = modelProviderCredentialCipherFromEnv({ key: "aa".repeat(32) });
+      const cipher = new ReversingCipher();
       const task = ModelProviderCredentialsMigrateTask.create({
         database: () => database,
         cipher: () => cipher,
@@ -27,14 +36,6 @@ describe("ModelProviderCredentialsMigrateTask", () => {
       await task.run({ args: [], signal: controller.signal });
 
       expect(database.project.findMany).toHaveBeenCalledOnce();
-    });
-  });
-
-  describe("when no key is configured", () => {
-    it("refuses to build a cipher", () => {
-      expect(() => modelProviderCredentialCipherFromEnv({ key: undefined })).toThrow(
-        /CREDENTIALS_SECRET/,
-      );
     });
   });
 });

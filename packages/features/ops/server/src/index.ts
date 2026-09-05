@@ -90,12 +90,7 @@ export {
   OVERDUE_WAKE_MS,
 } from "./services/manager-explorer.service";
 export { LOCK_REFRESH_INTERVAL_MS, ReplayService } from "./services/replay.service";
-export {
-  buildPipelineTree,
-  getOpsMetricsCollector,
-  mapJobTypeToPhase,
-  OpsMetricsCollector,
-} from "./services/ops-metrics-collector.service";
+export { OpsMetricsCollectorService } from "./services/ops-metrics-collector.service";
 export { totalInFlight, type InFlightCounts } from "./ops.in-flight";
 export {
   OpsEventingIntrospectionPort,
@@ -119,16 +114,16 @@ export {
 export { NullReplayRepository, type ReplayRepository } from "./ports/replay.repository";
 export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process-ops.repository";
 export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository";
+export { OpsExplainClickHouseRepository } from "./repositories/clickhouse/clickhouse.ops-explain.repository";
 export {
-  OpsExplainClickHouseRepository,
   OpsExplainClientResolver,
   type OpsExplainClientResolution,
-} from "./repositories/clickhouse/clickhouse.ops-explain.repository";
+} from "./repositories/ops-explain.repository";
 
 /** Public intake for the reports customers' coding agents file. */
 export {
+  BugReportIntakeService,
   BugReportRateLimitedError,
-  submitBugReport,
   type SubmitBugReportInput,
 } from "./services/bug-report-intake.service";
 export {

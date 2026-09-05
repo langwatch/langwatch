@@ -26,24 +26,32 @@ function modelNameVariations(modelName: string): string[] {
   return variations;
 }
 
-/** The ceilings for a model id, or null when the catalogue does not name it. */
-export function getModelLimits(modelName: string): ModelLimits | null {
-  try {
-    for (const variation of modelNameVariations(modelName)) {
-      const model = getModelById(variation);
-      if (model) {
-        return {
-          maxInputTokens: model.contextLength,
-          maxOutputTokens: model.maxCompletionTokens ?? undefined,
-          maxTokens: model.contextLength,
-        };
+export class ModelLimitsService {
+  static create(): ModelLimitsService {
+    return new ModelLimitsService();
+  }
+
+  private constructor() {}
+
+  /** The ceilings for a model id, or null when the catalogue does not name it. */
+  getModelLimits(modelName: string): ModelLimits | null {
+    try {
+      for (const variation of modelNameVariations(modelName)) {
+        const model = getModelById(variation);
+        if (model) {
+          return {
+            maxInputTokens: model.contextLength,
+            maxOutputTokens: model.maxCompletionTokens ?? undefined,
+            maxTokens: model.contextLength,
+          };
+        }
       }
+
+      return null;
+    } catch (error) {
+      logger.error({ modelName, error }, "error getting model limits");
+
+      return null;
     }
-
-    return null;
-  } catch (error) {
-    logger.error({ modelName, error }, "error getting model limits");
-
-    return null;
   }
 }

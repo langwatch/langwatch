@@ -55,7 +55,7 @@ describe.skipIf(!hasRedis)("operator recovery clears every per-group counter", (
   }
 
   beforeEach(async () => {
-    repo = new QueueRedisRepository(redis);
+    repo = QueueRedisRepository.create({ redis });
     queueCounter++;
     queueName = `test-oprecover-${queueCounter}`;
     prefix = `${queueName}:gq:`;

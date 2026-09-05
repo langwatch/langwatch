@@ -54,17 +54,6 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
  * the call settles as cost-unknown with no other signal that anything went
  * wrong.
  */
-export function readCustomKeys(
-  raw: unknown,
-  cipher: ModelProviderCredentialCipherPort,
-): CustomKeysRead {
-  if (raw === null || raw === undefined) return ABSENT;
-  if (typeof raw === "object") {
-    return isKeyBag(raw) ? { state: "read", keys: raw } : UNREADABLE;
-  }
-  if (typeof raw !== "string") return UNREADABLE;
-  return parseDecrypted(raw, cipher);
-}
 
 /** Decrypts one stored value and reads it as JSON. */
 function parseDecrypted(raw: string, cipher: ModelProviderCredentialCipherPort): CustomKeysRead {
@@ -113,6 +102,15 @@ function parseDecrypted(raw: string, cipher: ModelProviderCredentialCipherPort):
  * for the last two rather than taking a request down with it.
  */
 export class EncryptedModelProviderCredentialAdapter extends ModelProviderCredentialCodec {
+  static readCustomKeys(raw: unknown, cipher: ModelProviderCredentialCipherPort): CustomKeysRead {
+    if (raw === null || raw === undefined) return ABSENT;
+    if (typeof raw === "object") {
+      return isKeyBag(raw) ? { state: "read", keys: raw } : UNREADABLE;
+    }
+    if (typeof raw !== "string") return UNREADABLE;
+    return parseDecrypted(raw, cipher);
+  }
+
   static create(input: {
     cipher: ModelProviderCredentialCipherPort;
   }): EncryptedModelProviderCredentialAdapter {
@@ -128,7 +126,7 @@ export class EncryptedModelProviderCredentialAdapter extends ModelProviderCreden
   }
 
   tryDecode(value: unknown): Record<string, unknown> | null {
-    const parsed = readCustomKeys(value, this.cipher);
+    const parsed = EncryptedModelProviderCredentialAdapter.readCustomKeys(value, this.cipher);
     return parsed.state === "read" ? parsed.keys : null;
   }
 }

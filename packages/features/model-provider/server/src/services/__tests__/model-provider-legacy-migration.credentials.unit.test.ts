@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderCredentialCipherPort } from "../../ports/model-provider.port";
-import { migrateModelProviderKeysRow } from "../model-provider-legacy-migration.service";
+import { ModelProviderLegacyMigrationService } from "../model-provider-legacy-migration.service";
+
+const migrations = ModelProviderLegacyMigrationService.create();
 
 /** The deployment's cipher, standing in with a readable transform. */
 class RecordingCipher extends ModelProviderCredentialCipherPort {
@@ -15,7 +17,7 @@ class RecordingCipher extends ModelProviderCredentialCipherPort {
 
 const cipher = new RecordingCipher();
 
-describe("migrateModelProviderKeysRow", () => {
+describe("ModelProviderLegacyMigrationService.migrateModelProviderKeysRow", () => {
   describe("given a row with plaintext object customKeys", () => {
     describe("when migrating", () => {
       it("returns the encrypted string", () => {
@@ -25,7 +27,7 @@ describe("migrateModelProviderKeysRow", () => {
           customKeys: { apiKey: "sk-123", orgId: "org-456" },
         };
 
-        const result = migrateModelProviderKeysRow({ row, cipher });
+        const result = migrations.migrateModelProviderKeysRow({ row, cipher });
 
         expect(result).toBe(`encrypted:${JSON.stringify({ apiKey: "sk-123", orgId: "org-456" })}`);
       });
@@ -41,7 +43,7 @@ describe("migrateModelProviderKeysRow", () => {
           customKeys: "abc123:def456:ghi789",
         };
 
-        const result = migrateModelProviderKeysRow({ row, cipher });
+        const result = migrations.migrateModelProviderKeysRow({ row, cipher });
 
         expect(result).toBeNull();
       });
@@ -57,7 +59,7 @@ describe("migrateModelProviderKeysRow", () => {
           customKeys: null,
         };
 
-        const result = migrateModelProviderKeysRow({ row, cipher });
+        const result = migrations.migrateModelProviderKeysRow({ row, cipher });
 
         expect(result).toBeNull();
       });
@@ -73,7 +75,7 @@ describe("migrateModelProviderKeysRow", () => {
           customKeys: undefined,
         };
 
-        const result = migrateModelProviderKeysRow({ row, cipher });
+        const result = migrations.migrateModelProviderKeysRow({ row, cipher });
 
         expect(result).toBeNull();
       });

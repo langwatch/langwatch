@@ -26,12 +26,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzService } from "@langwatch/authz-contract";
-import { ModelProviderCommandService } from "../model-provider-command.service";
-import { ModelProviderAuthorizationService } from "../model-provider-authorization.service";
-import { ModelProviderWriteAuthorizationService } from "../model-provider-write-authorization.service";
-import { ModelProviderScopeService } from "../model-provider-scope.service";
-import { ModelProviderKeysService } from "../model-provider-keys.service";
-import { PrismaModelProviderRepository } from "../../repositories/prisma/prisma.model-provider.repository";
+import { ModelProviderCommandService } from "../services/model-provider-command.service";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service";
+import { ModelProviderKeysService } from "../services/model-provider-keys.service";
+import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository";
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,
@@ -81,7 +81,9 @@ describe.skipIf(!DB_URL)(
     const scopes = ModelProviderScopeService.create({
       projects: new PrismaProjects(prisma),
       organizations: {
-        getBillingProfile: async (input: { organizationId: string }) => ({ id: input.organizationId }),
+        getBillingProfile: async (input: { organizationId: string }) => ({
+          id: input.organizationId,
+        }),
       } as never,
     });
 
@@ -93,7 +95,10 @@ describe.skipIf(!DB_URL)(
     const memberUserId = `member-${ns}`;
     const outsiderUserId = `outsider-${ns}`;
 
-    function commandFor(userId: string, catalog: TestModelProviderCatalog = new TestModelProviderCatalog()) {
+    function commandFor(
+      userId: string,
+      catalog: TestModelProviderCatalog = new TestModelProviderCatalog(),
+    ) {
       const authz = roleComputingAuthz({
         [adminUserId]: { organizationId, role: "ADMIN" },
         [memberUserId]: { organizationId, role: "MEMBER" },
@@ -136,13 +141,20 @@ describe.skipIf(!DB_URL)(
     afterAll(async () => {
       for (const org of [organizationId, outsiderOrganizationId]) {
         const providerIds = (
-          await prisma.modelProvider.findMany({ where: { organizationId: org }, select: { id: true } })
+          await prisma.modelProvider.findMany({
+            where: { organizationId: org },
+            select: { id: true },
+          })
         ).map((p) => p.id);
-        await prisma.modelProviderScope.deleteMany({ where: { modelProviderId: { in: providerIds } } });
+        await prisma.modelProviderScope.deleteMany({
+          where: { modelProviderId: { in: providerIds } },
+        });
         await prisma.modelProvider.deleteMany({ where: { organizationId: org } });
       }
       await prisma.team.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: { in: [organizationId, outsiderOrganizationId] } } });
+      await prisma.organization.deleteMany({
+        where: { id: { in: [organizationId, outsiderOrganizationId] } },
+      });
       await prisma.$disconnect();
     });
 
@@ -243,7 +255,9 @@ describe.skipIf(!DB_URL)(
       /** @scenario "Assigning a provider to a scope I do not control" */
       it("refuses the whole write when one scope is unmanageable", async () => {
         const { command } = commandFor(outsiderUserId);
-        const before = await prisma.modelProvider.count({ where: { organizationId: outsiderOrganizationId } });
+        const before = await prisma.modelProvider.count({
+          where: { organizationId: outsiderOrganizationId },
+        });
 
         await expect(
           command.upsert({
@@ -263,7 +277,9 @@ describe.skipIf(!DB_URL)(
           meta: { scopeType: "TEAM", requiredPermission: "team:manage" },
         });
 
-        const after = await prisma.modelProvider.count({ where: { organizationId: outsiderOrganizationId } });
+        const after = await prisma.modelProvider.count({
+          where: { organizationId: outsiderOrganizationId },
+        });
         expect(after).toBe(before);
       });
     });

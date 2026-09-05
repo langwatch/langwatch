@@ -6,8 +6,8 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelProviderEgressPort } from "../../ports/model-provider.port";
 import {
+  HttpModelProviderCredentialProbeAdapter,
   ProviderUnreachableError,
-  validateProviderApiKey as probeCredential,
 } from "../http.model-provider-credential-probe.adapter";
 
 // The probe goes out through the guarded egress port the composition root
@@ -23,7 +23,7 @@ const egress: ModelProviderEgressPort = {
 };
 
 const validateProviderApiKey = (provider: string, customKeys: Record<string, string>) =>
-  probeCredential(provider, customKeys, egress);
+  HttpModelProviderCredentialProbeAdapter.validateProviderApiKey(provider, customKeys, egress);
 
 type ValidationResult = ModelProviderCredentialVerdict;
 

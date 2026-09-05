@@ -2,7 +2,7 @@ import { generateText } from "ai";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { ModelTranslationPort } from "../ports/model-provider.port";
 import {
-  getVercelAIModel,
+  ModelProviderExecutionHandleService,
   type ModelProviderExecutionHandleOptions,
 } from "../services/model-provider-execution-handle.service";
 
@@ -39,7 +39,7 @@ export class VercelAiModelTranslationAdapter extends ModelTranslationPort {
     model: string;
     modelProviders: ModelProviderService;
   }): Promise<string> {
-    const model = await getVercelAIModel({
+    const model = await ModelProviderExecutionHandleService.getVercelAIModel({
       ...this.options,
       modelProviders: input.modelProviders,
       projectId: input.projectId,

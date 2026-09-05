@@ -40,6 +40,7 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-server": "workspace:*",
+    "@langwatch/secret-server": "workspace:*",
     "@langwatch/stored-object-server": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/task": "workspace:*",

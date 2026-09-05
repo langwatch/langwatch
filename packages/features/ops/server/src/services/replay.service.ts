@@ -27,7 +27,17 @@ class ReplayCancelledError extends Error {
 }
 
 export class ReplayService {
-  constructor(
+  static create({
+    repo,
+    runtimeFactory,
+  }: {
+    repo: ReplayRepository;
+    runtimeFactory: OpsReplayRuntimePort;
+  }): ReplayService {
+    return new ReplayService(repo, runtimeFactory);
+  }
+
+  private constructor(
     readonly repo: ReplayRepository,
     private readonly runtimeFactory: OpsReplayRuntimePort,
   ) {}

@@ -20,16 +20,13 @@ import {
   MissingSecretService,
 } from "../../../api.application";
 import { ApiAuditPort } from "../../../api-request.policy";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 import { composeBugReportFeature } from "../bug-report.composition";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
@@ -70,7 +67,7 @@ function composeApplication() {
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: { ...stubComposedFeatures(), bugReport },
     infrastructure,
-    collaborators: composeApiTrpcCollaborators(testHalves(), stubApplicationSlices()),
+    collaborators: stubCollaborators(),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 

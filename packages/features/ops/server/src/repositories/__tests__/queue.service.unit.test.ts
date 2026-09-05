@@ -72,7 +72,7 @@ function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueReposito
 describe("QueueService", () => {
   describe("when Redis is not composed", () => {
     it("returns empty operational state without requiring a payload decoder", async () => {
-      const service = QueueService.create({ repo: new NullQueueRepository() });
+      const service = QueueService.create({ repo: NullQueueRepository.create() });
 
       await expect(service.getQueues()).resolves.toEqual([]);
       await expect(service.getBlockedSummary()).resolves.toEqual({

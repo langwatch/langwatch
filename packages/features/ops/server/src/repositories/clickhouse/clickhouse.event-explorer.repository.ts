@@ -19,11 +19,15 @@ export interface EventExplorerClickHouseClient {
 }
 
 export class EventExplorerClickHouseRepository implements EventExplorerRepository {
-  private readonly client: EventExplorerClickHouseClient;
-
-  constructor(client: EventExplorerClickHouseClient) {
-    this.client = client;
+  static create({
+    client,
+  }: {
+    client: EventExplorerClickHouseClient;
+  }): EventExplorerClickHouseRepository {
+    return new EventExplorerClickHouseRepository(client);
   }
+
+  private constructor(private readonly client: EventExplorerClickHouseClient) {}
 
   async findAggregates(params: {
     aggregateTypes: string[];

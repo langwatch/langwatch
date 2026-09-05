@@ -138,126 +138,130 @@ function sample<T>({ pool, count }: { pool: T[]; count: number }): T[] {
   return copy.slice(0, size);
 }
 
+type SystemMigrationsServiceDependencies = {
+  state: SystemMigrationStateReader;
+  /** Every registered migration's listing-facing declaration, cutover last. */
+  migrations: () => Array<{
+    name: string;
+    title: string;
+    description: string;
+    requiresOperatorConfirmation: boolean;
+    runsAutomaticallyOnSelfHosted: boolean;
+    /**
+     * Whether cloud puts every organization in this migration's cohort
+     * with no enrollment row. The enrollment actions refuse for such a
+     * migration rather than writing rows nothing reads.
+     */
+    enrolledAutomatically: boolean;
+    /**
+     * Which axis the runner drives this migration over. Organization
+     * migrations form the ordered per-organization pipeline; a user
+     * migration (ADR-101 §6) is paced by the same organization
+     * enrollment but its tenants are the organization's MEMBERS, so it
+     * is neither a step in that pipeline nor readable back by
+     * organization id. Omitted means organization.
+     */
+    tenant?: "organization" | "user";
+  }>;
+  /** Read per call, so the answer is never a boot-time capture. */
+  isSaaS: () => boolean;
+  enrollments: SystemMigrationEnrollmentStore;
+  /**
+   * The organizations whose data plane is a private ClickHouse instance,
+   * read from the environment's routing table. A cohort must never sweep
+   * one up, and the environment - not a list in code - is what names
+   * them.
+   */
+  privateDataplaneOrganizationIds: () => string[];
+  /**
+   * The ops audit trail. Enrollment decides which organizations the
+   * platform migrates, so both actions are recorded the way the
+   * backfill's own writes are - and the enrollment LISTING is recorded
+   * too, because it returns the enrollers' display names (personal
+   * data). A platform-scope entry carries no organizationId.
+   */
+  audit: (entry: {
+    userId: string;
+    organizationId?: string;
+    action: string;
+    args?: Record<string, unknown>;
+  }) => Promise<void>;
+  runPass: () => Promise<MigrationPassSummary>;
+  /**
+   * One migration for one organization, now, under the same
+   * per-organization claim as a full pass (the summary's `claimed`
+   * says another pass is already working the organization). The
+   * composition supplies it because only the composition can build a
+   * runner scoped to a single (tenant, migration) pair.
+   */
+  runTargetedPass: (args: {
+    organizationId: string;
+    migrationName: string;
+  }) => Promise<MigrationPassSummary>;
+  /**
+   * Whether a migration's stored report means it merely WAITED, per
+   * migration name. The state machine has no waiting status, so a
+   * migration that is waiting on something records `migrated` exactly
+   * as a held one does, and only the migration's own composition can
+   * tell the two apart by reading its report - so the predicate lives
+   * there, like `rollbackGuards`. A migration that never waits has no
+   * entry, and its `migrated` always means held.
+   */
+  waitingReports?: Record<string, (report: unknown) => boolean>;
+  /**
+   * What else a rollback has to DO, per migration name. The generic
+   * rollback is a state write; a migration whose finalization changed
+   * how the running fleet behaves needs that change undone too, and
+   * only the migration's own composition knows how (for the authz
+   * cutover: the projection flipped off synchronously, the epoch bumped,
+   * the gate cache dropped, a `cutover_rolled_back` fact appended).
+   * Migrations with nothing to undo simply have no entry.
+   *
+   * An effect MUST be idempotent, because `rollBack` re-runs it on every
+   * retry (see the method's own doc). `decidedAt` is what makes that
+   * cheap: it is the moment the rollback was DECIDED (the pin's
+   * timestamp), stable across every retry of that decision and fresh for
+   * a later rollback of a re-cutover organization, so an effect can
+   * derive a deduplicating id from it rather than from the clock.
+   */
+  rollbackEffects?: Record<
+    string,
+    (args: { tenantId: string; actorUserId: string; decidedAt: string }) => Promise<void>
+  >;
+  /**
+   * What must HOLD before a rollback may even be pinned, per migration
+   * name. The generic service knows the state machine; it does not know
+   * that one migration's state depends on another's, or that a status
+   * can be technically eligible while there is nothing behind it to
+   * undo - that is domain knowledge, and it lives in the composition
+   * (runtime.ts) exactly like `rollbackEffects` does. A guard refuses
+   * by throwing (a `HandledError` the operator can act on); it runs
+   * BEFORE the pin is written, and on retries too - a refusal must hold
+   * however the operator arrived here.
+   */
+  rollbackGuards?: Record<
+    string,
+    (args: {
+      tenantId: string;
+      /** Null when nothing has run for this tenant yet - the operator is
+       *  pinning it OUT of a rollout ahead of the pass, and a guard that
+       *  needs a record has to say so itself rather than assume one. */
+      record: TenantMigrationRecord | null;
+    }) => Promise<void>
+  >;
+};
+
 /**
  * The ops dashboard's view of the in-place migrations, and the operator's one
  * lever over them. Routes call this and nothing else - the state repository
  * stays behind the app layer.
  */
 export class SystemMigrationsService {
-  constructor(
-    private readonly deps: {
-      state: SystemMigrationStateReader;
-      /** Every registered migration's listing-facing declaration, cutover last. */
-      migrations: () => Array<{
-        name: string;
-        title: string;
-        description: string;
-        requiresOperatorConfirmation: boolean;
-        runsAutomaticallyOnSelfHosted: boolean;
-        /**
-         * Whether cloud puts every organization in this migration's cohort
-         * with no enrollment row. The enrollment actions refuse for such a
-         * migration rather than writing rows nothing reads.
-         */
-        enrolledAutomatically: boolean;
-        /**
-         * Which axis the runner drives this migration over. Organization
-         * migrations form the ordered per-organization pipeline; a user
-         * migration (ADR-101 §6) is paced by the same organization
-         * enrollment but its tenants are the organization's MEMBERS, so it
-         * is neither a step in that pipeline nor readable back by
-         * organization id. Omitted means organization.
-         */
-        tenant?: "organization" | "user";
-      }>;
-      /** Read per call, so the answer is never a boot-time capture. */
-      isSaaS: () => boolean;
-      enrollments: SystemMigrationEnrollmentStore;
-      /**
-       * The organizations whose data plane is a private ClickHouse instance,
-       * read from the environment's routing table. A cohort must never sweep
-       * one up, and the environment - not a list in code - is what names
-       * them.
-       */
-      privateDataplaneOrganizationIds: () => string[];
-      /**
-       * The ops audit trail. Enrollment decides which organizations the
-       * platform migrates, so both actions are recorded the way the
-       * backfill's own writes are - and the enrollment LISTING is recorded
-       * too, because it returns the enrollers' display names (personal
-       * data). A platform-scope entry carries no organizationId.
-       */
-      audit: (entry: {
-        userId: string;
-        organizationId?: string;
-        action: string;
-        args?: Record<string, unknown>;
-      }) => Promise<void>;
-      runPass: () => Promise<MigrationPassSummary>;
-      /**
-       * One migration for one organization, now, under the same
-       * per-organization claim as a full pass (the summary's `claimed`
-       * says another pass is already working the organization). The
-       * composition supplies it because only the composition can build a
-       * runner scoped to a single (tenant, migration) pair.
-       */
-      runTargetedPass: (args: {
-        organizationId: string;
-        migrationName: string;
-      }) => Promise<MigrationPassSummary>;
-      /**
-       * Whether a migration's stored report means it merely WAITED, per
-       * migration name. The state machine has no waiting status, so a
-       * migration that is waiting on something records `migrated` exactly
-       * as a held one does, and only the migration's own composition can
-       * tell the two apart by reading its report - so the predicate lives
-       * there, like `rollbackGuards`. A migration that never waits has no
-       * entry, and its `migrated` always means held.
-       */
-      waitingReports?: Record<string, (report: unknown) => boolean>;
-      /**
-       * What else a rollback has to DO, per migration name. The generic
-       * rollback is a state write; a migration whose finalization changed
-       * how the running fleet behaves needs that change undone too, and
-       * only the migration's own composition knows how (for the authz
-       * cutover: the projection flipped off synchronously, the epoch bumped,
-       * the gate cache dropped, a `cutover_rolled_back` fact appended).
-       * Migrations with nothing to undo simply have no entry.
-       *
-       * An effect MUST be idempotent, because `rollBack` re-runs it on every
-       * retry (see the method's own doc). `decidedAt` is what makes that
-       * cheap: it is the moment the rollback was DECIDED (the pin's
-       * timestamp), stable across every retry of that decision and fresh for
-       * a later rollback of a re-cutover organization, so an effect can
-       * derive a deduplicating id from it rather than from the clock.
-       */
-      rollbackEffects?: Record<
-        string,
-        (args: { tenantId: string; actorUserId: string; decidedAt: string }) => Promise<void>
-      >;
-      /**
-       * What must HOLD before a rollback may even be pinned, per migration
-       * name. The generic service knows the state machine; it does not know
-       * that one migration's state depends on another's, or that a status
-       * can be technically eligible while there is nothing behind it to
-       * undo - that is domain knowledge, and it lives in the composition
-       * (runtime.ts) exactly like `rollbackEffects` does. A guard refuses
-       * by throwing (a `HandledError` the operator can act on); it runs
-       * BEFORE the pin is written, and on retries too - a refusal must hold
-       * however the operator arrived here.
-       */
-      rollbackGuards?: Record<
-        string,
-        (args: {
-          tenantId: string;
-          /** Null when nothing has run for this tenant yet - the operator is
-           *  pinning it OUT of a rollout ahead of the pass, and a guard that
-           *  needs a record has to say so itself rather than assume one. */
-          record: TenantMigrationRecord | null;
-        }) => Promise<void>
-      >;
-    },
-  ) {}
+  static create(deps: SystemMigrationsServiceDependencies): SystemMigrationsService {
+    return new SystemMigrationsService(deps);
+  }
+
+  private constructor(private readonly deps: SystemMigrationsServiceDependencies) {}
 
   /**
    * Per migration: the status rollup, plus the tenants needing attention -

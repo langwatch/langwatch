@@ -132,7 +132,7 @@ function serviceWith({
       return Promise.resolve();
     }),
   };
-  const service = new SystemMigrationsService({
+  const service = SystemMigrationsService.create({
     state,
     migrations: () => migrations,
     isSaaS: () => isSaaS,

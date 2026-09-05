@@ -1,36 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
-
-export type QueueControlAction =
-  | "queue_redrive_dlq_groups"
-  | "queue_discard_dlq_groups"
-  | "queue_drain_group"
-  | "queue_drain_tenant"
-  | "queue_move_group_to_dlq"
-  | "queue_move_all_blocked_to_dlq"
-  | "queue_unblock_group"
-  | "queue_unblock_all";
-
-/**
- * Audit sink for GroupQueue operator actions
- * (specs/ops/dead-letter-recovery.feature). The Redis substrate forgets DLQ
- * entries at their TTL, so for a discard THIS row is the retained mark: the
- * queue, the groups, how many jobs they held, and their last errors survive
- * here after the entries themselves are gone.
- *
- * The same holds for a drain, which removes jobs outright. Every act that
- * removes or relocates work carries a name here, because an act the log
- * cannot name is an act that did not happen as far as anyone reading it
- * later is concerned.
- */
-export interface QueueAuditSink {
-  append(entry: {
-    actorUserId: string;
-    action: QueueControlAction;
-    queueName: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<void>;
-}
+import { QueueAuditSink, type QueueControlAction } from "../../ports/queue-audit.sink";
 
 const auditMetadataSchema = z.record(z.string(), z.json());
 
@@ -55,19 +25,14 @@ const TARGET_KIND_BY_ACTION: Record<QueueControlAction, string> = {
   queue_unblock_all: "queue",
 };
 
-/** For app presets that run without Postgres. */
-export class NullQueueAuditSink implements QueueAuditSink {
-  async append(): Promise<void> {
-    // no-op
-  }
-}
-
 /** Writes queue dead-letter operator actions to the shared audit log. */
-export class QueueAuditRepository implements QueueAuditSink {
-  private constructor(private readonly prisma: PrismaClient) {}
-
-  static create(prisma: PrismaClient): QueueAuditRepository {
+export class QueueAuditRepository extends QueueAuditSink {
+  static create({ prisma }: { prisma: PrismaClient }): QueueAuditRepository {
     return new QueueAuditRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {
+    super();
   }
 
   async append(entry: {

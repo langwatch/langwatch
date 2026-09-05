@@ -1,30 +1,10 @@
-import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
-
-/**
- * The one call this repository makes, as it asks for it. Narrower than the
- * driver client so the fleet-wide EXPLAIN can carry its `unscoped` reason.
- */
-export interface OpsExplainQueryClient {
-  query(input: {
-    query: string;
-    format: "JSONEachRow";
-    clickhouse_settings?: ClickHouseSettings;
-    unscoped?: { reason: string };
-  }): Promise<{ json(): Promise<unknown[]> }>;
-}
-
-export interface OpsExplainClientResolution {
-  client: ClickHouseClient;
-  /** True when the dedicated `langwatch_ops` readonly user is not
-   *  configured on this instance and the call fell back to the
-   *  default-user shared client. */
-  usingFallback: boolean;
-}
-
-/** Complete composition port for selecting the dedicated or shared client. */
-export abstract class OpsExplainClientResolver {
-  abstract resolve(): OpsExplainClientResolution | null;
-}
+import type { ClickHouseSettings } from "@clickhouse/client";
+import {
+  OpsExplainRepository,
+  type OpsExplainClientResolution,
+  type OpsExplainClientResolver,
+  type OpsExplainQueryClient,
+} from "../ops-explain.repository";
 
 /**
  * Resolves and queries the ClickHouse client behind the operator-only
@@ -35,8 +15,18 @@ export abstract class OpsExplainClientResolver {
  * is why this repository sits outside the tenant-scoped access pattern
  * every other repository follows.
  */
-export class OpsExplainClickHouseRepository {
-  constructor(private readonly resolver: OpsExplainClientResolver) {}
+export class OpsExplainClickHouseRepository extends OpsExplainRepository {
+  static create({
+    resolver,
+  }: {
+    resolver: OpsExplainClientResolver;
+  }): OpsExplainClickHouseRepository {
+    return new OpsExplainClickHouseRepository(resolver);
+  }
+
+  private constructor(private readonly resolver: OpsExplainClientResolver) {
+    super();
+  }
 
   /**
    * The dedicated `langwatch_ops` readonly user when `CLICKHOUSE_OPS_URL`

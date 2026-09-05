@@ -1,7 +1,7 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import { ManagerExplorerService } from "../manager-explorer.service";
-import { NullProcessAuditSink } from "../../repositories/prisma/prisma.process-audit.repository";
+import { NullProcessAuditSink } from "../../ports/process-audit.sink";
 import {
   NullProcessOpsRepository,
   type ProcessNameCounts,
@@ -66,10 +66,10 @@ function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = 
     }
   }
 
-  return new ManagerExplorerService({
+  return ManagerExplorerService.create({
     store: fakeStore(),
     fleet,
-    audit: new NullProcessAuditSink(),
+    audit: NullProcessAuditSink.create(),
     introspection: new FakeIntrospection(),
   });
 }

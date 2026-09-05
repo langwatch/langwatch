@@ -23,8 +23,8 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
-import { PostgresModelProviderEvidenceAdapter } from "../../adapters/postgres.model-provider-evidence.adapter";
-import { ModelCostProjectPort } from "../../ports/model-provider.port";
+import { PostgresModelProviderEvidenceAdapter } from "../adapters/postgres.model-provider-evidence.adapter";
+import { ModelCostProjectPort } from "../ports/model-provider.port";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { CustomModelList } from "../custom-model-list.adapter";
+import { CustomModelList } from "../custom-model-list.rules";
 
 describe("CustomModelList.toCanonical", () => {
   describe("given the string shape the field started as", () => {

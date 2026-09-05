@@ -34,7 +34,7 @@ function serviceWith({
       insertedCount: organizationIds.length,
     }));
   const audit = vi.fn().mockResolvedValue(undefined);
-  const service = new SystemMigrationsService({
+  const service = SystemMigrationsService.create({
     state: {
       findStatusCounts: vi.fn(),
       findRecordsByStatus: vi.fn(),

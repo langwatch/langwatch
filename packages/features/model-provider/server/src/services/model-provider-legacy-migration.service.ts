@@ -125,47 +125,6 @@ function migrateField({
   return filtered.map((modelId) => convertStringToEntry({ modelId, mode }));
 }
 
-/**
- * Migrate a single ModelProvider row's custom models data.
- *
- * Pure function: takes a row and a registry lookup function, returns the
- * migrated fields or null if no update is needed.
- */
-export function migrateCustomModelsRow({
-  row,
-  registryLookup,
-}: {
-  row: ModelProviderRow;
-  registryLookup: RegistryLookup;
-}): MigrationResult {
-  const chatRegistryIds = new Set(registryLookup(row.provider, "chat").map((m) => m.value));
-  const embeddingRegistryIds = new Set(
-    registryLookup(row.provider, "embedding").map((m) => m.value),
-  );
-
-  const migratedCustomModels = migrateField({
-    value: row.customModels,
-    mode: "chat",
-    registryModelIds: chatRegistryIds,
-  });
-
-  const migratedCustomEmbeddingsModels = migrateField({
-    value: row.customEmbeddingsModels,
-    mode: "embedding",
-    registryModelIds: embeddingRegistryIds,
-  });
-
-  // If neither field needs migration, return null
-  if (migratedCustomModels === null && migratedCustomEmbeddingsModels === null) {
-    return null;
-  }
-
-  return {
-    customModels: migratedCustomModels,
-    customEmbeddingsModels: migratedCustomEmbeddingsModels,
-  };
-}
-
 // ============================================================================
 // Credential encryption
 // ============================================================================
@@ -188,24 +147,74 @@ function isAlreadyEncrypted(customKeys: unknown): boolean {
   return typeof customKeys === "string";
 }
 
-/**
- * The ciphertext one row's `customKeys` becomes, or `null` when the row needs
- * no update — already encrypted, or holding nothing.
- */
-export function migrateModelProviderKeysRow({
-  row,
-  cipher,
-}: {
-  row: ModelProviderCredentialRow;
-  cipher: ModelProviderCredentialCipherPort;
-}): string | null {
-  if (row.customKeys == null) {
-    return null;
+/** The two row conversions, as the one-off migration tasks drive them. */
+export class ModelProviderLegacyMigrationService {
+  static create(): ModelProviderLegacyMigrationService {
+    return new ModelProviderLegacyMigrationService();
   }
 
-  if (isAlreadyEncrypted(row.customKeys)) {
-    return null;
+  private constructor() {}
+
+  /**
+   * Migrate a single ModelProvider row's custom models data.
+   *
+   * Pure function: takes a row and a registry lookup function, returns the
+   * migrated fields or null if no update is needed.
+   */
+  migrateCustomModelsRow({
+    row,
+    registryLookup,
+  }: {
+    row: ModelProviderRow;
+    registryLookup: RegistryLookup;
+  }): MigrationResult {
+    const chatRegistryIds = new Set(registryLookup(row.provider, "chat").map((m) => m.value));
+    const embeddingRegistryIds = new Set(
+      registryLookup(row.provider, "embedding").map((m) => m.value),
+    );
+
+    const migratedCustomModels = migrateField({
+      value: row.customModels,
+      mode: "chat",
+      registryModelIds: chatRegistryIds,
+    });
+
+    const migratedCustomEmbeddingsModels = migrateField({
+      value: row.customEmbeddingsModels,
+      mode: "embedding",
+      registryModelIds: embeddingRegistryIds,
+    });
+
+    // If neither field needs migration, return null
+    if (migratedCustomModels === null && migratedCustomEmbeddingsModels === null) {
+      return null;
+    }
+
+    return {
+      customModels: migratedCustomModels,
+      customEmbeddingsModels: migratedCustomEmbeddingsModels,
+    };
   }
 
-  return cipher.encrypt(JSON.stringify(row.customKeys));
+  /**
+   * The ciphertext one row's `customKeys` becomes, or `null` when the row needs
+   * no update — already encrypted, or holding nothing.
+   */
+  migrateModelProviderKeysRow({
+    row,
+    cipher,
+  }: {
+    row: ModelProviderCredentialRow;
+    cipher: ModelProviderCredentialCipherPort;
+  }): string | null {
+    if (row.customKeys == null) {
+      return null;
+    }
+
+    if (isAlreadyEncrypted(row.customKeys)) {
+      return null;
+    }
+
+    return cipher.encrypt(JSON.stringify(row.customKeys));
+  }
 }

@@ -32,7 +32,11 @@ return 0
 export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
   private readonly token = randomUUID();
 
-  constructor(private readonly redis: Redis | Cluster | null) {}
+  static create({ redis }: { redis: Redis | Cluster | null }): RedisMigrationLeaseRepository {
+    return new RedisMigrationLeaseRepository(redis);
+  }
+
+  private constructor(private readonly redis: Redis | Cluster | null) {}
 
   async acquire({ name, ttlMs }: { name: string; ttlMs: number }): Promise<boolean> {
     if (!this.redis) return false;

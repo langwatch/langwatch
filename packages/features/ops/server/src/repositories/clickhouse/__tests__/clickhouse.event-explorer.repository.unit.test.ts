@@ -3,10 +3,10 @@ import { EventExplorerClickHouseRepository } from "../clickhouse.event-explorer.
 
 const repoCapturingQuery = () => {
   const query = vi.fn().mockResolvedValue({ json: async () => [] as unknown[] });
-  const client = { query } as unknown as ConstructorParameters<
-    typeof EventExplorerClickHouseRepository
-  >[0];
-  const repo = new EventExplorerClickHouseRepository(client);
+  const client = { query } as unknown as Parameters<
+    typeof EventExplorerClickHouseRepository.create
+  >[0]["client"];
+  const repo = EventExplorerClickHouseRepository.create({ client });
   return { repo, query };
 };
 

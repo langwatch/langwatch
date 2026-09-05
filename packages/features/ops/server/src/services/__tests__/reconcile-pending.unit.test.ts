@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { OpsMetricsCollector } from "../ops-metrics-collector.service";
+import { OpsMetricsCollectorService } from "../ops-metrics-collector.service";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture";
 
 function createMockRedis() {
@@ -24,7 +24,7 @@ function createMockRedis() {
  * dashboard the way the UI does.
  */
 const runReconcile = async (ops: OpsMetricsTestAdapter) => {
-  const collector = new OpsMetricsCollector({
+  const collector = OpsMetricsCollectorService.create({
     redis: createMockRedis(),
     ops,
   });
@@ -34,7 +34,7 @@ const runReconcile = async (ops: OpsMetricsTestAdapter) => {
   return collector.getDashboardData().pendingDrift;
 };
 
-describe("OpsMetricsCollector", () => {
+describe("OpsMetricsCollectorService", () => {
   describe("reconcilePending()", () => {
     describe("given this instance measured the drift itself", () => {
       describe("when reconcilePending runs", () => {

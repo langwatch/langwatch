@@ -37,7 +37,7 @@ function repositoryWith(overrides: {
   };
   return {
     prisma,
-    repository: new PrismaSystemMigrationEnrollmentRepository(prisma as never),
+    repository: PrismaSystemMigrationEnrollmentRepository.create({ prisma: prisma as never }),
   };
 }
 

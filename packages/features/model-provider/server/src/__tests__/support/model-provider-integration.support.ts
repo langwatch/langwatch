@@ -16,7 +16,15 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectWithTeam } from "@langwatch/project-contract";
+import {
+  ProjectService,
+  type PaginatedProjects,
+  type Project,
+  type ProjectIdentity,
+  type ProjectIdsByOrganizationInput,
+  type ProjectNamesByIdsInput,
+  type ProjectWithTeam,
+} from "@langwatch/project-contract";
 import type {
   ModelDefaultScope,
   ModelProvider,
@@ -24,11 +32,10 @@ import type {
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import {
-  ModelCostProjectPort,
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
-} from "../../../ports/model-provider.port";
-import { PrefixedModelProviderIdAdapter } from "../../../adapters/prefixed.model-provider-id.adapter";
+} from "../../ports/model-provider.port";
+import { PrefixedModelProviderIdAdapter } from "../../adapters/prefixed.model-provider-id.adapter";
 
 export const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -44,8 +51,19 @@ export function testNamespace(prefix: string): string {
   return `${prefix}-${randomBytes(5).toString("hex")}`;
 }
 
-/** Reads real project + team rows this integration suite created. */
-export class PrismaProjects extends ModelCostProjectPort {
+const notImplemented = (): never => {
+  throw new Error("not implemented in this test fixture");
+};
+
+/**
+ * Reads real project + team rows this integration suite created.
+ *
+ * Only the reads `ModelProviderScopeService`/`ModelProviderProjectScopeService`
+ * actually call are backed by Postgres; the rest of `ProjectService`'s surface
+ * is unused by the model-provider services under test here and throws if a
+ * future caller starts depending on it.
+ */
+export class PrismaProjects extends ProjectService {
   constructor(private readonly prisma: PrismaClient) {
     super();
   }
@@ -63,6 +81,81 @@ export class PrismaProjects extends ModelCostProjectPort {
     if (!project) throw new Error("no project");
     return project;
   }
+
+  async listByOrganization(input: {
+    organizationId: string;
+    page: number;
+    limit: number;
+    projectIds?: string[];
+  }): Promise<PaginatedProjects> {
+    const where = {
+      team: { organizationId: input.organizationId },
+      ...(input.projectIds ? { id: { in: input.projectIds } } : {}),
+    };
+    const [data, total] = await Promise.all([
+      this.prisma.project.findMany({
+        where,
+        skip: (input.page - 1) * input.limit,
+        take: input.limit,
+      }),
+      this.prisma.project.count({ where }),
+    ]);
+    return {
+      data: data as unknown as Project[],
+      pagination: { page: input.page, limit: input.limit, total },
+    };
+  }
+
+  async listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]> {
+    const rows = await this.prisma.project.findMany({
+      where: { team: { organizationId: input.organizationId } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectIdentity[]> {
+    const rows = await this.prisma.project.findMany({
+      where: { id: { in: input.projectIds } },
+      include: { team: true },
+    });
+    return rows.map(
+      (row) =>
+        ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          teamId: row.teamId,
+          organizationId: row.team.organizationId,
+          isPersonal: row.isPersonal,
+          ownerUserId: row.ownerUserId,
+        }) satisfies ProjectIdentity,
+    );
+  }
+
+  tryFindInternal = notImplemented;
+  ensureInternal = notImplemented;
+  isPresenceEnabled = notImplemented;
+  getById = notImplemented;
+  tryGetIdentity = notImplemented;
+  getOrganizationId = notImplemented;
+  tryGetOrganizationId = notImplemented;
+  tryGetById = notImplemented;
+  tryGetSummaryById = notImplemented;
+  create = notImplemented;
+  update = notImplemented;
+  archive = notImplemented;
+  listByTeam = notImplemented;
+  listActiveByScopes = notImplemented;
+  updateMetadata = notImplemented;
+  touchCodingAgentSessionSeen = notImplemented;
+  touchCodingAgentPullRequestSeen = notImplemented;
+  searchByQuery = notImplemented;
+  tryGetTraceSharingConfig = notImplemented;
+  resolveOrgAdmin = notImplemented;
+  resolveTraceDestination = notImplemented;
+  tryGetTraceDestination = notImplemented;
+  listTraceDestinations = notImplemented;
 }
 
 /** Round-trips credentials as plain JSON — the tests below never assert on ciphertext shape. */
@@ -205,13 +298,19 @@ export class TestModelProviderCatalog extends ModelProviderCatalog {
     return Promise.resolve(this.verdict);
   }
 
-  tryGetExecutionValue(input: { customKeys: Record<string, unknown> | null; key: string }): string | null {
+  tryGetExecutionValue(input: {
+    customKeys: Record<string, unknown> | null;
+    key: string;
+  }): string | null {
     const stored = input.customKeys?.[input.key];
     return typeof stored === "string" && stored.length > 0 ? stored : null;
   }
 }
 
-export async function cleanupTenancyFixture(prisma: PrismaClient, fixture: TenancyFixture): Promise<void> {
+export async function cleanupTenancyFixture(
+  prisma: PrismaClient,
+  fixture: TenancyFixture,
+): Promise<void> {
   const providerIds = (
     await prisma.modelProvider.findMany({
       where: { organizationId: fixture.organizationId },

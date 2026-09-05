@@ -8,7 +8,7 @@ import type {
   ProcessInstanceDetail,
 } from "@langwatch/ops-contract";
 import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
-import type { ProcessAuditSink } from "../repositories/prisma/prisma.process-audit.repository";
+import type { ProcessAuditSink } from "../ports/process-audit.sink";
 import type {
   DeadLetterCount,
   DeadOutboxMessageView,
@@ -48,7 +48,16 @@ export class ManagerExplorerService {
   /** The live pipeline surface, supplied by the process composition. */
   private readonly introspection: OpsEventingIntrospectionPort;
 
-  constructor(params: {
+  static create(params: {
+    store: ProcessStore;
+    fleet: ProcessOpsRepository;
+    audit: ProcessAuditSink;
+    introspection: OpsEventingIntrospectionPort;
+  }): ManagerExplorerService {
+    return new ManagerExplorerService(params);
+  }
+
+  private constructor(params: {
     store: ProcessStore;
     fleet: ProcessOpsRepository;
     audit: ProcessAuditSink;

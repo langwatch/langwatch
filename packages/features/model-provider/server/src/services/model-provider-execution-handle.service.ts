@@ -12,7 +12,7 @@ import {
   getProjectModelProviders,
   type LegacyModelProviderExecution,
   prepareLitellmParams,
-} from "../adapters/legacy-model-provider.adapter";
+} from "../rules/legacy-model-provider.rules";
 import type {
   ModelCostProjectPort,
   ModelProviderCodexHandlePort,
@@ -60,84 +60,6 @@ export type ModelProviderExecutionHandleOptions = {
    * models refuse by name — see {@link ModelProviderCodexHandlePort}.
    */
   codexHandles?: ModelProviderCodexHandlePort;
-};
-
-export const getVercelAIModel = async (
-  input: ModelProviderExecutionHandleInput & ModelProviderExecutionHandleOptions,
-): Promise<LanguageModel> => {
-  const { projectId, model, featureKey = "prompt.create_default" } = input;
-  const project = await input.projects.tryGetWithTeam(projectId);
-
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
-  const modelProviders = await getProjectModelProviders(input.modelProviders, projectId);
-
-  const model_ = await resolveModel({
-    explicit: model,
-    projectId,
-    featureKey,
-    modelProviders,
-    modelProviderService: input.modelProviders,
-  });
-
-  const providerKey = model_.split("/")[0] ?? "";
-  const modelProvider = modelProviders[providerKey];
-
-  if (!modelProvider) {
-    throw new Error(
-      `Model provider "${providerKey}" is not configured for this project. Go to Settings → Model Providers to add it.`,
-    );
-  }
-
-  if (!modelProvider.enabled) {
-    throw new Error(
-      `Model provider "${providerKey}" is configured but disabled. Go to Settings → Model Providers to enable it.`,
-    );
-  }
-
-  // Codex never goes through the nlpgo chat-completions proxy: the codex
-  // backend is Responses-only and its OAuth session lives at the AI
-  // gateway, so the handle comes from there instead. The branch sits AFTER
-  // the existence/enabled guards so an explicit "openai_codex/..." model
-  // cannot bypass a disconnected or disabled provider row.
-  if (isCodexModel(model_)) {
-    if (!input.codexHandles) {
-      throw new Error(
-        `Codex models cannot be executed by this process: it composes no AI gateway credential, and "${model_}" has no other road. Configure the gateway, or choose a model from another provider.`,
-      );
-    }
-
-    return input.codexHandles.resolve({
-      projectId,
-      model: model_,
-      featureKey,
-    });
-  }
-
-  const litellmParams = await prepareLitellmParams(input.modelProviders, null, {
-    model: model_,
-    modelProvider,
-    projectId,
-  });
-  const headers = Object.fromEntries(
-    Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
-  );
-
-  // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,
-  // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body; the Go
-  // side reads x-litellm-* via the gatewayproxy package and dispatches
-  // in-process.
-  const baseURL = input.executionProxyBaseUrl;
-  const vercelProvider = createOpenAICompatible({
-    name: `${providerKey}`,
-    apiKey: litellmParams.api_key,
-    baseURL,
-    headers,
-  });
-
-  return vercelProvider(model_);
 };
 
 async function resolveModel({
@@ -258,7 +180,7 @@ async function resolveModel({
 /**
  * The model-resolution cascade with its collaborators bound once.
  *
- * The function above is the cascade; this is how a process holds it. Every
+ * The static below is the cascade; this is how a process holds it. Every
  * caller in a process resolves through the SAME instance, which is the point:
  * two instances could disagree about where the execution proxy lives, and the
  * one that drifts answers with a handle pointing at nothing.
@@ -270,7 +192,85 @@ export class ModelProviderExecutionHandleService {
 
   private constructor(private readonly options: ModelProviderExecutionHandleOptions) {}
 
+  static async getVercelAIModel(
+    input: ModelProviderExecutionHandleInput & ModelProviderExecutionHandleOptions,
+  ): Promise<LanguageModel> {
+    const { projectId, model, featureKey = "prompt.create_default" } = input;
+    const project = await input.projects.tryGetWithTeam(projectId);
+
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const modelProviders = await getProjectModelProviders(input.modelProviders, projectId);
+
+    const model_ = await resolveModel({
+      explicit: model,
+      projectId,
+      featureKey,
+      modelProviders,
+      modelProviderService: input.modelProviders,
+    });
+
+    const providerKey = model_.split("/")[0] ?? "";
+    const modelProvider = modelProviders[providerKey];
+
+    if (!modelProvider) {
+      throw new Error(
+        `Model provider "${providerKey}" is not configured for this project. Go to Settings → Model Providers to add it.`,
+      );
+    }
+
+    if (!modelProvider.enabled) {
+      throw new Error(
+        `Model provider "${providerKey}" is configured but disabled. Go to Settings → Model Providers to enable it.`,
+      );
+    }
+
+    // Codex never goes through the nlpgo chat-completions proxy: the codex
+    // backend is Responses-only and its OAuth session lives at the AI
+    // gateway, so the handle comes from there instead. The branch sits AFTER
+    // the existence/enabled guards so an explicit "openai_codex/..." model
+    // cannot bypass a disconnected or disabled provider row.
+    if (isCodexModel(model_)) {
+      if (!input.codexHandles) {
+        throw new Error(
+          `Codex models cannot be executed by this process: it composes no AI gateway credential, and "${model_}" has no other road. Configure the gateway, or choose a model from another provider.`,
+        );
+      }
+
+      return input.codexHandles.resolve({
+        projectId,
+        model: model_,
+        featureKey,
+      });
+    }
+
+    const litellmParams = await prepareLitellmParams(input.modelProviders, null, {
+      model: model_,
+      modelProvider,
+      projectId,
+    });
+    const headers = Object.fromEntries(
+      Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
+    );
+
+    // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,
+    // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body; the Go
+    // side reads x-litellm-* via the gatewayproxy package and dispatches
+    // in-process.
+    const baseURL = input.executionProxyBaseUrl;
+    const vercelProvider = createOpenAICompatible({
+      name: `${providerKey}`,
+      apiKey: litellmParams.api_key,
+      baseURL,
+      headers,
+    });
+
+    return vercelProvider(model_);
+  }
+
   resolve(input: ModelProviderExecutionHandleInput): Promise<LanguageModel> {
-    return getVercelAIModel({ ...this.options, ...input });
+    return ModelProviderExecutionHandleService.getVercelAIModel({ ...this.options, ...input });
   }
 }

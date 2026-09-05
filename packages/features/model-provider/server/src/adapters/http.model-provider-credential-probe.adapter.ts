@@ -980,112 +980,29 @@ async function runProbeChain({
 }
 
 /**
- * Validates an API key against a custom URL or default URL.
- * Gets API key from stored DB value OR env var (whichever exists).
+ * Which of Google's two doors a credential is being checked against, for the
+ * providers that have two.
  *
- * @param projectId - The project ID to look up stored keys
- * @param provider - The provider key (e.g., "openai", "anthropic")
- * @param customBaseUrl - Optional custom base URL to validate against. If not provided, uses default URL.
- * @param modelProviders - composed Model Provider service
- * @returns Promise resolving to validation result
+ * Carried on the probe context so a refusal can say which door refused —
+ * "fill in the project and location" and "clear them" are opposite
+ * instructions, and giving the wrong one sends the customer the wrong way.
+ * Absent entirely for every other provider, which has only one door.
  */
-export async function validateKeyWithCustomUrl({
-  projectId,
+function googleDoorFor({
   provider,
-  customBaseUrl,
-  modelProviders: service,
-  environment,
-  egress,
+  agentPlatform,
 }: {
-  projectId: string;
   provider: string;
-  customBaseUrl: string | undefined;
-  modelProviders: ModelProviderService;
-  /**
-   * The process environment the fallback key is read from, passed in rather
-   * than read here: a package has no environment of its own, and the caller
-   * that has one is the composition root.
-   */
-  environment: Readonly<Record<string, string | undefined>>;
-  egress: ModelProviderEgressPort;
-}): Promise<ModelProviderCredentialVerdict> {
-  const providerDef = tryGetModelProviderDefinition(provider);
-  if (!providerDef) {
-    return unchecked("unknown_provider");
+  agentPlatform: { project: string; location: string };
+}): { googleDoor?: "agent-platform" | "gemini-api" } {
+  if (provider !== "gemini" && provider !== "google_agent_platform") {
+    return {};
   }
-
-  if (NOT_PROBEABLE.has(provider)) {
-    return unchecked("provider_not_probeable");
-  }
-
-  const apiKeyField = providerDef.apiKey;
-  const endpointField = providerDef.endpointKey;
-
-  // Try to get stored API key from DB (decrypted by repository)
-  const storedProvider = await service.tryGetProviderForProject({
-    projectId,
-    provider,
-  });
-
-  const storedKeys = Object.fromEntries(
-    Object.entries(storedProvider?.customKeys ?? {}).filter(
-      (entry): entry is [string, string] => typeof entry[1] === "string",
-    ),
-  );
-  let apiKey = storedKeys[apiKeyField]?.trim() ?? "";
-
-  // Fallback to env var if no stored key
-  if (!apiKey) {
-    apiKey = environment[apiKeyField]?.trim() ?? "";
-  }
-
-  if (!apiKey) {
-    return refused(new ProviderKeyMissingError({ provider }).serialize());
-  }
-
-  // Start from what's stored, not from a blank object: a provider whose
-  // credential is more than a key plus an endpoint — Agent Platform's
-  // project and location, or any future one — had those fields silently
-  // dropped when this rebuilt customKeys from scratch. That turned "the
-  // customer edited an unrelated field" into an empty probe walk and a
-  // false "could not reach the provider", which is the exact misdiagnosis
-  // this whole area of the code exists to remove. The freshly resolved key
-  // and an explicit custom URL are layered on top, in that order, so they
-  // still win over whatever was stored.
-  const customKeys: Record<string, string> = {
-    ...storedKeys,
-    [apiKeyField]: apiKey,
+  return {
+    googleDoor: agentPlatform.project && agentPlatform.location ? "agent-platform" : "gemini-api",
   };
-  if (endpointField && customBaseUrl) {
-    customKeys[endpointField] = customBaseUrl;
-  }
-  // Note: if customBaseUrl is not provided, validateProviderApiKey will use the default URL
-
-  return validateProviderApiKey(provider, customKeys, egress);
 }
 
-/**
- * Validates an API key for a given model provider.
- *
- * Uses the `modelProviders` registry to dynamically get API key and endpoint
- * field names. All providers use bearer auth by default unless overridden.
- *
- * @param provider - The provider key (e.g., "openai", "anthropic")
- * @param customKeys - Record containing the API key and optional base URL
- * @returns Promise resolving to validation result
- *
- * @remarks
- * - Skips validation if the API key is masked (editing existing provider without changing key)
- * - Skips validation for providers with complex auth (Bedrock, Vertex AI, Azure)
- *
- * @example
- * ```ts
- * const result = await validateProviderApiKey("openai", {
- *   OPENAI_API_KEY: "sk-...",
- *   OPENAI_BASE_URL: "https://api.openai.com/v1"
- * });
- * ```
- */
 /**
  * The credential-shaped reasons we decline to ask: nothing usable to send, or
  * nowhere to send it.
@@ -1176,89 +1093,6 @@ function whyNotCheckable({
   return null;
 }
 
-export async function validateProviderApiKey(
-  provider: string,
-  customKeys: Record<string, string>,
-  egress: ModelProviderEgressPort,
-): Promise<ModelProviderCredentialVerdict> {
-  // Get provider definition from registry
-  const providerDef = tryGetModelProviderDefinition(provider);
-  if (!providerDef) {
-    return unchecked("unknown_provider");
-  }
-
-  if (NOT_PROBEABLE.has(provider)) {
-    return unchecked("provider_not_probeable");
-  }
-
-  // Extract API key and base URL using registry field names
-  const apiKeyField = providerDef.apiKey;
-  const endpointField = providerDef.endpointKey;
-
-  const apiKey = customKeys[apiKeyField]?.trim() ?? "";
-  const baseUrl = endpointField ? (customKeys[endpointField]?.trim() ?? "") : "";
-
-  // Get auth strategy (default to bearer) and base URL
-  const authStrategy = PROVIDER_AUTH_OVERRIDES[provider] ?? "bearer";
-  const defaultBaseUrl =
-    providerDefaultBaseUrls[provider] ?? VALIDATION_ONLY_BASE_URLS[provider] ?? "";
-
-  const agentPlatform = agentPlatformPair({ provider, customKeys });
-
-  const cannotCheck = whyNotCheckable({
-    provider,
-    apiKey,
-    baseUrl,
-    defaultBaseUrl,
-    hasAgentPlatformDoor: !!agentPlatform.project && !!agentPlatform.location,
-  });
-  if (cannotCheck) {
-    return unchecked(cannotCheck);
-  }
-
-  return runProbeChain({
-    candidates: buildProbeCandidates({
-      strategy: authStrategy,
-      apiKey,
-      baseUrl,
-      defaultBaseUrl,
-      apiRoot: providerApiRoots[provider],
-      agentPlatform,
-    }),
-    context: {
-      provider,
-      apiKey,
-      hasConfigurableEndpoint: !!endpointField,
-      ...googleDoorFor({ provider, agentPlatform }),
-    },
-    egress,
-  });
-}
-
-/**
- * Which of Google's two doors a credential is being checked against, for the
- * providers that have two.
- *
- * Carried on the probe context so a refusal can say which door refused —
- * "fill in the project and location" and "clear them" are opposite
- * instructions, and giving the wrong one sends the customer the wrong way.
- * Absent entirely for every other provider, which has only one door.
- */
-function googleDoorFor({
-  provider,
-  agentPlatform,
-}: {
-  provider: string;
-  agentPlatform: { project: string; location: string };
-}): { googleDoor?: "agent-platform" | "gemini-api" } {
-  if (provider !== "gemini" && provider !== "google_agent_platform") {
-    return {};
-  }
-  return {
-    googleDoor: agentPlatform.project && agentPlatform.location ? "agent-platform" : "gemini-api",
-  };
-}
-
 /**
  * The catalogue's credential probe, over the process's guarded egress.
  *
@@ -1267,6 +1101,176 @@ function googleDoorFor({
  * SSRF policy meets the feature's knowledge of how each provider authenticates.
  */
 export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCredentialProbePort {
+  /**
+   * Validates an API key against a custom URL or default URL.
+   * Gets API key from stored DB value OR env var (whichever exists).
+   *
+   * @param projectId - The project ID to look up stored keys
+   * @param provider - The provider key (e.g., "openai", "anthropic")
+   * @param customBaseUrl - Optional custom base URL to validate against. If not provided, uses default URL.
+   * @param modelProviders - composed Model Provider service
+   * @returns Promise resolving to validation result
+   */
+  static async validateKeyWithCustomUrl({
+    projectId,
+    provider,
+    customBaseUrl,
+    modelProviders: service,
+    environment,
+    egress,
+  }: {
+    projectId: string;
+    provider: string;
+    customBaseUrl: string | undefined;
+    modelProviders: ModelProviderService;
+    /**
+     * The process environment the fallback key is read from, passed in rather
+     * than read here: a package has no environment of its own, and the caller
+     * that has one is the composition root.
+     */
+    environment: Readonly<Record<string, string | undefined>>;
+    egress: ModelProviderEgressPort;
+  }): Promise<ModelProviderCredentialVerdict> {
+    const providerDef = tryGetModelProviderDefinition(provider);
+    if (!providerDef) {
+      return unchecked("unknown_provider");
+    }
+
+    if (NOT_PROBEABLE.has(provider)) {
+      return unchecked("provider_not_probeable");
+    }
+
+    const apiKeyField = providerDef.apiKey;
+    const endpointField = providerDef.endpointKey;
+
+    // Try to get stored API key from DB (decrypted by repository)
+    const storedProvider = await service.tryGetProviderForProject({
+      projectId,
+      provider,
+    });
+
+    const storedKeys = Object.fromEntries(
+      Object.entries(storedProvider?.customKeys ?? {}).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
+    let apiKey = storedKeys[apiKeyField]?.trim() ?? "";
+
+    // Fallback to env var if no stored key
+    if (!apiKey) {
+      apiKey = environment[apiKeyField]?.trim() ?? "";
+    }
+
+    if (!apiKey) {
+      return refused(new ProviderKeyMissingError({ provider }).serialize());
+    }
+
+    // Start from what's stored, not from a blank object: a provider whose
+    // credential is more than a key plus an endpoint — Agent Platform's
+    // project and location, or any future one — had those fields silently
+    // dropped when this rebuilt customKeys from scratch. That turned "the
+    // customer edited an unrelated field" into an empty probe walk and a
+    // false "could not reach the provider", which is the exact misdiagnosis
+    // this whole area of the code exists to remove. The freshly resolved key
+    // and an explicit custom URL are layered on top, in that order, so they
+    // still win over whatever was stored.
+    const customKeys: Record<string, string> = {
+      ...storedKeys,
+      [apiKeyField]: apiKey,
+    };
+    if (endpointField && customBaseUrl) {
+      customKeys[endpointField] = customBaseUrl;
+    }
+    // Note: if customBaseUrl is not provided, validateProviderApiKey will use the default URL
+
+    return HttpModelProviderCredentialProbeAdapter.validateProviderApiKey(
+      provider,
+      customKeys,
+      egress,
+    );
+  }
+
+  /**
+   * Validates an API key for a given model provider.
+   *
+   * Uses the `modelProviders` registry to dynamically get API key and endpoint
+   * field names. All providers use bearer auth by default unless overridden.
+   *
+   * @param provider - The provider key (e.g., "openai", "anthropic")
+   * @param customKeys - Record containing the API key and optional base URL
+   * @returns Promise resolving to validation result
+   *
+   * @remarks
+   * - Skips validation if the API key is masked (editing existing provider without changing key)
+   * - Skips validation for providers with complex auth (Bedrock, Vertex AI, Azure)
+   *
+   * @example
+   * ```ts
+   * const result = await validateProviderApiKey("openai", {
+   *   OPENAI_API_KEY: "sk-...",
+   *   OPENAI_BASE_URL: "https://api.openai.com/v1"
+   * });
+   * ```
+   */
+  static async validateProviderApiKey(
+    provider: string,
+    customKeys: Record<string, string>,
+    egress: ModelProviderEgressPort,
+  ): Promise<ModelProviderCredentialVerdict> {
+    // Get provider definition from registry
+    const providerDef = tryGetModelProviderDefinition(provider);
+    if (!providerDef) {
+      return unchecked("unknown_provider");
+    }
+
+    if (NOT_PROBEABLE.has(provider)) {
+      return unchecked("provider_not_probeable");
+    }
+
+    // Extract API key and base URL using registry field names
+    const apiKeyField = providerDef.apiKey;
+    const endpointField = providerDef.endpointKey;
+
+    const apiKey = customKeys[apiKeyField]?.trim() ?? "";
+    const baseUrl = endpointField ? (customKeys[endpointField]?.trim() ?? "") : "";
+
+    // Get auth strategy (default to bearer) and base URL
+    const authStrategy = PROVIDER_AUTH_OVERRIDES[provider] ?? "bearer";
+    const defaultBaseUrl =
+      providerDefaultBaseUrls[provider] ?? VALIDATION_ONLY_BASE_URLS[provider] ?? "";
+
+    const agentPlatform = agentPlatformPair({ provider, customKeys });
+
+    const cannotCheck = whyNotCheckable({
+      provider,
+      apiKey,
+      baseUrl,
+      defaultBaseUrl,
+      hasAgentPlatformDoor: !!agentPlatform.project && !!agentPlatform.location,
+    });
+    if (cannotCheck) {
+      return unchecked(cannotCheck);
+    }
+
+    return runProbeChain({
+      candidates: buildProbeCandidates({
+        strategy: authStrategy,
+        apiKey,
+        baseUrl,
+        defaultBaseUrl,
+        apiRoot: providerApiRoots[provider],
+        agentPlatform,
+      }),
+      context: {
+        provider,
+        apiKey,
+        hasConfigurableEndpoint: !!endpointField,
+        ...googleDoorFor({ provider, agentPlatform }),
+      },
+      egress,
+    });
+  }
+
   static create(input: {
     egress: ModelProviderEgressPort;
   }): HttpModelProviderCredentialProbeAdapter {
@@ -1281,7 +1285,11 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     provider: string;
     customKeys: Record<string, string>;
   }): Promise<ModelProviderCredentialVerdict> {
-    return validateProviderApiKey(input.provider, input.customKeys, this.egress);
+    return HttpModelProviderCredentialProbeAdapter.validateProviderApiKey(
+      input.provider,
+      input.customKeys,
+      this.egress,
+    );
   }
 }
 

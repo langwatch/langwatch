@@ -146,7 +146,7 @@ function stageGroup({
 }
 
 async function scan({ redis, topN }: { redis: FakeRedis; topN: number }) {
-  const repo = new QueueRedisRepository(redis as unknown as Redis);
+  const repo = QueueRedisRepository.create({ redis: redis as unknown as Redis });
   const queues = await repo.scanQueues({ queueNames: [QUEUE_NAME], topN });
   return queues[0]!;
 }

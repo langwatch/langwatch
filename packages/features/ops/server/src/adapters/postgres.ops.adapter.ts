@@ -76,10 +76,13 @@ export class PostgresOpsAdapter {
       this.options.access ?? AdminAccessService.create({ adminEmails: this.options.adminEmails });
     const queues = this.options.redis
       ? QueueService.create({
-          repo: new QueueRedisRepository(this.options.redis, this.queuePayloads()),
-          audit: QueueAuditRepository.create(this.options.database),
+          repo: QueueRedisRepository.create({
+            redis: this.options.redis,
+            payloads: this.queuePayloads(),
+          }),
+          audit: QueueAuditRepository.create({ prisma: this.options.database }),
         })
-      : QueueService.create({ repo: new NullQueueRepository() });
+      : QueueService.create({ repo: NullQueueRepository.create() });
 
     return OpsService.create({
       access,

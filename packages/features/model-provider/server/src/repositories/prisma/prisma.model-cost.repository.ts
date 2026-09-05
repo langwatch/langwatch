@@ -9,6 +9,24 @@ import { ModelCostRepository } from "../../ports/model-provider.port";
 type Database = Pick<PrismaClient, "customLLMModelCost">;
 
 export class PrismaModelCostRepository extends ModelCostRepository {
+  /**
+   * The runtime check that belongs to the UNTYPED seam, and only to it.
+   *
+   * `PostgresModelProviderAdapter` still takes `database: object` — the legacy
+   * shape the standards call out — so something has to say what that object must
+   * be before a query runs. `PostgresModelCostCatalogAdapter` takes
+   * `Pick<PrismaClient, "customLLMModelCost">`, which says the same thing at
+   * compile time, and re-checking it there did more than duplicate the type: an
+   * `in` test refuses any client that answers through a proxy, so a composition
+   * test handing the graph a stand-in was told its Prisma was not a Prisma.
+   */
+  static requireModelCostDatabase(database: object): Database {
+    if (!isModelCostDatabase(database)) {
+      throw new Error("Model Cost repository requires a Prisma database adapter");
+    }
+    return database;
+  }
+
   private constructor(private readonly database: Database) {
     super();
   }
@@ -55,24 +73,6 @@ export class PrismaModelCostRepository extends ModelCostRepository {
   async delete(id: string): Promise<void> {
     await this.database.customLLMModelCost.delete({ where: { id } });
   }
-}
-
-/**
- * The runtime check that belongs to the UNTYPED seam, and only to it.
- *
- * `PostgresModelProviderAdapter` still takes `database: object` — the legacy
- * shape the standards call out — so something has to say what that object must
- * be before a query runs. `PostgresModelCostCatalogAdapter` takes
- * `Pick<PrismaClient, "customLLMModelCost">`, which says the same thing at
- * compile time, and re-checking it there did more than duplicate the type: an
- * `in` test refuses any client that answers through a proxy, so a composition
- * test handing the graph a stand-in was told its Prisma was not a Prisma.
- */
-export function requireModelCostDatabase(database: object): Database {
-  if (!isModelCostDatabase(database)) {
-    throw new Error("Model Cost repository requires a Prisma database adapter");
-  }
-  return database;
 }
 
 function isModelCostDatabase(database: object): database is Database {
