@@ -84,6 +84,36 @@ describe("the evaluator editor on an attachment", () => {
       });
     });
 
+    describe("when the spans of the trace are picked for an input", () => {
+      /** @scenario "A Trace.spans mapping renders as spans" */
+      it("writes a trace.spans mapping and renders its chip as spans", async () => {
+        const user = userEvent.setup();
+        const onMappingChange = vi.fn();
+        render(
+          <Harness
+            gate={{ required: true, canRequire: true }}
+            required={true}
+            onMappingChange={onMappingChange}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        await user.click(screen.getByTestId("mapping-input-expected_output"));
+        await waitFor(() =>
+          expect(screen.getByText("Trace")).toBeInTheDocument(),
+        );
+        await user.click(screen.getByTestId("field-option-spans"));
+
+        expect(onMappingChange).toHaveBeenCalledWith("expected_output", {
+          type: "source",
+          sourceId: "trace",
+          path: ["spans"],
+        });
+        const chips = screen.getAllByTestId("source-mapping-tag");
+        expect(chips.map((chip) => chip.textContent)).toContain("spans");
+      });
+    });
+
     describe("when the editor is opened from a pill", () => {
       /** @scenario "A mapping edited in the editor lands on the attachment" */
       it("opens the drawer with the scenario sources and writes a picked mapping back", async () => {

@@ -150,6 +150,30 @@ describe("evaluator attachments", () => {
       });
     });
 
+    describe("when an evaluator with the input spans is attached", () => {
+      /** @scenario "A saved mapping to trace.spans is valid" */
+      it("never infers the spans and offers them under Trace", () => {
+        const mappings = inferScenarioMappings({
+          inputs: [input("spans")],
+          ctx,
+        });
+        expect(mappings.spans).toBeUndefined();
+
+        const trace = scenarioMappingSources({ ctx })[2];
+        expect(trace?.fields.find((field) => field.name === "spans")).toEqual({
+          name: "spans",
+          label: "Spans",
+          type: "list",
+        });
+        expect(
+          scenarioMappingPathIssue({
+            mapping: { type: "source", sourceId: "trace", path: ["spans"] },
+            ctx,
+          }),
+        ).toBeNull();
+      });
+    });
+
     describe("when the mapping sources are listed", () => {
       it("offers the tool call with its input and output", () => {
         const sources = scenarioMappingSources({ ctx });
@@ -338,6 +362,7 @@ describe("evaluator attachments", () => {
           { sourceId: "scenario", path: ["situation"] },
           { sourceId: "scenario", path: ["fields", "golden_sql"] },
           { sourceId: "trace", path: ["contexts"] },
+          { sourceId: "trace", path: ["spans"] },
           { sourceId: "trace", path: ["tool_calls", "run_sql", "input"] },
         ] as const;
         for (const mapping of valid) {

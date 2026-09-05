@@ -9,8 +9,8 @@ Feature: Evaluators run on scenario runs
     evaluator input reads its value through a mapping: the conversation (first
     user message, last agent message, transcript, messages), the scenario (its
     situation, its criteria, one of the suite's fields), the trace the run
-    produced (a tool call's input or output, the retrieved contexts), or a
-    literal value.
+    produced (a tool call's input or output, the retrieved contexts, every
+    span of its traces as JSON), or a literal value.
 
     The work runs as a queued job, one per run, retried with a growing delay
     while the trace is still arriving. Each evaluator produces one result:
@@ -54,6 +54,40 @@ Feature: Evaluators run on scenario runs
     Then tool_calls.run_sql.input reads the input of the last run_sql call
     And tool_calls.run_sql.output reads the output of the last run_sql call
     And contexts reads the text of every retrieved context
+
+  @unit
+  Scenario: An input mapped to the trace spans receives every span of the run as JSON
+    Given a run whose traces hold a tool span and a rag span
+    And an evaluator input mapped to spans
+    Then the input reads every span as JSON, with nothing left out
+    And the evaluator receives the whole JSON while the stored copy is cut to two thousand characters
+
+  @unit
+  Scenario: The spans arrive in start order across traces
+    Given two traces whose spans interleave in time
+    Then spans lists them by their start time, whichever trace they belong to
+
+  @unit
+  Scenario: A run with traces whose spans have not arrived yet retries
+    Given an evaluator input mapped to spans
+    And the run's spans have not arrived
+    When the run is evaluated
+    Then the input is pending and the job tries again
+
+  @unit
+  Scenario: A run without traces cannot answer the spans
+    Given an evaluator input mapped to spans
+    And a run that produced no trace
+    When the run is evaluated
+    Then the run records a failed result with the details "no spans in the trace"
+
+  @unit
+  Scenario: A saved mapping to trace.spans is valid
+    Given an evaluator attachment mapped to trace.spans
+    When the attachment is saved
+    Then no path issue is reported
+    And the mapping picker offers spans under Trace
+    And spans is never inferred for an input
 
   @unit
   Scenario: A literal mapping reads its value

@@ -37305,12 +37305,12 @@ Every evaluator input reads from one source:
 |---|---|---|
 | **Conversation** | `first_user_message`, `last_agent_message`, `transcript`, `messages` | The first message of the simulated user, the last reply of the agent, the whole conversation as `role: content` lines, or the messages as JSON. |
 | **Scenario** | `situation`, `criteria`, `fields.<identifier>` | The scenario's own text, or its value for a field the suite declares. |
-| **Trace** | `contexts`, `tool_calls.<tool>.input`, `tool_calls.<tool>.output` | The retrieved contexts of the run's traces, or the input or output of the last call of a tool. Needs [linked traces](/agent-testing/linking-your-traces). |
+| **Trace** | `contexts`, `spans`, `tool_calls.<tool>.input`, `tool_calls.<tool>.output` | The retrieved contexts of the run's traces, every span of those traces as JSON in start order, or the input or output of the last call of a tool. Needs [linked traces](/agent-testing/linking-your-traces). |
 | A value | | A literal, the same for every scenario. |
 
 Mappings are inferred when an evaluator is attached. An input named `input`, `question` or `user_input` reads the first user message; `output`, `response` or `answer` reads the last agent message; `transcript`, `conversation` or `messages` reads the transcript; `contexts` or `retrieved_contexts` reads the trace's contexts.
 
-An input named `expected_output`, `expected_contexts` or another `expected_*` reads the field whose name matches, so `expected_output` matches `golden_sql` and `expected_contexts` matches `table_schema`. A suite with one field maps an expected input to it. A tool call is never inferred: set it by hand.
+An input named `expected_output`, `expected_contexts` or another `expected_*` reads the field whose name matches, so `expected_output` matches `golden_sql` and `expected_contexts` matches `table_schema`. A suite with one field maps an expected input to it. A tool call or the spans are never inferred: set them by hand. `spans` hands a code or LLM evaluator the whole run, every span of every trace as JSON, when one tool call at a time is not enough.
 
 The example of a text-to-SQL agent: the suite declares `golden_sql` and `table_schema`, and **SQL Query Equivalence** reads `output` from `tool_calls.run_sql.input`, `expected_output` from `fields.golden_sql` and `expected_contexts` from `fields.table_schema`.
 

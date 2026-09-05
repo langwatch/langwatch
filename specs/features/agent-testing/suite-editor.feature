@@ -214,6 +214,13 @@ Feature: The test suite editor
     And the Scenario source lists situation, criteria and the two fields
 
   @integration
+  Scenario: A Trace.spans mapping renders as spans
+    Given the evaluator editor is opened on an attached evaluator
+    When Spans is picked under Trace for an input
+    Then the attachment maps that input to trace.spans
+    And the input's chip reads spans
+
+  @integration
   Scenario: The evaluator editor carries the Required to pass switch
     Given an attached evaluator that produces a pass or fail
     When its editor is opened

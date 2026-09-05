@@ -234,6 +234,88 @@ describe("resolveTraceMapping", () => {
     });
   });
 
+  describe("given a tool span and a rag span on the run's traces", () => {
+    const spans = [
+      toolCall({ startedAt: 2_000, input: "SELECT 2", output: "2" }),
+      ragSpan(["refunds(id, amount)"]),
+    ];
+
+    /** @scenario "An input mapped to the trace spans receives every span of the run as JSON" */
+    it("reads every span as JSON with nothing left out, and only the stored copy is cut", () => {
+      const resolved = resolveTraceMapping({
+        path: ["spans"],
+        spans,
+        hasTraces: true,
+      });
+      expect(resolved.kind).toBe("value");
+      const json = (resolved as { value: string }).value;
+      expect(JSON.parse(json)).toEqual([spans[1], spans[0]]);
+
+      const padded = spans.map((span) => ({
+        ...span,
+        output: { type: "text", value: "x".repeat(MAX_STORED_INPUT_LENGTH) },
+      })) as Span[];
+      const full = resolveTraceMapping({
+        path: ["spans"],
+        spans: padded,
+        hasTraces: true,
+      }) as { value: string };
+      expect(full.value.length).toBeGreaterThan(MAX_STORED_INPUT_LENGTH);
+      expect(JSON.parse(full.value)).toHaveLength(2);
+      expect(storedInputsOf({ spans: full.value }).spans).toHaveLength(
+        MAX_STORED_INPUT_LENGTH,
+      );
+    });
+  });
+
+  describe("given two traces whose spans interleave in time", () => {
+    /** @scenario "The spans arrive in start order across traces" */
+    it("lists the spans by start time whichever trace they belong to", () => {
+      const at = (trace_id: string, span_id: string, startedAt: number) =>
+        span({
+          type: "span",
+          trace_id,
+          span_id,
+          timestamps: {
+            started_at: startedAt,
+            finished_at: startedAt + 1,
+            first_token_at: null,
+          },
+        });
+      const resolved = resolveTraceMapping({
+        path: ["spans"],
+        spans: [
+          at("trace-2", "b2", 4_000),
+          at("trace-1", "a1", 1_000),
+          at("trace-2", "b1", 2_000),
+          at("trace-1", "a2", 3_000),
+        ],
+        hasTraces: true,
+      }) as { value: string };
+      expect(
+        (JSON.parse(resolved.value) as Span[]).map((entry) => entry.span_id),
+      ).toEqual(["a1", "b1", "a2", "b2"]);
+    });
+  });
+
+  describe("when the run has traces but no span of them has arrived", () => {
+    /** @scenario "A run with traces whose spans have not arrived yet retries" */
+    it("reports the spans as pending", () => {
+      expect(
+        resolveTraceMapping({ path: ["spans"], spans: [], hasTraces: true }),
+      ).toEqual({ kind: "pending", details: "no spans in the trace" });
+    });
+  });
+
+  describe("when the run produced no trace and the spans are read", () => {
+    /** @scenario "A run without traces cannot answer the spans" */
+    it("fails right away instead of waiting", () => {
+      expect(
+        resolveTraceMapping({ path: ["spans"], spans: [], hasTraces: false }),
+      ).toEqual({ kind: "failed", details: "no spans in the trace" });
+    });
+  });
+
   describe("when the run produced no trace at all", () => {
     /** @scenario "Retrieved contexts the trace does not hold fail the evaluator with a reason" */
     it("fails right away instead of waiting", () => {

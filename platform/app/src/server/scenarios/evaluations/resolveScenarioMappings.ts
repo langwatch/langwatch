@@ -20,6 +20,7 @@ import type {
 import {
   TOOL_CALL_PARTS,
   TRACE_CONTEXTS_PATH,
+  TRACE_SPANS_PATH,
   TRACE_TOOL_CALLS_PATH,
 } from "../evaluator-attachments";
 import { fieldValueIsBlank, type ScenarioFieldValues } from "../suite-fields";
@@ -197,6 +198,22 @@ function resolveTraceContextsMapping({
   return notYet("no retrieved contexts in the trace");
 }
 
+/**
+ * What the trace's spans answer: every span of every trace the run produced,
+ * as stored, in start order, as one JSON string. Or why they cannot yet.
+ */
+function resolveTraceSpansMapping({
+  spans,
+  notYet,
+}: {
+  spans: Span[];
+  notYet: (reason: string) => ResolvedInput;
+}): ResolvedInput {
+  if (spans.length === 0) return notYet("no spans in the trace");
+  const ordered = [...spans].sort((a, b) => startedAtOf(a) - startedAtOf(b));
+  return value(JSON.stringify(ordered));
+}
+
 /** What the last call of the named tool answers, or why it cannot yet. */
 function resolveTraceToolCallMapping({
   toolName,
@@ -217,7 +234,8 @@ function resolveTraceToolCallMapping({
 
 /**
  * What the trace source answers for one path. The last call of a tool wins,
- * the way a person reads the final answer of an agent that retried.
+ * the way a person reads the final answer of an agent that retried; the
+ * spans hand over the whole run for an evaluator that reads it all.
  */
 export function resolveTraceMapping({
   path,
@@ -233,6 +251,10 @@ export function resolveTraceMapping({
 
   if (head === TRACE_CONTEXTS_PATH) {
     return resolveTraceContextsMapping({ spans, notYet });
+  }
+
+  if (head === TRACE_SPANS_PATH) {
+    return resolveTraceSpansMapping({ spans, notYet });
   }
 
   if (

@@ -6,11 +6,12 @@
  * converter between the two: `{ type: "source", sourceId, path }` or
  * `{ type: "value", value }`. The three sources are the conversation, the
  * scenario (its situation, its criteria, or one of the suite's fields) and the
- * trace the run produced (retrieved contexts, or a tool call's input or
- * output).
+ * trace the run produced (retrieved contexts, a tool call's input or output,
+ * or every span of its traces as JSON).
  *
- * Mappings are inferred when an evaluator is attached. Tool calls are never
- * inferred: a wrong guess there reads the wrong call and grades it. A plan
+ * Mappings are inferred when an evaluator is attached. Tool calls and the
+ * spans are never inferred: a wrong guess there reads the wrong call and
+ * grades it, and the spans are a deliberate choice. A plan
  * level attachment never reads scenario fields, because a run plan may cover
  * scenarios from several suites with different fields.
  *
@@ -49,8 +50,9 @@ export type ConversationPath = (typeof CONVERSATION_PATHS)[number];
 /** The scalar paths under the scenario source; a field is `["fields", id]`. */
 export const SCENARIO_PATHS = ["situation", "criteria"] as const;
 
-/** The first segment of the two trace paths. */
+/** The first segment of the three trace paths. */
 export const TRACE_CONTEXTS_PATH = "contexts";
+export const TRACE_SPANS_PATH = "spans";
 export const TRACE_TOOL_CALLS_PATH = "tool_calls";
 export const TOOL_CALL_PARTS = ["input", "output"] as const;
 
@@ -178,7 +180,10 @@ function scenarioSource({
   };
 }
 
-/** The trace source: retrieved contexts and the tool calls seen so far. */
+/**
+ * The trace source: retrieved contexts, every span as JSON, and the tool
+ * calls seen so far.
+ */
 function traceSource({ toolNames }: { toolNames: string[] }): AvailableSource {
   const toolCalls: NestedField = {
     name: TRACE_TOOL_CALLS_PATH,
@@ -200,6 +205,7 @@ function traceSource({ toolNames }: { toolNames: string[] }): AvailableSource {
         label: "Retrieved contexts",
         type: "list",
       },
+      { name: TRACE_SPANS_PATH, label: "Spans", type: "list" },
       toolCalls,
     ],
   };
@@ -469,7 +475,12 @@ function scenarioPathIssue({
 
 function tracePathIssue(path: readonly string[]): string | null {
   const [head, second, third] = path;
-  if (path.length === 1 && head === TRACE_CONTEXTS_PATH) return null;
+  if (
+    path.length === 1 &&
+    (head === TRACE_CONTEXTS_PATH || head === TRACE_SPANS_PATH)
+  ) {
+    return null;
+  }
   const isToolCall =
     head === TRACE_TOOL_CALLS_PATH &&
     path.length === 3 &&
