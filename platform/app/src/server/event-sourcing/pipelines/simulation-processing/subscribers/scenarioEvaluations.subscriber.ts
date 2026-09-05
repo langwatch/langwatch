@@ -59,15 +59,45 @@ function scenarioIdToEvaluate(params: {
   return scenarioId;
 }
 
+/** The first attempt of the job that grades one finished run. */
+function jobPayloadOf({
+  tenantId,
+  scenarioRunId,
+  scenarioId,
+  evaluators,
+  traceIds,
+}: {
+  tenantId: string;
+  scenarioRunId: string;
+  scenarioId: string;
+  evaluators: RunEvaluators;
+  traceIds: string[] | undefined;
+}): ScenarioEvaluationsJobPayload {
+  return {
+    tenantId,
+    scenarioRunId,
+    scenarioId,
+    suiteId: evaluators.suiteId,
+    planId: evaluators.planId,
+    attachments: evaluators.attachments,
+    ...(evaluators.fieldValues && { fieldValues: evaluators.fieldValues }),
+    ...(evaluators.definitions && { definitions: evaluators.definitions }),
+    traceIds: traceIds ?? [],
+    attempt: 1,
+    occurredAt: Date.now(),
+  };
+}
+
 /**
  * On RunFinished, queues the evaluation job for the run when its suite or
  * its plan attaches evaluators.
  *
- * The attachments come off the event, where the queue command pinned them
- * when the run was scheduled, so the run is graded with what it was queued
- * with and the job payload carries the same set to every retry. An event
- * without them is a run scheduled before they were recorded: the suite and
- * the plan are read now instead.
+ * The attachments, the scenario's field values and the evaluator definitions
+ * come off the event, where the queue command pinned them when the run was
+ * scheduled, so the run is graded with what it was queued with and the job
+ * payload carries the same set to every retry. An event without them is a
+ * run scheduled before they were recorded: the suite and the plan are read
+ * now instead.
  *
  * A run whose finished results already carry evaluations was graded by the
  * code that ran it, and is stored as sent. A run that errored or was
@@ -121,17 +151,15 @@ export function createScenarioEvaluationsSubscriber(
         },
         "Queueing scenario evaluations for finished run",
       );
-      await deps.enqueue({
-        tenantId,
-        scenarioRunId,
-        scenarioId: evaluatedScenarioId,
-        suiteId: evaluators.suiteId,
-        planId: evaluators.planId,
-        attachments: evaluators.attachments,
-        traceIds: event.data.traceIds ?? [],
-        attempt: 1,
-        occurredAt: Date.now(),
-      });
+      await deps.enqueue(
+        jobPayloadOf({
+          tenantId,
+          scenarioRunId,
+          scenarioId: evaluatedScenarioId,
+          evaluators,
+          traceIds: event.data.traceIds,
+        }),
+      );
     },
   };
 }

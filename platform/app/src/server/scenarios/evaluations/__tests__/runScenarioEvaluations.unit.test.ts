@@ -4,9 +4,11 @@ import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.gen
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import type { Span } from "~/server/tracer/types";
 import type { EvaluatorAttachment } from "../../evaluator-attachments";
+import { runEvaluatorDefinitionOf } from "../../scenario-run-evaluators";
 import { MAX_STORED_INPUT_LENGTH } from "../constants";
 import {
   checkTypeOf,
+  loadRunAttachments,
   type RunScenarioEvaluationsDeps,
   runScenarioEvaluations,
   TraceDataPendingError,
@@ -491,15 +493,203 @@ describe("toScenarioEvaluationResult", () => {
 });
 
 describe("checkTypeOf", () => {
+  const definition = (overrides: Partial<EvaluatorWithFields> = {}) =>
+    runEvaluatorDefinitionOf(evaluator(overrides));
+
   it("dispatches a workflow evaluator on its workflow, a code one on its id, a built-in on its type", () => {
     expect(
-      checkTypeOf(evaluator({ type: "workflow", workflowId: "wf-1" })),
+      checkTypeOf(definition({ type: "workflow", workflowId: "wf-1" })),
     ).toBe("custom/wf-1");
-    expect(checkTypeOf(evaluator({ type: "code", id: "eval-code" }))).toBe(
+    expect(checkTypeOf(definition({ type: "code", id: "eval-code" }))).toBe(
       "code/eval-code",
     );
-    expect(checkTypeOf(evaluator())).toBe("langevals/exact_match");
-    expect(checkTypeOf(evaluator({ config: {} }))).toBeNull();
+    expect(checkTypeOf(definition())).toBe("langevals/exact_match");
+    expect(checkTypeOf(definition({ config: {} }))).toBeNull();
+  });
+});
+
+describe("loadRunAttachments", () => {
+  describe("given a scenario that carries a field and a suite that attaches one evaluator", () => {
+    /** @scenario "The scenario field values a run is graded with are resolved when it is queued" */
+    it("records the scenario's field values next to the attachments", async () => {
+      const deps = makeDeps({ fields: { golden_sql: "SELECT 1" } });
+
+      const loaded = await loadRunAttachments({
+        deps,
+        projectId,
+        scenarioId: "scenario-1",
+        planId: "suite-1",
+      });
+
+      expect(loaded).toEqual(
+        expect.objectContaining({
+          suiteId: "suite-1",
+          planId: "suite-1",
+          attachments: [attachment()],
+          fieldValues: { golden_sql: "SELECT 1" },
+        }),
+      );
+    });
+
+    /** @scenario "The evaluator definitions a run is graded with are resolved when it is queued" */
+    it("records the definition of every attached evaluator the project holds", async () => {
+      const deps = makeDeps({
+        attachments: [attachment(), attachment({ evaluatorId: "eval-gone" })],
+      });
+
+      const loaded = await loadRunAttachments({
+        deps,
+        projectId,
+        scenarioId: "scenario-1",
+        planId: "suite-1",
+      });
+
+      expect(loaded.definitions).toEqual([
+        {
+          id: "eval-exact",
+          name: "Exact match",
+          type: "evaluator",
+          evaluatorType: "langevals/exact_match",
+          workflowId: null,
+          settings: { case_sensitive: true },
+          fields: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+        },
+      ]);
+    });
+  });
+
+  describe("given a suite that attaches nothing", () => {
+    it("reads no evaluator and records no definition", async () => {
+      const deps = makeDeps({ attachments: [] });
+
+      const loaded = await loadRunAttachments({
+        deps,
+        projectId,
+        scenarioId: "scenario-1",
+        planId: "suite-1",
+      });
+
+      expect(deps.suites.getAttachedEvaluators).not.toHaveBeenCalled();
+      expect(loaded.definitions).toEqual([]);
+    });
+  });
+});
+
+describe("the values and the definitions a job grades with", () => {
+  const queuedDefinition = runEvaluatorDefinitionOf(evaluator());
+
+  describe("given a payload that carries the field values the run was queued with", () => {
+    /** @scenario "A scenario field edited while the batch executes does not change what a queued run is graded against" */
+    it("reads the field off the payload, not the scenario as it stands now", async () => {
+      const deps = makeDeps({ fields: { golden_sql: "SELECT 2" } });
+
+      await runScenarioEvaluations({
+        deps,
+        payload: {
+          ...payload,
+          attachments: [attachment()],
+          fieldValues: { golden_sql: "SELECT 1" },
+          definitions: [queuedDefinition],
+        },
+        isFinalAttempt: false,
+      });
+
+      expect(deps.runEvaluation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            type: "default",
+            data: { output: "SELECT 1", expected_output: "SELECT 1" },
+          },
+        }),
+      );
+      expect(recorded(deps)?.evaluations[0]?.status).toBe("passed");
+    });
+  });
+
+  describe("given a payload that carries the evaluator definitions the run was queued with", () => {
+    /** @scenario "An evaluator edited while the batch executes does not change what a queued run is graded against" */
+    it("runs the evaluator as it was saved then and never reads the saved evaluator", async () => {
+      const deps = makeDeps({
+        evaluators: [
+          evaluator({
+            config: {
+              evaluatorType: "langevals/exact_match",
+              settings: { case_sensitive: false },
+            },
+          }),
+        ],
+      });
+
+      await runScenarioEvaluations({
+        deps,
+        payload: {
+          ...payload,
+          attachments: [attachment()],
+          fieldValues: { golden_sql: "SELECT 1" },
+          definitions: [queuedDefinition],
+        },
+        isFinalAttempt: false,
+      });
+
+      expect(deps.suites.getAttachedEvaluators).not.toHaveBeenCalled();
+      expect(deps.runEvaluation).toHaveBeenCalledWith(
+        expect.objectContaining({ settings: { case_sensitive: true } }),
+      );
+    });
+
+    it("records an evaluator the definitions leave out as not found", async () => {
+      const deps = makeDeps();
+
+      await runScenarioEvaluations({
+        deps,
+        payload: {
+          ...payload,
+          attachments: [attachment({ evaluatorId: "eval-gone" })],
+          fieldValues: {},
+          definitions: [],
+        },
+        isFinalAttempt: false,
+      });
+
+      expect(deps.suites.getAttachedEvaluators).not.toHaveBeenCalled();
+      expect(recorded(deps)?.evaluations[0]).toEqual(
+        expect.objectContaining({
+          evaluatorId: "eval-gone",
+          status: "error",
+          details: "The evaluator was not found in this project",
+        }),
+      );
+    });
+  });
+
+  describe("given a payload written before the values and the definitions were carried", () => {
+    /** @scenario "A job written before the values and the definitions were carried reads them now" */
+    it("reads the scenario's field values and the saved evaluators", async () => {
+      const deps = makeDeps({ fields: { golden_sql: "SELECT 1" } });
+
+      await runScenarioEvaluations({
+        deps,
+        payload: { ...payload, attachments: [attachment()] },
+        isFinalAttempt: false,
+      });
+
+      expect(deps.suites.getAttachedEvaluators).toHaveBeenCalledWith({
+        projectId,
+        attachments: [attachment()],
+      });
+      expect(deps.runEvaluation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            type: "default",
+            data: { output: "SELECT 1", expected_output: "SELECT 1" },
+          },
+          settings: { case_sensitive: true },
+        }),
+      );
+    });
   });
 });
 

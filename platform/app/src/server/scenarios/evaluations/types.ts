@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { evaluatorAttachmentsSchema } from "../evaluator-attachments";
+import { runEvaluatorDefinitionSchema } from "../scenario-run-evaluators";
+import { scenarioFieldValuesSchema } from "../suite-fields";
 
 /** What one evaluation job carries: enough to load everything else. */
 export const scenarioEvaluationsJobPayloadSchema = z.object({
@@ -20,6 +22,19 @@ export const scenarioEvaluationsJobPayloadSchema = z.object({
    * suite and the plan when it runs.
    */
   attachments: evaluatorAttachmentsSchema.optional(),
+  /**
+   * The scenario's field values as they stood when the run was queued, so an
+   * edit to the scenario while the run executes, or between two attempts,
+   * never changes what it is graded against. A job queued before they were
+   * carried reads the scenario when it runs.
+   */
+  fieldValues: scenarioFieldValuesSchema.optional(),
+  /**
+   * The attached evaluators as they were saved when the run was queued, for
+   * the same reason. A job queued before they were carried reads the saved
+   * evaluators when it runs.
+   */
+  definitions: z.array(runEvaluatorDefinitionSchema).optional(),
   /** The traces the run produced, as the finished event carried them. */
   traceIds: z.array(z.string()),
   /** Starts at 1 and counts up on every requeue. */

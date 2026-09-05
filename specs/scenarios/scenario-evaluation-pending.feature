@@ -202,3 +202,61 @@ Feature: A run reports that its evaluators have not run yet
     Given an evaluation job that retried because the trace had not arrived
     When the retry runs
     Then it carries the attachments of the first attempt
+
+  # --- The values and the definitions the run is graded with ---
+  #
+  # The attachments say which evaluators run and where each input reads its
+  # value. Two more things decide the verdict: the scenario's field values a
+  # mapping reads, and the saved evaluator's own definition (its type, its
+  # settings, its inputs). Both are pinned with the attachments when the run
+  # is queued, so editing a scenario or an evaluator while a batch executes,
+  # or between two attempts of the grading job, changes the runs queued after
+  # the edit and never the ones already queued.
+
+  @unit
+  Scenario: The scenario field values a run is graded with are resolved when it is queued
+    Given a queue run command for a scenario that carries "SELECT 1" for golden_sql
+    When the command is handled
+    Then the queued event carries the field values next to the attachments
+
+  @unit
+  Scenario: The evaluator definitions a run is graded with are resolved when it is queued
+    Given a queue run command for a scenario whose suite attaches one evaluator
+    And that evaluator is saved with the settings it runs with and the inputs it declares
+    When the command is handled
+    Then the queued event carries the evaluator's definition next to the attachments
+    And an attached evaluator the project no longer holds is left out
+
+  @unit
+  Scenario: The finished event carries the field values and the definitions the run was queued with
+    Given a run queued with field values and evaluator definitions
+    And the scenario and the evaluator were edited since
+    When the run is finished
+    Then the finished event carries the field values and the definitions the run was queued with
+
+  @unit
+  Scenario: The evaluation job is queued with the field values and the definitions the run carries
+    Given a finished event carrying field values and evaluator definitions
+    When the evaluation subscriber handles it
+    Then the job payload carries the same field values and definitions
+
+  @unit
+  Scenario: A scenario field edited while the batch executes does not change what a queued run is graded against
+    Given an evaluation job whose payload carries "SELECT 1" for golden_sql
+    And the scenario now carries "SELECT 2" for golden_sql
+    When the worker runs
+    Then the evaluator reads "SELECT 1" for the field
+
+  @unit
+  Scenario: An evaluator edited while the batch executes does not change what a queued run is graded against
+    Given an evaluation job whose payload carries the evaluator's definition with case sensitive matching
+    And the saved evaluator was switched to case insensitive matching since
+    When the worker runs
+    Then the evaluator runs with case sensitive matching
+    And the saved evaluator is not read
+
+  @unit
+  Scenario: A job written before the values and the definitions were carried reads them now
+    Given an evaluation job whose payload carries attachments but no field values and no definitions
+    When the worker runs
+    Then it reads the scenario's field values and the saved evaluators

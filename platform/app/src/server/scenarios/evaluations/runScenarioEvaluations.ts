@@ -2,12 +2,12 @@
  * Runs the evaluators attached to a finished scenario run and records their
  * results on the run.
  *
- * The worker behind the scenario evaluations job. It loads the scenario, the
- * attachments of its suite and its plan, the saved evaluators they name and
- * the run's own state, resolves every mapping, runs each evaluator through
- * the shared evaluation runner, writes each evaluation that ran on the run's
- * last trace, and records one result per attachment through the record
- * evaluations command, which applies the gate.
+ * The worker behind the scenario evaluations job. It loads the scenario and
+ * the run's own state, takes the attachments, the scenario's field values and
+ * the evaluator definitions the job carries, resolves every mapping, runs
+ * each evaluator through the shared evaluation runner, writes each evaluation
+ * that ran on the run's last trace, and records one result per attachment
+ * through the record evaluations command, which applies the gate.
  *
  * Every dependency is an interface the composition root fills in, so the
  * orchestration is testable with stubs.
@@ -27,9 +27,16 @@ import { evaluatorInputSpecsOf } from "~/server/suites/suite-evaluators";
 import type { Span, Trace } from "~/server/tracer/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type { EvaluatorAttachment } from "../evaluator-attachments";
-import type { RunEvaluators } from "../scenario-run-evaluators";
+import {
+  type RunEvaluatorDefinition,
+  type RunEvaluators,
+  runEvaluatorDefinitionOf,
+} from "../scenario-run-evaluators";
 import type { ScenarioEvaluationResult } from "../schemas/event-schemas";
-import { parseScenarioFieldValues } from "../suite-fields";
+import {
+  parseScenarioFieldValues,
+  type ScenarioFieldValues,
+} from "../suite-fields";
 import {
   attachmentsReadTrace,
   type ConversationMessage,
@@ -127,10 +134,11 @@ export class TraceDataPendingError extends Error {
 }
 
 /**
- * The evaluator attachments one run reads, with the suite and the plan they
- * came from.
+ * The evaluators one run is graded with: the attachments of its suite and its
+ * plan, the scenario's field values the mappings read and the definition of
+ * every attached evaluator the project holds.
  *
- * Read when the run is queued, so the set the run is graded with is fixed
+ * Read when the run is queued, so what the run is graded with is fixed
  * before it executes, and again when a run that never passed through the
  * queue command finishes.
  */
@@ -152,7 +160,39 @@ export async function loadRunAttachments({
     suiteId,
     planId,
   });
-  return { suiteId, planId, attachments };
+  const definitions =
+    attachments.length === 0
+      ? []
+      : [...(await loadDefinitions({ deps, projectId, attachments })).values()];
+  return {
+    suiteId,
+    planId,
+    attachments,
+    fieldValues: parseScenarioFieldValues(scenario?.fields),
+    definitions,
+  };
+}
+
+/** The saved evaluators the attachments name, as the worker keeps them. */
+async function loadDefinitions({
+  deps,
+  projectId,
+  attachments,
+}: {
+  deps: Pick<RunScenarioEvaluationsDeps, "suites">;
+  projectId: string;
+  attachments: readonly EvaluatorAttachment[];
+}): Promise<Map<string, RunEvaluatorDefinition>> {
+  const saved = await deps.suites.getAttachedEvaluators({
+    projectId,
+    attachments,
+  });
+  return new Map(
+    [...saved].map(([id, evaluator]) => [
+      id,
+      runEvaluatorDefinitionOf(evaluator),
+    ]),
+  );
 }
 
 /**
@@ -161,7 +201,10 @@ export async function loadRunAttachments({
  * config names.
  */
 export function checkTypeOf(
-  evaluator: Pick<EvaluatorWithFields, "id" | "type" | "workflowId" | "config">,
+  evaluator: Pick<
+    RunEvaluatorDefinition,
+    "id" | "type" | "workflowId" | "evaluatorType"
+  >,
 ): string | null {
   if (evaluator.type === "workflow" && evaluator.workflowId) {
     return `custom/${evaluator.workflowId}`;
@@ -169,18 +212,7 @@ export function checkTypeOf(
   if (evaluator.type === "code") {
     return `${CODE_EVALUATOR_CHECK_PREFIX}${evaluator.id}`;
   }
-  const config = evaluator.config as { evaluatorType?: string } | null;
-  return config?.evaluatorType ?? null;
-}
-
-/** The settings a saved evaluator carries for its type. */
-export function settingsOf(
-  evaluator: Pick<EvaluatorWithFields, "config">,
-): Record<string, unknown> {
-  const config = evaluator.config as {
-    settings?: Record<string, unknown>;
-  } | null;
-  return config?.settings ?? {};
+  return evaluator.evaluatorType;
 }
 
 /** The runner's input shape for the resolved values. */
@@ -377,7 +409,7 @@ async function runOne({
 }: {
   deps: Pick<RunScenarioEvaluationsDeps, "runEvaluation">;
   context: RunContext;
-  evaluator: EvaluatorWithFields;
+  evaluator: RunEvaluatorDefinition;
   checkType: string;
   data: Record<string, ResolvedValue>;
 }): Promise<SingleEvaluationResult> {
@@ -386,7 +418,7 @@ async function runOne({
       projectId: context.projectId,
       evaluatorType: checkType,
       data: dataForEvaluation({ checkType, data }),
-      settings: settingsOf(evaluator),
+      settings: evaluator.settings,
       trace: context.trace,
       workflowId: evaluator.workflowId,
     });
@@ -420,7 +452,7 @@ async function evaluateAttachment({
   deps: Pick<RunScenarioEvaluationsDeps, "runEvaluation" | "reportEvaluation">;
   context: RunContext;
   attachment: EvaluatorAttachment;
-  evaluator: EvaluatorWithFields | undefined;
+  evaluator: RunEvaluatorDefinition | undefined;
 }): Promise<ScenarioEvaluationResult> {
   const name = evaluator?.name ?? attachment.evaluatorId;
   const record = (result: SingleEvaluationResult, inputs = {}) =>
@@ -502,13 +534,15 @@ async function buildRunContext({
   deps,
   payload,
   scenario,
+  fieldValues,
   attachments,
   runState,
   isFinalAttempt,
 }: {
   deps: RunScenarioEvaluationsDeps;
   payload: ScenarioEvaluationsJobPayload;
-  scenario: Pick<Scenario, "situation" | "criteria" | "fields">;
+  scenario: Pick<Scenario, "situation" | "criteria">;
+  fieldValues: ScenarioFieldValues;
   attachments: readonly EvaluatorAttachment[];
   runState: ScenarioRunState | null;
   isFinalAttempt: boolean;
@@ -532,7 +566,7 @@ async function buildRunContext({
     scenario: {
       situation: scenario.situation,
       criteria: scenario.criteria,
-      fields: parseScenarioFieldValues(scenario.fields),
+      fields: fieldValues,
     },
     lastTraceId,
     trace: traceForEvaluation({ projectId, traceId: lastTraceId, spans }),
@@ -567,10 +601,12 @@ export async function runScenarioEvaluations({
     );
     return [];
   }
-  // The job carries the attachments the run was queued with, so a suite or a
-  // plan edited while the run executed does not change what it is graded
-  // against, and a retry grades exactly what the first attempt would have.
-  // A payload written before they were carried reads them now instead.
+  // The job carries the attachments, the scenario's field values and the
+  // evaluator definitions the run was queued with, so a suite, a plan, a
+  // scenario or an evaluator edited while the run executed does not change
+  // what it is graded against, and a retry grades exactly what the first
+  // attempt would have. A payload written before they were carried reads
+  // them now instead.
   const attachments =
     payload.attachments ??
     (await deps.suites.getRunAttachments({
@@ -579,9 +615,13 @@ export async function runScenarioEvaluations({
       planId,
     }));
   if (attachments.length === 0) return [];
+  const fieldValues =
+    payload.fieldValues ?? parseScenarioFieldValues(scenario.fields);
 
   const [evaluatorsById, runState] = await Promise.all([
-    deps.suites.getAttachedEvaluators({ projectId, attachments }),
+    payload.definitions
+      ? new Map(payload.definitions.map((entry) => [entry.id, entry]))
+      : loadDefinitions({ deps, projectId, attachments }),
     deps.runs.getRunState({ tenantId: projectId, scenarioRunId }),
   ]);
 
@@ -589,6 +629,7 @@ export async function runScenarioEvaluations({
     deps,
     payload,
     scenario,
+    fieldValues,
     attachments,
     runState,
     isFinalAttempt,

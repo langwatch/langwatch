@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Command } from "~/server/event-sourcing";
 import type { EvaluatorAttachment } from "~/server/scenarios/evaluator-attachments";
-import type { RunEvaluators } from "~/server/scenarios/scenario-run-evaluators";
+import type {
+  RunEvaluatorDefinition,
+  RunEvaluators,
+} from "~/server/scenarios/scenario-run-evaluators";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import type { FinishRunCommandData } from "../../schemas/commands";
 import {
@@ -30,6 +33,16 @@ const ATTACHMENT: EvaluatorAttachment = {
   mappings: {},
 };
 
+const DEFINITION: RunEvaluatorDefinition = {
+  id: "eval-1",
+  name: "Exact match",
+  type: "evaluator",
+  evaluatorType: "langevals/exact_match",
+  workflowId: null,
+  settings: { case_sensitive: true },
+  fields: [{ identifier: "output", type: "str" }],
+};
+
 const SET_ID = getSuiteSetId("plan-1");
 
 function evaluators(overrides: Partial<RunEvaluators> = {}): RunEvaluators {
@@ -37,6 +50,8 @@ function evaluators(overrides: Partial<RunEvaluators> = {}): RunEvaluators {
     suiteId: "suite-1",
     planId: "plan-1",
     attachments: [ATTACHMENT],
+    fieldValues: { golden_sql: "SELECT 1" },
+    definitions: [DEFINITION],
     ...overrides,
   };
 }
@@ -103,6 +118,21 @@ describe("the evaluators a run is graded with", () => {
       expect(events[0]?.data).toMatchObject({ evaluators: evaluators() });
     });
 
+    /** @scenario "The scenario field values a run is graded with are resolved when it is queued" */
+    /** @scenario "The evaluator definitions a run is graded with are resolved when it is queued" */
+    it("records the scenario's field values and the evaluator definitions next to the attachments", async () => {
+      const loadRunAttachments = vi.fn(async () => evaluators());
+
+      const events = await new QueueRunCommand({ loadRunAttachments }).handle(
+        queueCommand(),
+      );
+
+      const carried = (events[0]?.data as { evaluators: RunEvaluators })
+        .evaluators;
+      expect(carried.fieldValues).toEqual({ golden_sql: "SELECT 1" });
+      expect(carried.definitions).toEqual([DEFINITION]);
+    });
+
     it("keeps the attachments the caller already resolved", async () => {
       const loadRunAttachments = vi.fn(async () => evaluators());
       const supplied = evaluators({ suiteId: "suite-2" });
@@ -144,6 +174,30 @@ describe("the evaluators a run is graded with", () => {
 
       expect(deps.loadRunAttachments).not.toHaveBeenCalled();
       expect(events[0]?.data).toMatchObject({ evaluators: queued });
+    });
+
+    /** @scenario "The finished event carries the field values and the definitions the run was queued with" */
+    it("carries the field values and the definitions the run was queued with, not the edited ones", async () => {
+      const queued = evaluators();
+      const deps: FinishRunDeps = {
+        loadPriorEvents: vi.fn(async () => [queuedEvent(queued)]),
+        loadRunAttachments: vi.fn(async () =>
+          evaluators({
+            fieldValues: { golden_sql: "SELECT 2" },
+            definitions: [
+              { ...DEFINITION, settings: { case_sensitive: false } },
+            ],
+          }),
+        ),
+      };
+
+      const events = await new FinishRunCommand(deps).handle(finishCommand());
+
+      expect(deps.loadRunAttachments).not.toHaveBeenCalled();
+      const carried = (events[0]?.data as { evaluators: RunEvaluators })
+        .evaluators;
+      expect(carried.fieldValues).toEqual({ golden_sql: "SELECT 1" });
+      expect(carried.definitions).toEqual([DEFINITION]);
     });
 
     /** @scenario "A run with no queued attachments resolves them when it finishes" */

@@ -136,6 +136,60 @@ describe("scenario evaluations subscriber", () => {
         }),
       );
     });
+
+    /** @scenario "The evaluation job is queued with the field values and the definitions the run carries" */
+    it("queues the field values and the evaluator definitions the event carries", async () => {
+      const deps = makeDeps();
+      const definition = {
+        id: "eval-1",
+        name: "Exact match",
+        type: "evaluator",
+        evaluatorType: "langevals/exact_match",
+        workflowId: null,
+        settings: { case_sensitive: true },
+        fields: [{ identifier: "output", type: "str" }],
+      };
+
+      await createScenarioEvaluationsSubscriber(deps).handler(
+        finishedEvent({
+          evaluators: {
+            suiteId: "suite-queued",
+            planId: "plan-queued",
+            attachments: [attachment],
+            fieldValues: { golden_sql: "SELECT 1" },
+            definitions: [definition],
+          },
+        }),
+        CONTEXT,
+      );
+
+      expect(deps.loadRunAttachments).not.toHaveBeenCalled();
+      expect(deps.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fieldValues: { golden_sql: "SELECT 1" },
+          definitions: [definition],
+        }),
+      );
+    });
+
+    it("queues neither when the event was written before they were carried", async () => {
+      const deps = makeDeps();
+
+      await createScenarioEvaluationsSubscriber(deps).handler(
+        finishedEvent({
+          evaluators: {
+            suiteId: "suite-queued",
+            planId: "plan-queued",
+            attachments: [attachment],
+          },
+        }),
+        CONTEXT,
+      );
+
+      const queued = vi.mocked(deps.enqueue).mock.calls[0]?.[0];
+      expect(queued).not.toHaveProperty("fieldValues");
+      expect(queued).not.toHaveProperty("definitions");
+    });
   });
 
   describe("when the finished results already carry evaluations", () => {
