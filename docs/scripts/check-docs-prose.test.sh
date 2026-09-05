@@ -72,6 +72,18 @@ else
   check "the percent sign reads as %25" no
 fi
 
+# awk compares against a limit that does not read as a number as a string, so
+# every paragraph passes and the rule is off. The script refuses such a limit.
+LIMIT_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=eighty bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+LIMIT_STATUS=$?
+
+if [[ $LIMIT_STATUS -eq 2 ]]; then
+  check "a paragraph limit that is not a whole number is refused" yes
+else
+  check "a paragraph limit that is not a whole number is refused" no
+  echo "Output: $LIMIT_OUTPUT"
+fi
+
 # A paragraph over the word limit fails, a list item over it fails, and a
 # table row or a paragraph split in two passes. An indented heading, a table
 # written without its outer pipes and a list item of exactly the limit pass
