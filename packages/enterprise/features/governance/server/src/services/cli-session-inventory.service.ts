@@ -1,3 +1,4 @@
+import { cliUserTokensIndexKey } from "@langwatch/auth-contract";
 import {
   type CliSession,
   type CliTokenRecord,
@@ -5,7 +6,6 @@ import {
   type RevokeCliSessionInput,
   cliTokenRecordSchema,
   cliUserInputSchema,
-  cliUserTokensIndexKey,
   revokeCliSessionInputSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type { CliTokenStorePort } from "../ports/cli-token-store.port";

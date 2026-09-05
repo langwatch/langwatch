@@ -1,4 +1,4 @@
-import { extractEmailDomain, normalizedRequestPathname } from "@langwatch/enterprise-sso-contract";
+import { extractEmailDomain, normalizedRequestPathname } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

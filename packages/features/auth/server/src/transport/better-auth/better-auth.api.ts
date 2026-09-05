@@ -7,9 +7,9 @@ import {
   isPasswordResetPath,
   normalizedRequestPathname,
   requestPathname,
-} from "@langwatch/enterprise-sso-contract";
+  type AuthService,
+} from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
-import type { AuthService } from "@langwatch/auth-contract";
 import type { SignInMethodPolicy } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UserService } from "@langwatch/user-contract";

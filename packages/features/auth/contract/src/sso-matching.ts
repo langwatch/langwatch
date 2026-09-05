@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 export interface OAuthAccountLike {
   providerId: string;
   accountId: string;

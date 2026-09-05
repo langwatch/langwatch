@@ -1,10 +1,9 @@
 import {
-  type CliUserInput,
   cliAccessTokenKey,
   cliRefreshTokenKey,
-  cliUserInputSchema,
   cliUserTokensIndexKey,
-} from "@langwatch/enterprise-governance-contract";
+} from "@langwatch/auth-contract";
+import { type CliUserInput, cliUserInputSchema } from "@langwatch/enterprise-governance-contract";
 import type { CliTokenStorePort } from "../ports/cli-token-store.port";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
 

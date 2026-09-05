@@ -1,19 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  cliAccessTokenKey,
-  cliRefreshTokenKey,
-  cliSessionSchema,
-  cliTokenRecordSchema,
-  cliUserTokensIndexKey,
-} from "../cli-sessions";
+import { cliSessionSchema, cliTokenRecordSchema } from "../cli-sessions";
 
 describe("CLI sessions contract", () => {
-  it("keeps the existing Redis key protocol stable", () => {
-    expect(cliUserTokensIndexKey("user")).toBe("lwcli:user:user:tokens");
-    expect(cliAccessTokenKey("access")).toBe("lwcli:access:access");
-    expect(cliRefreshTokenKey("refresh")).toBe("lwcli:refresh:refresh");
-  });
-
   it("rejects malformed token records and session outputs", () => {
     expect(
       cliTokenRecordSchema.safeParse({

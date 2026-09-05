@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Pure path predicates for the ADR-027 license-gated SSO decision. These
  * answer only *which BetterAuth endpoint is this?* — the license half of the

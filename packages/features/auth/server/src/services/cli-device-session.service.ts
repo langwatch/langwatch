@@ -14,12 +14,12 @@
  * ## Where the key grammar comes from, and why it is not declared here
  *
  * `lwcli:access:`, `lwcli:refresh:` and `lwcli:user:<id>:tokens` are already
- * declared once, in `@langwatch/enterprise-governance-contract`, because
- * Enterprise governance READS them: the CLI session inventory lists a person's
- * logins from that index and the deactivation sweep revokes through it. This
- * service is the WRITER of the same three keys, so it imports that grammar
- * rather than restating it — a second spelling would give the writer and the
- * two readers different keyspaces.
+ * declared once, in `@langwatch/auth-contract`, because Enterprise governance
+ * READS them: the CLI session inventory lists a person's logins from that
+ * index and the deactivation sweep revokes through it. This service is the
+ * WRITER of the same three keys, so it imports that grammar rather than
+ * restating it — a second spelling would give the writer and the two readers
+ * different keyspaces.
  *
  * The device-code and poll keyspaces have no second reader and are declared
  * here, where the only thing that writes them lives.
@@ -29,7 +29,7 @@ import {
   cliAccessTokenKey,
   cliRefreshTokenKey,
   cliUserTokensIndexKey,
-} from "@langwatch/enterprise-governance-contract";
+} from "@langwatch/auth-contract";
 import { randomBytes } from "node:crypto";
 
 import type { CliDeviceSessionStorePort } from "../ports/cli-device-session-store.port";

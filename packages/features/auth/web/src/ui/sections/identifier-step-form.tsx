@@ -58,7 +58,7 @@ export function IdentifierStepForm({
   footer?: ReactNode;
   /** Methods that can be taken without an address, under a thin "or". */
   alternatives?: ReactNode;
-  onSubmit: (values: IdentifierStepValues) => void | Promise<unknown>;
+  onSubmit: (values: IdentifierStepValues) => undefined | Promise<unknown>;
 }) {
   const addressField = useFocusWhenSettled();
 

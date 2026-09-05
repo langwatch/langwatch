@@ -365,7 +365,7 @@ function LinkNoLongerWorks({
 }: {
   error: unknown;
   isSending: boolean;
-  onResend: (email: string) => void | Promise<unknown>;
+  onResend: (email: string) => undefined | Promise<unknown>;
 }) {
   return (
     <AuthCard

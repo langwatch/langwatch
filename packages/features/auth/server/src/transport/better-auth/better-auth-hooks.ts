@@ -1,4 +1,4 @@
-import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/enterprise-sso-contract";
+import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/auth-contract";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
@@ -95,7 +95,7 @@ export const beforeUserCreate = async ({
 }: {
   prisma: PrismaClient;
   user: { email: string; deactivatedAt?: Date | null } & Record<string, unknown>;
-}): Promise<boolean | void> => {
+}): Promise<boolean | undefined> => {
   if (user.deactivatedAt) {
     logger.warn({ email: user.email }, "Blocked signup: user is deactivated");
     return false;
@@ -602,7 +602,7 @@ export const beforeSessionCreate = async ({
 }: {
   prisma: PrismaClient;
   session: { userId: string };
-}): Promise<boolean | void> => {
+}): Promise<boolean | undefined> => {
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     select: { deactivatedAt: true },
