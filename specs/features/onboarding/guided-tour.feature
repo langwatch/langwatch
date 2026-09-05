@@ -181,7 +181,8 @@ Feature: Guided onboarding tour
 
   @unit
   Scenario: the secret step reveals the secret
-    Given the key was created and the show-once dialog is open
+    Given the create request was sent by the previous step
+    Then the secret step waits up to fifteen seconds for the key to be created
     When the cursor lands on the secret
     Then the secret is revealed rather than masked
 

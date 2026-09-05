@@ -345,7 +345,7 @@ function TourLayerInner() {
         land(rect);
         return;
       }
-      if (waited >= TOUR_MISSING_TARGET_MS) {
+      if (waited >= (step.waitMs ?? TOUR_MISSING_TARGET_MS)) {
         advance();
         return;
       }

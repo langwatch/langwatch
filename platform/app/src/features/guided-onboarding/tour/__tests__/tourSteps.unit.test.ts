@@ -102,8 +102,9 @@ describe("tour step tables", () => {
     });
 
     /** @scenario the secret step reveals the secret */
-    it("reveals the secret on the last step", () => {
+    it("waits for the key to be created, then reveals the secret", () => {
       const c = ctx();
+      expect(TOUR_STEPS.gateway[4]!.waitMs).toBe(15_000);
       TOUR_STEPS.gateway[4]!.onArrive?.(c);
       expect(c.actions.revealVirtualKeySecret).toHaveBeenCalled();
     });

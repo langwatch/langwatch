@@ -32,6 +32,12 @@ export interface TourStep {
   placement: TourPlacement;
   /** Show a click ripple when the cursor lands. */
   click?: boolean;
+  /**
+   * How long to wait for the target before skipping the step, when the
+   * default is too short: a target that only exists once a request the
+   * previous step fired has answered.
+   */
+  waitMs?: number;
   /** Runs when the step starts, before the cursor moves (navigate, collapse). */
   before?: (ctx: TourStepContext) => void;
   /** Runs when the cursor lands on the target (expand, open the drawer). */
@@ -109,6 +115,8 @@ export const TOUR_STEPS: Record<GuidedPath, readonly TourStep[]> = {
       target: "vk-secret",
       text: "That's it! I will leave you to save it somewhere safe.",
       placement: "bottom",
+      /* the secret only exists once the create request has answered */
+      waitMs: 15_000,
       onArrive: ({ actions }) => actions.revealVirtualKeySecret?.(),
     },
   ],
