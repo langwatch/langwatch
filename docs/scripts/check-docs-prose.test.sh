@@ -72,6 +72,18 @@ else
   check "the percent sign reads as %25" no
 fi
 
+# awk compares against a limit that does not read as a number as a string, so
+# every paragraph passes and the rule is off. The script refuses such a limit.
+LIMIT_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=eighty bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+LIMIT_STATUS=$?
+
+if [[ $LIMIT_STATUS -eq 2 ]]; then
+  check "a paragraph limit that is not a whole number is refused" yes
+else
+  check "a paragraph limit that is not a whole number is refused" no
+  echo "Output: $LIMIT_OUTPUT"
+fi
+
 # A paragraph over the word limit fails, a list item over it fails, and a
 # table row or a paragraph split in two passes. An indented heading, a table
 # written without its outer pipes and a list item of exactly the limit pass
@@ -145,6 +157,27 @@ if printf '%s\n' "$LONG_OUTPUT" | grep -q 'long.mdx,line=5::'; then
   check "the annotation points at the first line of the long paragraph" yes
 else
   check "the annotation points at the first line of the long paragraph" no
+fi
+
+# A table written without its outer pipes ends the paragraph that ran into it.
+# Without that, the prose before the table and the prose after it count as one
+# paragraph and a page under the limit on both sides reports a violation.
+TABLE_PAGE="$WORK/docs/table.mdx"
+{
+  printf -- '---\ntitle: Table\n---\n\n'
+  printf 'one two three four five six seven eight\n'
+  printf 'name | description\n'
+  printf -- '--- | ---\n'
+  printf 'a | b\n'
+  printf 'one two three four five six seven eight\n'
+} > "$TABLE_PAGE"
+
+TABLE_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+if printf '%s\n' "$TABLE_OUTPUT" | grep -q 'table.mdx,line='; then
+  check "prose either side of a table without outer pipes is two paragraphs" no
+  echo "Output: $TABLE_OUTPUT"
+else
+  check "prose either side of a table without outer pipes is two paragraphs" yes
 fi
 
 if [[ $FAILURES -gt 0 ]]; then
