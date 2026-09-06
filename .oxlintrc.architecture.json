@@ -12,6 +12,7 @@
     }
   ],
   "rules": {
+    "complexity": ["error", { "max": 25 }],
     "langwatch/api-context-services": "error",
     "langwatch/environment-boundaries": "error",
     "langwatch/package-boundaries": "error",
@@ -230,6 +231,248 @@
       ],
       "rules": {
         "max-depth": ["error", { "max": 6 }]
+      }
+    },
+
+    // Test files are held to 40: a table-driven test or a fixture scanner
+    // legitimately branches more than a service method, and 3 of them sit
+    // between 25 and 40 today (none above).
+    {
+      "files": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "complexity": ["error", { "max": 40 }]
+      }
+    },
+    // ------------------------------------------------------------------
+    // CYCLOMATIC COMPLEXITY. Every function anywhere is held to 25.
+    //
+    // Measured 2026-09-06 over apps/** and packages/** production code
+    // (tests excluded): 1698 functions over 10, 713 over 15, 375 over 20,
+    // 213 over 25, 134 over 30, 47 over 50. The 190 files below carry the
+    // 213 and are pinned at the lowest tier that holds them today (40, 60,
+    // 110, and one file at 220), so the rule still watches them and the
+    // register can only shrink: split a function and delete its line. A
+    // file cannot join without a reviewer seeing it appear in this file.
+    // Web packages dominate the register (160 of the 213 are .tsx or
+    // */web/*); they are burned down after the visual diff, server code
+    // first.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "apps/api/src/features/langy/langy-navigate-resource.adapter.ts",
+        "apps/ui/e2e/langy/langy-agent.ts",
+        "packages/api/src/rest/builder.ts",
+        "packages/api/src/rest/pipeline.ts",
+        "packages/enterprise/features/governance/web/src/features/ai-tools/ui/sections/ai-tool-entry-drawer.tsx",
+        "packages/features/analytics/server/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts",
+        "packages/features/analytics/server/src/repositories/clickhouse/clickhouse.slim-timeseries-query.mapper.ts",
+        "packages/features/analytics/web/src/ui/sections/fields-filters.tsx",
+        "packages/features/analytics/web/src/ui/sections/filters/fields-filters.tsx",
+        "packages/features/annotation/web/src/ui/sections/annotation-list.tsx",
+        "packages/features/api-key/web/src/ui/sections/token-created-dialog.tsx",
+        "packages/features/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts",
+        "packages/features/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx",
+        "packages/features/automation/web/src/features/authoring/ui/sections/automation-drawer.tsx",
+        "packages/features/automation/web/src/features/authoring/ui/sections/slack.client.tsx",
+        "packages/features/coding-agent/server/src/repositories/coding-agent-session/clickhouse.repository.ts",
+        "packages/features/coding-agent/web/src/trace/terminal-ansi-parser.ts",
+        "packages/features/coding-agent/web/src/trace/terminal-view.tsx",
+        "packages/features/data-privacy/web/src/ui/blocks/privacy-rule-drawer.tsx",
+        "packages/features/data-retention/web/src/screens/data-retention/data-retention.screen.tsx",
+        "packages/features/data-retention/web/src/ui/blocks/add-override-drawer.tsx",
+        "packages/features/evaluator/contract/src/evaluation-result-parsing.ts",
+        "packages/features/evaluator/web/src/model/evaluations/preconditions.ts",
+        "packages/features/evaluator/web/src/screens/evaluators/evaluators.screen.tsx",
+        "packages/features/experiment/contract/src/workbench/compute-aggregates.ts",
+        "packages/features/experiment/server/src/services/experiment-run-storage.service.ts",
+        "packages/features/experiment/web/src/model/experiments-v3/mapping-validation.ts",
+        "packages/features/experiment/web/src/screens/experiments/experiments.screen.tsx",
+        "packages/features/experiment/web/src/ui/elements/experiments/BatchEvaluationV2/batch-evaluation-v2-evaluation-results.tsx",
+        "packages/features/experiment/web/src/ui/sections/batch-evaluation-results.aggregates.ts",
+        "packages/features/experiment/web/src/ui/sections/batch-evaluation-results.csv.ts",
+        "packages/features/experiment/web/src/ui/sections/batch-results/batch-runs-sidebar.tsx",
+        "packages/features/experiment/web/src/ui/sections/batch-results/comparison-table.tsx",
+        "packages/features/experiment/web/src/ui/sections/batch-results/single-run-table.tsx",
+        "packages/features/experiment/web/src/ui/sections/experiments-v3/TargetSection/evaluator-chip.tsx",
+        "packages/features/experiment/web/src/ui/sections/experiments-v3/TargetSection/target-summary.tsx",
+        "packages/features/experiment/web/src/ui/sections/experiments-v3/table-meta-wrappers.tsx",
+        "packages/features/gateway/web/src/features/budgets/ui/sections/budget-create-drawer.tsx",
+        "packages/features/gateway/web/src/features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx",
+        "packages/features/gateway/web/src/screens/gateway/gateway-usage.screen.tsx",
+        "packages/features/gateway/web/src/screens/gateway/gateway-virtual-keys.screen.tsx",
+        "packages/features/langy/server/src/adapters/langy-turn-relay.adapter.ts",
+        "packages/features/langy/web/src/behavior/langy-chip-context.ts",
+        "packages/features/langy/web/src/features/langy/behavior/data/use-langy-messages.ts",
+        "packages/features/langy/web/src/features/langy/behavior/logic/langy-error-explainer.ts",
+        "packages/features/langy/web/src/features/langy/behavior/use-capability-data.ts",
+        "packages/features/langy/web/src/features/langy/model/logic/langy-tool-failure.ts",
+        "packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-dataset-card.tsx",
+        "packages/features/langy/web/src/features/langy/ui/sections/composer.tsx",
+        "packages/features/langy/web/src/model/langy-local-waits.ts",
+        "packages/features/langy/web/src/ui/sections/langy-card.tsx",
+        "packages/features/log/server/src/adapters/canonical-log.adapter.ts",
+        "packages/features/model-provider/server/src/rules/reasoning-config.rules.ts",
+        "packages/features/model-provider/web/src/ui/elements/model-chip.tsx",
+        "packages/features/model-provider/web/src/ui/elements/model-selector.tsx",
+        "packages/features/model-provider/web/src/ui/elements/provider-model-selector.tsx",
+        "packages/features/onboarding/web/src/ui/elements/shared/selectable-icon-card.tsx",
+        "packages/features/onboarding/web/src/ui/sections/integration-checks.tsx",
+        "packages/features/ops/server/src/adapters/ops-clickhouse-explain.adapter.ts",
+        "packages/features/ops/web/src/features/deja-view/ui/sections/deja-view-panel.tsx",
+        "packages/features/ops/web/src/features/event-store/ui/sections/bulk-replay-wizard.tsx",
+        "packages/features/ops/web/src/features/event-store/ui/sections/replay-progress-drawer.tsx",
+        "packages/features/organization/server/src/repositories/prisma/prisma.organization-membership.repository.ts",
+        "packages/features/organization/server/src/transport/api-trpc/organization.api.ts",
+        "packages/features/organization/web/src/screens/organization/audit-log.screen.tsx",
+        "packages/features/project/web/src/screens/home/briefing/attention-inbox.ts",
+        "packages/features/project/web/src/screens/home/briefing/components/langy-briefing.tsx",
+        "packages/features/project/web/src/screens/project-settings/project-settings.screen.tsx",
+        "packages/features/prompt/web/src/screens/prompt-studio/model-selection/llm-config-popover.tsx",
+        "packages/features/prompt/web/src/screens/prompt-studio/model-selection/llm-model-display.tsx",
+        "packages/features/prompt/web/src/screens/prompt-studio/model-selection/model-selector.tsx",
+        "packages/features/prompt/web/src/ui/elements/llmPromptConfigs/llm-config-popover.tsx",
+        "packages/features/prompt/web/src/ui/elements/llmPromptConfigs/llm-model-display.tsx",
+        "packages/features/scenario/web/src/ui/sections/agents/agent-code-editor-drawer.tsx",
+        "packages/features/scenario/web/src/ui/sections/agents/agent-list-drawer.tsx",
+        "packages/features/scenario/web/src/ui/sections/agents/agent-workflow-editor-drawer.tsx",
+        "packages/features/scenario/web/src/ui/sections/media-part.tsx",
+        "packages/features/scenario/web/src/ui/sections/scenarios/scenario-ai-generation.tsx",
+        "packages/features/scenario/web/src/ui/sections/shared/ai-create-modal.tsx",
+        "packages/features/scenario/web/src/ui/sections/simulations/scenario-run-detail-drawer.tsx",
+        "packages/features/scenario/web/src/ui/sections/suites/external-set-detail-panel.tsx",
+        "packages/features/scenario/web/src/ui/sections/suites/run-history-panel.tsx",
+        "packages/features/scenario/web/src/ui/sections/suites/suite-form-drawer.tsx",
+        "packages/features/scenario/web/src/ui/sections/suites/suite-sidebar.tsx",
+        "packages/features/topic/server/src/services/topic.service.ts",
+        "packages/features/trace/server/src/adapters/trace-query-meta-fields.clickhouse.adapter.ts",
+        "packages/features/trace/server/src/projections/trace-summary.projection.ts",
+        "packages/features/trace/server/src/rules/trace-export-csv.rules.ts",
+        "packages/features/trace/server/src/services/trace-attribute-cap.service.ts",
+        "packages/features/trace/server/src/transport/api-trpc/shared-trace.api.ts",
+        "packages/features/trace/server/src/transport/api-trpc/trace-read-mappers.api.ts",
+        "packages/features/trace/web/src/behavior/flame/use-flame-keyboard.ts",
+        "packages/features/trace/web/src/model/evaluation-results.ts",
+        "packages/features/trace/web/src/model/sequence/mermaid.ts",
+        "packages/features/trace/web/src/model/sequence/topology-mermaid.ts",
+        "packages/features/trace/web/src/ui/sections/add-annotation-queue-drawer.tsx",
+        "packages/features/trace/web/src/ui/sections/datasets/dataset-mapping-preview.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/onboarding/traces-empty-onboarding.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/search-bar/search-bar.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/search-bar/token-value-picker.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/search-bar/use-filter-editor.ts",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/chat-turn-row.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/metric-pill.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-table/trace-table-shell.tsx",
+        "packages/features/trace/web/src/ui/sections/traces/traces-mapping.tsx",
+        "packages/features/trace/web/src/ui/sections/transcript/tool-blocks.tsx",
+        "packages/features/user/web/src/behavior/use-personal-context.ts",
+        "packages/features/user/web/src/screens/personal-workspace/personal-budget-request.screen.tsx",
+        "packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
+        "packages/features/workflow/server/src/adapters/prisma.workflow-agent-mapping.adapter.ts",
+        "packages/features/workflow/web/src/behavior/optimization_studio/use-get-dataset-data.ts",
+        "packages/features/workflow/web/src/model/code/python-provider.code-actions.ts",
+        "packages/features/workflow/web/src/ui/sections/optimization_studio/evaluate.tsx",
+        "packages/features/workflow/web/src/ui/sections/optimization_studio/history.tsx",
+        "packages/features/workflow/web/src/ui/sections/optimization_studio/optimize.tsx",
+        "packages/features/workflow/web/src/ui/sections/optimization_studio/properties/evaluator-properties-panel.tsx",
+        "packages/features/workflow/web/src/ui/sections/optimization_studio/publish.tsx",
+        "packages/features/workflow/web/src/ui/sections/optimization_studio/use-post-event.tsx",
+        "packages/features/workflow/web/src/ui/sections/workflow-base-properties-panel.tsx",
+        "packages/features/workflow/web/src/ui/sections/workflow-list-card.tsx"
+      ],
+      "rules": {
+        "complexity": ["error", { "max": 40 }]
+      }
+    },
+    {
+      "files": [
+        "apps/api/src/app-rest/app-rest.packaged-families.ts",
+        "apps/api/src/app-rest/app-rest.process-features.ts",
+        "apps/ui/src/behavior/ui-scope-resolution.ts",
+        "apps/worker/src/platform/config/worker.config.ts",
+        "packages/enterprise/features/billing/web/src/screens/billing/usage.screen.tsx",
+        "packages/features/analytics/web/src/ui/sections/custom-graph.tsx",
+        "packages/features/annotation/web/src/screens/annotations/my-queue.screen.tsx",
+        "packages/features/api-key/web/src/screens/api-key/cli-auth.screen.tsx",
+        "packages/features/automation/web/src/features/authoring/ui/sections/view-automation-drawer.tsx",
+        "packages/features/automation/web/src/screens/automations/automations.screen.tsx",
+        "packages/features/coding-agent/server/src/projections/coding-agent-session-log.projection.ts",
+        "packages/features/dataset/web/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+        "packages/features/evaluator/web/src/ui/sections/checks/check-config-form.tsx",
+        "packages/features/evaluator/web/src/ui/sections/checks/dynamic-zod-form.tsx",
+        "packages/features/evaluator/web/src/ui/sections/checks/try-it-out.tsx",
+        "packages/features/experiment/web/src/ui/elements/experiments/ds-py-experiment.tsx",
+        "packages/features/experiment/web/src/ui/sections/batch-evaluation-results.types.ts",
+        "packages/features/experiment/web/src/ui/sections/experiments-v3/TargetSection/target-header.tsx",
+        "packages/features/gateway/web/src/screens/gateway/gateway-budget.screen.tsx",
+        "packages/features/langy/contract/src/cards/handled-error.ts",
+        "packages/features/langy/web/src/features/langy/behavior/logic/langy-time-travel.ts",
+        "packages/features/langy/web/src/features/langy/ui/sections/message-content.tsx",
+        "packages/features/model-provider/contract/src/model-cost.ts",
+        "packages/features/model-provider/web/src/behavior/use-provider-form-submit.ts",
+        "packages/features/model-provider/web/src/ui/sections/model-provider-form.tsx",
+        "packages/features/navigation/web/src/ui/sections/shell-page-body.tsx",
+        "packages/features/ops/web/src/features/foundry/behavior/trace-executor.ts",
+        "packages/features/prompt/web/src/surfaces/variables/prompt-textarea/prompt-textarea-with-variables.tsx",
+        "packages/features/prompt/web/src/surfaces/variables/variable-mapping-input.tsx",
+        "packages/features/scenario/web/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+        "packages/features/trace/contract/src/trace-collector-common.ts",
+        "packages/features/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
+        "packages/features/trace/web/src/behavior/transcript/content-parser.ts",
+        "packages/features/trace/web/src/behavior/transcript/media-part.ts",
+        "packages/features/trace/web/src/model/explorer/trace-drawer/trace-accordions/log-summary.ts",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/drawer-header.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/span-accordions.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/viz-placeholder.tsx",
+        "packages/features/trace/web/src/ui/sections/traces/evaluation-status-item.tsx",
+        "packages/features/trace/web/src/ui/sections/traces/span-details.tsx",
+        "packages/features/workflow/web/src/model/code/python-provider.validator.ts",
+        "packages/features/workflow/web/src/ui/sections/optimization_studio/results-panel.tsx",
+        "packages/features/workflow/web/src/ui/sections/workflow-node-execution.tsx"
+      ],
+      "rules": {
+        "complexity": ["error", { "max": 60 }]
+      }
+    },
+    {
+      "files": [
+        "apps/api/src/app/api-production.composition.ts",
+        "apps/api/src/platform/config/api.config.ts",
+        "apps/worker/src/app/worker-production.composition.ts",
+        "packages/enterprise/features/billing/web/src/screens/billing/subscription-page.tsx",
+        "packages/enterprise/features/governance/web/src/screens/governance/governance-overview.screen.tsx",
+        "packages/features/automation/server/src/transport/api-trpc/automation.api.ts",
+        "packages/features/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
+        "packages/features/evaluator/web/src/ui/sections/evaluations/online-evaluation-drawer.tsx",
+        "packages/features/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx",
+        "packages/features/experiment/web/src/ui/sections/batch-evaluation-results/batch-evaluation-results.tsx",
+        "packages/features/gateway/web/src/screens/gateway/gateway-virtual-key.screen.tsx",
+        "packages/features/langy/contract/src/event-sourcing/folds/conversation-fold.ts",
+        "packages/features/ops/server/src/repositories/redis/queue.repository.ts",
+        "packages/features/project/web/src/screens/home/briefing/hooks/use-langy-briefing.ts",
+        "packages/features/project/web/src/screens/home/components/home-page-banners.tsx",
+        "packages/features/prompt/web/src/ui/sections/prompts/prompt-editor-drawer.tsx",
+        "packages/features/trace/contract/src/trace-content-part.dispatcher.ts",
+        "packages/features/trace/server/src/transport/api-rest/collector.api.ts",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/eval-cards/eval-card.tsx",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/markdown-view/build-trace-markdown.ts",
+        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/tree-row.tsx",
+        "packages/features/trace/web/src/ui/sections/flame/flame-block.tsx",
+        "packages/features/workflow/web/src/ui/sections/optimization_studio/properties/agent-properties-panel.tsx",
+        "packages/prisma-client/src/multi-tenancy-guard.ts"
+      ],
+      "rules": {
+        "complexity": ["error", { "max": 110 }]
+      }
+    },
+    {
+      "files": [
+        "packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx"
+      ],
+      "rules": {
+        "complexity": ["error", { "max": 220 }]
       }
     },
 
