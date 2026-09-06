@@ -273,6 +273,31 @@ Feature: Connected agents
     Then the call fails with "agent_call_timeout"
     And the instance receives a cancel frame
 
+  # An instance that answers with something the schema refuses has answered:
+  # it will not answer again, so the call fails now rather than at the
+  # deadline, and the error names the field the platform could not read.
+
+  @unit
+  Scenario: A result frame the platform cannot read names the field it failed on
+    Given a result frame whose output is a dict of fields with no role
+    When the gateway reads the frame
+    Then it is an unreadable result for that call id
+    And the issue names "output.role"
+
+  @integration
+  Scenario: A result the platform cannot read fails the call at once
+    Given an instance holding a call
+    When it answers with an output that is a dict of fields with no role
+    Then the call fails with "agent_call_failed" before the deadline
+    And the error says the agent answered a result LangWatch cannot read, naming "output.role"
+
+  @integration
+  Scenario: An unreadable result for a call the instance does not hold is dropped
+    Given an instance holding a call
+    When it sends an unreadable result under another call id
+    Then the call it holds is still waiting
+    And its later answer is returned
+
   @unit
   Scenario: A call is refused when every instance is full
     Given one live instance advertising a concurrency of one

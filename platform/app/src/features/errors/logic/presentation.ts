@@ -561,7 +561,7 @@ const presentations = {
     // The function's own error text rides on `meta.message` for the CLI and
     // the run drawer's envelope; relayed prose is never rendered here.
     describe: () =>
-      "The decorated function raised an error. The process logs carry the stack, and the run shows what it said.",
+      "The decorated function raised an error, or answered with something the platform cannot read. The process logs carry the stack, and the run shows what it said.",
   },
   agent_disconnected: {
     title: "The agent disconnected mid-call",
