@@ -410,6 +410,8 @@ type PullingSource = {
   sourceType: string;
   organizationId: string;
   teamId: string | null;
+  /** ADR-129: the named-or-blank line compares against this, no stored field. */
+  createdAt: Date;
   /** ADR-088 v7: trace destination for conversation routing. Null = don't route. */
   traceProjectId: string | null;
   /** ADR-088: the window already read without pricing. See `recordUnpricedUsageWindow`. */
@@ -879,6 +881,7 @@ async function recordPulledUsageFor({
         sourceType: source.sourceType,
         organizationId: source.organizationId,
         teamId: source.teamId,
+        createdAt: source.createdAt,
       },
       governanceProjectId: govProjectId,
       observedAt,

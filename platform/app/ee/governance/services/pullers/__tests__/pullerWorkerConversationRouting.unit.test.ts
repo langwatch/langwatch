@@ -53,6 +53,7 @@ const SOURCE = {
   sourceType: "databricks_genie",
   organizationId: "org-1",
   teamId: null,
+  createdAt: new Date("2026-07-01T00:00:00.000Z"),
   traceProjectId: "proj-dest",
   // A source that has never failed to price anything. Routing does not read
   // these, but the fixture stands in for a real row, which always carries them.

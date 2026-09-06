@@ -23,6 +23,7 @@ import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/
 import { pricePulledUsage } from "@ee/event-sourcing/pipelines/pulled-usage-processing/services/pulled-usage-pricing.service";
 import { z } from "zod";
 
+import { actorForPulledDay } from "../logic/pulledActorNaming";
 import type { NormalizedPullEvent } from "./pullerAdapter";
 
 /** The key an adapter attaches its usage hint under, inside `extra`. */
@@ -84,6 +85,14 @@ const pulledUsageHintSchema = z
      * reason as `currency`.
      */
     costUsdBiller: z.string().optional(),
+    /**
+     * The agent/application within the source, when the provider names one —
+     * a Genie space, a Copilot bot. Deliberately NOT a dimension: for every
+     * adapter that has one it is derivable from a coordinate that is already
+     * in `dimensions` (Genie's `spaceId`), so putting it there again would
+     * change every restatement key for nothing.
+     */
+    agentId: z.string().optional(),
     /** Falls back to the event's `target`, which is where models already sit. */
     model: z.string().optional(),
     tokensCacheRead: z.number().int().nonnegative().default(0),
@@ -113,6 +122,11 @@ export interface PulledUsageSourceAttribution {
   organizationId: string;
   /** Null when the source is org-wide. Never substituted with anything. */
   teamId: string | null;
+  /**
+   * When the source was connected — the input to ADR-129's named-or-blank
+   * line, not attribution. See `actorForPulledDay`.
+   */
+  createdAt: Date;
 }
 
 /**
@@ -240,6 +254,27 @@ export function buildPulledUsageRecord({
     rateVersion: priced.rateVersion,
     costBasis: priced.costBasis,
     costStatus: priced.costStatus,
+    // The spender, threaded from the adapter's own `actor` field through the
+    // one shared named-or-blank rule (ADR-129). This is what keeps the paused
+    // providers paused without a registry here: Anthropic and Azure emit
+    // `actor: ""` on their money events, so they stay blank structurally, and
+    // an adapter starts naming its spend the day it starts saying who spent.
+    // NOT hashed into `restatementKey` above — identity can change between
+    // pulls, and an actor in the key would mint a second record (ADR-129
+    // Decision 4, on `databricksGenie.puller.ts`'s own precedent).
+    rawActorId: actorForPulledDay({
+      sourceCreatedAt: source.createdAt,
+      dayUtc: new Date(occurredAtMs).toISOString().slice(0, 10),
+      reportedActor: event.actor ?? "",
+    }),
+    // The agent, from the hint, through the SAME line: the rollup cell is
+    // keyed by this field too, so ADR-129 Decision 2's twice-guard applies to
+    // it verbatim — a day recorded agent-less must stay agent-less.
+    agentId: actorForPulledDay({
+      sourceCreatedAt: source.createdAt,
+      dayUtc: new Date(occurredAtMs).toISOString().slice(0, 10),
+      reportedActor: hint.agentId ?? "",
+    }),
     occurredAtMs,
     observedAtMs: observedAt.getTime(),
   };

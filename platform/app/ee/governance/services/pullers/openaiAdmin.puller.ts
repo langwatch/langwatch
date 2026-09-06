@@ -386,12 +386,13 @@ const costResultSchema = z
     line_item: z.string().nullable().default(null),
     project_id: z.string().nullable().default(null),
     /**
-     * The ONLY thing on a cost row that names a person, and an opaque id
-     * ("user-…") rather than an address. The report has no email field: the
-     * result object is amount / line_item / project_id / user_id / api_key_id /
-     * quantity and nothing else. An earlier version of this file read a
-     * `user_email` that the endpoint never sends, so every row named nobody and
-     * person discovery — which skips a blank actor — found nobody at all.
+     * The provider's opaque id ("user-…") for the person the row is billed
+     * to. The row ALSO carries a `user_email` beside it — verified against
+     * saved raw responses (2026-08-25, re-confirmed 2026-09-06: 2,720/2,720
+     * rows populated) — and this adapter deliberately reads the id, not the
+     * address: the id is stable, and a raw email is heavier on a money row
+     * (erasure, exposure). The email still reaches `raw_payload` via
+     * `.passthrough()` below.
      *
      * Null whenever the row was not grouped by user, so it is read through
      * `dimension()` like every other coordinate.
@@ -841,9 +842,11 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
        * An id, not an address, and the erasure suppression list is keyed on
        * exactly this string (`partitionSuppressedEvents` reads `event.actor`,
        * and a discovered person's `rawActorId` is where the digest comes from),
-       * so the two agree: erasing this person suppresses this id. The address
-       * is never on the row, so matching an id to an account is the identity
-       * engine's job, not this adapter's.
+       * so the two agree: erasing this person suppresses this id. The provider
+       * DOES send a `user_email` beside the id (it survives into `raw_payload`
+       * via the schema's `.passthrough()`); it is deliberately not the actor,
+       * so matching an id to an account is the identity engine's job, not this
+       * adapter's.
        */
       actor: dimension(result.user_id),
       action: "cost_report",

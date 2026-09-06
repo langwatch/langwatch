@@ -114,6 +114,27 @@ export const pulledUsageObservedEventDataSchema = z.object({
     PULLED_USAGE_COST_STATUS.ESTIMATE,
   ]),
 
+  /**
+   * The provider's own raw id for the person the money belongs to, or `""`
+   * when the provider named nobody, the bucket is coarser than one person, or
+   * the day predates `PULLED_ACTOR_NAMING_STARTS_AT` (ADR-129). Never a guess,
+   * never derived from an API key.
+   *
+   * Defaulted rather than required, on `currencyCode`'s precedent above: the
+   * log is append-only, every event already on it was written before spend
+   * carried a spender, and `""` is the CORRECT reading of those — no read-time
+   * disambiguation helper needed.
+   */
+  rawActorId: z.string().default(""),
+  /**
+   * The agent/application within the source, when the provider names one —
+   * a Genie space, a Copilot bot — and `""` when it doesn't (#7881). Same
+   * additive-defaulted contract, and the same named-or-blank line, as
+   * `rawActorId` above: the rollup cell is keyed by this too, so naming a day
+   * that was already recorded blank would double-show its money the same way.
+   */
+  agentId: z.string().default(""),
+
   /** The provider's business bucket time, epoch ms. Stable under restatement. */
   occurredAtMs: z.number().int().positive(),
   /** Monotonic pull time, epoch ms. The restatement ordering field. */
