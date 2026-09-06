@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { APP_PACKAGE_NAMES, workspaceInstallArgs } from "../src/services/node-deps";
 
@@ -359,6 +359,37 @@ describe("the repo is a single pnpm workspace", () => {
         );
         expect(covered, `no distribution entry ships ${patch}`).toBe(true);
       }
+    });
+
+    /** @scenario The published package carries every input its install reads */
+    it("lists every extends target of a listed package's tsconfig", () => {
+      // A tsconfig `extends` chain can reach a repo-root file that is not
+      // application SOURCE at all — tsconfig.base.json isn't tracked as a
+      // shipped-tree file anywhere, so the sibling completeness checks above
+      // never looked for it. Missing it passed staging cleanly and crashed
+      // `prisma generate` at first boot with "File '../../tsconfig.base.json'
+      // not found".
+      const shipped = readJson("apps/server/distribution-files.json") as unknown as string[];
+      const isShipped = (relPath: string): boolean =>
+        shipped.some((f) => relPath === f || relPath.startsWith(f.endsWith("/") ? f : `${f}/`));
+
+      const tsconfigPaths = gitLsFiles("*tsconfig*.json");
+      expect(tsconfigPaths.length).toBeGreaterThan(5);
+
+      const offenders: string[] = [];
+      for (const tsconfigPath of tsconfigPaths) {
+        // Only tsconfigs the tarball actually carries: one belonging to a
+        // package the distribution list excludes on purpose extends nothing
+        // the end user needs.
+        if (!isShipped(tsconfigPath)) continue;
+        const match = /"extends"\s*:\s*"([^"]+)"/.exec(
+          readFileSync(join(repoRoot, tsconfigPath), "utf8"),
+        );
+        if (!match) continue;
+        const targetRel = join(dirname(tsconfigPath), match[1]);
+        if (!isShipped(targetRel)) offenders.push(`${tsconfigPath} -> ${match[1]}`);
+      }
+      expect(offenders).toEqual([]);
     });
 
     /** @scenario Every project the lockfile mentions is resolvable */

@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -113,6 +114,7 @@ function buildFixture(trackedPaths: string[]): string {
         "apps/server/dist/",
         "apps/server/src/",
         "apps/server/package.json",
+        "pnpm-lock.yaml",
       ],
       null,
       2,
@@ -314,6 +316,65 @@ describe("npm pack staging filters", () => {
         expect(existsSync(join(stageDir, target)), `${target} is not shipped`).toBe(true);
       }
     });
+  });
+
+  describe("the workspace: dependency shim", () => {
+    /** @scenario "The self-host command remains compatible" */
+    it("resolves every workspace: dependency apps/server declares", () => {
+      // pnpm 10.24's pack resolves a `workspace:` specifier for a package
+      // with no local node_modules by reading <cwd>/node_modules/<dep>'s own
+      // manifest, and the staged tree carries none — ADR-076 stages a plain
+      // copy, not an install. Give the fixture manifest a real `workspace:`
+      // dependency and run a REAL pack (not --check-filters, which stops
+      // before this matters) to prove the script's symlink shim covers it.
+      const root = buildFixture(["apps/api/src/config.ts"]);
+      const serverManifestPath = join(root, "apps/server/package.json");
+      const serverManifest = JSON.parse(readFileSync(serverManifestPath, "utf8")) as Record<
+        string,
+        unknown
+      >;
+      serverManifest.dependencies = { "@langwatch/config": "workspace:*" };
+      writeFileSync(serverManifestPath, `${JSON.stringify(serverManifest, null, 2)}\n`);
+      write({
+        root,
+        relPath: "packages/config/package.json",
+        content: `${JSON.stringify({ name: "@langwatch/config", version: "0.1.0" }, null, 2)}\n`,
+      });
+      // distribution-files.json already lists "packages/", so no change
+      // needed there — only re-stage the edits into the fixture's git index,
+      // since the completeness guard reads `git ls-files`.
+      execFileSync("git", ["add", "-A"], { cwd: root });
+
+      const packDest = join(root, "_pack");
+      mkdirSync(packDest, { recursive: true });
+      // Not runCheck: that helper always passes --check-filters, which stops
+      // before the pack this test exists to exercise.
+      let output = "";
+      let code = 0;
+      try {
+        output = execFileSync(
+          "bash",
+          [join(root, "dev", "scripts", "pack-npm.sh"), "--pack-destination", packDest],
+          { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+        );
+      } catch (error) {
+        const failure = error as { status?: number; stdout?: string; stderr?: string };
+        code = failure.status ?? 1;
+        output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
+      }
+
+      expect(output, output).not.toContain("ERR_PNPM_CANNOT_RESOLVE_WORKSPACE_PROTOCOL");
+      expect(code, output).toBe(0);
+
+      const tarball = readdirSync(packDest).find((f) => f.endsWith(".tgz"));
+      expect(tarball).toBeDefined();
+      const packageJson = execFileSync(
+        "tar",
+        ["-xzO", "-f", join(packDest, tarball!), "package/package.json"],
+        { encoding: "utf8" },
+      );
+      expect(packageJson).not.toContain("workspace:");
+    }, 20_000);
   });
 
   describe("--stage-to", () => {

@@ -19,8 +19,11 @@
   "pnpm-workspace.yaml",
   "pnpm-lock.yaml",
   "patches/",
+  "tsconfig.base.json",
   "apps/server/package.json",
   "plugins/langwatch/package.json",
   "services/langyworker/package.json",
-  "dev/tests/agentic-e2e/package.json"
+  "dev/tests/agentic-e2e/package.json",
+  "dev/tests/e2e-stack/package.json",
+  "tools/visualdiff/runner/package.json"
 ]

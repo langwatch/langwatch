@@ -404,12 +404,111 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   echo "→ verified: staging keeps every tracked source file across the shipped trees"
 fi
 
+# Guard: every staged tsconfig's `extends` target must itself be staged.
+#
+# distribution-files.json lists application SOURCE, and a tsconfig extends
+# chain can reach a repo-root file that is not source at all — tsconfig.base.json
+# is config, not source, so the guard above never looked for it. Missing it
+# passed staging cleanly and crashed `prisma generate` in start:prepare:files at
+# first boot with "File '../../tsconfig.base.json' not found", ~20 minutes into
+# the same class of failure the guard above exists to catch.
+#
+# Plain bash, not another `node -e`: this guard runs on every `--check-filters`
+# call, including the test suite's, and an extra node startup per invocation is
+# what pushed those tests past their 5s timeout the first time this was tried.
+# grep, not JSON.parse: every tsconfig in this repo carries `//` comments,
+# which JSON.parse rejects outright.
+missing_extends=""
+while IFS= read -r -d '' tsconfig; do
+  extends_target="$(grep -o '"extends"[[:space:]]*:[[:space:]]*"[^"]*"' "$tsconfig" \
+    | head -n1 | sed -E 's/.*"extends"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')"
+  [ -n "$extends_target" ] || continue
+  # `test -e` resolves the "../.." in a relative extends target itself; no
+  # canonicalisation needed.
+  if [ ! -e "$(dirname "$tsconfig")/$extends_target" ]; then
+    missing_extends="${missing_extends}${tsconfig#"$APP"/} -> $extends_target
+"
+  fi
+done < <(find "$APP" -name node_modules -prune -o -name 'tsconfig*.json' -type f -print0)
+if [ -n "$missing_extends" ]; then
+  echo "✗ a staged tsconfig extends a file the stage does not carry:" >&2
+  printf '%s' "$missing_extends" >&2
+  exit 1
+fi
+echo "→ verified: every staged tsconfig's extends target is itself staged"
+
 echo "→ staged $(du -sh "$STAGE" | cut -f1) at $STAGE"
 
 if [ "$CHECK_FILTERS_ONLY" -eq 1 ]; then
   echo "→ --check-filters: staging verified, stopping before the pack"
   exit 0
 fi
+
+# pnpm 10.24's pack resolves a `workspace:` specifier for a package with no
+# local install by reading <cwd>/node_modules/<dep>'s own manifest and
+# rewriting the copy in package.json to that version. The staged root
+# manifest carries apps/server/package.json's own `dependencies` verbatim
+# (only `bin`/`files`/`main`/`exports`/`scripts` are rewritten above), and
+# ADR-076's staged tree has no node_modules at all, so packing failed with
+# ERR_PNPM_CANNOT_RESOLVE_WORKSPACE_PROTOCOL for every `workspace:` dependency.
+#
+# A symlink per `workspace:` dependency the manifest actually declares — read
+# from it, not hardcoded — gives pnpm somewhere to resolve each one to the real
+# staged version. node_modules is never in `files`, so none of this ships.
+node -e '
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const { execFileSync } = require("node:child_process");
+
+  const stage = process.argv[1];
+  const app = path.join(stage, "app");
+
+  const serverPkg = JSON.parse(fs.readFileSync("apps/server/package.json", "utf8"));
+  const deps = { ...serverPkg.dependencies, ...serverPkg.devDependencies };
+  const workspaceDeps = Object.entries(deps)
+    .filter(([, spec]) => typeof spec === "string" && spec.startsWith("workspace:"))
+    .map(([name]) => name);
+  if (workspaceDeps.length === 0) process.exit(0);
+
+  // Name -> repo-relative directory, from every tracked manifest — the same
+  // resolution pnpm-workspace.yaml drives, read directly rather than assuming
+  // a fixed location for any one package.
+  const manifestPaths = execFileSync("git", ["ls-files", "--", "*package.json"], {
+    encoding: "utf8",
+  })
+    .split("\n")
+    .filter(Boolean)
+    .filter((p) => !p.includes("node_modules"));
+
+  const dirByName = {};
+  for (const manifestPath of manifestPaths) {
+    let manifest;
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    } catch {
+      continue;
+    }
+    if (manifest.name) dirByName[manifest.name] = path.dirname(manifestPath);
+  }
+
+  for (const name of workspaceDeps) {
+    const dir = dirByName[name];
+    if (!dir) {
+      console.error(`workspace: dependency ${name} names no tracked package.json`);
+      process.exit(1);
+    }
+    const target = path.join(app, dir);
+    if (!fs.existsSync(target)) {
+      console.error(`workspace: dependency ${name} resolves to ${dir}, which is not staged`);
+      process.exit(1);
+    }
+    const link = path.join(stage, "node_modules", name);
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.rmSync(link, { force: true });
+    fs.symlinkSync(path.relative(path.dirname(link), target), link, "dir");
+  }
+' "$STAGE"
+echo "→ linked workspace: dependencies of apps/server into $STAGE/node_modules for pnpm pack"
 
 echo "→ running: pnpm pack $*"
 cd "$STAGE"
@@ -468,10 +567,15 @@ fi
 # pack: this one answers "did packing lose something", that one answers "did
 # the filters keep the right things", and a single check that answered both
 # reported a deliberate strip as a too-broad exclude pattern.
+#
+# `$STAGE/node_modules` is the exception: it is the `workspace:` resolution
+# shim above, not part of the package (`files` names only `app`), so it is
+# excluded here rather than exempted below.
 staged_all="$(mktemp)"
 in_tar="$(mktemp)"
 (cd "$STAGE" && find . \( -type f -o -type l \)) \
-  | sed 's|^\./||' | grep -v '\.tgz$' | sort > "$staged_all"
+  | sed 's|^\./||' | grep -v '\.tgz$' \
+  | grep -v '^node_modules/' | sort > "$staged_all"
 # List once into a file rather than piping into `grep -q`. grep -q exits at the
 # first match, which SIGPIPEs tar; under `pipefail` that non-zero tar fails the
 # pipeline even though the match succeeded. It fires on linux and not macos,
@@ -488,6 +592,16 @@ if [ -n "$lost" ]; then
   exit 1
 fi
 echo "→ verified: the tarball carries every staged file"
+
+# The tarball's package.json is what an end user's install actually reads.
+# Confirm the node_modules shim above did its job: pnpm resolved every
+# `workspace:` specifier to a real version rather than leaving the protocol
+# behind for a registry install to reject.
+if tar -xzO -f "$tarball" package/package.json 2>/dev/null | grep -q 'workspace:'; then
+  echo "✗ the tarball's package.json still names a workspace: specifier" >&2
+  exit 1
+fi
+echo "→ verified: tarball package.json carries no workspace: specifiers"
 
 # The lockfile is the whole reason for the staged layout (npm strips one at
 # the package ROOT), so its presence is asserted on every pack — not only in
