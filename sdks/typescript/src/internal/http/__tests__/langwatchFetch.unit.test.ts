@@ -240,6 +240,34 @@ describe("langwatchFetch", () => {
         expect(error.status).toBe(307);
         expect(calls).toHaveLength(1);
       });
+
+      /** @scenario refuses to replay a streaming body */
+      it("settles when the caller aborts while a Request's streamed body is replayed", async () => {
+        const { fetchImpl, calls } = scripted(redirect({ status: 307, location: HTTPS_URL }), ok());
+        const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
+        const controller = new AbortController();
+        // One chunk, then silence: reading it to the end never finishes, so
+        // only the abort can settle the call.
+        const stream = new ReadableStream<Uint8Array>({
+          start(streamController) {
+            streamController.enqueue(new TextEncoder().encode("{"));
+          },
+        });
+        const request = new Request(HTTP_URL, {
+          method: "POST",
+          body: stream,
+          signal: controller.signal,
+          // @ts-expect-error duplex is required for streamed bodies in Node
+          duplex: "half",
+        });
+
+        const call = fetchLangWatch(request);
+        await Promise.resolve();
+        controller.abort();
+
+        await expect(call).rejects.toMatchObject({ name: "AbortError" });
+        expect(calls).toHaveLength(1);
+      });
     });
   });
 

@@ -92,6 +92,44 @@ const isRedirect = (response: Response): boolean =>
 const isStream = (body: unknown): boolean =>
   typeof ReadableStream !== "undefined" && body instanceof ReadableStream;
 
+const abortError = (signal: AbortSignal): unknown =>
+  signal.reason ??
+  (typeof DOMException !== "undefined"
+    ? new DOMException("This operation was aborted", "AbortError")
+    : Object.assign(new Error("This operation was aborted"), { name: "AbortError" }));
+
+/**
+ * The body bytes to replay, read under the caller's signal.
+ *
+ * A `Request` built from a stream hands its copy over as a stream too, and
+ * reading one that never ends would leave the call pending for good, past an
+ * abort the caller already made. The read races the signal and cancels the
+ * copy it loses to, so an aborted call settles.
+ */
+const replayBody = async ({
+  spare,
+  signal,
+}: {
+  spare: Request;
+  signal: AbortSignal | null | undefined;
+}): Promise<ArrayBuffer> => {
+  if (!signal) return spare.arrayBuffer();
+  if (signal.aborted) throw abortError(signal);
+
+  const aborted = new Promise<never>((_, reject) => {
+    signal.addEventListener("abort", () => reject(abortError(signal)), { once: true });
+  });
+  // An abort that arrives after the read already won still rejects this one,
+  // and nothing would be waiting on it by then.
+  void aborted.catch(() => undefined);
+  try {
+    return await Promise.race([spare.arrayBuffer(), aborted]);
+  } catch (error) {
+    await spare.body?.cancel().catch(() => undefined);
+    throw error;
+  }
+};
+
 const requestUrl = (input: RequestInfo | URL): string => {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.href;
@@ -278,7 +316,7 @@ const upgrade = async ({
         new Request(target, {
           method: effective.method,
           headers: effective.headers,
-          body: spare ? await spare.arrayBuffer() : null,
+          body: spare ? await replayBody({ spare, signal: effective.signal }) : null,
           signal: effective.signal,
           redirect: "manual",
         }),
