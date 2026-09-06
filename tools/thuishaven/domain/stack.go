@@ -19,6 +19,11 @@ type Service struct {
 	// answers confidently for somebody else's domains. Allocated here, the
 	// two sides are told the same number and there is nothing to collide.
 	DNSPort int `json:"dnsPort,omitempty"`
+	// Aliases are the extra hostnames routed to this same listener (see
+	// ServiceHostAliases). Hostname stays the one canonical address; these are
+	// recorded so a report can show every way in and teardown can remove every
+	// route it registered.
+	Aliases []string `json:"aliases,omitempty"`
 	// IsFallback is true when this worktree does not run the service itself and the
 	// hostname resolves to a shared baseline stack's copy instead. The hostname is
 	// always defined; only the backing port differs.
@@ -118,13 +123,28 @@ type Stack struct {
 // gets its own <name>.<slug>.langwatch.localhost. The Hono API is deliberately
 // absent: it shares `app`'s origin at /api (see Stack.APIPort), so the app and
 // its API are one URL. `app` is the browser application's port — the `ui` lane
-// (apps/ui, Vite) is what listens on it. Order is the launch + print order.
+// (apps/ui, Vite) is what listens on it. The last two are developer tools
+// rather than parts of the product: off unless the worktree selects them, and
+// never counted among the three Node lanes (see Lanes). Order is the launch +
+// print order.
 var PerWorktreeServices = []struct{ Name, Role string }{
 	{"app", "App — UI + API at /api"},
 	{"gateway", "AI Gateway (Go)"},
 	{"nlp", "NLP engine (Go)"},
 	{"langyagent", "Langy agent manager (Go)"},
 	{"idp", "IdP simulator (Go)"},
+	{StorybookService, "Design system — Storybook"},
+	{MailService, "Mail studio — transactional message preview"},
+}
+
+// ServiceHostAliases are extra hostnames routed to the same listener as a
+// service's own, so nobody has to remember which spelling was chosen. `ds` is
+// the short form of the design system, and the studio answers to both `mail`
+// and `mails` under either. The service's own name stays the one hostname
+// printed, linked and put in the overlay; these only ever add ways in.
+var ServiceHostAliases = map[string][]string{
+	StorybookService: {"ds"},
+	MailService:      {"mail." + StorybookService, "mails.ds", "mail.ds"},
 }
 
 // BaselineService finds a live baseline stack that runs `service` locally (not

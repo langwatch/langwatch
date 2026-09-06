@@ -114,6 +114,17 @@ func (s Stack) OverlayEnv() []string {
 			env = append(env, fmt.Sprintf("SSO_DOMAIN_PROOF_DNS_SERVERS=127.0.0.1:%d", idp.DNSPort))
 		}
 	}
+	// The design system's Storybook. The ui lane frames it at /design-system and
+	// starts one itself on the first visit unless something is already listening
+	// on the port it derives — so naming haven's port here is what makes the two
+	// agree: the lane haven supervises IS the listener the route finds, instead
+	// of a second Storybook building the same stories on a different port.
+	// Emitted only when there is a Storybook to point at (a local lane, or a
+	// baseline stack's), so a worktree that never selected it keeps today's
+	// start-on-first-visit behavior untouched.
+	if sb := s.svc(StorybookService); sb.Port != 0 {
+		env = append(env, fmt.Sprintf("LANGWATCH_STORYBOOK_PORT=%d", sb.Port))
+	}
 	// A stable local API key so the seed always mints the same credential and any
 	// agent can authenticate without rediscovering it per worktree. Emitted as
 	// HAVEN_SEED_LANGWATCH_API_KEY, never LANGWATCH_API_KEY: the latter is the langwatch

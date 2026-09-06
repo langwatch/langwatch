@@ -37,6 +37,11 @@ func (o *Orchestrator) DownStack(ctx context.Context, slug string) error {
 	}
 	for _, svc := range st.Services {
 		o.proxy.Remove(svc.Name, slug)
+		// The extra ways in go with it: an alias left registered keeps resolving
+		// to a port the kernel has since reissued.
+		for _, alias := range domain.ServiceHostAliases[svc.Name] {
+			o.proxy.Remove(alias, slug)
+		}
 	}
 	o.store.RemoveStack(slug)
 	return nil

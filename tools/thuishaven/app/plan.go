@@ -8,7 +8,7 @@ import (
 )
 
 // palette gives each supervised child a distinct prefix color.
-var palette = []string{"32", "34", "33", "35", "36", "31", "92", "94"}
+var palette = []string{"32", "34", "33", "35", "36", "31", "92", "94", "96", "95"}
 
 // goServiceShell picks `make service` (go run) or `make service-watch` (air) for
 // a Go service — the "run vs watch" decision the orchestrator owns.
@@ -110,6 +110,30 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			Env:   idpEnv,
 		})
 	}
+	// The two developer tools. Neither is a Node LANE — nothing in the product
+	// degrades without them — so they are planned like the Go services: only
+	// when the worktree has selected them, and never counted among the three.
+	// Each is handed the port haven allocated for its hostname, on the command
+	// line, because both tools otherwise bind a fixed default that a second
+	// worktree would find busy.
+	if opts.Selection.Storybook {
+		out = append(out, Child{
+			Name: "storybook", Dir: repoDir, Color: palette[8], LogPath: logPath("storybook"),
+			Shell: fmt.Sprintf("pnpm -s --filter %s storybook --port %d --ci",
+				DesignSystemPackage, port(domain.StorybookService)),
+			Env: nodeEnv(),
+		})
+	}
+	if opts.Selection.Mail {
+		out = append(out, Child{
+			Name: "mail", Dir: repoDir, Color: palette[9], LogPath: logPath("mail"),
+			// --strictPort: vite silently moves to the next free port otherwise,
+			// which would leave mail.<slug> routed to nothing at all.
+			Shell: fmt.Sprintf("pnpm -s --filter %s dev --port %d --strictPort",
+				MailPackage, port(domain.MailService)),
+			Env: nodeEnv(),
+		})
+	}
 	if opts.Selection.Langy {
 		langy := o.langyChild(st, opts, base, port("langyagent"), langyDockerHost)
 		langy.LogPath = logPath("langyagent")
@@ -145,6 +169,19 @@ const (
 	APIPackage = "@langwatch/platform-api"
 	// WorkerPackage is the background process: queues, schedulers, projections.
 	WorkerPackage = "@langwatch/worker"
+)
+
+// The two developer tools a stack can optionally supervise, by workspace
+// package name. They are tools rather than parts of the product — nothing the
+// application does depends on either — so they stay in their own packages and
+// haven only runs them for a worktree that asked (`haven up +storybook +mail`).
+const (
+	// DesignSystemPackage owns the component workshop (Storybook), routed at
+	// design.<slug>.
+	DesignSystemPackage = "@langwatch/design-system"
+	// MailPackage owns the studio that previews every transactional message,
+	// routed at mail.<slug>. Its `dev` script is the studio's Vite server.
+	MailPackage = "@langwatch/mail"
 )
 
 // UIDirRel is where the browser application lives inside the workspace. Only

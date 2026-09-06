@@ -216,10 +216,22 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 			scheme, port := o.serviceEndpoint(proxyScheme, proxyPort, svc.Port)
 			svc.URL = o.cfg.Naming.URL(r.Name, slug, scheme, port)
 		}
+		// The extra ways in (see domain.ServiceHostAliases): every alias points at
+		// the same listener, so nobody has to remember whether the design system
+		// answers to `ds` or the studio to `mail` rather than `mails`. Recorded on
+		// the service, so teardown removes exactly what was registered.
+		for _, alias := range domain.ServiceHostAliases[r.Name] {
+			svc.Aliases = append(svc.Aliases, o.cfg.Naming.Hostname(alias, slug))
+		}
 		st.Services = append(st.Services, svc)
 		if svc.Port != 0 && !o.cfg.PortlessDisabled {
 			if err := o.proxy.Register(svc.Name, slug, svc.Port); err != nil {
 				o.log.Warn("alias registration failed", zap.String("host", svc.Hostname), zap.Error(err))
+			}
+			for _, alias := range domain.ServiceHostAliases[r.Name] {
+				if err := o.proxy.Register(alias, slug, svc.Port); err != nil {
+					o.log.Warn("alias registration failed", zap.String("host", o.cfg.Naming.Hostname(alias, slug)), zap.Error(err))
+				}
 			}
 		}
 	}
@@ -240,6 +252,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		if !o.cfg.PortlessDisabled {
 			for _, s := range st.Services {
 				o.proxy.Remove(s.Name, slug)
+				for _, alias := range domain.ServiceHostAliases[s.Name] {
+					o.proxy.Remove(alias, slug)
+				}
 			}
 		}
 		o.store.RemoveStack(slug)
@@ -691,11 +706,17 @@ func (o *Orchestrator) removeStackRoutes(slug string, services []domain.Service)
 		seen[name] = true
 		o.proxy.Remove(name, slug)
 	}
+	removeWithAliases := func(name string) {
+		remove(name)
+		for _, alias := range domain.ServiceHostAliases[name] {
+			remove(alias)
+		}
+	}
 	for _, r := range domain.PerWorktreeServices {
-		remove(r.Name)
+		removeWithAliases(r.Name)
 	}
 	for _, s := range services {
-		remove(s.Name)
+		removeWithAliases(s.Name)
 	}
 	remove(domain.ClickHouseService)
 	remove(domain.PostgresService)
@@ -945,6 +966,10 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.Langy
 	case "idp":
 		return opts.Selection.IDP
+	case domain.StorybookService:
+		return opts.Selection.Storybook
+	case domain.MailService:
+		return opts.Selection.Mail
 	default:
 		return true
 	}

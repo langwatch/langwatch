@@ -116,6 +116,11 @@ type selectionFields struct {
 	NLP     *bool `json:"nlp"`
 	Langy   *bool `json:"langy"`
 	IDP     *bool `json:"idp"`
+	// The two developer tools, both off by default and both stated here the
+	// same way as the rest, so a file written before they existed keeps
+	// leaving them off rather than reading as a deliberate choice.
+	Storybook *bool `json:"storybook"`
+	Mail      *bool `json:"mail"`
 }
 
 // applyTo overlays the services this file actually states onto sel.
@@ -125,6 +130,8 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.NLP, &sel.NLP},
 		{f.Langy, &sel.Langy},
 		{f.IDP, &sel.IDP},
+		{f.Storybook, &sel.Storybook},
+		{f.Mail, &sel.Mail},
 	} {
 		if field.stated != nil {
 			*field.target = *field.stated
@@ -164,10 +171,12 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 // write.
 func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 	b, err := json.MarshalIndent(selectionFile{Services: &selectionFields{
-		Gateway: &sel.Gateway,
-		NLP:     &sel.NLP,
-		Langy:   &sel.Langy,
-		IDP:     &sel.IDP,
+		Gateway:   &sel.Gateway,
+		NLP:       &sel.NLP,
+		Langy:     &sel.Langy,
+		IDP:       &sel.IDP,
+		Storybook: &sel.Storybook,
+		Mail:      &sel.Mail,
 	}}, "", "  ")
 	if err != nil {
 		return err

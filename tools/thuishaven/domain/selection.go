@@ -23,14 +23,27 @@ type Selection struct {
 	// setup step. Worktrees that don't want it say `haven up -idp` once.
 	// `haven idp` runs the simulator alone, with no stack at all.
 	IDP bool `json:"idp"`
+	// Storybook is the design system's component workshop, off by default: it
+	// is a developer's tool rather than a part of the product, and the
+	// worktrees that never open it should not pay for the build. A worktree
+	// doing design work says `haven up +storybook` once. With the lane on, the
+	// ui lane frames THIS Storybook at /design-system instead of starting a
+	// second one (see Stack.OverlayEnv's LANGWATCH_STORYBOOK_PORT).
+	Storybook bool `json:"storybook"`
+	// Mail is the studio that renders every transactional message the product
+	// sends. Off by default for the same reason as Storybook: it is a tool for
+	// the person writing an email template, not a service the application
+	// talks to, so nothing else in the stack degrades without it.
+	Mail bool `json:"mail"`
 }
 
 // DefaultSelection is a fresh worktree's lean default: the three Node lanes,
-// gateway, nlp and the idp simulator — no langy.
+// gateway, nlp and the idp simulator — no langy, and neither of the two
+// developer tools (storybook, mail).
 func DefaultSelection() Selection { return Selection{Gateway: true, NLP: true, IDP: true} }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"gateway", "nlp", "langy", "idp"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "storybook", "mail"}
 
 // RetiredSelectionServices are ±names that used to pick something and no longer
 // can, with what to say instead. `workers` was the choice between a standalone
@@ -61,6 +74,10 @@ func ApplySelectionDeltas(sel Selection, deltas []string) (Selection, error) {
 			sel.Langy = on
 		case "idp":
 			sel.IDP = on
+		case "storybook":
+			sel.Storybook = on
+		case "mail":
+			sel.Mail = on
 		default:
 			return sel, fmt.Errorf("unknown service %q — services: %s", d[1:], strings.Join(SelectableServices, ", "))
 		}
@@ -83,6 +100,10 @@ func SelectionFromStack(st Stack) Selection {
 			sel.Langy = local
 		case "idp":
 			sel.IDP = local
+		case StorybookService:
+			sel.Storybook = local
+		case MailService:
+			sel.Mail = local
 		}
 	}
 	return sel
@@ -100,6 +121,13 @@ func CLIServiceName(internal string) string {
 		return "langy"
 	case "app":
 		return "ui"
+	// The two developer tools: their hostnames describe what you are looking at
+	// (design-system, and the studio under it), their CLI names the tool you are
+	// running.
+	case StorybookService:
+		return "storybook"
+	case MailService:
+		return "mail"
 	default:
 		return internal
 	}
@@ -121,6 +149,8 @@ func (s Selection) Describe() string {
 	add(s.NLP, "nlp")
 	add(s.Langy, "langy")
 	add(s.IDP, "idp")
+	add(s.Storybook, "storybook")
+	add(s.Mail, "mail")
 	out := "services: " + strings.Join(on, " · ")
 	if len(off) > 0 {
 		out += "   off: " + strings.Join(off, " · ")

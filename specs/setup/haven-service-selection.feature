@@ -17,6 +17,7 @@ Feature: haven service selection
     When the developer runs "haven up"
     Then the stack runs the three Node lanes (ui, api, workers), nlp, gateway, and the idp simulator
     And langy is not started
+    And neither developer tool is started
     And the first up prints the selection and how to change it
 
   Scenario: Adding a service is one word and it sticks
@@ -135,3 +136,49 @@ Feature: haven service selection
       When they run "haven up +langy" on a machine with no container runtime
       Then the tier they asked for is the tier they get
       And refusing host access explicitly keeps the sandboxed tier
+
+  Rule: The developer tools are optional lanes, never product lanes
+
+    # The design system's Storybook and the mail studio are tools a developer
+    # opens, not services the application talks to: nothing in the product
+    # degrades when they are absent. So they stay in their own packages
+    # (@langwatch/design-system, @langwatch/mail) and haven runs them the way it
+    # runs langy — off by default, added by name, sticky from then on. Bound by
+    # domain/devtools_test.go and app/plan_devtools_test.go.
+
+    Scenario: The developer tools are off until a worktree asks for them
+      Given a worktree that has never been up
+      When the developer runs "haven up"
+      Then the design-system Storybook is not started
+      And the mail studio is not started
+      And the status line names each one with the exact "+svc" that adds it
+
+    Scenario: Adding both developer tools is one command and it sticks
+      When the developer runs "haven up +storybook +mail"
+      Then the Storybook lane and the mail studio lane start as part of this stack
+      And a later plain "haven up" in this worktree still runs both
+
+    Scenario: A selected developer tool is reached by hostname
+      Given a worktree running both developer tools
+      Then the Storybook is served at "design.<slug>.langwatch.localhost"
+      And the mail studio is served at "mail.<slug>.langwatch.localhost"
+      And each is healthy once its root answers
+      And "haven logs storybook" shows that lane's own output
+
+    # The application already frames the Storybook at /design-system and starts
+    # one itself on the first visit unless something already answers on the port
+    # it derives. Handing it haven's port is what stops a second Storybook
+    # building the same stories beside the one the stack is already running.
+    Scenario: The application frames the Storybook the stack is already running
+      Given a worktree running the Storybook lane
+      When someone opens "/design-system" in the application
+      Then the page frames the Storybook haven supervises
+      And no second Storybook is started
+
+    # A stack missing one of the three Node lanes serves pages and quietly
+    # processes no jobs. Neither developer tool can be mistaken for one of them.
+    Scenario: A developer tool is not one of the three Node lanes
+      Given a worktree running both developer tools
+      When a reader asks which Node lanes the stack supervises
+      Then the answer is still ui, api and workers
+      And neither developer tool appears among them

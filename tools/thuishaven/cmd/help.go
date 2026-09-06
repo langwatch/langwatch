@@ -30,6 +30,7 @@ COMMANDS
 EXAMPLES
     haven up                     # stack up in the background + attached log view
     haven up +langy              # add a service here, now and from now on
+    haven up +storybook +mail    # add the design-system Storybook + mail studio
     haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
     haven logs nlp -t            # tail one service live
@@ -53,6 +54,14 @@ hostname through the portless proxy:
     gateway.portless.langwatch.localhost     AI Gateway (Go)
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
+
+Two more only when the worktree asked for them ("haven up +storybook +mail"):
+
+    design-system.portless.langwatch.localhost        The design system's Storybook
+    mails.design-system.portless.langwatch.localhost  The mail studio
+
+Both take a shorter spelling too: "ds" stands in for "design-system", and the
+studio answers to "mail" as well as "mails" under either.
 
 The app and its API share ONE origin: open app.<slug>.langwatch.localhost for the
 UI and hit app.<slug>.langwatch.localhost/api for the API — one URL, not two.

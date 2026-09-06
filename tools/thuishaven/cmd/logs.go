@@ -53,6 +53,7 @@ func fileToCLIService(name string) string {
 // the same in `haven logs` as it did live.
 var logServiceColors = map[string]string{
 	"ui": "34", "api": "35", "gateway": "33", "nlp": "36", "langy": "92", "workers": "32",
+	"storybook": "96", "mail": "95",
 }
 
 func runLogsCmd(ctx context.Context, d deps, inv invocation) error {

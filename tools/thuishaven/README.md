@@ -21,6 +21,18 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                         |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database  |
 
+Two more are there only when the worktree asked for them (`haven up +storybook
++mail`) — developer tools rather than parts of the product:
+
+| Hostname                                       | Service                                  |
+| ---------------------------------------------- | ---------------------------------------- |
+| `design-system.<slug>.langwatch.localhost`     | The design system's Storybook            |
+| `mails.design-system.<slug>.langwatch.localhost` | The mail studio — every message previewed |
+
+Both answer to more than one spelling, so nothing has to be remembered: `ds`
+stands in for `design-system`, and the studio answers to `mail` as well as
+`mails` under either. The hostnames above are the canonical ones haven prints.
+
 The **app and its API are one origin**: open `app.<slug>.langwatch.localhost` for
 the UI and hit `app.<slug>.langwatch.localhost/api` for the API. There is no
 separate `api.<slug>` hostname — the frontend and backend never split into two
@@ -70,8 +82,9 @@ haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
                  switch between "all" and per-service logs, q detaches (the stack
                  keeps running; haven down stops it). +svc/-svc picks services and
-                 sticks (+langy, -nlp, -gateway); a fresh worktree runs
-                 ui + api + workers + nlp + gateway + idp, langy off. -w watches
+                 sticks (+langy, -nlp, -gateway, +storybook, +mail); a fresh
+                 worktree runs ui + api + workers + nlp + gateway + idp, with
+                 langy and the two developer tools off. -w watches
                  the Go services via
                  air; -d detaches without the view; --rebuild forces images
 haven down       stop this worktree's stack — data is always kept;
@@ -357,6 +370,14 @@ registry, and dashboard stay the same.
   resolves to a shared baseline stack (`HAVEN_BASELINE=1`, off `main`) instead of
   dead-ending. ClickHouse embodies this: one server, `clickhouse.<slug>` always
   resolves, only the database is per-worktree.
+- **Developer tools are lanes, not products.** The design system's Storybook and
+  the mail studio stay in their own packages (`@langwatch/design-system`,
+  `@langwatch/mail`); haven only offers to run them, off by default, the way it
+  offers langy. Nothing in the application degrades without either, and neither
+  is ever counted among the three Node lanes. Selecting the Storybook also tells
+  the ui lane which port it is on (`LANGWATCH_STORYBOOK_PORT`), so opening
+  `/design-system` in the app frames the Storybook the stack is already running
+  instead of starting a second one.
 - **Sandboxed Langy worker (by default).** The langyagent worker runs the Langy
   agent, so haven isolates it like production rather than letting a test model run
   as your own user. Two env flags pick one of three tiers:
