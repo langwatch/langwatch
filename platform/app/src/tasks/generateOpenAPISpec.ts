@@ -30,23 +30,14 @@ import { app as organizationApp } from "../app/api/organization/[[...route]]/app
 import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { ORGANIZATIONS_SPEC_OPTIONS } from "../app/api/organizations/[[...route]]/openapi";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
+import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as runPlansApp } from "../app/api/run-plans/[[...route]]/app";
-import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
-import { normalizeExclusiveBounds } from "../server/api/openapi-exclusive-bounds";
-import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
-import {
-  allRegisteredRoutes,
-  type CredentialClass,
-  documentedPathOf,
-  isHttpMethod,
-  securityForCredentialClass,
-} from "../server/api/security";
-import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
+import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
@@ -56,6 +47,15 @@ import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
+import { normalizeExclusiveBounds } from "../server/api/openapi-exclusive-bounds";
+import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
+import {
+  allRegisteredRoutes,
+  type CredentialClass,
+  documentedPathOf,
+  isHttpMethod,
+  securityForCredentialClass,
+} from "../server/api/security";
 // The two legacy route files below are wired in for the routes they describe
 // and nothing else: `generateSpecs` skips any handler without `describeRoute`,
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
