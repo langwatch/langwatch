@@ -1002,3 +1002,125 @@ tester.run("package-boundaries: web test seam", plugin.rules["package-boundaries
     },
   ],
 });
+
+tester.run("cognitive-complexity", plugin.rules["cognitive-complexity"], {
+  valid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function classify(a, b, c) { if (a) { return 1; } if (b) { return 2; } if (c) { return 3; } return 0; }",
+      options: [{ max: 3 }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export const pick = (a, b) => (a ? 1 : b ? 2 : 3);",
+      options: [{ max: 3 }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function outer(items) { return items.map((item) => { if (item) { return 1; } return 0; }); }",
+      options: [{ max: 2 }],
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function classify(a, b, c) { if (a) { return 1; } if (b) { return 2; } if (c) { return 3; } return 0; }",
+      options: [{ max: 2 }],
+      errors: [{ messageId: "tooComplex" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function nested(a, b, c) { if (a) { for (const x of b) { while (c) { c = false; } } } }",
+      options: [{ max: 5 }],
+      errors: [{ messageId: "tooComplex" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function chain(a, b, c, d, e) { if (a && b && c || d || e) { return 1; } return 0; }",
+      options: [{ max: 2 }],
+      errors: [{ messageId: "tooComplex" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function ternary(a) { return a ? (a ? 1 : 2) : 3; }",
+      options: [{ max: 2 }],
+      errors: [{ messageId: "tooComplex" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function loopWithArrow(items) { for (const item of items) { items.map((value) => (value ? 1 : 2)); } }",
+      options: [{ max: 3 }],
+      errors: [{ messageId: "tooComplex" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function countdown(n) { if (n > 0) { return countdown(n - 1); } return 0; }",
+      options: [{ max: 1 }],
+      errors: [{ messageId: "tooComplex" }],
+    },
+  ],
+});
+
+tester.run("condition-shape", plugin.rules["condition-shape"], {
+  valid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function guard(input) { if (!input.id) { return null; } return input; }",
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function ready(state) { if (state.loaded && state.visible) { return true; } return false; }",
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function pick(state) { return state.enabled ? 1 : 0; }",
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function scan(rows) { while (rows.length) { rows.pop(); } }",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function deep(input) { if (input.meta.owner.name) { return 1; } return 0; }",
+      errors: [{ messageId: "nameCondition" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function optional(input) { if (input?.meta?.owner?.name) { return 1; } return 0; }",
+      errors: [{ messageId: "nameCondition" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function calls(a, b) { if (first(a) && second(b)) { return 1; } return 0; }",
+      errors: [{ messageId: "nameCondition" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function operators(a, b, c, d) { if (a && b || c && d) { return 1; } return 0; }",
+      errors: [{ messageId: "nameCondition" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function nestedTernary(a, b) { return (a ? b : !b) ? 1 : 0; }",
+      errors: [{ messageId: "nameCondition" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function loop(rows, index) { while (rows.at(index).children.length) { index += 1; } }",
+      errors: [{ messageId: "nameCondition" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function branch(input) { switch (input.meta.owner.kind) { default: return 0; } }",
+      errors: [{ messageId: "nameCondition" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export function loosened(a, b, c) { if (a && b && c) { return 1; } return 0; }",
+      options: [{ maxOperators: 1 }],
+      errors: [{ messageId: "nameCondition" }],
+    },
+  ],
+});

@@ -1471,8 +1471,308 @@ const apiContextServicesRule = {
   },
 };
 
+// SonarSource cognitive complexity: a structural +1 per control-flow break,
+// plus the current nesting level for the constructs that nest. `else` and
+// `else if` take the +1 without the nesting penalty, boolean sequences and
+// recursion take +1 flat, and a nested function raises the nesting level for
+// everything inside it.
+const COGNITIVE_FUNCTION_TYPES = new Set([
+  "FunctionDeclaration",
+  "FunctionExpression",
+  "ArrowFunctionExpression",
+]);
+
+function isLogicalSequence(node) {
+  return node.type === "LogicalExpression" && (node.operator === "&&" || node.operator === "||");
+}
+
+function isNestedFunction(node) {
+  let current = node.parent;
+  while (current) {
+    if (COGNITIVE_FUNCTION_TYPES.has(current.type)) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+function functionName(node) {
+  if (node.id?.name) return node.id.name;
+  const owner = node.parent;
+  if (!owner) return undefined;
+  if (owner.type === "VariableDeclarator" && owner.id?.type === "Identifier") return owner.id.name;
+  if (
+    (owner.type === "MethodDefinition" || owner.type === "PropertyDefinition") &&
+    owner.key?.type === "Identifier"
+  ) {
+    return owner.key.name;
+  }
+  if (owner.type === "Property" && owner.key?.type === "Identifier") return owner.key.name;
+  return undefined;
+}
+
+function isRecursiveCall(node, name) {
+  if (!name) return false;
+  const callee = node.callee;
+  if (!callee) return false;
+  if (callee.type === "Identifier") return callee.name === name;
+  return (
+    callee.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object?.type === "ThisExpression" &&
+    callee.property?.type === "Identifier" &&
+    callee.property.name === name
+  );
+}
+
+function* childNodes(node) {
+  for (const key of Object.keys(node)) {
+    if (key === "parent") continue;
+    const value = node[key];
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item && typeof item.type === "string") yield item;
+      }
+      continue;
+    }
+    if (value && typeof value.type === "string") yield value;
+  }
+}
+
+function cognitiveComplexity(functionNode) {
+  let score = 0;
+
+  const walkIf = (node, nesting, isElseIf, owner) => {
+    score += isElseIf ? 1 : 1 + nesting;
+    walk(node.test, nesting, owner);
+    walk(node.consequent, nesting + 1, owner);
+    const alternate = node.alternate;
+    if (!alternate) return;
+    if (alternate.type === "IfStatement") {
+      walkIf(alternate, nesting, true, owner);
+      return;
+    }
+    score += 1;
+    walk(alternate, nesting + 1, owner);
+  };
+
+  const walkChildren = (node, nesting, owner) => {
+    for (const child of childNodes(node)) walk(child, nesting, owner);
+  };
+
+  const walkNested = (node, nesting, owner, bodyNesting) => {
+    for (const child of childNodes(node)) {
+      walk(child, child === node.body ? bodyNesting : nesting, owner);
+    }
+  };
+
+  function walk(node, nesting, owner) {
+    if (!node) return;
+    switch (node.type) {
+      case "IfStatement":
+        walkIf(node, nesting, false, owner);
+        return;
+      case "ConditionalExpression":
+        score += 1 + nesting;
+        walk(node.test, nesting, owner);
+        walk(node.consequent, nesting + 1, owner);
+        walk(node.alternate, nesting + 1, owner);
+        return;
+      case "SwitchStatement":
+        score += 1 + nesting;
+        walk(node.discriminant, nesting, owner);
+        for (const switchCase of node.cases) walk(switchCase, nesting + 1, owner);
+        return;
+      case "ForStatement":
+      case "ForInStatement":
+      case "ForOfStatement":
+      case "WhileStatement":
+      case "DoWhileStatement":
+        score += 1 + nesting;
+        walkNested(node, nesting, owner, nesting + 1);
+        return;
+      case "CatchClause":
+        score += 1 + nesting;
+        walkNested(node, nesting, owner, nesting + 1);
+        return;
+      case "LogicalExpression": {
+        if (!isLogicalSequence(node)) break;
+        const operators = [];
+        const leaves = [];
+        const flatten = (current) => {
+          if (!isLogicalSequence(current)) {
+            leaves.push(current);
+            return;
+          }
+          flatten(current.left);
+          operators.push(current.operator);
+          flatten(current.right);
+        };
+        flatten(node);
+        let sequences = 1;
+        for (let index = 1; index < operators.length; index += 1) {
+          if (operators[index] !== operators[index - 1]) sequences += 1;
+        }
+        score += sequences;
+        for (const leaf of leaves) walk(leaf, nesting, owner);
+        return;
+      }
+      case "BreakStatement":
+      case "ContinueStatement":
+        if (node.label) score += 1;
+        return;
+      case "CallExpression":
+        if (isRecursiveCall(node, owner)) score += 1;
+        break;
+      case "FunctionDeclaration":
+      case "FunctionExpression":
+      case "ArrowFunctionExpression":
+        walkNested(node, nesting, functionName(node) ?? owner, nesting + 1);
+        return;
+      default:
+        break;
+    }
+    walkChildren(node, nesting, owner);
+  }
+
+  walkNested(functionNode, 0, functionName(functionNode), 0);
+  return score;
+}
+
+const cognitiveComplexityRule = {
+  meta: {
+    type: "problem",
+    schema: [
+      {
+        type: "object",
+        properties: { max: { type: "integer", minimum: 0 } },
+        additionalProperties: false,
+      },
+    ],
+    messages: {
+      tooComplex:
+        "Function has a cognitive complexity of {{complexity}}. Maximum allowed is {{max}}.",
+    },
+  },
+  create(context) {
+    const max = context.options?.[0]?.max ?? 15;
+
+    const check = (node) => {
+      if (isNestedFunction(node)) return;
+      const complexity = cognitiveComplexity(node);
+      if (complexity <= max) return;
+      context.report({
+        node,
+        messageId: "tooComplex",
+        data: { complexity: String(complexity), max: String(max) },
+      });
+    };
+
+    return {
+      FunctionDeclaration: check,
+      FunctionExpression: check,
+      ArrowFunctionExpression: check,
+    };
+  },
+};
+
+// A condition is readable at a glance or it is named. The shape checks are
+// the four ways a test stops being glanceable: a deep property chain, more
+// than one call, a stack of logical operators, or a ternary inside the test.
+const CONDITION_LOGICAL_OPERATORS = new Set(["&&", "||", "??"]);
+
+function chainDepth(node) {
+  if (!node) return 0;
+  if (node.type === "MemberExpression" || node.type === "OptionalMemberExpression") {
+    return 1 + chainDepth(node.object);
+  }
+  if (node.type === "CallExpression" || node.type === "OptionalCallExpression") {
+    return chainDepth(node.callee);
+  }
+  if (node.type === "ChainExpression" || node.type === "TSNonNullExpression") {
+    return chainDepth(node.expression);
+  }
+  return 0;
+}
+
+function conditionShape(test) {
+  const shape = { calls: 0, hops: 0, nestedTernary: false, operators: 0 };
+  const visit = (node) => {
+    if (!node) return;
+    switch (node.type) {
+      case "MemberExpression":
+      case "OptionalMemberExpression":
+        shape.hops = Math.max(shape.hops, chainDepth(node));
+        break;
+      case "CallExpression":
+      case "OptionalCallExpression":
+        shape.calls += 1;
+        break;
+      case "LogicalExpression":
+        if (CONDITION_LOGICAL_OPERATORS.has(node.operator)) shape.operators += 1;
+        break;
+      case "ConditionalExpression":
+        shape.nestedTernary = true;
+        break;
+      default:
+        break;
+    }
+    for (const child of childNodes(node)) visit(child);
+  };
+  visit(test);
+  return shape;
+}
+
+const conditionShapeRule = {
+  meta: {
+    type: "problem",
+    schema: [
+      {
+        type: "object",
+        properties: {
+          maxCalls: { type: "integer", minimum: 0 },
+          maxHops: { type: "integer", minimum: 0 },
+          maxOperators: { type: "integer", minimum: 0 },
+        },
+        additionalProperties: false,
+      },
+    ],
+    messages: {
+      nameCondition: "Name this condition: assign it to a const and test the name.",
+    },
+  },
+  create(context) {
+    const options = context.options?.[0] ?? {};
+    const maxHops = options.maxHops ?? 2;
+    const maxCalls = options.maxCalls ?? 1;
+    const maxOperators = options.maxOperators ?? 2;
+
+    const check = (test) => {
+      if (!test) return;
+      const shape = conditionShape(test);
+      const unreadable =
+        shape.hops > maxHops ||
+        shape.calls > maxCalls ||
+        shape.operators > maxOperators ||
+        shape.nestedTernary;
+      if (!unreadable) return;
+      context.report({ node: test, messageId: "nameCondition" });
+    };
+
+    return {
+      ConditionalExpression: (node) => check(node.test),
+      DoWhileStatement: (node) => check(node.test),
+      ForStatement: (node) => check(node.test),
+      IfStatement: (node) => check(node.test),
+      SwitchStatement: (node) => check(node.discriminant),
+      WhileStatement: (node) => check(node.test),
+    };
+  },
+};
+
 export const rules = {
   "api-context-services": apiContextServicesRule,
+  "cognitive-complexity": cognitiveComplexityRule,
+  "condition-shape": conditionShapeRule,
   "environment-boundaries": environmentBoundariesRule,
   "package-boundaries": boundaryRule,
   "feature-module-classes": featureModuleClassesRule,
