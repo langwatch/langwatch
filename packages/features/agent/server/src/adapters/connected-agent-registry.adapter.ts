@@ -9,7 +9,7 @@ import {
 } from "@langwatch/agent-contract";
 
 import { inflightKey, instanceMetaKey, instanceSetKey } from "../rules/connected-agent-keys.rules";
-import type { AgentStateStorePort } from "../ports/agent-state-store.port";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import {
   ConnectedAgentRegistryPort,
   type InstanceMeta,

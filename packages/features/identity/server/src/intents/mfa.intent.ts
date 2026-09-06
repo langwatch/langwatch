@@ -18,8 +18,8 @@ import {
 import type { MfaGuardsService } from "../services/mfa-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import { MfaEnrollmentStateFoldProjection } from "../projections/mfa-enrollment-state.projection";
 import type { MfaEvent } from "../projections/mfa-enrollment-state.projection";
+import { mfaEventsFor } from "../intents/mfa-events.intent";
 
 /**
  * The seven two-step verification verbs, as the queue's STAGED RE-RUN of each: the same guard the
@@ -60,7 +60,7 @@ function mfaCommand<Schema extends ZodTypeAny>({
     async handle(command: Command<Data>): Promise<MfaEvent[]> {
       const data = command.data as never;
       const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
-      return MfaEnrollmentStateFoldProjection.eventsFor({
+      return mfaEventsFor({
         command: { type, data } as MfaCommand,
         facts,
       });

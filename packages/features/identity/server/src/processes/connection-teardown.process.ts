@@ -1,8 +1,5 @@
-import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing";
-
-const logger = createLogger("langwatch:identity:connection-teardown");
 
 export const CONNECTION_TEARDOWN_PROCESS_NAME = "connectionTeardown" as const;
 
@@ -102,17 +99,3 @@ export const connectionTeardownWake: WakeHandler<
     ],
   };
 };
-
-export function runCompleteTeardown(deps: { port: ConnectionTeardownPort }) {
-  return async (payload: z.infer<typeof completeTeardownIntentSchema>): Promise<void> => {
-    await deps.port.completeTeardown({
-      connectionId: payload.connectionId,
-      organizationId: payload.organizationId,
-      occurredAtMs: payload.scheduledFor,
-    });
-    logger.info(
-      { connectionId: payload.connectionId },
-      "sso connection teardown grace elapsed; completion command dispatched",
-    );
-  };
-}

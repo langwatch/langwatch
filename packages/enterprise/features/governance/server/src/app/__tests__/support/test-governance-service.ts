@@ -72,7 +72,8 @@ export class TestGovernanceService extends GovernanceService {
     unsupported<GovernanceService["ingestionKeyIssueForPersonalProject"]>();
   ingestionKeyListForPersonalProject =
     unsupported<GovernanceService["ingestionKeyListForPersonalProject"]>();
-  ingestionKeyDescribePersonal = unsupported<GovernanceService["ingestionKeyDescribePersonal"]>();
+  tryDescribePersonalIngestionKey =
+    unsupported<GovernanceService["tryDescribePersonalIngestionKey"]>();
   ingestionRecordRunCompleted = unsupported<GovernanceService["ingestionRecordRunCompleted"]>();
   ingestionRecordRunFailed = unsupported<GovernanceService["ingestionRecordRunFailed"]>();
   ingestionSourceArchive = unsupported<GovernanceService["ingestionSourceArchive"]>();

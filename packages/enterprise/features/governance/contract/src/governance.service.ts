@@ -214,7 +214,7 @@ export abstract class GovernanceService {
     userId: string;
     organizationId: string;
   }): Promise<PersonalIngestionKey[]>;
-  abstract ingestionKeyDescribePersonal(input: {
+  abstract tryDescribePersonalIngestionKey(input: {
     userId: string;
     organizationId: string;
     lookupId: string;

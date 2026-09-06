@@ -79,10 +79,12 @@ function lastWorkspaceConnection(events: readonly LangyConversationProcessingEve
     if (type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED) {
       return true;
     }
+
     if (type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED) {
       return false;
     }
   }
+
   return false;
 }
 
@@ -95,7 +97,10 @@ function foldWaitTurns(
 ): Map<string, LangyConversationTurnFoldState> {
   const turns = new Map<string, LangyConversationTurnFoldState>();
   for (const event of events) {
-    if (!isLangyWaitEventType(event.type)) continue;
+    if (!isLangyWaitEventType(event.type)) {
+      continue;
+    }
+
     const parsed = langyConversationTurnEventSchema.safeParse({
       id: event.id,
       createdAt: event.createdAt,
@@ -103,13 +108,17 @@ function foldWaitTurns(
       type: event.type,
       data: event.data,
     });
-    if (!parsed.success) continue;
+    if (!parsed.success) {
+      continue;
+    }
+
     const turnId = parsed.data.data.turnId;
     turns.set(
       turnId,
       foldLangyConversationTurn(turns.get(turnId) ?? initLangyConversationTurnState(), parsed.data),
     );
   }
+
   return turns;
 }
 
@@ -462,8 +471,13 @@ export class LangyConversationService {
       projectId,
       userId,
     });
-    if (!visible) throw new LangyConversationNotFoundError(conversationId);
-    if (!this.events) return { waits: [], workspaceConnected: false };
+    if (!visible) {
+      throw new LangyConversationNotFoundError(conversationId);
+    }
+
+    if (!this.events) {
+      return { waits: [], workspaceConnected: false };
+    }
 
     const all = await this.events.getEventsOccurredSince(
       conversationId,

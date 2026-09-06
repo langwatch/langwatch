@@ -9,8 +9,8 @@ import {
   connectionTeardownWake,
   onTeardownRequested,
   onTornDown,
-  runCompleteTeardown,
 } from "../connection-teardown.process";
+import { runCompleteTeardown } from "../../intents/connection-teardown.intent";
 
 const ORG = "org_acme";
 const CONNECTION = "ssoc_1";

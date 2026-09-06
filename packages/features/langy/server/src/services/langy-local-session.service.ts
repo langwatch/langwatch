@@ -22,9 +22,15 @@ import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { LangyTurnInProgressError } from "@langwatch/langy-contract";
 import { LangyActorSessionService, type LangyActorUserReader } from "./langy-actor-session.service";
 import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port";
-import type { AgentStateStorePort, Unsubscribe } from "@langwatch/agent-server";
-import { LANGY_LOCAL_CONNECT_NOTICE } from "@langwatch/langy-contract";
-import type { LocalCallDispatcher } from "./langy-local-call-dispatcher.service";
+import type { AgentStateStorePort, Unsubscribe } from "@langwatch/agent-contract";
+import {
+  connectMessage,
+  conversationTitle,
+  conversationUrl,
+  disconnectMessage,
+  grantedPatterns,
+} from "../rules/langy-local-session-text.rules";
+import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service";
 import { workspaceNudgeSchema } from "./langy-local-call-dispatcher.service";
 import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
 import type { ControlRequestService } from "./langy-local-control-request.service";
@@ -32,9 +38,9 @@ import { LangyWaitExpiredError } from "@langwatch/langy-contract";
 import { workspaceChannel } from "../rules/langy-local-control-keys.rules";
 import type {
   ConnectedWorkspace,
-  LocalWorkspacePresence,
+  LangyLocalPresencePort,
   PresenceHeartbeat,
-} from "../adapters/redis.langy-local-presence.adapter";
+} from "../ports/langy-local-presence.port";
 import {
   type CallEnvelope,
   LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -169,8 +175,8 @@ export interface LocalControlSessionCoreOptions {
   /** This deployment's own origin, for the follow-along link. */
   baseHost: string | undefined;
   store: AgentStateStorePort;
-  presence: LocalWorkspacePresence;
-  dispatcher: LocalCallDispatcher;
+  presence: LangyLocalPresencePort;
+  dispatcher: LocalCallDispatcherService;
   waits: UserWaitService;
   requests: ControlRequestService;
   /** Injected so the auto turn can be observed without a worker. */
@@ -182,7 +188,7 @@ export interface LocalControlSessionCoreOptions {
   now?: () => number;
 }
 
-export class LocalControlSessionCore {
+export class LocalControlSessionCoreService {
   private readonly apiKeys: ApiKeyService;
   private readonly readCredential: ControlCredentialReader;
   private readonly baseHost: string | undefined;
@@ -192,17 +198,50 @@ export class LocalControlSessionCore {
   private readonly conversations: () => ControlConversations;
   private readonly events: () => ControlEvents;
   private readonly buffer: () => ControlBuffer;
-  readonly presence: LocalWorkspacePresence;
-  readonly dispatcher: LocalCallDispatcher;
+  readonly presence: LangyLocalPresencePort;
+  readonly dispatcher: LocalCallDispatcherService;
   readonly waits: UserWaitService;
   readonly requests: ControlRequestService;
   readonly now: () => number;
 
-  static create(options: LocalControlSessionCoreOptions): LocalControlSessionCore {
-    return new LocalControlSessionCore(options);
+  static create(options: LocalControlSessionCoreOptions): LocalControlSessionCoreService {
+    return new LocalControlSessionCoreService(options);
   }
 
-  constructor(options: LocalControlSessionCoreOptions) {
+  /** Starts the turn as the acting user, through whatever runs Langy turns here. */
+  static turnStarter(options: {
+    actors: LangyActorUserReader;
+    turns: LangyLocalConversationTurns;
+  }): ControlTurnStarter {
+    return {
+      async start({ projectId, conversationId, userId, text, idempotencyKey }) {
+        const actor = await LangyActorSessionService.create({
+          users: options.actors,
+        }).resolve({ userId });
+
+        if (!actor.ok) {
+          logger.warn(
+            { conversationId, reason: actor.reason },
+            "no acting user for the folder-connected turn",
+          );
+
+          return;
+        }
+
+        await options.turns.startConversationTurn({
+          projectId,
+          idempotencyKey,
+          session: actor.session,
+          requestedConversationId: conversationId,
+          messages: [{ role: "user", parts: [{ type: "text", text }] }],
+          isRetry: false,
+          turnContext: {},
+        });
+      },
+    };
+  }
+
+  private constructor(options: LocalControlSessionCoreOptions) {
     this.apiKeys = options.apiKeys;
     this.readCredential = options.readCredential;
     this.baseHost = options.baseHost;
@@ -251,6 +290,7 @@ export class LocalControlSessionCore {
         message: "Send the Langy session key as a bearer token.",
       };
     }
+
     const resolved = await this.apiKeys.tryResolveToken({
       token: credentials.token,
       projectId: credentials.projectId,
@@ -262,6 +302,7 @@ export class LocalControlSessionCore {
         message: "That key is not valid for this project.",
       };
     }
+
     // A key with no person behind it, a project key for instance, is refused
     // as the wrong kind rather than as an invalid one: it is a real key, and
     // saying so is what points the developer at the command that mints the
@@ -274,6 +315,7 @@ export class LocalControlSessionCore {
           "Only the key that approving a control request mints can share a folder. Run `langwatch langy --share-control` and approve the request.",
       };
     }
+
     const binding = await this.requests.readKeyBinding(resolved.apiKeyId);
     if (!binding || binding.projectId !== resolved.project.id) {
       return {
@@ -283,6 +325,7 @@ export class LocalControlSessionCore {
           "That key does not control a conversation any more. Ask Langy for the code change again.",
       };
     }
+
     return {
       ok: true,
       credential: {
@@ -396,7 +439,9 @@ export class LocalControlSessionCore {
    */
   async afterRegister(session: ControlSession): Promise<void> {
     const workspace = await this.presence.read(session.conversationId);
-    if (!workspace) return;
+    if (!workspace) {
+      return;
+    }
 
     await this.events().connectLocalWorkspace({
       tenantId: session.projectId,
@@ -422,8 +467,10 @@ export class LocalControlSessionCore {
           { conversationId: session.conversationId },
           "folder connected while a turn was running, no second turn started",
         );
+
         return;
       }
+
       throw error;
     }
   }
@@ -462,14 +509,21 @@ export class LocalControlSessionCore {
    */
   private async isCurrentConnection(session: ControlSession): Promise<boolean> {
     const workspace = await this.presence.read(session.conversationId);
+
     return !workspace || workspace.instanceId === session.instanceId;
   }
 
   /** The command line started the call. */
   async ack(session: ControlSession, callId: string): Promise<void> {
     const call = await this.dispatcher.read(callId);
-    if (call?.conversationId !== session.conversationId) return;
-    if (!(await this.isCurrentConnection(session))) return;
+    if (call?.conversationId !== session.conversationId) {
+      return;
+    }
+
+    if (!(await this.isCurrentConnection(session))) {
+      return;
+    }
+
     await this.dispatcher.ack(callId);
   }
 
@@ -483,22 +537,30 @@ export class LocalControlSessionCore {
    */
   async result(session: ControlSession, frame: ResultFrame): Promise<void> {
     const call = await this.dispatcher.read(frame.callId);
-    if (call?.conversationId !== session.conversationId) return;
+    if (call?.conversationId !== session.conversationId) {
+      return;
+    }
+
     // A folder that was replaced must not answer the folder that replaced it.
     if (!(await this.isCurrentConnection(session))) {
       logger.info(
         { callId: frame.callId, conversationId: session.conversationId },
         "a result arrived from a connection a newer folder replaced, refused",
       );
+
       return;
     }
+
     await this.dispatcher.result({ callId: frame.callId, frame });
   }
 
   /** The command line needs the developer's answer before it runs the call. */
   async permissionRequired(session: ControlSession, frame: PermissionRequiredFrame): Promise<void> {
     const call = await this.dispatcher.read(frame.callId);
-    if (!call || call.conversationId !== session.conversationId) return;
+    if (!call || call.conversationId !== session.conversationId) {
+      return;
+    }
+
     const wait = await this.waits.startPermission({
       projectId: call.projectId,
       conversationId: call.conversationId,
@@ -533,9 +595,18 @@ export class LocalControlSessionCore {
    */
   async permissionAnswered(session: ControlSession, frame: PermissionAnsweredFrame): Promise<void> {
     const call = await this.dispatcher.read(frame.callId);
-    if (!call || call.conversationId !== session.conversationId) return;
-    if (!call.waitId) return;
-    if (!(await this.isCurrentConnection(session))) return;
+    if (!call || call.conversationId !== session.conversationId) {
+      return;
+    }
+
+    if (!call.waitId) {
+      return;
+    }
+
+    if (!(await this.isCurrentConnection(session))) {
+      return;
+    }
+
     try {
       await this.waits.answer({
         waitId: call.waitId,
@@ -550,8 +621,10 @@ export class LocalControlSessionCore {
           { callId: frame.callId, conversationId: session.conversationId },
           "the terminal answered a permission card that had already settled",
         );
+
         return;
       }
+
       throw error;
     }
   }
@@ -570,11 +643,15 @@ export class LocalControlSessionCore {
       userId: session.userId,
     });
     const model = conversation?.lastModel;
-    if (!model) return false;
+    if (!model) {
+      return false;
+    }
+
     const decision = await this.skipGate({
       projectId: session.projectId,
       model,
     });
+
     return decision.allowed;
   }
 
@@ -600,7 +677,9 @@ export class LocalControlSessionCore {
     });
     // A socket replaced by a newer share clears nothing, and must not cancel
     // the calls the new folder is already running.
-    if (!cleared) return;
+    if (!cleared) {
+      return;
+    }
 
     for (const call of await this.dispatcher.listPendingForConversation(session.conversationId)) {
       await this.dispatcher.cancel({
@@ -672,7 +751,10 @@ export class LocalControlSessionCore {
       userId: session.userId,
     });
     const turnId = conversation?.currentTurnId;
-    if (!turnId) return;
+    if (!turnId) {
+      return;
+    }
+
     const workspace = await this.presence.read(session.conversationId);
     await this.buffer().appendLocalWorkspace({
       conversationId: session.conversationId,
@@ -693,28 +775,41 @@ export class LocalControlSessionCore {
     send: (frame: PlatformFrame) => void,
   ): Promise<void> {
     const parsed = safeNudge(raw);
-    if (!parsed) return;
+    if (!parsed) {
+      return;
+    }
+
     if ("call" in parsed) {
       const call = await this.dispatcher.read(parsed.call);
-      if (!call || call.conversationId !== session.conversationId) return;
+      if (!call || call.conversationId !== session.conversationId) {
+        return;
+      }
+
       // The channel is the conversation's, not this connection's, so a folder
       // that a newer one replaced still hears every call written for it.
-      if (!(await this.isCurrentConnection(session))) return;
+      if (!(await this.isCurrentConnection(session))) {
+        return;
+      }
+
       send({
         type: "call",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
         call: this.dispatcher.envelopeOf(call),
       });
+
       return;
     }
+
     if ("cancel" in parsed) {
       send({
         type: "cancel",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
         callId: parsed.cancel,
       });
+
       return;
     }
+
     if ("permission" in parsed) {
       send({
         type: "permission",
@@ -722,16 +817,20 @@ export class LocalControlSessionCore {
         callId: parsed.permission.callId,
         decision: parsed.permission.decision,
       });
+
       return;
     }
+
     if ("policy" in parsed) {
       send({
         type: "policy",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
         skipPermissions: parsed.policy.skipPermissions,
       });
+
       return;
     }
+
     send({
       type: "disconnect",
       protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -749,6 +848,7 @@ function eventWorkspace(
   connected: ConnectedWorkspace,
 ): LangyLocalWorkspaceConnectedEventData["workspace"] {
   const { workspace } = connected;
+
   return {
     root: workspace.root,
     name: workspace.name,
@@ -766,109 +866,6 @@ function eventWorkspace(
   };
 }
 
-/**
- * Every pattern one "allow for this session" answer grants.
- *
- * The command line grants a pattern for every part of the chain that is not
- * read-only, so a card that named only `frame.pattern` told the reader about
- * the first of them and gave away the rest. The segments the ask carries are
- * the whole list; a command line that sends none leaves the one pattern.
- */
-export function grantedPatterns(frame: PermissionRequiredFrame): string[] {
-  const fromSegments = (frame.segments ?? [])
-    .filter((segment) => !segment.readOnly)
-    .map((segment) => segment.pattern)
-    .filter((pattern) => pattern !== "");
-  const patterns = fromSegments.length > 0 ? fromSegments : [frame.pattern];
-  return [...new Set(patterns)].filter((pattern) => pattern !== "");
-}
-
-/**
- * The message the connected folder starts the next turn with.
- *
- * Four words, and no facts. The model reads the path, the machine and the
- * branch off the workspace facts the code access tool hands it, so nothing is
- * lost, and the panel draws no bubble for it at all: the header chip and the
- * code access card above it already say the folder is connected.
- */
-export function connectMessage(): string {
-  return LANGY_LOCAL_CONNECT_NOTICE;
-}
-
-/**
- * The line the transcript carries when the folder goes away.
- *
- * The folder NAME, for the same reason the connect line above uses it: the
- * path is long, the card already carries it, and the two lines sit next to
- * each other in the transcript.
- */
-export function disconnectMessage(
-  workspace: { name: string; root: string },
-  hostname: string,
-): string {
-  return `Local folder disconnected: ${workspace.name || workspace.root} on ${hostname}`;
-}
-
-/**
- * How long a conversation name may be where the terminal prints it on one
- * line, next to the folder path and the project name.
- */
-const MAX_TITLE_LENGTH = 60;
-
-/** The name of a conversation Langy has not named yet. */
-const UNNAMED_CONVERSATION_TITLE = "Langy";
-
-/**
- * The conversation name the card and the terminal show.
- *
- * Langy names a conversation after the first turn, and that name is short. A
- * conversation that has no name yet carries a placeholder cut from the first
- * message, which runs to the width of the terminal and often stops mid word.
- * So a name over the limit is cut back to the last whole word and closed with
- * an ellipsis.
- */
-export function conversationTitle(title: string | null | undefined): string {
-  const trimmed = (title ?? "").trim();
-  if (trimmed === "") return UNNAMED_CONVERSATION_TITLE;
-  if (trimmed.length <= MAX_TITLE_LENGTH) return trimmed;
-  const cut = trimmed.slice(0, MAX_TITLE_LENGTH);
-  const lastSpace = cut.lastIndexOf(" ");
-  const words = lastSpace > 0 ? cut.slice(0, lastSpace) : cut;
-  return `${words.replace(/[\s.,;:!?-]+$/, "")}\u2026`;
-}
-
-/**
- * Where the panel opens one conversation, as a link the terminal can open.
- *
- * `BASE_HOST` is the external-facing origin, the same one the emails and the
- * API's `platformUrl` build their links from. A relative path is correct in
- * the browser and useless in a terminal, so the absolute form is what this
- * returns. An origin that is empty or has no scheme cannot be trusted to
- * build a link, so the path travels on its own rather than as a guess.
- *
- * The link names the PROJECT the conversation belongs to. A conversation is
- * project scoped, and the panel reads it through a project scoped query, so a
- * link to the reader's own home opens the panel on the wrong project whenever
- * the reader last worked somewhere else, and the conversation then reads as
- * one they cannot see. Root stays the answer when the project is not known,
- * and the landing redirect carries the parameter onto whatever home it picks.
- */
-export function conversationUrl(
-  conversationId: string,
-  baseHost: string | undefined,
-  projectSlug?: string,
-): string {
-  const home = projectSlug ? `/${encodeURIComponent(projectSlug)}` : "/";
-  const path = `${home}?langyConversation=${encodeURIComponent(conversationId)}`;
-  const origin = (baseHost ?? "").trim().replace(/\/+$/, "");
-  if (!/^https?:\/\//i.test(origin)) return path;
-  try {
-    return new URL(path, origin).toString();
-  } catch {
-    return path;
-  }
-}
-
 /** The one turn method a folder-connected session starts work through. */
 export type LangyLocalConversationTurns = Readonly<{
   startConversationTurn(input: {
@@ -882,39 +879,10 @@ export type LangyLocalConversationTurns = Readonly<{
   }): Promise<{ conversationId: string; turnId: string }>;
 }>;
 
-/** Starts the turn as the acting user, through whatever runs Langy turns here. */
-export function langyLocalTurnStarter(options: {
-  actors: LangyActorUserReader;
-  turns: LangyLocalConversationTurns;
-}): ControlTurnStarter {
-  return {
-    async start({ projectId, conversationId, userId, text, idempotencyKey }) {
-      const actor = await LangyActorSessionService.create({
-        users: options.actors,
-      }).resolve({ userId });
-      if (!actor.ok) {
-        logger.warn(
-          { conversationId, reason: actor.reason },
-          "no acting user for the folder-connected turn",
-        );
-        return;
-      }
-      await options.turns.startConversationTurn({
-        projectId,
-        idempotencyKey,
-        session: actor.session,
-        requestedConversationId: conversationId,
-        messages: [{ role: "user", parts: [{ type: "text", text }] }],
-        isRetry: false,
-        turnContext: {},
-      });
-    },
-  };
-}
-
 function safeNudge(raw: string) {
   try {
     const parsed = workspaceNudgeSchema.safeParse(JSON.parse(raw));
+
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

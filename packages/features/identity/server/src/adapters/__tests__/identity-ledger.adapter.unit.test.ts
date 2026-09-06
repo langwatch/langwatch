@@ -9,7 +9,6 @@ import { IdentityService } from "../../services/identity.service";
 import { describe, expect, it, vi } from "vitest";
 import type { IdentityEvent } from "../../projections/identity-state.projection";
 import type { IdentityFoldState } from "../../projections/identity-state.projection";
-import { IdentityStateFoldProjection } from "../../projections/identity-state.projection";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
@@ -19,6 +18,7 @@ import { IdentityLedgerWriterAdapter } from "../identity-ledger.adapter";
 import { identityProjectionConvergenceTimeoutsTotal } from "../metrics.identity-ledger.adapter";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
 import { CryptoIdentifierIdentityAdapter } from "../crypto.identifier-identity.adapter";
+import { identityEventsFor } from "../../intents/identity-events.intent";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -137,7 +137,7 @@ function harness(overrides?: {
         data as Parameters<IdentityGuardsService["attachIdentifier"]>[0],
       );
       if (facts.length === 0) return undefined;
-      const events = IdentityStateFoldProjection.eventsFor({
+      const events = identityEventsFor({
         command: { type: ATTACH_IDENTIFIER_COMMAND_TYPE, data: data as never },
         facts,
       });

@@ -33,8 +33,8 @@ import {
 } from "@langwatch/eventing";
 import { SSO_CONNECTION_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
-import { SsoConnectionStateFoldProjection } from "../projections/sso-connection-state.projection";
 import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection";
+import { ssoConnectionEventsFor } from "../intents/sso-connection-events.intent";
 
 const logger = createLogger("langwatch:identity:sso-connection-ledger");
 
@@ -98,7 +98,7 @@ export class SsoConnectionLedgerWriterAdapter implements SsoConnectionLedger {
     command: SsoConnectionCommand;
     facts: SsoConnectionFactInput[];
   }): Promise<SsoConnectionFact[]> {
-    const events = SsoConnectionStateFoldProjection.eventsFor({ command, facts });
+    const events = ssoConnectionEventsFor({ command, facts });
     if (events.length === 0) return [];
     const { connectionId, tenantId } = command.data;
 

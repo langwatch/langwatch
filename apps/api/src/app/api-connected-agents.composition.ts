@@ -10,8 +10,8 @@ import {
   PostgresAgentAdapter,
   type AssertConnectedAgentsRunnablePort,
   type ConnectedAgentRuntime,
-  type ConnectUpgradeRouterPort,
 } from "@langwatch/agent-server";
+import type { ConnectUpgradeRouterPort } from "@langwatch/api";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { runActorFromRequest } from "@langwatch/scenario-contract";
 import { ConnectedTargetService } from "@langwatch/suite-server";

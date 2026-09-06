@@ -15,37 +15,24 @@
 
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import {
-  type RedisConnection,
-  RedisConnectionService,
-} from "@langwatch/redis-client";
+import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import type { ApiKeyService, ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import { LangyTurnInProgressError } from "@langwatch/langy-contract";
-import {
-  type AgentStateStorePort,
-  ConnectedAgentStateAdapter,
-  type UpgradeHandler,
-} from "@langwatch/agent-server";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
+import type { UpgradeHandler } from "@langwatch/api";
 import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.api";
 import { LocalControlLongPoll } from "../../api-rest/langy-local-control-long-poll";
 import { presenceKey } from "../../../rules/langy-local-control-keys.rules";
 import { LOCAL_CONTROL_PROTOCOL_VERSION } from "@langwatch/langy-contract";
 import {
-  createLocalControlRuntime,
+  LangyLocalControlRuntimeAdapter,
   type LocalControlRuntime,
 } from "../../../adapters/langy-local-control-runtime.adapter";
-import { LocalControlSessionCore } from "../../../services/langy-local-session.service";
+import { LocalControlSessionCoreService } from "../../../services/langy-local-session.service";
 
 const ns = `local-control-${nanoid(8)}`;
 
@@ -90,7 +77,7 @@ let skipAllowed = false;
 
 type Pod = {
   runtime: LocalControlRuntime;
-  core: LocalControlSessionCore;
+  core: LocalControlSessionCoreService;
   gateway: LocalControlGateway;
   longPoll: LocalControlLongPoll;
   server: Server;
@@ -152,7 +139,7 @@ function upgradeRouterFor(server: Server) {
 }
 
 function testPorts(store: AgentStateStorePort) {
-  const runtime = createLocalControlRuntime({
+  const runtime = LangyLocalControlRuntimeAdapter.create({
     store,
     projects: { tryReadOrganizationId: async () => organizationId },
     mintSessionKey: async ({ userId: owner }) => {
@@ -186,7 +173,7 @@ function testPorts(store: AgentStateStorePort) {
       },
     },
   });
-  const core = LocalControlSessionCore.create({
+  const core = LocalControlSessionCoreService.create({
     apiKeys,
     readCredential: (header) => {
       const authorization = header("authorization") ?? "";
@@ -212,11 +199,7 @@ function testPorts(store: AgentStateStorePort) {
         recordedMessages.push({
           role: role ?? "user",
           text: parts
-            .map((part) =>
-              part.type === "text" && typeof part.text === "string"
-                ? part.text
-                : "",
-            )
+            .map((part) => (part.type === "text" && typeof part.text === "string" ? part.text : ""))
             .join(""),
         });
         return { messageId: "msg_1" };
@@ -309,15 +292,7 @@ class FakeCli {
   private readonly waiters: ((frame: Frame) => void)[] = [];
   readonly socket: WebSocket;
 
-  constructor({
-    url,
-    token,
-    instanceId,
-  }: {
-    url: string;
-    token: string;
-    instanceId?: string;
-  }) {
+  constructor({ url, token, instanceId }: { url: string; token: string; instanceId?: string }) {
     this.instanceId = instanceId ?? `lci_${nanoid(6)}`;
     this.socket = new WebSocket(`${url}${CONTROL_CONNECT_PATH}`, {
       headers: {
@@ -342,9 +317,7 @@ class FakeCli {
   }
 
   send(frame: Record<string, unknown>): void {
-    this.socket.send(
-      JSON.stringify({ protocol: LOCAL_CONTROL_PROTOCOL_VERSION, ...frame }),
-    );
+    this.socket.send(JSON.stringify({ protocol: LOCAL_CONTROL_PROTOCOL_VERSION, ...frame }));
   }
 
   register(inFlightCallIds: string[] = []): void {
@@ -392,9 +365,7 @@ class FakeCli {
   }
 
   closed(): Promise<{ code: number }> {
-    return new Promise((resolve) =>
-      this.socket.once("close", (code) => resolve({ code })),
-    );
+    return new Promise((resolve) => this.socket.once("close", (code) => resolve({ code })));
   }
 }
 
@@ -433,11 +404,7 @@ async function shareFolder(
 }
 
 /** Nothing of this type arrived inside the window. */
-async function noFrame(
-  cli: FakeCli,
-  type: string,
-  withinMs = 1_500,
-): Promise<boolean> {
+async function noFrame(cli: FakeCli, type: string, withinMs = 1_500): Promise<boolean> {
   const arrived = await cli
     .next(type, withinMs)
     .then(() => true)
@@ -503,8 +470,7 @@ describe("given an approved control request", () => {
       // Let the writes registration itself makes settle, so the baseline is
       // the record as it stands with nothing but the heartbeat left to move it.
       await new Promise((resolve) => setTimeout(resolve, 1_000));
-      const before = (await podA.runtime.presence.read(conversationId))
-        ?.lastSeenAt;
+      const before = (await podA.runtime.presence.read(conversationId))?.lastSeenAt;
       expect(before).toBeDefined();
 
       // Five ping periods of an idle but healthy socket. The presence record
@@ -512,8 +478,7 @@ describe("given an approved control request", () => {
       // heartbeat that never runs takes the folder offline mid-turn while the
       // command line is still connected.
       await new Promise((resolve) => setTimeout(resolve, 1_000));
-      const after = (await podA.runtime.presence.read(conversationId))
-        ?.lastSeenAt;
+      const after = (await podA.runtime.presence.read(conversationId))?.lastSeenAt;
       expect(after).toBeGreaterThan(before!);
 
       cli.close();
@@ -525,16 +490,12 @@ describe("given an approved control request", () => {
       const key = await approvedSessionKey(podA);
       const { cli } = await shareFolder(podA, key);
       await expect
-        .poll(
-          () =>
-            events.some((event) => event.name === "local_workspace_connected"),
-          { timeout: 5_000 },
-        )
+        .poll(() => events.some((event) => event.name === "local_workspace_connected"), {
+          timeout: 5_000,
+        })
         .toBe(true);
 
-      const connectedEvent = events.find(
-        (event) => event.name === "local_workspace_connected",
-      );
+      const connectedEvent = events.find((event) => event.name === "local_workspace_connected");
       expect(connectedEvent?.data.workspace).toMatchObject({
         root: "/Users/dev/acme-app",
         gitBranch: "main",
@@ -573,11 +534,9 @@ describe("given an approved control request", () => {
       const key = await approvedSessionKey(podA);
       const { cli } = await shareFolder(podA, key);
       await expect
-        .poll(
-          () =>
-            events.some((event) => event.name === "local_workspace_connected"),
-          { timeout: 5_000 },
-        )
+        .poll(() => events.some((event) => event.name === "local_workspace_connected"), {
+          timeout: 5_000,
+        })
         .toBe(true);
 
       expect(startedTurns).toEqual([]);
@@ -764,9 +723,7 @@ describe("given a folder shared with the conversation", () => {
         hostname: "rogerio-mbp",
         status: "pending",
       });
-      expect((await podA.runtime.dispatcher.read(call.callId))?.state).toBe(
-        "awaiting_permission",
-      );
+      expect((await podA.runtime.dispatcher.read(call.callId))?.state).toBe("awaiting_permission");
     });
 
     /** @scenario "The session grant button names every pattern the click covers" */
@@ -811,9 +768,7 @@ describe("given a folder shared with the conversation", () => {
           timeout: 5_000,
         })
         .toHaveLength(1);
-      expect(
-        liveEntries.find((e) => e.kind === "local_permission")?.payload,
-      ).toMatchObject({
+      expect(liveEntries.find((e) => e.kind === "local_permission")?.payload).toMatchObject({
         patterns: ["git fetch", "git checkout"],
         timeoutSeconds: 300,
       });
@@ -844,9 +799,9 @@ describe("given a folder shared with the conversation", () => {
           timeout: 5_000,
         })
         .toHaveLength(1);
-      expect(
-        liveEntries.find((e) => e.kind === "local_permission")?.payload,
-      ).toMatchObject({ skipOffered: false });
+      expect(liveEntries.find((e) => e.kind === "local_permission")?.payload).toMatchObject({
+        skipOffered: false,
+      });
     });
   });
 
@@ -870,12 +825,9 @@ describe("given a folder shared with the conversation", () => {
         skipOffered: true,
       });
       await expect
-        .poll(
-          () => podA.runtime.waits.listPending({ conversationId, turnId }),
-          {
-            timeout: 5_000,
-          },
-        )
+        .poll(() => podA.runtime.waits.listPending({ conversationId, turnId }), {
+          timeout: 5_000,
+        })
         .toHaveLength(1);
 
       const [wait] = await podA.runtime.waits.listPending({
@@ -952,14 +904,11 @@ describe("given a folder shared with the conversation", () => {
           source: "terminal",
         });
       expect(
-        events.find(
-          (event) =>
-            event.name === "user_wait_ended" && event.data.waitId === waitId,
-        )?.data,
+        events.find((event) => event.name === "user_wait_ended" && event.data.waitId === waitId)
+          ?.data,
       ).toMatchObject({ outcome: "answered", source: "terminal" });
       expect(
-        liveEntries.filter((entry) => entry.kind === "local_permission").at(-1)
-          ?.payload,
+        liveEntries.filter((entry) => entry.kind === "local_permission").at(-1)?.payload,
       ).toMatchObject({ status: "answered", source: "terminal" });
     });
 
@@ -1099,25 +1048,19 @@ describe("given a folder the developer stops sharing", () => {
     });
     expect(answer).toMatchObject({ state: "done", ok: false });
     expect(answer?.error?.code).toBe("cancelled");
-    expect(
-      events.some((event) => event.name === "local_workspace_disconnected"),
-    ).toBe(true);
+    expect(events.some((event) => event.name === "local_workspace_disconnected")).toBe(true);
   });
 
   /** @scenario "The chat says the folder is gone" */
   it("writes the disconnect into the transcript, and starts no turn for it", async () => {
     const key = await approvedSessionKey(podA);
     const { cli } = await shareFolder(podA, key);
-    await expect
-      .poll(() => startedTurns.length, { timeout: 5_000 })
-      .toBeGreaterThan(0);
+    await expect.poll(() => startedTurns.length, { timeout: 5_000 }).toBeGreaterThan(0);
 
     cli.send({ type: "deregister" });
     await cli.closed();
 
-    await expect
-      .poll(() => recordedMessages.length, { timeout: 5_000 })
-      .toBeGreaterThan(0);
+    await expect.poll(() => recordedMessages.length, { timeout: 5_000 }).toBeGreaterThan(0);
     expect(startedTurns.at(-1)?.text).toContain("Local folder connected");
     // The folder NAME, the way the connect line says it. The whole path made
     // the two lines beside each other read as two different folders.
@@ -1231,10 +1174,9 @@ describe("given a command line that reconnects while a command still runs", () =
         text: "4 migrations applied",
       });
       await expect
-        .poll(
-          async () => (await podA.runtime.dispatcher.read(call.callId))?.state,
-          { timeout: 5_000 },
-        )
+        .poll(async () => (await podA.runtime.dispatcher.read(call.callId))?.state, {
+          timeout: 5_000,
+        })
         .toBe("done");
 
       // A second copy of the same result changes nothing and raises nothing.
@@ -1270,9 +1212,7 @@ describe("given a folder replaced by a newer one", () => {
       // The replaced connection is told what happened and closed, rather than
       // left subscribed to the conversation it no longer holds.
       const told = await old.cli.next("disconnect");
-      expect(told.reason).toBe(
-        "Another folder is now shared with this conversation.",
-      );
+      expect(told.reason).toBe("Another folder is now shared with this conversation.");
       await old.cli.closed();
 
       const call = await podA.runtime.dispatcher.start({
@@ -1311,9 +1251,7 @@ describe("given a folder replaced by a newer one", () => {
           text: "written on the machine that was replaced",
         },
       );
-      expect((await podA.runtime.dispatcher.read(call.callId))?.state).not.toBe(
-        "done",
-      );
+      expect((await podA.runtime.dispatcher.read(call.callId))?.state).not.toBe("done");
 
       // The folder the panel shows still answers it.
       fresh.cli.send({
@@ -1323,12 +1261,9 @@ describe("given a folder replaced by a newer one", () => {
         text: "written",
       });
       await expect
-        .poll(
-          async () => (await podA.runtime.dispatcher.read(call.callId))?.state,
-          {
-            timeout: 5_000,
-          },
-        )
+        .poll(async () => (await podA.runtime.dispatcher.read(call.callId))?.state, {
+          timeout: 5_000,
+        })
         .toBe("done");
 
       fresh.cli.close();

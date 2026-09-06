@@ -59,11 +59,11 @@ class GatedSimulationRunStateFoldStore implements FoldProjectionStore<Simulation
     for (const { state, context } of writable) await this.inner.store(state, context);
   }
 
-  async get(
+  async tryGet(
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<SimulationRunStateData | null> {
-    return await this.inner.get(aggregateId, context);
+    return await this.inner.tryGet(aggregateId, context);
   }
 
   private reportDeclined(context: ProjectionStoreContext): void {

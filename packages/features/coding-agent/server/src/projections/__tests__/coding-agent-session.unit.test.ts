@@ -60,7 +60,7 @@ const modelProviders = new TestModelProviderService((input: ModelCostEstimateInp
 
 function makeProjection() {
   return CodingAgentSessionFoldProjection.create({
-    store: { store: async () => {}, get: async () => null },
+    store: { store: async () => {}, tryGet: async () => null },
     traceCanonicalisation,
     modelProviders,
   });

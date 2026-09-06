@@ -26,7 +26,7 @@ import {
 } from "@langwatch/model-provider-server";
 import { PostgresProcessManagerPurgeAdapter, ProcessManagerPurgeTask } from "@langwatch/ops-server";
 import type { Task } from "@langwatch/task";
-import { GdprUserDataEraseRepository, UserDataEraseTask } from "@langwatch/user-server";
+import { PostgresUserDataEraseAdapter, UserDataEraseTask } from "@langwatch/user-server";
 import { buildAnnotationClickHouseBackfillTask } from "./platform/annotation-clickhouse-backfill.composition";
 import { buildDatasetContentBackfillTask } from "./platform/dataset-content-backfill.composition";
 import { buildObjectStorageMigrateTask } from "./platform/object-storage-migrate.composition";
@@ -92,7 +92,7 @@ export function buildTasksCatalogue({
     StripePricesSyncTask.create({ secretKey: () => process.env.STRIPE_SECRET_KEY }),
     TieredFreeToSeatEventMigrateTask.create({ database: () => host.requirePrisma() }),
     UserDataEraseTask.create({
-      repository: () => GdprUserDataEraseRepository.create({ database: host.requirePrisma() }),
+      repository: () => PostgresUserDataEraseAdapter.create({ database: host.requirePrisma() }),
     }),
     ModelRegistrySyncTask.create({ apiKey: () => process.env.OPENROUTER_API_KEY }),
   ];

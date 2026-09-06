@@ -31,8 +31,8 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules";
-import type { LangyTokenBufferAdapter } from "../adapters/redis.langy-token-buffer.adapter";
-import type { AgentStateStorePort } from "@langwatch/agent-server";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port";
 import {
   CALL_POLL_HOLD_MS,
   LIVE_STREAM_KEEPALIVE_MS,
@@ -110,7 +110,7 @@ export interface UserWaitEvents {
 
 /** The live half: the entries the panel wakes up on, and the turn's liveness. */
 export type UserWaitBuffer = Pick<
-  LangyTokenBufferAdapter,
+  LangyTokenBufferPort,
   "appendLocalPermission" | "appendQuestion" | "appendStatus" | "heartbeat"
 >;
 
@@ -151,7 +151,11 @@ export class UserWaitService {
   private readonly keepaliveMs: number;
   readonly now: () => number;
 
-  constructor(options: UserWaitServiceOptions) {
+  static create(options: UserWaitServiceOptions): UserWaitService {
+    return new UserWaitService(options);
+  }
+
+  private constructor(options: UserWaitServiceOptions) {
     this.store = options.store;
     this.events = options.events;
     this.buffer = options.buffer;
@@ -207,6 +211,7 @@ export class UserWaitService {
         hostname: params.hostname,
       },
     });
+
     return wait;
   }
 
@@ -236,6 +241,7 @@ export class UserWaitService {
       expiresAt: wait.expiresAt,
       questions: params.questions,
     });
+
     return wait;
   }
 
@@ -257,11 +263,20 @@ export class UserWaitService {
     const beat = this.beater();
     for (;;) {
       const wait = await this.readSettlingExpiry(waitId);
-      if (!wait) return null;
-      if (wait.state !== "pending") return toPollResponse(wait);
+      if (!wait) {
+        return null;
+      }
+
+      if (wait.state !== "pending") {
+        return toPollResponse(wait);
+      }
+
       await beat(wait);
       await this.keepAlive(wait);
-      if (this.now() >= until || signal?.aborted) return toPollResponse(wait);
+      if (this.now() >= until || signal?.aborted) {
+        return toPollResponse(wait);
+      }
+
       await sleep(this.pollIntervalMs, signal);
     }
   }
@@ -273,10 +288,14 @@ export class UserWaitService {
    */
   private beater(): (wait: StoredUserWait) => Promise<void> {
     let lastBeatAt: number | null = null;
+
     return async (wait) => {
       const now = this.now();
       const due = lastBeatAt === null || now - lastBeatAt >= LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS;
-      if (!due) return;
+      if (!due) {
+        return;
+      }
+
       lastBeatAt = now;
       await this.buffer.heartbeat({
         conversationId: wait.conversationId,
@@ -312,7 +331,9 @@ export class UserWaitService {
     patterns?: string[];
   }): Promise<StoredUserWait> {
     const wait = await this.readSettlingExpiry(waitId);
-    if (wait?.state !== "pending") refuseSettled({ waitId, wait });
+    if (wait?.state !== "pending") {
+      refuseSettled({ waitId, wait });
+    }
 
     const answered: StoredUserWait = {
       ...wait,
@@ -334,6 +355,7 @@ export class UserWaitService {
         decision: decision ?? "deny",
       });
     }
+
     return answered;
   }
 
@@ -360,8 +382,10 @@ export class UserWaitService {
           decision: "expired",
         });
       }
+
       cancelled.push(next);
     }
+
     return cancelled;
   }
 
@@ -377,16 +401,23 @@ export class UserWaitService {
     const pending: StoredUserWait[] = [];
     for (const id of ids) {
       const wait = await this.read(id);
-      if (wait?.state === "pending") pending.push(wait);
+      if (wait?.state === "pending") {
+        pending.push(wait);
+      }
     }
+
     return pending;
   }
 
   async read(waitId: string): Promise<StoredUserWait | null> {
     const raw = await this.store.tryGet(waitKey(waitId));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
+
     try {
       const parsed = storedUserWaitSchema.safeParse(JSON.parse(raw));
+
       return parsed.success ? parsed.data : null;
     } catch {
       return null;
@@ -396,8 +427,14 @@ export class UserWaitService {
   /** The wait, with its budget applied: a card past its time reads expired. */
   private async readSettlingExpiry(waitId: string): Promise<StoredUserWait | null> {
     const wait = await this.read(waitId);
-    if (!wait) return null;
-    if (wait.state !== "pending" || wait.expiresAt > this.now()) return wait;
+    if (!wait) {
+      return null;
+    }
+
+    if (wait.state !== "pending" || wait.expiresAt > this.now()) {
+      return wait;
+    }
+
     const expired: StoredUserWait = { ...wait, state: "expired" };
     await this.persist(expired);
     await this.end(expired, "expired");
@@ -408,7 +445,9 @@ export class UserWaitService {
         decision: "expired",
       });
     }
+
     logger.info({ waitId, kind: expired.kind }, "user wait passed its budget with no answer");
+
     return expired;
   }
 
@@ -427,8 +466,12 @@ export class UserWaitService {
     wait: StoredUserWait,
     outcome: "answered" | "expired" | "cancelled",
   ): Promise<void> {
-    if (wait.kind === "permission") await this.publishPermission(wait);
-    else await this.publishQuestion(wait);
+    if (wait.kind === "permission") {
+      await this.publishPermission(wait);
+    } else {
+      await this.publishQuestion(wait);
+    }
+
     await this.events.endUserWait({
       tenantId: wait.projectId,
       occurredAt: this.now(),
@@ -461,7 +504,10 @@ export class UserWaitService {
    */
   private async keepAlive(wait: StoredUserWait): Promise<void> {
     const now = this.now();
-    if (now - wait.lastKeepaliveAt < this.keepaliveMs) return;
+    if (now - wait.lastKeepaliveAt < this.keepaliveMs) {
+      return;
+    }
+
     await this.persist({ ...wait, lastKeepaliveAt: now });
     await this.buffer.appendStatus({
       conversationId: wait.conversationId,
@@ -474,7 +520,10 @@ export class UserWaitService {
   }
 
   private async publishPermission(wait: StoredUserWait): Promise<void> {
-    if (!wait.callId) return;
+    if (!wait.callId) {
+      return;
+    }
+
     await this.buffer.appendLocalPermission({
       conversationId: wait.conversationId,
       turnId: wait.turnId,
@@ -549,6 +598,7 @@ export class UserWaitService {
     questions?: UserWaitQuestion[];
   }): StoredUserWait {
     const createdAt = this.now();
+
     return {
       waitId: `lwait_${nanoid()}`,
       projectId,
@@ -602,6 +652,7 @@ export class UserWaitService {
  */
 function refuseSettled({ waitId, wait }: { waitId: string; wait: StoredUserWait | null }): never {
   const ended = wait?.state;
+
   throw new LangyWaitExpiredError({
     waitId,
     ...(ended && ended !== "pending" ? { outcome: ended } : {}),

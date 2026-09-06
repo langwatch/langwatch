@@ -254,7 +254,11 @@ describe("given keys the person and the platform each revoked", () => {
       ledger.revoke({ id: byCap.apiKeyId, cause: "cap" });
 
       const describe_ = (lookupId: string) =>
-        service.describePersonalKey({ userId: USER_ID, organizationId: ORGANIZATION_ID, lookupId });
+        service.tryDescribePersonalKey({
+          userId: USER_ID,
+          organizationId: ORGANIZATION_ID,
+          lookupId,
+        });
 
       expect(await describe_(`lookup-1`)).toMatchObject({
         live: false,

@@ -112,7 +112,7 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
 
         const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
-        expect(store.get).toHaveBeenCalledTimes(1);
+        expect(store.tryGet).toHaveBeenCalledTimes(1);
         expect(state.count).toBe(1);
         // The fallback counter keeps meaning "the retry ran": a skipped retry
         // must not show up as `absent`, or the width-health signal drowns.
@@ -197,14 +197,14 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
       /** @scenario a hit is untouched by the option */
       it("folds onto the loaded state exactly as before", async () => {
         const { fold, store } = makeFold();
-        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
           count: 3,
           LastEventOccurredAt: OCCURRED_AT - 1,
         });
 
         const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
-        expect(store.get).toHaveBeenCalledTimes(1);
+        expect(store.tryGet).toHaveBeenCalledTimes(1);
         expect(state.count).toBe(4);
         expect(trustedMetric).not.toHaveBeenCalled();
       });
@@ -219,7 +219,7 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
 
         await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
-        expect(store.get).toHaveBeenCalledTimes(2);
+        expect(store.tryGet).toHaveBeenCalledTimes(2);
         expect(fallbackMetric).toHaveBeenCalledWith("trusted", "absent");
         expect(trustedMetric).not.toHaveBeenCalled();
       });

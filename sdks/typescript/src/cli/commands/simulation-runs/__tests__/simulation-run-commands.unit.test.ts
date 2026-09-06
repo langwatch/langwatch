@@ -19,6 +19,7 @@ vi.mock("ora", () => ({
 import { listSimulationRunsCommand } from "../list";
 import { getSimulationRunCommand } from "../get";
 import { setOutputFormat } from "../../../utils/outputScope";
+import { stripAnsi } from "../../../utils/formatting";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -345,7 +346,7 @@ describe("the note and the scenario version", () => {
     process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
   });
 
-  const printed = () => vi.mocked(console.log).mock.calls.flat().join("\n");
+  const printed = () => stripAnsi(vi.mocked(console.log).mock.calls.flat().join("\n"));
 
   describe("listSimulationRunsCommand()", () => {
     /** @scenario "List simulation runs shows the note and the scenario version" */

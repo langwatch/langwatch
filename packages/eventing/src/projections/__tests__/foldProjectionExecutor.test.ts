@@ -28,7 +28,7 @@ describe("FoldProjectionExecutor.execute", () => {
   describe("when no prior state exists", () => {
     it("initializes state and applies event", async () => {
       const store = createMockFoldProjectionStore<{ count: number }>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
       const foldDef = createMockFoldProjectionDefinition("counter", {
         store,
@@ -54,7 +54,7 @@ describe("FoldProjectionExecutor.execute", () => {
       expect(result).toEqual({ count: 1 });
       // store.get receives the event's occurredAt as a read hint; store.store
       // still gets the original context.
-      expect(store.get).toHaveBeenCalledWith(TEST_CONSTANTS.AGGREGATE_ID, {
+      expect(store.tryGet).toHaveBeenCalledWith(TEST_CONSTANTS.AGGREGATE_ID, {
         ...context,
         occurredAtMs: 1000000,
       });
@@ -68,7 +68,7 @@ describe("FoldProjectionExecutor.execute", () => {
   describe("when prior state exists", () => {
     it("loads existing state and applies event", async () => {
       const store = createMockFoldProjectionStore<{ count: number }>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 5 });
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 5 });
 
       const foldDef = createMockFoldProjectionDefinition("counter", {
         store,
@@ -102,7 +102,7 @@ describe("FoldProjectionExecutor.execute", () => {
   describe("when eventTypes is empty (all events)", () => {
     it("applies any event type", async () => {
       const store = createMockFoldProjectionStore<{ count: number }>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 2 });
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 2 });
 
       const foldDef = createMockFoldProjectionDefinition("counter", {
         store,
@@ -137,7 +137,7 @@ describe("FoldProjectionExecutor.execute", () => {
   describe("when event type does not match", () => {
     it("returns init state without loading or storing", async () => {
       const store = createMockFoldProjectionStore<{ count: number }>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 3 });
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 3 });
 
       const foldDef = createMockFoldProjectionDefinition("counter", {
         store,
@@ -162,7 +162,7 @@ describe("FoldProjectionExecutor.execute", () => {
       const result = await executor.execute(foldDef, event, context);
 
       expect(result).toEqual({ count: 0 });
-      expect(store.get).not.toHaveBeenCalled();
+      expect(store.tryGet).not.toHaveBeenCalled();
       expect(store.store).not.toHaveBeenCalled();
     });
   });
@@ -170,7 +170,7 @@ describe("FoldProjectionExecutor.execute", () => {
   describe("when custom key is provided in context", () => {
     it("uses the custom key for store.get", async () => {
       const store = createMockFoldProjectionStore<{ count: number }>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 10 });
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 10 });
 
       const foldDef = createMockFoldProjectionDefinition("counter", {
         store,
@@ -195,7 +195,7 @@ describe("FoldProjectionExecutor.execute", () => {
       const result = await executor.execute(foldDef, event, context);
 
       expect(result).toEqual({ count: 11 });
-      expect(store.get).toHaveBeenCalledWith("custom-key-123", {
+      expect(store.tryGet).toHaveBeenCalledWith("custom-key-123", {
         ...context,
         occurredAtMs: 1000000,
       });
@@ -203,7 +203,7 @@ describe("FoldProjectionExecutor.execute", () => {
 
     it("omits the occurredAt hint when the event has no occurredAt", async () => {
       const store = createMockFoldProjectionStore<{ count: number }>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 0 });
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 0 });
 
       const foldDef = createMockFoldProjectionDefinition("counter", {
         store,
@@ -228,8 +228,8 @@ describe("FoldProjectionExecutor.execute", () => {
 
       await executor.execute(foldDef, event, context);
 
-      expect(store.get).toHaveBeenCalledWith(TEST_CONSTANTS.AGGREGATE_ID, context);
-      const passedContext = (store.get as ReturnType<typeof vi.fn>).mock.calls[0]![1];
+      expect(store.tryGet).toHaveBeenCalledWith(TEST_CONSTANTS.AGGREGATE_ID, context);
+      const passedContext = (store.tryGet as ReturnType<typeof vi.fn>).mock.calls[0]![1];
       expect(passedContext).not.toHaveProperty("occurredAtMs");
     });
   });
@@ -290,7 +290,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
     /** @scenario 'Folding several events reads once and stores once' */
     it("reads once, folds all, and stores once", async () => {
       const store = createMockFoldProjectionStore<BatchState>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
       const foldDef = createMockFoldProjectionDefinition("counter", {
         store,
         init: batchInit,
@@ -303,7 +303,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
 
       expect(result.count).toBe(3);
       expect(result.seen).toEqual(["e1", "e2", "e3"]);
-      expect(store.get).toHaveBeenCalledTimes(1);
+      expect(store.tryGet).toHaveBeenCalledTimes(1);
       expect(store.store).toHaveBeenCalledTimes(1);
       expect((store.store as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe(result);
     });
@@ -313,7 +313,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
       const events = [makeEvent(1000, "a"), makeEvent(2000, "b"), makeEvent(3000, "c")];
 
       const batchStore = createMockFoldProjectionStore<BatchState>();
-      (batchStore.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (batchStore.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
       const batchDef = createMockFoldProjectionDefinition("counter", {
         store: batchStore,
         init: batchInit,
@@ -324,7 +324,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
       // Sequential path: each execute() re-reads the latest stored state.
       let current: BatchState | null = null;
       const seqStore = createMockFoldProjectionStore<BatchState>();
-      (seqStore.get as ReturnType<typeof vi.fn>).mockImplementation(async () => current);
+      (seqStore.tryGet as ReturnType<typeof vi.fn>).mockImplementation(async () => current);
       (seqStore.store as ReturnType<typeof vi.fn>).mockImplementation(async (s: BatchState) => {
         current = s;
       });
@@ -345,7 +345,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
     /** @scenario 'Out-of-order events are folded in occurredAt order' */
     it("folds them in occurredAt order", async () => {
       const store = createMockFoldProjectionStore<BatchState>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
       const foldDef = createMockFoldProjectionDefinition("counter", {
         store,
         init: batchInit,
@@ -367,7 +367,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
   describe("when a single event matches", () => {
     it("delegates to execute() and stores once", async () => {
       const store = createMockFoldProjectionStore<BatchState>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
       const foldDef = createMockFoldProjectionDefinition("counter", {
         store,
         init: batchInit,
@@ -377,7 +377,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
       const result = await executor.executeBatch(foldDef, [makeEvent(1000, "only")], context);
 
       expect(result.count).toBe(1);
-      expect(store.get).toHaveBeenCalledTimes(1);
+      expect(store.tryGet).toHaveBeenCalledTimes(1);
       expect(store.store).toHaveBeenCalledTimes(1);
     });
   });
@@ -397,7 +397,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
       const result = await executor.executeBatch(foldDef, events, context);
 
       expect(result).toEqual(batchInit());
-      expect(store.get).not.toHaveBeenCalled();
+      expect(store.tryGet).not.toHaveBeenCalled();
       expect(store.store).not.toHaveBeenCalled();
     });
   });
@@ -405,7 +405,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
   describe("when the batch starts before the persisted checkpoint", () => {
     it("re-folds from scratch via eventLoader", async () => {
       const store = createMockFoldProjectionStore<BatchState>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
         count: 5,
         seen: ["old"],
         LastEventOccurredAt: 5000,
@@ -435,7 +435,7 @@ describe("FoldProjectionExecutor.executeBatch", () => {
 
     it("applies on top of the checkpoint when no eventLoader is available", async () => {
       const store = createMockFoldProjectionStore<BatchState>();
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
         count: 5,
         seen: ["old"],
         LastEventOccurredAt: 5000,

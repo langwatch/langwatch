@@ -35,25 +35,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(__dirname, "../../../..");
 
 /** Where a run puts the temporary repositories it shares with Langy. */
-const SCENARIO_REPO_DIR = path.join(
-  REPO_ROOT,
-  ".claude",
-  "tmp",
-  "scenario-repos",
-);
+const SCENARIO_REPO_DIR = path.join(REPO_ROOT, ".claude", "tmp", "scenario-repos");
 
 /** The demo applications a scenario can share. */
 export type DemoLanguage = "python" | "typescript";
 
 const DEMO_SOURCE: Record<DemoLanguage, string> = {
   python: path.join(REPO_ROOT, "dev", "dogfood", "acme-support", "python"),
-  typescript: path.join(
-    REPO_ROOT,
-    "dev",
-    "dogfood",
-    "acme-support",
-    "typescript",
-  ),
+  typescript: path.join(REPO_ROOT, "dev", "dogfood", "acme-support", "typescript"),
 };
 
 /** Never copied: they are rebuilt in the temporary repository, or they are noise. */
@@ -81,8 +70,7 @@ const sh = (
     stdio: ["ignore", "pipe", "pipe"],
   }).toString();
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * The model key the demo applications need, from the environment or from the
@@ -92,10 +80,7 @@ function openaiKey(): string {
   const fromEnvironment = process.env.OPENAI_API_KEY;
   if (fromEnvironment) return fromEnvironment;
   try {
-    const dotenv = readFileSync(
-      path.join(REPO_ROOT, "platform", "app", ".env"),
-      "utf8",
-    );
+    const dotenv = readFileSync(path.join(REPO_ROOT, "platform", "app", ".env"), "utf8");
     return /^OPENAI_API_KEY=(.*)$/m.exec(dotenv)?.[1]?.trim() ?? "";
   } catch {
     return "";
@@ -115,12 +100,7 @@ async function waitFor<T>({
   intervalMs = 1_000,
 }: {
   what: string;
-  read: () =>
-    | Promise<T | null | undefined | false>
-    | T
-    | null
-    | undefined
-    | false;
+  read: () => Promise<T | null | undefined | false> | T | null | undefined | false;
   timeoutMs: number;
   intervalMs?: number;
 }): Promise<T> {
@@ -149,6 +129,15 @@ async function waitFor<T>({
 // ---------------------------------------------------------------------------
 
 let cliApiKeyPromise: Promise<string> | null = null;
+
+/** Whether any team of this organization holds the test project. */
+function organizationHoldsProject(organization: {
+  teams?: Array<{ projects?: Array<{ id: string }> }>;
+}): boolean {
+  return (organization.teams ?? []).some((team) =>
+    (team.projects ?? []).some((project) => project.id === PROJECT_ID),
+  );
+}
 
 /**
  * A user-scoped API key for the test's own user, bound to the test project.
@@ -181,15 +170,9 @@ export function getCliApiKey(): Promise<string> {
         }>
       >({ cookie, path: "organization.getAll", input: {} });
       const organizationId =
-        organizations.find((organization) =>
-          (organization.teams ?? []).some((team) =>
-            (team.projects ?? []).some((project) => project.id === PROJECT_ID),
-          ),
-        )?.id ?? organizations[0]?.id;
+        organizations.find(organizationHoldsProject)?.id ?? organizations[0]?.id;
       if (!organizationId) {
-        throw new Error(
-          `no organization holds project ${PROJECT_ID}; check LANGY_PROJECT_ID`,
-        );
+        throw new Error(`no organization holds project ${PROJECT_ID}; check LANGY_PROJECT_ID`);
       }
       let refusal = "";
       for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -201,9 +184,7 @@ export function getCliApiKey(): Promise<string> {
             name: `langy-local-control-e2e ${new Date().toISOString()}`,
             keyType: "personal",
             permissionMode: "all",
-            bindings: [
-              { role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID },
-            ],
+            bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID }],
           },
         });
         refusal = await keyRefusal(created.token);
@@ -214,9 +195,7 @@ export function getCliApiKey(): Promise<string> {
         // in the same second all land inside that window.
         await sleep(3_000 * (attempt + 1));
       }
-      throw new Error(
-        `every minted key was refused by the control route: ${refusal}`,
-      );
+      throw new Error(`every minted key was refused by the control route: ${refusal}`);
     } catch (error) {
       cliApiKeyPromise = null;
       throw error;
@@ -321,11 +300,7 @@ async function pointSdkAtThisCheckout({
     dependencies?: Record<string, string>;
   };
   if (manifest.dependencies?.langwatch) {
-    manifest.dependencies.langwatch = `file:${path.join(
-      REPO_ROOT,
-      "sdks",
-      "typescript",
-    )}`;
+    manifest.dependencies.langwatch = `file:${path.join(REPO_ROOT, "sdks", "typescript")}`;
   }
   await fs.writeFile(file, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
@@ -357,10 +332,7 @@ export function demoReposToPrune({
 }): string[] {
   const stamped = existing
     .map((folder) => {
-      const stamp = Number.parseInt(
-        folder.slice(folder.lastIndexOf("-") + 1),
-        36,
-      );
+      const stamp = Number.parseInt(folder.slice(folder.lastIndexOf("-") + 1), 36);
       return { folder, stamp: Number.isNaN(stamp) ? 0 : stamp };
     })
     .sort((a, b) => b.stamp - a.stamp);
@@ -369,9 +341,7 @@ export function demoReposToPrune({
 
 /** Delete every demo repository but the most recent few, remotes included. */
 async function pruneDemoRepos(): Promise<void> {
-  const entries = await fs
-    .readdir(SCENARIO_REPO_DIR, { withFileTypes: true })
-    .catch(() => []);
+  const entries = await fs.readdir(SCENARIO_REPO_DIR, { withFileTypes: true }).catch(() => []);
   const folders = entries
     .filter((entry) => entry.isDirectory() && !entry.name.endsWith(".git"))
     .map((entry) => entry.name);
@@ -396,10 +366,7 @@ export async function createDemoRepo({
   install?: boolean;
 }): Promise<DemoRepo> {
   await pruneDemoRepos();
-  const root = path.join(
-    SCENARIO_REPO_DIR,
-    `${name}-${Date.now().toString(36)}`,
-  );
+  const root = path.join(SCENARIO_REPO_DIR, `${name}-${Date.now().toString(36)}`);
   await fs.rm(root, { recursive: true, force: true });
   await copyTree(DEMO_SOURCE[language], root);
   await pointSdkAtThisCheckout({ root, language });
@@ -472,14 +439,7 @@ export async function createDemoRepo({
 // ---------------------------------------------------------------------------
 
 /** Where the built command line lives once the SDK is bundled. */
-const CLI_ENTRY = path.join(
-  REPO_ROOT,
-  "sdks",
-  "typescript",
-  "dist",
-  "cli",
-  "index.js",
-);
+const CLI_ENTRY = path.join(REPO_ROOT, "sdks", "typescript", "dist", "cli", "index.js");
 
 let cliBuildPromise: Promise<void> | null = null;
 
@@ -518,10 +478,7 @@ export interface CliTerminal {
   /** Everything the terminal has shown so far. */
   capture: () => string;
   /** Wait until the terminal shows this text, then answer with the capture. */
-  waitForText: (
-    pattern: string | RegExp,
-    timeoutMs?: number,
-  ) => Promise<string>;
+  waitForText: (pattern: string | RegExp, timeoutMs?: number) => Promise<string>;
   sendKeys: (...keys: string[]) => void;
   /** Wait for the approve question and answer it with Approve. */
   approve: (timeoutMs?: number) => Promise<void>;
@@ -614,30 +571,13 @@ export async function startShareControl({
     { encoding: "utf8", mode: 0o755 },
   );
 
-  sh("tmux", [
-    "new-session",
-    "-d",
-    "-s",
-    sessionName,
-    "-x",
-    "200",
-    "-y",
-    "60",
-    "bash",
-    script,
-  ]);
+  sh("tmux", ["new-session", "-d", "-s", sessionName, "-x", "200", "-y", "60", "bash", script]);
 
   // Everything the terminal prints, kept on disk. tmux ends the session with
   // the process and takes the last screen with it, so the goodbye line a test
   // asserts on would otherwise be gone before it could be read.
   const paneLog = path.join(repo.root, "..", `${sessionName}.log`);
-  sh("tmux", [
-    "pipe-pane",
-    "-o",
-    "-t",
-    sessionName,
-    `cat >> ${JSON.stringify(paneLog)}`,
-  ]);
+  sh("tmux", ["pipe-pane", "-o", "-t", sessionName, `cat >> ${JSON.stringify(paneLog)}`]);
 
   // tmux ends the session with the process, and capture-pane on a session that
   // is gone answers nothing. The last text the terminal showed is what a test
@@ -651,11 +591,10 @@ export async function startShareControl({
     }
   };
   const capture = (): string => {
-    const result = spawnSync(
-      "tmux",
-      ["capture-pane", "-p", "-t", sessionName, "-S", "-3000"],
-      { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
-    );
+    const result = spawnSync("tmux", ["capture-pane", "-p", "-t", sessionName, "-S", "-3000"], {
+      encoding: "utf8",
+      maxBuffer: 8 * 1024 * 1024,
+    });
     const pane = result.stdout ?? "";
     const logged = readPaneLog();
     // The live pane reads best while the session is there; once it is gone the
@@ -669,20 +608,14 @@ export async function startShareControl({
   const sendKeys = (...keys: string[]): void => {
     spawnSync("tmux", ["send-keys", "-t", sessionName, ...keys]);
   };
-  const waitForText = async (
-    pattern: string | RegExp,
-    timeoutMs = 120_000,
-  ): Promise<string> =>
+  const waitForText = async (pattern: string | RegExp, timeoutMs = 120_000): Promise<string> =>
     waitFor({
       what: `the terminal to show ${String(pattern)}`,
       timeoutMs,
       intervalMs: 750,
       read: () => {
         const text = capture();
-        const seen =
-          typeof pattern === "string"
-            ? text.includes(pattern)
-            : pattern.test(text);
+        const seen = typeof pattern === "string" ? text.includes(pattern) : pattern.test(text);
         return seen ? text : null;
       },
     });
@@ -742,10 +675,7 @@ export async function startShareControl({
       spawnSync("tmux", ["kill-session", "-t", sessionName]);
     },
   };
-  await terminal.waitForText(
-    /Waiting for a Langy conversation|share this folder\?/i,
-    120_000,
-  );
+  await terminal.waitForText(/Waiting for a Langy conversation|share this folder\?/i, 120_000);
   return terminal;
 }
 
@@ -850,10 +780,7 @@ export interface ConversationWatcher {
   /** The turns the panel started on its own, without a message from the test. */
   turnsStartedWithoutUs: (knownTurnIds: string[]) => string[];
   /** Wait for a turn other than the ones already known. */
-  waitForNewTurn: (input: {
-    knownTurnIds: string[];
-    timeoutMs?: number;
-  }) => Promise<string>;
+  waitForNewTurn: (input: { knownTurnIds: string[]; timeoutMs?: number }) => Promise<string>;
   /**
    * Wait until no turn is in flight.
    *
@@ -869,10 +796,7 @@ export interface ConversationWatcher {
    * The text of one turn's answer, or of the last answer stored when no turn
    * is named.
    */
-  lastAssistantText: (input?: {
-    turnId?: string;
-    timeoutMs?: number;
-  }) => Promise<string>;
+  lastAssistantText: (input?: { turnId?: string; timeoutMs?: number }) => Promise<string>;
   /**
    * One turn's answer as a judge reads it: the tool calls it made and what
    * they answered, then its reply.
@@ -886,10 +810,7 @@ export interface ConversationWatcher {
    * last right now, which after a turn that just ended can still be the answer
    * before it.
    */
-  lastTurnMessages: (input?: {
-    turnId?: string;
-    timeoutMs?: number;
-  }) => Promise<JudgeMessage[]>;
+  lastTurnMessages: (input?: { turnId?: string; timeoutMs?: number }) => Promise<JudgeMessage[]>;
   stop: () => void;
 }
 
@@ -908,14 +829,9 @@ export interface StoredMessage {
  * link between a turn and its stored answer, so a read can wait for the right
  * message instead of taking whichever answer is last.
  */
-export function answerOfTurn(
-  messages: StoredMessage[],
-  turnId: string,
-): StoredMessage | null {
+export function answerOfTurn(messages: StoredMessage[], turnId: string): StoredMessage | null {
   return (
-    messages.find(
-      (message) => message.role === "assistant" && message.id.endsWith(turnId),
-    ) ?? null
+    messages.find((message) => message.role === "assistant" && message.id.endsWith(turnId)) ?? null
   );
 }
 
@@ -926,8 +842,7 @@ export function answerOfTurn(
  * as an action taken in the panel rather than as something said in the chat.
  */
 export function permissionAnswerNote(ask: PermissionAsk): string {
-  const where =
-    ask.answeredIn === "terminal" ? "in the terminal" : "in the panel";
+  const where = ask.answeredIn === "terminal" ? "in the terminal" : "in the panel";
   if (ask.decision === "deny") {
     return `[developer denied ${where}: ${ask.summary}]`;
   }
@@ -993,13 +908,10 @@ async function readTurnEntries({
   const input = encodeURIComponent(
     JSON.stringify({ json: { projectId: PROJECT_ID, conversationId, turnId } }),
   );
-  const response = await fetch(
-    `${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`,
-    {
-      headers: { Cookie: cookie, Accept: "text/event-stream" },
-      signal,
-    },
-  );
+  const response = await fetch(`${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`, {
+    headers: { Cookie: cookie, Accept: "text/event-stream" },
+    signal,
+  });
   if (!response.ok || !response.body) return;
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -1022,8 +934,7 @@ async function readTurnEntries({
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    let index: number;
-    while ((index = buffer.indexOf("\n\n")) >= 0) {
+    for (let index = buffer.indexOf("\n\n"); index >= 0; index = buffer.indexOf("\n\n")) {
       handleFrame(buffer.slice(0, index));
       buffer = buffer.slice(index + 2);
     }
@@ -1073,10 +984,7 @@ export function watchLangyConversation({
     return policy.fallback ?? "allow_once";
   };
 
-  const answerPermission = async (
-    entry: StreamEntry,
-    turnId: string,
-  ): Promise<void> => {
+  const answerPermission = async (entry: StreamEntry, turnId: string): Promise<void> => {
     const waitId = String(entry.waitId ?? "");
     if (!waitId || answeredWaits.has(waitId)) return;
     if (entry.status !== "pending") return;
@@ -1119,10 +1027,7 @@ export function watchLangyConversation({
     });
   };
 
-  const answerQuestionCard = async (
-    entry: StreamEntry,
-    turnId: string,
-  ): Promise<void> => {
+  const answerQuestionCard = async (entry: StreamEntry, turnId: string): Promise<void> => {
     const waitId = String(entry.waitId ?? "");
     if (!waitId || answeredWaits.has(waitId)) return;
     if (entry.status !== "pending") return;
@@ -1222,10 +1127,7 @@ export function watchLangyConversation({
     }
   })();
 
-  const messageText = (message: {
-    role: string;
-    parts: Array<Record<string, unknown>>;
-  }): string =>
+  const messageText = (message: { role: string; parts: Array<Record<string, unknown>> }): string =>
     message.parts
       .filter((part) => typeof part.text === "string")
       .map((part) => String(part.text))
@@ -1265,14 +1167,9 @@ export function watchLangyConversation({
           toolCallId: String(part.toolCallId),
           toolName: String(part.type).slice("tool-".length),
           output: {
-            type:
-              part.state === "output-error"
-                ? ("error-text" as const)
-                : ("text" as const),
+            type: part.state === "output-error" ? ("error-text" as const) : ("text" as const),
             value:
-              typeof part.output === "string"
-                ? part.output
-                : JSON.stringify(part.output ?? ""),
+              typeof part.output === "string" ? part.output : JSON.stringify(part.output ?? ""),
           },
         })),
       },
@@ -1300,16 +1197,13 @@ export function watchLangyConversation({
       const messages = (snapshot?.messages ?? []) as StoredMessage[];
       const answer = turnId
         ? answerOfTurn(messages, turnId)
-        : (messages.filter((message) => message.role === "assistant").pop() ??
-          null);
+        : (messages.filter((message) => message.role === "assistant").pop() ?? null);
       // A named turn that stored its answer is readable whatever happened
       // after it. Without a name, the last answer is only this turn's answer
       // while the conversation has not failed.
       if (answer && (turnId || !snapshot?.lastError)) return answer;
       if (snapshot?.lastError) {
-        throw new Error(
-          turnFailureMessage({ turnId, failure: snapshot.lastError }),
-        );
+        throw new Error(turnFailureMessage({ turnId, failure: snapshot.lastError }));
       }
       if (Date.now() > deadline) {
         if (!turnId) return null;
@@ -1336,8 +1230,7 @@ export function watchLangyConversation({
     },
     workspaceEvents,
     turnIds,
-    turnsStartedWithoutUs: (knownTurnIds) =>
-      turnIds.filter((id) => !knownTurnIds.includes(id)),
+    turnsStartedWithoutUs: (knownTurnIds) => turnIds.filter((id) => !knownTurnIds.includes(id)),
     waitForNewTurn: async ({ knownTurnIds, timeoutMs = 240_000 }) =>
       waitFor({
         what: "a turn the panel started on its own",
@@ -1364,9 +1257,7 @@ export function watchLangyConversation({
         .join("\n\n");
       // The failure is part of what happened, so it is read where the rest of
       // the conversation is read.
-      return snapshot?.lastError
-        ? `${body}\n\n### turn failed\n\n${snapshot.lastError}`
-        : body;
+      return snapshot?.lastError ? `${body}\n\n### turn failed\n\n${snapshot.lastError}` : body;
     },
     lastAssistantText: async (input = {}) => {
       const answer = await readTurnAnswer(input);
@@ -1398,9 +1289,7 @@ export interface LocalWorkspaceStatus {
 }
 
 /** What the panel chip and the code access card read. */
-export async function getLocalWorkspace(
-  conversationId: string,
-): Promise<LocalWorkspaceStatus> {
+export async function getLocalWorkspace(conversationId: string): Promise<LocalWorkspaceStatus> {
   const cookie = await getSessionCookie();
   return await trpcQuery<LocalWorkspaceStatus>({
     cookie,
@@ -1410,9 +1299,7 @@ export async function getLocalWorkspace(
 }
 
 /** Remember, or forget, how Langy reaches this person's code. */
-export async function setCodeAccessPreference(
-  preference: "github" | null,
-): Promise<void> {
+export async function setCodeAccessPreference(preference: "github" | null): Promise<void> {
   const cookie = await getSessionCookie();
   await trpcMutate({
     cookie,
@@ -1422,9 +1309,7 @@ export async function setCodeAccessPreference(
 }
 
 /** Close the shared folder the way the panel header chip closes it. */
-export async function disconnectLocalWorkspace(
-  conversationId: string,
-): Promise<void> {
+export async function disconnectLocalWorkspace(conversationId: string): Promise<void> {
   const cookie = await getSessionCookie();
   await trpcMutate({
     cookie,
@@ -1488,18 +1373,10 @@ export async function freePort(): Promise<number> {
  * the demo's `.gitignore` stays exactly as it ships and Langy never commits
  * the credentials the fixture wrote.
  */
-async function excludeFromGit({
-  root,
-  entry,
-}: {
-  root: string;
-  entry: string;
-}): Promise<void> {
+async function excludeFromGit({ root, entry }: { root: string; entry: string }): Promise<void> {
   const excludeFile = path.join(root, ".git", "info", "exclude");
   await fs.mkdir(path.dirname(excludeFile), { recursive: true });
-  const current = existsSync(excludeFile)
-    ? await fs.readFile(excludeFile, "utf8")
-    : "";
+  const current = existsSync(excludeFile) ? await fs.readFile(excludeFile, "utf8") : "";
   if (current.split("\n").some((line) => line.trim() === entry)) return;
   const separator = current === "" || current.endsWith("\n") ? "" : "\n";
   await fs.appendFile(excludeFile, `${separator}${entry}\n`, "utf8");
@@ -1576,24 +1453,12 @@ export async function startDemoApp({
     ].join("\n"),
     { encoding: "utf8", mode: 0o755 },
   );
-  sh("tmux", [
-    "new-session",
-    "-d",
-    "-s",
-    sessionName,
-    "-x",
-    "200",
-    "-y",
-    "60",
-    "bash",
-    script,
-  ]);
+  sh("tmux", ["new-session", "-d", "-s", sessionName, "-x", "200", "-y", "60", "bash", script]);
   const capture = (): string =>
-    spawnSync(
-      "tmux",
-      ["capture-pane", "-p", "-t", sessionName, "-S", "-3000"],
-      { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
-    ).stdout ?? "";
+    spawnSync("tmux", ["capture-pane", "-p", "-t", sessionName, "-S", "-3000"], {
+      encoding: "utf8",
+      maxBuffer: 8 * 1024 * 1024,
+    }).stdout ?? "";
   return {
     port: chosenPort,
     sessionName,
@@ -1639,8 +1504,7 @@ export async function readAgent(name: string): Promise<{
   // newest connection is the one this run is asserting about.
   return (
     named.sort(
-      (left, right) =>
-        Date.parse(right.lastSeenAt ?? "") - Date.parse(left.lastSeenAt ?? ""),
+      (left, right) => Date.parse(right.lastSeenAt ?? "") - Date.parse(left.lastSeenAt ?? ""),
     )[0] ?? null
   );
 }
@@ -1693,10 +1557,7 @@ export function pidsRunningIn({
 
 /** Read one lsof invocation, or nothing when lsof is absent or finds nobody. */
 function lsof(args: string[]): string {
-  return (
-    spawnSync("lsof", args, { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })
-      .stdout ?? ""
-  );
+  return spawnSync("lsof", args, { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }).stdout ?? "";
 }
 
 /** End one process, its group first, so a shell takes its children with it. */
@@ -1723,18 +1584,10 @@ function endProcess(pid: number): void {
  * to end it itself. Left alone, the demo server of one run holds its port and
  * serves a folder that the next run has already deleted.
  */
-export function killScenarioProcesses({
-  port,
-  root,
-}: {
-  port?: number;
-  root?: string;
-}): void {
+export function killScenarioProcesses({ port, root }: { port?: number; root?: string }): void {
   const pids = new Set<number>();
   if (port) {
-    for (const pid of listeningPids(
-      lsof(["-nP", `-iTCP:${port}`, "-sTCP:LISTEN"]),
-    )) {
+    for (const pid of listeningPids(lsof(["-nP", `-iTCP:${port}`, "-sTCP:LISTEN"]))) {
       pids.add(pid);
     }
   }
@@ -1775,9 +1628,7 @@ export async function teardown({
 
 /** The terminal capture, for the scenario transcript. */
 export function terminalSection(terminal: CliTerminal): string {
-  return ["## Terminal", "", "```", terminal.capture().trim(), "```"].join(
-    "\n",
-  );
+  return ["## Terminal", "", "```", terminal.capture().trim(), "```"].join("\n");
 }
 
 /** Best-effort note in the log when the machine has no `uv` or no `tmux`. */

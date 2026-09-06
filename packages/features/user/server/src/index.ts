@@ -21,10 +21,7 @@ export {
   UserDataEraseTask,
   type GdprUserDataEraseOutcome,
 } from "./tasks/user-data-erase.task";
-export {
-  GdprUserDataEraseRepository,
-  type GdprUserDataEraseDatabase,
-} from "./repositories/prisma/prisma.user-data-erase.repository";
+export { PostgresUserDataEraseAdapter } from "./adapters/postgres.user-data-erase.adapter";
 export {
   IdentityTrpcApi,
   type IdentityTrpcContext,

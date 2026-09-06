@@ -44,12 +44,9 @@ import { z } from "zod";
 import type { LangyApp } from "#app/langy.app";
 import type { LocalControlRuntime } from "#adapters/langy-local-control-runtime.adapter";
 import { LangyKeyIdentityService } from "#services/langy-key-identity.service";
-import {
-  conversationTitle,
-  conversationUrl,
-  type ControlSkipGate,
-} from "#services/langy-local-session.service";
-import { toControlRequestWire } from "#services/langy-local-control-request.service";
+import type { ControlSkipGate } from "#services/langy-local-session.service";
+import { conversationTitle, conversationUrl } from "#rules/langy-local-session-text.rules";
+import { toControlRequestWire } from "#rules/langy-local-control-request-wire.rules";
 import { reconcileSkipPolicy } from "#rules/langy-local-skip-policy.rules";
 import type { UserWaitEvents } from "#services/langy-local-user-wait.service";
 import type { LangyRestCredentialPorts } from "./langy-rest-credentials.api";

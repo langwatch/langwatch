@@ -9,3 +9,4 @@ export {
  */
 export { PostgresPersonalVirtualKeyAdapter } from "./adapters/postgres.governance-personal-key.adapter";
 export { PostgresRoutingPolicyAdapter } from "./adapters/postgres.governance-routing.adapter";
+export { PostgresDepartmentAdapter } from "./adapters/postgres.department.adapter";

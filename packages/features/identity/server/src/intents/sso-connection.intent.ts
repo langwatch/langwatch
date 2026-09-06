@@ -46,8 +46,8 @@ import {
 import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import { SsoConnectionStateFoldProjection } from "../projections/sso-connection-state.projection";
 import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
+import { ssoConnectionEventsFor } from "../intents/sso-connection-events.intent";
 
 /**
  * The connection pipeline's thirteen verbs plus grandfathering, as the queue's STAGED RE-RUN of
@@ -92,7 +92,7 @@ function connectionCommand<Schema extends ZodTypeAny>({
     async handle(command: Command<Data>): Promise<SsoConnectionEvent[]> {
       const data = command.data as never;
       const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
-      return SsoConnectionStateFoldProjection.eventsFor({
+      return ssoConnectionEventsFor({
         command: { type, data } as SsoConnectionCommand,
         facts,
       });

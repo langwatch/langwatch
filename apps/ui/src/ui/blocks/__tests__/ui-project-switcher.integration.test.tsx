@@ -74,7 +74,7 @@ describe("given a reader whose only shared team has no projects yet", () => {
       const trigger = screen.getByRole("button", { name: "Switch project" });
       fireEvent.click(trigger);
 
-      await screen.findByText("New Project");
+      expect(await screen.findByText("New Project")).not.toBeNull();
     });
   });
 

@@ -119,7 +119,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     this.updatedAtOf = options.updatedAtOf ?? readUpdatedAt;
   }
 
-  async get(aggregateId: string, context: ProjectionStoreContext): Promise<State | null> {
+  async tryGet(aggregateId: string, context: ProjectionStoreContext): Promise<State | null> {
     return (await this.getWithApplied(aggregateId, context)).state;
   }
 
@@ -266,7 +266,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     const result = this.inner.getWithApplied
       ? await this.inner.getWithApplied(aggregateId, context)
       : {
-          state: await this.inner.get(aggregateId, context),
+          state: await this.inner.tryGet(aggregateId, context),
           appliedEventIds: [] as string[],
         };
     observeEsFoldCacheGetDuration(this.keyPrefix, "clickhouse", performance.now() - startedAt);

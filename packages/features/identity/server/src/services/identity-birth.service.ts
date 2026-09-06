@@ -18,9 +18,9 @@ import {
 } from "../ports/identity-birth.port";
 import { createLogger } from "@langwatch/observability";
 import type { IdentityEvent } from "../projections/identity-state.projection";
-import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
 import type { IdentityBirthLedgerPort } from "../ports/identity-birth-ledger.port";
 import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository";
+import { identityEventsFor } from "../intents/identity-events.intent";
 
 const logger = createLogger("langwatch:identity:birth");
 
@@ -68,7 +68,7 @@ export class IdentityBirthService implements IdentityBirthPort {
     await this.deps.rows.claim({ userId });
 
     const facts = await this.deps.guards.attachIdentifier(command);
-    const events = IdentityStateFoldProjection.eventsFor({ command: staged, facts });
+    const events = identityEventsFor({ command: staged, facts });
     if (events.length > 0) {
       await this.claimAddress({ userId, normalizedValue, facts, command });
       try {

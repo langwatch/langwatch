@@ -211,33 +211,4 @@ export class ScimSyncStateFoldProjection
   ): ScimSyncFoldState {
     return this.fold(event, state);
   }
-
-  /**
-   * The ONE place a directory-sync fact becomes a framework event: the guards
-   * (`ScimSyncGuardsService`) decide what a command states, and this stamps the
-   * envelope, so every producer stamps a fact identically.
-   */
-  static eventsFor({
-    command,
-    facts,
-  }: {
-    command: ScimSyncCommand;
-    facts: ScimSyncFactInput[];
-  }): ScimSyncEvent[] {
-    const { scimSyncId, tenantId, commandId, occurredAtMs } = command.data;
-    return facts.map(
-      (fact, index) =>
-        EventUtils.createEvent({
-          aggregateType: SCIM_SYNC_AGGREGATE_TYPE,
-          aggregateId: scimSyncId,
-          tenantId: createTenantId(tenantId),
-          type: fact.type,
-          version: SCIM_SYNC_EVENT_VERSION_LATEST,
-          data: fact.data,
-          metadata: {},
-          occurredAt: occurredAtMs,
-          idempotencyKey: eventIdempotencyKey({ commandId, index }),
-        }) as ScimSyncEvent,
-    );
-  }
 }

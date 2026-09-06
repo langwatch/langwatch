@@ -25,8 +25,8 @@ import {
   type SessionCoreOptions,
   type SessionInfo,
 } from "../../services/connected-agent-session.service";
-import type { Unsubscribe } from "../../ports/agent-state-store.port";
-import type { ConnectUpgradeRouterPort } from "../../ports/connect-upgrade-router.port";
+import type { Unsubscribe } from "@langwatch/agent-contract";
+import type { ConnectUpgradeRouterPort } from "@langwatch/api";
 
 const logger = createLogger("langwatch:connected-agents:gateway");
 

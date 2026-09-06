@@ -7,7 +7,7 @@
 import { EventEmitter } from "node:events";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import type { AgentStateStorePort } from "../ports/agent-state-store.port";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
 
 // ---------------------------------------------------------------------------
 // Redis

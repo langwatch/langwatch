@@ -1,10 +1,6 @@
 import { parseLangwatchCommand } from "@langwatch/langy-contract";
 
 import { LANGY_ANSWER_HERE_OR_TERMINAL } from "./langy-local-waits";
-import {
-  describeToolCall,
-  effectiveToolName,
-} from "../features/langy/model/logic/langy-tool-label";
 
 /**
  * Derives an honest status from observable turn signals. A running tool is named,

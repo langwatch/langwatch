@@ -46,7 +46,7 @@ function compose(overrides: { executionPool?: { submit(job: unknown): void } } =
       get: async () => null,
       set: async () => "OK",
     } as never,
-    traceSummaryStore: { get: async () => null, save: async () => undefined } as never,
+    traceSummaryStore: { tryGet: async () => null, save: async () => undefined } as never,
     eventStore: { getEvents: async () => [] } as never,
     broadcast: {
       broadcastToTenant: async (input: { tenantId: string; event: string; eventType: string }) => {

@@ -75,7 +75,6 @@ export {
   type InstanceMeta,
   type LiveInstance,
 } from "./ports/connected-agent-runtime.port";
-export { AgentStateStorePort, type Unsubscribe } from "./ports/agent-state-store.port";
 export { ConnectedAgentStateAdapter } from "./adapters/connected-agent-state.adapter";
 export {
   CallDispatcherAdapter,
@@ -105,12 +104,10 @@ export {
   type SessionInfo,
 } from "./services/connected-agent-session.service";
 export {
-  INSTANCE_TOKEN_HEADER,
   LongPollTransportService,
   type LongPollTransportOptions,
   type RegisterAnswer,
 } from "./services/connected-agent-long-poll.service";
-export { ConnectUpgradeRouterPort, type UpgradeHandler } from "./ports/connect-upgrade-router.port";
 export {
   CONNECT_PATH,
   ConnectGateway,

@@ -17,7 +17,7 @@ import { createTestRuntime } from "./fixtures/trace-summary-test.fixtures";
  */
 
 const deps = {
-  store: { store: async () => {}, get: async () => null },
+  store: { store: async () => {}, tryGet: async () => null },
   traceCanonicalisation: TraceCanonicalisationService.create(),
   runtime: createTestRuntime(),
 };
@@ -26,7 +26,7 @@ const FOLDS = [
   {
     name: "traceSummary",
     projection: TraceSummaryFoldProjection.create(deps),
-    // TraceSummaryStore is get()-only — consistent, because this fold declares
+    // TraceSummaryStore is tryGet()-only — consistent, because this fold declares
     // no refoldOnStoreMiss for a miss discriminator to feed.
     storeClass: TraceSummaryStore,
   },

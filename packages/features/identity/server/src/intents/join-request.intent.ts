@@ -19,8 +19,8 @@ import {
 import type { JoinRequestGuardsService } from "../services/join-request-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import { JoinRequestStateFoldProjection } from "../projections/join-request-state.projection";
 import type { JoinRequestEvent } from "../projections/join-request-state.projection";
+import { joinRequestEventsFor } from "../intents/join-request-events.intent";
 
 /**
  * The join-request pipeline's five verbs, as the queue's STAGED RE-RUN of each: the same guard the
@@ -65,7 +65,7 @@ function joinRequestCommand<Schema extends ZodTypeAny>({
     async handle(command: Command<Data>): Promise<JoinRequestEvent[]> {
       const data = command.data as never;
       const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
-      return JoinRequestStateFoldProjection.eventsFor({
+      return joinRequestEventsFor({
         command: { type, data } as JoinRequestCommand,
         facts,
       });

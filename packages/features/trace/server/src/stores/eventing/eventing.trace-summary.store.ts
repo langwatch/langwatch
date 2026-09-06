@@ -58,7 +58,7 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
     await this.storage.upsertBatch(batchEntries);
   }
 
-  async get(
+  async tryGet(
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<TraceSummaryData | null> {

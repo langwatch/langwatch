@@ -80,8 +80,10 @@ export class LangyTitleGeneratorService {
           { projectId, conversationId },
           "no cheap model configured for Langy titles — leaving title unchanged",
         );
+
         return null;
       }
+
       throw error;
     }
 

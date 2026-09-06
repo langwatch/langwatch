@@ -205,27 +205,4 @@ export class MfaEnrollmentStateFoldProjection
   ): MfaFoldState {
     return this.fold(event, state);
   }
-
-  /**
-   * The same envelope stamp the identity pipeline's events get, and a separate function for one
-   * reason that matters: SCHEMA VERSION. An envelope stamps exactly one `version`, fold read-back
-   * is version-gated, and these two families evolve independently.
-   */
-  static eventsFor({ command, facts }: { command: MfaCommand; facts: MfaFactInput[] }): MfaEvent[] {
-    const { userId, tenantId, commandId, occurredAtMs } = command.data;
-    return facts.map(
-      (fact, index) =>
-        EventUtils.createEvent({
-          aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
-          aggregateId: userId,
-          tenantId: createTenantId(tenantId),
-          type: fact.type,
-          version: MFA_EVENT_VERSION_LATEST,
-          data: fact.data,
-          metadata: {},
-          occurredAt: occurredAtMs,
-          idempotencyKey: eventIdempotencyKey({ commandId, index }),
-        }) as MfaEvent,
-    );
-  }
 }

@@ -44,7 +44,7 @@ export class ExperimentRunStateStore implements FoldProjectionStore<ExperimentRu
     });
   }
 
-  async get(
+  async tryGet(
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<ExperimentRunStateData | null> {

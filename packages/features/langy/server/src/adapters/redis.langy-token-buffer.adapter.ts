@@ -9,9 +9,9 @@ import {
   LANGY_STREAM,
   LANGY_STREAMING,
 } from "../rules/langy-streaming-constants.rules";
+import { langyEmptyTurnLine } from "../rules/langy-empty-turn.rules";
 import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatch/langy-contract";
 import {
-  langyEmptyTurnLine,
   type LangyStreamRead,
   type LangyStreamRedis,
   LangyTokenBufferPort,

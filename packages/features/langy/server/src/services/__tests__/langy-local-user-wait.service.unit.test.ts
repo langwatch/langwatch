@@ -8,7 +8,8 @@
  * @see specs/langy/langy-choice-questions.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type AgentStateStorePort, ConnectedAgentStateAdapter } from "@langwatch/agent-server";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
 import {
   LIVE_STREAM_KEEPALIVE_MS,
   PERMISSION_WAIT_BUDGET_MS,
@@ -123,7 +124,7 @@ beforeEach(() => {
   events = recordingEvents();
   buffer = recordingBuffer();
   sendPermission = vi.fn(async () => undefined);
-  service = new UserWaitService({
+  service = UserWaitService.create({
     store,
     events,
     buffer,
@@ -255,7 +256,7 @@ describe("given a command that is not on the read-only list", () => {
       // The event store is the slow half. While it was first in this chain the
       // card kept its buttons for as long as it took, which was up to thirteen
       // seconds with the command already running behind it.
-      let released = () => undefined as void;
+      let released = (): void => undefined;
       const slowStore = new Promise<void>((resolve) => {
         released = () => resolve();
       });

@@ -24,8 +24,9 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules";
-import type { LangyTokenBufferAdapter } from "../adapters/redis.langy-token-buffer.adapter";
-import type { AgentStateStorePort } from "@langwatch/agent-server";
+import { callActivityLine } from "../rules/langy-local-call-activity.rules";
+import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import {
   CALL_ENVELOPE_SLACK_MS,
   CALL_OFFLINE_WAIT_MS,
@@ -43,7 +44,7 @@ import {
   pendingCallsKey,
   workspaceChannel,
 } from "../rules/langy-local-control-keys.rules";
-import type { LocalWorkspacePresence } from "../adapters/redis.langy-local-presence.adapter";
+import type { LangyLocalPresencePort } from "../ports/langy-local-presence.port";
 import {
   bashOutputSchema,
   type CallEnvelope,
@@ -102,11 +103,11 @@ export type WorkspaceNudge = z.infer<typeof workspaceNudgeSchema>;
  * The live edge of the turn a call belongs to: the liveness key that says the
  * turn is still being worked on, and the activity line the panel reads.
  */
-export type LocalCallBuffer = Pick<LangyTokenBufferAdapter, "appendStatus" | "heartbeat">;
+export type LocalCallBuffer = Pick<LangyTokenBufferPort, "appendStatus" | "heartbeat">;
 
 export interface LocalCallDispatcherOptions {
   store: AgentStateStorePort;
-  presence: LocalWorkspacePresence;
+  presence: LangyLocalPresencePort;
   buffer?: LocalCallBuffer;
   now?: () => number;
   /** Test knob: how long a first call waits for the folder to appear. */
@@ -114,15 +115,19 @@ export interface LocalCallDispatcherOptions {
   pollIntervalMs?: number;
 }
 
-export class LocalCallDispatcher {
+export class LocalCallDispatcherService {
   private readonly store: AgentStateStorePort;
-  private readonly presence: LocalWorkspacePresence;
+  private readonly presence: LangyLocalPresencePort;
   private readonly buffer: LocalCallBuffer | null;
   private readonly offlineWaitMs: number;
   private readonly pollIntervalMs: number;
   readonly now: () => number;
 
-  constructor(options: LocalCallDispatcherOptions) {
+  static create(options: LocalCallDispatcherOptions): LocalCallDispatcherService {
+    return new LocalCallDispatcherService(options);
+  }
+
+  private constructor(options: LocalCallDispatcherOptions) {
     this.store = options.store;
     this.presence = options.presence;
     this.buffer = options.buffer ?? null;
@@ -173,6 +178,7 @@ export class LocalCallDispatcher {
       workspaceChannel(conversationId),
       JSON.stringify({ call: stored.callId } satisfies WorkspaceNudge),
     );
+
     return stored;
   }
 
@@ -202,10 +208,19 @@ export class LocalCallDispatcher {
     const beat = this.beater();
     for (;;) {
       const call = await this.read(callId);
-      if (!call) return null;
-      if (call.state === "done") return toPollResponse(call);
+      if (!call) {
+        return null;
+      }
+
+      if (call.state === "done") {
+        return toPollResponse(call);
+      }
+
       await beat(call);
-      if (this.now() >= until || signal?.aborted) return toPollResponse(call);
+      if (this.now() >= until || signal?.aborted) {
+        return toPollResponse(call);
+      }
+
       await sleep(this.pollIntervalMs, signal);
     }
   }
@@ -216,10 +231,14 @@ export class LocalCallDispatcher {
    */
   private beater(): (call: StoredLocalCall) => Promise<void> {
     let lastBeatAt: number | null = null;
+
     return async (call) => {
       const now = this.now();
       const due = lastBeatAt === null || now - lastBeatAt >= LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS;
-      if (!due) return;
+      if (!due) {
+        return;
+      }
+
       lastBeatAt = now;
       await this.keepTurnAlive(call);
     };
@@ -240,7 +259,10 @@ export class LocalCallDispatcher {
    */
   private async keepTurnAlive(call: StoredLocalCall): Promise<void> {
     const buffer = this.buffer;
-    if (!buffer) return;
+    if (!buffer) {
+      return;
+    }
+
     await buffer.heartbeat({
       conversationId: call.conversationId,
       turnId: call.turnId,
@@ -249,12 +271,16 @@ export class LocalCallDispatcher {
     if (this.now() - call.createdAt < LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS) {
       return;
     }
+
     const firstOfWindow = await this.store.setIfAbsent(
       callKeepaliveKey(call.callId),
       String(this.now()),
       Math.ceil(LIVE_STREAM_KEEPALIVE_MS / 1000),
     );
-    if (!firstOfWindow) return;
+    if (!firstOfWindow) {
+      return;
+    }
+
     const workspace = await this.presence.read(call.conversationId);
     await buffer.appendStatus({
       conversationId: call.conversationId,
@@ -269,7 +295,10 @@ export class LocalCallDispatcher {
   /** The command line started the call. */
   async ack(callId: string): Promise<void> {
     const call = await this.read(callId);
-    if (call?.state !== "pending") return;
+    if (call?.state !== "pending") {
+      return;
+    }
+
     await this.write({ ...call, state: "running" });
   }
 
@@ -291,7 +320,10 @@ export class LocalCallDispatcher {
     waitId: string;
   }): Promise<StoredLocalCall | null> {
     const call = await this.read(callId);
-    if (!call || call.state === "done") return null;
+    if (!call || call.state === "done") {
+      return null;
+    }
+
     const next: StoredLocalCall = {
       ...call,
       state: "awaiting_permission",
@@ -299,6 +331,7 @@ export class LocalCallDispatcher {
     };
     await this.write(next);
     await this.track(next);
+
     return next;
   }
 
@@ -325,6 +358,7 @@ export class LocalCallDispatcher {
       await this.write(released);
       await this.track(released);
     }
+
     await this.store.publish(
       workspaceChannel(conversationId),
       JSON.stringify({
@@ -342,7 +376,10 @@ export class LocalCallDispatcher {
     frame: Pick<ResultFrame, "ok" | "text" | "output" | "error">;
   }): Promise<void> {
     const call = await this.read(callId);
-    if (!call || call.state === "done") return;
+    if (!call || call.state === "done") {
+      return;
+    }
+
     await this.settle({
       ...call,
       ok: frame.ok,
@@ -367,11 +404,15 @@ export class LocalCallDispatcher {
     message?: string;
   }): Promise<StoredLocalCall | null> {
     const call = await this.read(callId);
-    if (!call || call.state === "done") return null;
+    if (!call || call.state === "done") {
+      return null;
+    }
+
     await this.store.publish(
       workspaceChannel(call.conversationId),
       JSON.stringify({ cancel: callId } satisfies WorkspaceNudge),
     );
+
     return this.settle({ ...call, ok: false, error: { code, message } });
   }
 
@@ -384,6 +425,7 @@ export class LocalCallDispatcher {
     turnId: string;
   }): Promise<StoredLocalCall[]> {
     const calls = await this.listPendingForConversation(conversationId);
+
     return calls.filter((call) => call.turnId === turnId);
   }
 
@@ -393,8 +435,11 @@ export class LocalCallDispatcher {
     const calls: StoredLocalCall[] = [];
     for (const id of ids) {
       const call = await this.read(id);
-      if (call && call.state !== "done") calls.push(call);
+      if (call && call.state !== "done") {
+        calls.push(call);
+      }
     }
+
     return calls;
   }
 
@@ -409,16 +454,23 @@ export class LocalCallDispatcher {
     const envelopes: CallEnvelope[] = [];
     for (const id of ids) {
       const call = await this.read(id);
-      if (call && call.state !== "done") envelopes.push(toEnvelope(call));
+      if (call && call.state !== "done") {
+        envelopes.push(toEnvelope(call));
+      }
     }
+
     return envelopes;
   }
 
   async read(callId: string): Promise<StoredLocalCall | null> {
     const raw = await this.store.tryGet(callKey(callId));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
+
     try {
       const parsed = storedLocalCallSchema.safeParse(JSON.parse(raw));
+
       return parsed.success ? parsed.data : null;
     } catch {
       return null;
@@ -438,11 +490,16 @@ export class LocalCallDispatcher {
     const until = this.now() + this.offlineWaitMs;
     for (;;) {
       const workspace = await this.presence.read(conversationId);
-      if (workspace) return;
+      if (workspace) {
+        return;
+      }
+
       if (this.now() >= until) {
         logger.info({ conversationId }, "no local folder answered the call");
+
         throw new LangyLocalWorkspaceOfflineError({ conversationId });
       }
+
       await sleep(this.pollIntervalMs);
     }
   }
@@ -455,6 +512,7 @@ export class LocalCallDispatcher {
       Math.ceil(CALL_RESULT_TTL_MS / 1000),
     );
     await this.store.zrem(pendingCallsKey(done.conversationId), done.callId);
+
     return done;
   }
 
@@ -478,39 +536,18 @@ export class LocalCallDispatcher {
    * and the call has to be there when they do.
    */
   private expiresAt(call: StoredLocalCall): number {
-    if (call.state !== "awaiting_permission") return call.deadlineAt;
+    if (call.state !== "awaiting_permission") {
+      return call.deadlineAt;
+    }
+
     return Math.max(call.deadlineAt, this.now() + PERMISSION_WAIT_BUDGET_MS);
   }
 
   private envelopeTtlSeconds(call: StoredLocalCall): number {
     const remaining = this.expiresAt(call) - this.now() + CALL_ENVELOPE_SLACK_MS;
+
     return Math.max(1, Math.ceil(remaining / 1000));
   }
-}
-
-/** The longest command the activity line shows before it trails off. */
-const ACTIVITY_COMMAND_CAP = 120;
-
-/** What the panel says while one call runs on the developer's machine. */
-export function callActivityLine({
-  call,
-  machine,
-}: {
-  call: LocalToolCall;
-  machine: string;
-}): string {
-  if (call.tool === "local_bash") {
-    const command = call.params.command.replace(/\s+/g, " ").trim();
-    const shown =
-      command.length > ACTIVITY_COMMAND_CAP
-        ? `${command.slice(0, ACTIVITY_COMMAND_CAP)}...`
-        : command;
-    return `Running on ${machine}: ${shown}`;
-  }
-  if (call.tool === "local_write" || call.tool === "local_edit") {
-    return `Editing on ${machine}`;
-  }
-  return `Reading on ${machine}`;
 }
 
 function toEnvelope(call: StoredLocalCall): CallEnvelope {

@@ -5,8 +5,8 @@ import {
 } from "@langwatch/identity-contract";
 import type { IdentityGuardsService } from "../services/identity-guards.service";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
 import type { IdentityEvent } from "../projections/identity-state.projection";
+import { identityEventsFor } from "../intents/identity-events.intent";
 
 /**
  * The staged re-run of a link proposal (ADR-117 §3): the same guard the calling
@@ -31,7 +31,7 @@ export class ProposeLinkCommand implements CommandHandler<
 
   async handle(command: Command<ProposeLinkCommandData>): Promise<IdentityEvent[]> {
     const facts = await this.guards.proposeLink(command.data);
-    return IdentityStateFoldProjection.eventsFor({
+    return identityEventsFor({
       command: { type: PROPOSE_LINK_COMMAND_TYPE, data: command.data },
       facts,
     });

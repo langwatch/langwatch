@@ -32,7 +32,7 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       const expectedState = { value: "test" };
-      (foldStore.get as ReturnType<typeof vi.fn>).mockResolvedValue(expectedState);
+      (foldStore.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(expectedState);
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -49,7 +49,7 @@ describe("EventSourcingService - Projection Flows", () => {
       );
 
       expect(result).not.toBeNull();
-      expect(foldStore.get).toHaveBeenCalledWith(
+      expect(foldStore.tryGet).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
         expect.objectContaining({
           aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -96,7 +96,7 @@ describe("EventSourcingService - Projection Flows", () => {
         store: foldStore,
       });
 
-      (foldStore.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (foldStore.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
         value: "test",
       });
 
@@ -124,7 +124,7 @@ describe("EventSourcingService - Projection Flows", () => {
         store: foldStore,
       });
 
-      (foldStore.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (foldStore.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -217,7 +217,7 @@ describe("EventSourcingService - Projection Flows", () => {
       await service.storeEvents(events, context);
 
       // Each event is applied incrementally (store.get + apply + store.store)
-      expect(foldDef.store.get).toHaveBeenCalled();
+      expect(foldDef.store.tryGet).toHaveBeenCalled();
       expect(foldDef.apply).toHaveBeenCalledTimes(1);
       expect(foldDef.store.store).toHaveBeenCalled();
     });

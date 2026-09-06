@@ -7,7 +7,7 @@
 import { nanoid } from "nanoid";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import type { AgentStateStorePort } from "../ports/agent-state-store.port";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import type { ConnectedAgentRuntime } from "../ports/connected-agent-runtime.port";
 import { ConnectedAgentStateAdapter } from "./connected-agent-state.adapter";
 import { CallDispatcherAdapter } from "./connected-agent-dispatch.adapter";

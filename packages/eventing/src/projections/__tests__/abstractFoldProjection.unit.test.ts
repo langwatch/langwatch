@@ -30,7 +30,7 @@ interface TestState {
 
 const noopStore: FoldProjectionStore<TestState> = {
   store: async () => {},
-  get: async () => null,
+  tryGet: async () => null,
 };
 
 class TestFoldProjection
@@ -86,7 +86,7 @@ class CamelFoldProjection
   readonly version = "2026-01-01";
   readonly store: FoldProjectionStore<CamelState> = {
     store: async () => {},
-    get: async () => null,
+    tryGet: async () => null,
   };
 
   protected readonly events = camelEvents;

@@ -12,13 +12,12 @@
  */
 import { createErrorHandler } from "@langwatch/api";
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-server";
+import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
+import { ConnectedAgentStateAdapter } from "@langwatch/agent-server";
 import {
-  createLocalControlRuntime,
-  createLocalControlStore,
+  LangyLocalControlRuntimeAdapter,
   LocalControlLongPoll,
-  LocalControlSessionCore,
-  nullLocalControlBuffer,
+  LocalControlSessionCoreService,
   type LocalControlRuntime,
 } from "@langwatch/langy-server";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
@@ -39,15 +38,15 @@ let api: ReturnType<typeof mount>;
 
 beforeEach(() => {
   actingUserId = OWNER;
-  runtime = createLocalControlRuntime({
-    store: createLocalControlStore(null),
+  runtime = LangyLocalControlRuntimeAdapter.create({
+    store: ConnectedAgentStateAdapter.memory(),
     projects: { tryReadOrganizationId: async () => "organization-1" },
     mintSessionKey: async () => ({
       token: `sk-lw-${nanoid(48)}`,
       apiKeyId: `key_${nanoid(10)}`,
     }),
     events: { startUserWait: async () => undefined, endUserWait: async () => undefined },
-    buffer: nullLocalControlBuffer(),
+    buffer: LangyLocalControlRuntimeAdapter.nullBuffer(),
   });
   api = mount();
 });
@@ -169,7 +168,7 @@ async function refusalOf(response: Response): Promise<{ code: string; message: s
 
 function mount() {
   const hono = new Hono();
-  const core = LocalControlSessionCore.create({
+  const core = LocalControlSessionCoreService.create({
     apiKeys: { tryResolveToken: async () => null } as unknown as ApiKeyService,
     readCredential: () => null,
     actors: { tryFindById: async () => null } as never,

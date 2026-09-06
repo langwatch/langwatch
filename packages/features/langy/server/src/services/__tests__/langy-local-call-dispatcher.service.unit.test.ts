@@ -6,10 +6,14 @@
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { type AgentStateStorePort, ConnectedAgentStateAdapter } from "@langwatch/agent-server";
-import { LocalCallDispatcher, type WorkspaceNudge } from "../langy-local-call-dispatcher.service";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
+import {
+  LocalCallDispatcherService,
+  type WorkspaceNudge,
+} from "../langy-local-call-dispatcher.service";
 import { workspaceChannel } from "../../rules/langy-local-control-keys.rules";
-import { LocalWorkspacePresence } from "../../adapters/redis.langy-local-presence.adapter";
+import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter";
 
 const projectId = "proj_1";
 const conversationId = "conv_1";
@@ -17,8 +21,8 @@ const turnId = "turn_1";
 
 let now = 1_700_000_000_000;
 let store: AgentStateStorePort;
-let presence: LocalWorkspacePresence;
-let dispatcher: LocalCallDispatcher;
+let presence: LangyLocalPresenceAdapter;
+let dispatcher: LocalCallDispatcherService;
 
 function workspace() {
   return {
@@ -54,8 +58,8 @@ async function collectNudges(): Promise<WorkspaceNudge[]> {
 beforeEach(() => {
   now = 1_700_000_000_000;
   store = ConnectedAgentStateAdapter.memory({ now: () => now });
-  presence = new LocalWorkspacePresence({ store, now: () => now });
-  dispatcher = new LocalCallDispatcher({
+  presence = LangyLocalPresenceAdapter.create({ store, now: () => now });
+  dispatcher = LocalCallDispatcherService.create({
     store,
     presence,
     now: () => now,
@@ -102,9 +106,9 @@ describe("given a folder connected to the conversation", () => {
 
     /** @scenario "A call and its socket can be on different pods" */
     it("is delivered from the store, so another replica can serve the socket", async () => {
-      const otherPod = new LocalCallDispatcher({
+      const otherPod = LocalCallDispatcherService.create({
         store,
-        presence: new LocalWorkspacePresence({ store, now: () => now }),
+        presence: LangyLocalPresenceAdapter.create({ store, now: () => now }),
         now: () => now,
         offlineWaitMs: 0,
         pollIntervalMs: 1,

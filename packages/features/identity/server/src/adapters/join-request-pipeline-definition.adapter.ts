@@ -31,8 +31,6 @@ import {
   onJoinRequested,
   onJoinResolved,
   remindAdminsIntentSchema,
-  runExpireRequest,
-  runRemindAdmins,
 } from "../processes/join-request-lifecycle.process";
 import {
   type JoinRequestEvent,
@@ -43,6 +41,7 @@ import {
   JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_REQUEST_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
+import { runExpireRequest, runRemindAdmins } from "../intents/join-request-lifecycle.intent";
 
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by (the ledger writer

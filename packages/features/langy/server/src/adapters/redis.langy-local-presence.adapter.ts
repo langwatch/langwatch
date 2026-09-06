@@ -11,35 +11,18 @@
  * place.
  */
 
-import { z } from "zod";
-import type { AgentStateStorePort } from "@langwatch/agent-server";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { PRESENCE_TTL_MS } from "@langwatch/langy-contract";
 import { policyKey, presenceKey } from "../rules/langy-local-control-keys.rules";
-import { workspaceInfoSchema } from "@langwatch/langy-contract";
+import {
+  connectedWorkspaceSchema,
+  type ConnectedWorkspace,
+  LangyLocalPresencePort,
+  type PresenceHeartbeat,
+} from "../ports/langy-local-presence.port";
 
 /** How long the skip choice outlives the socket that carried it. */
 const POLICY_TTL_SECONDS = 6 * 60 * 60;
-
-export const connectedWorkspaceSchema = z.object({
-  conversationId: z.string(),
-  projectId: z.string(),
-  /** The user who approved the control request this folder connected on. */
-  userId: z.string(),
-  requestId: z.string(),
-  instanceId: z.string(),
-  hostname: z.string(),
-  connectedAt: z.number(),
-  lastSeenAt: z.number(),
-  workspace: workspaceInfoSchema,
-});
-export type ConnectedWorkspace = z.infer<typeof connectedWorkspaceSchema>;
-
-/**
- * What one heartbeat did: it moved the record on, it wrote a lapsed record
- * back, or it found the conversation shared by a newer connection and left it
- * alone.
- */
-export type PresenceHeartbeat = "refreshed" | "restored" | "replaced";
 
 export interface LocalPresenceOptions {
   store: AgentStateStorePort;
@@ -47,15 +30,20 @@ export interface LocalPresenceOptions {
   presenceTtlMs?: number;
 }
 
-export class LocalWorkspacePresence {
+export class LangyLocalPresenceAdapter extends LangyLocalPresencePort {
   private readonly store: AgentStateStorePort;
   private readonly presenceTtlMs: number;
   readonly now: () => number;
 
-  constructor(options: LocalPresenceOptions) {
+  private constructor(options: LocalPresenceOptions) {
+    super();
     this.store = options.store;
     this.now = options.now ?? (() => Date.now());
     this.presenceTtlMs = options.presenceTtlMs ?? PRESENCE_TTL_MS;
+  }
+
+  static create(options: LocalPresenceOptions): LangyLocalPresenceAdapter {
+    return new LangyLocalPresenceAdapter(options);
   }
 
   /** Writes the folder as connected, replacing whatever was there. */

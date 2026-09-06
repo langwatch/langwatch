@@ -27,7 +27,7 @@ import {
   type MountableRestApp,
   type ProjectScopedContext,
 } from "@langwatch/api/rest";
-import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-server";
+import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import {
   approveControlRequestBodySchema,
   approveControlRequestResponseSchema,
@@ -43,8 +43,8 @@ import {
 import { z } from "zod";
 
 import type { LocalControlRuntime } from "#adapters/langy-local-control-runtime.adapter";
-import { toControlRequestWire } from "#services/langy-local-control-request.service";
-import { conversationUrl } from "#services/langy-local-session.service";
+import { toControlRequestWire } from "#rules/langy-local-control-request-wire.rules";
+import { conversationUrl } from "#rules/langy-local-session-text.rules";
 import type { LocalControlLongPoll } from "./langy-local-control-long-poll";
 
 /** Everything the control family reaches that Langy does not own. */

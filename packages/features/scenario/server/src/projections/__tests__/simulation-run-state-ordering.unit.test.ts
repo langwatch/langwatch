@@ -1,6 +1,6 @@
 /**
  * Combinatorial test for simulation run fold ordering. Proves that the fold produces correct final
- * state regardless of event processing order. Simulates the incremental fold pattern: store.get() →
+ * state regardless of event processing order. Simulates the incremental fold pattern: store.tryGet() →
  * apply(event) → store.store() for each event.
  */
 
@@ -40,7 +40,10 @@ function createReplacingMergeTreeStore(): FoldProjectionStore<SimulationRunState
     async store(state: SimulationRunStateData): Promise<void> {
       rows.push({ ...state });
     },
-    async get(_key: string, _ctx: ProjectionStoreContext): Promise<SimulationRunStateData | null> {
+    async tryGet(
+      _key: string,
+      _ctx: ProjectionStoreContext,
+    ): Promise<SimulationRunStateData | null> {
       if (rows.length === 0) return null;
       return rows.reduce((best, row) => (row.UpdatedAt > best.UpdatedAt ? row : best));
     },
@@ -203,7 +206,7 @@ async function processFold(
   store.clear();
   for (const event of events) {
     allEventsSoFar.push(event);
-    const currentState = (await store.get("run-1", ctx)) ?? projection.init();
+    const currentState = (await store.tryGet("run-1", ctx)) ?? projection.init();
 
     // Capture LastEventOccurredAt before apply
     const prevLastOccurred = currentState.LastEventOccurredAt ?? 0;
@@ -226,7 +229,7 @@ async function processFold(
     }
   }
   // Return what ReplacingMergeTree would return
-  return (await store.get("run-1", ctx))!;
+  return (await store.tryGet("run-1", ctx))!;
 }
 
 // --- Permutation helper ---

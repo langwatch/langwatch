@@ -84,7 +84,7 @@ describe("fold failures after the state was stored", () => {
     );
 
     const store = createMockFoldProjectionStore<{ count: number }>();
-    (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     if (shouldStoreFail) {
       (store.store as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("store boom"));
     }

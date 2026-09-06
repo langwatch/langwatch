@@ -82,7 +82,7 @@ describe("ProjectionRouter subscriber dispatch over a coalesced batch", () => {
     );
 
     const store = createMockFoldProjectionStore<{ count: number }>();
-    (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     const fold = createMockFoldProjectionDefinition("counter", {
       store,
       init: () => ({ count: 0 }),

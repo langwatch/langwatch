@@ -134,7 +134,7 @@ function withAppliedEventIds(
  * Executes a fold projection incrementally by applying a single event to existing state.
  *
  * Flow:
- * 1. Load existing state via `store.get()` (or `init()` if none)
+ * 1. Load existing state via `store.tryGet()` (or `init()` if none)
  * 2. If the store missed and `options.refoldOnStoreMiss` is set → re-fold
  *    from the event log up to the delivered event (see below)
  * 3. `state = projection.apply(state, event)`
@@ -151,7 +151,7 @@ function withAppliedEventIds(
  *
  * Store-miss re-fold (`options.refoldOnStoreMiss`): a fold whose persisted
  * row cannot be read back into fold state (lossy analytics rows) returns
- * null from `store.get()` whenever its cache is cold. Starting from `init()`
+ * null from `store.tryGet()` whenever its cache is cold. Starting from `init()`
  * there would fold only the delivered events — a partial state that
  * overwrites the complete row. Instead, the aggregate's history is loaded
  * up to AND INCLUDING the delivered event in log order (`eventLoaderUpTo`)
@@ -234,7 +234,7 @@ export class FoldProjectionExecutor {
       // A get()-only store has no way to say "found but refused", so its null
       // is always an absent miss; stamping it keeps the miss kind uniform for
       // the refold gate and `trustAbsentMiss` downstream.
-      const state = await store.get(key, readContext);
+      const state = await store.tryGet(key, readContext);
       return {
         state,
         appliedEventIds: [],

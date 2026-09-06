@@ -63,14 +63,19 @@ function splitModelReference({
   if (parsed.kind === "unknown") {
     return { provider: "", modelId: parsed.raw, row: null };
   }
+
   if (parsed.kind === "mp-id") {
     const row = rows.find((candidate) => candidate.id === parsed.mpId) ?? null;
+
     return { provider: row?.provider ?? "", modelId: parsed.model, row };
   }
+
   if (parsed.provider in modelProviders) {
     return { provider: parsed.provider, modelId: parsed.model, row: null };
   }
+
   const row = rows.find((candidate) => candidate.routingHandle === parsed.provider) ?? null;
+
   return { provider: row?.provider ?? "", modelId: parsed.model, row };
 }
 
@@ -93,43 +98,52 @@ function listForFamily({
     .filter((row) => row.provider === provider)
     .filter((row) => readStoredSkipList(row.langySkipPermissionsModels).length > 0)
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
   return resolveSkipList({
     provider,
     stored: withStoredList[0]?.langySkipPermissionsModels ?? null,
   });
 }
 
-/**
- * Answers whether `model` may run with the permission checks skipped.
- *
- * `model` is the conversation's model reference in any of the shapes the
- * platform stores it in: "openai/gpt-6", "mp_abc123/gpt-6", or a routing
- * handle such as "eu/claude-sonnet-5".
- */
-export async function canModelSkipPermissions({
-  projectId,
-  model,
-  providerRows,
-}: {
-  projectId: string;
-  model: string;
-  /** The accessible provider rows. Supplied by the composition root (ADR-092 layering). */
-  providerRows: SkipPermissionsProviderRows;
-}): Promise<SkipPermissionsDecision> {
-  const rows = await providerRows.findAllAccessibleForProject(projectId);
-  const { provider, modelId, row } = splitModelReference({ model, rows });
+export class SkipPermissionsService {
+  private constructor() {}
 
-  if (provider === "" || modelId === "") {
-    return { allowed: false, provider, modelId };
+  static create(): SkipPermissionsService {
+    return new SkipPermissionsService();
   }
 
-  const patterns = row
-    ? resolveSkipList({ provider, stored: row.langySkipPermissionsModels })
-    : listForFamily({ provider, rows });
+  /**
+   * Answers whether `model` may run with the permission checks skipped.
+   *
+   * `model` is the conversation's model reference in any of the shapes the
+   * platform stores it in: "openai/gpt-6", "mp_abc123/gpt-6", or a routing
+   * handle such as "eu/claude-sonnet-5".
+   */
+  static async canModelSkipPermissions({
+    projectId,
+    model,
+    providerRows,
+  }: {
+    projectId: string;
+    model: string;
+    /** The accessible provider rows. Supplied by the composition root (ADR-092 layering). */
+    providerRows: SkipPermissionsProviderRows;
+  }): Promise<SkipPermissionsDecision> {
+    const rows = await providerRows.findAllAccessibleForProject(projectId);
+    const { provider, modelId, row } = splitModelReference({ model, rows });
 
-  return {
-    allowed: matchesSkipList({ patterns, modelId }),
-    provider,
-    modelId,
-  };
+    if (provider === "" || modelId === "") {
+      return { allowed: false, provider, modelId };
+    }
+
+    const patterns = row
+      ? resolveSkipList({ provider, stored: row.langySkipPermissionsModels })
+      : listForFamily({ provider, rows });
+
+    return {
+      allowed: matchesSkipList({ patterns, modelId }),
+      provider,
+      modelId,
+    };
+  }
 }

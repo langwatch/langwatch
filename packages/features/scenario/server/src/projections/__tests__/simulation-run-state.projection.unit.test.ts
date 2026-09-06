@@ -25,7 +25,7 @@ import {
 // Create a dummy store -- only init/apply are tested, not persistence
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
-  get: async () => null,
+  tryGet: async () => null,
 };
 const foldProjection = SimulationRunStateFoldProjection.create({
   store: noopStore,

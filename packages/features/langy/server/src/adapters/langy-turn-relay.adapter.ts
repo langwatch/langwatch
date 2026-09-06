@@ -33,7 +33,8 @@ import { LangyResourceLinksAdapter } from "./redis.langy-resource-links.adapter"
 import { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter";
 import type { LangyHandoffRedis } from "./redis.langy-turn-handoff.adapter";
 import { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter";
-import { LANGY_EMPTY_TURN_FALLBACK, type LangyStreamRedis } from "../ports/langy-token-buffer.port";
+import type { LangyStreamRedis } from "../ports/langy-token-buffer.port";
+import { LANGY_EMPTY_TURN_FALLBACK } from "../rules/langy-empty-turn.rules";
 
 type PlatformProgress = { headline: string };
 

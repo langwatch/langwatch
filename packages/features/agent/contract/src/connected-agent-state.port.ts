@@ -1,6 +1,8 @@
 /**
  * The small key, sorted-set, hash and pub/sub surface connected agents need
- * (ADR-128).
+ * (ADR-128). Transport-neutral so any feature that shares this coordination
+ * substrate (langy's local control among them) depends on the contract, not
+ * on agent-server's own runtime.
  */
 
 export type Unsubscribe = () => Promise<void>;

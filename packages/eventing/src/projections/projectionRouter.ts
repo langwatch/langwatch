@@ -2150,7 +2150,7 @@ export class ProjectionRouter<
       tenantId: context.tenantId,
     };
 
-    const state = await fold.store.get(lookupKey, storeContext);
+    const state = await fold.store.tryGet(lookupKey, storeContext);
     if (state === null) return null;
 
     return {

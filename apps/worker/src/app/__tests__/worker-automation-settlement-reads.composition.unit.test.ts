@@ -155,7 +155,7 @@ describe("given the trace reads automation settlement makes in this process", ()
       const reads: Array<{ key: string; tenantId: string }> = [];
       const reader = WorkerAutomationSettlementTraceReader.create({
         traceSummaryStore: {
-          get: async (key: string, scope: { tenantId: string }) => {
+          tryGet: async (key: string, scope: { tenantId: string }) => {
             reads.push({ key, tenantId: scope.tenantId });
             return { traceId: key } as never;
           },
@@ -173,7 +173,7 @@ describe("given the trace reads automation settlement makes in this process", ()
     /** @scenario "A trace whose full record this process cannot read still notifies" */
     it("refuses as unavailable rather than as an unclassified failure", async () => {
       const reader = WorkerAutomationSettlementTraceReader.create({
-        traceSummaryStore: { get: async () => null } as never,
+        traceSummaryStore: { tryGet: async () => null } as never,
         resolveClickHouseClient: clickHouse().resolve,
       });
 
@@ -186,7 +186,7 @@ describe("given the trace reads automation settlement makes in this process", ()
     it("names the missing read once at composition rather than at the first digest", () => {
       const absences: string[] = [];
       WorkerAutomationSettlementTraceReader.create({
-        traceSummaryStore: { get: async () => null } as never,
+        traceSummaryStore: { tryGet: async () => null } as never,
         resolveClickHouseClient: clickHouse().resolve,
         absence: recordingAbsence(absences),
       });
@@ -200,7 +200,7 @@ describe("given the trace reads automation settlement makes in this process", ()
     it("declares nothing absent", () => {
       const absences: string[] = [];
       WorkerAutomationSettlementTraceReader.create({
-        traceSummaryStore: { get: async () => null } as never,
+        traceSummaryStore: { tryGet: async () => null } as never,
         resolveClickHouseClient: clickHouse().resolve,
         records: recordReader(clickHouse().resolve),
         absence: recordingAbsence(absences),
@@ -219,7 +219,7 @@ describe("given the trace reads automation settlement makes in this process", ()
     it("answers not-found for a trace ClickHouse does not hold, tenant-scoped", async () => {
       const ch = clickHouse([]);
       const reader = WorkerAutomationSettlementTraceReader.create({
-        traceSummaryStore: { get: async () => null } as never,
+        traceSummaryStore: { tryGet: async () => null } as never,
         resolveClickHouseClient: ch.resolve,
         records: recordReader(ch.resolve),
       });
@@ -365,7 +365,7 @@ describe("given the trace reads automation settlement makes in this process", ()
     it("reads the events from stored spans, tenant-scoped and partition-hinted", async () => {
       const ch = clickHouse([]);
       const reader = WorkerAutomationSettlementTraceReader.create({
-        traceSummaryStore: { get: async () => null } as never,
+        traceSummaryStore: { tryGet: async () => null } as never,
         resolveClickHouseClient: ch.resolve,
       });
 
@@ -395,7 +395,7 @@ describe("given the trace reads automation settlement makes in this process", ()
     it("reads a trace's events once per fold version, however many matches settle", async () => {
       const ch = clickHouse([]);
       const reader = WorkerAutomationSettlementTraceReader.create({
-        traceSummaryStore: { get: async () => null } as never,
+        traceSummaryStore: { tryGet: async () => null } as never,
         resolveClickHouseClient: ch.resolve,
       });
       const read = () =>

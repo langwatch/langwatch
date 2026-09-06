@@ -5,7 +5,7 @@
 
 import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
 
-import type { AgentStateStorePort } from "./agent-state-store.port";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
 
 /** What one instance says about itself, as the agents page shows it. */
 export interface InstanceMeta {

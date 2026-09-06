@@ -206,7 +206,7 @@ export class IngestionKeyService {
    * re-minted, a key a person revoked may not. Null when no such key belongs to
    * this user here, which is also what another user's key reads as.
    */
-  async describePersonalKey(input: {
+  async tryDescribePersonalKey(input: {
     userId: string;
     organizationId: string;
     lookupId: string;

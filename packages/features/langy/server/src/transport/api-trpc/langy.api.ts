@@ -53,7 +53,7 @@ import { LangySessionRequiredError, type LangyApp } from "#app/langy.app";
 import type { LocalControlRuntime } from "../../adapters/langy-local-control-runtime.adapter";
 import { workspaceChannel } from "../../rules/langy-local-control-keys.rules";
 import { reconcileSkipPolicy } from "../../rules/langy-local-skip-policy.rules";
-import { toControlRequestWire } from "../../services/langy-local-control-request.service";
+import { toControlRequestWire } from "../../rules/langy-local-control-request-wire.rules";
 import type { SkipPermissionsDecision } from "../../services/langy-skip-permissions.service";
 
 const logger = createLogger("langwatch:langy:router");

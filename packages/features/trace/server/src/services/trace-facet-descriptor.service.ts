@@ -37,7 +37,7 @@ export class TraceFacetDescriptorService {
     return new TraceFacetDescriptorService(repository, topicNaming);
   }
 
-  async materializeDescriptor(
+  async tryMaterializeDescriptor(
     def: FacetDefinition,
     params: DiscoverParams,
     batchByTable: Map<FacetTable, BatchedFacetResult>,

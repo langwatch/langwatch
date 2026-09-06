@@ -6,7 +6,8 @@
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type AgentStateStorePort, ConnectedAgentStateAdapter } from "@langwatch/agent-server";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
 import { CONTROL_REQUEST_TTL_MS } from "@langwatch/langy-contract";
 import {
   ControlRequestService,

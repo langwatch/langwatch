@@ -140,7 +140,7 @@ class ProducerOnlyExperimentRunStateStore implements ExperimentRunStateFoldStore
     );
   }
 
-  get(): Promise<never> {
+  tryGet(): Promise<never> {
     return Promise.reject(
       producerOnly(this.processName, "read the experiment run state projection"),
     );

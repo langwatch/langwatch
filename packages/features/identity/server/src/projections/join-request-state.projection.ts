@@ -177,33 +177,4 @@ export class JoinRequestStateFoldProjection
   ): JoinRequestFoldState {
     return this.fold(event, state);
   }
-
-  /**
-   * The ONE place a join-request fact becomes a framework event: the guards
-   * (`JoinRequestGuardsService`) decide what a command states, and this stamps the
-   * envelope, so every producer stamps a fact identically.
-   */
-  static eventsFor({
-    command,
-    facts,
-  }: {
-    command: JoinRequestCommand;
-    facts: JoinRequestFactInput[];
-  }): JoinRequestEvent[] {
-    const { joinRequestId, tenantId, commandId, occurredAtMs } = command.data;
-    return facts.map(
-      (fact, index) =>
-        EventUtils.createEvent({
-          aggregateType: JOIN_REQUEST_AGGREGATE_TYPE,
-          aggregateId: joinRequestId,
-          tenantId: createTenantId(tenantId),
-          type: fact.type,
-          version: JOIN_REQUEST_EVENT_VERSION_LATEST,
-          data: fact.data,
-          metadata: {},
-          occurredAt: occurredAtMs,
-          idempotencyKey: eventIdempotencyKey({ commandId, index }),
-        }) as JoinRequestEvent,
-    );
-  }
 }

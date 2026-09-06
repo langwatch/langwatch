@@ -26,7 +26,7 @@ import {
   SuiteRunCommandsPort,
   SuiteRunIdPort,
   type QueueSimulationRunCommandData,
-} from "@langwatch/suite-server";
+} from "@langwatch/suite-server/testing";
 import type { StartSuiteRunCommandData } from "@langwatch/suite-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";

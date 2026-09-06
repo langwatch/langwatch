@@ -42,6 +42,7 @@ export class McpOAuthClientRegistryService {
     if (!redis) {
       throw new Error("Redis is not available");
     }
+
     await redis.set(
       `${REDIS_CLIENT_PREFIX}${clientId}`,
       JSON.stringify(client),
@@ -57,12 +58,23 @@ export class McpOAuthClientRegistryService {
     redis: HostedMcpRedis | null;
     clientId: string;
   }): Promise<RegisteredOAuthClient | null> {
-    if (!redis) return null;
+    if (!redis) {
+      return null;
+    }
+
     const raw = await redis.get(`${REDIS_CLIENT_PREFIX}${clientId}`);
-    if (!raw) return null;
+
+    if (!raw) {
+      return null;
+    }
+
     try {
       const parsed = JSON.parse(raw) as RegisteredOAuthClient;
-      if (!Array.isArray(parsed.redirectUris)) return null;
+
+      if (!Array.isArray(parsed.redirectUris)) {
+        return null;
+      }
+
       return parsed;
     } catch {
       return null;

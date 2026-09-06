@@ -36,7 +36,6 @@ import {
   connectionTeardownWake,
   onTeardownRequested,
   onTornDown,
-  runCompleteTeardown,
 } from "../processes/connection-teardown.process";
 import {
   type SsoConnectionEvent,
@@ -47,6 +46,7 @@ import {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
+import { runCompleteTeardown } from "../intents/connection-teardown.intent";
 
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by (the ledger writer

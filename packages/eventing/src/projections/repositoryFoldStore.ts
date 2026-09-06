@@ -100,7 +100,7 @@ export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
     );
   }
 
-  async get(aggregateId: string, context: ProjectionStoreContext): Promise<TData | null> {
+  async tryGet(aggregateId: string, context: ProjectionStoreContext): Promise<TData | null> {
     const projection = await this.repo.tryGetProjection(aggregateId, {
       tenantId: context.tenantId,
     });

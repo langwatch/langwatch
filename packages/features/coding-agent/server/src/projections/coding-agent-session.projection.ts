@@ -443,7 +443,7 @@ export interface CodingAgentSessionRow {
 
   // ── Read-back state (ADR-066, migration 00053) ─────────────────────────
   // Not analytics columns — these round-trip the fold's working state so
-  // store.get() can read it back (decode the row) without replaying event_log.
+  // store.tryGet() can read it back (decode the row) without replaying event_log.
   /** The dedup set behind `subAgents`; the row keeps count + types, plus this. */
   subAgentIds: string[];
   /** Per-step start times, index-aligned with `steps` (dropped by the 3-tuple). */
@@ -462,7 +462,7 @@ export interface CodingAgentSessionRow {
  * Project the fold state into the row. Every heavy thing stays out: the row
  * carries counters, bounded sets, and the IDS that reach the spans, the logs and
  * the response body — never their contents. The read-back columns (ADR-066)
- * carry the fold's working-state bookkeeping so `store.get()` round-trips.
+ * carry the fold's working-state bookkeeping so `store.tryGet()` round-trips.
  */
 export class CodingAgentSessionRowMapper {
   private constructor() {}
@@ -635,7 +635,7 @@ const nullIfEmpty = (value: string): string | null => (value === "" ? null : val
  *
  * This is a deserialize, NOT a rebuild. A rebuild replays the aggregate's
  * history from `event_log`; this only maps the columns of the last committed
- * projection back into the state shape, so `store.get()` can return the state
+ * projection back into the state shape, so `store.tryGet()` can return the state
  * that Redis (or, on a miss, ClickHouse) already holds. It derives nothing.
  *
  * The row mirrors the state field-for-field; the only conversions are the

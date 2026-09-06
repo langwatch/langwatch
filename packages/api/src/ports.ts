@@ -7,6 +7,9 @@
 // capability that silently does nothing is worse than no capability.
 // ---------------------------------------------------------------------------
 
+import type { IncomingMessage } from "node:http";
+import type { Duplex } from "node:stream";
+
 /**
  * Rate limiting port, supplied via `createService({ rateLimiter })`.
  *
@@ -29,4 +32,18 @@ export interface ResponseCache {
   get(key: string): Promise<Uint8Array | null>;
   set(key: string, tag: string, body: Uint8Array, ttlSeconds: number): Promise<void>;
   invalidateTag(tag: string): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Upgrade routing (ADR-128)
+//
+// One `upgrade` listener shared by every WebSocket door of a process. A
+// feature that serves a WebSocket registers its path against this port; the
+// process owns the HTTP server the upgrade rides on.
+// ---------------------------------------------------------------------------
+
+export type UpgradeHandler = (request: IncomingMessage, socket: Duplex, head: Buffer) => void;
+
+export abstract class ConnectUpgradeRouterPort {
+  abstract register(pathname: string, handler: UpgradeHandler): void;
 }

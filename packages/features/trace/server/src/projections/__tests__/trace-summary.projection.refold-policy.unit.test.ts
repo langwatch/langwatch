@@ -67,7 +67,7 @@ describe("TraceSummaryFoldProjection re-fold policy", () => {
   /** @scenario "The trace summary folds an earlier span without reading the event log" */
   it("folds a span that occurred before the checkpoint without reading the event log", async () => {
     const store: FoldProjectionStore<TraceSummaryData> = {
-      get: vi.fn().mockResolvedValue(stateWithSpanCount(MAX_PROCESSED_SPANS + 1)),
+      tryGet: vi.fn().mockResolvedValue(stateWithSpanCount(MAX_PROCESSED_SPANS + 1)),
       store: vi.fn().mockResolvedValue(undefined),
     };
     const projection = buildProjection(store);
@@ -90,7 +90,7 @@ describe("TraceSummaryFoldProjection re-fold policy", () => {
         const stored = stateWithSpanCount(MAX_PROCESSED_SPANS + 10);
         let persisted: TraceSummaryData | undefined;
         const store: FoldProjectionStore<TraceSummaryData> = {
-          get: vi.fn().mockResolvedValue(stored),
+          tryGet: vi.fn().mockResolvedValue(stored),
           store: vi.fn(async (state: TraceSummaryData) => {
             persisted = state;
           }),

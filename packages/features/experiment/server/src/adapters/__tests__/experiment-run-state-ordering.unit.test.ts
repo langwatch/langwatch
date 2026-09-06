@@ -37,7 +37,10 @@ function createReplacingMergeTreeStore(): FoldProjectionStore<ExperimentRunState
     async store(state: ExperimentRunStateData): Promise<void> {
       rows.push({ ...state });
     },
-    async get(_key: string, _ctx: ProjectionStoreContext): Promise<ExperimentRunStateData | null> {
+    async tryGet(
+      _key: string,
+      _ctx: ProjectionStoreContext,
+    ): Promise<ExperimentRunStateData | null> {
       if (rows.length === 0) return null;
       return rows.reduce((best, row) => (row.UpdatedAt > best.UpdatedAt ? row : best));
     },
@@ -142,11 +145,11 @@ async function processFold(
 
   store.clear();
   for (const event of events) {
-    const currentState = (await store.get("run-1", ctx)) ?? projection.init();
+    const currentState = (await store.tryGet("run-1", ctx)) ?? projection.init();
     const newState = projection.apply(currentState, event);
     await store.store(newState, ctx);
   }
-  return (await store.get("run-1", ctx))!;
+  return (await store.tryGet("run-1", ctx))!;
 }
 
 // --- Permutation helper ---

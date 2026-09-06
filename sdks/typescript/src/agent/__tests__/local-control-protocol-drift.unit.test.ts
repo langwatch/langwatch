@@ -52,13 +52,7 @@ function bracedBody({ source, from }: { source: string; from: number }): string 
 }
 
 /** The top-level keys of one zod object literal in the platform source, by schema name. */
-function platformKeys({
-  source,
-  schema,
-}: {
-  source: string;
-  schema: string;
-}): string[] {
+function platformKeys({ source, schema }: { source: string; schema: string }): string[] {
   const start = source.indexOf(`export const ${schema} =`);
   if (start === -1) throw new Error(`platform protocol has no ${schema}`);
   const body = bracedBody({ source, from: start });
@@ -70,9 +64,7 @@ function platformKeys({
       const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*:/.exec(trimmed);
       if (match) keys.push(match[1]!);
     }
-    level +=
-      (trimmed.match(/[{(]/g) ?? []).length -
-      (trimmed.match(/[})]/g) ?? []).length;
+    level += (trimmed.match(/[{(]/g) ?? []).length - (trimmed.match(/[})]/g) ?? []).length;
   }
   return keys;
 }
@@ -90,26 +82,17 @@ function cliKeys({ source, name }: { source: string; name: string }): string[] {
       const match = /^(?:readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)\??:/.exec(trimmed);
       if (match) keys.push(match[1]!);
     }
-    level +=
-      (trimmed.match(/[{(]/g) ?? []).length -
-      (trimmed.match(/[})]/g) ?? []).length;
+    level += (trimmed.match(/[{(]/g) ?? []).length - (trimmed.match(/[})]/g) ?? []).length;
   }
   return keys;
 }
 
 const sorted = (keys: string[]): string[] => [...keys].sort();
 
-const withoutType = (keys: string[]): string[] =>
-  keys.filter((key) => key !== "type");
+const withoutType = (keys: string[]): string[] => keys.filter((key) => key !== "type");
 
 /** The string entries of one `export const NAME = [...] as const` list. */
-function stringList({
-  source,
-  name,
-}: {
-  source: string;
-  name: string;
-}): string[] {
+function stringList({ source, name }: { source: string; name: string }): string[] {
   const listed = new RegExp(`${name} = \\[([^\\]]*)\\]`).exec(source)?.[1] ?? "";
   return [...listed.matchAll(/"([a-z_]+)"/g)].map((entry) => entry[1]!);
 }
@@ -118,13 +101,7 @@ function stringList({
  * One numeric constant of the platform's constants module. The budgets are
  * written as sums of products (`5 * 60 * 1000`), which is all this reads.
  */
-function platformNumber({
-  source,
-  name,
-}: {
-  source: string;
-  name: string;
-}): number {
+function platformNumber({ source, name }: { source: string; name: string }): number {
   const match = new RegExp(`export const ${name} = ([^;]+);`).exec(source);
   if (!match) throw new Error(`the platform constants have no ${name}`);
   const expression = match[1]!.replace(/_/g, "");
@@ -144,8 +121,9 @@ function platformNumber({
 
 describe("the CLI local control protocol, given the platform's contract module", () => {
   if (!existsSync(PLATFORM_PROTOCOL)) {
+    // A published SDK checkout carries no platform/app; the drift check runs in the monorepo.
     it.skip("matches the platform contract (skipped: no platform tree in this checkout)", () => {
-      // A published SDK checkout carries no platform/app; the drift check runs in the monorepo.
+      expect(existsSync(PLATFORM_PROTOCOL)).toBe(true);
     });
     return;
   }
@@ -155,24 +133,18 @@ describe("the CLI local control protocol, given the platform's contract module",
   const cli = readFileSync(CLI_PROTOCOL, "utf8");
 
   it("speaks the same protocol version", () => {
-    const match = /export const LOCAL_CONTROL_PROTOCOL_VERSION = (\d+);/.exec(
-      platform,
-    );
+    const match = /export const LOCAL_CONTROL_PROTOCOL_VERSION = (\d+);/.exec(platform);
     expect(Number(match?.[1])).toBe(LOCAL_CONTROL_PROTOCOL_VERSION);
   });
 
   it("knows every frame type the platform names", () => {
     const platformTypes = [
       ...new Set(
-        [...platform.matchAll(/type: z\.literal\("([a-z_]+)"\)/g)].map(
-          (entry) => entry[1]!,
-        ),
+        [...platform.matchAll(/type: z\.literal\("([a-z_]+)"\)/g)].map((entry) => entry[1]!),
       ),
     ].sort();
     const cliTypes = [
-      ...new Set(
-        [...cli.matchAll(/type: "([a-z_]+)";/g)].map((entry) => entry[1]!),
-      ),
+      ...new Set([...cli.matchAll(/type: "([a-z_]+)";/g)].map((entry) => entry[1]!)),
     ].sort();
     expect(cliTypes).toEqual(platformTypes);
     expect(cliTypes).toEqual([
@@ -203,47 +175,31 @@ describe("the CLI local control protocol, given the platform's contract module",
       expect(sorted(cliKeys({ source: cli, name: "LocalControlCli" }))).toEqual(
         sorted(platformKeys({ source: platform, schema: "cliSchema" })),
       );
-      expect(
-        sorted(cliKeys({ source: cli, name: "LocalRegisterInstance" })),
-      ).toEqual(
-        sorted(
-          platformKeys({ source: platform, schema: "registerInstanceSchema" }),
-        ),
+      expect(sorted(cliKeys({ source: cli, name: "LocalRegisterInstance" }))).toEqual(
+        sorted(platformKeys({ source: platform, schema: "registerInstanceSchema" })),
       );
       expect(sorted(cliKeys({ source: cli, name: "WorkspaceInfo" }))).toEqual(
         sorted(platformKeys({ source: platform, schema: "workspaceInfoSchema" })),
       );
-      expect(
-        sorted(withoutType(cliKeys({ source: cli, name: "LocalRegisterFrame" }))),
-      ).toEqual(
+      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalRegisterFrame" })))).toEqual(
         sorted([
           "protocol",
-          ...withoutType(
-            platformKeys({ source: platform, schema: "registerFrameSchema" }),
-          ),
+          ...withoutType(platformKeys({ source: platform, schema: "registerFrameSchema" })),
         ]),
       );
     });
 
     it("ack, result and deregister carry the same keys", () => {
-      expect(
-        sorted(withoutType(cliKeys({ source: cli, name: "LocalAckFrame" }))),
-      ).toEqual(
+      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalAckFrame" })))).toEqual(
         sorted([
           "protocol",
-          ...withoutType(
-            platformKeys({ source: platform, schema: "ackFrameSchema" }),
-          ),
+          ...withoutType(platformKeys({ source: platform, schema: "ackFrameSchema" })),
         ]),
       );
-      expect(
-        sorted(withoutType(cliKeys({ source: cli, name: "LocalResultFrame" }))),
-      ).toEqual(
+      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalResultFrame" })))).toEqual(
         sorted([
           "protocol",
-          ...withoutType(
-            platformKeys({ source: platform, schema: "resultFrameSchema" }),
-          ),
+          ...withoutType(platformKeys({ source: platform, schema: "resultFrameSchema" })),
         ]),
       );
       expect(sorted(cliKeys({ source: cli, name: "LocalCallError" }))).toEqual(
@@ -252,11 +208,9 @@ describe("the CLI local control protocol, given the platform's contract module",
       expect(sorted(cliKeys({ source: cli, name: "BashOutput" }))).toEqual(
         sorted(platformKeys({ source: platform, schema: "bashOutputSchema" })),
       );
-      expect(
-        sorted(
-          withoutType(cliKeys({ source: cli, name: "LocalDeregisterFrame" })),
-        ),
-      ).toEqual(["protocol"]);
+      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalDeregisterFrame" })))).toEqual([
+        "protocol",
+      ]);
     });
 
     it("permission_required carries the same keys, segments included", () => {
@@ -264,11 +218,7 @@ describe("the CLI local control protocol, given the platform's contract module",
         sorted(platformKeys({ source: platform, schema: "commandSegmentSchema" })),
       );
       expect(
-        sorted(
-          withoutType(
-            cliKeys({ source: cli, name: "LocalPermissionRequiredFrame" }),
-          ),
-        ),
+        sorted(withoutType(cliKeys({ source: cli, name: "LocalPermissionRequiredFrame" }))),
       ).toEqual(
         sorted([
           "protocol",
@@ -284,11 +234,7 @@ describe("the CLI local control protocol, given the platform's contract module",
 
     it("permission_answered carries the same keys", () => {
       expect(
-        sorted(
-          withoutType(
-            cliKeys({ source: cli, name: "LocalPermissionAnsweredFrame" }),
-          ),
-        ),
+        sorted(withoutType(cliKeys({ source: cli, name: "LocalPermissionAnsweredFrame" }))),
       ).toEqual(
         sorted([
           "protocol",
@@ -311,29 +257,19 @@ describe("the CLI local control protocol, given the platform's contract module",
 
   describe("when the frames the CLI receives are compared", () => {
     it("registered carries the same keys", () => {
-      expect(
-        sorted(
-          withoutType(cliKeys({ source: cli, name: "LocalRegisteredFrame" })),
-        ),
-      ).toEqual(
+      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalRegisteredFrame" })))).toEqual(
         sorted([
           "protocol",
-          ...withoutType(
-            platformKeys({ source: platform, schema: "registeredFrameSchema" }),
-          ),
+          ...withoutType(platformKeys({ source: platform, schema: "registeredFrameSchema" })),
         ]),
       );
     });
 
     it("refused carries the same keys and every refusal code has advice", () => {
-      expect(
-        sorted(withoutType(cliKeys({ source: cli, name: "LocalRefusedFrame" }))),
-      ).toEqual(
+      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalRefusedFrame" })))).toEqual(
         sorted([
           "protocol",
-          ...withoutType(
-            platformKeys({ source: platform, schema: "refusedFrameSchema" }),
-          ),
+          ...withoutType(platformKeys({ source: platform, schema: "refusedFrameSchema" })),
         ]),
       );
       const codes = stringList({
@@ -343,9 +279,7 @@ describe("the CLI local control protocol, given the platform's contract module",
       expect(codes.length).toBeGreaterThan(0);
       expect([...LOCAL_CONTROL_REFUSED_CODES]).toEqual(codes);
       for (const code of codes) {
-        expect(cli, `localRefusalAdvice has no case for ${code}`).toContain(
-          `case "${code}":`,
-        );
+        expect(cli, `localRefusalAdvice has no case for ${code}`).toContain(`case "${code}":`);
       }
     });
 
@@ -354,17 +288,11 @@ describe("the CLI local control protocol, given the platform's contract module",
         source: platform,
         schema: "callEnvelopeSchema",
       });
-      expect(sorted(cliKeys({ source: cli, name: "LocalCallEnvelope" }))).toEqual(
-        sorted(envelope),
-      );
-      expect(
-        sorted(withoutType(cliKeys({ source: cli, name: "LocalCallFrame" }))),
-      ).toEqual(
+      expect(sorted(cliKeys({ source: cli, name: "LocalCallEnvelope" }))).toEqual(sorted(envelope));
+      expect(sorted(withoutType(cliKeys({ source: cli, name: "LocalCallFrame" })))).toEqual(
         sorted([
           "protocol",
-          ...withoutType(
-            platformKeys({ source: platform, schema: "callFrameSchema" }),
-          ),
+          ...withoutType(platformKeys({ source: platform, schema: "callFrameSchema" })),
         ]),
       );
     });
@@ -378,10 +306,7 @@ describe("the CLI local control protocol, given the platform's contract module",
       ];
       for (const [name, schema] of pairs) {
         expect(sorted(withoutType(cliKeys({ source: cli, name })))).toEqual(
-          sorted([
-            "protocol",
-            ...withoutType(platformKeys({ source: platform, schema })),
-          ]),
+          sorted(["protocol", ...withoutType(platformKeys({ source: platform, schema }))]),
         );
       }
     });

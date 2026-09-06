@@ -103,7 +103,7 @@ describe("GET /api/auth/cli/governance/ingestion-keys/:lookup_id", () => {
   /** @scenario "The CLI can ask what became of its own key" */
   it("answers with the cause for a revoked key, live for a live one", async () => {
     const api = mountCli({
-      ingestionKeyDescribePersonal: vi
+      tryDescribePersonalIngestionKey: vi
         .fn()
         .mockResolvedValueOnce({
           sourceType: "opencode",
@@ -128,7 +128,7 @@ describe("GET /api/auth/cli/governance/ingestion-keys/:lookup_id", () => {
   });
 
   it("answers unknown with a 200 for a lookup id that names none of the caller's keys", async () => {
-    const api = mountCli({ ingestionKeyDescribePersonal: vi.fn().mockResolvedValue(null) });
+    const api = mountCli({ tryDescribePersonalIngestionKey: vi.fn().mockResolvedValue(null) });
 
     const response = await api.get("/api/auth/cli/governance/ingestion-keys/nosuchlookupid");
 

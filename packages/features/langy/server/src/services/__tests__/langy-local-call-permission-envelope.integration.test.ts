@@ -13,9 +13,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { type AgentStateStorePort, ConnectedAgentStateAdapter } from "@langwatch/agent-server";
-import { LocalCallDispatcher } from "../langy-local-call-dispatcher.service";
-import { LocalWorkspacePresence } from "../../adapters/redis.langy-local-presence.adapter";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
+import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service";
+import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter";
 
 const projectId = "project_envelope";
 const conversationId = "conv_envelope";
@@ -43,9 +44,9 @@ async function callWaitingOnACard(clock: { now: number }) {
   const store: AgentStateStorePort = ConnectedAgentStateAdapter.memory({
     now: () => clock.now,
   });
-  const presence = new LocalWorkspacePresence({ store, now: () => clock.now });
+  const presence = LangyLocalPresenceAdapter.create({ store, now: () => clock.now });
   await presence.register(connectedFolder(clock.now));
-  const dispatcher = new LocalCallDispatcher({
+  const dispatcher = LocalCallDispatcherService.create({
     store,
     presence,
     now: () => clock.now,

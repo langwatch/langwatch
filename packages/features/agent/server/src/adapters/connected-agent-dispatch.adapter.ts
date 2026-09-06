@@ -41,7 +41,7 @@ import {
   resultKey,
   threadPinKey,
 } from "../rules/connected-agent-keys.rules";
-import type { AgentStateStorePort, Unsubscribe } from "../ports/agent-state-store.port";
+import type { AgentStateStorePort, Unsubscribe } from "@langwatch/agent-contract";
 import {
   ConnectedAgentDispatchPort,
   type ConnectedAgentRegistryPort,

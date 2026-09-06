@@ -41,7 +41,7 @@ const DEFAULT_TARGET: SuiteTarget = { type: "http", referenceId: "agent-1" };
 
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
-  get: async () => null,
+  tryGet: async () => null,
 };
 
 let ch: ClickHouseClient | undefined;

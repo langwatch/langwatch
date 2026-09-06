@@ -302,7 +302,7 @@ export class TraceDiscoverService {
     // Assemble in registry order so the sidebar's group ordering is preserved.
     const facets: FacetDescriptor[] = [];
     for (const def of ClickHouseFacetRegistryAdapter.FACET_REGISTRY) {
-      const descriptor = await this.descriptors.materializeDescriptor(
+      const descriptor = await this.descriptors.tryMaterializeDescriptor(
         def,
         params,
         batchByTable,

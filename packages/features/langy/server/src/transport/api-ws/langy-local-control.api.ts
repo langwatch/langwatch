@@ -20,10 +20,10 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
-import type { ConnectUpgradeRouterPort as UpgradeRouter } from "@langwatch/agent-server";
+import type { ConnectUpgradeRouterPort as UpgradeRouter } from "@langwatch/api";
 import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
 import { DeliveredCalls } from "../../rules/langy-local-delivered-calls.rules";
-import type { PresenceHeartbeat } from "../../adapters/redis.langy-local-presence.adapter";
+import type { PresenceHeartbeat } from "../../ports/langy-local-presence.port";
 import {
   type CliFrame,
   cliFrameSchema,
@@ -33,7 +33,7 @@ import {
 import type {
   ControlCredential,
   ControlSession,
-  LocalControlSessionCore,
+  LocalControlSessionCoreService,
 } from "../../services/langy-local-session.service";
 
 const logger = createLogger("langwatch:langy:local-control:gateway");
@@ -67,7 +67,7 @@ interface LiveSocket {
 }
 
 export interface ControlGatewayOptions {
-  core: LocalControlSessionCore;
+  core: LocalControlSessionCoreService;
   pingIntervalMs?: number;
   pongWaitMs?: number;
   /** The biggest frame a command line may send. */
@@ -76,7 +76,7 @@ export interface ControlGatewayOptions {
 
 export class LocalControlGateway {
   private readonly wss: WebSocketServer;
-  private readonly core: LocalControlSessionCore;
+  private readonly core: LocalControlSessionCoreService;
   private readonly pingIntervalMs: number;
   private readonly pongWaitMs: number;
   private readonly sockets = new Set<LiveSocket>();
@@ -103,11 +103,7 @@ export class LocalControlGateway {
     return this.sockets.size;
   }
 
-  private upgrade(
-    request: IncomingMessage,
-    socket: Duplex,
-    head: Buffer,
-  ): void {
+  private upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
     this.wss.handleUpgrade(request, socket, head, (ws) => {
       void this.accept(ws, request);
     });
@@ -132,9 +128,7 @@ export class LocalControlGateway {
     const projectHeader = request.headers["x-project-id"];
     const authenticated = await this.core.authenticate({
       authorization: request.headers.authorization,
-      projectId: Array.isArray(projectHeader)
-        ? projectHeader[0]
-        : projectHeader,
+      projectId: Array.isArray(projectHeader) ? projectHeader[0] : projectHeader,
     });
     ws.off("message", hold);
     if (!authenticated.ok) {
@@ -187,17 +181,13 @@ export class LocalControlGateway {
     };
     // The command line is still running these; handing them over again would
     // run them twice on the developer's machine.
-    for (const callId of registered.inFlightCallIds)
-      live.delivered.reserve(callId);
+    for (const callId of registered.inFlightCallIds) live.delivered.reserve(callId);
     this.sockets.add(live);
-    live.unsubscribe = await this.core.subscribe(
-      registered.session,
-      (platformFrame) => {
-        if (platformFrame.type === "disconnect") live.released = true;
-        if (!live.delivered.admit(platformFrame)) return;
-        this.send(ws, platformFrame);
-      },
-    );
+    live.unsubscribe = await this.core.subscribe(registered.session, (platformFrame) => {
+      if (platformFrame.type === "disconnect") live.released = true;
+      if (!live.delivered.admit(platformFrame)) return;
+      this.send(ws, platformFrame);
+    });
 
     ws.on("message", (data) => void this.onFrame(live, data));
     ws.on("pong", () => {
@@ -226,19 +216,16 @@ export class LocalControlGateway {
     // while this folder was away.
     await this.core.afterRegister(registered.session);
     for (const envelope of await this.core.pendingCalls(registered.session)) {
-      const frame: PlatformFrame = {
+      const callFrame: PlatformFrame = {
         type: "call",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
         call: envelope,
       };
-      if (live.delivered.admit(frame)) this.send(ws, frame);
+      if (live.delivered.admit(callFrame)) this.send(ws, callFrame);
     }
   }
 
-  private async onFrame(
-    live: LiveSocket,
-    raw: WebSocket.RawData,
-  ): Promise<void> {
+  private async onFrame(live: LiveSocket, raw: WebSocket.RawData): Promise<void> {
     const frame = parseCliFrame(raw);
     if (!frame) return;
     switch (frame.type) {

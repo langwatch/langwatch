@@ -135,7 +135,7 @@ export class ComputeRunMetricsAdapter implements CommandHandler<
 
     // Pull fallback: read from trace summary store
     if (!metrics) {
-      const traceSummary = await this.deps.traceSummaryStore.get(traceId, {
+      const traceSummary = await this.deps.traceSummaryStore.tryGet(traceId, {
         tenantId,
         aggregateId: traceId,
       });

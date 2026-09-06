@@ -9,7 +9,10 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
-import { SuiteExecutionService, type QueueSimulationRunCommandData } from "@langwatch/suite-server";
+import {
+  SuiteExecutionService,
+  type QueueSimulationRunCommandData,
+} from "@langwatch/suite-server/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

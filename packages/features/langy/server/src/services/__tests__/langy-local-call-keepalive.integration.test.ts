@@ -23,13 +23,14 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { LANGY_LIVENESS } from "../../rules/langy-streaming-constants.rules";
 import { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter";
 import { createAgentTurnLivenessSubscriber } from "../../subscribers/langy-conversation.subscriber";
-import { type AgentStateStorePort, ConnectedAgentStateAdapter } from "@langwatch/agent-server";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
 import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
 import { DispatchError } from "@langwatch/eventing";
 import type { EventSubscriberContext } from "@langwatch/eventing";
-import { LocalCallDispatcher } from "../langy-local-call-dispatcher.service";
+import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service";
 import { CALL_POLL_HOLD_MS } from "@langwatch/langy-contract";
-import { LocalWorkspacePresence } from "../../adapters/redis.langy-local-presence.adapter";
+import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter";
 
 /** How long the subscriber lets a turn go quiet before it ends it. */
 const STALL_WINDOW_MS = LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 3;
@@ -81,7 +82,6 @@ function livenessEvent(
 }
 
 function subscriberOver({
-  conversationId,
   turnId,
   acceptedAt,
 }: {
@@ -117,7 +117,7 @@ async function pollFor({
   callId,
   forMs,
 }: {
-  dispatcher: LocalCallDispatcher;
+  dispatcher: LocalCallDispatcherService;
   callId: string;
   forMs: number;
 }): Promise<void> {
@@ -151,9 +151,9 @@ describe("given a command running on the developer's machine", () => {
       const conversationId = "conv_alive";
       const turnId = "turn_alive";
       const acceptedAt = startedAt();
-      const presence = new LocalWorkspacePresence({ store, now: () => now });
+      const presence = LangyLocalPresenceAdapter.create({ store, now: () => now });
       await presence.register(workspace(conversationId));
-      const dispatcher = new LocalCallDispatcher({
+      const dispatcher = LocalCallDispatcherService.create({
         store,
         presence,
         buffer,
@@ -208,9 +208,9 @@ describe("given a command running on the developer's machine", () => {
       const conversationId = "conv_gone";
       const turnId = "turn_gone";
       const acceptedAt = startedAt();
-      const presence = new LocalWorkspacePresence({ store, now: () => now });
+      const presence = LangyLocalPresenceAdapter.create({ store, now: () => now });
       await presence.register(workspace(conversationId));
-      const dispatcher = new LocalCallDispatcher({
+      const dispatcher = LocalCallDispatcherService.create({
         store,
         presence,
         now: () => now,

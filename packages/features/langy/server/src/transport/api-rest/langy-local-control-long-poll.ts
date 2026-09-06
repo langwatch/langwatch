@@ -4,7 +4,7 @@
  * A network that blocks WebSockets still has to carry the folder, so the same
  * three moves are available over plain requests: register once, poll for the
  * frames the platform has for you, and post the frames you have for it. The
- * meaning of each move is `LocalControlSessionCore`'s, exactly as it is for the
+ * meaning of each move is `LocalControlSessionCoreService`'s, exactly as it is for the
  * socket; this file owns only the queue that turns a subscription into a poll.
  *
  * One hold per poll, twenty seconds, so a proxy sees one request every twenty
@@ -14,7 +14,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import type { Unsubscribe } from "@langwatch/agent-server";
+import type { Unsubscribe } from "@langwatch/agent-contract";
 import { CALL_POLL_HOLD_MS, POLL_INTERVAL_MS } from "@langwatch/langy-contract";
 import { DeliveredCalls } from "../../rules/langy-local-delivered-calls.rules";
 import {
@@ -25,7 +25,7 @@ import {
 } from "@langwatch/langy-contract";
 import type {
   ControlSession,
-  LocalControlSessionCore,
+  LocalControlSessionCoreService,
 } from "../../services/langy-local-session.service";
 
 const logger = createLogger("langwatch:langy:local-control:long-poll");
@@ -46,7 +46,7 @@ export interface LongPollRegisterOutcome {
 }
 
 export interface LocalControlLongPollOptions {
-  core: LocalControlSessionCore;
+  core: LocalControlSessionCoreService;
   holdMs?: number;
   pollIntervalMs?: number;
 }
@@ -58,7 +58,7 @@ export interface LocalControlLongPollOptions {
  * dropped socket takes.
  */
 export class LocalControlLongPoll {
-  private readonly core: LocalControlSessionCore;
+  private readonly core: LocalControlSessionCoreService;
   private readonly holdMs: number;
   private readonly pollIntervalMs: number;
   private readonly sessions = new Map<
@@ -132,12 +132,12 @@ export class LocalControlLongPoll {
 
     await this.core.afterRegister(registered.session);
     for (const envelope of await this.core.pendingCalls(registered.session)) {
-      const frame: PlatformFrame = {
+      const callFrame: PlatformFrame = {
         type: "call",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
         call: envelope,
       };
-      if (entry.delivered.admit(frame)) queue.push(frame);
+      if (entry.delivered.admit(callFrame)) queue.push(callFrame);
     }
     return { ok: true, token, reply: registered.reply };
   }

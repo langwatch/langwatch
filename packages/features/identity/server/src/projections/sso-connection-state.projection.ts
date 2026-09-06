@@ -313,33 +313,4 @@ export class SsoConnectionStateFoldProjection
   ): SsoConnectionFoldState {
     return this.fold(event, state);
   }
-
-  /**
-   * The ONE place a connection fact becomes a framework event: the guards
-   * (`SsoConnectionGuardsService`) decide what a command states, and this stamps the
-   * envelope, so every producer stamps a fact identically.
-   */
-  static eventsFor({
-    command,
-    facts,
-  }: {
-    command: SsoConnectionCommand;
-    facts: SsoConnectionFactInput[];
-  }): SsoConnectionEvent[] {
-    const { connectionId, tenantId, commandId, occurredAtMs } = command.data;
-    return facts.map(
-      (fact, index) =>
-        EventUtils.createEvent({
-          aggregateType: SSO_CONNECTION_AGGREGATE_TYPE,
-          aggregateId: connectionId,
-          tenantId: createTenantId(tenantId),
-          type: fact.type,
-          version: SSO_CONNECTION_EVENT_VERSION_LATEST,
-          data: fact.data,
-          metadata: {},
-          occurredAt: occurredAtMs,
-          idempotencyKey: eventIdempotencyKey({ commandId, index }),
-        }) as SsoConnectionEvent,
-    );
-  }
 }

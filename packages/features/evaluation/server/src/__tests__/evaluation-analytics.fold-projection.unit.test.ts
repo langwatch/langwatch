@@ -21,7 +21,7 @@ const rowProjection = EvaluationAnalyticsRowProjection.create();
 
 function makeFold() {
   return EvaluationAnalyticsFoldProjection.create({
-    store: { store: async () => {}, get: async () => null },
+    store: { store: async () => {}, tryGet: async () => null },
   });
 }
 

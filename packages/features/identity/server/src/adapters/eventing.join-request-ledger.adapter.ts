@@ -24,8 +24,8 @@ import {
 } from "@langwatch/eventing";
 import { JOIN_REQUEST_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 import type { JoinRequestEvent } from "../projections/join-request-state.projection";
-import { JoinRequestStateFoldProjection } from "../projections/join-request-state.projection";
 import type { JoinRequestFoldState } from "../projections/join-request-state.projection";
+import { joinRequestEventsFor } from "../intents/join-request-events.intent";
 
 const logger = createLogger("langwatch:identity:join-request-ledger");
 
@@ -75,7 +75,7 @@ export class EventingJoinRequestLedgerAdapter implements JoinRequestLedger {
     command: JoinRequestCommand;
     facts: JoinRequestFactInput[];
   }): Promise<JoinRequestFact[]> {
-    const events = JoinRequestStateFoldProjection.eventsFor({ command, facts });
+    const events = joinRequestEventsFor({ command, facts });
     if (events.length === 0) return [];
     const { joinRequestId, tenantId } = command.data;
 

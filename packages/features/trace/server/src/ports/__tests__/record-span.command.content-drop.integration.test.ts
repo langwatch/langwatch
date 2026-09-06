@@ -229,7 +229,7 @@ describe("RecordSpanCommand content drop", () => {
       it("yields no computed input from the fold but keeps the computed output", async () => {
         const runtime = createTestRuntime();
         const fold = TraceSummaryFoldProjection.create({
-          store: { store: async () => {}, get: async () => null },
+          store: { store: async () => {}, tryGet: async () => null },
           traceCanonicalisation: TraceCanonicalisationService.create(),
           runtime,
         });

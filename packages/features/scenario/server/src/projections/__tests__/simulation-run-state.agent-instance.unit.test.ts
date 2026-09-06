@@ -24,7 +24,7 @@ import {
 
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
-  get: async () => null,
+  tryGet: async () => null,
 };
 const foldProjection = SimulationRunStateFoldProjection.create({
   store: noopStore,
@@ -185,7 +185,7 @@ describe("simulationRunStateFoldProjection", () => {
       const written: SimulationRunStateData[] = [];
       const projection = SimulationRunStateFoldProjection.create({
         store: {
-          get: async () => stored,
+          tryGet: async () => stored,
           store: async (state: SimulationRunStateData) => {
             written.push(state);
           },

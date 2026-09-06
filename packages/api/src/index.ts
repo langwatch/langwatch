@@ -13,7 +13,8 @@ export {
   InvalidApiVersionError,
 } from "./errors.js";
 
-export type { RateLimiter, ResponseCache } from "./ports.js";
+export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.js";
+export { ConnectUpgradeRouterPort } from "./ports.js";
 
 export type { ApiSchema, ApiSchemaOutput } from "./schema.js";
 

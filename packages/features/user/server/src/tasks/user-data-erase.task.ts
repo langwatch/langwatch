@@ -70,7 +70,7 @@ export async function runGdprUserDataErase({
   email: string;
   execute: boolean;
 }): Promise<GdprUserDataEraseOutcome> {
-  const user = await repository.findUserByEmail(email);
+  const user = await repository.tryFindUserByEmail(email);
   if (!user) {
     throw new Error(`No user found with email: ${email}`);
   }
@@ -120,7 +120,7 @@ export async function runGdprUserDataErase({
     soleOwnedOrgIds,
   });
 
-  const remaining = await repository.findUserById(userId);
+  const remaining = await repository.tryFindUserById(userId);
   if (remaining) {
     throw new Error("Deletion verification failed: user still exists");
   }

@@ -33,7 +33,14 @@ import {
   type TraceRecord,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { ClickHouseTraceDerivationSpanReaderAdapter, TraceLegacyReadClickHouseRepository, TraceEventDerivationService, TraceQueryClassificationAdapter, VisibilityWindowService, type TraceClickHouseWriteResolver } from "@langwatch/trace-server";
+import {
+  ClickHouseTraceDerivationSpanReaderAdapter,
+  TraceLegacyReadClickHouseRepository,
+  TraceEventDerivationService,
+  TraceQueryClassificationAdapter,
+  VisibilityWindowService,
+  type TraceClickHouseWriteResolver,
+} from "@langwatch/trace-server";
 import type { WorkerAutomationSettlementAbsenceReportPort } from "./worker-automation-settlement.composition";
 
 /**
@@ -79,7 +86,7 @@ export class WorkerAutomationSettlementTraceReader extends AutomationSettlementT
   }
 
   tryGetSummary(input: { projectId: string; traceId: string }): Promise<TraceSummaryData | null> {
-    return this.summaries.get(input.traceId, {
+    return this.summaries.tryGet(input.traceId, {
       aggregateId: input.traceId,
       tenantId: createTenantId(input.projectId),
     });

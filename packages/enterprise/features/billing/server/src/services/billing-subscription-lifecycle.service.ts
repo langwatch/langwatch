@@ -274,7 +274,7 @@ export class BillingSubscriptionLifecycleService {
   }: {
     subscriptionId: string;
     throwOnMissing?: boolean;
-  }) {
+  }): Promise<void> {
     await waitForStripeConsistency();
 
     const previousSubscription =

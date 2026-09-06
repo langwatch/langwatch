@@ -1,7 +1,7 @@
 /**
  * The API process's four Langy REST doors, and what it can and cannot put behind each of them.
  */
-import { canModelSkipPermissions, LangyTokenBufferAdapter } from "@langwatch/langy-server";
+import { LangyTokenBufferAdapter, SkipPermissionsService } from "@langwatch/langy-server";
 import { LangyUiNoBrowserError } from "@langwatch/langy-contract";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
@@ -204,7 +204,11 @@ function composeLocal(input: {
     github: () => local.github,
     baseHost: local.baseHost,
     skipGate: ({ projectId, model }) =>
-      canModelSkipPermissions({ projectId, model, providerRows: local.providerRows }),
+      SkipPermissionsService.canModelSkipPermissions({
+        projectId,
+        model,
+        providerRows: local.providerRows,
+      }),
   };
 }
 

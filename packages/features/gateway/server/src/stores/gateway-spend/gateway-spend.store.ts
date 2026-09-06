@@ -27,7 +27,7 @@ export class GatewaySpendStore implements FoldProjectionStore<GatewaySpendState>
 
   private constructor(private readonly repo: GatewaySpendEventsPort) {}
 
-  async get(
+  async tryGet(
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<GatewaySpendState | null> {

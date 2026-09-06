@@ -115,7 +115,10 @@
       "root": "billing",
       "uses": {
         "screens": ["@langwatch/enterprise-billing-web/screens/billing"],
-        "surfaces": ["@langwatch/enterprise-billing-web/surfaces/contact-sales"]
+        "surfaces": [
+          "@langwatch/enterprise-billing-web/surfaces/contact-sales",
+          "@langwatch/enterprise-billing-web/surfaces/seat-proration-preview"
+        ]
       }
     },
     {
@@ -219,7 +222,7 @@
       "root": "langy",
       "uses": {
         "screens": ["@langwatch/langy-web/screens/langy"],
-        "surfaces": []
+        "surfaces": ["@langwatch/langy-web/surfaces/langy-code-access-preference"]
       }
     },
     {
@@ -297,7 +300,7 @@
       "root": "personal-workspace",
       "uses": {
         "screens": ["@langwatch/user-web/screens/personal-workspace"],
-        "surfaces": []
+        "surfaces": ["@langwatch/langy-web/surfaces/langy-store"]
       }
     },
     {

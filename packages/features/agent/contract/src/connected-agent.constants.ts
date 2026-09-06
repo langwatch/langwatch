@@ -57,6 +57,9 @@ export const PRESENCE_TTL_SECONDS = 30;
 /** How often presence is refreshed while the socket answers pings. */
 export const PRESENCE_REFRESH_MS = 10_000;
 
+/** The instance token an HTTP session is addressed by. */
+export const INSTANCE_TOKEN_HEADER = "x-agent-instance-token";
+
 /** How long a poll of the HTTP transport waits for a frame before it answers empty. */
 export const POLL_WAIT_MS = 25_000;
 

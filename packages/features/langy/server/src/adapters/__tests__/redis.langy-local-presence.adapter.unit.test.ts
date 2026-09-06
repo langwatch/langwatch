@@ -6,18 +6,17 @@
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { type AgentStateStorePort, ConnectedAgentStateAdapter } from "@langwatch/agent-server";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules";
-import {
-  type ConnectedWorkspace,
-  LocalWorkspacePresence,
-} from "../redis.langy-local-presence.adapter";
+import { LangyLocalPresenceAdapter } from "../redis.langy-local-presence.adapter";
+import type { ConnectedWorkspace } from "../../ports/langy-local-presence.port";
 
 const conversationId = "conv_1";
 
 let now = 1_700_000_000_000;
 let store: AgentStateStorePort;
-let presence: LocalWorkspacePresence;
+let presence: LangyLocalPresenceAdapter;
 
 function workspace(instanceId = "lci_1"): ConnectedWorkspace {
   return {
@@ -40,7 +39,7 @@ function workspace(instanceId = "lci_1"): ConnectedWorkspace {
 beforeEach(() => {
   now = 1_700_000_000_000;
   store = ConnectedAgentStateAdapter.memory({ now: () => now });
-  presence = new LocalWorkspacePresence({ store, now: () => now });
+  presence = LangyLocalPresenceAdapter.create({ store, now: () => now });
 });
 
 describe("given a folder connected to the conversation", () => {

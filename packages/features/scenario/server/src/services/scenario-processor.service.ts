@@ -171,6 +171,50 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
     this.options.metrics.started();
     jobLogger.info("Processing scenario job");
 
+    const prepared = await this.prepareRun({ jobData, jobLogger });
+    if (!prepared) return;
+    const { prefetch } = prepared;
+    let { childSession, childStartedAt } = prepared;
+
+    if (!childSession) {
+      childStartedAt = Date.now();
+      childSession = this.options.childProcesses.start({
+        jobData,
+        environment: {
+          labels: prefetch.data.scenario.labels,
+          telemetry: prefetch.telemetry,
+        },
+      });
+    }
+
+    const result = await childSession.execute({
+      ...prefetch.data,
+      scenarioRunId: jobData.scenarioRunId,
+    });
+    await this.finishExecution({
+      jobData,
+      result,
+      startedAt,
+      childStartedAt: childStartedAt ?? startedAt,
+      jobLogger,
+    });
+  }
+
+  /**
+   * Prepares the run and resolves its prefetch, starting the child as soon as its environment is
+   * known. Answers null when the run is already finished — cancelled, or refused by the prefetch.
+   */
+  private async prepareRun({
+    jobData,
+    jobLogger,
+  }: {
+    jobData: ExecutionJobData;
+    jobLogger: Logger;
+  }): Promise<{
+    prefetch: ScenarioExecutionPrefetchResult & { success: true };
+    childSession: ScenarioChildExecutionSession | null;
+    childStartedAt: number | null;
+  } | null> {
     const preparation = this.options.execution.prepare({
       context: {
         projectId: jobData.projectId,
@@ -207,7 +251,7 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
       await this.releaseChild({ childSession, scenarioRunId: jobData.scenarioRunId });
       await this.handleCancelled(jobData, "Cancelled before execution started");
 
-      return;
+      return null;
     }
 
     if (!prefetch.success) {
@@ -215,31 +259,10 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
       ScenarioProcessorService.logPrefetchFailure({ jobLogger, prefetchResult: prefetch });
       await this.handleFailed(jobData, prefetch.error);
 
-      return;
+      return null;
     }
 
-    if (!childSession) {
-      childStartedAt = Date.now();
-      childSession = this.options.childProcesses.start({
-        jobData,
-        environment: {
-          labels: prefetch.data.scenario.labels,
-          telemetry: prefetch.telemetry,
-        },
-      });
-    }
-
-    const result = await childSession.execute({
-      ...prefetch.data,
-      scenarioRunId: jobData.scenarioRunId,
-    });
-    await this.finishExecution({
-      jobData,
-      result,
-      startedAt,
-      childStartedAt: childStartedAt ?? startedAt,
-      jobLogger,
-    });
+    return { prefetch, childSession, childStartedAt };
   }
 
   /**
@@ -306,7 +329,9 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
     jobLogger?: Logger;
   }): Promise<void> {
     const agentInstance = input.result.agentInstance;
-    if (!agentInstance) {return;}
+    if (!agentInstance) {
+      return;
+    }
 
     try {
       await this.options.execution.recordAgentInstance({

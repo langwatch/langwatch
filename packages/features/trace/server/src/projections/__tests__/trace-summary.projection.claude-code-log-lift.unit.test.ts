@@ -37,7 +37,7 @@ const applySpanToSummary = TraceSummaryFoldProjection.applySpanToSummary;
 
 function makeProjection() {
   return TraceSummaryFoldProjection.create({
-    store: { store: async () => {}, get: async () => null },
+    store: { store: async () => {}, tryGet: async () => null },
     traceCanonicalisation: TraceCanonicalisationService.create(),
     runtime: createTestRuntime(),
   });

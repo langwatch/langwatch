@@ -42,7 +42,7 @@ class TestAutomationEvaluationSubscriberService extends AutomationEvaluationSubs
 
 function foldStore<State>(): FoldProjectionStore<State> {
   return {
-    get: vi.fn().mockResolvedValue(null),
+    tryGet: vi.fn().mockResolvedValue(null),
     store: vi.fn().mockResolvedValue(undefined),
   };
 }

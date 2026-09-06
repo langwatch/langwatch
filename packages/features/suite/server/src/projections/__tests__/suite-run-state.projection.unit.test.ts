@@ -11,7 +11,7 @@ import { type SuiteRunStateData, SuiteRunStateFoldProjection } from "../suite-ru
 
 const noopStore: FoldProjectionStore<SuiteRunStateData> = {
   store: async () => {},
-  get: async () => null,
+  tryGet: async () => null,
 };
 const projection = SuiteRunStateFoldProjection.create({ store: noopStore });
 

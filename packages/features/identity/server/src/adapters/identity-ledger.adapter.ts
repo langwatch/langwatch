@@ -22,8 +22,8 @@ import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
 import type { IdentityEvent } from "../projections/identity-state.projection";
 import type { IdentityFoldState } from "../projections/identity-state.projection";
-import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
 import { MetricsIdentityLedgerAdapter } from "./metrics.identity-ledger.adapter";
+import { identityEventsFor } from "../intents/identity-events.intent";
 
 const logger = createLogger("langwatch:identity:ledger");
 
@@ -89,7 +89,7 @@ export class IdentityLedgerWriterAdapter implements IdentityLedger {
     command: IdentityCommand;
     facts: IdentityFactInput[];
   }): Promise<IdentityFact[]> {
-    const events = IdentityStateFoldProjection.eventsFor({ command, facts });
+    const events = identityEventsFor({ command, facts });
     if (events.length === 0) return [];
     const done = LEDGER_METRICS.startCommitTimer();
     try {

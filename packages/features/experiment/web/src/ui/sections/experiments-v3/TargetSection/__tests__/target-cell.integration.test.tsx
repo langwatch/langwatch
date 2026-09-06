@@ -506,11 +506,9 @@ describe("TargetCellContent", () => {
       const outputText = screen.getByText(/This is some content/);
       await user.click(outputText);
 
-      // Should still show Add evaluator button in expanded view
+      // The expanded overlay repeats the collapsed cell's own output text.
       await waitFor(() => {
-        // There should be 2 Add evaluator buttons now (one in collapsed, one in expanded)
-        const addButtons = screen.getAllByTestId(`add-evaluator-button-${target.id}`);
-        expect(addButtons.length).toBe(2);
+        expect(screen.getAllByText(/This is some content that would overflow/)).toHaveLength(2);
       });
     });
 

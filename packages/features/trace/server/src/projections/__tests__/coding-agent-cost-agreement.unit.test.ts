@@ -48,7 +48,7 @@ const CENTS_OF_A_CENT = 6;
 type CallExtra = Record<string, string | number>;
 
 const runtime = createTestRuntime();
-const noopFoldStore = { store: async () => {}, get: async () => null };
+const noopFoldStore = { store: async () => {}, tryGet: async () => null };
 const noopAppendStore = { append: async () => {}, bulkAppend: async () => {} } as never;
 
 function claudeCallEvent(extra: CallExtra = {}): SpanReceivedEvent {

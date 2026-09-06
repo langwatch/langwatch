@@ -12,7 +12,7 @@
 
 import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
-import type { ConnectUpgradeRouterPort, UpgradeHandler } from "@langwatch/agent-server";
+import type { ConnectUpgradeRouterPort, UpgradeHandler } from "@langwatch/api";
 import { ApiUpgradeSurfacePort } from "./api-http.listener";
 
 export class ApiUpgradeRouter extends ApiUpgradeSurfacePort implements ConnectUpgradeRouterPort {

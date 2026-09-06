@@ -1,4 +1,4 @@
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentService, AgentStateStorePort } from "@langwatch/agent-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -65,7 +65,7 @@ import {
   ApiConnectedAgentsAbsenceReportPort,
   ApiConnectedAgentsComposition,
 } from "./api-connected-agents.composition";
-import { ConnectedAgentPresenceService } from "@langwatch/agent-server";
+import { ConnectedAgentPresenceService, ConnectedAgentStateAdapter } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router";
 import {
   composeDatasetFeature,
@@ -404,16 +404,13 @@ import {
 import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
 import { HandledError } from "@langwatch/handled-error";
 import {
-  canModelSkipPermissions,
-  createLocalControlRuntime,
-  createLocalControlStore,
+  SkipPermissionsService,
+  LangyLocalControlRuntimeAdapter,
   LangyTokenBufferAdapter,
-  nullLocalControlBuffer,
   type LangyConversationCommands,
-  langyLocalTurnStarter,
   LocalControlGateway,
   LocalControlLongPoll,
-  LocalControlSessionCore,
+  LocalControlSessionCoreService,
   type LangyLocalTrpcPorts,
   type LocalControlRuntime,
   type SkipPermissionsProviderRows,
@@ -761,7 +758,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedLangyInternalSecret: string | undefined;
   private composedLangyLocalRuntime: LocalControlRuntime | undefined;
   private composedLangyPublicBaseUrl: string | undefined;
-  private composedLangyLocalSessionCore: LocalControlSessionCore | undefined;
+  private composedLangyLocalSessionCore: LocalControlSessionCoreService | undefined;
   private composedLangyLocalLongPoll: LocalControlLongPoll | undefined;
   /** The shared bearer the internal cron family authenticates its caller with, or none. */
   private composedCronApiKey: string | undefined;
@@ -2582,8 +2579,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   ): LocalControlRuntime {
     if (this.composedLangyLocalRuntime) return this.composedLangyLocalRuntime;
     const redis = this.composedQueueRedis;
-    this.composedLangyLocalRuntime = createLocalControlRuntime({
-      store: createLocalControlStore(redis ?? null),
+    this.composedLangyLocalRuntime = LangyLocalControlRuntimeAdapter.create({
+      store: this.composeLangyLocalStore(redis ?? null),
       projects: {
         tryReadOrganizationId: async (projectId) =>
           (
@@ -2598,9 +2595,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The request is still recorded; the refusal names the cause.
       mintSessionKey: () => Promise.reject(new ApiLangySessionKeyUnavailableError()),
       events: commands,
-      buffer: redis ? LangyTokenBufferAdapter.create({ redis }) : nullLocalControlBuffer(),
+      buffer: redis
+        ? LangyTokenBufferAdapter.create({ redis })
+        : LangyLocalControlRuntimeAdapter.nullBuffer(),
     });
     return this.composedLangyLocalRuntime;
+  }
+
+  /** The store the local-control runtime shares with connected agents: Redis when there is one. */
+  private composeLangyLocalStore(
+    redis: Parameters<typeof ConnectedAgentStateAdapter.redis>[0] | null,
+  ): AgentStateStorePort {
+    return redis ? ConnectedAgentStateAdapter.redis(redis) : ConnectedAgentStateAdapter.memory();
   }
 
   /**
@@ -3478,7 +3484,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * What a shared folder MEANS to this process, independent of the transport
    * that carries it (ADR-129). One core, read by the socket and the long poll.
    */
-  private composeLangyLocalSessionCore(): LocalControlSessionCore | undefined {
+  private composeLangyLocalSessionCore(): LocalControlSessionCoreService | undefined {
     if (this.composedLangyLocalSessionCore) return this.composedLangyLocalSessionCore;
     const prisma = this.composedDatabase?.connection.client;
     const apiKeys = this.composedTenancy?.apiKeys;
@@ -3486,7 +3492,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     if (!prisma || !apiKeys || !commands) return undefined;
 
     const langy = this.composedLangy.app;
-    const core = LocalControlSessionCore.create({
+    const core = LocalControlSessionCoreService.create({
       apiKeys,
       readCredential: (header: (name: string) => string | undefined) =>
         extractApiKeyRequestCredentials(
@@ -3511,7 +3517,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       buffer: LangyTokenBufferAdapter.create({
         redis: this.composedQueueRedis as NonNullable<typeof this.composedQueueRedis>,
       }),
-      turns: langyLocalTurnStarter({
+      turns: LocalControlSessionCoreService.turnStarter({
         actors: prisma,
         turns: {
           startConversationTurn: ({
@@ -3537,7 +3543,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         },
       }),
       skipGate: ({ projectId, model }) =>
-        canModelSkipPermissions({
+        SkipPermissionsService.canModelSkipPermissions({
           projectId,
           model,
           providerRows: this.composeLangyProviderRows(prisma),
@@ -3556,7 +3562,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       runtime: this.composeLangyLocalRuntime(prisma, commands),
       commands,
       skipGate: ({ projectId, model }) =>
-        canModelSkipPermissions({
+        SkipPermissionsService.canModelSkipPermissions({
           projectId,
           model,
           providerRows: this.composeLangyProviderRows(prisma),

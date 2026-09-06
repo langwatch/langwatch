@@ -259,7 +259,7 @@ describe("RepositoryFoldStore", () => {
       };
       const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
-      const result = await store.get("agg-1", makeContext());
+      const result = await store.tryGet("agg-1", makeContext());
       expect(result).toEqual({
         total: 10,
         status: "done",
@@ -273,7 +273,7 @@ describe("RepositoryFoldStore", () => {
       repo.getResult = null;
       const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
-      const result = await store.get("agg-1", makeContext());
+      const result = await store.tryGet("agg-1", makeContext());
       expect(result).toBeNull();
     });
 
@@ -282,7 +282,7 @@ describe("RepositoryFoldStore", () => {
       repo.getResult = null;
       const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
-      await store.get("agg-1", makeContext({ tenantId: "tenant-99" as TenantId }));
+      await store.tryGet("agg-1", makeContext({ tenantId: "tenant-99" as TenantId }));
 
       expect(repo.tryGetProjection).toHaveBeenCalledWith(
         "agg-1",

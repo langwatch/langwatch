@@ -14,7 +14,7 @@ import {
 } from "@langwatch/agent-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
-import type { AgentStateStorePort } from "../ports/agent-state-store.port";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { callKey, httpSessionKey, pendingKey } from "../rules/connected-agent-keys.rules";
 import type { StoredCall } from "@langwatch/agent-contract";
 import type { AgentRepository } from "../repositories/agent.repository";

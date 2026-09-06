@@ -16,7 +16,7 @@ import { EvaluationRunFoldProjection } from "../projections/evaluation-run.proje
 
 function createStubStore(): FoldProjectionStore<EvaluationRunData> {
   return {
-    get: async () => null,
+    tryGet: async () => null,
     store: async () => {},
   };
 }
@@ -292,7 +292,7 @@ describe("evaluationRun foldProjection", () => {
     it("applies a coalesced lifecycle batch by createdAt and event id, not occurredAt", async () => {
       let persisted: EvaluationRunData | null = null;
       const store: FoldProjectionStore<EvaluationRunData> = {
-        get: async () => null,
+        tryGet: async () => null,
         store: async (state) => {
           persisted = state;
         },
@@ -325,7 +325,7 @@ describe("evaluationRun foldProjection", () => {
     it("uses event id as the canonical tiebreaker when accepted timestamps match", async () => {
       const projection = new EvaluationRunFoldProjection({
         store: {
-          get: async () => null,
+          tryGet: async () => null,
           store: async () => {},
         },
       });
@@ -357,7 +357,7 @@ describe("evaluationRun foldProjection", () => {
           LastEventOccurredAt: CHECKPOINT_MS,
         };
         const store: FoldProjectionStore<EvaluationRunData> = {
-          get: async () => stored,
+          tryGet: async () => stored,
           store: async () => {},
         };
 

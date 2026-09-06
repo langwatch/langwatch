@@ -9,7 +9,6 @@ import {
   type OutputDeclared,
   type ParamsDeclared,
   type RestEndpoint,
-  type RestEndpointHandler,
   type RestEndpointDocs,
   type RouteChain,
   type SseChain,

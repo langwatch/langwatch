@@ -230,11 +230,11 @@ export {
 } from "./ports/langy-turn-handoff.port";
 export { LangyTokenBufferAdapter } from "./adapters/redis.langy-token-buffer.adapter";
 export {
-  LANGY_EMPTY_TURN_FALLBACK,
   type LangyStreamRead,
   type LangyStreamRedis,
   LangyTokenBufferPort,
 } from "./ports/langy-token-buffer.port";
+export { LANGY_EMPTY_TURN_FALLBACK } from "./rules/langy-empty-turn.rules";
 export { LangyTurnSettlementWaiterService } from "./services/langy-turn-settlement-waiter.service";
 export { decideSyntheticTerminal } from "./rules/langy-turn-settlement.rules";
 export type {
@@ -306,25 +306,18 @@ export {
 // for the developer. One runtime per process, two transports over it, and the
 // worker's REST door onto both.
 export {
-  cancelLocalWorkForTurn,
-  createLocalControlRuntime,
-  createLocalControlStore,
-  nullLocalControlBuffer,
-  type LocalControlRedis,
+  LangyLocalControlRuntimeAdapter,
   type LocalControlRuntime,
 } from "./adapters/langy-local-control-runtime.adapter";
 export {
   ControlRequestService,
-  toControlRequestWire,
   type ControlRequestKeyMinter,
   type ControlRequestProjects,
   type StoredControlRequest,
 } from "./services/langy-local-control-request.service";
+export { toControlRequestWire } from "./rules/langy-local-control-request-wire.rules";
 export {
-  conversationTitle,
-  conversationUrl,
-  langyLocalTurnStarter,
-  LocalControlSessionCore,
+  LocalControlSessionCoreService,
   type ControlConversations,
   type ControlCredentialReader,
   type ControlEvents,
@@ -333,13 +326,20 @@ export {
   type LangyLocalConversationTurns,
   type LocalControlSessionCoreOptions,
 } from "./services/langy-local-session.service";
-export { LocalCallDispatcher } from "./services/langy-local-call-dispatcher.service";
+export {
+  connectMessage,
+  conversationTitle,
+  conversationUrl,
+  disconnectMessage,
+  grantedPatterns,
+} from "./rules/langy-local-session-text.rules";
+export { LocalCallDispatcherService } from "./services/langy-local-call-dispatcher.service";
 export { UserWaitService, type UserWaitEvents } from "./services/langy-local-user-wait.service";
-export { LocalWorkspacePresence } from "./adapters/redis.langy-local-presence.adapter";
+export { LangyLocalPresenceAdapter } from "./adapters/redis.langy-local-presence.adapter";
 export { reconcileSkipPolicy, type SkipGate } from "./rules/langy-local-skip-policy.rules";
 export type { LangyLocalTrpcPorts } from "./transport/api-trpc/langy.api";
 export {
-  canModelSkipPermissions,
+  SkipPermissionsService,
   type SkipPermissionsDecision,
   type SkipPermissionsProviderRow,
   type SkipPermissionsProviderRows,

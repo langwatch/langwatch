@@ -38,9 +38,6 @@ import {
   type SessionInfo,
 } from "./connected-agent-session.service";
 
-/** The instance token an HTTP session is addressed by. */
-export const INSTANCE_TOKEN_HEADER = "x-agent-instance-token";
-
 /** The most call ids a poll may announce as in flight. */
 const MAX_IN_FLIGHT_IDS = 1000;
 

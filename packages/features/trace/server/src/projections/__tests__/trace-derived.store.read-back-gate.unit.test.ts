@@ -35,7 +35,7 @@ const BASE_MS = 1_760_000_000_000;
 
 const runtime = createTestRuntime();
 const projection = TraceAnalyticsFoldProjection.create({
-  store: { store: async () => {}, get: async () => null },
+  store: { store: async () => {}, tryGet: async () => null },
   traceCanonicalisation: TraceCanonicalisationService.create(),
   runtime,
 });
@@ -127,7 +127,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
         ).toBe("llm-call");
 
         // Which is why the store never hands it to the fold at all.
-        expect(await storeOver(olderShape).get(TRACE_ID, context)).toBeNull();
+        expect(await storeOver(olderShape).tryGet(TRACE_ID, context)).toBeNull();
       });
     });
   });

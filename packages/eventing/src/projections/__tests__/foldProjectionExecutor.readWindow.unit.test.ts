@@ -93,15 +93,15 @@ describe("FoldProjectionExecutor declared read window", () => {
       /** @scenario a declared read window bounds the store read */
       it("bounds the store read to occurredAt ± widthMs and reads once", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
-        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
           count: 3,
           LastEventOccurredAt: OCCURRED_AT - 1,
         });
 
         const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
-        expect(store.get).toHaveBeenCalledTimes(1);
-        expect(store.get).toHaveBeenCalledWith(
+        expect(store.tryGet).toHaveBeenCalledTimes(1);
+        expect(store.tryGet).toHaveBeenCalledWith(
           TEST_CONSTANTS.AGGREGATE_ID,
           expect.objectContaining({
             occurredAtMs: OCCURRED_AT,
@@ -120,7 +120,7 @@ describe("FoldProjectionExecutor declared read window", () => {
       /** @scenario a windowed miss retries unwindowed before treating the aggregate as new */
       it("retries once without the window and folds onto the recovered state", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
-        (store.get as ReturnType<typeof vi.fn>).mockImplementation(
+        (store.tryGet as ReturnType<typeof vi.fn>).mockImplementation(
           async (_key: string, readContext: ProjectionStoreContext) =>
             readContext.readWindow === undefined
               ? { count: 7, LastEventOccurredAt: OCCURRED_AT - 1 }
@@ -129,8 +129,8 @@ describe("FoldProjectionExecutor declared read window", () => {
 
         const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
-        expect(store.get).toHaveBeenCalledTimes(2);
-        const retryContext = (store.get as ReturnType<typeof vi.fn>).mock
+        expect(store.tryGet).toHaveBeenCalledTimes(2);
+        const retryContext = (store.tryGet as ReturnType<typeof vi.fn>).mock
           .calls[1]![1] as ProjectionStoreContext;
         expect(retryContext.readWindow).toBeUndefined();
         // The windowed attempt consulted the cache moments ago — the retry
@@ -149,7 +149,7 @@ describe("FoldProjectionExecutor declared read window", () => {
 
         const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
-        expect(store.get).toHaveBeenCalledTimes(2);
+        expect(store.tryGet).toHaveBeenCalledTimes(2);
         expect(state.count).toBe(1);
         expect(fallbackMetric).toHaveBeenCalledWith("windowed", "absent");
       });
@@ -162,8 +162,8 @@ describe("FoldProjectionExecutor declared read window", () => {
 
         await executor.execute(fold, eventAt(0), context);
 
-        expect(store.get).toHaveBeenCalledTimes(1);
-        const readContext = (store.get as ReturnType<typeof vi.fn>).mock
+        expect(store.tryGet).toHaveBeenCalledTimes(1);
+        const readContext = (store.tryGet as ReturnType<typeof vi.fn>).mock
           .calls[0]![1] as ProjectionStoreContext;
         expect(readContext.readWindow).toBeUndefined();
         expect(fallbackMetric).not.toHaveBeenCalled();
@@ -173,7 +173,7 @@ describe("FoldProjectionExecutor declared read window", () => {
     describe("when a batch's windowed read misses a row that exists outside the window", () => {
       it("retries once without the window and folds the batch onto the recovered state", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
-        (store.get as ReturnType<typeof vi.fn>).mockImplementation(
+        (store.tryGet as ReturnType<typeof vi.fn>).mockImplementation(
           async (_key: string, readContext: ProjectionStoreContext) =>
             readContext.readWindow === undefined
               ? { count: 10, LastEventOccurredAt: OCCURRED_AT - 1 }
@@ -186,8 +186,8 @@ describe("FoldProjectionExecutor declared read window", () => {
           context,
         );
 
-        expect(store.get).toHaveBeenCalledTimes(2);
-        const retryContext = (store.get as ReturnType<typeof vi.fn>).mock
+        expect(store.tryGet).toHaveBeenCalledTimes(2);
+        const retryContext = (store.tryGet as ReturnType<typeof vi.fn>).mock
           .calls[1]![1] as ProjectionStoreContext;
         expect(retryContext.readWindow).toBeUndefined();
         expect(retryContext.bypassReadCache).toBe(true);
@@ -199,7 +199,7 @@ describe("FoldProjectionExecutor declared read window", () => {
     describe("when a batch is folded", () => {
       it("anchors the window on the batch's earliest event", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
-        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
           count: 0,
           LastEventOccurredAt: 0,
         });
@@ -210,7 +210,7 @@ describe("FoldProjectionExecutor declared read window", () => {
           context,
         );
 
-        expect(store.get).toHaveBeenCalledWith(
+        expect(store.tryGet).toHaveBeenCalledWith(
           TEST_CONSTANTS.AGGREGATE_ID,
           expect.objectContaining({
             readWindow: {
@@ -242,7 +242,7 @@ describe("FoldProjectionExecutor declared read window", () => {
         const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
         expect(getWithApplied).toHaveBeenCalledTimes(2);
-        expect(store.get).not.toHaveBeenCalled();
+        expect(store.tryGet).not.toHaveBeenCalled();
         expect(state.count).toBe(3);
         expect(fallbackMetric).toHaveBeenCalledWith("windowed", "recovered");
       });
@@ -339,8 +339,8 @@ describe("FoldProjectionExecutor declared read window", () => {
 
         await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
-        expect(store.get).toHaveBeenCalledTimes(1);
-        const readContext = (store.get as ReturnType<typeof vi.fn>).mock
+        expect(store.tryGet).toHaveBeenCalledTimes(1);
+        const readContext = (store.tryGet as ReturnType<typeof vi.fn>).mock
           .calls[0]![1] as ProjectionStoreContext;
         expect(readContext.readWindow).toBeUndefined();
         expect(readContext.occurredAtMs).toBe(OCCURRED_AT);

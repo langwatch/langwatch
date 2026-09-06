@@ -14,7 +14,7 @@ export type StoredIngestionKey = {
   createdAt?: Date;
 };
 
-/** One key as `describePersonalKey` reads it, ownership included. */
+/** One key as `tryDescribePersonalKey` reads it, ownership included. */
 export type StoredIngestionKeyOwnership = StoredIngestionKey & {
   organizationId: string;
   userId: string | null;

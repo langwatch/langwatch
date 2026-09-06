@@ -27,7 +27,7 @@
     },
     {
       "file": "packages/enterprise/features/webhook/server/src/services/webhook-delivery.service.ts",
-      "moduleLines": 1166,
+      "moduleLines": 1035,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,

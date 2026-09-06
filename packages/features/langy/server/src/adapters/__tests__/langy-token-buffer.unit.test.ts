@@ -5,10 +5,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LANGY_STREAMING } from "../../rules/langy-streaming-constants.rules";
 import { LangyTokenBufferAdapter } from "../redis.langy-token-buffer.adapter";
-import {
-  LANGY_EMPTY_TURN_FALLBACK,
-  type LangyStreamRedis,
-} from "../../ports/langy-token-buffer.port";
+import type { LangyStreamRedis } from "../../ports/langy-token-buffer.port";
+import { LANGY_EMPTY_TURN_FALLBACK } from "../../rules/langy-empty-turn.rules";
 
 interface RecordedEntry {
   type: string;

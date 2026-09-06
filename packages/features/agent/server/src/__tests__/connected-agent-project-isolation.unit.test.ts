@@ -14,7 +14,7 @@ import type { StoredCall } from "@langwatch/agent-contract";
 import type { AgentRepository } from "../repositories/agent.repository";
 import type { ConnectCredentialPort } from "../ports/connect-credential.port";
 import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
-import type { AgentStateStorePort } from "../ports/agent-state-store.port";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import {
   callAckKey,
   callKey,

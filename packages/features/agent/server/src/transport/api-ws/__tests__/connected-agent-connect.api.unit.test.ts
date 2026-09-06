@@ -21,10 +21,7 @@ import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-st
 import { AgentSessionService } from "../../../services/connected-agent-session.service";
 import type { AgentRepository } from "../../../repositories/agent.repository";
 import type { ConnectCredentialPort } from "../../../ports/connect-credential.port";
-import type {
-  ConnectUpgradeRouterPort,
-  UpgradeHandler,
-} from "../../../ports/connect-upgrade-router.port";
+import type { ConnectUpgradeRouterPort, UpgradeHandler } from "@langwatch/api";
 import { CONNECT_PATH, ConnectGateway } from "../connected-agent-connect.api";
 
 /** The minimal router a standalone `http.Server` needs, main's shape. */

@@ -108,7 +108,7 @@ describe("given a trace whose span carries a 1 MB output value", () => {
         store: async (state) => {
           durableWrites.push(state);
         },
-        get: async () => null,
+        tryGet: async () => null,
       };
       const { redis, entries } = redisDouble();
       const store = new RedisCachedFoldStore<TraceSummaryData>(durable, redis, {

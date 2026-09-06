@@ -9,10 +9,10 @@ import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
 import {
   GatewayBudgetLedgerAdapter,
   PrismaGatewayAdapter,
+  TestProjectService,
   type GatewayBudgetSpendPort,
-} from "@langwatch/gateway-server";
-import { TestProjectService } from "@langwatch/gateway-server/testing";
-import type { GatewayService } from "@langwatch/gateway-server";
+  type GatewayService,
+} from "@langwatch/gateway-server/testing";
 import {
   PrismaConfigService,
   PrismaConnectionService,

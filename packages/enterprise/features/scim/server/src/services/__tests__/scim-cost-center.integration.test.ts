@@ -8,7 +8,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { PostgresDepartmentAdapter } from "@langwatch/enterprise-governance-server";
+import { PostgresDepartmentAdapter } from "@langwatch/enterprise-governance-server/testing";
 import { EntitlementService } from "@langwatch/entitlement-contract";
 import {
   PrismaConfigService,

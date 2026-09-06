@@ -7,7 +7,7 @@ import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys";
  *
  * FoldProjection uses a pure functional approach: `init()` provides the
  * initial state, and `apply()` produces new state from old state + event.
- * The framework loads existing state via `store.get()`, applies the event,
+ * The framework loads existing state via `store.tryGet()`, applies the event,
  * and persists via `store.store()`.
  *
  * All projections are incremental: the event arrives in the job payload,
@@ -175,7 +175,7 @@ export interface FoldProjectionOptions {
    */
   readWindow?: { widthMs: number };
   /**
-   * Re-fold from the event log when `store.get()` returns null, instead of
+   * Re-fold from the event log when `store.tryGet()` returns null, instead of
    * starting from `init()`.
    *
    * **Defaults to `false`, and that is the shape a new fold should keep** — the
@@ -286,7 +286,7 @@ export interface FoldProjectionStore<State> {
   storeBatch?(entries: Array<{ state: State; context: ProjectionStoreContext }>): Promise<void>;
 
   /** Retrieves the stored state for an aggregate, or null if not found. */
-  get(aggregateId: string, context: ProjectionStoreContext): Promise<State | null>;
+  tryGet(aggregateId: string, context: ProjectionStoreContext): Promise<State | null>;
 
   /**
    * Retrieves the stored state together with the ids of the events already

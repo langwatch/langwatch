@@ -174,9 +174,9 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly ingestionKeyListForPersonalProject: GovernanceService["ingestionKeyListForPersonalProject"] =
     (...args) => this.ingestion.ingestionKeyListForPersonalProject(...args);
 
-  readonly ingestionKeyDescribePersonal: GovernanceService["ingestionKeyDescribePersonal"] = (
+  readonly tryDescribePersonalIngestionKey: GovernanceService["tryDescribePersonalIngestionKey"] = (
     ...args
-  ) => this.ingestion.ingestionKeyDescribePersonal(...args);
+  ) => this.ingestion.tryDescribePersonalIngestionKey(...args);
 
   readonly ingestionSourceList: GovernanceService["ingestionSourceList"] = (...args) =>
     this.ingestion.ingestionSourceList(...args);

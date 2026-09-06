@@ -14,8 +14,8 @@ import {
 import type { ScimSyncGuardsService } from "../services/scim-sync-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import { ScimSyncStateFoldProjection } from "../projections/scim-sync-state.projection";
 import type { ScimSyncEvent } from "../projections/scim-sync-state.projection";
+import { scimSyncEventsFor } from "../intents/scim-sync-events.intent";
 
 /**
  * The directory-sync pipeline's five verbs, as the queue's STAGED RE-RUN of each: the same guard
@@ -58,7 +58,7 @@ function scimSyncCommand<Schema extends ZodTypeAny>({
     async handle(command: Command<Data>): Promise<ScimSyncEvent[]> {
       const data = command.data as never;
       const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
-      return ScimSyncStateFoldProjection.eventsFor({
+      return scimSyncEventsFor({
         command: { type, data } as ScimSyncCommand,
         facts,
       });

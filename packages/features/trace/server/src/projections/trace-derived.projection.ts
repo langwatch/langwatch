@@ -256,7 +256,7 @@ export interface TraceAnalyticsRow {
 
   // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
   // Not analytics columns — these round-trip the fold's working state so
-  // store.get() can decode the row without replaying event_log. The hoisted
+  // store.tryGet() can decode the row without replaying event_log. The hoisted
   // dimension columns above (UserId / ConversationId / CustomerId / Origin /
   // Models / Labels / TraceName) double as read-back sources for the fold's
   // attribute map; these carry the state the slim row otherwise dropped.
@@ -1094,7 +1094,7 @@ export class TraceAnalyticsFoldProjection
    *
    * This is a deserialize, NOT a rebuild. A rebuild replays the trace's spans /
    * logs / annotations from `event_log`; this only maps the columns of the last
-   * committed slim row back into the fold's state shape, so `store.get()` can
+   * committed slim row back into the fold's state shape, so `store.tryGet()` can
    * return the state that Redis (or, on a miss, ClickHouse) already holds. It
    * derives nothing.
    *

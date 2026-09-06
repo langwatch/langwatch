@@ -31,7 +31,7 @@ const TRACE_ID = "aaaa0000000000000000000000000012";
 const BASE_MS = 1_760_000_000_000;
 
 const projection = TraceSummaryFoldProjection.create({
-  store: { store: async () => {}, get: async () => null },
+  store: { store: async () => {}, tryGet: async () => null },
   traceCanonicalisation: TraceCanonicalisationService.create(),
   runtime: createTestRuntime(),
 });

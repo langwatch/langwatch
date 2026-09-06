@@ -11,6 +11,7 @@ import {
   callFrameSchema,
   cancelFrameSchema,
   deregisterFrameSchema,
+  INSTANCE_TOKEN_HEADER,
   POLL_WAIT_MS,
   refusedFrameSchema,
   registeredFrameSchema,
@@ -28,10 +29,7 @@ import {
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
-import {
-  INSTANCE_TOKEN_HEADER,
-  type LongPollTransportService,
-} from "../../services/connected-agent-long-poll.service";
+import type { LongPollTransportService } from "../../services/connected-agent-long-poll.service";
 import type { ConnectCredentials } from "../../services/connected-agent-session.service";
 
 /** The frames a process may post; a register goes to its own endpoint. */

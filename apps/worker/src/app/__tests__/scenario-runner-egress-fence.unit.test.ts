@@ -107,9 +107,9 @@ describe("the scenario runner's outbound fence", () => {
       /** @scenario "Cloud provider internal domains are blocked even when BLOCK_LOCAL_HTTP_CALLS is <toggle>" */
       it("refuses it whatever the local-address policy says", async () => {
         for (const source of toggles) {
-          await expect(
-            runnerUrlValidator(source)("https://metadata.google.internal/chat"),
-          ).rejects.toThrow(/cloud provider internal domains is not allowed/i);
+          await expect(runnerUrlValidator(source)("https://s3.amazonaws.com/chat")).rejects.toThrow(
+            /cloud provider internal domains is not allowed/i,
+          );
         }
       });
     });

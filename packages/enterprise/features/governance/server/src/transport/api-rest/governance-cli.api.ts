@@ -1227,7 +1227,7 @@ export function createGovernanceCliRestApp(options: {
           400,
         );
       }
-      const key = await ports.governance().ingestionKeyDescribePersonal({
+      const key = await ports.governance().tryDescribePersonalIngestionKey({
         userId: caller.user_id,
         organizationId: caller.organization_id,
         lookupId,

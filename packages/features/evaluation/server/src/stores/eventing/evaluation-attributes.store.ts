@@ -174,7 +174,7 @@ export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationA
   }
 
   /** State only; delegates to `getWithApplied` so the two paths cannot diverge. */
-  async get(
+  async tryGet(
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<EvaluationAnalyticsData | null> {

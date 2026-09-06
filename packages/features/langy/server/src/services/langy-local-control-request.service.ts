@@ -22,13 +22,12 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import type { AgentStateStorePort } from "@langwatch/agent-server";
+import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { CONTROL_REQUEST_TTL_MS, SHARE_CONTROL_COMMAND } from "@langwatch/langy-contract";
 import {
   LangyLocalRequestExpiredError,
   LangyLocalRequestInvalidError,
 } from "@langwatch/langy-contract";
-import type { ControlRequest } from "@langwatch/langy-contract";
 import {
   controlRequestClaimKey,
   controlRequestKey,
@@ -114,7 +113,7 @@ export class ControlRequestService {
     return new ControlRequestService(options);
   }
 
-  constructor(options: ControlRequestServiceOptions) {
+  private constructor(options: ControlRequestServiceOptions) {
     this.store = options.store;
     this.projects = options.projects;
     this.now = options.now ?? (() => Date.now());
@@ -146,9 +145,13 @@ export class ControlRequestService {
     conversationUrl: string;
   }): Promise<StoredControlRequest> {
     for (const older of await this.listOpen({ projectId, userId })) {
-      if (older.conversationId !== conversationId) continue;
+      if (older.conversationId !== conversationId) {
+        continue;
+      }
+
       await this.forget(older);
     }
+
     const createdAt = this.now();
     const request: StoredControlRequest = {
       id: `lcr_${nanoid()}`,
@@ -175,6 +178,7 @@ export class ControlRequestService {
       member: request.id,
       ttlSeconds: Math.ceil((this.ttlMs + RECORD_GRACE_MS) / 1000),
     });
+
     return request;
   }
 
@@ -198,10 +202,17 @@ export class ControlRequestService {
     const requests: StoredControlRequest[] = [];
     for (const id of ids) {
       const request = await this.read(id);
-      if (!request) continue;
-      if (request.userId !== userId || request.projectId !== projectId) continue;
+      if (!request) {
+        continue;
+      }
+
+      if (request.userId !== userId || request.projectId !== projectId) {
+        continue;
+      }
+
       requests.push(request);
     }
+
     return requests.sort((left, right) => right.createdAt - left.createdAt);
   }
 
@@ -216,15 +227,20 @@ export class ControlRequestService {
     conversationId: string;
   }): Promise<StoredControlRequest | null> {
     const open = await this.listOpen({ projectId, userId });
+
     return open.find((row) => row.conversationId === conversationId) ?? null;
   }
 
   /** The conversation one minted key controls, or nothing when it controls none. */
   async readKeyBinding(apiKeyId: string): Promise<SessionKeyBinding | null> {
     const raw = await this.store.tryGet(sessionKeyBindingKey(apiKeyId));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
+
     try {
       const parsed = sessionKeyBindingSchema.safeParse(JSON.parse(raw));
+
       return parsed.success ? parsed.data : null;
     } catch {
       return null;
@@ -257,14 +273,19 @@ export class ControlRequestService {
       await this.store.del(sessionKeyBindingKey(apiKeyId));
       await this.store.zrem(key, apiKeyId);
     }
+
     return apiKeyIds;
   }
 
   async read(requestId: string): Promise<StoredControlRequest | null> {
     const raw = await this.store.tryGet(controlRequestKey(requestId));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
+
     try {
       const parsed = storedControlRequestSchema.safeParse(JSON.parse(raw));
+
       return parsed.success ? parsed.data : null;
     } catch {
       return null;
@@ -293,7 +314,9 @@ export class ControlRequestService {
       userId,
       Math.ceil(this.ttlMs / 1000),
     );
-    if (!claimed) throw new LangyLocalRequestInvalidError({ requestId });
+    if (!claimed) {
+      throw new LangyLocalRequestInvalidError({ requestId });
+    }
 
     const organizationId = await this.organizationOf(request.projectId);
     const minted = await this.mintSessionKey({
@@ -324,6 +347,7 @@ export class ControlRequestService {
       { requestId, conversationId: request.conversationId },
       "control request approved, session key minted",
     );
+
     return { request, sessionKey: minted.token, apiKeyId: minted.apiKeyId };
   }
 
@@ -339,6 +363,7 @@ export class ControlRequestService {
   }): Promise<StoredControlRequest> {
     const request = await this.requireOwn({ requestId, userId, projectId });
     await this.forget(request);
+
     return request;
   }
 
@@ -355,9 +380,14 @@ export class ControlRequestService {
     const request = await this.read(requestId);
     // A request that belongs to somebody else answers exactly like one that
     // never existed, so the id cannot be used to probe another person's chat.
-    if (!request || request.userId !== userId || request.projectId !== projectId)
+    if (!request || request.userId !== userId || request.projectId !== projectId) {
       throw new LangyLocalRequestInvalidError({ requestId });
-    if (request.expiresAt <= this.now()) throw new LangyLocalRequestExpiredError({ requestId });
+    }
+
+    if (request.expiresAt <= this.now()) {
+      throw new LangyLocalRequestExpiredError({ requestId });
+    }
+
     return request;
   }
 
@@ -377,20 +407,7 @@ export class ControlRequestService {
     if (!organizationId) {
       throw new Error(`Project ${projectId} resolves to no organization`);
     }
+
     return organizationId;
   }
-}
-
-/** The wire shape of one request, as the command line lists it. */
-export function toControlRequestWire(request: StoredControlRequest): ControlRequest {
-  return {
-    id: request.id,
-    conversationId: request.conversationId,
-    conversationTitle: request.conversationTitle,
-    conversationUrl: request.conversationUrl,
-    projectId: request.projectId,
-    projectName: request.projectName,
-    createdAt: new Date(request.createdAt).toISOString(),
-    expiresAt: new Date(request.expiresAt).toISOString(),
-  };
 }

@@ -39,7 +39,7 @@ class ProducerOnlyFoldStore<TState> implements FoldProjectionStore<TState> {
     return Promise.reject(producerOnly(this.processName, `write the ${this.name} projection`));
   }
 
-  get(): Promise<TState | null> {
+  tryGet(): Promise<TState | null> {
     return Promise.reject(producerOnly(this.processName, `read the ${this.name} projection`));
   }
 }

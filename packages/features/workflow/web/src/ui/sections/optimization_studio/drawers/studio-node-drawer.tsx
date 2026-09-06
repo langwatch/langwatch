@@ -39,7 +39,7 @@ import { BasePropertiesPanel, PropertySectionTitle } from "../properties/base-pr
 import { CustomPropertiesPanel } from "../properties/custom-properties-panel";
 import { EvaluatorPropertiesPanel } from "../properties/evaluator-properties-panel";
 import { useGetDatasetData } from "../../../../behavior/optimization_studio/use-get-dataset-data";
-import { SignaturePromptEditorBridge } from "../../../elements/optimization_studio/drawers/signature-prompt-editor-bridge";
+import { SignaturePromptEditorBridge } from "./signature-prompt-editor-bridge";
 import { StudioDrawerWrapper } from "./studio-drawer-wrapper";
 
 function CodePropertiesPanel({ node }: { node: Node<Component> }) {

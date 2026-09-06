@@ -14,10 +14,7 @@ import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-
 import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter";
 import type { AgentLastSeenWriter } from "../../../projections/connected-agent-presence.projection";
 import { ConnectCredentialPort } from "../../../ports/connect-credential.port";
-import type {
-  ConnectUpgradeRouterPort,
-  UpgradeHandler,
-} from "../../../ports/connect-upgrade-router.port";
+import type { ConnectUpgradeRouterPort, UpgradeHandler } from "@langwatch/api";
 import { CONNECT_PATH, ConnectGateway } from "../connected-agent-connect.api";
 
 function createUpgradeRouter(server: Server): ConnectUpgradeRouterPort {

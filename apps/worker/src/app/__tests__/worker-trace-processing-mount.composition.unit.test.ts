@@ -203,8 +203,8 @@ function composePipeline() {
     stores: {
       spanAppendStore: { append: async () => undefined } as never,
       traceAnalyticsRollupAppendStore: { append: async () => undefined } as never,
-      traceSummaryStore: { get: async () => null, save: async () => undefined } as never,
-      traceAnalyticsStore: { get: async () => null, save: async () => undefined } as never,
+      traceSummaryStore: { tryGet: async () => null, save: async () => undefined } as never,
+      traceAnalyticsStore: { tryGet: async () => null, save: async () => undefined } as never,
     },
     commands: {
       executeEvaluation: async (data) => void RECORDED.executeEvaluation.push(data),

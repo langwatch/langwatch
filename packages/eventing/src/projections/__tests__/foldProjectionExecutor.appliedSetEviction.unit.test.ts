@@ -60,7 +60,7 @@ describe("FoldProjectionExecutor applied-set eviction", () => {
   } {
     const storeFn = vi.fn().mockResolvedValue(undefined);
     const store: FoldProjectionStore<FoldState> = {
-      get: vi.fn().mockResolvedValue(state),
+      tryGet: vi.fn().mockResolvedValue(state),
       getWithApplied: vi.fn().mockResolvedValue({ state, appliedEventIds }),
       store: storeFn,
     };
