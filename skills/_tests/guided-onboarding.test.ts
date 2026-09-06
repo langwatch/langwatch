@@ -164,9 +164,12 @@ describe("the guided-onboarding skill", () => {
     });
 
     /** @scenario "Nothing runs against an agent that is not online" */
-    it("waits for the agent row to be online before any run", () => {
+    it("waits for the agent row to be online through one CLI call, before any run", () => {
       expect(rendered).toContain(
-        "until the row's `status` is `online`, for up to two minutes",
+        "run `langwatch agent list --wait-online <agent name> --format json` once",
+      );
+      expect(rendered).toContain(
+        "it fails after two minutes when the row never does. Never write a loop of your own around `agent list`.",
       );
       expect(rendered).toContain(
         "Nothing runs against an agent that is not online: no scenario, no suite.",

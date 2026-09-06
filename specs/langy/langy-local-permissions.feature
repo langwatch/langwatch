@@ -38,6 +38,17 @@ Feature: The CLI decides what Langy may run on the developer's machine
       And no permission card is rendered
       And every other git worktree verb still asks
 
+    # The first thing the code-changes skill runs is a status, the remote list
+    # and a lookup of where origin's HEAD points, ending in true so a missing
+    # remote does not fail the chain. It was announced as a change to the
+    # repository and spent a card.
+    @unit
+    Scenario: A git chain that only reads runs at once
+      When Langy runs git status, the remote listing and a symbolic-ref lookup chained with true
+      Then the chain runs at once
+      And no permission card is rendered
+      And a git command that moves a reference or sets a config value still asks, as a change to the repository
+
     @unit
     Scenario: Editing a file inside the folder runs at once
       When Langy writes or edits a file inside the folder
@@ -127,6 +138,16 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Then one permission card asks about the whole chain
       And the card lists every segment of the chain with the pattern that segment would grant
       And a segment that is read-only is marked as such
+
+    # A script fed to python through a here-document was split at every line
+    # break, so the card listed each line of the script as a segment and the
+    # session grant offered one pattern per line.
+    @unit
+    Scenario: A here-document is one command
+      When Langy runs a program that reads its script from a here-document
+      Then one permission card asks about one segment, the program and its first argument
+      And the session grant names that one pattern, not a line of the script
+      And the reason says it runs a program that is not read-only
 
     @unit
     Scenario: A pattern grant covers exactly the segments the card named
@@ -360,6 +381,12 @@ Feature: The CLI decides what Langy may run on the developer's machine
       When Langy reads an environment file, a private key or a credentials file inside the folder
       Then a permission card is rendered
       And the card says the file may hold secrets
+
+    @unit
+    Scenario: The credentials write says it writes
+      When Langy asks to write LangWatch credentials into the app's env file
+      Then the terminal card's heading says Langy wants to write a file
+      And the reason says the file is not written without an answer
 
     @unit
     Scenario: A committed example environment file is not a secret

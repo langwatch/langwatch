@@ -339,6 +339,20 @@ Feature: Guided onboarding tour
     And no kickoff is queued when it ends
 
   # ============================================================================
+  # Other coach marks
+  # ============================================================================
+
+  # Langy navigates to the traces page in the middle of the llmops path, and
+  # the trace explorer's own first-trace coach mark opened over the page and
+  # sat there while Langy worked.
+  @unit
+  Scenario: no other coach mark starts while a guided path is active
+    Given the organization is in the guided variant with a path being set up, or its tour is running
+    When the trace explorer would start its first-trace coach mark
+    Then no coach mark starts
+    And it is not marked as shown, so it starts once the path is done
+
+  # ============================================================================
   # Analytics
   # ============================================================================
 

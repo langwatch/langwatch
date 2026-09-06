@@ -30,6 +30,17 @@ Feature: The agent commands show connected agents and run them through the relay
       Then the first row names the user
       And the second row names the host label
 
+    # A process that has just started takes a few seconds to register. The
+    # wait lives in the command so no caller scripts a loop of its own around
+    # it: Langy once wrote such a loop, misread the document it got back and
+    # gave up on an agent that was online the whole time.
+    Scenario: The list can wait for an agent to come online
+      Given a connected agent that registers a few seconds after its process starts
+      When I run "langwatch agent list --wait-online acme-checkout"
+      Then the list is read again every few seconds until that agent reports online
+      And the list is printed once it does
+      And the command fails when the timeout passes with the agent still offline
+
     Scenario: A row the key cannot choose reads as not selectable
       Given a personal development agent owned by another person
       When I run "langwatch agent list"

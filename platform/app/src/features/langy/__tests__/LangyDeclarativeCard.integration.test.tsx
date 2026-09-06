@@ -363,6 +363,72 @@ describe("LangyDeclarativeCard", () => {
     });
   });
 
+  describe("given a connected agent read", () => {
+    const agent = {
+      id: "agent_1",
+      name: "acme-checkout",
+      type: "connected",
+      config: { timeoutMs: 120000 },
+      environment: "development",
+      status: "online",
+      hostLabel: "riley-laptop",
+      ownerUserId: null,
+      lastSeenAt: "2026-09-06T18:42:34.162Z",
+      createdAt: "2026-09-06T17:41:57.478Z",
+      updatedAt: "2026-09-06T18:42:34.164Z",
+    };
+
+    describe("when the detail card renders", () => {
+      /** @scenario "An agent card reads in customer copy" */
+      it("shows the status as a word, the environment and the host, and no id, type or timestamp", () => {
+        renderCard({
+          name: "langwatch.agent.get",
+          input: { command: "langwatch agent get agent_1 --format json" },
+          output: JSON.stringify(agent),
+        });
+
+        expect(screen.getByText("Online")).toBeTruthy();
+        expect(screen.getByText("environment")).toBeTruthy();
+        expect(screen.getByText("development")).toBeTruthy();
+        expect(screen.getByText("host")).toBeTruthy();
+        expect(screen.getByText("riley-laptop")).toBeTruthy();
+        expect(screen.queryByText("id")).toBeNull();
+        expect(screen.queryByText("agent_1")).toBeNull();
+        expect(screen.queryByText("type")).toBeNull();
+        expect(screen.queryByText("created at")).toBeNull();
+        expect(screen.queryByText("updated at")).toBeNull();
+        expect(screen.queryByText("host label")).toBeNull();
+      });
+    });
+
+    describe("when the list card renders", () => {
+      /** @scenario "An agent card reads in customer copy" */
+      it("words each row's status", () => {
+        renderCard({
+          name: "langwatch.agent.list",
+          input: { command: "langwatch agent list --format json" },
+          output: JSON.stringify({
+            data: [
+              agent,
+              {
+                ...agent,
+                id: "agent_2",
+                name: "acme-support",
+                status: "offline",
+              },
+            ],
+            pagination: { total: 2, page: 1, totalPages: 1, limit: 100 },
+          }),
+        });
+
+        expect(screen.getByText("acme-checkout")).toBeTruthy();
+        expect(screen.getByText("Online")).toBeTruthy();
+        expect(screen.getByText("Offline")).toBeTruthy();
+        expect(screen.queryByText("online")).toBeNull();
+      });
+    });
+  });
+
   describe("given the onboarding commands Langy runs at the end of a guided path", () => {
     describe("when the complete-path card renders", () => {
       /** @scenario "The done marker is one line" */

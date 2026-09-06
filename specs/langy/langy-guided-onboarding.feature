@@ -348,10 +348,13 @@ Feature: Langy guides the first setup after sign-up
 
   Rule: A step that fails stops the path
 
+    # The wait is one CLI call, not a loop the model writes: a hand-written
+    # poll once misread the list and gave up on an agent that was online.
     @unit
     Scenario: Nothing runs against an agent that is not online
       When the compiled guided-onboarding skill is read
-      Then it waits up to two minutes for the agent row to read online
+      Then it waits for the agent row to read online through one agent list call that fails after two minutes
+      And it never writes a loop of its own around the agent list
       And no scenario or suite runs against an agent that is not online
 
     @unit

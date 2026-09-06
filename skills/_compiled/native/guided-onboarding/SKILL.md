@@ -76,7 +76,7 @@ Then, still through `code-changes` and before the first edit, work on a branch o
 
 Then call `local_langwatch_env` once, with the env file the app loads (`.env` next to the manifest unless the code loads another). The command line writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT there with the user's own login. The key never reaches you: never ask for it, never write it yourself and never read the file back for it.
 
-Start the agent from that branch the way the repo starts it (the `local_*` tools run the process; the connect-agent skill says how to keep it up), then read `langwatch agent list --format json` every few seconds until the row's `status` is `online`, for up to two minutes. Nothing runs against an agent that is not online: no scenario, no suite. Note the agent name: every `--target` below is `connected:<that name>`.
+Start the agent from that branch the way the repo starts it (the `local_*` tools run the process; the connect-agent skill says how to keep it up), then run `langwatch agent list --wait-online <agent name> --format json` once: it reads the list again every few seconds and prints it as soon as the row's `status` is `online`, and it fails after two minutes when the row never does. Never write a loop of your own around `agent list`. Nothing runs against an agent that is not online: no scenario, no suite. Note the agent name: every `--target` below is `connected:<that name>`.
 
 Keep that branch checked out while the agent you started runs; the commit and the pull request come at the end of step 5.
 

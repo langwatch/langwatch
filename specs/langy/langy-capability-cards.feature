@@ -80,6 +80,15 @@ Feature: Langy renders domain-capability cards for tool calls
     And the card shows the scenario status when the payload carries one
     And the card shows no line of the serialised payload
 
+  # The agent's document is a machine contract: ids, timestamps and a host
+  # label that the skills read. The card names the catalog's fields instead
+  # of printing the row.
+  @integration
+  Scenario: An agent card reads in customer copy
+    When Langy reads one connected agent, or lists them
+    Then the card shows its status as Online or Offline, its environment and its host
+    And it shows no id, type, timestamp or host label field
+
   @integration
   Scenario: Every LangWatch action Langy takes shows a result card
     When Langy runs any LangWatch action and it returns a result

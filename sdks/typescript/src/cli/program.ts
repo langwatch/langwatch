@@ -1895,10 +1895,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     agentCmd
       .command("list")
       .description("List all agents in the project")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option(
+        "--wait-online <agent>",
+        "Read the list again every few seconds until the agent with this name or id reports online, then print it",
+      )
+      .option(
+        "--timeout <seconds>",
+        "How long --wait-online waits before failing",
+        "120",
+      ),
+    async (options: { waitOnline?: string; timeout?: string }) => {
       const { listAgentsCommand: impl } = await import("./commands/agents/list.js");
-      return impl();
+      return impl(options);
     },
   );
 
