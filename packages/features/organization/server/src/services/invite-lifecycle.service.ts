@@ -2,6 +2,8 @@
  * An invitation after it exists: resending it, asking for a fresh one, and the
  * payment-pending invites a checkout creates and later approves.
  */
+import { isAccountManagedPlan } from "@langwatch/entitlement-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   InviteNotFoundError,
   OrganizationNotFoundError,
@@ -17,6 +19,8 @@ import {
   type InviteServiceDependencies,
 } from "../rules/invite-contracts.rules";
 import { InviteCreationService } from "./invite-creation.service";
+
+const logger = createLogger("langwatch:invites:lifecycle");
 
 export class InviteLifecycleService {
   static create(deps: InviteServiceDependencies): InviteLifecycleService {
@@ -129,6 +133,8 @@ export class InviteLifecycleService {
       return { notifiedAdmins: 0 };
     }
 
+    const seats = await this.trySeatCensus({ organizationId: existing.organizationId });
+
     // One failing address must not silence the rest: an organization whose
     // first admin has a bouncing address still has the others to ask.
     const results = await Promise.allSettled(
@@ -138,6 +144,7 @@ export class InviteLifecycleService {
           organizationName: existing.organization?.name ?? "",
           invitedEmail: existing.email,
           membersSettingsUrl,
+          ...seats,
         }),
       ),
     );
@@ -145,6 +152,37 @@ export class InviteLifecycleService {
     return {
       notifiedAdmins: results.filter((r) => r.status === "fulfilled").length,
     };
+  }
+
+  /**
+   * Seats held against the seats the plan covers, where that is a fact.
+   *
+   * Nothing is returned for an organization on enterprise or negotiated terms:
+   * its ceiling was agreed rather than bought, so the number on the public
+   * page is not its number and a mail that quoted it would be wrong in a way
+   * the administrator can see. A census that cannot be read returns nothing
+   * too — a seat line is not worth failing a re-request over.
+   */
+  private async trySeatCensus({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ seats?: { used: number; ceiling: number } }> {
+    try {
+      const plan = await this.deps.plans.getActivePlan({ organizationId });
+      if (isAccountManagedPlan(plan) || plan.maxMembers <= 0) return {};
+
+      return {
+        seats: {
+          used: await this.deps.seats.getMemberCount(organizationId),
+          ceiling: plan.maxMembers,
+        },
+      };
+    } catch (error) {
+      logger.warn({ error }, "Could not read the seat census for an invitation re-request");
+
+      return {};
+    }
   }
 
   /**

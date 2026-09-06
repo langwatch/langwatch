@@ -2,6 +2,7 @@ import { z } from "zod";
 import { sendEmail } from "../email-sender";
 import type { EmailDeliveryPort } from "../providers/types";
 import {
+  DataTable,
   DetailTable,
   EmailLayout,
   InlineLink,
@@ -41,6 +42,25 @@ export const budgetIncreaseRequestEmailSubject = ({
   requesterEmail,
 }: BudgetIncreaseRequestEmailProps): string => `Budget increase requested by ${requesterEmail}`;
 
+/**
+ * Where the spend stands against the limit, as a share.
+ *
+ * The two numbers are already in the table; what the decision needs is the
+ * relation between them, which is the one thing a reader has to work out for
+ * themselves otherwise. Nothing is said when no limit is set, because a share
+ * of nothing is not a fact.
+ */
+const trySpendShare = ({
+  limitUsd,
+  spentUsd,
+}: Pick<BudgetIncreaseRequestEmailProps, "limitUsd" | "spentUsd">): string | undefined => {
+  const limit = Number(limitUsd);
+  const spent = Number(spentUsd);
+  if (!Number.isFinite(limit) || !Number.isFinite(spent) || limit <= 0) return undefined;
+
+  return `${Math.round((spent / limit) * 100).toLocaleString()}%`;
+};
+
 export const BudgetIncreaseRequestEmail = (props: BudgetIncreaseRequestEmailProps) => (
   <EmailLayout
     eyebrow="BUDGET"
@@ -53,13 +73,36 @@ export const BudgetIncreaseRequestEmail = (props: BudgetIncreaseRequestEmailProp
       <InlineLink href={`mailto:${props.requesterEmail}`}>{props.requesterEmail}</InlineLink>) has
       requested a budget increase in <strong>{props.organizationName}</strong>.
     </Paragraph>
+    {trySpendShare(props) && (
+      <DataTable
+        columns={[
+          { key: "spent", label: "Spent so far", align: "right" },
+          { key: "limit", label: "Current limit", align: "right" },
+          { key: "share", label: "Of the limit", align: "right" },
+        ]}
+        rows={[
+          {
+            key: "spend",
+            cells: {
+              spent: `$${props.spentUsd}`,
+              limit: `$${props.limitUsd}`,
+              share: trySpendShare(props),
+            },
+          },
+        ]}
+      />
+    )}
     <DetailTable
       rows={[
         { label: "Scope", value: props.scope },
         { label: "Scope ID", value: props.scopeId },
         { label: "Period", value: props.period ?? "current period" },
-        { label: "Current limit", value: `$${props.limitUsd}` },
-        { label: "Spent so far", value: `$${props.spentUsd}` },
+        ...(trySpendShare(props)
+          ? []
+          : [
+              { label: "Current limit", value: `$${props.limitUsd}` },
+              { label: "Spent so far", value: `$${props.spentUsd}` },
+            ]),
       ]}
     />
     {props.message && (
@@ -103,6 +146,15 @@ export const budgetIncreaseRequestEmailTemplate = defineTemplate({
       scopeId: "organization_2mQvT7hLzR",
       limitUsd: "1000.00",
       spentUsd: "1000.00",
+    },
+    "no limit set yet": {
+      requesterEmail: "sam@acme.example",
+      organizationName: "Acme Corp",
+      budgetsUrl: "https://app.langwatch.ai/settings/budgets",
+      scope: "organization",
+      scopeId: "organization_2mQvT7hLzR",
+      limitUsd: "0.00",
+      spentUsd: "412.90",
     },
   },
 });

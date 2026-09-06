@@ -2,7 +2,14 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { sendEmail } from "../email-sender";
 import type { EmailDeliveryPort } from "../providers/types";
-import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout";
+import { ActionRow, DataTable, EmailLayout, InlineLink, Muted, Paragraph } from "./email-layout";
+import {
+  accountTeamStepSchema,
+  meteredNoun,
+  priceLine,
+  selfServeStepFields,
+  usageUnitSchema,
+} from "./next-step";
 import { defineTemplate, renderMailTemplate } from "./registry";
 
 const logger = createLogger("langwatch:mailer:automationLimitEmail");
@@ -20,6 +27,29 @@ export const automationLimitEmailProps = z.object({
   /** Confirmed matches it dropped today, at the moment the mail was queued. */
   skippedToday: z.number().int().nonnegative(),
   actionUrl: z.url(),
+  /** What the project's organization is metered in, as its own meter reports it. */
+  usageUnit: usageUnitSchema.optional(),
+  /**
+   * Where this organization can go for a higher ceiling, resolved for it.
+   *
+   * Rendered only for a ceiling that was reached. A paused automation is a
+   * mistake in the customer's own condition, and selling more ceiling there
+   * sells them more of the mistake, so the gate is the kind and not the data.
+   *
+   * An organization on enterprise or negotiated terms has a ceiling that is
+   * its own, so it is never shown a tier's number. It is shown the people who
+   * can change the one it has.
+   */
+  nextStep: z
+    .discriminatedUnion("kind", [
+      z.object({
+        ...selfServeStepFields,
+        /** Confirmed matches a day one automation may act on, on that tier. */
+        dailyCeiling: z.number().int().positive(),
+      }),
+      accountTeamStepSchema,
+    ])
+    .optional(),
 });
 
 export type AutomationLimitEmailProps = z.infer<typeof automationLimitEmailProps>;
@@ -39,8 +69,14 @@ export const AutomationLimitEmail = ({
   dailyCeiling,
   skippedToday,
   actionUrl,
+  usageUnit,
+  nextStep,
 }: AutomationLimitEmailProps) => {
   const paused = kind === "paused";
+  const noun = meteredNoun(usageUnit);
+  // A paused automation is a mistake in the customer's own condition, so the
+  // offer is gated on the kind rather than on whether the data arrived.
+  const offer = !paused && nextStep?.kind === "self_serve" ? nextStep : undefined;
   return (
     <EmailLayout
       eyebrow="AUTOMATIONS"
@@ -53,16 +89,44 @@ export const AutomationLimitEmail = ({
     >
       <Paragraph>
         {paused
-          ? `This automation in ${projectName} matched almost every trace in your project, well past its limit of ${dailyCeiling.toLocaleString()} matches a day. We have paused it so it stops creating records you did not intend.`
-          : `This automation in ${projectName} matched more traces today than its limit of ${dailyCeiling.toLocaleString()} a day allows, so we stopped acting on the rest for today. It is still switched on, and it starts again tomorrow.`}
+          ? `This automation in ${projectName} matched almost every one of your ${noun}, well past its limit of ${dailyCeiling.toLocaleString()} matches a day. We have paused it so it stops creating records you did not intend.`
+          : `This automation in ${projectName} matched more ${noun} today than its limit of ${dailyCeiling.toLocaleString()} a day allows, so we stopped acting on the rest for today. It is still switched on, and it starts again tomorrow.`}
       </Paragraph>
-      <Paragraph>{skippedToday.toLocaleString()} matches were skipped today.</Paragraph>
+      <DataTable
+        columns={[
+          { key: "ceiling", label: "Daily limit", align: "right" },
+          { key: "skipped", label: "Skipped today", align: "right" },
+        ]}
+        rows={[
+          {
+            key: automationName,
+            cells: {
+              ceiling: dailyCeiling.toLocaleString(),
+              skipped: skippedToday.toLocaleString(),
+            },
+          },
+        ]}
+      />
       <Paragraph>
         {paused
-          ? "Narrow its condition so it selects the traces you actually want, then switch it back on."
-          : "If this is the volume you expect, narrow the condition so it selects fewer traces, or talk to us about a higher limit on your plan."}
+          ? `Narrow its condition so it selects the ${noun} you actually want, then switch it back on.`
+          : `If this is the volume you expect, narrow the condition so it selects fewer ${noun}, or ask for a higher limit.`}
       </Paragraph>
-      <PrimaryButton href={actionUrl}>Open the automation</PrimaryButton>
+      <ActionRow
+        primary={{ href: actionUrl, label: "Open the automation" }}
+        {...(offer
+          ? {
+              secondary: { href: offer.url, label: `Upgrade to ${offer.name}` },
+              note: `Raises this automation's daily limit to ${offer.dailyCeiling.toLocaleString()} matches, from ${priceLine(offer)}.`,
+            }
+          : {})}
+      />
+      {!paused && nextStep?.kind === "account_team" && (
+        <Muted>
+          Your ceiling is set by your agreement with us.{" "}
+          <InlineLink href={nextStep.contactUrl}>Talk to your account team</InlineLink> to raise it.
+        </Muted>
+      )}
     </EmailLayout>
   );
 };
@@ -81,6 +145,33 @@ export const automationLimitEmailTemplate = defineTemplate({
       projectName: "Support agent",
       dailyCeiling: 500,
       skippedToday: 1_284,
+      actionUrl: "https://app.langwatch.ai/support-agent/automations/auto_7Kd2ppQ4",
+      nextStep: {
+        kind: "self_serve",
+        name: "Accelerate",
+        dailyCeiling: 5_000,
+        price: 199,
+        currency: "USD",
+        billingPeriod: "monthly",
+        url: "https://app.langwatch.ai/settings/subscription/checkout/accelerate",
+      },
+    },
+    "ceiling reached on negotiated terms": {
+      kind: "ceiling_reached",
+      automationName: "Escalate low satisfaction",
+      projectName: "Claims triage",
+      dailyCeiling: 25_000,
+      skippedToday: 3_140,
+      actionUrl: "https://app.langwatch.ai/claims-triage/automations/auto_7Kd2ppQ4",
+      usageUnit: "events",
+      nextStep: { kind: "account_team", contactUrl: "https://langwatch.ai/contact" },
+    },
+    "ceiling reached, nothing higher to move to": {
+      kind: "ceiling_reached",
+      automationName: "Escalate low satisfaction",
+      projectName: "Support agent",
+      dailyCeiling: 50_000,
+      skippedToday: 402,
       actionUrl: "https://app.langwatch.ai/support-agent/automations/auto_7Kd2ppQ4",
     },
     paused: {

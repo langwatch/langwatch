@@ -2,6 +2,7 @@ import { z } from "zod";
 import { sendEmail } from "../email-sender";
 import type { EmailDeliveryPort } from "../providers/types";
 import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout";
+import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps";
 import { defineTemplate, renderMailTemplate } from "./registry";
 
 /**
@@ -13,6 +14,18 @@ import { defineTemplate, renderMailTemplate } from "./registry";
 export const signUpVerificationEmailProps = z.object({
   email: z.email(),
   verificationUrl: z.url(),
+  /**
+   * The first steps to show, when the sender wants them shown.
+   *
+   * Present, the mail carries what to do once they are in, so the empty
+   * project on the other side of the link is not the first thing the reader
+   * meets. Absent, the message is only the confirmation it always was: this
+   * arrives before an account exists, so it is onboarding and never an offer.
+   *
+   * The organization does not exist yet at this point in sign-up, so nothing
+   * here knows why they came and the block falls back to its default steps.
+   */
+  firstSteps: firstStepsSchema.optional(),
 });
 
 export type SignUpVerificationEmailProps = z.infer<typeof signUpVerificationEmailProps>;
@@ -23,6 +36,7 @@ export const signUpVerificationEmailSubject = (): string =>
 export const SignUpVerificationEmail = ({
   email,
   verificationUrl,
+  firstSteps,
 }: SignUpVerificationEmailProps) => (
   <EmailLayout
     eyebrow="ACCOUNT"
@@ -34,6 +48,7 @@ export const SignUpVerificationEmail = ({
       Confirm it below to carry on.
     </Paragraph>
     <PrimaryButton href={verificationUrl}>Confirm my email address</PrimaryButton>
+    {firstSteps && <FirstSteps {...firstSteps} />}
     <Paragraph>
       This link expires in 1 hour and can be used once. If this was not you, you can ignore this
       email: nothing has been created.
@@ -50,6 +65,11 @@ export const signUpVerificationEmailTemplate = defineTemplate({
   Component: SignUpVerificationEmail,
   fixtures: {
     default: {
+      email: "morgan@acme.example",
+      verificationUrl: "https://app.langwatch.ai/auth/verify/ver_71c0aa93f5",
+      firstSteps: {},
+    },
+    "without the first steps": {
       email: "morgan@acme.example",
       verificationUrl: "https://app.langwatch.ai/auth/verify/ver_71c0aa93f5",
     },

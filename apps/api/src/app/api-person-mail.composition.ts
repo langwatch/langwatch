@@ -30,6 +30,11 @@ export class ApiComposedPersonMail extends ApiPersonMailPort {
     return `${this.mail.baseHost}/settings/members`;
   }
 
+  /** The first steps a new member is shown, on this deployment. */
+  private get onboardingUrl(): string {
+    return `${this.mail.baseHost}/onboarding`;
+  }
+
   async sendSignUpVerificationLink(input: {
     email: string;
     verificationUrl: string;
@@ -38,6 +43,9 @@ export class ApiComposedPersonMail extends ApiPersonMailPort {
       mailer: this.mail.delivery,
       email: input.email,
       verificationUrl: input.verificationUrl,
+      // No organization exists yet at this point in sign-up, so nothing here
+      // knows why they came and the block shows its default steps.
+      firstSteps: {},
     });
   }
 
@@ -85,11 +93,16 @@ export class ApiComposedPersonMail extends ApiPersonMailPort {
   async sendRequestApproved(input: {
     requesterEmail: string;
     organizationName: string;
+    intent?: "AGENT_GOVERNANCE" | "LLM_OPS";
   }): Promise<unknown> {
+    const { intent, ...rest } = input;
+
     return sendJoinRequestApprovedEmail({
       mailer: this.mail.delivery,
-      ...input,
+      ...rest,
       organizationUrl: this.mail.baseHost,
+      onboardingUrl: this.onboardingUrl,
+      firstSteps: { ...(intent ? { intent } : {}) },
     });
   }
 

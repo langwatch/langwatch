@@ -6,6 +6,7 @@ import type { OrganizationInviteRepository } from "../repositories/organization-
 import type {
   OrganizationInviteMailPort,
   OrganizationInviteSeatCensusPort,
+  OrganizationInviteWorkspaceCensusPort,
 } from "../ports/invite.port";
 import type { InviteSendThrottleService } from "../services/invite-send-throttle.service";
 
@@ -114,6 +115,12 @@ export type InviteServiceDependencies = Readonly<{
    * caller is told `emailNotSent`.
    */
   mail?: OrganizationInviteMailPort | undefined;
+  /**
+   * How many projects the organization already has, where the process composed
+   * the read. Absent means the invitation says nothing about it rather than
+   * saying zero.
+   */
+  workspace?: OrganizationInviteWorkspaceCensusPort | undefined;
 }>;
 
 /**

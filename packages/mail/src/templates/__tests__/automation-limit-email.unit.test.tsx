@@ -83,10 +83,10 @@ describe("automationLimitEmail", () => {
     it("formats the skipped count with thousands separators", async () => {
       const html = await renderAutomationLimitEmail(ceilingProps);
 
-      // React splits an interpolation from its neighbouring text with a
-      // comment node, so the sentence is matched in its two rendered halves.
+      // The count is a cell in the figures table rather than a sentence now,
+      // so the assertion is on the number and the column that names it.
       expect(html).toContain("12,345");
-      expect(html).toContain("matches were skipped today");
+      expect(html).toContain("Skipped today");
     });
 
     it("formats the ceiling with thousands separators", async () => {

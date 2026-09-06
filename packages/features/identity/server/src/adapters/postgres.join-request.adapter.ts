@@ -224,15 +224,16 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     organizationId: string;
     requesterUserId: string;
   }): Promise<void> {
-    const [organizationName, requesterEmail] = await Promise.all([
+    const [organizationName, requesterEmail, intent] = await Promise.all([
       this.organizationName({ organizationId }),
       this.emailOf({ userId: requesterUserId }),
+      this.organizationIntent({ organizationId }),
     ]);
     if (!requesterEmail) return;
     await this.fanOut({
       joinRequestId,
       what: "requestApproved",
-      sends: [this.mail.sendRequestApproved({ requesterEmail, organizationName })],
+      sends: [this.mail.sendRequestApproved({ requesterEmail, organizationName, ...intent })],
     });
   }
 
@@ -331,6 +332,27 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
       select: { name: true },
     });
     return organization?.name ?? "your organization";
+  }
+
+  /**
+   * Why the organization came, for the one message a new member reads first.
+   *
+   * Read off the same row the name comes from rather than through the
+   * organization feature: this adapter already asks that row who it is, and a
+   * second hop for one column on it would buy nothing. Null is a supported
+   * answer — plenty of organizations never said.
+   */
+  private async organizationIntent({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ intent?: "AGENT_GOVERNANCE" | "LLM_OPS" }> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { primaryIntent: true },
+    });
+
+    return organization?.primaryIntent ? { intent: organization.primaryIntent } : {};
   }
 
   private async adminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {

@@ -13,6 +13,7 @@ import {
   Text,
 } from "@react-email/components";
 import type { CSSProperties, ReactNode } from "react";
+import { tokenize, type HighlightLanguage } from "./onboarding/highlight";
 
 /**
  * The one shell every LangWatch message is built in.
@@ -65,6 +66,22 @@ const light = {
   accentText: "#a83e05",
   tint: "#fdece0",
   field: "#f6f5f4",
+  /**
+   * Syntax colours, anchored on the expressive palette where it has an answer.
+   *
+   * The brand orange carries keywords, because a keyword is exactly the kind of
+   * detail the orange is kept for; a comment is the palette's quietest text.
+   * The green and the blue are the two the palette does not hold and a reader
+   * of code expects, chosen to sit at the same weight as the orange rather than
+   * to shout past it.
+   */
+  syntax: {
+    keyword: "#a83e05",
+    string: "#0a6b46",
+    comment: "#8a8985",
+    call: "#0a4fa3",
+    number: "#0a6b46",
+  },
 } as const;
 
 const dark = {
@@ -81,19 +98,41 @@ const dark = {
   accentText: "#ff8a3d",
   tint: "#3c2317",
   field: "#1c1c20",
+  syntax: {
+    keyword: "#ff8a3d",
+    string: "#7ee7b0",
+    comment: "#8a8985",
+    call: "#79c0ff",
+    number: "#7ee7b0",
+  },
 } as const;
 
 /**
- * Headings are set in the site's serif; the fallback is the point.
+ * Headings are set in the site's display serif, and in Georgia where they
+ * cannot be.
  *
- * The site's display face is Sentient and it is NOT fetched here. A remote font
- * in mail is a tracking pixel that sometimes draws letters, it leaks an open
- * back to us from a person who only read a password reset, and the clients that
- * would most benefit render no woff2 anyway. So the stack names Sentient for
- * anyone who already has it and lands everywhere else on a real serif at the
- * same size and tracking — which reads as the same decision rather than as a
- * missing one, and is why the fallback is a serif stack and not the body sans.
+ * Sentient is fetched from Fontshare, who serve it, rather than from an asset
+ * of ours: mail has no origin of its own to serve a font from, and Fontshare's
+ * own delivery is the path the face is published through. The clients that
+ * honour a remote stylesheet — Apple Mail, iOS Mail, Outlook for Mac,
+ * Thunderbird — draw the face the front door draws. Gmail on the web and
+ * Outlook on Windows strip it and land on the serif stack, which is why the
+ * fallback is a serif at the same size and tracking rather than the body sans:
+ * both cuts have to read as the same decision.
+ *
+ * Weight stays 400 and tracking -0.03em in both, because that pair is the
+ * front door's display line and a heavier cut of Sentient is a different
+ * voice.
  */
+/**
+ * Where the fine print sends a reader who wants to know more.
+ *
+ * One constant, used once, in the shell every message is built in: the link
+ * belongs to every message equally, so a template that wanted its own copy of
+ * it would be the first step toward fifteen slightly different addresses.
+ */
+export const DOCUMENTATION_URL = "https://docs.langwatch.ai";
+
 const HEADING_FONT = '"Sentient", ui-serif, Georgia, "Times New Roman", serif';
 const BODY_FONT =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
@@ -151,7 +190,27 @@ const WORDMARK_DARK = "https://app.langwatch.ai/images/logo-full-darktheme.svg";
 const HIDDEN_ASSET = `display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important;`;
 const SHOWN_ASSET = `display: block !important; width: 112px !important; max-height: none !important; overflow: visible !important; font-size: 20px !important; line-height: normal !important;`;
 
+/**
+ * The face, from the people who publish it.
+ *
+ * Both the stylesheet link and an `@font-face` of the same files: a client that
+ * drops `<link>` but keeps a `<style>` block still gets the font, and a client
+ * that drops both falls through to the stack with nothing to clean up. `swap`
+ * so a heading is never invisible while the file arrives.
+ */
+const SENTIENT_STYLESHEET = "https://api.fontshare.com/v2/css?f[]=sentient@400&display=swap";
+const SENTIENT_FILES =
+  "https://cdn.fontshare.com/wf/RVTZPYAA57KV4AMXRX7ZIPJXSTYCRP7A/36OUS5CBIXRKI2QU7G7OUHOK7HHA53Y2/SIH66VPT4WS2HIF5PEJNDU4INNUF54LG";
+
 const STYLESHEET = `
+@font-face {
+  font-family: 'Sentient';
+  src: url('${SENTIENT_FILES}.woff2') format('woff2'),
+       url('${SENTIENT_FILES}.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { ${HIDDEN_ASSET} }
 @media (prefers-color-scheme: dark) {
@@ -166,9 +225,18 @@ const STYLESHEET = `
   .lw-eyebrow { color: ${dark.accentText} !important; }
   .lw-mesh { background-color: ${MESH.dark.solid} !important; background-image: ${MESH.dark.image} !important; }
   .lw-action { background-color: ${dark.action} !important; border-color: ${dark.action} !important; color: ${dark.onAction} !important; }
+  .lw-action-secondary { background-color: ${dark.card} !important; border-color: ${dark.cardBorder} !important; color: ${dark.text} !important; }
   .lw-panel { background-color: ${dark.tint} !important; }
   .lw-panel-ink { color: ${dark.accentText} !important; }
   .lw-code { background-color: ${dark.field} !important; color: ${dark.text} !important; }
+  .lw-table-head { color: ${dark.textMuted} !important; border-color: ${dark.hairline} !important; }
+  .lw-table-cell { color: ${dark.text} !important; border-color: ${dark.hairline} !important; }
+  .lw-table-secondary { color: ${dark.textMuted} !important; }
+  .lw-tok-keyword { color: ${dark.syntax.keyword} !important; }
+  .lw-tok-string { color: ${dark.syntax.string} !important; }
+  .lw-tok-comment { color: ${dark.syntax.comment} !important; }
+  .lw-tok-call { color: ${dark.syntax.call} !important; }
+  .lw-tok-number { color: ${dark.syntax.number} !important; }
   .lw-light-only { ${HIDDEN_ASSET} }
   .lw-dark-only { ${SHOWN_ASSET} }
 }
@@ -197,6 +265,7 @@ export const EmailLayout = ({
     <Head>
       <meta name="color-scheme" content="light dark" />
       <meta name="supported-color-schemes" content="light dark" />
+      <link rel="stylesheet" href={SENTIENT_STYLESHEET} />
       <style>{STYLESHEET}</style>
     </Head>
     <Preview>{preview}</Preview>
@@ -258,7 +327,7 @@ export const EmailLayout = ({
               LANGWATCH
             </span>{" "}
             ·{" "}
-            <Link className="lw-link" href="https://docs.langwatch.ai" style={linkStyle}>
+            <Link className="lw-link" href={DOCUMENTATION_URL} style={linkStyle}>
               Documentation
             </Link>{" "}
             ·{" "}
@@ -417,27 +486,92 @@ export const InlineLink = ({ href, children }: { href: string; children: ReactNo
   </Link>
 );
 
+const ACTION_STYLE: CSSProperties = {
+  display: "inline-block",
+  padding: "12px 24px",
+  lineHeight: "20px",
+  backgroundColor: light.action,
+  border: `1px solid ${light.action}`,
+  color: light.onAction,
+  fontSize: "14px",
+  fontWeight: 600,
+  textDecoration: "none",
+  borderRadius: RADIUS.action,
+};
+
+const SECONDARY_ACTION_STYLE: CSSProperties = {
+  ...ACTION_STYLE,
+  backgroundColor: light.card,
+  border: `1px solid ${light.cardBorder}`,
+  color: light.text,
+};
+
 /** The primary action, in the site's button language: an ink pill on paper. */
 export const PrimaryButton = ({ href, children }: { href: string; children: ReactNode }) => (
   <Section style={{ margin: `${SPACE.block}px 0` }}>
-    <Button
-      className="lw-action"
-      href={href}
-      style={{
-        display: "inline-block",
-        padding: "12px 24px",
-        lineHeight: "20px",
-        backgroundColor: light.action,
-        border: `1px solid ${light.action}`,
-        color: light.onAction,
-        fontSize: "14px",
-        fontWeight: 600,
-        textDecoration: "none",
-        borderRadius: RADIUS.action,
-      }}
-    >
+    <Button className="lw-action" href={href} style={ACTION_STYLE}>
       {children}
     </Button>
+  </Section>
+);
+
+/**
+ * The actions of a message, on one line, with the supporting note under them.
+ *
+ * Two buttons stacked as separate blocks read as two unrelated things that
+ * happen to follow one another, and the line explaining the second ends up
+ * further from it than the first button is. Side by side in one row they read
+ * as what they are: the thing to do, and the other thing available. Outlook
+ * draws no flexbox, so the row is two cells and the second is only drawn when
+ * there is a second action.
+ */
+export const ActionRow = ({
+  primary,
+  secondary,
+  note,
+}: {
+  primary: { href: string; label: string };
+  secondary?: { href: string; label: string };
+  /** One line under the row, explaining the secondary action. */
+  note?: ReactNode;
+}) => (
+  <Section style={{ margin: `${SPACE.block}px 0 ${SPACE.row}px` }}>
+    <table
+      border={0}
+      cellPadding="0"
+      cellSpacing="0"
+      role="presentation"
+      style={{ borderCollapse: "separate", borderSpacing: "0" }}
+    >
+      <tbody>
+        <tr>
+          <td style={{ paddingRight: secondary ? "10px" : "0", verticalAlign: "middle" }}>
+            <Button className="lw-action" href={primary.href} style={ACTION_STYLE}>
+              {primary.label}
+            </Button>
+          </td>
+          {secondary && (
+            <td style={{ verticalAlign: "middle" }}>
+              <Button
+                className="lw-action-secondary"
+                href={secondary.href}
+                style={SECONDARY_ACTION_STYLE}
+              >
+                {secondary.label}
+              </Button>
+            </td>
+          )}
+        </tr>
+      </tbody>
+    </table>
+    {note && (
+      <Text
+        className="lw-subtle"
+        style={{ margin: "10px 0 0", fontSize: "12.5px", lineHeight: 1.5, color: light.textSubtle }}
+      >
+        {note}
+      </Text>
+    )}
   </Section>
 );
 
@@ -500,8 +634,226 @@ export const DetailTable = ({ rows }: { rows: readonly { label: string; value: R
   </table>
 );
 
-/** A key, a licence, a token: something to be copied exactly. */
-export const CodeBlock = ({ children }: { children: ReactNode }) => (
+/**
+ * One column of a data table.
+ *
+ * `align` is the whole of the numeric treatment a mail can carry: tabular
+ * figures are asked for and the client either has them or does not, but a
+ * right edge lines up in every client there is, and a column of counts that
+ * does not line up is the difference between a table and a list.
+ */
+export interface DataColumn {
+  key: string;
+  label: string;
+  align?: "left" | "right";
+  /** A share of the mail column, when equal shares are the wrong shares. */
+  width?: string;
+  /** A second, quieter value under the first, where the row carries one. */
+  secondary?: boolean;
+}
+
+/** One row: a stable key, its cells by column key, and an optional link on the first. */
+export interface DataRow {
+  key: string;
+  cells: Readonly<Record<string, ReactNode>>;
+  /** Where the first column's cell points, when it points anywhere. */
+  href?: string;
+}
+
+/**
+ * The one table every message shows data in.
+ *
+ * Written once because the alternative already happened: a usage breakdown
+ * with its own header styles, a seat position written as prose, a digest of
+ * bare links. Each read as a different product. It is a real `<table>` with
+ * inline styles rather than anything flexible, because Outlook draws no
+ * percentage-width `div` and a data view that collapses is worse than none.
+ *
+ * A column every shown row leaves empty is dropped rather than drawn as a
+ * stripe of nothing: a digest whose rows carry only an identifier is exactly
+ * as informative as it was before the other columns existed.
+ */
+export const DataTable = ({
+  columns,
+  rows,
+}: {
+  columns: readonly DataColumn[];
+  rows: readonly DataRow[];
+}) => {
+  const shown = columns.filter((column) =>
+    rows.some((row) => {
+      const cell = row.cells[column.key];
+
+      return cell !== undefined && cell !== null && cell !== "";
+    }),
+  );
+  if (shown.length === 0 || rows.length === 0) return null;
+
+  return (
+    <table
+      className="lw-table"
+      width="100%"
+      border={0}
+      cellPadding="0"
+      cellSpacing="0"
+      role="presentation"
+      style={{
+        width: "100%",
+        borderCollapse: "collapse",
+        margin: `${SPACE.row}px 0`,
+        tableLayout: "fixed",
+      }}
+    >
+      <thead>
+        <tr>
+          {shown.map((column) => (
+            <th
+              key={column.key}
+              className="lw-table-head"
+              style={{
+                width: column.width,
+                padding: "0 12px 7px 0",
+                textAlign: column.align ?? "left",
+                fontFamily: MONO_FONT,
+                fontSize: "10px",
+                fontWeight: 500,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: light.textMuted,
+                borderBottom: `1px solid ${light.hairline}`,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {column.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.key}>
+            {shown.map((column, index) => (
+              <td
+                key={column.key}
+                className={column.secondary ? "lw-table-secondary" : "lw-table-cell"}
+                style={{
+                  padding: "9px 12px 9px 0",
+                  textAlign: column.align ?? "left",
+                  fontSize: "13px",
+                  lineHeight: 1.4,
+                  color: column.secondary ? light.textMuted : light.text,
+                  borderBottom: `1px solid ${light.hairline}`,
+                  fontVariantNumeric: column.align === "right" ? "tabular-nums" : "normal",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {index === 0 && row.href ? (
+                  <InlineLink href={row.href}>{row.cells[column.key]}</InlineLink>
+                ) : (
+                  row.cells[column.key]
+                )}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+};
+
+/**
+ * A code block with its tokens coloured.
+ *
+ * The colour is inline for the clients that read no stylesheet and a class for
+ * the ones that honour the dark block, which is the same two-cut rule the rest
+ * of this shell follows. A plain token gets neither, so the markup is a block
+ * of text with a few spans in it rather than a span per word.
+ */
+export const HighlightedCode = ({
+  code,
+  language,
+}: {
+  code: string;
+  language: HighlightLanguage;
+}) => (
+  <CodeBlock>
+    {tokenize(code, language).map((token, index) =>
+      token.kind === "plain" ? (
+        token.text
+      ) : (
+        <span
+          key={`${token.kind}-${index}`}
+          className={`lw-tok-${token.kind}`}
+          style={{ color: light.syntax[token.kind] }}
+        >
+          {token.text}
+        </span>
+      ),
+    )}
+  </CodeBlock>
+);
+
+/** A row of counts over a table, each a number with what it counts under it. */
+export const CountTiles = ({ tiles }: { tiles: readonly { label: string; value: string }[] }) => (
+  <table
+    width="100%"
+    border={0}
+    cellPadding="0"
+    cellSpacing="0"
+    role="presentation"
+    style={{ width: "100%", borderCollapse: "collapse", margin: `${SPACE.row}px 0` }}
+  >
+    <tbody>
+      <tr>
+        {tiles.map((tile) => (
+          <td
+            key={tile.label}
+            style={{ width: `${Math.floor(100 / tiles.length)}%`, verticalAlign: "top" }}
+          >
+            <Text
+              className="lw-text"
+              style={{ margin: 0, fontSize: "22px", lineHeight: 1.2, color: light.text }}
+            >
+              {tile.value}
+            </Text>
+            <Text
+              className="lw-muted"
+              style={{
+                margin: "2px 0 0",
+                fontFamily: MONO_FONT,
+                fontSize: "10px",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: light.textMuted,
+              }}
+            >
+              {tile.label}
+            </Text>
+          </td>
+        ))}
+      </tr>
+    </tbody>
+  </table>
+);
+
+/**
+ * A key, a licence, a token, a line of code: something to be copied exactly.
+ *
+ * `breakAnywhere` is for the one case that has no spaces to break on — a
+ * licence key is a single 200-character word and has to wrap mid-token or run
+ * off the card. Everything else breaks on spaces, because a shell command
+ * split down the middle of `langwatch/skills` is a command the reader has to
+ * repair before they can use it.
+ */
+export const CodeBlock = ({
+  children,
+  breakAnywhere = false,
+}: {
+  children: ReactNode;
+  breakAnywhere?: boolean;
+}) => (
   <pre
     className="lw-code"
     style={{
@@ -514,8 +866,8 @@ export const CodeBlock = ({ children }: { children: ReactNode }) => (
       lineHeight: 1.5,
       color: light.text,
       whiteSpace: "pre-wrap",
-      overflowWrap: "break-word",
-      wordBreak: "break-all",
+      overflowWrap: breakAnywhere ? "break-word" : "normal",
+      wordBreak: breakAnywhere ? "break-all" : "normal",
     }}
   >
     {children}

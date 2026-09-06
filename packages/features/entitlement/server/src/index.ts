@@ -47,6 +47,8 @@ export {
 } from "./services/usage-limit-message.service";
 export { InProcessUsageCache, NoUsageCache, UsageCachePort } from "./ports/usage-cache.port";
 export { UsageOrganizationPort, type UsageMeterReading } from "./ports/usage-organization.port";
+export { PlanCataloguePort, type CataloguePlan } from "./ports/plan-catalogue.port";
+export { PlanNextStepService } from "./services/plan-next-step.service";
 export {
   UsageVolumeCounterPort,
   type ProjectUsageCount,

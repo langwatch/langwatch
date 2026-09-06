@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { EmailLayout, InlineLink, Muted, Paragraph } from "./email-layout";
+import {
+  CountTiles,
+  DataTable,
+  EmailLayout,
+  Muted,
+  Paragraph,
+  ActionRow,
+  type DataRow,
+} from "./email-layout";
 import { defineTemplate, renderMailTemplate } from "./registry";
 
 /**
@@ -12,10 +20,26 @@ import { defineTemplate, renderMailTemplate } from "./registry";
  */
 const DIGEST_ROW_LIMIT = 10;
 
-/** One settled match, as a row in the digest. */
+/**
+ * One settled match, as a row in the digest.
+ *
+ * Everything past the two identifiers is optional and everything optional is
+ * something the sender already had: the moment it happened, a short preview of
+ * what matched, and the number that tripped the automation. A row carrying
+ * only an identifier still renders, in the same table, exactly as informative
+ * as the whole digest used to be.
+ */
 export const triggerDigestEntry = z.object({
   traceId: z.string().optional(),
   graphId: z.string().optional(),
+  /** When it happened, already formatted by the sender in its own zone. */
+  occurredAt: z.string().min(1).optional(),
+  /** A short piece of what matched — the trace's input, or the graph's name. */
+  preview: z.string().min(1).optional(),
+  /** The score or metric that tripped the automation. */
+  value: z.string().min(1).optional(),
+  /** What that value is measured in. */
+  unit: z.string().min(1).optional(),
 });
 
 export type TriggerDigestEntry = z.infer<typeof triggerDigestEntry>;
@@ -40,6 +64,14 @@ export const triggerDigestMail = z.object({
   projectSlug: z.string().min(1),
   baseHost: z.url(),
   entries: z.array(triggerDigestEntry),
+  /**
+   * The automation these matches came from, when the sender names it.
+   *
+   * This digest is only ever the one nobody wrote a message for, so its reader
+   * is exactly the person who does not know they can write their own. With the
+   * id the mail can offer that; without it, it says nothing.
+   */
+  triggerId: z.string().min(1).optional(),
 });
 
 export type TriggerDigestMail = z.infer<typeof triggerDigestMail>;
@@ -61,8 +93,26 @@ const linkFor = (
   return "#";
 };
 
+/** Where the automation's own message is written, built the way a row link is. */
+const automationEditUrl = ({
+  baseHost,
+  projectSlug,
+  triggerId,
+}: {
+  baseHost: string;
+  projectSlug: string;
+  triggerId: string;
+}): string =>
+  `${baseHost}/${projectSlug}/automations?drawer.open=automation&drawer.automationId=${triggerId}`;
+
 const textFor = (entry: TriggerDigestEntry): string =>
   entry.graphId ? "View graph" : (entry.traceId ?? "View");
+
+/** Long enough to recognise a conversation, short enough to hold a table cell. */
+const PREVIEW_LIMIT = 60;
+
+const truncate = (value: string): string =>
+  value.length > PREVIEW_LIMIT ? `${value.slice(0, PREVIEW_LIMIT - 1)}…` : value;
 
 /**
  * The subject the worker puts on the digest.
@@ -77,6 +127,17 @@ export const triggerDigestSubject = ({ triggerType, triggerName }: TriggerDigest
 export const TriggerDigestEmail = (input: TriggerDigestMail) => {
   const shown = input.entries.slice(0, DIGEST_ROW_LIMIT);
   const hidden = input.entries.length - shown.length;
+  const rows: DataRow[] = shown.map((entry, index) => ({
+    key: `${entry.graphId ?? entry.traceId ?? "row"}-${index}`,
+    href: linkFor(entry, input),
+    cells: {
+      what: entry.preview ? truncate(entry.preview) : textFor(entry),
+      when: entry.occurredAt ?? "",
+      value: entry.value ? `${entry.value}${entry.unit ? ` ${entry.unit}` : ""}` : "",
+      open: entry.graphId ? "View graph" : "View trace",
+    },
+  }));
+
   return (
     <EmailLayout
       eyebrow="TRIGGER"
@@ -85,24 +146,42 @@ export const TriggerDigestEmail = (input: TriggerDigestMail) => {
       footNote="You are receiving this because an automation in this project sends it."
     >
       <Paragraph>
-        This automation matched {input.entries.length.toLocaleString()}{" "}
-        {input.entries.length === 1 ? "message" : "messages"}
-        {input.triggerType ? ` on ${input.triggerType}` : ""}. They are listed below.
+        {`This automation settled ${input.entries.length.toLocaleString()} ${input.entries.length === 1 ? "match" : "matches"}${input.triggerType ? ` on ${input.triggerType}` : ""}.`}
       </Paragraph>
       {input.triggerMessage && <Paragraph>{input.triggerMessage}</Paragraph>}
-      {shown.map((entry, index) => (
-        <Paragraph
-          key={`${entry.graphId ?? entry.traceId ?? "row"}-${index}`}
-          style={{ margin: "0 0 8px" }}
-        >
-          <InlineLink href={linkFor(entry, input)}>{textFor(entry)}</InlineLink>
-        </Paragraph>
-      ))}
+      <CountTiles
+        tiles={[
+          { label: "Matched", value: input.entries.length.toLocaleString() },
+          { label: "Listed here", value: shown.length.toLocaleString() },
+          ...(hidden > 0 ? [{ label: "Not listed", value: hidden.toLocaleString() }] : []),
+        ]}
+      />
+      <DataTable
+        columns={[
+          { key: "what", label: "What matched", width: "46%" },
+          { key: "when", label: "When", secondary: true, width: "14%" },
+          { key: "value", label: "Value", align: "right", width: "22%" },
+          { key: "open", label: "Open", align: "right", secondary: true, width: "18%" },
+        ]}
+        rows={rows}
+      />
       {hidden > 0 && (
         <Muted>
-          {hidden.toLocaleString()} more {hidden === 1 ? "match is" : "matches are"} not listed
-          here. All of them are in the product.
+          {`${hidden.toLocaleString()} more ${hidden === 1 ? "match is" : "matches are"} not listed here. All of them are in the product.`}
         </Muted>
+      )}
+      {input.triggerId && (
+        <ActionRow
+          primary={{
+            href: automationEditUrl({
+              baseHost: input.baseHost,
+              projectSlug: input.projectSlug,
+              triggerId: input.triggerId,
+            }),
+            label: "Write your own message",
+          }}
+          note="Replaces this digest with whatever you want the automation to say, to whoever it notifies."
+        />
       )}
     </EmailLayout>
   );
@@ -123,10 +202,38 @@ export const triggerDigestEmailTemplate = defineTemplate({
       projectSlug: "support-agent",
       baseHost: "https://app.langwatch.ai",
       entries: [
-        { traceId: "trace_4KpQ2mXv9dLbR7" },
-        { traceId: "trace_8ZnT1cWy3fJhU0" },
-        { graphId: "graph_5RmB6qEs2vNkP4" },
+        {
+          traceId: "trace_4KpQ2mXv9dLbR7",
+          occurredAt: "09:14",
+          preview: "My order still has not arrived and nobody will tell me why",
+          value: "0.21",
+          unit: "satisfaction",
+        },
+        {
+          traceId: "trace_8ZnT1cWy3fJhU0",
+          occurredAt: "09:41",
+          preview: "This is the third time I am asking about the same refund",
+          value: "0.18",
+          unit: "satisfaction",
+        },
+        {
+          graphId: "graph_5RmB6qEs2vNkP4",
+          occurredAt: "10:02",
+          preview: "Checkout satisfaction, hourly",
+          value: "0.24",
+          unit: "satisfaction",
+        },
       ],
+      triggerId: "auto_7Kd2ppQ4",
+    },
+    "identifiers only": {
+      triggerName: "Low satisfaction on checkout",
+      triggerType: "alert",
+      triggerMessage: "",
+      projectSlug: "support-agent",
+      baseHost: "https://app.langwatch.ai",
+      entries: [{ traceId: "trace_4KpQ2mXv9dLbR7" }, { graphId: "graph_5RmB6qEs2vNkP4" }],
+      triggerId: "auto_7Kd2ppQ4",
     },
     "truncated at ten": {
       triggerName: "Every failed evaluation",

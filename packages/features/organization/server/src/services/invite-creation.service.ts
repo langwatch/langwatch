@@ -234,10 +234,13 @@ export class InviteCreationService {
     email,
     organization,
     inviteCode,
+    inviter,
   }: {
     email: string;
     organization: Organization;
     inviteCode: string;
+    /** Who is asking, where the caller knows. Nothing is looked up for it. */
+    inviter?: { name?: string | null };
   }): Promise<{ emailNotSent: boolean }> {
     const mailer = this.mailer;
     if (!mailer) {
@@ -247,7 +250,14 @@ export class InviteCreationService {
     try {
       await mailer.sendInvite({
         email,
-        organization,
+        organization: {
+          ...organization,
+          ...(await this.tryCountProjects(organization.id)),
+        },
+        ...(inviter?.name ? { inviter: { name: inviter.name } } : {}),
+        firstSteps: {
+          ...(organization.primaryIntent ? { intent: organization.primaryIntent } : {}),
+        },
         acceptInviteUrl: buildInviteAcceptUrl(this.deps.baseHost, inviteCode),
       });
 
@@ -256,6 +266,26 @@ export class InviteCreationService {
       logger.error({ error }, "Failed to send invite email");
 
       return { emailNotSent: true };
+    }
+  }
+
+  /**
+   * How many projects the organization has, when the process can answer.
+   *
+   * A failure here is not a failure of the invitation. The count is one line in
+   * the mail; the invitation is the durable fact, so a census that cannot be
+   * read leaves the line out and the invitation still goes.
+   */
+  private async tryCountProjects(organizationId: string): Promise<{ projectCount?: number }> {
+    const workspace = this.deps.workspace;
+    if (!workspace) return {};
+
+    try {
+      return { projectCount: await workspace.countProjects(organizationId) };
+    } catch (error) {
+      logger.warn({ error }, "Could not count the organization's projects for an invitation");
+
+      return {};
     }
   }
 
@@ -329,6 +359,7 @@ export class InviteCreationService {
           email: record.invite.email,
           organization: record.organization,
           inviteCode: record.invite.inviteCode,
+          inviter: user,
         });
 
         return { invite: record.invite, emailNotSent };

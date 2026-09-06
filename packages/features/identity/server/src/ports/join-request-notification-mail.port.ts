@@ -31,6 +31,14 @@ export abstract class JoinRequestNotificationMailPort {
   abstract sendRequestApproved(input: {
     requesterEmail: string;
     organizationName: string;
+    /**
+     * Why the organization came, where its row says.
+     *
+     * This message is the first one a new member gets, and unlike the sign-up
+     * confirmation it is sent when an organization already exists to have an
+     * answer. Absent falls back to the steps every reader can take.
+     */
+    intent?: "AGENT_GOVERNANCE" | "LLM_OPS";
   }): Promise<unknown>;
 
   /** They are not. Sent to the requester, who may ask again after the cool-down. */

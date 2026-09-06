@@ -1,7 +1,15 @@
 import { z } from "zod";
 import { sendEmail } from "../email-sender";
 import type { EmailDeliveryPort } from "../providers/types";
-import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout";
+import {
+  DataTable,
+  EmailLayout,
+  InlineLink,
+  Muted,
+  Paragraph,
+  PrimaryButton,
+} from "./email-layout";
+import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps";
 import { defineTemplate, renderMailTemplate } from "./registry";
 
 /**
@@ -31,7 +39,18 @@ export const joinRequestArrivedProps = z.object({
   requesterName: z.string().min(1),
   domain: z.string().min(1),
   membersSettingsUrl: z.url(),
+  /**
+   * How many requests from this domain have already been approved.
+   *
+   * An admin approving a third colleague from one address domain is doing by
+   * hand what one setting does for them. Saying so on the first request is
+   * noise, so the line waits until the pattern is real.
+   */
+  approvedFromDomainCount: z.number().int().nonnegative().optional(),
 });
+
+/** Two approvals is a habit; one is an event. */
+const DOMAIN_HABIT_FLOOR = 2;
 
 export type JoinRequestArrivedProps = z.infer<typeof joinRequestArrivedProps>;
 
@@ -45,6 +64,7 @@ export const JoinRequestArrivedEmail = ({
   requesterName,
   domain,
   membersSettingsUrl,
+  approvedFromDomainCount,
 }: JoinRequestArrivedProps) => (
   <EmailLayout
     eyebrow="JOIN REQUEST"
@@ -61,6 +81,13 @@ export const JoinRequestArrivedEmail = ({
       send them an invitation instead — that is the flow that carries roles and teams.
     </Paragraph>
     <PrimaryButton href={membersSettingsUrl}>Open members settings</PrimaryButton>
+    {approvedFromDomainCount !== undefined && approvedFromDomainCount >= DOMAIN_HABIT_FLOOR && (
+      <Muted>
+        {`You have approved ${approvedFromDomainCount.toLocaleString()} requests from ${domain} already. `}
+        You can let anyone with a verified address on that domain join without asking, from the same
+        page.
+      </Muted>
+    )}
     <Paragraph>If nobody answers, the request lapses on its own after two weeks.</Paragraph>
   </EmailLayout>
 );
@@ -79,6 +106,14 @@ export const joinRequestArrivedTemplate = defineTemplate({
       requesterName: "Morgan Ellis",
       domain: "acme.example",
       membersSettingsUrl: "https://app.langwatch.ai/settings/members",
+    },
+    "the third colleague from one domain": {
+      adminEmail: "priya@acme.example",
+      organizationName: "Acme Corp",
+      requesterName: "Morgan Ellis",
+      domain: "acme.example",
+      membersSettingsUrl: "https://app.langwatch.ai/settings/members",
+      approvedFromDomainCount: 2,
     },
   },
 });
@@ -170,6 +205,22 @@ export const joinRequestApprovedProps = z.object({
   requesterEmail: z.email(),
   organizationName: z.string().min(1),
   organizationUrl: z.url(),
+  /**
+   * The checklist of first steps, when the sender knows where it lives.
+   *
+   * This reader arrives to a workspace that already has work in it, so the
+   * checklist has real items rather than an empty shell. It sits beside the
+   * button and never in place of it: the thing they asked for is the door.
+   */
+  onboardingUrl: z.url().optional(),
+  /**
+   * What to do first, in the language of why the organization came.
+   *
+   * The organization exists by the time this is sent — somebody in it approved
+   * the request — so unlike the sign-up confirmation this message can know the
+   * intent and show the steps that match it.
+   */
+  firstSteps: firstStepsSchema.optional(),
 });
 
 export type JoinRequestApprovedProps = z.infer<typeof joinRequestApprovedProps>;
@@ -181,6 +232,8 @@ export const joinRequestApprovedSubject = ({
 export const JoinRequestApprovedEmail = ({
   organizationName,
   organizationUrl,
+  onboardingUrl,
+  firstSteps,
 }: JoinRequestApprovedProps) => (
   <EmailLayout
     eyebrow="WELCOME"
@@ -192,6 +245,13 @@ export const JoinRequestApprovedEmail = ({
       member now, with the organization&apos;s default role.
     </Paragraph>
     <PrimaryButton href={organizationUrl}>Open {organizationName}</PrimaryButton>
+    {onboardingUrl && (
+      <Muted>
+        New to LangWatch? <InlineLink href={onboardingUrl}>Start with the checklist</InlineLink> and
+        you will have your first traces in a few minutes.
+      </Muted>
+    )}
+    {firstSteps && <FirstSteps {...firstSteps} />}
   </EmailLayout>
 );
 
@@ -204,6 +264,20 @@ export const joinRequestApprovedTemplate = defineTemplate({
   Component: JoinRequestApprovedEmail,
   fixtures: {
     default: {
+      requesterEmail: "morgan@acme.example",
+      organizationName: "Acme Corp",
+      organizationUrl: "https://app.langwatch.ai/acme-corp",
+      onboardingUrl: "https://app.langwatch.ai/onboarding",
+      firstSteps: { intent: "LLM_OPS" },
+    },
+    "an organization watching its agents": {
+      requesterEmail: "morgan@acme.example",
+      organizationName: "Acme Corp",
+      organizationUrl: "https://app.langwatch.ai/acme-corp",
+      onboardingUrl: "https://app.langwatch.ai/onboarding",
+      firstSteps: { intent: "AGENT_GOVERNANCE" },
+    },
+    "without the checklist": {
       requesterEmail: "morgan@acme.example",
       organizationName: "Acme Corp",
       organizationUrl: "https://app.langwatch.ai/acme-corp",
@@ -270,7 +344,17 @@ export const sendJoinRequestRejectedEmail = async ({
 
 /* ── Nobody answered in time. ────────────────────────────────────────────── */
 
-export const joinRequestExpiredProps = z.object({ organizationName: z.string().min(1) });
+export const joinRequestExpiredProps = z.object({
+  organizationName: z.string().min(1),
+  /**
+   * A project of their own to work in meanwhile, when they have none.
+   *
+   * A second line and never the action: the thing this reader came for is the
+   * organization, and asking again is what they do next. Suppressed when they
+   * already have somewhere to work, where it would only be noise.
+   */
+  personalProjectUrl: z.url().optional(),
+});
 
 export type JoinRequestExpiredProps = z.infer<typeof joinRequestExpiredProps>;
 
@@ -278,7 +362,10 @@ export type JoinRequestExpiredProps = z.infer<typeof joinRequestExpiredProps>;
 export const joinRequestExpiredSubject = ({ organizationName }: JoinRequestExpiredProps): string =>
   `Your request to join ${organizationName} lapsed`;
 
-export const JoinRequestExpiredEmail = ({ organizationName }: JoinRequestExpiredProps) => (
+export const JoinRequestExpiredEmail = ({
+  organizationName,
+  personalProjectUrl,
+}: JoinRequestExpiredProps) => (
   <EmailLayout
     eyebrow="JOIN REQUEST"
     preview={`Your request to join ${organizationName} lapsed`}
@@ -289,6 +376,13 @@ export const JoinRequestExpiredEmail = ({ organizationName }: JoinRequestExpired
       two weeks, so it lapsed.
     </Paragraph>
     <Paragraph>You can ask again whenever you like.</Paragraph>
+    {personalProjectUrl && (
+      <Muted>
+        In the meantime you can{" "}
+        <InlineLink href={personalProjectUrl}>work in a project of your own</InlineLink>, and move
+        what you build there once you are in.
+      </Muted>
+    )}
   </EmailLayout>
 );
 
@@ -299,7 +393,13 @@ export const joinRequestExpiredTemplate = defineTemplate({
   schema: joinRequestExpiredProps,
   subject: joinRequestExpiredSubject,
   Component: JoinRequestExpiredEmail,
-  fixtures: { default: { organizationName: "Acme Corp" } },
+  fixtures: {
+    default: {
+      organizationName: "Acme Corp",
+      personalProjectUrl: "https://app.langwatch.ai/personal-morgan-ellis",
+    },
+    "they already have somewhere to work": { organizationName: "Acme Corp" },
+  },
 });
 
 /** Rendered only. See the reminder above for why the render and the send split. */
@@ -329,6 +429,18 @@ export const domainAutoJoinedProps = z.object({
   memberName: z.string().min(1),
   domain: z.string().min(1),
   membersSettingsUrl: z.url(),
+  /**
+   * Seats held after this join, against what the plan covers.
+   *
+   * This message exists so an admin can catch a mistake, so the count goes
+   * under the action rather than in front of it. It is a fact, not an offer:
+   * somebody they did not approve now holds one of these seats. An
+   * organization whose seat ceiling is negotiated rather than sold is passed
+   * nothing, because a public number would not be its number.
+   */
+  seats: z
+    .object({ used: z.number().int().nonnegative(), ceiling: z.number().int().positive() })
+    .optional(),
 });
 
 export type DomainAutoJoinedProps = z.infer<typeof domainAutoJoinedProps>;
@@ -343,6 +455,7 @@ export const DomainAutoJoinedEmail = ({
   memberName,
   domain,
   membersSettingsUrl,
+  seats,
 }: DomainAutoJoinedProps) => (
   <EmailLayout
     eyebrow="NEW MEMBER"
@@ -359,6 +472,23 @@ export const DomainAutoJoinedEmail = ({
       approve. You can change that setting, or remove them, from members settings.
     </Paragraph>
     <PrimaryButton href={membersSettingsUrl}>Open members settings</PrimaryButton>
+    {seats && (
+      <DataTable
+        columns={[
+          { key: "used", label: "Seats used", align: "right" },
+          { key: "ceiling", label: "Seats on your plan", align: "right" },
+        ]}
+        rows={[
+          {
+            key: "seats",
+            cells: {
+              used: seats.used.toLocaleString(),
+              ceiling: seats.ceiling.toLocaleString(),
+            },
+          },
+        ]}
+      />
+    )}
   </EmailLayout>
 );
 
@@ -371,6 +501,14 @@ export const domainAutoJoinedTemplate = defineTemplate({
   Component: DomainAutoJoinedEmail,
   fixtures: {
     default: {
+      adminEmail: "priya@acme.example",
+      organizationName: "Acme Corp",
+      memberName: "Morgan Ellis",
+      domain: "acme.example",
+      membersSettingsUrl: "https://app.langwatch.ai/settings/members",
+      seats: { used: 4, ceiling: 5 },
+    },
+    "without the seat count": {
       adminEmail: "priya@acme.example",
       organizationName: "Acme Corp",
       memberName: "Morgan Ellis",
