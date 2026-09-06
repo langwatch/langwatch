@@ -18,6 +18,12 @@ Feature: Enterprise billing compatibility
     When its dependency graph is inspected
     Then it imports no Stripe SDK, Prisma client, server package, or application source
 
+  @unit
+  Scenario: The automation ceiling rises with each self-serve rung
+    Given the self-serve ladder of Free, Launch, Accelerate and Growth
+    When their automation daily dispatch ceilings are compared
+    Then each rung's ceiling is strictly higher than the rung below it
+
   Rule: A billing month names one whole calendar month in UTC
 
     The month a usage figure is billed under is a UTC calendar month, not a

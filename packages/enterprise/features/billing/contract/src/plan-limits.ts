@@ -1,6 +1,6 @@
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import { GROWTH_SEAT_PLAN_TYPES, type PlanTypes as PlanType, PlanTypes } from "./plan-types";
+import { GROWTH_SEAT_PLAN_TYPES, type PlanTypes as PlanType, PlanTypes } from "./plan-types.ts";
 
 /**
  * Sentinel value representing no message cap.
@@ -48,6 +48,7 @@ const LAUNCH_PLAN = definePaidPlan({
   name: "Launch",
   maxMembers: 3,
   maxMessagesPerMonth: 20_000,
+  automationDailyDispatchCeiling: 150,
   prices: {
     USD: 59,
     EUR: 59,
@@ -59,6 +60,7 @@ const ACCELERATE_PLAN = definePaidPlan({
   name: "Accelerate",
   maxMembers: 5,
   maxMessagesPerMonth: 20_000,
+  automationDailyDispatchCeiling: 300,
   prices: {
     USD: 199,
     EUR: 199,
@@ -77,6 +79,8 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     maxMessagesPerMonth: 50_000,
     maxMembersLite: 0,
     canPublish: true,
+    // Matches the persist-cap service's own free-tier default.
+    automationDailyDispatchCeiling: 50,
     prices: {
       USD: 0,
       EUR: 0,
@@ -87,6 +91,9 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     name: "Pro",
     maxMembers: 5,
     maxMessagesPerMonth: 10_000,
+    // Legacy grandfathered tier, not on the self-serve ladder: kept at the
+    // paid-bucket value it already resolved to.
+    automationDailyDispatchCeiling: 500,
     prices: {
       USD: 99,
       EUR: 99,
@@ -117,6 +124,9 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     name: "Growth",
     maxMembers: 10,
     maxMessagesPerMonth: 100_000,
+    // The top self-serve rung: kept at the paid-bucket value the cap service
+    // already gave every non-free, non-enterprise plan.
+    automationDailyDispatchCeiling: 500,
     prices: {
       USD: 399,
       EUR: 399,
@@ -130,6 +140,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
         name: "Growth",
         maxMembers: 20,
         maxMessagesPerMonth: UNLIMITED_MESSAGES,
+        automationDailyDispatchCeiling: 500,
         userPrice: { EUR: 29, USD: 32 },
         prices: { USD: 0, EUR: 0 },
       }),
@@ -146,6 +157,8 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     // a contract resolved some other way, such as a license signed before the
     // feature existed.
     webhookEndpointsEnabled: true,
+    // Matches the persist-cap service's own enterprise-tier default.
+    automationDailyDispatchCeiling: 5_000,
     prices: {
       USD: 999,
       EUR: 999,

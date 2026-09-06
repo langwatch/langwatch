@@ -3,9 +3,9 @@ import {
   RUNAWAY_PAUSE_REASON,
   type AutomationPersistCapBreach,
 } from "@langwatch/automation-contract";
-import { AutomationRunawayPort } from "../ports/automation-runaway.port";
-import { AutomationClockPort } from "../ports/automation-clock.port";
-import { TriggerRepository } from "../repositories/trigger.repository";
+import { AutomationRunawayPort } from "../ports/automation-runaway.port.ts";
+import { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import { TriggerRepository } from "../repositories/trigger.repository.ts";
 
 export { RUNAWAY_PAUSE_REASON };
 
@@ -160,6 +160,11 @@ export class RunawayContainmentService {
       return;
     }
 
+    // A paused automation is a mistake in the customer's own condition, so the
+    // upgrade offer is gated on the kind rather than on whether it resolved.
+    const nextStep =
+      kind === "ceiling_reached" ? await this.runaway.resolveNextStep(input.projectId) : undefined;
+
     await this.runaway.sendLimitEmail({
       to,
       kind,
@@ -171,6 +176,7 @@ export class RunawayContainmentService {
         projectId: input.projectId,
         triggerId: input.trigger.id,
       }),
+      ...(nextStep ? { nextStep } : {}),
     });
   }
 }

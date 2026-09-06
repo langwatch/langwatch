@@ -8,8 +8,8 @@ const planMock = vi.hoisted(() => ({
 // counting contract is the same either way; what differs is the blast radius
 // when Redis is down, which the email caps already pin.
 // The TTL cache would otherwise carry one test's plan answer into the next.
-import { AutomationPersistCapService } from "../persist-cap.service";
-import { SettlementProjectService } from "../../ports/__tests__/support/settlement.fixtures";
+import { AutomationPersistCapService } from "../persist-cap.service.ts";
+import { SettlementProjectService } from "../../ports/__tests__/support/settlement.fixtures.ts";
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";
@@ -124,6 +124,13 @@ describe("given a project on a plan", () => {
       });
 
       expect(await persistCaps.resolvePersistDailyCap(PROJECT_ID)).toBe(50_000);
+    });
+
+    /** @scenario "A plan's own ceiling wins over the free/paid/enterprise bucket" */
+    it("lets the plan's own ceiling win over the type bucket", async () => {
+      plan({ type: "LAUNCH", automationDailyDispatchCeiling: 150 });
+
+      expect(await persistCaps.resolvePersistDailyCap(PROJECT_ID)).toBe(150);
     });
   });
 

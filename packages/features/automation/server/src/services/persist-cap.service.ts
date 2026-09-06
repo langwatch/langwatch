@@ -273,6 +273,10 @@ export class AutomationPersistCapService {
       return plan.maxTriggerPersistDispatchesPerDay;
     }
 
+    if (plan.automationDailyDispatchCeiling !== undefined) {
+      return plan.automationDailyDispatchCeiling;
+    }
+
     if (ENTERPRISE_PLAN_TYPES.has(plan.type)) {
       return config.enterprise;
     }

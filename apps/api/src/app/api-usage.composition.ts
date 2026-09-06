@@ -54,8 +54,8 @@ import { sendUsageLimitEmail } from "@langwatch/mail";
 import { PostgresNotificationAdapter } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PricingModel, PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ApiMailComposition } from "./api-mail.composition";
-import { ApiUsageStatsPort } from "../features/entitlement/spend.composition";
+import type { ApiMailComposition } from "./api-mail.composition.ts";
+import { ApiUsageStatsPort } from "../features/entitlement/spend.composition.ts";
 
 /** What the plan provider is composed from. */
 export type ApiPlanProviderOptions = Readonly<{
@@ -320,6 +320,9 @@ function catalogueRung(representative: PlanTypes, types: readonly PlanTypes[]): 
     pricedPerSeat,
     maxMessagesPerMonth: plan.maxMessagesPerMonth,
     maxMembers: plan.maxMembers,
+    // Every plan on a ladder listed below sets its own ceiling in PLAN_LIMITS;
+    // the assertion mirrors userPrice above.
+    automationDailyDispatchCeiling: plan.automationDailyDispatchCeiling!,
   };
 }
 

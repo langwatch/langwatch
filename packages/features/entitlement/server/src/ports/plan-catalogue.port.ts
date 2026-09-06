@@ -27,6 +27,8 @@ export interface CataloguePlan {
   pricedPerSeat: boolean;
   maxMessagesPerMonth: number;
   maxMembers: number;
+  /** Confirmed matches a day one automation may act on, on this rung. */
+  automationDailyDispatchCeiling: number;
 }
 
 /**

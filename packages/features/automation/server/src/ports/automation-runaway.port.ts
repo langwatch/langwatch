@@ -1,3 +1,5 @@
+import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
+
 type LimitEmailKind = "ceiling_reached" | "paused";
 
 export type ClaimLease = { key: string; token: string };
@@ -17,7 +19,14 @@ export abstract class AutomationRunawayPort {
     dailyCeiling: number;
     skippedToday: number;
     actionUrl: string;
+    /** Only ever passed for a `ceiling_reached` notice. */
+    nextStep?: AutomationLimitNextStep;
   }): Promise<void>;
+  /**
+   * Where this project's organization can go for a higher ceiling. Called
+   * only for a `ceiling_reached` breach, never for a pause.
+   */
+  abstract resolveNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined>;
   abstract tryClaimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | null>;
   abstract releaseClaim(lease: ClaimLease): Promise<void>;
   abstract projectName(projectId: string): Promise<string>;

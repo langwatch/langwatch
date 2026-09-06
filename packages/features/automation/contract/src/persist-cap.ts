@@ -12,6 +12,8 @@ export interface AutomationPlan {
   type: string;
   free: boolean;
   maxTriggerPersistDispatchesPerDay?: number;
+  /** The daily ceiling this plan's tier carries, ahead of the free/paid/enterprise bucket fallback. */
+  automationDailyDispatchCeiling?: number;
 }
 
 /** Complete plan capability supplied by billing composition. */

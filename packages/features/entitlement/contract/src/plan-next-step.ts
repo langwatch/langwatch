@@ -28,6 +28,8 @@ export const planNextStepSchema = z.discriminatedUnion("kind", [
     pricedPerSeat: z.boolean(),
     maxMessagesPerMonth: z.number().int().positive(),
     maxMembers: z.number().int().positive(),
+    /** Confirmed matches a day one automation may act on, on this rung. */
+    automationDailyDispatchCeiling: z.number().int().positive(),
   }),
   z.object({ kind: z.literal("account_team") }),
   z.object({ kind: z.literal("none") }),

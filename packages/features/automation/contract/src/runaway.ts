@@ -15,3 +15,24 @@ export type AutomationPersistCapBreach = {
   cap: number;
   skipped: number;
 };
+
+/**
+ * Where a project's organization can go for a higher automation ceiling,
+ * matching the shape `@langwatch/mail`'s automation-limit template asks for.
+ *
+ * Resolved only for a `ceiling_reached` notice — a paused automation is a
+ * mistake in the customer's own condition, not a sales moment.
+ */
+export type AutomationLimitNextStep =
+  | {
+      kind: "self_serve";
+      name: string;
+      url: string;
+      price: number;
+      currency: string;
+      billingPeriod: "monthly" | "annual";
+      pricedPerSeat?: boolean;
+      /** Confirmed matches a day one automation may act on, on that tier. */
+      dailyCeiling: number;
+    }
+  | { kind: "account_team"; contactUrl: string };

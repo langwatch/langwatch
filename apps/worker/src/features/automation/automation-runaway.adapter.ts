@@ -4,6 +4,7 @@ import {
   AutomationRunawayPort,
   type ClaimLease,
 } from "@langwatch/automation-server";
+import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { sendAutomationLimitEmail } from "@langwatch/mail";
 import type { EmailDeliveryPort } from "@langwatch/notification-server";
@@ -39,6 +40,15 @@ export type WorkerAutomationRunawaySuppression = Readonly<{
 }>;
 
 /**
+ * Where a project's organization can go for a higher ceiling. Optional: a
+ * deployment that composed no self-serve catalogue still contains a runaway
+ * automation, it just names no upgrade in the mail.
+ */
+export type WorkerAutomationNextStepResolver = Readonly<{
+  resolve(projectId: string): Promise<AutomationLimitNextStep | undefined>;
+}>;
+
+/**
  * The infrastructure behind Automation's runaway containment, in this process.
  *
  * The POLICY is `RunawayContainmentService`'s — when an automation counts as
@@ -62,6 +72,8 @@ export class WorkerAutomationRunawayAdapter extends AutomationRunawayPort {
     resolveClickHouseClient: WorkerRunawayClickHouseResolver;
     metrics: AutomationRunawayMetricsSink;
     baseHost: string;
+    /** Absent on a deployment that composed no self-serve plan catalogue. */
+    nextStep?: WorkerAutomationNextStepResolver | null;
     logger?: Logger;
   }): WorkerAutomationRunawayAdapter {
     return new WorkerAutomationRunawayAdapter(
@@ -79,6 +91,7 @@ export class WorkerAutomationRunawayAdapter extends AutomationRunawayPort {
       resolveClickHouseClient: WorkerRunawayClickHouseResolver;
       metrics: AutomationRunawayMetricsSink;
       baseHost: string;
+      nextStep?: WorkerAutomationNextStepResolver | null;
     },
     private readonly logger: Logger,
   ) {
@@ -137,8 +150,13 @@ export class WorkerAutomationRunawayAdapter extends AutomationRunawayPort {
     dailyCeiling: number;
     skippedToday: number;
     actionUrl: string;
+    nextStep?: AutomationLimitNextStep;
   }): Promise<void> {
     return sendAutomationLimitEmail({ mailer: this.input.mailer, ...params });
+  }
+
+  async resolveNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined> {
+    return this.input.nextStep?.resolve(projectId);
   }
 
   tryClaimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | null> {

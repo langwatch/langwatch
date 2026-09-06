@@ -22,6 +22,7 @@ export const planSchema = z.object({
   canPublish: z.boolean(),
   webhookEndpointsEnabled: z.boolean().optional(),
   maxTriggerPersistDispatchesPerDay: z.number().optional(),
+  automationDailyDispatchCeiling: z.number().optional(),
   usageUnit: z.string().optional(),
   userPrice: moneyByCurrencySchema.optional(),
   tracesPrice: moneyByCurrencySchema.optional(),

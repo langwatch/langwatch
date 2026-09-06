@@ -4,7 +4,7 @@ import {
   type PlanNextStep,
   type PricingModel,
 } from "@langwatch/entitlement-contract";
-import type { PlanCataloguePort } from "../ports/plan-catalogue.port";
+import type { PlanCataloguePort } from "../ports/plan-catalogue.port.ts";
 
 /**
  * What an organization may truthfully be told about where it goes next.
@@ -67,6 +67,7 @@ export class PlanNextStepService {
       pricedPerSeat: above.pricedPerSeat,
       maxMessagesPerMonth: above.maxMessagesPerMonth,
       maxMembers: above.maxMembers,
+      automationDailyDispatchCeiling: above.automationDailyDispatchCeiling,
     };
   }
 }

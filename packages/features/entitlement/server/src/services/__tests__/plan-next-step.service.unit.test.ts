@@ -1,7 +1,7 @@
 import type { Plan, PricingModel } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
-import { PlanCataloguePort, type CataloguePlan } from "../../ports/plan-catalogue.port";
-import { PlanNextStepService } from "../plan-next-step.service";
+import { PlanCataloguePort, type CataloguePlan } from "../../ports/plan-catalogue.port.ts";
+import { PlanNextStepService } from "../plan-next-step.service.ts";
 
 /**
  * Five organizations, because five is how many ways the answer differs: two
@@ -18,6 +18,7 @@ const TIERED_LADDER: readonly CataloguePlan[] = [
     pricedPerSeat: false,
     maxMessagesPerMonth: 50_000,
     maxMembers: 2,
+    automationDailyDispatchCeiling: 50,
   },
   {
     tier: "LAUNCH",
@@ -27,6 +28,7 @@ const TIERED_LADDER: readonly CataloguePlan[] = [
     pricedPerSeat: false,
     maxMessagesPerMonth: 100_000,
     maxMembers: 3,
+    automationDailyDispatchCeiling: 150,
   },
   {
     tier: "ACCELERATE",
@@ -36,6 +38,7 @@ const TIERED_LADDER: readonly CataloguePlan[] = [
     pricedPerSeat: false,
     maxMessagesPerMonth: 500_000,
     maxMembers: 5,
+    automationDailyDispatchCeiling: 300,
   },
 ];
 
@@ -48,6 +51,7 @@ const SEAT_EVENT_LADDER: readonly CataloguePlan[] = [
     pricedPerSeat: false,
     maxMessagesPerMonth: 50_000,
     maxMembers: 2,
+    automationDailyDispatchCeiling: 50,
   },
   {
     tier: "GROWTH_SEAT",
@@ -62,6 +66,7 @@ const SEAT_EVENT_LADDER: readonly CataloguePlan[] = [
     pricedPerSeat: true,
     maxMessagesPerMonth: 999_999_999,
     maxMembers: 20,
+    automationDailyDispatchCeiling: 500,
   },
 ];
 
@@ -112,7 +117,20 @@ describe("given an organization buying from the public tiered ladder", () => {
         pricedPerSeat: false,
         maxMessagesPerMonth: 100_000,
         maxMembers: 3,
+        automationDailyDispatchCeiling: 150,
       });
+    });
+  });
+
+  describe("when a tiered organization's next step is priced", () => {
+    /** @scenario "The next rung names its automation ceiling too" */
+    it("carries the daily automation ceiling the next rung sells", async () => {
+      const step = await service.resolve({
+        plan: planOf({ type: "FREE", planSource: "free", free: true }),
+        pricingModel: "TIERED",
+      });
+
+      expect(step).toMatchObject({ automationDailyDispatchCeiling: 150 });
     });
   });
 

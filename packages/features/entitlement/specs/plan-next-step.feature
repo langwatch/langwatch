@@ -22,6 +22,12 @@ Feature: Where an organization can go next
     Then the rung above it is named with its monthly price
 
   @unit
+  Scenario: The next rung names its automation ceiling too
+    Given an organization on a tiered plan below the top rung
+    When its next step is resolved
+    Then the rung above it carries the daily automation ceiling it sells
+
+  @unit
   Scenario: An organization at the top of its ladder is offered nothing
     Given an organization already on the top rung of its ladder
     When its next step is resolved

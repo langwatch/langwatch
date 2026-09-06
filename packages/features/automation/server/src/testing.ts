@@ -8,7 +8,7 @@ import {
   AutomationSlackBotTokenDecryptorPort,
   AutomationTestFirePort,
   AutomationPersistCapService,
-} from "./index";
+} from "./index.ts";
 
 export { AutomationPersistCapService };
 
@@ -28,7 +28,7 @@ export {
   RecordingDelivery,
   SilentLogger,
   TestDispatchErrors,
-} from "./fixtures/graph-activity.fixture";
+} from "./fixtures/graph-activity.fixture.ts";
 
 class TestNotifier extends AutomationGraphNotifierPort {
   async dispatch() {
@@ -72,6 +72,9 @@ class TestRunaway extends AutomationRunawayPort {
     return [];
   }
   async sendLimitEmail() {}
+  async resolveNextStep() {
+    return undefined;
+  }
   async tryClaimOnce() {
     return null;
   }

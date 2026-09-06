@@ -305,6 +305,10 @@ class UncontainedApiAutomationRunaway extends AutomationRunawayPort {
     return Promise.reject(new ApiAutomationUnavailableError("send automation limit mail"));
   }
 
+  resolveNextStep(): Promise<undefined> {
+    return Promise.resolve(undefined);
+  }
+
   tryClaimOnce(): Promise<ClaimLease | null> {
     return Promise.resolve(null);
   }

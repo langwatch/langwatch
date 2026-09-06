@@ -25,6 +25,7 @@ import {
   AutomationSettlementFilterEvaluatorPort,
   AutomationSettlementMatchConfirmationService,
   AutomationSettlementObservabilityPort,
+  OtelAutomationSettlementObservabilityAdapter,
   AutomationSettlementTraceReaderPort,
   AutomationEmailCapService,
   AutomationHeartbeatPort,
@@ -65,11 +66,12 @@ import {
 import { TraceQueryEvaluationAdapter } from "@langwatch/trace-server";
 import {
   WorkerAutomationRunawayAdapter,
+  type WorkerAutomationNextStepResolver,
   type WorkerAutomationRunawayDirectories,
   type WorkerRunawayClickHouseResolver,
-} from "../features/automation/automation-runaway.adapter";
-import type { AutomationWorkerCapability } from "../features/automation/automation-worker-feature.installer";
-import type { WorkerConfig } from "../platform/config/worker.config";
+} from "../features/automation/automation-runaway.adapter.ts";
+import type { AutomationWorkerCapability } from "../features/automation/automation-worker-feature.installer.ts";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 export type WorkerAutomationSettlementCompositionOptions = Readonly<{
   config: WorkerConfig;
@@ -147,6 +149,12 @@ export type WorkerAutomationContainment = Readonly<{
   mailer: EmailDeliveryPort;
   directories: WorkerAutomationRunawayDirectories;
   resolveClickHouseClient: WorkerRunawayClickHouseResolver;
+  /**
+   * Where a project's organization can go for a higher ceiling. Absent on a
+   * deployment that composed no self-serve plan catalogue, in which case a
+   * ceiling-reached notice names no upgrade.
+   */
+  nextStep?: WorkerAutomationNextStepResolver | undefined;
 }>;
 
 export type WorkerAutomationAnnotationWriter = Readonly<{
@@ -261,6 +269,7 @@ export function createWorkerAutomationSettlement(
         suppression: ledger,
         mailer: options.containment.mailer,
         resolveClickHouseClient: options.containment.resolveClickHouseClient,
+        nextStep: options.containment.nextStep ?? null,
         metrics: OtelAutomationRunawayMetricsAdapter.create(),
         baseHost: options.notifications.baseHost,
         logger,
@@ -291,7 +300,7 @@ export function createWorkerAutomationSettlement(
     slack: SlackProviderAdapter.create(notifications.crypto),
     webhooks: WebhookProviderAdapter.create(notifications.crypto),
     clock: options.clock,
-    observability: new LoggedSettlementObservability(logger),
+    observability: WorkerSettlementObservability.create(logger),
     emailHourlyCap: options.config.automation.emailHourlyCap,
     tenantDailyCap: options.config.automation.tenantDailyCap,
   });
@@ -569,20 +578,35 @@ class WorkerSettlementLogger extends AutomationLoggerPort {
 }
 
 /**
- * Settlement's two observability calls, over this process's logger. The application increments a
- * Prometheus counter and captures to PostHog.
+ * Settlement's two observability calls: the overflow lands on the published series AND in this
+ * process's log, because the counter answers how often the fleet flushes early and the log line is
+ * what names the settlement that did.
  */
-class LoggedSettlementObservability extends AutomationSettlementObservabilityPort {
-  constructor(private readonly logger: Logger) {
+class WorkerSettlementObservability extends AutomationSettlementObservabilityPort {
+  static create(logger: Logger): WorkerSettlementObservability {
+    return new WorkerSettlementObservability(
+      logger,
+      OtelAutomationSettlementObservabilityAdapter.create({
+        capture: (error, extra) =>
+          logger.error({ ...extra, error: error.message }, "Automation settlement dispatch failed"),
+      }),
+    );
+  }
+
+  private constructor(
+    private readonly logger: Logger,
+    private readonly metrics: AutomationSettlementObservabilityPort,
+  ) {
     super();
   }
 
   recordOverflow(flushed: number): void {
     this.logger.warn({ flushed }, "Automation settlement flushed matches early to stay in bounds");
+    this.metrics.recordOverflow(flushed);
   }
 
   capture(error: Error, extra: Record<string, unknown>): void {
-    this.logger.error({ ...extra, error: error.message }, "Automation settlement dispatch failed");
+    this.metrics.capture(error, extra);
   }
 }
 

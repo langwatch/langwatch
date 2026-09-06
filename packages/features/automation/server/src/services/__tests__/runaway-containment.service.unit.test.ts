@@ -1,16 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
+  AutomationLimitNextStep,
   AutomationPersistCapBreach,
   AutomationRunawayTrigger,
 } from "@langwatch/automation-contract";
-import { AutomationRunawayPort } from "../../ports/automation-runaway.port";
-import { RunawayContainmentService, RUNAWAY_PAUSE_REASON } from "../runaway-containment.service";
+import { AutomationRunawayPort } from "../../ports/automation-runaway.port.ts";
+import { RunawayContainmentService, RUNAWAY_PAUSE_REASON } from "../runaway-containment.service.ts";
 
 class TestRunawayPort extends AutomationRunawayPort {
   readonly paused = vi.fn();
-  readonly emailed = vi.fn<(input: { kind: "ceiling_reached" | "paused" }) => Promise<void>>(
-    async () => undefined,
-  );
+  readonly emailed = vi.fn<
+    (input: { kind: "ceiling_reached" | "paused"; nextStep?: unknown }) => Promise<void>
+  >(async () => undefined);
+  readonly nextStep = vi.fn(async () => undefined as AutomationLimitNextStep | undefined);
   private readonly claimed = new Set<string>();
   /** Every port call in the order the policy made it. */
   readonly calls: string[] = [];
@@ -31,9 +33,13 @@ class TestRunawayPort extends AutomationRunawayPort {
     dailyCeiling: number;
     skippedToday: number;
     actionUrl: string;
+    nextStep?: AutomationLimitNextStep;
   }): Promise<void> {
     if (this.failEmail) throw new Error("mailer down");
     await this.emailed(input);
+  }
+  async resolveNextStep(): Promise<AutomationLimitNextStep | undefined> {
+    return this.nextStep();
   }
   async tryClaimOnce(key: string): Promise<{ key: string; token: string } | null> {
     this.calls.push(`claim:${key}`);
@@ -153,6 +159,43 @@ describe("runaway containment policy", () => {
     expect(port.paused).not.toHaveBeenCalled();
     expect(port.emailed).toHaveBeenCalledWith(expect.objectContaining({ kind: "ceiling_reached" }));
     expect(port.emailed).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "A ceiling-reached notice offers the next tier" */
+  it("passes the resolved next step for a ceiling that was reached", async () => {
+    const port = new TestRunawayPort();
+    port.nextStep.mockResolvedValue({
+      kind: "self_serve",
+      name: "Accelerate",
+      url: "https://app/settings/subscription/checkout/accelerate",
+      price: 199,
+      currency: "USD",
+      billingPeriod: "monthly",
+      dailyCeiling: 300,
+    });
+    const { service } = runtime(port);
+    const filtered = () =>
+      breach({ trigger: trigger({ filters: { status: ["error"] } }), count: 899, skipped: 799 });
+
+    await service.handle(filtered());
+
+    expect(port.emailed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "ceiling_reached",
+        nextStep: expect.objectContaining({ kind: "self_serve", name: "Accelerate" }),
+      }),
+    );
+  });
+
+  /** @scenario "A paused runaway automation is never offered the next tier" */
+  it("never resolves or sends a next step for a paused automation", async () => {
+    const { port, service } = runtime();
+
+    await service.handle(breach());
+
+    expect(port.nextStep).not.toHaveBeenCalled();
+    expect(port.emailed).toHaveBeenCalledWith(expect.objectContaining({ kind: "paused" }));
+    expect(port.emailed.mock.calls[0]?.[0]).not.toHaveProperty("nextStep");
   });
 
   /** @scenario "A limit email that could not be sent is tried again" */

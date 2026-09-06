@@ -57,6 +57,30 @@ Feature: Automation ownership
     And it sends at most one ceiling notification for the UTC day
 
   @unit
+  Scenario: A plan's own ceiling wins over the free/paid/enterprise bucket
+    Given a project on a plan that carries its own automation ceiling
+    When the daily persist ceiling is resolved
+    Then the plan's own ceiling is used instead of the type bucket
+
+  @unit
+  Scenario: A ceiling-reached notice offers the next tier
+    Given a filtered automation has exceeded its daily persist cap
+    When runaway containment sends its ceiling notification
+    Then the notice carries the organization's next self-serve tier
+
+  @unit
+  Scenario: A ceiling notice sent from the background process offers the same next tier
+    Given an automation past its daily ceiling on a deployment that prices its plans
+    When the background process that settles automations sends the ceiling notification
+    Then the notice offers the organization's next self-serve tier at that tier's own price
+
+  @unit
+  Scenario: A paused runaway automation is never offered the next tier
+    Given a condition-less trace automation has exceeded its daily persist cap
+    When runaway containment pauses and notifies about it
+    Then no next tier is resolved or offered in the pause notice
+
+  @unit
   Scenario: Graph threshold evaluation uses the singular AutomationService
     Given an active graph trigger and its custom graph
     When Eventing evaluates the trigger with a real-time or heartbeat reason
