@@ -113,6 +113,29 @@ func registerPiWorker(t *testing.T, relay *Relay, gatewayURL, ingestURL string) 
 	return token
 }
 
+// awaitSpans reads exported bodies until it holds n spans, so a test that made
+// several calls does not depend on how the exporter batched them.
+func awaitSpans(t *testing.T, ingest *signallingIngest, n int) []ptrace.Span {
+	t.Helper()
+	var spans []ptrace.Span
+	for len(spans) < n {
+		td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.await(t))
+		if err != nil {
+			t.Fatalf("forwarded payload is not OTLP protobuf: %v", err)
+		}
+		for i := range td.ResourceSpans().Len() {
+			scopes := td.ResourceSpans().At(i).ScopeSpans()
+			for j := range scopes.Len() {
+				sp := scopes.At(j).Spans()
+				for k := range sp.Len() {
+					spans = append(spans, sp.At(k))
+				}
+			}
+		}
+	}
+	return spans
+}
+
 func firstSpan(t *testing.T, payload []byte) (ptrace.ResourceSpans, ptrace.Span) {
 	t.Helper()
 	td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(payload)
@@ -331,9 +354,21 @@ func TestLLMProxy_PiHarnessRecordsGatewayDroppedParams(t *testing.T) {
 		resp.Body.Close()
 	}
 
-	_, span := firstSpan(t, ingest.await(t))
-	if v, ok := span.Attributes().Get("langwatch.langy.params_dropped"); !ok || v.Str() != "max_output_tokens,temperature" {
-		t.Errorf("the retold span must record what the gateway dropped, got %v", v.Str())
+	// One span per call, and the exporter batches them as it likes: the bodies
+	// carry the spans of several calls, or one call each, in whatever order the
+	// flushes happen. What the span must carry is its own call's drop set, so
+	// the whole set of spans is read and counted.
+	dropped := map[string]int{}
+	for _, span := range awaitSpans(t, ingest, len(sets)) {
+		v, ok := span.Attributes().Get("langwatch.langy.params_dropped")
+		if !ok {
+			t.Errorf("a retold span records nothing about what the gateway dropped")
+			continue
+		}
+		dropped[v.Str()]++
+	}
+	if dropped["max_output_tokens,temperature"] != 2 || dropped["top_p"] != 1 {
+		t.Errorf("the retold spans must record what the gateway dropped, got %v", dropped)
 	}
 	if int(calls.Load()) != len(sets) {
 		t.Fatalf("expected every call to reach the gateway, got %d", calls.Load())
