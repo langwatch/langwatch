@@ -12,6 +12,7 @@
  * root of the app's tRPC surface, and moving it under a namespace would be a
  * client-visible rename.
  */
+import { createTrpcProcedure } from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -40,6 +41,12 @@ type PublicEnvTrpcProcedures<
   policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
 }>;
 
+/** What the browser reads off this answer. @see PublicEnvTrpcApi */
+const publicEnvAnswer = z.object({
+  NEXTAUTH_PROVIDER: z.string(),
+  SHOW_OPS_IN_MAIN_SIDEBAR: z.boolean(),
+});
+
 const PUBLIC_ENV_ACCESS: AuthzDeclaration = {
   kind: "no-permission",
   reason: "resolves sign-in mode and viewer UI visibility only; no tenant product data",
@@ -58,14 +65,22 @@ export class PublicEnvTrpcApi {
   >(procedures: PublicEnvTrpcProcedures<TContext, TOptions, TRoot>, app: AuthApp) {
     const { public: publicProcedure, policy } = procedures;
 
-    return policy(PUBLIC_ENV_ACCESS)(publicProcedure.input(z.object({}).passthrough())).query(
-      async ({ ctx }) => ({
-        NEXTAUTH_PROVIDER: await app.resolveAuthProvider(),
-        SHOW_OPS_IN_MAIN_SIDEBAR: app.showsOperatorEntry(
-          ctx.session?.user?.email,
-          ctx.app.config.opsSidebarEmails,
-        ),
-      }),
+    return createTrpcProcedure({
+      procedures: { protected: publicProcedure, policy },
+    }).query("publicEnv", (p) =>
+      p
+        // Permissive on purpose: clients have historically sent whatever they
+        // had to hand, and refusing them now would sign nobody in.
+        .withInput(z.object({}).passthrough())
+        .withOutput(publicEnvAnswer)
+        .withPermission(PUBLIC_ENV_ACCESS)
+        .handle(async ({ ctx }) => ({
+          NEXTAUTH_PROVIDER: await app.resolveAuthProvider(),
+          SHOW_OPS_IN_MAIN_SIDEBAR: app.showsOperatorEntry(
+            ctx.session?.user?.email,
+            ctx.app.config.opsSidebarEmails,
+          ),
+        })),
     );
   }
 }

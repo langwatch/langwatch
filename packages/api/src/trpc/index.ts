@@ -78,10 +78,13 @@ export type {
   TrpcTranslatedCause,
 } from "./trpc-policy-ports.js";
 export {
+  createTrpcProcedure,
   createTrpcService,
+  type TrpcBareProcedure,
   type TrpcDeclaredAbsent,
   type TrpcPolicyDecorator,
   type TrpcProcedureChain,
+  type TrpcProcedureConfig,
   type TrpcService,
   type TrpcServiceConfig,
   type TrpcServiceProcedures,

@@ -280,9 +280,9 @@ export class SsoConnectionTrpcApi {
       root: trpc,
       procedures: {
         protected: procedure,
-        // Every procedure here declares its access with one of the two
-        // already-built staff chains, so no declaration reaches this factory.
-        policy: () => (built) => built,
+        // No `policy`: every procedure here declares its access with one of
+        // the two already-built staff chains, so nothing ever asks the process
+        // to resolve a declaration.
       },
       validateOutput,
     })

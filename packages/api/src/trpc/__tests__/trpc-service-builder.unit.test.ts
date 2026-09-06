@@ -10,7 +10,11 @@ import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contrac
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { TrpcRootDefinition } from "../trpc-root.js";
-import { createTrpcService, type TrpcPolicyDecorator } from "../trpc-service-builder.js";
+import {
+  createTrpcProcedure,
+  createTrpcService,
+  type TrpcPolicyDecorator,
+} from "../trpc-service-builder.js";
 
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
@@ -321,5 +325,103 @@ describe("createTrpcService.subscription", () => {
       );
       expect(seen).toEqual([{ id: "first" }]);
     });
+  });
+});
+
+describe("a surface that is one procedure", () => {
+  /** @scenario "A surface that is one procedure declares it on the same chain" */
+  it("hands back the procedure itself, declarations and all", async () => {
+    const { declarations, policy } = recordingPolicy();
+    const publicEnv = createTrpcProcedure({
+      procedures: { protected: root.procedure, policy },
+    }).query("publicEnv", (p) =>
+      p
+        .withoutInput("the environment is the same for every caller")
+        .withOutput(z.object({ region: z.string() }))
+        .withPermission("project:view")
+        .handle(async () => ({ region: "eu" })),
+    );
+
+    expect(publicEnv._def.procedure).toBe(true);
+    expect(publicEnv._def.type).toBe("query");
+    expect(declarations).toEqual(["project:view"]);
+
+    const caller = root.router({ publicEnv }).createCaller({ actor: { id: "u1" } });
+    await expect(caller.publicEnv()).resolves.toEqual({ region: "eu" });
+  });
+});
+
+describe("a service mounting a child router", () => {
+  /** @scenario "A service mounts a child router without writing a record by hand" */
+  it("nests it exactly where hand-writing the record put it", async () => {
+    const { policy } = recordingPolicy();
+    const child = createTrpcService({
+      root,
+      procedures: { protected: root.procedure, policy },
+    })
+      .query("list", (p) =>
+        p
+          .withoutInput("the caller's own suites")
+          .withOutput(z.array(z.string()))
+          .withPermission("project:view")
+          .handle(async () => ["one"]),
+      )
+      .build();
+
+    const parent = createTrpcService({
+      root,
+      procedures: { protected: root.procedure, policy },
+    })
+      .query("count", (p) =>
+        p
+          .withoutInput("no argument")
+          .withOutput(z.number())
+          .withPermission("project:view")
+          .handle(async () => 1),
+      )
+      .router("testSuites", child)
+      .build();
+
+    const caller = parent.createCaller({ actor: { id: "u1" } });
+    await expect(caller.testSuites.list()).resolves.toEqual(["one"]);
+    await expect(caller.count()).resolves.toBe(1);
+  });
+});
+
+describe("a surface whose every procedure carries its own policy", () => {
+  /** @scenario "A surface whose every procedure carries its own policy declares none" */
+  it("builds with no policy, and refuses withPermission by name", async () => {
+    const seen: string[] = [];
+    const own: TrpcPolicyDecorator = <TProcedure>(procedure: TProcedure): TProcedure =>
+      (procedure as { use(middleware: unknown): TProcedure }).use(
+        async ({ next }: { next: () => Promise<unknown> }) => {
+          seen.push("own");
+          return next();
+        },
+      );
+
+    const built = createTrpcService({ root, procedures: { protected: root.procedure } })
+      .query("whoami", (p) =>
+        p
+          .withoutInput("the caller is the argument")
+          .withOutput(z.string())
+          .withCustomPermission(own, "the connection's own installation check authorizes this")
+          .handle(async () => "u1"),
+      )
+      .build();
+
+    const caller = built.createCaller({ actor: { id: "u1" } });
+    await expect(caller.whoami()).resolves.toBe("u1");
+    expect(seen).toEqual(["own"]);
+
+    expect(() =>
+      createTrpcService({ root, procedures: { protected: root.procedure } }).query("nope", (p) =>
+        p
+          .withoutInput("none")
+          .withOutput(z.string())
+          .withPermission("project:view")
+          .handle(async () => "x"),
+      ),
+    ).toThrow(/declares withPermission, but the surface was opened with no policy/);
   });
 });

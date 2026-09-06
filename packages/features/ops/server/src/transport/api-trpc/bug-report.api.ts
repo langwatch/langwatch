@@ -170,9 +170,9 @@ export class BugReportTrpcApi {
       root: trpc,
       procedures: {
         protected: procedure,
-        // Both procedures declare their access with the already-built staff
-        // chain, so no declaration reaches this factory.
-        policy: () => (built) => built,
+        // No `policy`: both procedures declare their access with the
+        // already-built staff chain, so nothing ever asks the process to
+        // resolve a declaration.
       },
       validateOutput,
     })

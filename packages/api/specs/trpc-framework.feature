@@ -55,3 +55,23 @@ Feature: tRPC framework boundary
     When it is compared with the same subscription written by hand
     Then the two are the same type
     And every value the stream yields is checked against its declared shape, not only the first
+
+  @unit
+  Scenario: A surface that is one procedure declares it on the same chain
+    Given a feature's whole tRPC surface is a single procedure mounted at the root
+    When it is declared on the chain
+    Then what comes back is the procedure itself, not a router around it
+    And it carries the same input, output and access declarations any procedure does
+
+  @unit
+  Scenario: A service mounts a child router without writing a record by hand
+    Given a feature nests another router inside its own surface
+    When the child is mounted on the chain by name
+    Then the built router nests it exactly where hand-writing the record put it
+
+  @unit
+  Scenario: A surface whose every procedure carries its own policy declares none
+    Given every procedure on a surface declares a custom permission
+    When the surface is opened with no policy at all
+    Then it builds, and a procedure that asks for a declared permission is refused by name
+
