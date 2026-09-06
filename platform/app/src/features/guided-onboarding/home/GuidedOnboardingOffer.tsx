@@ -16,7 +16,7 @@
  *
  * @see specs/home/guided-onboarding-offer.feature
  */
-import { Box, HStack } from "@chakra-ui/react";
+import { chakra, HStack } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import { AnalyticsBoundary, useAnalytics } from "react-contextual-analytics";
@@ -143,8 +143,7 @@ function GuidedOnboardingOfferInner({ space }: { space: GuidedSpace }) {
 
   return (
     <HStack justify="center" width="full" marginTop={3}>
-      <Box
-        as="button"
+      <chakra.button
         type="button"
         data-testid="guided-onboarding-offer"
         onClick={() => void begin()}
@@ -169,7 +168,7 @@ function GuidedOnboardingOfferInner({ space }: { space: GuidedSpace }) {
       >
         <Sparkles size={14} color="#ea580c" aria-hidden="true" />
         Start guided onboarding
-      </Box>
+      </chakra.button>
     </HStack>
   );
 }

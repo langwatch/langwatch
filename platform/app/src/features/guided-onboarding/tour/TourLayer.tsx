@@ -16,7 +16,7 @@
  *
  * @see specs/features/onboarding/guided-tour.feature
  */
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import { Castle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnalyticsBoundary, useAnalytics } from "react-contextual-analytics";
@@ -538,8 +538,7 @@ function TourLayerInner() {
             </Text>
           </HStack>
           <HStack marginTop={3} justify="space-between">
-            <Box
-              as="button"
+            <chakra.button
               type="button"
               onClick={back}
               disabled={stepIndex === 0}
@@ -561,10 +560,9 @@ function TourLayerInner() {
             >
               {stepIndex > 0 && <ChevronLeft size={11} aria-hidden="true" />}
               {stepIndex + 1} of {steps.length}
-            </Box>
+            </chakra.button>
             <HStack gap={1.5}>
-              <Box
-                as="button"
+              <chakra.button
                 type="button"
                 onClick={() => endTour("skipped")}
                 cursor="pointer"
@@ -577,9 +575,8 @@ function TourLayerInner() {
                 _hover={{ background: "bg.muted", color: "fg" }}
               >
                 Skip
-              </Box>
-              <Box
-                as="button"
+              </chakra.button>
+              <chakra.button
                 type="button"
                 onClick={next}
                 display="flex"
@@ -598,7 +595,7 @@ function TourLayerInner() {
                 <TimerRing duration={readMs(step.text)} playKey={stepIndex} />
                 Next
                 <ChevronRight size={13} aria-hidden="true" />
-              </Box>
+              </chakra.button>
             </HStack>
           </HStack>
         </Box>

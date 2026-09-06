@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, type Mock, vi } from "vitest";
 import { GOVERNANCE_SOURCES_ROUTE } from "../../landing";
 import {
   BUILD_GROUP_ID,
@@ -10,11 +10,11 @@ import {
 } from "../tourSteps";
 
 function ctx(): TourStepContext & {
-  navigate: ReturnType<typeof vi.fn>;
+  navigate: Mock<(to: string) => void>;
   actions: Record<string, ReturnType<typeof vi.fn>>;
 } {
   return {
-    navigate: vi.fn(),
+    navigate: vi.fn<(to: string) => void>(),
     actions: {
       expandGroup: vi.fn(),
       collapseGroup: vi.fn(),
