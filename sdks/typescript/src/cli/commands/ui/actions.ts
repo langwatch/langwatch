@@ -20,17 +20,23 @@ export const uiActionsCommand = async (): Promise<CommandResult | void> => {
   const { apiKey, endpoint } = await resolveCredentials();
 
   let response: Response;
+  let text: string;
   try {
     response = await langwatchFetch(`${endpoint}/api/langy/ui/actions`, {
       method: "GET",
       headers: { "X-Auth-Token": apiKey },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
+    // The deadline covers the body too: a socket that goes quiet after the
+    // headers aborts this read, not the send.
+    text = await response.text();
   } catch (error) {
     // A tripped deadline rejects with a bare TimeoutError, which reads as a
     // crash rather than as the limit this command set. Name it, and leave every
-    // other failure to the caller's error path.
-    if ((error as { name?: string } | null)?.name !== "TimeoutError") throw error;
+    // other failure to the caller's error path. An aborted body read arrives as
+    // an AbortError instead.
+    const name = (error as { name?: string } | null)?.name;
+    if (name !== "TimeoutError" && name !== "AbortError") throw error;
     process.stderr.write(
       `${endpoint} did not answer with the UI actions within ${REQUEST_TIMEOUT_MS / 1000}s.\n`,
     );
@@ -38,7 +44,6 @@ export const uiActionsCommand = async (): Promise<CommandResult | void> => {
     return;
   }
 
-  const text = await response.text();
   if (!response.ok) {
     process.stderr.write(`${text}\n`);
     process.exitCode = 1;
