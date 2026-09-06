@@ -26,7 +26,6 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { UserService } from "@langwatch/user-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiAuditPort } from "../../api-request.policy";
 import { createOpsTrpcRouter } from "./ops-trpc.mount";
@@ -64,13 +63,7 @@ export type OpsFeatureCollaborators = Readonly<{
   logger: Logger;
 }>;
 
-/** The operator application, its ports and the gate the namespace is behind. */
-export type ComposedOpsFeature = Readonly<{
-  /** The `ctx.app.ops` slice, which other surfaces' staff checks read. */
-  app: OpsApp;
-  /** `ops.*`, built on the process's own root and its own operator chain. */
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createOpsTrpcRouter>;
-}>;
+import type { ComposedOpsFeature } from "./ops.composition.types";
 
 /** Reports each operator absence, with what it costs. */
 export abstract class ApiOpsAbsenceReport {

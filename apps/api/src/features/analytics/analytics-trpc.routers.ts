@@ -1,0 +1,69 @@
+/**
+ * The two analytics namespaces, and the port groups they are assembled from.
+ *
+ * Apart from the composition because `ComposedAnalyticsFeature` names this
+ * function's return type, and that record is reached by every program naming
+ * `AppRouter`. Through the composition it would drag the composition's
+ * adapters, its Prisma resolution and its ClickHouse client along with it.
+ */
+import type { filterFieldsEnum } from "@langwatch/analytics-contract";
+import type { sharedFiltersInputSchema, timeseriesInputSchema } from "@langwatch/analytics-server";
+import type { AnalyticsTrpcPorts, LangWatchQLTrpcPorts } from "@langwatch/analytics-server";
+import type { GraphTrpcPorts, SavedWorkbenchChartTrpcPorts } from "@langwatch/dashboard-server";
+import type { z } from "zod";
+import type { ApiTrpcFeatureMount } from "../../api.application";
+import {
+  createGraphTrpcRouter,
+  createSavedWorkbenchChartTrpcRouter,
+} from "../dashboard/dashboard-trpc.mount";
+import { createAnalyticsTrpcRouter, createLangWatchQLTrpcRouter } from "./analytics-trpc.mount";
+
+/** The filter fields this deployment offers, as the enum publishes them. */
+export type ApiFilterField = (typeof filterFieldsEnum)["options"][number];
+
+/** The charted reads' ports, with this deployment's two shared input schemas. */
+export type ApiAnalyticsReadPorts = AnalyticsTrpcPorts<
+  ApiTimeseriesInput,
+  ApiReadInput,
+  ApiFilterField,
+  ApiTimeseriesInputWire,
+  ApiReadInputWire
+>;
+
+/**
+ * What each shared schema publishes to a CLIENT and hands to a HANDLER, named
+ * apart because for these two they differ: `filters` carries a default, so the
+ * wire may omit it while the parsed value always has it.
+ */
+type ApiReadInput = z.output<typeof sharedFiltersInputSchema>;
+type ApiReadInputWire = z.input<typeof sharedFiltersInputSchema>;
+type ApiTimeseriesInput = z.output<typeof timeseriesInputSchema>;
+type ApiTimeseriesInputWire = z.input<typeof timeseriesInputSchema>;
+
+/** The three port groups the `analytics.*` namespace is assembled from. */
+export type AnalyticsFeaturePorts = Readonly<{
+  reads: ApiAnalyticsReadPorts;
+  workbench: LangWatchQLTrpcPorts;
+  savedCharts: SavedWorkbenchChartTrpcPorts;
+}>;
+
+/** The two namespaces, built the one way whether the feature composed or not. */
+export function analyticsRouters(
+  mount: ApiTrpcFeatureMount,
+  ports: AnalyticsFeaturePorts,
+  graphPorts: GraphTrpcPorts<ApiFilterField>,
+) {
+  return {
+    analytics: mount.root.mergeRouters(
+      createAnalyticsTrpcRouter({ ...mount, ports: ports.reads }),
+      mount.root.router({
+        lwql: createLangWatchQLTrpcRouter({ ...mount, ports: ports.workbench }),
+        savedWorkbenchCharts: createSavedWorkbenchChartTrpcRouter({
+          ...mount,
+          ports: ports.savedCharts,
+        }),
+      }),
+    ),
+    graphs: createGraphTrpcRouter({ ...mount, ports: graphPorts }),
+  };
+}

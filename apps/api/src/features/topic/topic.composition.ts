@@ -5,16 +5,10 @@ import { HandledError } from "@langwatch/handled-error";
 import type { TopicService } from "@langwatch/topic-contract";
 import { PostgresTopicAdapter, TopicClusteringSchedulePort } from "@langwatch/topic-server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createTopicTrpcRouter } from "./topic-trpc.mount";
 
-/** The one namespace and the reader `ctx.app.topics` carries. */
-export type ComposedTopicFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createTopicTrpcRouter>;
-  /** For `ctx.app.topics` — the same reader the trace grid labels rows with. */
-  service: TopicService;
-}>;
+import type { ComposedTopicFeature } from "./topic.composition.types";
 
 /** Composes the topic tree over this process's own connection. */
 export function composeTopicFeature(options: {

@@ -20,7 +20,6 @@ import {
 } from "@langwatch/monitor-server";
 import { nanoid } from "nanoid";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createMonitorTrpcRouter } from "./monitor-trpc.mount";
 
@@ -96,11 +95,7 @@ export type MonitorFeatureCollaborators = MonitorPeers &
     report?: ApiMonitorAbsenceReport;
   }>;
 
-/** The namespace and the `ctx.app.monitors` slice the REST family reads. */
-export type ComposedMonitorFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createMonitorTrpcRouter>;
-  app: MonitorApp;
-}>;
+import type { ComposedMonitorFeature } from "./monitor.composition.types";
 
 /** Composes the monitor surface over this process's own graph. */
 export function composeMonitorFeature(options: {

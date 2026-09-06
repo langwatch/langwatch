@@ -11,7 +11,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 
 import type { ApiAuditPort } from "../../api-request.policy";
-import type { ApiTrpcFeatureMount } from "../../api.application";
+
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
 import {
   createEnterpriseTrpcRouters,
@@ -38,17 +38,7 @@ export abstract class ApiEnterpriseApplicationPort {
   abstract backoffice(): ReturnType<EnterpriseTrpcMountPorts["ssoConnections"]["backoffice"]>;
 }
 
-/** The four namespaces, the three `ctx.app` slices, and the SCIM REST door. */
-export type ComposedEnterpriseFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): ReturnType<typeof createEnterpriseTrpcRouters>;
-  /** For `ctx.app.licensing`, `ctx.app.scimApp` and `ctx.app.usageLimits`. */
-  application: Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits">;
-  /**
-   * The SCIM application the packaged REST family serves, where this process composed the
-   * feature at all.
-   */
-  scim?: ApiTrpcFeatureApplication["scimApp"] | undefined;
-}>;
+import type { ComposedEnterpriseFeature } from "./enterprise.composition.types";
 
 /** Composes the four Enterprise tenant surfaces over this deployment's graph. */
 export function composeEnterpriseFeature(options: {

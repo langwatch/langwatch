@@ -22,13 +22,9 @@ import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse";
 import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request";
 import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
-import {
-  composeTraceFeature,
-  LoggedApiTraceAbsence,
-  type ComposedTraceFeature,
-  type ApiTracePorts,
-  type ApiTraceReadStackPort,
-} from "../trace.composition";
+import { composeTraceFeature, LoggedApiTraceAbsence } from "../trace.composition";
+import type { ApiTraceReadStackPort } from "../trace-read-stack.port";
+import type { ApiTracePorts } from "../trace.composition.types";
 import {
   stubCollaborators,
   stubComposedFeatures,
@@ -47,6 +43,7 @@ import {
 import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "../traces-v2-trpc.mount";
 import { ApiUsageStatsPort, composeSpendFeature } from "../../entitlement/spend.composition";
 import type { LimitsTrpcPorts } from "@langwatch/entitlement-server";
+import type { ComposedTraceFeature } from "../trace.composition.types";
 
 /**
  * The sixteen namespaces this half owns, as the wire names them.

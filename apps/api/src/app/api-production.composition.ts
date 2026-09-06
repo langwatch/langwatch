@@ -71,50 +71,35 @@ import {
   composeDatasetFeature,
   composeDatasetService,
   refusingDatasetFeature,
-  type ComposedDatasetFeature,
 } from "../features/dataset/dataset.composition";
 import {
   composeEvaluatorFeature,
   composeEvaluatorService,
   refusingEvaluatorFeature,
-  type ComposedEvaluatorFeature,
 } from "../features/evaluator/evaluator.composition";
-import {
-  composePromptFeature,
-  refusingPromptFeature,
-  type ComposedPromptFeature,
-} from "../features/prompt/prompt.composition";
+import { composePromptFeature, refusingPromptFeature } from "../features/prompt/prompt.composition";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
 import {
   composeFeatureFlagFeature,
   refusingFeatureFlagFeature,
-  type ComposedFeatureFlagFeature,
 } from "../features/feature-flag/feature-flag.composition";
 import {
   composeAnalyticsFeature,
   refusingAnalyticsFeature,
-  type ComposedAnalyticsFeature,
 } from "../features/analytics/analytics.composition";
 import {
   composeAuthFeature,
   refusingAuthFeature,
   type ApiPersonDeploymentFacts,
-  type ComposedAuthFeature,
 } from "../features/auth/auth.composition";
-import {
-  composeUserFeature,
-  refusingUserFeature,
-  type ComposedUserFeature,
-} from "../features/user/user.composition";
+import { composeUserFeature, refusingUserFeature } from "../features/user/user.composition";
 import {
   composePresenceFeature,
   refusingPresenceFeature,
-  type ComposedPresenceFeature,
 } from "../features/presence/presence.composition";
 import {
   composeApiKeyFeature,
   refusingApiKeyFeature,
-  type ComposedApiKeyFeature,
 } from "../features/api-key/api-key.composition";
 import type { ApiPersonMailPort } from "./api-person-mail.port";
 import { ApiEventingIdentityAdapter } from "./api-identity-eventing.adapter";
@@ -128,18 +113,15 @@ import {
   composeWorkflowRuntime,
   refusingWorkflowFeature,
   type ApiWorkflowRuntime,
-  type ComposedWorkflowFeature,
 } from "../features/workflow/workflow.composition";
 import {
   composeExperimentFeature,
   refusingExperimentFeature,
-  type ComposedExperimentFeature,
 } from "../features/experiment/experiment.composition";
 import {
   composeEvaluationFeature,
   ApiEvaluationUnavailableError,
   refusingEvaluationFeature,
-  type ComposedEvaluationFeature,
 } from "../features/evaluation/evaluation.composition";
 import {
   composeApiEvaluatorExecution,
@@ -150,19 +132,10 @@ import {
   composeTraceFeature,
   LoggedApiTraceAbsence,
   refusingTraceFeature,
-  type ApiTraceReadStackPort,
-  type ComposedTraceFeature,
 } from "../features/trace/trace.composition";
-import {
-  composeShareFeature,
-  refusingShareFeature,
-  type ComposedShareFeature,
-} from "../features/share/share.composition";
-import {
-  composeTopicFeature,
-  refusingTopicFeature,
-  type ComposedTopicFeature,
-} from "../features/topic/topic.composition";
+import type { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port";
+import { composeShareFeature, refusingShareFeature } from "../features/share/share.composition";
+import { composeTopicFeature, refusingTopicFeature } from "../features/topic/topic.composition";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { UsageService } from "@langwatch/entitlement-server";
 
@@ -174,74 +147,54 @@ import {
   composeScenarioFeature,
   LoggedApiScenarioAbsence,
   refusingScenarioFeature,
-  type ComposedScenarioFeature,
 } from "../features/scenario/scenario.composition";
-import {
-  composeRoleFeature,
-  refusingRoleFeature,
-  type ComposedRoleFeature,
-} from "../features/role/role.composition";
-import {
-  composeHomeFeature,
-  refusingHomeFeature,
-  type ComposedHomeFeature,
-} from "../features/project/home.composition";
+import { composeRoleFeature, refusingRoleFeature } from "../features/role/role.composition";
+import { composeHomeFeature, refusingHomeFeature } from "../features/project/home.composition";
 import {
   composeDataRetentionFeature,
   LoggedApiDataRetentionAbsence,
   refusingDataRetentionFeature,
-  type ComposedDataRetentionFeature,
 } from "../features/data-retention/data-retention.composition";
 import {
   composeMonitorFeature,
   composeMonitorService,
   LoggedApiMonitorAbsence,
   refusingMonitorFeature,
-  type ComposedMonitorFeature,
 } from "../features/monitor/monitor.composition";
 import {
   composeStoredObjectFeature,
   DeferredPayloadStagingAdapter,
   LoggedApiStoredObjectAbsence,
   refusingStoredObjectFeature,
-  type ComposedStoredObjectFeature,
 } from "../features/stored-object/stored-object.composition";
 import {
   composeOrganizationFeature,
   refusingOrganizationFeature,
   type ApiOrganizationInvitePort,
-  type ComposedOrganizationFeature,
 } from "../features/organization/organization.composition";
 import {
   composeProjectFeature,
   refusingProjectFeature,
-  type ComposedProjectFeature,
 } from "../features/project/project.composition";
 import {
   composeCodingAgentFeature,
   refusingCodingAgentFeature,
-  type ComposedCodingAgentFeature,
 } from "../features/coding-agent/coding-agent.composition";
 import {
   composeAutomationFeature,
   refusingAutomationFeature,
-  type ComposedAutomationFeature,
 } from "../features/automation/automation.composition";
 import {
   composeEnterpriseFeature,
   refusingEnterpriseFeature,
   type ApiEnterpriseApplicationPort,
-  type ComposedEnterpriseFeature,
 } from "../features/enterprise/enterprise.composition";
 import type { ApiViewerProtectionsPort } from "../features/trace/trace-viewer-protections";
 import {
   composeApiOrganizationInvites,
   type ApiOrganizationInvites,
 } from "./api-organization-invites.composition";
-import {
-  composeGatewayFeature,
-  type ComposedGatewayFeature,
-} from "../features/gateway/gateway.composition";
+import { composeGatewayFeature } from "../features/gateway/gateway.composition";
 import { composeEnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition";
 import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition";
@@ -278,32 +231,27 @@ import {
   composeHttpProxyFeature,
   LoggedApiStudioAbsence,
   type ApiStudioHostPort,
-  type ComposedHttpProxyFeature,
 } from "../features/agent/http-proxy.composition";
 import {
   composeModelProviderFeature,
   LoggedApiModelProviderAbsence as LoggedApiModelProviderSurfaceAbsence,
   refusingModelProviderFeature,
   type ApiModelProviderHostPort,
-  type ComposedModelProviderFeature,
 } from "../features/model-provider/model-provider.composition";
 import {
   composeSavedViewFeature,
   refusingSavedViewFeature,
-  type ComposedSavedViewFeature,
 } from "../features/dashboard/saved-view.composition";
 import {
   composeSpendFeature,
   LoggedApiSpendAbsence,
   refusingSpendFeature,
   type ApiUsageStatsPort,
-  type ComposedSpendFeature,
 } from "../features/entitlement/spend.composition";
 import {
   composeAnnotationFeature,
   refusingAnnotationFeature,
   type ApiAnnotationTraceContentPort,
-  type ComposedAnnotationFeature,
 } from "../features/annotation/annotation.composition";
 import {
   composeApiTraceProducerCommands,
@@ -313,7 +261,6 @@ import {
   composeIntegrationsChecksFeature,
   refusingIntegrationsChecksFeature,
   type ApiSimulationEvidencePort,
-  type ComposedIntegrationsChecksFeature,
 } from "../features/project/integrations-checks.composition";
 import { TraceSpanIngestPort } from "@langwatch/trace-server";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
@@ -430,27 +377,20 @@ import {
   LoggedApiAgentPipelinesAbsence,
   type ApiAgentPipelines,
 } from "./api-agent-pipelines.composition";
-import {
-  composeLangyFeature,
-  refusingLangyFeature,
-  type ComposedLangyFeature,
-} from "../features/langy/langy.composition";
+import { composeLangyFeature, refusingLangyFeature } from "../features/langy/langy.composition";
 import { ApiLangyNavigateResourceAdapter } from "../features/langy/langy-navigate-resource.adapter";
 import {
   composeDataPrivacyFeature,
   refusingDataPrivacyFeature,
-  type ComposedDataPrivacyFeature,
 } from "../features/data-privacy/data-privacy.composition";
 import {
   composeBugReportFeature,
   refusingBugReportFeature,
-  type ComposedBugReportFeature,
 } from "../features/bug-report/bug-report.composition";
 import {
   composeOpsFeature,
   LoggedApiOpsAbsence,
   refusingOpsFeature,
-  type ComposedOpsFeature,
 } from "../features/ops/ops.composition";
 import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-flow-rest.mount";
 import { composeApiAuthRest } from "../features/auth/auth-rest.mount";
@@ -469,6 +409,43 @@ import type {
 } from "@langwatch/enterprise-governance-server";
 import type { GithubRestPorts } from "@langwatch/github-server";
 import type { FilesRateLimiter } from "@langwatch/stored-object-server";
+import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition.types";
+import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition.types";
+import type { ComposedPromptFeature } from "../features/prompt/prompt.composition.types";
+import type { ComposedFeatureFlagFeature } from "../features/feature-flag/feature-flag.composition.types";
+import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition.types";
+import type { ComposedAuthFeature } from "../features/auth/auth.composition.types";
+import type { ComposedUserFeature } from "../features/user/user.composition.types";
+import type { ComposedPresenceFeature } from "../features/presence/presence.composition.types";
+import type { ComposedApiKeyFeature } from "../features/api-key/api-key.composition.types";
+import type { ComposedWorkflowFeature } from "../features/workflow/workflow.composition.types";
+import type { ComposedExperimentFeature } from "../features/experiment/experiment.composition.types";
+import type { ComposedEvaluationFeature } from "../features/evaluation/evaluation.composition.types";
+import type { ComposedTraceFeature } from "../features/trace/trace.composition.types";
+import type { ComposedShareFeature } from "../features/share/share.composition.types";
+import type { ComposedTopicFeature } from "../features/topic/topic.composition.types";
+import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition.types";
+import type { ComposedRoleFeature } from "../features/role/role.composition.types";
+import type { ComposedHomeFeature } from "../features/project/home.composition.types";
+import type { ComposedDataRetentionFeature } from "../features/data-retention/data-retention.composition.types";
+import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition.types";
+import type { ComposedStoredObjectFeature } from "../features/stored-object/stored-object.composition.types";
+import type { ComposedOrganizationFeature } from "../features/organization/organization.composition.types";
+import type { ComposedProjectFeature } from "../features/project/project.composition.types";
+import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding-agent.composition.types";
+import type { ComposedAutomationFeature } from "../features/automation/automation.composition.types";
+import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition.types";
+import type { ComposedGatewayFeature } from "../features/gateway/gateway.composition.types";
+import type { ComposedHttpProxyFeature } from "../features/agent/http-proxy.composition.types";
+import type { ComposedModelProviderFeature } from "../features/model-provider/model-provider.composition.types";
+import type { ComposedSavedViewFeature } from "../features/dashboard/saved-view.composition.types";
+import type { ComposedSpendFeature } from "../features/entitlement/spend.composition.types";
+import type { ComposedAnnotationFeature } from "../features/annotation/annotation.composition.types";
+import type { ComposedIntegrationsChecksFeature } from "../features/project/integrations-checks.composition.types";
+import type { ComposedLangyFeature } from "../features/langy/langy.composition.types";
+import type { ComposedDataPrivacyFeature } from "../features/data-privacy/data-privacy.composition.types";
+import type { ComposedBugReportFeature } from "../features/bug-report/bug-report.composition.types";
+import type { ComposedOpsFeature } from "../features/ops/ops.composition.types";
 
 /**
  * The REST-family capabilities the API process supplies out of its own configuration and its

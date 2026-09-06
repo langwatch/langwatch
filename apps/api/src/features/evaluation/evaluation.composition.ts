@@ -20,7 +20,6 @@ import { createLogger } from "@langwatch/observability";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import type { ZodTypeAny } from "zod";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { permissiveMappingsSchema } from "../trace/trace-mappings";
 import type { ApiWorkflowRuntime } from "../workflow/workflow.composition";
@@ -34,17 +33,7 @@ export type EvaluationPeers = Readonly<{
   workflowRuntime: ApiWorkflowRuntime;
 }>;
 
-/** The namespace, the `ctx.app.evaluations` slice and the pipeline sender. */
-export type ComposedEvaluationFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createEvaluationTrpcRouter>;
-  /** For `ctx.app.evaluations`. */
-  app: Readonly<{ reportEvaluation(data: never): Promise<unknown> }>;
-  /**
-   * The pipeline sender itself, as the experiment run loop and the evaluator
-   * runtime take it. ONE registration, handed out rather than repeated.
-   */
-  reportEvaluation: (data: ReportEvaluationCommandData) => Promise<unknown>;
-}>;
+import type { ComposedEvaluationFeature } from "./evaluation.composition.types";
 
 /** Composes the evaluation surface over this process's own graph. */
 export function composeEvaluationFeature(options: {

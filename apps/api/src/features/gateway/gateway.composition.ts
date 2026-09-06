@@ -10,13 +10,11 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import {
   composeApiGateway,
   type ApiGatewayClickHousePort,
-  type ApiGatewayComposition,
   type ApiGatewayIdempotencyPort,
 } from "../../app/api-gateway.composition";
 import { createGatewayTrpcRouters } from "./gateway-trpc.mount";
@@ -61,19 +59,7 @@ export type GatewayFeatureOptions = Readonly<{
   idempotency?: ApiGatewayIdempotencyPort | undefined;
 }>;
 
-/** What the gateway's three kinds of door are given. */
-export type ComposedGatewayFeature = Readonly<{
-  /** The `ctx.app.gateway` slice, and what the two REST families are handed. */
-  app: ApiTrpcFeatureApplication["gateway"];
-  /**
-   * Everything the composition opened, for the two doors that need more than the
-   * application: the billing reconciliation family walks the spend store directly, and
-   * the Go data plane materialises a key's warm-cache bundle against the decision store.
-   */
-  composition: ApiGatewayComposition | undefined;
-  /** The six namespaces, built on the process's own root. */
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createGatewayTrpcRouters>;
-}>;
+import type { ComposedGatewayFeature } from "./gateway.composition.types";
 
 /** Composes the gateway over this process's graph, or over its refusals. */
 export function composeGatewayFeature(options: GatewayFeatureOptions): ComposedGatewayFeature {

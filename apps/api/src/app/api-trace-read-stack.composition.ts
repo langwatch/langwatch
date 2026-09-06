@@ -97,7 +97,7 @@ import {
 } from "@langwatch/trace-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
-import { ApiTraceReadStackPort } from "../features/trace/trace.composition";
+import { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port";
 
 /** Everything the read stack is composed from. */
 export type ApiTraceReadStackOptions = Readonly<{

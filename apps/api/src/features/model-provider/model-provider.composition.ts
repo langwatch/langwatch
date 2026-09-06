@@ -81,16 +81,7 @@ export type ModelProviderPeers = Readonly<{
   spans?: TraceAppDependencies["traces"]["spans"];
 }>;
 
-/** The three namespaces and the `ctx.app.modelProviders` slice. */
-export type ComposedModelProviderFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): {
-    modelProvider: ReturnType<typeof createModelProviderTrpcRouter>;
-    llmModelCost: ReturnType<typeof createLlmModelCostTrpcRouter>;
-    translate: ReturnType<typeof createTranslateTrpcRouter>;
-  };
-  /** For `ctx.app.modelProviders`. */
-  app: ModelProviderApp;
-}>;
+import type { ComposedModelProviderFeature } from "./model-provider.composition.types";
 
 /** Composes the provider surfaces over this process's own graph. */
 export function composeModelProviderFeature(options: {

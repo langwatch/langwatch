@@ -20,7 +20,6 @@ import {
   lwqlTimeWindowSchema,
   sharedFiltersInputSchema,
   timeseriesInputSchema,
-  type AnalyticsTrpcPorts,
   type LangWatchQLService,
   type LangWatchQLTrpcPorts,
 } from "@langwatch/analytics-server";
@@ -34,7 +33,6 @@ import {
   WorkbenchAwareGraphVisibilityAdapter,
   type DashboardGraphAlertLookup,
   type GraphTrpcPorts,
-  type SavedWorkbenchChartTrpcPorts,
   SavedWorkbenchChartErrorsAdapter,
 } from "@langwatch/dashboard-server";
 import {
@@ -51,15 +49,14 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import { nanoid } from "nanoid";
-import type { z } from "zod";
 import type { ApiLangWatchQLConfigResolution } from "../../platform/config/api.config";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import {
-  createGraphTrpcRouter,
-  createSavedWorkbenchChartTrpcRouter,
-} from "../dashboard/dashboard-trpc.mount";
-import { createAnalyticsTrpcRouter, createLangWatchQLTrpcRouter } from "./analytics-trpc.mount";
+  analyticsRouters,
+  type AnalyticsFeaturePorts,
+  type ApiAnalyticsReadPorts,
+  type ApiFilterField,
+} from "./analytics-trpc.routers";
 
 /**
  * The retention floor an evaluation read is bounded by when a project names no policy of
@@ -101,26 +98,7 @@ export type AnalyticsFeatureCollaborators = Readonly<{
   ) => Record<string, unknown>;
 }>;
 
-/** The two namespaces, the two `ctx.app` slices, and what the REST doors take. */
-export type ComposedAnalyticsFeature = Readonly<{
-  /**
-   * `analytics.*` and `graphs.*`, on the process's own root.
-   */
-  routers(mount: ApiTrpcFeatureMount): ReturnType<typeof analyticsRouters>;
-  /** For `ctx.app.analytics`. */
-  analytics: AnalyticsApp;
-  /** For `ctx.app.dashboard`. */
-  dashboard: DashboardApp;
-  /**
-   * The governed-SQL runner, the rollout switch it is behind, and the content protections
-   * an API KEY resolves to — the three the public governed-SQL REST family needs and the
-   * tRPC ports do not expose.
-   */
-  langWatchQL: LangWatchQLService;
-  featureFlags: FeatureFlagService;
-  /** See {@link ApiAnalyticsProtections.resolveForApiKey}. */
-  apiKeyProtections: (input: { projectId: string }) => Promise<LangWatchQLProtections>;
-}>;
+import type { ComposedAnalyticsFeature } from "./analytics.composition.types";
 
 /**
  * Dashboard's card-placement gate, answered by LangWatchQL's own rollout flag. Dashboard
@@ -152,28 +130,6 @@ class LangWatchQLWorkbenchAccess extends WorkbenchAccessPort {
     });
   }
 }
-
-/** The filter fields this deployment offers, as the enum publishes them. */
-export type ApiFilterField = (typeof filterFieldsEnum)["options"][number];
-
-/** The charted reads' ports, with this deployment's two shared input schemas. */
-export type ApiAnalyticsReadPorts = AnalyticsTrpcPorts<
-  ApiTimeseriesInput,
-  ApiReadInput,
-  ApiFilterField,
-  ApiTimeseriesInputWire,
-  ApiReadInputWire
->;
-
-/**
- * What each shared schema publishes to a CLIENT and hands to a HANDLER, named
- * apart because for these two they differ: `filters` carries a default, so the
- * wire may omit it while the parsed value always has it.
- */
-type ApiReadInput = z.output<typeof sharedFiltersInputSchema>;
-type ApiReadInputWire = z.input<typeof sharedFiltersInputSchema>;
-type ApiTimeseriesInput = z.output<typeof timeseriesInputSchema>;
-type ApiTimeseriesInputWire = z.input<typeof timeseriesInputSchema>;
 
 /**
  * Composes the analytics half from this process's graph.
@@ -333,34 +289,6 @@ export function composeAnalyticsFeature(
     apiKeyProtections: (input) => protections.resolveForApiKey(input),
   };
 }
-
-/** The two namespaces, built the one way whether the feature composed or not. */
-function analyticsRouters(
-  mount: ApiTrpcFeatureMount,
-  ports: AnalyticsFeaturePorts,
-  graphPorts: GraphTrpcPorts<ApiFilterField>,
-) {
-  return {
-    analytics: mount.root.mergeRouters(
-      createAnalyticsTrpcRouter({ ...mount, ports: ports.reads }),
-      mount.root.router({
-        lwql: createLangWatchQLTrpcRouter({ ...mount, ports: ports.workbench }),
-        savedWorkbenchCharts: createSavedWorkbenchChartTrpcRouter({
-          ...mount,
-          ports: ports.savedCharts,
-        }),
-      }),
-    ),
-    graphs: createGraphTrpcRouter({ ...mount, ports: graphPorts }),
-  };
-}
-
-/** The three port groups the `analytics.*` namespace is assembled from. */
-type AnalyticsFeaturePorts = Readonly<{
-  reads: ApiAnalyticsReadPorts;
-  workbench: LangWatchQLTrpcPorts;
-  savedCharts: SavedWorkbenchChartTrpcPorts;
-}>;
 
 /**
  * The analytics surfaces on a process that composed no graph to read them over.

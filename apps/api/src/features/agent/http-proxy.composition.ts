@@ -7,7 +7,6 @@ import type { HttpProxyTrpcPorts } from "@langwatch/agent-server";
 import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import { createHttpProxyTrpcRouter } from "./http-proxy-trpc.mount";
 
 /** The studio's outbound event dispatch and the agent test's own trace write. */
@@ -38,10 +37,7 @@ export class LoggedApiStudioAbsence extends ApiStudioAbsenceReport {
   }
 }
 
-/** The one namespace, built over the composed host. */
-export type ComposedHttpProxyFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createHttpProxyTrpcRouter>;
-}>;
+import type { ComposedHttpProxyFeature } from "./http-proxy.composition.types";
 
 /** Composes the studio dispatch over the host this process was given. */
 export function composeHttpProxyFeature(options: {

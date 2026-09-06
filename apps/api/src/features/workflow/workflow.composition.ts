@@ -36,7 +36,6 @@ import type { LLMConfig, WorkflowService } from "@langwatch/workflow-contract";
 
 import type { ProjectService } from "@langwatch/project-contract";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import { composeApiAuthoringModelResolver } from "../../app/api-authoring-model.composition";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
@@ -152,19 +151,7 @@ export type WorkflowPeers = Readonly<{
   modelProviders: ModelProviderService;
 }>;
 
-/** The two namespaces and the `ctx.app.workflows` application. */
-export type ComposedWorkflowFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): {
-    workflow: ReturnType<typeof createWorkflowTrpcRouter>;
-    optimization: ReturnType<typeof createWorkflowOptimizationTrpcRouter>;
-  };
-  /** For `ctx.app.workflows`, and for the packaged workflow REST family. */
-  app: WorkflowApp;
-  /**
-   * The studio graph service itself, where this process composed one.
-   */
-  service?: WorkflowService | undefined;
-}>;
+import type { ComposedWorkflowFeature } from "./workflow.composition.types";
 
 /**
  * Composes the studio's commit-message writer over this process's model gateway.

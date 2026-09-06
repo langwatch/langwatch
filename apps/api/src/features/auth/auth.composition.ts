@@ -55,21 +55,7 @@ export type ApiPersonDeploymentFacts = Readonly<{
   adminEmails?: string | readonly string[] | undefined;
 }>;
 
-/** The two signed-out doors, and the application both answer from. */
-export type ComposedAuthFeature = Readonly<{
-  /** The composed auth application. */
-  app: AuthApp;
-  /**
-   * ADR-027's single source of truth for this process, published so the
-   * signed-in person's own account screens report the same mode the door they
-   * came through offered.
-   */
-  resolveAuthProvider(): Promise<string>;
-  routers(mount: ApiTrpcFeatureMount): Readonly<{
-    frontDoor: ReturnType<typeof createFrontDoorTrpcRouter>;
-    publicEnv: ReturnType<typeof createPublicEnvTrpcProcedure>;
-  }>;
-}>;
+import type { ComposedAuthFeature } from "./auth.composition.types";
 
 /** Composes the two signed-out doors over this process's own graph. */
 export function composeAuthFeature(options: {

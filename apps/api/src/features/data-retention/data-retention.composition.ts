@@ -27,7 +27,6 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type {
   ApiTrpcFeatureApplication,
   ApiTrpcPortsContext,
@@ -83,16 +82,7 @@ export type DataRetentionFeatureCollaborators = Readonly<{
   report?: ApiDataRetentionAbsenceReport;
 }>;
 
-/** The namespace, the composed policy, and the service every reader shares. */
-export type ComposedDataRetentionFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createDataRetentionTrpcRouter>;
-  /**
-   * For `ctx.app.dataRetention`, and for every other surface a retention window bounds:
-   * the trace read stack's own floor, a share link's expiry and the storage meter all
-   * read THIS service.
-   */
-  service: DataRetentionService;
-}>;
+import type { ComposedDataRetentionFeature } from "./data-retention.composition.types";
 
 /** Composes the retention surface over this process's own graph. */
 export function composeDataRetentionFeature(options: {

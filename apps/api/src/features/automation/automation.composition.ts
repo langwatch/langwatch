@@ -14,7 +14,6 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { composeApiAutomationApp } from "../../app/api-automation.composition";
 import {
@@ -35,20 +34,7 @@ export type AutomationPeers = Readonly<{
   redis: RedisConnection | null;
 }>;
 
-/** The two namespaces this feature mounts, and its `ctx.app` application. */
-export type ComposedAutomationFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): {
-    automation: ReturnType<typeof createAutomationTrpcRouter>;
-    emailSuppression: ReturnType<typeof createEmailSuppressionTrpcRouter>;
-  };
-  /** For `ctx.app.automation`. */
-  app: AutomationApp;
-  /**
-   * The same application, where this process composed one, for the packaged automation
-   * REST family and the one-click unsubscribe door.
-   */
-  service?: AutomationApp | undefined;
-}>;
+import type { ComposedAutomationFeature } from "./automation.composition.types";
 
 /** Composes both automation namespaces over this process's own graph. */
 export function composeAutomationFeature(options: {

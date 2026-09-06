@@ -16,23 +16,9 @@ import {
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import { createPresenceTrpcRouter } from "./presence-trpc.mount";
 
-/** The one namespace this feature mounts, and the two slices behind it. */
-export type ComposedPresenceFeature = Readonly<{
-  /** The `ctx.app.presence` slice. */
-  app: PresenceService;
-  /** The `ctx.app.broadcast` slice, which the export relay reads too. */
-  emitter: PresenceEmitterPort;
-  /**
-   * The fan-out itself, for the REST families and the three subscription surfaces that
-   * broadcast on it. Absent on a process that composed no presence graph, so each of them
-   * refuses by name rather than publishing into a fabric nobody subscribed to.
-   */
-  broadcast: BroadcastAdapter | undefined;
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createPresenceTrpcRouter>;
-}>;
+import type { ComposedPresenceFeature } from "./presence.composition.types";
 
 /** Composes presence and the fabric it publishes on. */
 export function composePresenceFeature(options: {

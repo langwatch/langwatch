@@ -17,7 +17,7 @@ import type { ShareService } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 
 import type { ApiAuditPort } from "../../api-request.policy";
-import type { ApiTrpcFeatureMount } from "../../api.application";
+
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections";
@@ -43,12 +43,7 @@ export type ProjectPeers = Readonly<{
   viewerProtections?: ApiViewerProtectionsPort | undefined;
 }>;
 
-/** The one namespace this feature mounts, and the `ctx.app.projects` slice. */
-export type ComposedProjectFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createProjectTrpcRouter>;
-  /** For `ctx.app.projects`, which several other namespaces read as well. */
-  app: ProjectApp;
-}>;
+import type { ComposedProjectFeature } from "./project.composition.types";
 
 /** Composes `project.*` over this process's own graph. */
 export function composeProjectFeature(options: {

@@ -24,15 +24,7 @@ export type SharePeers = Readonly<{
   grants: AuthzGrantsService;
 }>;
 
-/** The two namespaces and the service `ctx.app.share` carries. */
-export type ComposedShareFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): {
-    share: ReturnType<typeof createShareTrpcRouter>;
-    pinnedTrace: ReturnType<typeof createPinnedTraceTrpcRouter>;
-  };
-  /** For `ctx.app.share` — the one ledger every share door reads. */
-  service: ShareService;
-}>;
+import type { ComposedShareFeature } from "./share.composition.types";
 
 /** Composes the share ledger over this process's own graph. */
 export function composeShareFeature(options: {

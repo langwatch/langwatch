@@ -13,7 +13,7 @@ import {
 import { z } from "zod";
 
 import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session";
-import type { ApiTraceReadStackPort } from "../trace/trace.composition";
+import type { ApiTraceReadStackPort } from "../trace/trace-read-stack.port";
 
 /**
  * A download request as a caller sends it: the trace package's own shape plus

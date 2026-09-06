@@ -9,7 +9,6 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
 import { PostgresPromptAdapter, PromptApp, type PromptTrpcPorts } from "@langwatch/prompt-server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createPromptTrpcRouter } from "./prompt-trpc.mount";
 
@@ -29,12 +28,7 @@ export type PromptPeers = Readonly<{
   modelProviders?: ModelProviderService;
 }>;
 
-/** The namespace and the `ctx.app.prompts` slice two other doors read. */
-export type ComposedPromptFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createPromptTrpcRouter>;
-  /** For `ctx.app.prompts`. */
-  app: PromptApp;
-}>;
+import type { ComposedPromptFeature } from "./prompt.composition.types";
 
 /** Composes the prompt library over this process's own graph. */
 export function composePromptFeature(options: {

@@ -6,7 +6,6 @@ import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import type { Cost, PrismaClient, Project } from "@langwatch/prisma-client/generated";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createCostTrpcRouter, createLimitsTrpcRouter } from "./entitlement-trpc.mount";
 
@@ -58,13 +57,7 @@ export type ApiProjectSpendRollup = Readonly<{
   >;
 }>;
 
-/** The two namespaces, built over the composed readings. */
-export type ComposedSpendFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): {
-    costs: ReturnType<typeof createCostTrpcRouter>;
-    limits: ReturnType<typeof createLimitsTrpcRouter>;
-  };
-}>;
+import type { ComposedSpendFeature } from "./spend.composition.types";
 
 /** Composes the spend rollup and the allowance reading over this process. */
 export function composeSpendFeature(options: {

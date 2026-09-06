@@ -22,7 +22,6 @@ import {
   RoleScopePort,
 } from "@langwatch/role-server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createTeamTrpcRouter } from "../organization/organization-trpc.mount";
@@ -54,21 +53,7 @@ export type RoleFeatureCollaborators = Readonly<{
   customRolePlan?: ApiCustomRolePlanGatePort;
 }>;
 
-/** The two namespaces, the `ctx.app` slices, and the service the invites read. */
-export type ComposedRoleFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): {
-    role: ReturnType<typeof createRoleTrpcRouter>;
-    team: ReturnType<typeof createTeamTrpcRouter>;
-  };
-  /** For `ctx.app.roles` — the same application both role surfaces read. */
-  app: RoleApp;
-  /** For `ctx.app.authzApp`. */
-  authzApp: AuthzApp;
-  /**
-   * The role service under {@link ComposedRoleFeature.app}.
-   */
-  roles: RoleService;
-}>;
+import type { ComposedRoleFeature } from "./role.composition.types";
 
 /** Composes the role and team surfaces over this process's own graph. */
 export function composeRoleFeature(options: {

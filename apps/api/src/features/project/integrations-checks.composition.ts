@@ -8,7 +8,6 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createIntegrationsChecksTrpcRouter } from "./project-trpc.mount";
 
@@ -45,10 +44,7 @@ export type ApiOnboardingCheckStatus = Readonly<{
   integrated: boolean;
 }>;
 
-/** The one namespace, built over the composed rollup. */
-export type ComposedIntegrationsChecksFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createIntegrationsChecksTrpcRouter>;
-}>;
+import type { ComposedIntegrationsChecksFeature } from "./integrations-checks.composition.types";
 
 /** Composes the setup checklist over this process's own connection. */
 export function composeIntegrationsChecksFeature(options: {

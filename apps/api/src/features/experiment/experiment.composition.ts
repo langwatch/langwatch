@@ -8,7 +8,7 @@ import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { DatasetExperimentLookup } from "@langwatch/dataset-server";
-import type { ExperimentService } from "@langwatch/experiment-contract";
+
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { EventSourcing } from "@langwatch/eventing";
@@ -34,7 +34,6 @@ import type { WorkflowApp } from "@langwatch/workflow-server";
 import { EventEmitter } from "node:events";
 import { nanoid } from "nanoid";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import {
@@ -84,20 +83,7 @@ export type ExperimentPeers = Readonly<{
   reportEvaluation: (data: ReportEvaluationCommandData) => Promise<unknown>;
 }>;
 
-/** The namespace, the `ctx.app.experiments` application and the run loop. */
-export type ComposedExperimentFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createExperimentTrpcRouter>;
-  /** For `ctx.app.experiments`, and for the packaged experiment REST family. */
-  app: ExperimentApp;
-  /** The experiment lookup a dataset resolves a borrowed name through. */
-  experimentLookup: DatasetExperimentLookup;
-  /** The run loop the three REST run doors dispatch through. */
-  run: ApiExperimentRun;
-  /**
-   * The experiment service itself, where this process composed one.
-   */
-  experiments?: ExperimentService | undefined;
-}>;
+import type { ComposedExperimentFeature } from "./experiment.composition.types";
 
 /** Composes the experiment surface and its run loop over this process's graph. */
 export function composeExperimentFeature(options: {

@@ -8,15 +8,10 @@ import { ApiKeyApp } from "@langwatch/api-key-server";
 import { HandledError } from "@langwatch/handled-error";
 
 import type { ApiAuditPort } from "../../api-request.policy";
-import type { ApiTrpcFeatureMount } from "../../api.application";
+
 import { createApiKeyTrpcRouter, type ApiKeyAuditSink } from "./api-key-trpc.mount";
 
-/** The one namespace this feature mounts, and the slice behind it. */
-export type ComposedApiKeyFeature = Readonly<{
-  /** The `ctx.app.apiKeys` slice. */
-  app: ApiKeyApp;
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createApiKeyTrpcRouter>;
-}>;
+import type { ComposedApiKeyFeature } from "./api-key.composition.types";
 
 /** Composes `apiKey.*` over this process's own credential service and trail. */
 export function composeApiKeyFeature(options: {

@@ -23,7 +23,6 @@ import {
 import { PrismaTraceEditOverlayRepository } from "@langwatch/trace-server/composition/trace-edit-overlay";
 import type { UserService } from "@langwatch/user-contract";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiTraceProducerCommands } from "../trace/trace-producer.composition";
@@ -61,15 +60,7 @@ export type AnnotationPeers = Readonly<{
   traceCommands: ApiTraceProducerCommands;
 }>;
 
-/** The two namespaces and the `ctx.app.annotations` slice. */
-export type ComposedAnnotationFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): {
-    annotation: ReturnType<typeof createAnnotationTrpcRouter>;
-    annotationScore: ReturnType<typeof createAnnotationScoreTrpcRouter>;
-  };
-  /** For `ctx.app.annotations`, which the annotation REST family also reads. */
-  app: AnnotationApp;
-}>;
+import type { ComposedAnnotationFeature } from "./annotation.composition.types";
 
 /** Composes the annotation surfaces over this process's own graph. */
 export function composeAnnotationFeature(options: {

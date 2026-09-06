@@ -32,63 +32,56 @@ export {
 /** A project's captured traffic, and the five surfaces it is read through. */
 export {
   ApiTraceAbsenceReport,
-  ApiTraceReadStackPort,
   composeTraceFeature,
   LoggedApiTraceAbsence,
   refusingTraceFeature,
-  type ApiTracePorts,
-  type ComposedTraceFeature,
   type TraceFeatureOptions,
 } from "./features/trace/trace.composition";
+export { ApiTraceReadStackPort } from "./features/trace/trace-read-stack.port";
+export type { ApiTracePorts, ComposedTraceFeature } from "./features/trace/trace.composition.types";
 /** The links a project shares outside itself, and the topics its traces carry. */
-export {
-  composeShareFeature,
-  refusingShareFeature,
-  type ComposedShareFeature,
-} from "./features/share/share.composition";
-export {
-  composeTopicFeature,
-  refusingTopicFeature,
-  type ComposedTopicFeature,
-} from "./features/topic/topic.composition";
+export { composeShareFeature, refusingShareFeature } from "./features/share/share.composition";
+export type { ComposedShareFeature } from "./features/share/share.composition.types";
+export { composeTopicFeature, refusingTopicFeature } from "./features/topic/topic.composition";
+export type { ComposedTopicFeature } from "./features/topic/topic.composition.types";
 /** An organization's spend, and the allowance it is taken against. */
 export {
   ApiUsageStatsPort,
   composeSpendFeature,
   refusingSpendFeature,
   type ApiProjectSpendRollup,
-  type ComposedSpendFeature,
 } from "./features/entitlement/spend.composition";
+export type { ComposedSpendFeature } from "./features/entitlement/spend.composition.types";
 /** The studio's outbound dispatch and the agent test's own trace write. */
 export {
   ApiStudioHostPort,
   composeHttpProxyFeature,
   refusingHttpProxyFeature,
-  type ComposedHttpProxyFeature,
 } from "./features/agent/http-proxy.composition";
+export type { ComposedHttpProxyFeature } from "./features/agent/http-proxy.composition.types";
 /** The model providers a tenant attaches, and the cost rules they are priced by. */
 export {
   ApiModelProviderHostPort,
   composeModelProviderFeature,
   refusingModelProviderFeature,
-  type ComposedModelProviderFeature,
 } from "./features/model-provider/model-provider.composition";
+export type { ComposedModelProviderFeature } from "./features/model-provider/model-provider.composition.types";
 /** The stored filter sets the explorer offers. */
 export {
   composeSavedViewFeature,
   refusingSavedViewFeature,
-  type ComposedSavedViewFeature,
 } from "./features/dashboard/saved-view.composition";
+export type { ComposedSavedViewFeature } from "./features/dashboard/saved-view.composition.types";
 /**
  * The AI Gateway, composed as its own feature: one application for its six
  * tRPC namespaces, its `ctx.app` slice and its two REST families.
  */
 export {
   composeGatewayFeature,
-  type ComposedGatewayFeature,
   type GatewayFeatureOptions,
   type GatewayPeers,
 } from "./features/gateway/gateway.composition";
+export type { ComposedGatewayFeature } from "./features/gateway/gateway.composition.types";
 export {
   ApiGatewayIdempotencyPort,
   composeApiGateway,

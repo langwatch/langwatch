@@ -191,35 +191,7 @@ export type ScenarioFeatureCollaborators = Readonly<{
   report?: ApiScenarioAbsenceReport;
 }>;
 
-/** The three routers, the two `ctx.app` slices, and the services the doors take. */
-export type ComposedScenarioFeature = Readonly<{
-  /** `scenarios.*`, `suites.*` and `setupSkills.*`, on the process's own root. */
-  routers(mount: ApiTrpcFeatureMount): {
-    scenarios: ReturnType<typeof createScenarioTrpcRouter>;
-    setupSkills: ReturnType<typeof createSetupSkillsTrpcRouter>;
-    suites: ReturnType<typeof createSuiteTrpcRouter>;
-  };
-  /** For `ctx.app.scenarios`. */
-  scenarios: ScenarioApp;
-  /**
-   * The canonical Scenario service and the tab registry, published for the two
-   * packaged REST families that take them directly.
-   */
-  scenarioService: ScenarioService;
-  scenarioTabs: ScenarioTabRegistry;
-  /**
-   * The canonical Simulation service, published so the run EXPORT can sweep
-   * through it.
-   */
-  simulations: SimulationService;
-  /**
-   * Runs "Test agent", for the `AgentTestPort` this root wires into the
-   * Agent package's own application (`ApiAgentTestAdapter`).
-   */
-  agentTestService: AgentTestService;
-  /** For `ctx.app.suites`. */
-  suites: SuiteApp;
-}>;
+import type { ComposedScenarioFeature } from "./scenario.composition.types";
 
 /** Composes the scenario feature over this process's own graph. */
 export function composeScenarioFeature(

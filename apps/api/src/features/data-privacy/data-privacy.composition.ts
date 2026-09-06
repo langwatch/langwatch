@@ -36,16 +36,7 @@ export type DataPrivacyPeers = Readonly<{
   organizations: OrganizationService;
 }>;
 
-/** The one namespace, built over the composed rules. */
-export type ComposedDataPrivacyFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createDataPrivacyTrpcRouter>;
-  // The interlock the ingest edge asks before it externalizes inline media:
-  // storing bytes for a project whose policy is about to discard them keeps
-  // exactly what the customer asked us not to.
-
-  /** True when this project's resolved policy drops any span content at all. */
-  dropsAnyContent(projectId: string): Promise<boolean>;
-}>;
+import type { ComposedDataPrivacyFeature } from "./data-privacy.composition.types";
 
 /** The three answers the privacy surface needs from this deployment. */
 type ApiDataPrivacyPorts = DataPrivacyTrpcPorts<DataPrivacySnapshot, DataPrivacyPolicy>;

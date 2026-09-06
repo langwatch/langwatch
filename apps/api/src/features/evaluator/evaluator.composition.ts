@@ -18,7 +18,6 @@ import type { WorkflowService } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 import { TRPCError } from "@trpc/server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createEvaluatorTrpcRouter } from "./evaluator-trpc.mount";
@@ -68,14 +67,7 @@ export type EvaluatorPeers = Readonly<{
 export type EvaluatorFeatureCollaborators = EvaluatorPeers &
   Readonly<{ prisma: ApiTrpcInfrastructure["prisma"] }>;
 
-/** The namespace, its `ctx.app` slice, and the ports the monitor copy takes. */
-export type ComposedEvaluatorFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createEvaluatorTrpcRouter>;
-  /** For `ctx.app.evaluatorApp`. */
-  app: EvaluatorApp;
-  /** The replication half of these ports, taken by the monitor feature. */
-  ports: EvaluatorTrpcPorts;
-}>;
+import type { ComposedEvaluatorFeature } from "./evaluator.composition.types";
 
 /** Composes the evaluator surface over this process's own graph. */
 export function composeEvaluatorFeature(options: {

@@ -29,33 +29,12 @@ import {
   type UserTrpcPorts,
 } from "@langwatch/user-server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiPersonMailPort } from "../../app/api-person-mail.port";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
 import type { ApiPersonDeploymentFacts } from "../auth/auth.composition";
 import { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount";
 
-/** The two namespaces this feature mounts, and the slices behind them. */
-export type ComposedUserFeature = Readonly<{
-  /** The `ctx.app.users` slice. */
-  app: UserApp;
-  /**
-   * The operator allow-list this deployment names, in the shape `ctx.app.ops`
-   * carries. Published for the retention gate, so "who may keep data forever"
-   * and "who sees the operator sidebar" are never two answers.
-   */
-  ops: ApiTrpcFeatureApplication["ops"];
-  /** The `ctx.app.config` slice: the same allow-list, parsed once. */
-  config: ApiTrpcFeatureApplication["config"];
-  /**
-   * The two port groups the namespaces are built on.
-   */
-  ports: Readonly<{ identity: IdentityTrpcPorts; user: UserTrpcPorts }>;
-  routers(mount: ApiTrpcFeatureMount): Readonly<{
-    identity: ReturnType<typeof createIdentityTrpcRouter>;
-    user: ReturnType<typeof createUserTrpcRouter>;
-  }>;
-}>;
+import type { ComposedUserFeature } from "./user.composition.types";
 
 /** The other services the signed-in person's surfaces reach. */
 export type UserPeers = Readonly<{

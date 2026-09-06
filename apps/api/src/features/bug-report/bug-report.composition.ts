@@ -11,14 +11,10 @@ import {
 } from "@langwatch/ops-server";
 import type { BugReport } from "@langwatch/prisma-client/generated";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createBugReportTrpcRouter } from "./bug-report-trpc.mount";
 
-/** The one namespace, built over the composed inbox. */
-export type ComposedBugReportFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createBugReportTrpcRouter>;
-}>;
+import type { ComposedBugReportFeature } from "./bug-report.composition.types";
 
 /** The inbox's ports: the two reads, and the trail each is written to. */
 type ApiBugReportPorts = BugReportTrpcPorts<BugReportListing, BugReport>;

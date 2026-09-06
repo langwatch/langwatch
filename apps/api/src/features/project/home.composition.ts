@@ -6,14 +6,10 @@ import { HandledError } from "@langwatch/handled-error";
 import type { RecentItem } from "@langwatch/project-contract";
 import { PostgresRecentItemsAdapter, type HomeTrpcPorts } from "@langwatch/project-server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createHomeTrpcRouter } from "./project-trpc.mount";
 
-/** The one namespace this feature mounts. */
-export type ComposedHomeFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createHomeTrpcRouter>;
-}>;
+import type { ComposedHomeFeature } from "./home.composition.types";
 
 /** Composes the recent-items strip over this process's own connection. */
 export function composeHomeFeature(options: {

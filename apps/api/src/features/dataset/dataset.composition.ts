@@ -13,7 +13,6 @@ import {
 } from "@langwatch/dataset-server";
 import { HandledError } from "@langwatch/handled-error";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import { createBatchRecordTrpcRouter, createDatasetTrpcRouter } from "./dataset-trpc.mount";
@@ -37,15 +36,7 @@ export type DatasetPeers = Readonly<{
   experimentLookup: DatasetExperimentLookup;
 }>;
 
-/** The two namespaces and the `ctx.app.dataset` slice the REST family reads. */
-export type ComposedDatasetFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): {
-    dataset: ReturnType<typeof createDatasetTrpcRouter>;
-    batchRecord: ReturnType<typeof createBatchRecordTrpcRouter>;
-  };
-  /** For `ctx.app.dataset`. */
-  app: DatasetApp;
-}>;
+import type { ComposedDatasetFeature } from "./dataset.composition.types";
 
 /** Composes the dataset surface over this process's own graph. */
 export function composeDatasetFeature(options: {

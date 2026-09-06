@@ -20,12 +20,13 @@ import {
   type TraceAppDependencies,
   type TraceEditOverlayTrpcPorts,
   type TracesTrpcPorts,
-  type TracesV2TrpcPorts,
 } from "@langwatch/trace-server";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import type { TrpcRequestLike } from "@langwatch/api/trpc";
 import { trpcClientAddress } from "../../app/api-client-address";
 import type { ApiTrpcFeatureMount } from "../../api.application";
+import { ApiTraceReadStackPort } from "./trace-read-stack.port";
+import type { ApiTracePorts } from "./trace.composition.types";
 import {
   createSpansTrpcRouter,
   createTraceEditOverlayTrpcRouter,
@@ -36,75 +37,6 @@ import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "./traces-
 // ---------------------------------------------------------------------------
 // The four named absences
 // ---------------------------------------------------------------------------
-
-/**
- * The ClickHouse trace READ stack, which never left `platform/app` and went with
- * it when the monolith was deleted.
- */
-export abstract class ApiTraceReadStackPort {
-  /** The ten readers `TraceApp` is composed from. */
-  abstract readers(): TraceAppDependencies["traces"];
-  /**
-   * The caller's read-time redactions for one project: cost visibility, the
-   * data-privacy policy's content categories, the restricted-attribute rules
-   * and the plan's visibility cutoff.
-   */
-  abstract getViewerProtections(
-    ctx: unknown,
-    input: Readonly<{ projectId: string }>,
-  ): Promise<Protections>;
-  /**
-   * The trace-view read ports both the explorer and the anonymous share read
-   * carry: the plan window, the span display and redaction passes, Data
-   * Privacy's content catalogue and the coding-agent log join.
-   */
-  abstract readPorts(): Pick<
-    TracesV2TrpcPorts,
-    "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes" | "codingAgentEnrichment"
-  >;
-  /**
-   * The explorer's own: the AI composer, the reserved-metadata write and its
-   * parser, the unmapped-cost suggestion, the prompt-ancestor walk and the
-   * application's `trace_not_found`.
-   */
-  abstract explorerPorts(): Omit<
-    TracesV2TrpcPorts,
-    | "getViewerProtections"
-    | "tryGetVisibilityCutoffMs"
-    | "mappers"
-    | "derivedAttrPrefixes"
-    | "codingAgentEnrichment"
-    | "queryTranslation"
-  >;
-  /**
-   * The legacy grid's two shared input schemas, the evaluator inventory's type
-   * schema, the precondition rule schema and engine, and the readable digest.
-   */
-  abstract legacyPorts(): Omit<
-    TracesTrpcPorts<TraceLegacyListInput, unknown, TraceLegacyFilterInput, unknown, unknown>,
-    "getViewerProtections"
-  >;
-  /** The two rules a reviewer's correction is carried through. */
-  abstract editOverlayRedaction(): Omit<
-    TraceEditOverlayTrpcPorts<Protections>,
-    "getViewerProtections"
-  >;
-  /**
-   * The share viewer's redactions, computed for the presented session with
-   * `publiclyShared` set. Null when the project is gone, which the read turns
-   * into the same generic not-found a bad token gets.
-   */
-  abstract tryGetShareViewerProtections(input: {
-    projectId: string;
-    session: { user?: { id: string } } | null | undefined;
-  }): Promise<Protections | null>;
-  /**
-   * The redactions an API KEY reads through, for the public REST doors.
-   */
-  abstract getApiKeyProtections(input: Readonly<{ projectId: string }>): Promise<Protections>;
-  /** True when the read's trace no longer exists. */
-  abstract isTraceNotFound(error: unknown): boolean;
-}
 
 /** What each absence costs, written where a deployment reads its logs. */
 export abstract class ApiTraceAbsenceReport {
@@ -159,39 +91,7 @@ export type TraceFeatureOptions = Readonly<{
   report?: ApiTraceAbsenceReport;
 }>;
 
-/** The application slices and the group's ports, composed together. */
-export type ComposedTraceFeature = Readonly<{
-  /**
-   * The five namespaces, built on the process's own root.
-   */
-  routers(mount: ApiTrpcFeatureMount): {
-    traces: ReturnType<typeof createTracesTrpcRouter>;
-    tracesV2: ReturnType<typeof createTracesV2TrpcRouter>;
-    spans: ReturnType<typeof createSpansTrpcRouter>;
-    traceEditOverlay: ReturnType<typeof createTraceEditOverlayTrpcRouter>;
-    sharedTrace: ReturnType<typeof createSharedTraceTrpcRouter>;
-  };
-  /** For `ctx.app.traces` — the one application all five trace doors read. */
-  traces: TraceApp;
-  /**
-   * The read stack itself, where this process composed one.
-   */
-  traceReads?: ApiTraceReadStackPort | undefined;
-  /** For `ctx.app.planProvider`. */
-  planProvider: Pick<PlanProvider, "getActivePlan">;
-  ports: ApiTracePorts;
-}>;
-
-/**
- * The thirteen tRPC ports {@link ApiTrpcCollaborators} mounts individually.
- */
-export type ApiTracePorts = Readonly<{
-  traces: TracesTrpcPorts<TraceLegacyListInput, unknown, TraceLegacyFilterInput, unknown, unknown>;
-  tracesV2: Omit<TracesV2TrpcPorts<unknown, unknown>, "queryTranslation">;
-  spans: SpansTrpcPorts;
-  traceEditOverlay: TraceEditOverlayTrpcPorts<Protections>;
-  sharedTrace: SharedTraceTrpcPorts;
-}>;
+import type { ComposedTraceFeature } from "./trace.composition.types";
 
 // ---------------------------------------------------------------------------
 // The composition

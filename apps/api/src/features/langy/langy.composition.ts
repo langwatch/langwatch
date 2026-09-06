@@ -31,7 +31,6 @@ import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiAuditPort } from "../../api-request.policy";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
@@ -87,16 +86,7 @@ export type LangyFeatureCollaborators = Readonly<{
   local: LangyLocalTrpcPorts | undefined;
 }>;
 
-/** The Langy application and the two routers built over it. */
-export type ComposedLangyFeature = Readonly<{
-  /** The `ctx.app.langy` slice both Langy doors read. */
-  app: LangyApp;
-  /** `langy.*` and `langyEgress.*`, behind the same two process gates. */
-  routers(mount: ApiTrpcFeatureMount): {
-    langy: ReturnType<typeof createLangyTrpcRouter>;
-    langyEgress: ReturnType<typeof createLangyEgressTrpcRouter>;
-  };
-}>;
+import type { ComposedLangyFeature } from "./langy.composition.types";
 
 /** Composes the Langy feature over this process's own graph. */
 export function composeLangyFeature(options: {
