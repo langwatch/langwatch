@@ -10,7 +10,11 @@ export const COMMENT_BLOCK_SIZE_ALLOWED =
   "Split the explanation near the code it describes, or move durable narrative to an ADR or developer document.";
 
 export function commentBlockSizeMessage(lines) {
-  return `Comment block has ${lines} lines; the maximum is ${MAX_COMMENT_BLOCK_LINES}.`;
+  return (
+    `Comment block has ${lines} lines; the maximum is ${MAX_COMMENT_BLOCK_LINES}.` +
+    " Comments exist to make code readable and good code needs almost none: keep the why in a" +
+    " line or two, and put design narrative in an ADR the comment points to."
+  );
 }
 
 const SOURCE_WHITESPACE = new Set([" ", "\t", "\r", "\n"]);

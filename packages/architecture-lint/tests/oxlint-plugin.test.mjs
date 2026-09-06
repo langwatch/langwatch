@@ -1679,12 +1679,22 @@ looseTester.run("comment-block-size", plugin.rules["comment-block-size"], {
     {
       filename: "src/nine.ts",
       code: blockComment(9),
-      errors: [{ message: "Comment block has 9 lines; the maximum is 5." }],
+      errors: [
+        {
+          message:
+            "Comment block has 9 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+        },
+      ],
     },
     {
       filename: "apps/api/src/app/example.composition.ts",
       code: blockComment(12),
-      errors: [{ message: "Comment block has 12 lines; the maximum is 5." }],
+      errors: [
+        {
+          message:
+            "Comment block has 12 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+        },
+      ],
     },
     {
       filename: "src/wide.ts",
@@ -1705,12 +1715,22 @@ looseTester.run("comment-block-size-warning", plugin.rules["comment-block-size-w
     {
       filename: "src/six.ts",
       code: blockComment(6),
-      errors: [{ message: "Comment block has 6 lines; the maximum is 5." }],
+      errors: [
+        {
+          message:
+            "Comment block has 6 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+        },
+      ],
     },
     {
       filename: "src/eight.ts",
       code: blockComment(8),
-      errors: [{ message: "Comment block has 8 lines; the maximum is 5." }],
+      errors: [
+        {
+          message:
+            "Comment block has 8 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+        },
+      ],
     },
   ],
 });
@@ -1746,7 +1766,12 @@ describe("the comment-block burn-down allowlist", () => {
       {
         filename: "packages/other/src/nine.ts",
         code: blockComment(9),
-        errors: [{ message: "Comment block has 9 lines; the maximum is 5." }],
+        errors: [
+          {
+            message:
+              "Comment block has 9 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+          },
+        ],
       },
     ],
   });
@@ -1758,7 +1783,12 @@ describe("the comment-block burn-down allowlist", () => {
       {
         filename: "packages/legacy/src/nine.ts",
         code: blockComment(9),
-        errors: [{ message: "Comment block has 9 lines; the maximum is 5." }],
+        errors: [
+          {
+            message:
+              "Comment block has 9 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+          },
+        ],
       },
     ],
   });
