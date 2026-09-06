@@ -61,3 +61,26 @@ func TestNilWritersError(t *testing.T) {
 		t.Fatalf("nil writers: exit = %d, want 2", code)
 	}
 }
+
+func TestLedgerPathDefaultsBesideTheReport(t *testing.T) {
+	if got := ledgerPath(&probeFlags{reportFile: "/tmp/run/report.json"}); got != "/tmp/run/ledger.json" {
+		t.Fatalf("ledgerPath = %q, want it beside the report", got)
+	}
+	if got := ledgerPath(&probeFlags{reportFile: "/tmp/run/report.json", ledgerFile: "/tmp/other.json"}); got != "/tmp/other.json" {
+		t.Fatalf("-ledger must win: %q", got)
+	}
+	if got := ledgerPath(&probeFlags{}); got != "" {
+		t.Fatalf("no report and no -ledger writes nothing, got %q", got)
+	}
+}
+
+func TestLedgerBaselineMustExist(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	args := []string{"probe", "-a", "http://127.0.0.1:1", "-b", "http://127.0.0.1:2", "-ledger-baseline", "/nonexistent/ledger.json"}
+	if code := Run(args, &stdout, &stderr); code != 2 {
+		t.Fatalf("missing baseline: exit = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "ledger baseline") {
+		t.Fatalf("stderr must name the baseline:\n%s", stderr.String())
+	}
+}

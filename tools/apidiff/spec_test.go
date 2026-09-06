@@ -229,3 +229,59 @@ func TestSpecDiffFindsChanges(t *testing.T) {
 		t.Fatalf("changes = %+v, want one added /api/extra", changes)
 	}
 }
+
+// The union used to take the BASE's schema for every operation both sides
+// document, so a branch that added a required field was probed with main's
+// body — against a doc comment claiming the opposite.
+func TestUnionPrefersCandidateSchema(t *testing.T) {
+	candidate := []Operation{{
+		Method: "POST", Path: "/api/things",
+		Params:   []Param{{Name: "projectId", In: "query", Required: true}},
+		Security: []string{"project_api_key"},
+		BodySchema: map[string]any{
+			"type": "object", "required": []any{"name", "kind"},
+			"properties": map[string]any{
+				"name": map[string]any{"type": "string"},
+				"kind": map[string]any{"type": "string"},
+			},
+		},
+		BodyRequired: true,
+	}}
+	base := []Operation{{
+		Method: "POST", Path: "/api/things",
+		Security: []string{"legacy_key"},
+		BodySchema: map[string]any{
+			"type": "object", "required": []any{"name"},
+			"properties": map[string]any{"name": map[string]any{"type": "string"}},
+		},
+	}}
+
+	union := UnionOperations(candidate, base)
+	if len(union) != 1 {
+		t.Fatalf("union = %d operations, want 1", len(union))
+	}
+	merged := union[0]
+	if !merged.InA || !merged.InB {
+		t.Fatalf("presence = A:%v B:%v, want both", merged.InA, merged.InB)
+	}
+	if len(merged.Params) != 1 || merged.Params[0].Name != "projectId" {
+		t.Fatalf("params = %+v, want the candidate's", merged.Params)
+	}
+	if len(merged.Security) != 1 || merged.Security[0] != "project_api_key" {
+		t.Fatalf("security = %v, want the candidate's", merged.Security)
+	}
+	if !merged.BodyRequired {
+		t.Fatal("bodyRequired must come from the candidate")
+	}
+	payload, ok := SynthesizePayload(merged.BodySchema, 0).(map[string]any)
+	if !ok || payload["kind"] == nil {
+		t.Fatalf("synthesized payload = %#v, want the candidate's required kind field", payload)
+	}
+	// Both sides' own declarations stay available for a per-side probe.
+	if merged.BodySchemaA == nil || merged.BodySchemaB == nil {
+		t.Fatal("each side's own body schema must be recorded")
+	}
+	if requiredB, _ := merged.BodySchemaB["required"].([]any); len(requiredB) != 1 {
+		t.Fatalf("base schema = %#v, want its own single required field", merged.BodySchemaB)
+	}
+}

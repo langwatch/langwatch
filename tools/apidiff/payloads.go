@@ -239,61 +239,121 @@ func ValidationBody(schema map[string]any) any {
 	return map[string]any{}
 }
 
-// SymbolTable holds IDs captured from earlier responses this run, keyed by
-// the operation that produced them. Resolution falls back to any captured
-// value, most recent first.
+// SymbolTable holds IDs captured from earlier responses this run, bucketed
+// by the parameter name each ID can satisfy. There is deliberately no
+// untyped catch-all: an operation whose {promptId} has no captured prompt id
+// is skipped rather than probed with a trace id.
 type SymbolTable struct {
-	byOperation map[string][]string
-	all         []string
+	byParam map[string][]string
 }
 
 // NewSymbolTable returns an empty table.
 func NewSymbolTable() *SymbolTable {
-	return &SymbolTable{byOperation: map[string][]string{}}
+	return &SymbolTable{byParam: map[string][]string{}}
 }
 
 // Capture walks a decoded response body in sorted-key order (deterministic:
-// capture order feeds fallback resolution) and records string values under
-// id-like keys, tagged with the producing operation. Returns the captured IDs.
-func (table *SymbolTable) Capture(operationID string, body any) []string {
+// capture order feeds resolution) and records string values under id-like
+// keys. Each ID is filed under the normalized form of its own key
+// (promptId → promptid) and, when the key is a bare "id", under the resource
+// the producing operation's path names (POST /api/prompts → promptid).
+// Returns the captured IDs.
+func (table *SymbolTable) Capture(operationPath string, body any) []string {
 	captured := make([]string, 0)
-	table.captureValue(operationID, body, &captured)
+	table.captureValue(resourceParamName(operationPath), body, &captured)
 	return captured
 }
 
-func (table *SymbolTable) captureValue(operationID string, value any, captured *[]string) {
+func (table *SymbolTable) captureValue(resourceParam string, value any, captured *[]string) {
 	switch typed := value.(type) {
 	case map[string]any:
-		table.captureObject(operationID, typed, captured)
+		table.captureObject(resourceParam, typed, captured)
 	case []any:
 		for _, element := range typed {
-			table.captureValue(operationID, element, captured)
+			table.captureValue(resourceParam, element, captured)
 		}
 	}
 }
 
-func (table *SymbolTable) captureObject(operationID string, object map[string]any, captured *[]string) {
+func (table *SymbolTable) captureObject(resourceParam string, object map[string]any, captured *[]string) {
 	for _, key := range sortedKeys(object) {
 		child := object[key]
 		if text, ok := child.(string); ok && isIDKey(key) && text != "" {
-			table.byOperation[operationID] = append(table.byOperation[operationID], text)
-			table.all = append(table.all, text)
+			table.file(normalizeParamName(key), text)
+			if bareIDKey(key) && resourceParam != "" {
+				table.file(resourceParam, text)
+			}
 			*captured = append(*captured, text)
 		}
-		table.captureValue(operationID, child, captured)
+		table.captureValue(resourceParam, child, captured)
 	}
 }
 
-// Lookup returns a captured ID for the operation, or any captured ID when
-// the operation has none of its own.
-func (table *SymbolTable) Lookup(operationID string) (string, bool) {
-	if values := table.byOperation[operationID]; len(values) > 0 {
-		return values[len(values)-1], true
+func (table *SymbolTable) file(bucket, id string) {
+	if bucket == "" {
+		return
 	}
-	if len(table.all) > 0 {
-		return table.all[len(table.all)-1], true
+	table.byParam[bucket] = append(table.byParam[bucket], id)
+}
+
+// Lookup returns the most recently captured ID that can satisfy the named
+// parameter of an operation at operationPath. A bare {id}/{idOrSlug}/{slug}
+// resolves through the resource its own path names, never through whatever
+// was captured last.
+func (table *SymbolTable) Lookup(paramName, operationPath string) (string, bool) {
+	for _, bucket := range lookupBuckets(paramName, operationPath) {
+		if values := table.byParam[bucket]; len(values) > 0 {
+			return values[len(values)-1], true
+		}
 	}
 	return "", false
+}
+
+// lookupBuckets names the buckets a parameter may resolve from, in order.
+func lookupBuckets(paramName, operationPath string) []string {
+	normalized := normalizeParamName(paramName)
+	if !bareIDKey(paramName) {
+		return []string{normalized}
+	}
+	if resource := resourceParamName(operationPath); resource != "" {
+		return []string{resource}
+	}
+	return nil
+}
+
+// bareIDKey reports whether a key or parameter name carries no resource of
+// its own ("id", "idOrSlug", "slug") and must be typed by its path.
+func bareIDKey(name string) bool {
+	switch normalizeParamName(name) {
+	case "id", "idorslug", "slug", "_id":
+		return true
+	}
+	return false
+}
+
+// resourceParamName derives the parameter bucket a path's own resource
+// implies: the last literal segment before any placeholder, singularized —
+// /api/prompts and /api/prompts/{id}/versions both name "promptid" and
+// "versionid" respectively.
+func resourceParamName(operationPath string) string {
+	segments := strings.Split(strings.Trim(operationPath, "/"), "/")
+	for index := len(segments) - 1; index >= 0; index-- {
+		segment := segments[index]
+		if segment == "" || strings.HasPrefix(segment, "{") {
+			continue
+		}
+		return normalizeParamName(singularize(segment)) + "id"
+	}
+	return ""
+}
+
+// singularize trims a trailing plural "s" (prompts → prompt), leaving words
+// that do not end in one untouched.
+func singularize(word string) string {
+	if len(word) > 2 && strings.HasSuffix(word, "s") && !strings.HasSuffix(word, "ss") {
+		return strings.TrimSuffix(word, "s")
+	}
+	return word
 }
 
 // isIDKey matches the identifier subset of the volatile key patterns.
@@ -316,15 +376,15 @@ var SeededConstants = map[string]string{
 
 // ResolveParam picks a value for a path or required query parameter: spec
 // examples/defaults first, then seeded constants matched by name, then the
-// symbol table.
-func ResolveParam(param Param, symbols *SymbolTable, operationID string) (string, bool) {
+// symbol table, typed by the parameter name and the operation's own path.
+func ResolveParam(param Param, symbols *SymbolTable, operationPath string) (string, bool) {
 	if param.HasValue {
 		return fmt.Sprint(param.Example), true
 	}
 	if value, ok := SeededConstants[normalizeParamName(param.Name)]; ok {
 		return value, true
 	}
-	return symbols.Lookup(operationID)
+	return symbols.Lookup(param.Name, operationPath)
 }
 
 func normalizeParamName(name string) string {

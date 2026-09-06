@@ -85,43 +85,84 @@ func TestValidationBody(t *testing.T) {
 
 func TestSymbolTableCaptureAndLookup(t *testing.T) {
 	table := NewSymbolTable()
-	if _, ok := table.Lookup("anything"); ok {
+	if _, ok := table.Lookup("id", "/api/things"); ok {
 		t.Fatal("empty table must not resolve")
 	}
-	table.Capture("createThing", map[string]any{
+	table.Capture("/api/things", map[string]any{
 		"id":   "thing-1",
 		"name": "not-an-id",
 		"nested": map[string]any{
 			"projectId": "project-9",
 		},
 	})
-	if got, ok := table.Lookup("createThing"); !ok || got != "project-9" {
-		t.Fatalf("Lookup(createThing) = %q, %v; want most recent project-9", got, ok)
+	if got, ok := table.Lookup("thingId", "/api/things"); !ok || got != "thing-1" {
+		t.Fatalf("Lookup(thingId) = %q, %v; want thing-1", got, ok)
 	}
-	// Unknown operations fall back to any captured ID.
-	if got, ok := table.Lookup("deleteThing"); !ok || got != "project-9" {
-		t.Fatalf("Lookup(deleteThing) = %q, %v; want fallback project-9", got, ok)
+	if got, ok := table.Lookup("id", "/api/things/{id}"); !ok || got != "thing-1" {
+		t.Fatalf("bare {id} on /api/things/{id} = %q, %v; want thing-1", got, ok)
+	}
+	if got, ok := table.Lookup("projectId", "/api/other"); !ok || got != "project-9" {
+		t.Fatalf("Lookup(projectId) = %q, %v; want project-9", got, ok)
+	}
+}
+
+// The untyped catch-all is what put a trace id into {promptId}: a table that
+// holds no prompt id must resolve nothing, so the operation is skipped.
+func TestLookupIsTypeScoped(t *testing.T) {
+	table := NewSymbolTable()
+	table.Capture("/api/traces", map[string]any{"traceId": "trace-1"})
+	if got, ok := table.Lookup("promptId", "/api/prompts/{promptId}"); ok {
+		t.Fatalf("promptId resolved to %q from a table holding only a trace id", got)
+	}
+	if got, ok := table.Lookup("traceId", "/api/traces/{traceId}"); !ok || got != "trace-1" {
+		t.Fatalf("traceId = %q, %v; want trace-1", got, ok)
+	}
+}
+
+func TestNoUntypedFallback(t *testing.T) {
+	table := NewSymbolTable()
+	table.Capture("/api/traces", map[string]any{"id": "trace-1"})
+	if got, ok := table.Lookup("id", "/api/prompts/{id}"); ok {
+		t.Fatalf("bare {id} on /api/prompts resolved to %q captured from /api/traces", got)
+	}
+	if got, ok := table.Lookup("evaluatorId", "/api/evaluators/{evaluatorId}"); ok {
+		t.Fatalf("evaluatorId resolved to %q with no evaluator id captured", got)
+	}
+}
+
+func TestResourceParamName(t *testing.T) {
+	cases := []struct{ path, want string }{
+		{"/api/prompts", "promptid"},
+		{"/api/prompts/{id}", "promptid"},
+		{"/api/v1/prompts/{id}/versions", "versionid"},
+		{"/api/evaluators/{idOrSlug}", "evaluatorid"},
+		{"/", ""},
+	}
+	for _, testCase := range cases {
+		if got := resourceParamName(testCase.path); got != testCase.want {
+			t.Errorf("resourceParamName(%q) = %q, want %q", testCase.path, got, testCase.want)
+		}
 	}
 }
 
 func TestResolveParamPrecedence(t *testing.T) {
 	symbols := NewSymbolTable()
-	symbols.Capture("createThing", map[string]any{"id": "captured-1"})
+	symbols.Capture("/api/things", map[string]any{"id": "captured-1"})
 
 	example := Param{Name: "slug", In: "path", Required: true, Example: "spec-example", HasValue: true}
-	if got, ok := ResolveParam(example, symbols, "getThing"); !ok || got != "spec-example" {
+	if got, ok := ResolveParam(example, symbols, "/api/things/{slug}"); !ok || got != "spec-example" {
 		t.Fatalf("example resolution = %q, %v", got, ok)
 	}
 	seeded := Param{Name: "projectId", In: "path", Required: true}
-	if got, ok := ResolveParam(seeded, symbols, "getThing"); !ok || got != "local-dev-project" {
+	if got, ok := ResolveParam(seeded, symbols, "/api/things/{projectId}"); !ok || got != "local-dev-project" {
 		t.Fatalf("seeded resolution = %q, %v", got, ok)
 	}
 	captured := Param{Name: "thingId", In: "path", Required: true}
-	if got, ok := ResolveParam(captured, symbols, "getThing"); !ok || got != "captured-1" {
+	if got, ok := ResolveParam(captured, symbols, "/api/things/{thingId}"); !ok || got != "captured-1" {
 		t.Fatalf("captured resolution = %q, %v", got, ok)
 	}
 	empty := NewSymbolTable()
-	if _, ok := ResolveParam(captured, empty, "getThing"); ok {
+	if _, ok := ResolveParam(captured, empty, "/api/things/{thingId}"); ok {
 		t.Fatal("unresolvable param must fail")
 	}
 }

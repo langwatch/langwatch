@@ -401,3 +401,102 @@ func TestProbeExcludePrefixAndMethodFilter(t *testing.T) {
 		t.Fatalf("method filter: exit = %d, stderr:\n%s", code, stderr)
 	}
 }
+
+// thingsSpec creates a thing and reads it back by its own id, which is the
+// shape that exposed the shared symbol table: the id belongs to whichever
+// instance minted it.
+const thingsSpec = `{
+  "openapi": "3.0.3",
+  "paths": {
+    "/api/things": {
+      "post": {
+        "operationId": "createThing",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}
+        }}}},
+        "responses": {"200": {"description": "ok"}}
+      }
+    },
+    "/api/things/{id}": {
+      "get": {
+        "operationId": "getThing",
+        "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "ok"}, "404": {"description": "gone"}}
+      }
+    }
+  }
+}`
+
+// thingsServer mints one id and serves it back; any other id is a 404, the
+// way a real instance answers another instance's id.
+func thingsServer(t *testing.T, mintedID string, seen *[]string) *httptest.Server {
+	t.Helper()
+	return newTestServer(t, thingsSpec, map[string]http.HandlerFunc{
+		"POST /api/things": func(writer http.ResponseWriter, _ *http.Request) {
+			writeJSON(writer, 200, `{"id": "`+mintedID+`", "name": "apidiff"}`)
+		},
+		"GET /api/things/{id}": func(writer http.ResponseWriter, request *http.Request) {
+			*seen = append(*seen, request.URL.Path)
+			if request.PathValue("id") != mintedID {
+				writeJSON(writer, 404, `{"error": "not found"}`)
+				return
+			}
+			writeJSON(writer, 200, `{"id": "`+mintedID+`", "name": "apidiff"}`)
+		},
+	})
+}
+
+// Each side must be probed with the id its OWN instance minted. One shared
+// table sent B's id to A and manufactured a 404-vs-200 status_diff.
+func TestPathParameterResolvesPerSide(t *testing.T) {
+	var seenA, seenB []string
+	sideA := thingsServer(t, "id-a", &seenA)
+	sideB := thingsServer(t, "id-b", &seenB)
+
+	code, stdout, _ := runProbeCLI(t, "probe", "-a", sideA.URL, "-b", sideB.URL, "-settle-timeout", "200ms")
+	if code != 0 {
+		t.Fatalf("exit = %d, want 0 (no real difference here):\n%s", code, stdout)
+	}
+	if strings.Contains(stdout, "status_diff") {
+		t.Fatalf("per-side ids must not manufacture a status difference:\n%s", stdout)
+	}
+	if len(seenA) == 0 || len(seenB) == 0 {
+		t.Fatalf("both sides must be probed: A=%v B=%v", seenA, seenB)
+	}
+	for _, path := range seenA {
+		if !strings.HasSuffix(path, "/id-a") {
+			t.Fatalf("candidate probed at %q, want its own id-a", path)
+		}
+	}
+	for _, path := range seenB {
+		if !strings.HasSuffix(path, "/id-b") {
+			t.Fatalf("base probed at %q, want its own id-b", path)
+		}
+	}
+}
+
+// When only one side can resolve a parameter, the honest answer is a skip
+// naming the side — probing anyway compares two different requests.
+func TestOneSidedResolutionIsRecordedAsAHarnessSkip(t *testing.T) {
+	var seenA, seenB []string
+	sideA := thingsServer(t, "id-a", &seenA)
+	sideB := newTestServer(t, thingsSpec, map[string]http.HandlerFunc{
+		"POST /api/things": func(writer http.ResponseWriter, _ *http.Request) {
+			writeJSON(writer, 500, `{"error": "cannot create"}`)
+		},
+		"GET /api/things/{id}": func(writer http.ResponseWriter, request *http.Request) {
+			seenB = append(seenB, request.URL.Path)
+			writeJSON(writer, 200, `{"id": "whatever"}`)
+		},
+	})
+	_, stdout, _ := runProbeCLI(t, "probe", "-a", sideA.URL, "-b", sideB.URL, "-settle-timeout", "200ms")
+	if !strings.Contains(stdout, "resolvable on the candidate only") {
+		t.Fatalf("want a skip naming the side that resolved:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "harness-symbol-table") {
+		t.Fatalf("the skip must carry the harness root cause:\n%s", stdout)
+	}
+	if len(seenB) != 0 {
+		t.Fatalf("the base must not be probed with the candidate's id: %v", seenB)
+	}
+}

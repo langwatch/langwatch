@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -45,8 +46,8 @@ type probeFlags struct {
 	a               string
 	b               string
 	keys            Keys
-	concurrency     int
 	timeout         time.Duration
+	settleTimeout   time.Duration
 	pathPrefix      string
 	method          string
 	excludePrefixes stringSlice
@@ -54,6 +55,8 @@ type probeFlags struct {
 	exactStatus     bool
 	jsonOutput      bool
 	reportFile      string
+	ledgerFile      string
+	ledgerBaseline  string
 }
 
 func (probe *probeFlags) filter() OpFilter {
@@ -69,8 +72,8 @@ func registerProbeFlags(flags *flag.FlagSet, probe *probeFlags) {
 	flags.StringVar(&probe.keys.ScimKey, "scim-key", "", "SCIM provisioning token (run mode seeds a fixed one)")
 	flags.StringVar(&probe.keys.ProjectKeyB, "project-key-b", "", "same-org sibling project key for permission probes (run mode provisions one)")
 	flags.StringVar(&probe.keys.ProjectKeyC, "project-key-c", "", "foreign-org project key for permission probes (run mode provisions one)")
-	flags.IntVar(&probe.concurrency, "concurrency", 1, "reserved; probing is lockstep (1)")
 	flags.DurationVar(&probe.timeout, "timeout", 30*time.Second, "per-request timeout")
+	flags.DurationVar(&probe.settleTimeout, "settle-timeout", defaultSettleTimeout, "how long to poll a collection for a created entity before calling it invisible (negative disables the wait)")
 	flags.StringVar(&probe.pathPrefix, "path-prefix", "", "only probe operations under this path prefix")
 	flags.StringVar(&probe.method, "method", "", "only probe this HTTP method")
 	flags.Var(&probe.excludePrefixes, "exclude-prefix", "path prefix to skip (repeatable)")
@@ -78,6 +81,8 @@ func registerProbeFlags(flags *flag.FlagSet, probe *probeFlags) {
 	flags.BoolVar(&probe.exactStatus, "exact-status", false, "compare exact status codes and error bodies (default: classes only, error bodies skipped)")
 	flags.BoolVar(&probe.jsonOutput, "json", false, "write the machine report to stdout instead of the summary")
 	flags.StringVar(&probe.reportFile, "report", "", "also write the machine report (JSON) to this file")
+	flags.StringVar(&probe.ledgerFile, "ledger", "", "write the per-operation ledger to this file (default: ledger.json beside -report)")
+	flags.StringVar(&probe.ledgerBaseline, "ledger-baseline", "", "a previous ledger.json (or JSON array of cause slugs) whose causes are already known; only NEW causes fail the run")
 }
 
 const usage = `apidiff — live two-instance API behavior diff
@@ -88,8 +93,9 @@ usage:
                 [-pg-url URL -ch-url URL -redis-url URL] [-compose-project NAME]
                 [probe flags...]
   apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
-                [-concurrency N] [-timeout DUR] [-path-prefix P] [-method M]
+                [-timeout DUR] [-settle-timeout DUR] [-path-prefix P] [-method M]
                 [-exclude-prefix P]... [-max-ops N] [-json] [-report FILE]
+                [-ledger FILE] [-ledger-baseline FILE]
 
 exit codes: 0 no behavioral differences, 1 differences found, 2 error.
 `
@@ -191,8 +197,10 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 		fmt.Fprintf(out.stderr, "invalid HTTP method %q\n", probe.method)
 		return exitError
 	}
-	if probe.concurrency != 1 {
-		fmt.Fprintln(out.stderr, "note: -concurrency is reserved; probing is lockstep (1)")
+	baseline, err := loadBaseline(probe.ledgerBaseline)
+	if err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return exitError
 	}
 
 	client := &http.Client{Timeout: probe.timeout}
@@ -221,13 +229,47 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 		ExactStatus:     probe.exactStatus,
 		Client:          client,
 		Progress:        out.stderr,
+		SettleTimeout:   probe.settleTimeout,
 	}, operations)
 
-	report := BuildReport(changes, result)
-	if code := emitReport(report, probe, out); code != exitEqual {
+	verdict := runVerdict{report: BuildReport(changes, result), probe: probe}
+	verdict.ledger = BuildLedger(operations, verdict.report, baseline)
+	if code := emitReport(verdict, out); code != exitEqual {
 		return code
 	}
-	if report.Differences > 0 {
+	return verdict.exitCode(out)
+}
+
+// runVerdict is one completed comparison: what was found, how it groups, and
+// the flags that decide the exit code.
+type runVerdict struct {
+	report Report
+	ledger Ledger
+	probe  *probeFlags
+}
+
+// loadBaseline reads the known-cause set, or nil when no baseline is given.
+func loadBaseline(path string) (map[string]bool, error) {
+	if path == "" {
+		return nil, nil
+	}
+	return LoadCauseBaseline(path)
+}
+
+// exitCode decides the run's verdict. Without a baseline, any difference
+// fails. With one, the known causes are the ratchet: they are still
+// reported, and only a cause the baseline does not name fails the run, so a
+// branch can drive 40 causes to 0 without the tool being red throughout.
+func (verdict runVerdict) exitCode(out streams) int {
+	if verdict.probe.ledgerBaseline == "" {
+		if verdict.report.Differences > 0 {
+			return exitDifferences
+		}
+		return exitEqual
+	}
+	fmt.Fprintf(out.stderr, "ledger baseline %s: %d known causes, %d new\n",
+		verdict.probe.ledgerBaseline, verdict.ledger.Totals.KnownCauses, verdict.ledger.Totals.NewCauses)
+	if verdict.ledger.Totals.NewCauses > 0 {
 		return exitDifferences
 	}
 	return exitEqual
@@ -275,37 +317,71 @@ func (specs *fetchedSpecs) diffAndUnion() ([]openapidiff.Change, []Operation, er
 	return changes, UnionOperations(operationsA, operationsB), nil
 }
 
-// emitReport writes the machine report file and the stdout rendering.
-func emitReport(report Report, probe *probeFlags, out streams) int {
-	if probe.reportFile != "" {
-		if err := writeReportFile(probe.reportFile, report); err != nil {
-			fmt.Fprintln(out.stderr, err)
-			return exitError
-		}
+// emitReport writes the machine report and ledger files and the stdout
+// rendering, which opens with the root-cause summary.
+func emitReport(verdict runVerdict, out streams) int {
+	if err := verdict.writeFiles(out); err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return exitError
 	}
-	if probe.jsonOutput && probe.reportFile == "" {
-		if err := WriteJSONReport(out.stdout, report); err != nil {
+	if verdict.probe.jsonOutput && verdict.probe.reportFile == "" {
+		if err := WriteJSONReport(out.stdout, verdict.report); err != nil {
 			fmt.Fprintln(out.stderr, err)
 			return exitError
 		}
 		return exitEqual
 	}
-	if err := WriteHumanSummary(out.stdout, report); err != nil {
+	if err := WriteCauseSummary(out.stdout, verdict.ledger); err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return exitError
+	}
+	if err := WriteHumanSummary(out.stdout, verdict.report); err != nil {
 		fmt.Fprintln(out.stderr, err)
 		return exitError
 	}
 	return exitEqual
 }
 
-func writeReportFile(path string, report Report) error {
-	file, err := os.Create(path)
+// writeFiles persists the machine report and the ledger beside it.
+func (verdict runVerdict) writeFiles(out streams) error {
+	if path := verdict.probe.reportFile; path != "" {
+		if err := writeJSONFile(path, func(file *os.File) error { return WriteJSONReport(file, verdict.report) }); err != nil {
+			return err
+		}
+	}
+	path := ledgerPath(verdict.probe)
+	if path == "" {
+		return nil
+	}
+	if err := writeJSONFile(path, func(file *os.File) error { return WriteLedger(file, verdict.ledger) }); err != nil {
+		return err
+	}
+	fmt.Fprintf(out.stderr, "ledger: %s\n", path)
+	return nil
+}
+
+// ledgerPath resolves where the ledger goes: -ledger wins, otherwise
+// ledger.json lands beside the report file, and nothing is written when
+// neither was asked for.
+func ledgerPath(probe *probeFlags) string {
+	if probe.ledgerFile != "" {
+		return probe.ledgerFile
+	}
+	if probe.reportFile == "" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(probe.reportFile), "ledger.json")
+}
+
+func writeJSONFile(path string, write func(*os.File) error) error {
+	file, err := os.Create(path) // #nosec G304 -- operator-supplied output path
 	if err != nil {
 		return err
 	}
-	writeErr := WriteJSONReport(file, report)
+	writeErr := write(file)
 	closeErr := file.Close()
 	if writeErr != nil {
-		return fmt.Errorf("write report: %w", writeErr)
+		return fmt.Errorf("write %s: %w", path, writeErr)
 	}
 	return closeErr
 }

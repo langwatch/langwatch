@@ -1,7 +1,16 @@
 package apidiff
 
 import (
+	"sort"
 	"strings"
+	"time"
+)
+
+// Settle bounds for the collection-visibility wait.
+const (
+	defaultSettleTimeout = 10 * time.Second
+	settlePollInterval   = 500 * time.Millisecond
+	settleCollectionCase = "collection"
 )
 
 // Post-pass probing, run after the main lockstep pass. Two concerns:
@@ -66,50 +75,145 @@ func matchingReads(operations []Operation, collectionPath string) []Operation {
 
 // verifyCollection re-probes one collection GET and checks the created entity
 // is visible on each side: both visible compares the now-non-empty lists, one
-// visible is mutation_not_visible, neither is a probe note.
+// visible is mutation_not_visible, neither is a probe note. The re-probe is
+// an event-driven settle (settleForVisibility), never a fixed sleep.
 func (engine *probeEngine) verifyCollection(operation Operation, record mutationRecord) []Finding {
-	params, unresolved := resolveParams(operation, engine.symbols, false)
-	if unresolved != "" {
+	target, ok := engine.ownerTarget(operation)
+	if !ok {
 		return nil
 	}
-	pathA, pathB := operation.SidePaths()
-	target := probeTarget{
-		pathA:   substitutePath(pathA, params.pathValues),
-		pathB:   substitutePath(pathB, params.pathValues),
-		query:   params.query,
-		headers: authHeaders(operation, engine.options.Schemes, engine.options.Keys),
-	}
-	read := probeCase{name: "collection"}
-	transcript := engine.runCase(operation, read, target)
-	engine.transcripts = append(engine.transcripts, transcript)
+	settled := engine.settleForVisibility(operation, record, target)
+	engine.transcripts = append(engine.transcripts, settled.transcript)
 
-	visibleA := containsID(transcript.A.Body, record.idA)
-	visibleB := containsID(transcript.B.Body, record.idB)
-	if visibleA && visibleB {
-		cmp := Comparison{Method: operation.Method, Path: operation.Path, Case: "collection", OperationID: operation.OperationID, ExactStatus: engine.options.ExactStatus}
-		outcome := CompareResults(cmp, transcript.B, transcript.A)
+	if settled.visibleA && settled.visibleB {
+		cmp := Comparison{Method: operation.Method, Path: operation.Path, Case: settleCollectionCase, OperationID: operation.OperationID, ExactStatus: engine.options.ExactStatus}
+		outcome := CompareResults(cmp, settled.transcript.B, settled.transcript.A)
 		engine.suppressed.add(outcome.Suppressed)
 		return outcome.Findings
 	}
-	if !visibleA && !visibleB {
-		engine.progress("note %s %s: created entity not visible in either list\n", operation.Method, operation.Path)
+	if !settled.visibleA && !settled.visibleB {
+		engine.progress("note %s %s: created entity not visible in either list after %s\n", operation.Method, operation.Path, settled.waited)
 		return nil
 	}
 	return []Finding{{
 		Kind:        FindingMutationNotVisible,
 		Method:      operation.Method,
 		Path:        operation.Path,
-		Case:        "collection",
+		Case:        settleCollectionCase,
 		OperationID: operation.OperationID,
 		Fields: map[string][2]any{
-			"status":  {transcript.B.Status, transcript.A.Status},
-			"visible": {visibleB, visibleA},
+			"status":   {settled.transcript.B.Status, settled.transcript.A.Status},
+			"visible":  {settled.visibleB, settled.visibleA},
+			"waitedMs": {settled.waited.Milliseconds(), settled.waited.Milliseconds()},
 		},
+		Reason: "waited " + settled.waited.String() + " for the created entity to appear in both lists",
 	}}
 }
 
+// ownerTarget resolves one operation's request target per side with the owner
+// credentials, or reports that a parameter could not be resolved.
+func (engine *probeEngine) ownerTarget(operation Operation) (probeTarget, bool) {
+	paramsA, unresolvedA := resolveParams(operation, engine.symbolsA, false)
+	paramsB, unresolvedB := resolveParams(operation, engine.symbolsB, false)
+	if unresolvedA != "" || unresolvedB != "" {
+		return probeTarget{}, false
+	}
+	pathA, pathB := operation.SidePaths()
+	return probeTarget{
+		pathA:   substitutePath(pathA, paramsA.pathValues),
+		pathB:   substitutePath(pathB, paramsB.pathValues),
+		queryA:  paramsA.query,
+		queryB:  paramsB.query,
+		headers: authHeaders(operation, engine.options.Schemes, engine.options.Keys),
+	}, true
+}
+
+// settleOutcome is one visibility wait's result: the last transcript, what
+// each side showed, and how long the wait took.
+type settleOutcome struct {
+	transcript Transcript
+	visibleA   bool
+	visibleB   bool
+	attempts   int
+	waited     time.Duration
+}
+
+// settleForVisibility re-reads the collection until the created entity is
+// visible on BOTH sides or the settle deadline passes. A projection or queue
+// that has not run yet is a wait, not a difference; the deadline is what
+// turns "not yet" into a finding, and both the progress line and the finding
+// name what was waited for. There is no fixed sleep anywhere in this path.
+//
+// Two deadlines, because they answer different questions. One side visible
+// and the other not is exactly the lag worth waiting out, so it gets the
+// whole settle timeout. NEITHER side visible is usually a collection this
+// creation does not populate at all, and paying the full timeout for every
+// one of those costs minutes a run, so it gets the shorter first-sight
+// budget.
+func (engine *probeEngine) settleForVisibility(operation Operation, record mutationRecord, target probeTarget) settleOutcome {
+	timeout := engine.settleTimeout()
+	started := time.Now()
+	deadline := started.Add(timeout)
+	firstSight := started.Add(firstSightBudget(timeout))
+	outcome := settleOutcome{}
+	for {
+		outcome.attempts++
+		outcome.transcript = engine.runCase(operation, probeCase{name: settleCollectionCase}, target)
+		outcome.visibleA = containsID(outcome.transcript.A.Body, record.idA)
+		outcome.visibleB = containsID(outcome.transcript.B.Body, record.idB)
+		outcome.waited = time.Since(started)
+		if outcome.visibleA && outcome.visibleB {
+			return outcome
+		}
+		if outcome.expired(deadline, firstSight) {
+			engine.progress("settle %s %s: gave up after %s / %d reads waiting for the created entity in both lists (candidate=%v base=%v)\n",
+				operation.Method, operation.Path, outcome.waited, outcome.attempts, outcome.visibleA, outcome.visibleB)
+			return outcome
+		}
+		select {
+		case <-engine.ctx.Done():
+			return outcome
+		case <-time.After(settlePollInterval):
+		}
+	}
+}
+
+// expired reports whether this wait is over: the full deadline always, and
+// the shorter first-sight budget when neither side has shown the entity.
+func (outcome settleOutcome) expired(deadline, firstSight time.Time) bool {
+	now := time.Now()
+	if now.After(deadline) {
+		return true
+	}
+	return !outcome.visibleA && !outcome.visibleB && now.After(firstSight)
+}
+
+// firstSightBudget is how long a creation nothing has listed yet is waited
+// for before the collection is called uncovered.
+func firstSightBudget(timeout time.Duration) time.Duration {
+	budget := timeout / 4
+	if budget < settlePollInterval {
+		return settlePollInterval
+	}
+	return budget
+}
+
+// settleTimeout is the visibility deadline; a negative -settle-timeout turns
+// the wait off (one read, no polling).
+func (engine *probeEngine) settleTimeout() time.Duration {
+	if engine.options.SettleTimeout != 0 {
+		if engine.options.SettleTimeout < 0 {
+			return 0
+		}
+		return engine.options.SettleTimeout
+	}
+	return defaultSettleTimeout
+}
+
 // permissionProbes repeats every project-key read with the sibling-project
-// (B) and foreign-org (C) keys, comparing denial behavior across sides.
+// (B) and foreign-org (C) keys, comparing denial behavior across sides. An
+// operation that already reported a status difference is skipped: replaying
+// it with two foreign keys re-reports the same root cause twice more.
 func (engine *probeEngine) permissionProbes(operations []Operation) []Finding {
 	keys := engine.options.Keys
 	if keys.ProjectKeyB == "" || keys.ProjectKeyC == "" {
@@ -121,58 +225,90 @@ func (engine *probeEngine) permissionProbes(operations []Operation) []Finding {
 		if !isReadMethod(operation.Method) || !usesProjectKey(operation, engine.options.Schemes, keys) {
 			continue
 		}
+		if engine.statusDiffs[operationKeyOf(operation)] {
+			engine.progress("skip permission pass %s %s (already differs on the owner key)\n", operation.Method, operation.Path)
+			continue
+		}
 		findings = append(findings, engine.permissionProbe(operation)...)
 	}
 	return findings
 }
 
-// permissionProbe runs one operation's read with both foreign keys.
+// foreignKey is one non-owner credential and the identities that credential
+// legitimately owns — its own project, and the organization and team it sits
+// in. Seeing one of those is that key reading its own scope, not a leak.
+type foreignKey struct {
+	label string
+	key   string
+	scope map[string]bool
+}
+
+func (engine *probeEngine) foreignKeys() []foreignKey {
+	return []foreignKey{
+		{label: "key-b", key: engine.options.Keys.ProjectKeyB, scope: map[string]bool{
+			fixtureProjectBID: true, "local-dev-organization": true, "local-dev-team": true,
+		}},
+		{label: "key-c", key: engine.options.Keys.ProjectKeyC, scope: map[string]bool{
+			fixtureProjectCID: true, fixtureOrg2ID: true, fixtureTeam2ID: true,
+		}},
+	}
+}
+
+// permissionProbe runs one operation's read with both foreign keys and
+// classifies each answer against what the OWNER key saw on this same
+// operation.
 func (engine *probeEngine) permissionProbe(operation Operation) []Finding {
-	params, unresolved := resolveParams(operation, engine.symbols, false)
-	if unresolved != "" {
+	paramsA, unresolvedA := resolveParams(operation, engine.symbolsA, false)
+	paramsB, unresolvedB := resolveParams(operation, engine.symbolsB, false)
+	if unresolvedA != "" || unresolvedB != "" {
 		return nil
 	}
 	pathA, pathB := operation.SidePaths()
 	target := probeTarget{
-		pathA: substitutePath(pathA, params.pathValues),
-		pathB: substitutePath(pathB, params.pathValues),
-		query: params.query,
+		pathA:  substitutePath(pathA, paramsA.pathValues),
+		pathB:  substitutePath(pathB, paramsB.pathValues),
+		queryA: paramsA.query,
+		queryB: paramsB.query,
 	}
+
+	keys := engine.foreignKeys()
+	transcripts := make([]Transcript, 0, len(keys))
+	for _, foreign := range keys {
+		headers, ok := foreignProjectHeaders(operation, engine.options.Schemes, foreign.key)
+		if !ok {
+			engine.progress("skip permission pass %s %s (a non-project credential cannot be swapped for a foreign one)\n", operation.Method, operation.Path)
+			return nil
+		}
+		target.headers = headers
+		transcript := engine.runCase(operation, probeCase{name: "permission-" + foreign.label}, target)
+		engine.transcripts = append(engine.transcripts, transcript)
+		transcripts = append(transcripts, transcript)
+	}
+
 	findings := make([]Finding, 0)
-	for _, foreign := range []struct {
-		label string
-		key   string
-	}{
-		{"key-b", engine.options.Keys.ProjectKeyB},
-		{"key-c", engine.options.Keys.ProjectKeyC},
-	} {
-		target.headers = authHeaders(operation, engine.options.Schemes, engine.options.Keys)
-		target.headers["X-Auth-Token"] = foreign.key
-		findings = append(findings, engine.permissionCase(operation, foreign.label, target)...)
+	for index, foreign := range keys {
+		findings = append(findings, engine.classifyPermission(operation, foreign, transcripts[index])...)
 	}
 	return findings
 }
 
-// permissionCase probes both sides with one foreign key and classifies the
-// outcome: leak (2xx carrying the owning project's data), diff (denial
-// classes disagree), or nothing.
-func (engine *probeEngine) permissionCase(operation Operation, label string, target probeTarget) []Finding {
-	read := probeCase{name: "permission-" + label}
-	transcript := engine.runCase(operation, read, target)
-	engine.transcripts = append(engine.transcripts, transcript)
-
-	leakA := transcript.A.Status >= 200 && transcript.A.Status < 300 && containsAnyID(transcript.A.Body, engine.leakSet(engine.idsA))
-	leakB := transcript.B.Status >= 200 && transcript.B.Status < 300 && containsAnyID(transcript.B.Body, engine.leakSet(engine.idsB))
-	if leakA || leakB {
+// classifyPermission reports a leak (an owner-only ID reached a foreign key)
+// or a denial-class disagreement between the sides.
+func (engine *probeEngine) classifyPermission(operation Operation, foreign foreignKey, transcript Transcript) []Finding {
+	owner := engine.ownerIDs[operationKeyOf(operation)]
+	leakedA, okA := leakedID(ownerSet(owner, true), transcript.A, foreign.scope)
+	leakedB, okB := leakedID(ownerSet(owner, false), transcript.B, foreign.scope)
+	if okA || okB {
 		return []Finding{{
 			Kind:        FindingPermissionLeak,
 			Method:      operation.Method,
 			Path:        operation.Path,
-			Case:        read.name,
+			Case:        "permission-" + foreign.label,
 			OperationID: operation.OperationID,
 			Fields: map[string][2]any{
-				"key":    {label, label},
+				"key":    {foreign.label, foreign.label},
 				"status": {transcript.B.Status, transcript.A.Status},
+				"id":     {leakedB, leakedA},
 			},
 		}}
 	}
@@ -181,10 +317,10 @@ func (engine *probeEngine) permissionCase(operation Operation, label string, tar
 			Kind:        FindingPermissionDiff,
 			Method:      operation.Method,
 			Path:        operation.Path,
-			Case:        read.name,
+			Case:        "permission-" + foreign.label,
 			OperationID: operation.OperationID,
 			Fields: map[string][2]any{
-				"key":    {label, label},
+				"key":    {foreign.label, foreign.label},
 				"status": {transcript.B.Status, transcript.A.Status},
 			},
 		}}
@@ -192,32 +328,71 @@ func (engine *probeEngine) permissionCase(operation Operation, label string, tar
 	return nil
 }
 
-// leakSet filters a side's captured IDs down to owner data: the fixture
-// identities are legitimately present in a foreign key's OWN scope response
-// (GET /api/me/project with key B answers B's project), and system_* IDs are
-// global identities identical in every project, not tenant data.
-func (engine *probeEngine) leakSet(ids map[string]bool) map[string]bool {
-	set := make(map[string]bool, len(ids))
-	for id := range ids {
-		if leakExemptID(id) {
-			continue
-		}
-		set[id] = true
+func ownerSet(owner *sideIDs, sideA bool) map[string]bool {
+	if owner == nil {
+		return nil
 	}
-	return set
+	if sideA {
+		return owner.a
+	}
+	return owner.b
 }
 
-func leakExemptID(id string) bool {
-	switch id {
-	case fixtureProjectBID, fixtureProjectCID, fixtureOrg2ID, fixtureTeam2ID,
-		// The seeded team/organization are shared org context: the same-org
-		// sibling key B legitimately resolves to them. The owner's PROJECT id
-		// (local-dev-project) stays in the leak set — a foreign key seeing it
-		// is the sharpest leak signal.
-		"local-dev-organization", "local-dev-team":
-		return true
+// leakedID names the first owner-scoped ID a foreign key saw, and is what
+// the finding records — a leak nobody can adjudicate from the report is a
+// puzzle, not a finding. The candidate set is the IDs the OWNER key saw on
+// THIS operation, not every ID the run ever captured, minus the identities
+// the foreign key legitimately owns (its own project, and the organization
+// and team it sits in — shared and cascading scope is not a leak).
+//
+// One class survives this rule: an endpoint that serves the same
+// instance-wide document to every key (model defaults, providers) is
+// indistinguishable, from its responses alone, from one that leaks to every
+// key. Those are reported, and the recorded ID is what tells them apart on
+// sight.
+func leakedID(ownerIDs map[string]bool, foreign SideResult, scope map[string]bool) (string, bool) {
+	if foreign.Status < 200 || foreign.Status >= 300 || len(ownerIDs) == 0 {
+		return "", false
 	}
-	return strings.HasPrefix(id, "system_")
+	candidates := make([]string, 0, len(ownerIDs))
+	for id := range ownerIDs {
+		candidates = append(candidates, id)
+	}
+	sort.Strings(candidates)
+	for _, id := range candidates {
+		if scope[id] || !containsID(foreign.Body, id) {
+			continue
+		}
+		return id, true
+	}
+	return "", false
+}
+
+// foreignProjectHeaders builds the header set for a foreign-key probe from
+// scratch: the project-key header carries the foreign key and NOTHING else is
+// sent. An operation that also admits an organization bearer or an admin key
+// cannot be probed this way — keeping the owner's second credential would
+// make a legitimate success read as a leak — so it is skipped instead.
+func foreignProjectHeaders(operation Operation, schemes map[string]map[string]any, foreignKeyValue string) (map[string]string, bool) {
+	headers := map[string]string{}
+	for _, name := range operation.Security {
+		cred := schemeHeader(name, schemes[name], Keys{ProjectKey: foreignKeyValue})
+		if cred.header == "X-Auth-Token" {
+			headers[cred.header] = foreignKeyValue
+			continue
+		}
+		if schemeAdmitsNonProjectCredential(name, schemes[name]) {
+			return nil, false
+		}
+	}
+	return headers, len(headers) > 0
+}
+
+// schemeAdmitsNonProjectCredential reports whether a security scheme names a
+// credential other than the project key.
+func schemeAdmitsNonProjectCredential(name string, scheme map[string]any) bool {
+	probe := schemeHeader(name, scheme, Keys{ProjectKey: "p", OrgKey: "o", AdminKey: "a", ScimKey: "s"})
+	return probe.header != "" && probe.header != "X-Auth-Token"
 }
 
 // markUnverifiedLists notes list GETs that answered 2xx with empty lists on
@@ -325,20 +500,6 @@ func containsID(body, id string) bool {
 		return false
 	}
 	return containsString(decoded, id)
-}
-
-// containsAnyID reports whether any of the IDs appears in the body.
-func containsAnyID(body string, ids map[string]bool) bool {
-	decoded, ok := decodeJSONBody(body)
-	if !ok {
-		return false
-	}
-	for id := range ids {
-		if containsString(decoded, id) {
-			return true
-		}
-	}
-	return false
 }
 
 func containsString(value any, want string) bool {

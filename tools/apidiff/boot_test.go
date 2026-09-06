@@ -1,6 +1,8 @@
 package apidiff
 
 import (
+	"context"
+	"io"
 	"strings"
 	"testing"
 )
@@ -152,5 +154,173 @@ func TestExternalInfra(t *testing.T) {
 	ok, err := externalInfra(BootConfig{PGURL: "postgres://x", CHURL: "http://y", RedisURL: "redis://z"})
 	if err != nil || !ok {
 		t.Fatalf("all URLs: ok=%v err=%v, want true/nil", ok, err)
+	}
+}
+
+// recordingRunner captures every external command a boot stage would run.
+type recordingRunner struct {
+	commands []commandSpec
+	output   string
+	err      error
+}
+
+func (recorder *recordingRunner) run(_ context.Context, spec commandSpec, log io.Writer) error {
+	recorder.commands = append(recorder.commands, spec)
+	if recorder.output != "" {
+		if _, err := io.WriteString(log, recorder.output); err != nil {
+			return err
+		}
+	}
+	return recorder.err
+}
+
+func (recorder *recordingRunner) ran(name string) bool {
+	for _, spec := range recorder.commands {
+		if spec.name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func externalBootState(recorder *recordingRunner, cfg BootConfig) *bootState {
+	state := &bootState{cfg: cfg, stderr: io.Discard, run: recorder.run, runID: "testrun"}
+	state.infra = infraURLs{
+		pgServer:    cfg.PGURL,
+		chServer:    cfg.CHURL,
+		redisServer: cfg.RedisURL,
+		branchRedis: 3,
+		mainRedis:   11,
+	}
+	return state
+}
+
+// A malformed infrastructure URL used to fall back to os.Environ(), which
+// carries the developer's own DATABASE_URL — the instance then migrated and
+// seeded into their database.
+func TestEnvForRejectsUnparseableInfraURL(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://developer:secret@127.0.0.1:5432/their_own_db")
+	state := externalBootState(&recordingRunner{}, BootConfig{})
+	state.infra.pgServer = "://"
+	env, err := state.envFor(Instance{Name: "branch", Port: 6560, Profile: modularProfile})
+	if err == nil {
+		t.Fatalf("unparseable postgres URL must error, got env of %d entries", len(env))
+	}
+	if env != nil {
+		t.Fatal("no environment may be returned alongside the error")
+	}
+	if !strings.Contains(err.Error(), "branch") {
+		t.Fatalf("error must name the instance: %v", err)
+	}
+}
+
+func TestEnvForUsesTheRunScopedRedisIndex(t *testing.T) {
+	state := externalBootState(&recordingRunner{}, BootConfig{})
+	state.infra.pgServer = "postgres://prisma:prisma@127.0.0.1:5432/postgres"
+	state.infra.chServer = "http://default:langwatch@127.0.0.1:8123"
+	state.infra.redisServer = "redis://127.0.0.1:6379"
+	for name, want := range map[string]string{"branch": "REDIS_DB_INDEX=3", "main": "REDIS_DB_INDEX=11"} {
+		env, err := state.envFor(Instance{Name: name, Port: 6560, Profile: modularProfile})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slicesContain(env, want) {
+			t.Fatalf("%s env missing %q", name, want)
+		}
+	}
+}
+
+func slicesContain(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+// pgAdmin used to hardcode the compose constant "mydb", so every external
+// run died at the first CREATE DATABASE.
+func TestPGAdminUsesSuppliedDatabaseForExternalInfra(t *testing.T) {
+	state := externalBootState(&recordingRunner{}, BootConfig{PGURL: "postgres://apidiff@127.0.0.1:5432/apidiff_admin"})
+	if got := state.adminDatabase(); got != "apidiff_admin" {
+		t.Fatalf("adminDatabase = %q, want apidiff_admin", got)
+	}
+	args, err := psqlArgs(state.infra.pgServer, state.adminDatabase(), "SELECT 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "/apidiff_admin") || strings.Contains(joined, "mydb") {
+		t.Fatalf("psql argv = %q, want the supplied database", joined)
+	}
+	// The compose stack keeps its own constant.
+	managed := externalBootState(&recordingRunner{}, BootConfig{})
+	managed.override = "/tmp/compose.apidiff.yml"
+	if got := managed.adminDatabase(); got != pgAdminDB {
+		t.Fatalf("managed adminDatabase = %q, want %q", got, pgAdminDB)
+	}
+}
+
+// A -pg-url without a username passes psql (which falls back to $USER) and
+// dies at prisma with P1010 — eight minutes and two installs later.
+func TestPreflightRejectsUsernamelessPostgresURL(t *testing.T) {
+	err := validateInfraURLs(infraURLs{
+		pgServer:    "postgres://127.0.0.1:5432/postgres",
+		chServer:    "http://default:langwatch@127.0.0.1:8123",
+		redisServer: "redis://127.0.0.1:6379",
+	})
+	if err == nil || !strings.Contains(err.Error(), "username") {
+		t.Fatalf("err = %v, want a username complaint", err)
+	}
+	if err := validateInfraURLs(infraURLs{
+		pgServer:    "postgres://apidiff@127.0.0.1:5432/postgres",
+		chServer:    "http://default:langwatch@127.0.0.1:8123",
+		redisServer: "redis://127.0.0.1:6379",
+	}); err != nil {
+		t.Fatalf("a complete URL set must pass: %v", err)
+	}
+	if err := validateInfraURLs(infraURLs{
+		pgServer:    "postgres://apidiff@127.0.0.1:5432",
+		chServer:    "http://127.0.0.1:8123",
+		redisServer: "redis://127.0.0.1:6379",
+	}); err == nil {
+		t.Fatal("a postgres URL with no admin database must be refused")
+	}
+}
+
+func TestPreflightRunsBeforeInstall(t *testing.T) {
+	recorder := &recordingRunner{}
+	state := externalBootState(recorder, BootConfig{
+		PGURL:    "postgres://127.0.0.1:5432/postgres",
+		CHURL:    "http://127.0.0.1:8123",
+		RedisURL: "redis://127.0.0.1:6379",
+	})
+	if err := state.preflight(context.Background()); err == nil {
+		t.Fatal("preflight must reject the usernameless postgres URL")
+	}
+	if recorder.ran("pnpm") {
+		t.Fatalf("preflight must fail before any install: %v", recorder.commands)
+	}
+	if recorder.ran("psql") {
+		t.Fatal("a URL that cannot be used must be rejected before it is dialed")
+	}
+}
+
+// The modular profile writes no env overlay; that the migrate landed in this
+// run's database is asserted, not assumed.
+func TestVerifyMigrationTargetRejectsAnUnmigratedDatabase(t *testing.T) {
+	recorder := &recordingRunner{output: "0\n"}
+	state := externalBootState(recorder, BootConfig{})
+	state.override = "/tmp/compose.apidiff.yml" // compose path: psql via docker exec
+	err := state.verifyMigrationTarget(context.Background(), Instance{Name: "branch"})
+	if err == nil || !strings.Contains(err.Error(), "apidiff_testrun_branch") {
+		t.Fatalf("err = %v, want the run-scoped database named", err)
+	}
+	applied := &recordingRunner{output: "297\n"}
+	ok := externalBootState(applied, BootConfig{})
+	ok.override = "/tmp/compose.apidiff.yml"
+	if err := ok.verifyMigrationTarget(context.Background(), Instance{Name: "main"}); err != nil {
+		t.Fatalf("a migrated database must pass: %v", err)
 	}
 }

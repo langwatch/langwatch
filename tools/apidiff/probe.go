@@ -75,7 +75,11 @@ type ProbeOptions struct {
 	ExactStatus     bool // compare exact status codes and error bodies
 	Client          *http.Client
 	Progress        io.Writer
-	Symbols         *SymbolTable
+
+	// SettleTimeout bounds the event-driven wait for a created entity to
+	// become visible in its collection (see settleForVisibility). Zero uses
+	// defaultSettleTimeout.
+	SettleTimeout time.Duration
 }
 
 // SuppressedCounts tallies comparisons the default semantics filtered out,
@@ -106,11 +110,11 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	if client == nil {
 		client = &http.Client{Timeout: options.Timeout}
 	}
-	symbols := options.Symbols
-	if symbols == nil {
-		symbols = NewSymbolTable()
+	engine := &probeEngine{
+		ctx: ctx, options: options, client: client,
+		symbolsA: NewSymbolTable(), symbolsB: NewSymbolTable(),
+		ownerIDs: map[string]*sideIDs{}, statusDiffs: map[string]bool{},
 	}
-	engine := &probeEngine{ctx: ctx, options: options, client: client, symbols: symbols, idsA: map[string]bool{}, idsB: map[string]bool{}}
 
 	selected := SelectOperations(operations, options.Filter)
 
@@ -155,15 +159,32 @@ func SelectOperations(operations []Operation, filter OpFilter) []Operation {
 }
 
 type probeEngine struct {
-	ctx         context.Context
-	options     ProbeOptions
-	client      *http.Client
-	symbols     *SymbolTable
+	ctx      context.Context
+	options  ProbeOptions
+	client   *http.Client
+	symbolsA *SymbolTable // IDs the candidate minted; never used to probe the base
+	symbolsB *SymbolTable
+
 	suppressed  SuppressedCounts
 	mutations   []mutationRecord
-	idsA        map[string]bool // IDs captured from side A responses
-	idsB        map[string]bool
+	ownerIDs    map[string]*sideIDs // per operation, IDs the owner key saw
+	statusDiffs map[string]bool     // operations already reported as differing
 	transcripts []Transcript
+}
+
+// sideIDs holds one operation's owner-visible IDs, per side.
+type sideIDs struct {
+	a map[string]bool
+	b map[string]bool
+}
+
+func newSideIDs() *sideIDs {
+	return &sideIDs{a: map[string]bool{}, b: map[string]bool{}}
+}
+
+// operationKeyOf names an operation in the engine's per-operation maps.
+func operationKeyOf(operation Operation) string {
+	return operation.Method + " " + operation.Path
 }
 
 func (engine *probeEngine) progress(format string, args ...any) {
@@ -182,29 +203,28 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 	headers := authHeaders(operation, engine.options.Schemes, engine.options.Keys)
 
 	deleteOp := operation.Method == http.MethodDelete
-	params, unresolved := resolveParams(operation, engine.symbols, deleteOp)
-	if unresolved != "" {
-		return []Finding{skippedFinding(operation, "unresolvable parameter: "+unresolved)}
+	paramsA, unresolvedA := resolveParams(operation, engine.symbolsA, deleteOp)
+	paramsB, unresolvedB := resolveParams(operation, engine.symbolsB, deleteOp)
+	if unresolvedA != "" || unresolvedB != "" {
+		return []Finding{unresolvedFinding(operation, unresolvedA, unresolvedB)}
 	}
 
-	// Each side is probed at the alias form its own spec documents.
+	// Each side is probed at the alias form its own spec documents, with the
+	// values its OWN instance minted.
 	pathA, pathB := operation.SidePaths()
 	target := probeTarget{
-		pathA:   substitutePath(pathA, params.pathValues),
-		pathB:   substitutePath(pathB, params.pathValues),
-		query:   params.query,
+		pathA:   substitutePath(pathA, paramsA.pathValues),
+		pathB:   substitutePath(pathB, paramsB.pathValues),
+		queryA:  paramsA.query,
+		queryB:  paramsB.query,
 		headers: headers,
 	}
-	cases := operationCases(operation)
 	findings := make([]Finding, 0)
 	missingReported := false
-	for _, probeCase := range cases {
+	for _, probeCase := range operationCases(operation) {
 		transcript := engine.runCase(operation, probeCase, target)
 		engine.transcripts = append(engine.transcripts, transcript)
-
-		engine.captureIDs(operation, transcript.A, engine.idsA)
-		engine.captureIDs(operation, transcript.B, engine.idsB)
-		engine.captureMutation(operation, probeCase, transcript)
+		engine.captureFrom(operation, probeCase, transcript)
 
 		if !operation.InA || !operation.InB {
 			if !missingReported {
@@ -213,12 +233,77 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 			}
 			continue
 		}
-		cmp := Comparison{Method: operation.Method, Path: operation.Path, Case: probeCase.name, OperationID: operation.OperationID, ExactStatus: engine.options.ExactStatus}
-		outcome := CompareResults(cmp, transcript.B, transcript.A)
-		findings = append(findings, outcome.Findings...)
-		engine.suppressed.add(outcome.Suppressed)
+		findings = append(findings, engine.compareCase(operation, probeCase, transcript)...)
 	}
 	return findings
+}
+
+// captureFrom files everything one probe case taught the engine: each side's
+// IDs into its own symbol table, the owner-visible IDs, and any create.
+func (engine *probeEngine) captureFrom(operation Operation, probeCase probeCase, transcript Transcript) {
+	engine.symbolsA.Capture(operation.Path, decodedBody(transcript.A.Body))
+	engine.symbolsB.Capture(operation.Path, decodedBody(transcript.B.Body))
+	engine.recordOwnerIDs(operation, probeCase, transcript)
+	engine.captureMutation(operation, probeCase, transcript)
+}
+
+// compareCase compares one case's two outcomes and remembers whether this
+// operation differs at all, which the permission pass reads to avoid
+// re-reporting the same root cause once per foreign key.
+func (engine *probeEngine) compareCase(operation Operation, probeCase probeCase, transcript Transcript) []Finding {
+	cmp := Comparison{Method: operation.Method, Path: operation.Path, Case: probeCase.name, OperationID: operation.OperationID, ExactStatus: engine.options.ExactStatus}
+	outcome := CompareResults(cmp, transcript.B, transcript.A)
+	for _, finding := range outcome.Findings {
+		if finding.Kind == FindingStatusDiff || finding.Kind == FindingProbeFailed {
+			engine.statusDiffs[operationKeyOf(operation)] = true
+		}
+	}
+	engine.suppressed.add(outcome.Suppressed)
+	return outcome.Findings
+}
+
+// unresolvedFinding explains why an operation was not probed. One side
+// resolving while the other does not is a HARNESS artifact — the two
+// instances mint their own IDs — and is recorded as such rather than probed
+// as an asymmetric pair, which is what used to manufacture 404-vs-200.
+func unresolvedFinding(operation Operation, unresolvedA, unresolvedB string) Finding {
+	switch {
+	case unresolvedA != "" && unresolvedB != "":
+		return skippedFinding(operation, "unresolvable parameter: "+unresolvedA)
+	case unresolvedA != "":
+		return skippedFinding(operation, "parameter "+unresolvedA+" resolvable on the base only; probing both sides would compare different requests")
+	default:
+		return skippedFinding(operation, "parameter "+unresolvedB+" resolvable on the candidate only; probing both sides would compare different requests")
+	}
+}
+
+// recordOwnerIDs remembers the IDs each side returned to the OWNER key for
+// one operation, so the permission pass can tell owner data apart from
+// instance-global data without an allowlist.
+func (engine *probeEngine) recordOwnerIDs(operation Operation, probeCase probeCase, transcript Transcript) {
+	if !isReadMethod(operation.Method) || probeCase.name != "read" {
+		return
+	}
+	key := operationKeyOf(operation)
+	seen, ok := engine.ownerIDs[key]
+	if !ok {
+		seen = newSideIDs()
+		engine.ownerIDs[key] = seen
+	}
+	collectBodyIDs(transcript.A.Body, seen.a)
+	collectBodyIDs(transcript.B.Body, seen.b)
+}
+
+// collectBodyIDs records every id-like string value in a response body.
+func collectBodyIDs(body string, into map[string]bool) {
+	decoded, ok := decodeJSONBody(body)
+	if !ok || decoded == nil {
+		return
+	}
+	table := NewSymbolTable()
+	for _, id := range table.Capture("", decoded) {
+		into[id] = true
+	}
 }
 
 // captureMutation records a successful create so the collection verification
@@ -259,11 +344,16 @@ func findFirstID(value any) (string, bool) {
 	}
 }
 
+// findFirstIDInMap prefers this object's OWN id over one nested inside it: a
+// create response that wraps the entity ({"data": {...}, "id": "x"}) must
+// yield the entity's id, not whichever id sorts first.
 func findFirstIDInMap(object map[string]any) (string, bool) {
 	for _, key := range sortedKeys(object) {
 		if text, ok := object[key].(string); ok && isIDKey(key) && text != "" {
 			return text, true
 		}
+	}
+	for _, key := range sortedKeys(object) {
 		if found, ok := findFirstID(object[key]); ok {
 			return found, true
 		}
@@ -285,7 +375,8 @@ func findFirstIDInSlice(values []any) (string, bool) {
 type probeTarget struct {
 	pathA   string
 	pathB   string
-	query   url.Values
+	queryA  url.Values
+	queryB  url.Values
 	headers map[string]string
 }
 
@@ -302,15 +393,16 @@ func (engine *probeEngine) runCase(operation Operation, probeCase probeCase, tar
 	}
 	request := probeRequest{
 		method:  operation.Method,
-		query:   target.query,
 		headers: target.headers,
 		body:    probeCase.body,
 	}
 	request.baseURL = engine.options.A
 	request.path = target.pathA
+	request.query = target.queryA
 	transcript.A = engine.execute(request)
 	request.baseURL = engine.options.B
 	request.path = target.pathB
+	request.query = target.queryB
 	transcript.B = engine.execute(request)
 	return transcript
 }
@@ -433,14 +525,15 @@ func (engine *probeEngine) executeOnce(probe probeRequest, encoded []byte) SideR
 	return result
 }
 
-func (engine *probeEngine) captureIDs(operation Operation, result SideResult, perSide map[string]bool) {
-	body, ok := decodeJSONBody(result.Body)
-	if !ok || body == nil {
-		return
+// decodedBody parses a captured response body, or nil when it is not JSON.
+// Each side's IDs are filed into THAT side's symbol table, so a value minted
+// by one instance can never be substituted into the other's request.
+func decodedBody(body string) any {
+	decoded, ok := decodeJSONBody(body)
+	if !ok {
+		return nil
 	}
-	for _, id := range engine.symbols.Capture(operation.OperationID, body) {
-		perSide[id] = true
-	}
+	return decoded
 }
 
 // operationCases picks the probe cases for an operation: one read for
@@ -471,12 +564,12 @@ type resolvedParams struct {
 	query      url.Values
 }
 
-// resolveParams resolves path and required query parameters once for both
-// sides; the per-side alias form is substituted later. DELETE operations
+// resolveParams resolves path and required query parameters against ONE
+// side's symbol table; the caller resolves once per side. DELETE operations
 // resolve only from captured or seeded IDs — never from spec examples — so an
 // example cannot delete seeded state.
 func resolveParams(operation Operation, symbols *SymbolTable, idsOnly bool) (resolvedParams, string) {
-	resolver := paramResolver{symbols: symbols, operationID: operation.OperationID, idsOnly: idsOnly}
+	resolver := paramResolver{symbols: symbols, operationPath: operation.Path, idsOnly: idsOnly}
 	params := resolvedParams{pathValues: map[string]string{}, query: url.Values{}}
 	for _, param := range operation.Params {
 		if param.In != "path" && (param.In != "query" || !param.Required) {
@@ -507,25 +600,25 @@ func substitutePath(template string, values map[string]string) string {
 // paramResolver resolves parameters for one operation; idsOnly restricts
 // resolution to seeded constants and captured IDs.
 type paramResolver struct {
-	symbols     *SymbolTable
-	operationID string
-	idsOnly     bool
+	symbols       *SymbolTable
+	operationPath string
+	idsOnly       bool
 }
 
 func (resolver paramResolver) resolve(param Param) (string, bool) {
 	if resolver.idsOnly {
-		return resolveIDParam(param, resolver.symbols, resolver.operationID)
+		return resolveIDParam(param, resolver.symbols, resolver.operationPath)
 	}
-	return ResolveParam(param, resolver.symbols, resolver.operationID)
+	return ResolveParam(param, resolver.symbols, resolver.operationPath)
 }
 
 // resolveIDParam resolves a parameter from seeded constants or the symbol
 // table only.
-func resolveIDParam(param Param, symbols *SymbolTable, operationID string) (string, bool) {
+func resolveIDParam(param Param, symbols *SymbolTable, operationPath string) (string, bool) {
 	if value, ok := SeededConstants[normalizeParamName(param.Name)]; ok {
 		return value, true
 	}
-	return symbols.Lookup(operationID)
+	return symbols.Lookup(param.Name, operationPath)
 }
 
 // authHeaders builds the credential headers for an operation from its

@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -32,9 +33,6 @@ const (
 
 	chUser = "default"
 	chPass = "langwatch"
-
-	branchRedisDBIndex = "14"
-	mainRedisDBIndex   = "15"
 
 	// throwawayCredentialsSecret matches the cipher's 32-bytes-of-hex rule
 	// (apps/api/src/platform/config/api.config.ts). Both instances share it;
@@ -336,6 +334,8 @@ type infraURLs struct {
 	pgPort      int
 	chPort      int
 	redisPort   int
+	branchRedis int // run-scoped logical DB indices; see RedisIndices
+	mainRedis   int
 }
 
 func (state *bootState) logf(format string, args ...any) {
@@ -388,7 +388,12 @@ func (state *bootState) prepareLayout() error {
 		return err
 	}
 	state.runID = RunID(state.workRoot)
-	state.logf("work root: %s (run %s)", state.workRoot, state.runID)
+	branchRedis, mainRedis, err := RedisIndices(state.runID)
+	if err != nil {
+		return err
+	}
+	state.infra.branchRedis, state.infra.mainRedis = branchRedis, mainRedis
+	state.logf("work root: %s (run %s, redis DBs %d/%d)", state.workRoot, state.runID, branchRedis, mainRedis)
 	return nil
 }
 
@@ -416,6 +421,8 @@ func (state *bootState) prepareInstances(booted *Booted) error {
 // bootInstances runs the per-instance bring-up stages in order.
 func (state *bootState) bootInstances(ctx context.Context, booted *Booted) error {
 	stages := []func() error{
+		func() error { return state.resolveInfra() },
+		func() error { return state.preflight(ctx) },
 		func() error { return state.install(ctx, booted.A) },
 		func() error { return state.install(ctx, booted.B) },
 		func() error { return state.startInfra(ctx) },
@@ -424,8 +431,10 @@ func (state *bootState) bootInstances(ctx context.Context, booted *Booted) error
 		func() error { return state.writeOverlay(booted.A) },
 		func() error { return state.writeOverlay(booted.B) },
 		func() error { return state.migrateAndSeed(ctx, booted.A) },
+		func() error { return state.verifyMigrationTarget(ctx, booted.A) },
 		func() error { return state.provision(ctx, booted.A) },
 		func() error { return state.migrateAndSeed(ctx, booted.B) },
+		func() error { return state.verifyMigrationTarget(ctx, booted.B) },
 		func() error { return state.provision(ctx, booted.B) },
 		func() error { return state.startAPI(ctx, &booted.A) },
 		func() error { return state.startAPI(ctx, &booted.B) },
@@ -493,23 +502,30 @@ func (state *bootState) writeOverlay(instance Instance) error {
 	if !instance.Profile.overlay {
 		return nil
 	}
+	env, err := state.envFor(instance)
+	if err != nil {
+		return err
+	}
 	path := filepath.Join(instance.Dir, overlayEnvFile)
-	if err := os.WriteFile(path, []byte(overlayContent(state.envFor(instance))), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(overlayContent(env)), 0o600); err != nil {
 		return fmt.Errorf("env overlay %s: %w", instance.Name, err)
 	}
 	state.logf("env overlay %s: %s", instance.Name, path)
 	return nil
 }
 
-// startInfra brings up postgres, redis and clickhouse under the apidiff
-// compose project, or adopts user-managed servers when URLs are given.
-func (state *bootState) startInfra(ctx context.Context) error {
+// resolveInfra decides where the infrastructure comes from: external servers
+// are adopted here, before anything is installed, so the preflight can reach
+// them; the managed stack only allocates its ports and writes its override.
+func (state *bootState) resolveInfra() error {
 	external, err := externalInfra(state.cfg)
 	if err != nil {
 		return err
 	}
 	if external {
-		state.infra = infraURLs{pgServer: state.cfg.PGURL, chServer: state.cfg.CHURL, redisServer: state.cfg.RedisURL}
+		state.infra.pgServer = state.cfg.PGURL
+		state.infra.chServer = state.cfg.CHURL
+		state.infra.redisServer = state.cfg.RedisURL
 		state.logf("infra: using external servers")
 		return nil
 	}
@@ -524,28 +540,125 @@ func (state *bootState) startInfra(ctx context.Context) error {
 	if err := os.WriteFile(state.override, []byte(portsOverrideYAML(state.infra.pgPort, state.infra.chPort, state.infra.redisPort)), 0o600); err != nil {
 		return err
 	}
-	state.logf("infra: docker compose up (pg :%d, clickhouse :%d, redis :%d)", state.infra.pgPort, state.infra.chPort, state.infra.redisPort)
-	args := composeArgs(state.compose(), "up", "-d", "postgres", "redis", "clickhouse", "--wait")
-	if err := state.runHost(ctx, "docker", args...); err != nil {
-		return fmt.Errorf("compose up: %w", err)
-	}
 	state.infra.pgServer = fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s", pgUser, pgPass, state.infra.pgPort, pgAdminDB)
 	state.infra.chServer = fmt.Sprintf("http://%s:%s@127.0.0.1:%d", chUser, chPass, state.infra.chPort)
 	state.infra.redisServer = fmt.Sprintf("redis://127.0.0.1:%d", state.infra.redisPort)
 	return nil
 }
 
+// preflight validates external infrastructure BEFORE the two pnpm installs.
+// Every precondition it checks used to surface eight minutes in, after two
+// installs and six builds: a Postgres URL without a username passes psql
+// (which falls back to $USER) and dies at prisma with P1010, and an admin
+// database that does not exist dies at the first CREATE DATABASE.
+func (state *bootState) preflight(ctx context.Context) error {
+	if state.override != "" {
+		state.logf("preflight: managed compose stack, no external endpoints to validate")
+		return nil
+	}
+	if err := validateInfraURLs(state.infra); err != nil {
+		return err
+	}
+	state.logf("preflight: checking postgres, clickhouse and redis are reachable")
+	if _, err := state.pgQuery(ctx, "SELECT 1"); err != nil {
+		return fmt.Errorf("preflight postgres %s: %w", redactURL(state.infra.pgServer), err)
+	}
+	if err := state.chAdmin(ctx, "SELECT 1"); err != nil {
+		return fmt.Errorf("preflight clickhouse: %w", err)
+	}
+	if err := redisPing(ctx, state.infra.redisServer); err != nil {
+		return fmt.Errorf("preflight redis: %w", err)
+	}
+	state.logf("preflight: all three endpoints answered")
+	return nil
+}
+
+// validateInfraURLs checks the shape of the three external URLs. The
+// Postgres username is required because prisma needs one and psql does not,
+// so its absence is invisible until migrate.
+func validateInfraURLs(infra infraURLs) error {
+	postgres, err := url.Parse(infra.pgServer)
+	if err != nil {
+		return fmt.Errorf("preflight: -pg-url: %w", err)
+	}
+	if postgres.User == nil || postgres.User.Username() == "" {
+		return errors.New("preflight: -pg-url needs a username (psql falls back to $USER, prisma does not: P1010)")
+	}
+	if postgres.Host == "" {
+		return errors.New("preflight: -pg-url needs a host")
+	}
+	if strings.Trim(postgres.Path, "/") == "" {
+		return errors.New("preflight: -pg-url needs a database to administer from, for example postgres://user@host:5432/postgres")
+	}
+	clickhouse, err := url.Parse(infra.chServer)
+	if err != nil {
+		return fmt.Errorf("preflight: -ch-url: %w", err)
+	}
+	if clickhouse.Host == "" {
+		return errors.New("preflight: -ch-url needs a host")
+	}
+	if _, err := parseRedisURL(infra.redisServer); err != nil {
+		return fmt.Errorf("preflight: -redis-url: %w", err)
+	}
+	return nil
+}
+
+// redactURL strips any password from a URL before it reaches a log line.
+func redactURL(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "(unparseable URL)"
+	}
+	if parsed.User != nil {
+		parsed.User = url.User(parsed.User.Username())
+	}
+	return parsed.String()
+}
+
+// startInfra brings the managed compose stack up; with external servers there
+// is nothing to start (resolveInfra adopted them and preflight checked them).
+func (state *bootState) startInfra(ctx context.Context) error {
+	if state.override == "" {
+		return nil
+	}
+	state.logf("infra: docker compose up (pg :%d, clickhouse :%d, redis :%d)", state.infra.pgPort, state.infra.chPort, state.infra.redisPort)
+	args := composeArgs(state.compose(), "up", "-d", "postgres", "redis", "clickhouse", "--wait")
+	if err := state.runHost(ctx, "docker", args...); err != nil {
+		return fmt.Errorf("compose up: %w", err)
+	}
+	return nil
+}
+
 // pgAdmin runs one SQL statement against the admin database, via compose exec
 // for the managed stack or a host psql for external servers.
 func (state *bootState) pgAdmin(ctx context.Context, sql string) error {
-	return state.pgAdminDB(ctx, pgAdminDB, sql)
+	return state.pgAdminDB(ctx, state.adminDatabase(), sql)
+}
+
+// adminDatabase names the database administrative statements run against.
+// The compose stack always has "mydb"; an external server has whatever
+// -pg-url names, and hardcoding the compose constant there made every
+// external run fail at the first CREATE DATABASE with 'database "mydb" does
+// not exist'.
+func (state *bootState) adminDatabase() string {
+	if state.override != "" {
+		return pgAdminDB
+	}
+	parsed, err := url.Parse(state.infra.pgServer)
+	if err != nil {
+		return pgAdminDB
+	}
+	if database := strings.Trim(parsed.Path, "/"); database != "" {
+		return database
+	}
+	return pgAdminDB
 }
 
 // pgQuery runs one SQL statement and returns its stdout (psql -tA).
 func (state *bootState) pgQuery(ctx context.Context, sql string) (string, error) {
 	var output bytes.Buffer
 	if state.override != "" {
-		args := composeArgs(state.compose(), "exec", "-T", "postgres", "psql", "-U", pgUser, "-d", pgAdminDB, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql)
+		args := composeArgs(state.compose(), "exec", "-T", "postgres", "psql", "-U", pgUser, "-d", state.adminDatabase(), "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql)
 		err := state.run(ctx, commandSpec{name: "docker", args: args, dir: state.cfg.BranchDir}, &output)
 		return strings.TrimSpace(output.String()), err
 	}
@@ -553,6 +666,26 @@ func (state *bootState) pgQuery(ctx context.Context, sql string) (string, error)
 		return "", errors.New("external -pg-url requires psql on PATH for database administration")
 	}
 	err := state.run(ctx, commandSpec{name: "psql", args: []string{state.infra.pgServer, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql}, dir: state.cfg.BranchDir}, &output)
+	return strings.TrimSpace(output.String()), err
+}
+
+// pgQueryDB runs one SQL statement against a NAMED database and returns its
+// stdout (psql -tA).
+func (state *bootState) pgQueryDB(ctx context.Context, database, sql string) (string, error) {
+	var output bytes.Buffer
+	if state.override != "" {
+		args := composeArgs(state.compose(), "exec", "-T", "postgres", "psql", "-U", pgUser, "-d", database, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql)
+		err := state.run(ctx, commandSpec{name: "docker", args: args, dir: state.cfg.BranchDir}, &output)
+		return strings.TrimSpace(output.String()), err
+	}
+	if _, err := exec.LookPath("psql"); err != nil {
+		return "", errors.New("external -pg-url requires psql on PATH for database administration")
+	}
+	databaseURL, err := pgDatabaseURL(state.infra.pgServer, database)
+	if err != nil {
+		return "", err
+	}
+	err = state.run(ctx, commandSpec{name: "psql", args: []string{databaseURL, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql}, dir: state.cfg.BranchDir}, &output)
 	return strings.TrimSpace(output.String()), err
 }
 
@@ -608,11 +741,21 @@ func (state *bootState) pgAdminDB(ctx context.Context, database, sql string) err
 	if _, err := exec.LookPath("psql"); err != nil {
 		return errors.New("external -pg-url requires psql on PATH for database administration")
 	}
-	databaseURL, err := pgDatabaseURL(state.infra.pgServer, database)
+	args, err := psqlArgs(state.infra.pgServer, database, sql)
 	if err != nil {
 		return err
 	}
-	return state.runHost(ctx, "psql", databaseURL, "-v", "ON_ERROR_STOP=1", "-c", sql)
+	return state.runHost(ctx, "psql", args...)
+}
+
+// psqlArgs builds the host psql argv for one statement against one database
+// on an external server.
+func psqlArgs(serverURL, database, sql string) ([]string, error) {
+	databaseURL, err := pgDatabaseURL(serverURL, database)
+	if err != nil {
+		return nil, err
+	}
+	return []string{databaseURL, "-v", "ON_ERROR_STOP=1", "-c", sql}, nil
 }
 
 // chAdmin runs one ClickHouse statement over the HTTP interface.
@@ -660,13 +803,29 @@ func (state *bootState) prepareDatabases(ctx context.Context) error {
 			return err
 		}
 	}
+	return state.flushRedis(ctx)
+}
+
+// flushRedis empties both instances' logical databases. Without it a
+// previous run's queues, idempotency ledger and caches survive on external
+// infrastructure and one side boots onto another run's state.
+func (state *bootState) flushRedis(ctx context.Context) error {
+	for name, index := range map[string]int{"branch": state.infra.branchRedis, "main": state.infra.mainRedis} {
+		state.logf("databases: flush redis DB %d (%s)", index, name)
+		if err := redisFlushDB(ctx, state.infra.redisServer, index); err != nil {
+			return fmt.Errorf("flush redis DB %d: %w", index, err)
+		}
+	}
 	return nil
 }
 
 // migrateAndSeed runs the profile's migrate and seed commands in one
 // worktree with the instance environment.
 func (state *bootState) migrateAndSeed(ctx context.Context, instance Instance) error {
-	env := state.envFor(instance)
+	env, err := state.envFor(instance)
+	if err != nil {
+		return err
+	}
 	state.logf("migrate %s: prisma + clickhouse", instance.Name)
 	steps := []struct {
 		name string
@@ -717,19 +876,22 @@ func sha256Hex(value string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// envFor composes the process environment for one instance.
-func (state *bootState) envFor(instance Instance) []string {
+// envFor composes the process environment for one instance. A URL that will
+// not parse is an error, never a fallback to os.Environ(): the inherited
+// environment carries the developer's own DATABASE_URL, and migrating and
+// seeding into it is a data-loss event, not a warning.
+func (state *bootState) envFor(instance Instance) ([]string, error) {
 	database, err := pgDatabaseURL(state.infra.pgServer, DatabaseName(state.runID, instance.Name))
 	if err != nil {
-		return os.Environ()
+		return nil, fmt.Errorf("env %s: %w", instance.Name, err)
 	}
 	chDatabase, err := chDatabaseURL(state.infra.chServer, DatabaseName(state.runID, instance.Name))
 	if err != nil {
-		return os.Environ()
+		return nil, fmt.Errorf("env %s: %w", instance.Name, err)
 	}
-	redisIndex := branchRedisDBIndex
+	redisIndex := state.infra.branchRedis
 	if instance.Name == "main" {
-		redisIndex = mainRedisDBIndex
+		redisIndex = state.infra.mainRedis
 	}
 	baseURL := fmt.Sprintf("http://127.0.0.1:%d", instance.Port)
 	return instanceEnv(os.Environ(), instanceEnvSpec{
@@ -739,8 +901,28 @@ func (state *bootState) envFor(instance Instance) []string {
 		database:     database,
 		chDatabase:   chDatabase,
 		redisURL:     state.infra.redisServer,
-		redisDBIndex: redisIndex,
-	})
+		redisDBIndex: strconv.Itoa(redisIndex),
+	}), nil
+}
+
+// verifyMigrationTarget proves the migrate that just ran landed in THIS
+// run's database and not in whatever DATABASE_URL a worktree's own .env
+// carries. The modular profile writes no env overlay and relies on node's
+// --env-file not overriding an already-set variable; that invariant is one
+// library swap away from pointing a migrate at the developer's database, so
+// it is asserted rather than commented.
+func (state *bootState) verifyMigrationTarget(ctx context.Context, instance Instance) error {
+	database := DatabaseName(state.runID, instance.Name)
+	applied, err := state.pgQueryDB(ctx, database, `SELECT count(*) FROM "_prisma_migrations" WHERE finished_at IS NOT NULL`)
+	if err != nil {
+		return fmt.Errorf("verify migration target %s: %w", instance.Name, err)
+	}
+	count, err := strconv.Atoi(strings.TrimSpace(applied))
+	if err != nil || count == 0 {
+		return fmt.Errorf("verify migration target %s: %s holds %s applied migrations; the migrate did not target this run's database", instance.Name, database, applied)
+	}
+	state.logf("migrate %s: %d migrations applied in %s", instance.Name, count, database)
+	return nil
 }
 
 // startAPI spawns the API process for one instance and waits for health.
@@ -750,14 +932,19 @@ func (state *bootState) startAPI(ctx context.Context, instance *Instance) error 
 	if err != nil {
 		return err
 	}
-	// #nosec G204 -- the executable is the allowlisted constant "pnpm" and
-	// startArgv comes from the two package-level bootProfile constants.
 	// Setpgid puts the pnpm wrapper and its tsx child in one process group so
 	// teardown can kill both — killing the parent alone orphans the server.
+	env, err := state.envFor(*instance)
+	if err != nil {
+		logFile.Close()
+		return err
+	}
+	// #nosec G204 -- the executable is the allowlisted constant "pnpm" and
+	// startArgv comes from the two package-level bootProfile constants.
 	command := exec.CommandContext(ctx, "pnpm", instance.Profile.startArgv...)
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Dir = instance.Dir
-	command.Env = state.envFor(*instance)
+	command.Env = env
 	command.Stdout = logFile
 	command.Stderr = logFile
 	if err := command.Start(); err != nil {
@@ -828,8 +1015,11 @@ func (state *bootState) teardown() {
 		}
 	} else {
 		// External infra has no compose down; drop exactly the run-scoped
-		// databases this run created.
+		// databases this run created and empty its two Redis logical DBs.
 		state.dropDatabases(ctx)
+		if err := state.flushRedis(ctx); err != nil {
+			state.logf("teardown: flush redis: %v", err)
+		}
 	}
 	if state.ownsMain {
 		if err := state.runHost(ctx, "git", "worktree", "remove", "--force", state.mainDir); err != nil {

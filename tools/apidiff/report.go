@@ -177,7 +177,6 @@ func findingLine(finding Finding) string {
 	if finding.Reason != "" {
 		line.WriteString(": ")
 		line.WriteString(finding.Reason)
-		return line.String()
 	}
 	if len(finding.Fields) > 0 {
 		encoded, err := json.Marshal(finding.Fields)

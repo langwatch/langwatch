@@ -44,6 +44,11 @@ type Operation struct {
 	InB          bool           `json:"inB"`
 	PathA        string         `json:"pathA,omitempty"` // documented form on side A
 	PathB        string         `json:"pathB,omitempty"` // documented form on side B
+
+	// Each side's own declared request body, kept so a later pass can probe
+	// a side with the shape its own spec declares when the two differ.
+	BodySchemaA map[string]any `json:"bodySchemaA,omitempty"`
+	BodySchemaB map[string]any `json:"bodySchemaB,omitempty"`
 }
 
 // CanonicalAliasPath collapses the branch's /api ↔ /api/v1 auto-alias: an
@@ -525,7 +530,8 @@ func collectSchemes(document map[string]any, schemes map[string]map[string]any) 
 // The merged operation's Path is the canonical bare form; PathA/PathB record
 // the form each side documents, preferring the /api/v1 form when a side
 // documents both. The probing definition (params, body schema, security)
-// prefers side A's spec and falls back to side B's.
+// prefers side A's spec and falls back to side B's; BodySchemaA/BodySchemaB
+// keep each side's own declared body.
 func UnionOperations(a, b []Operation) []Operation {
 	merger := &operationMerger{merged: map[operationKey]*Operation{}}
 	merger.ingest(b, false)
@@ -547,45 +553,66 @@ type operationMerger struct {
 	order  []operationKey
 }
 
+// ingested is one side's operation as it arrives: the parsed operation, the
+// alias FORM its own spec documents, and which side it came from.
+type ingested struct {
+	op   Operation
+	form string
+	isA  bool
+}
+
 func (merger *operationMerger) ingest(operations []Operation, isA bool) {
 	for index := range operations {
 		op := operations[index]
-		original := op.Path
-		op.Path = CanonicalAliasPath(original)
+		incoming := ingested{op: op, form: op.Path, isA: isA}
+		op.Path = CanonicalAliasPath(incoming.form)
 		id := operationKey{op.Method, op.Path}
 		if existing, ok := merger.merged[id]; ok {
-			merger.mergeInto(existing, original, isA)
+			merger.mergeInto(existing, incoming)
 			continue
 		}
-		merger.setForm(&op, original, isA)
+		merger.setForm(&op, incoming)
 		merger.merged[id] = &op
 		merger.order = append(merger.order, id)
 	}
 }
 
-// mergeInto folds a duplicate (alias-form) operation into the merged entry:
-// presence flags accumulate, and the side's documented form prefers /api/v1.
-func (merger *operationMerger) mergeInto(existing *Operation, form string, isA bool) {
-	if isA {
+// mergeInto folds a duplicate (alias-form or other-side) operation into the
+// merged entry: presence flags accumulate, the side's documented form prefers
+// /api/v1, and the CANDIDATE's definition wins. Probing an operation the
+// candidate declares with the base's parameters, body schema or security
+// would ask the two sides different questions.
+func (merger *operationMerger) mergeInto(existing *Operation, incoming ingested) {
+	if incoming.isA {
 		existing.InA = true
-		existing.PathA = preferredForm(existing.PathA, form)
+		existing.PathA = preferredForm(existing.PathA, incoming.form)
+		existing.BodySchemaA = incoming.op.BodySchema
+		existing.Params = incoming.op.Params
+		existing.BodySchema = incoming.op.BodySchema
+		existing.BodyRequired = incoming.op.BodyRequired
+		existing.Security = incoming.op.Security
 		return
 	}
 	existing.InB = true
-	existing.PathB = preferredForm(existing.PathB, form)
+	existing.PathB = preferredForm(existing.PathB, incoming.form)
+	if existing.BodySchemaB == nil {
+		existing.BodySchemaB = incoming.op.BodySchema
+	}
 }
 
 // setForm marks a first-seen operation's side presence and records the
 // ORIGINAL documented path, so probing targets exactly what that side's spec
 // declares.
-func (merger *operationMerger) setForm(op *Operation, form string, isA bool) {
-	if isA {
+func (merger *operationMerger) setForm(op *Operation, incoming ingested) {
+	if incoming.isA {
 		op.InA = true
-		op.PathA = form
+		op.PathA = incoming.form
+		op.BodySchemaA = op.BodySchema
 		return
 	}
 	op.InB = true
-	op.PathB = form
+	op.PathB = incoming.form
+	op.BodySchemaB = op.BodySchema
 }
 
 // preferredForm picks the /api/v1 form when both alias forms are documented.
