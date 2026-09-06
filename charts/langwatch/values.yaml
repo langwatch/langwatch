@@ -1899,23 +1899,33 @@ clickhouse:
     passwordSecretKey: lwql_password
     # lwql_postgres named collection — the ClickHouse -> PostgreSQL bridge that
     # backs the api-key -> tenant map. It must reach the SAME PostgreSQL the app
-    # dials via DATABASE_URL. When this chart manages PostgreSQL
-    # (postgresql.chartManaged: true, the default) the subchart auto-derives
-    # `host` to the chart's own Service (<release>-postgresql) — the one place
-    # the release name is in scope — so the collection renders and works out of
-    # the box; `database` and `user` default here to the chart-managed
-    # PostgreSQL's own defaults (postgresql.auth.database / user `postgres`).
+    # dials via DATABASE_URL, and it connects as a DEDICATED read-only role
+    # (`lwql_ro`), never the PostgreSQL superuser: the app converges that role
+    # from the reader password (LWQL_POSTGRES_READER_PASSWORD, the same
+    # `lwql_pg_password` key the subchart mounts here) at deploy time, granting it
+    # SELECT on the approved views only. A superuser bridge would both fail to
+    # authenticate (its password lives under `postgres-password`, not this key)
+    # and discard that reader isolation.
+    #
+    # CHART-MANAGED PostgreSQL (postgresql.chartManaged: true, the default): the
+    # subchart auto-derives `host` to the chart's own Service (<release>-postgresql)
+    # — the one place the release name is in scope — so the collection renders and
+    # works out of the box; `database` must equal postgresql.auth.database (the
+    # render fails if they diverge, since Helm cannot derive one subchart value
+    # from a parent one), and `user` stays `lwql_ro`.
+    #
     # EXTERNAL PostgreSQL (postgresql.chartManaged: false): the chart cannot know
-    # your PostgreSQL address, so you MUST set host/database/user (and the reader
-    # password key) to your instance, or LangWatchQL provisioning fails.
+    # your PostgreSQL address, so you MUST set `host` (the render fails otherwise);
+    # set `database` to your instance's, and keep `user: lwql_ro` unless you
+    # provision a different reader yourself.
     postgres:
-      ## @param clickhouse.lwqlAccessModel.postgres.host [string, default: ""] PostgreSQL host the lwql_postgres bridge dials. Empty auto-derives to the chart-managed PostgreSQL Service (<release>-postgresql); set explicitly for an external PostgreSQL.
+      ## @param clickhouse.lwqlAccessModel.postgres.host [string, default: ""] PostgreSQL host the lwql_postgres bridge dials. Empty auto-derives to the chart-managed PostgreSQL Service (<release>-postgresql); REQUIRED for an external PostgreSQL (the render fails if left empty with postgresql.chartManaged=false).
       host: ""
-      ## @param clickhouse.lwqlAccessModel.postgres.database [default: langwatch] PostgreSQL database the bridge reads (matches postgresql.auth.database). Set for an external PostgreSQL.
+      ## @param clickhouse.lwqlAccessModel.postgres.database [default: langwatch] PostgreSQL database the bridge reads. Must equal postgresql.auth.database for chart-managed PostgreSQL; set to your instance's database for an external PostgreSQL.
       database: langwatch
-      ## @param clickhouse.lwqlAccessModel.postgres.user [default: postgres] PostgreSQL user the bridge connects as (matches the chart-managed PostgreSQL user). Set for an external PostgreSQL.
-      user: postgres
-      ## @param clickhouse.lwqlAccessModel.postgres.passwordSecretKey [string, default: lwql_pg_password] Key holding the lwql_postgres reader password. Matches the subchart's default projection; only mounted when clickhouse.lwqlAccessModel.postgres.host is set.
+      ## @param clickhouse.lwqlAccessModel.postgres.user [default: lwql_ro] PostgreSQL role the bridge connects as — a dedicated read-only reader the app converges (never the superuser). Keep the default unless you provision your own reader on an external PostgreSQL.
+      user: lwql_ro
+      ## @param clickhouse.lwqlAccessModel.postgres.passwordSecretKey [string, default: lwql_pg_password] Key holding the lwql_ro reader password. Matches the subchart's default projection and the key the app reads as LWQL_POSTGRES_READER_PASSWORD; mounted whenever the bridge renders.
       passwordSecretKey: lwql_pg_password
 
   # ---------------------------------------------------------------------------
@@ -2015,7 +2025,10 @@ clickhouse:
     ## @param clickhouse.auth.password [string] ClickHouse password (auto-generated when empty).
     password: ""
     ## @param clickhouse.auth.existingSecret [string] Name of existing secret containing the password. Supports tpl expressions.
-    existingSecret: '{{ printf "%s-clickhouse" .Release.Name }}'
+    ## Defaults to the chart-managed ClickHouse Service name (release name truncated
+    ## to 36 chars, matching clickhouse-serverless.fullname), so the parent-rendered
+    ## Secret and the subchart mount agree on a release name of any length.
+    existingSecret: '{{ include "langwatch.clickhouse.serviceName" . }}'
     ## @extra clickhouse.auth.secretKeys Key mappings for existing secret.
     secretKeys:
       ## @param clickhouse.auth.secretKeys.passwordKey [string, default: password] Key name in the existing secret.

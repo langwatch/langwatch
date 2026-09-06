@@ -201,9 +201,67 @@ $(cat "$err")"
   fi
 }
 
+# The value emitted for a plain (non-secretKeyRef) `- name: <var>` env var in the
+# app Deployment. Scoped to that Source block, anchored past the env-name line.
+app_env_value() {
+  awk -v want="$2" '
+    /^# Source:/ { insrc = ($0 ~ /templates\/app\/deployment\.yaml/) }
+    insrc && $0 ~ ("- name: " want "$") {
+      getline; sub(/^[[:space:]]*value:[[:space:]]*/, ""); gsub(/"/, ""); print; exit
+    }
+  ' "$1"
+}
+
+# Verifies: The chart's LangWatchQL identity + tenant setting match the app's
+# LWQL_CONNECTION_DEFAULTS, so the two never drift out of a rendered install.
+#
+# langwatch_lwql and custom_api_key_hash are access-model constants baked into the
+# clickhouse-serverless image AND carried by the app as LWQL_CONNECTION_DEFAULTS
+# (connection.ts) AND emitted by the chart helpers. Three copies, one meaning: if
+# the chart emits a user or tenant setting the app does not expect, every query
+# authenticates or filters against the wrong thing. Pin the chart's rendered
+# values to the app source directly — no build, just the literals.
+test_lwql_connection_defaults_parity() {
+  local conn_ts="../../platform/app/src/server/analytics/lwql/connection.ts"
+  if [[ ! -f "$conn_ts" ]]; then
+    fail "defaults-parity-source" \
+      "cannot find $conn_ts (LWQL_CONNECTION_DEFAULTS) relative to charts/langwatch — the parity check needs the app source."
+    return
+  fi
+  local app_user app_tenant
+  app_user="$(sed -n 's/.*restrictedUser:[[:space:]]*"\([^"]*\)".*/\1/p' "$conn_ts" | head -1)"
+  app_tenant="$(sed -n 's/.*tenantSetting:[[:space:]]*"\([^"]*\)".*/\1/p' "$conn_ts" | head -1)"
+  if [[ -z "$app_user" || -z "$app_tenant" ]]; then
+    fail "defaults-parity-extract" \
+      "could not read restrictedUser/tenantSetting from LWQL_CONNECTION_DEFAULTS (got user='$app_user', tenant='$app_tenant'). Did the constant's shape change?"
+    return
+  fi
+
+  local out="${TMPDIR:-/tmp}/lwql-defaults-parity.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-defaults-parity.err"
+  if ! render_to "$out" "$err" lw --set autogen.enabled=true; then
+    fail "defaults-parity-render" "default render failed:
+$(cat "$err")"
+    return
+  fi
+
+  local ch_user ch_tenant
+  ch_user="$(app_env_value "$out" "LWQL_CLICKHOUSE_USER")"
+  ch_tenant="$(app_env_value "$out" "LWQL_TENANT_SETTING")"
+  if [[ "$ch_user" != "$app_user" ]]; then
+    fail "defaults-parity-user" \
+      "the chart emits LWQL_CLICKHOUSE_USER='$ch_user' but the app's LWQL_CONNECTION_DEFAULTS.restrictedUser is '$app_user'. langwatch.lwql.restrictedUser (helper), the subchart image, and connection.ts must all name the same identity."
+  fi
+  if [[ "$ch_tenant" != "$app_tenant" ]]; then
+    fail "defaults-parity-tenant" \
+      "the chart emits LWQL_TENANT_SETTING='$ch_tenant' but the app's LWQL_CONNECTION_DEFAULTS.tenantSetting is '$app_tenant'. langwatch.lwql.tenantSetting (helper), the subchart image, and connection.ts must all name the same setting."
+  fi
+}
+
 test_lwql_secret_name_parity
 test_lwql_secret_name_parity_long_release
 test_autogen_off_posture
+test_lwql_connection_defaults_parity
 
 if [[ $failures -gt 0 ]]; then
   echo

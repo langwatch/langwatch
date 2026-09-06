@@ -9,18 +9,20 @@
 # only the passwords made the executor refuse EVERY default-install query as
 # unconfigured — invisible in the template source, visible only in the render.
 #
-# Two postures are pinned:
+# Postures pinned:
 #   - chart-managed (default): app AND workers get all five ClickHouse vars plus
 #     the PostgreSQL reader password, and NOT LWQL_SELF_PROVISION (the subchart
-#     owns provisioning); the subchart emits the lwql_postgres bridge host, so
-#     the named collection the boot-time catalog needs is present.
+#     owns provisioning); the subchart emits the lwql_postgres bridge dialing the
+#     chart's own PostgreSQL as the dedicated read-only role lwql_ro, on the
+#     database the app itself uses (postgresql.auth.database).
 #   - external ClickHouse: the app self-provisions, so it emits
 #     LWQL_SELF_PROVISION=true and derives URL/user/database/tenant from
 #     CLICKHOUSE_URL itself — the chart must NOT emit the four chart-managed vars.
+#   - external PostgreSQL with no bridge host: the chart cannot invent the
+#     address, so the render must FAIL rather than silently dial a Service that
+#     does not exist.
 #
-# Scenario bindings use the same `@scenario` token as the sibling suites: a
-# hash-comment above the test function it verifies; the next line that is neither
-# blank nor a comment must be that function.
+# Each test carries a plain "# Verifies:" line naming what it pins.
 #
 # Usage (from charts/langwatch):
 #   helm dependency build .
@@ -64,6 +66,16 @@ env_names_in() {
 # True if $names (newline-separated) contains exactly $2.
 has_env() {
   printf '%s\n' "$1" | grep -qxF "$2"
+}
+
+# The literal value emitted for `- name: <var>` anywhere in the render (the
+# subchart's bridge env, unlike the app's, is a plain value not a secretKeyRef).
+# Reads the `value:` on the line following the name and strips its quotes.
+env_value_of() {
+  local render="$1" var="$2"
+  awk -v want="$var" '
+    $0 ~ "- name: " want "$" { getline; sub(/^[[:space:]]*value:[[:space:]]*/, ""); gsub(/"/, ""); print; exit }
+  ' "$render"
 }
 
 # Verifies: Chart-managed ClickHouse emits the full LangWatchQL connection on app and workers
@@ -113,6 +125,36 @@ $(cat "$err")"
     fail "managed-no-pg-bridge" \
       "the clickhouse-serverless subchart did not emit CLICKHOUSE_LWQL_PG_HOST, so the lwql_postgres named collection is omitted and the boot-time catalog provisioning fails on it. The bridge host must auto-derive to the chart's PostgreSQL on the default path."
   fi
+
+  # The bridge must dial as the dedicated read-only role, never the superuser:
+  # the superuser's password lives under a different Secret key, so a superuser
+  # bridge cannot even authenticate, and it would discard the reader isolation.
+  local pg_user
+  pg_user="$(env_value_of "$out" "CLICKHOUSE_LWQL_PG_USER")"
+  if [[ "$pg_user" != "lwql_ro" ]]; then
+    fail "managed-pg-user" \
+      "the lwql_postgres bridge connects as '${pg_user:-<empty>}', expected the dedicated reader 'lwql_ro'. A superuser bridge fails to authenticate (its password is under postgres-password, not lwql_pg_password) and discards reader isolation."
+  fi
+
+  # The bridge reads the app's OWN database. It must track postgresql.auth.database,
+  # not a hardcoded literal — render with a non-default database and require it to
+  # follow.
+  local dbout="${TMPDIR:-/tmp}/lwql-conn-managed-db.yaml"
+  local dberr="${TMPDIR:-/tmp}/lwql-conn-managed-db.err"
+  if render_to "$dbout" "$dberr" t \
+      --set autogen.enabled=true \
+      --set postgresql.auth.database=analytics_db \
+      --set clickhouse.lwqlAccessModel.postgres.database=analytics_db; then
+    local pg_db
+    pg_db="$(env_value_of "$dbout" "CLICKHOUSE_LWQL_PG_DATABASE")"
+    if [[ "$pg_db" != "analytics_db" ]]; then
+      fail "managed-pg-db" \
+        "the lwql_postgres bridge reads database '${pg_db:-<empty>}', expected 'analytics_db' (postgresql.auth.database). The bridge must read the app's own database."
+    fi
+  else
+    fail "managed-pg-db-render" "render with a non-default database failed:
+$(cat "$dberr")"
+  fi
 }
 
 # Verifies: External ClickHouse self-provisions and omits the chart-managed connection vars
@@ -152,8 +194,31 @@ $(cat "$err")"
   done
 }
 
+# Verifies: External PostgreSQL with no bridge host fails the render, fail-closed
+test_external_postgres_requires_host() {
+  local out="${TMPDIR:-/tmp}/lwql-conn-extpg.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-conn-extpg.err"
+  # External PostgreSQL, no bridge host set. A blank host would silently render
+  # the in-cluster <release>-postgresql Service, which does not exist for a BYO
+  # PostgreSQL, and every postgres-resident LWQL view would fail at query time.
+  if render_to "$out" "$err" t \
+      --set autogen.enabled=true \
+      --set postgresql.chartManaged=false \
+      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch"; then
+    fail "extpg-no-host-rendered" \
+      "render succeeded with postgresql.chartManaged=false and no clickhouse.lwqlAccessModel.postgres.host. It must fail closed — a blank host silently targets the non-existent in-cluster PostgreSQL Service."
+    return
+  fi
+  if ! grep -q 'clickhouse.lwqlAccessModel.postgres.host is required' "$err"; then
+    fail "extpg-no-host-message" \
+      "render failed, but not with the expected bridge-host guidance. Got:
+$(cat "$err")"
+  fi
+}
+
 test_chart_managed_full_connection
 test_external_self_provision
+test_external_postgres_requires_host
 
 if [[ $failures -gt 0 ]]; then
   echo

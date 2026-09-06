@@ -521,6 +521,31 @@ $provision_out"
   assert_eq "key-map rows unchanged after re-provisioning" "$rows_after" "$rows_before"
   assert_eq "still exactly one restricted user" \
     "$(ch_query "$pod" "SELECT count() FROM system.users WHERE name='langwatch_lwql'")" "1"
+
+  # End-to-end bridge proof (issue #6635 / langwatch-saas#1168). The lwql_postgres
+  # named collection dials PostgreSQL as the dedicated reader lwql_ro, which
+  # lwql:provision above just converged from LWQL_POSTGRES_READER_PASSWORD (the
+  # same key the ClickHouse pod mounts for the collection). Existence of the
+  # collection (asserted above) is only config; this READS an approved view
+  # THROUGH it, forcing ClickHouse to actually authenticate to PostgreSQL as
+  # lwql_ro. The old default dialed as the superuser `postgres` with the reader
+  # key as its password — a credential that does not exist — so this query errored
+  # while the config still rendered. A wrong bridge password fails here; a correct
+  # one returns a count. `lwql_annotations` is the approved view lwql:provision
+  # created and granted lwql_ro SELECT on (postgres-resident dataset "annotations"
+  # in lwql_catalog.json). The default ClickHouse user issues the query — the
+  # collection fixes the PostgreSQL identity regardless of the ClickHouse caller,
+  # so this probes the bridge, not langwatch_lwql's own grants. (The
+  # postgres-resident ClickHouse views themselves are the full-model scenario
+  # deferred to #7387; the collection is dialable without them.)
+  local bridge_out
+  if bridge_out=$(ch_query "$pod" \
+      "SELECT count() FROM postgresql(lwql_postgres, table='lwql_annotations')" 2>&1); then
+    pass "lwql_postgres bridge reads PostgreSQL as lwql_ro (count=$bridge_out)"
+  else
+    fail "lwql_postgres bridge failed to read through the named collection — lwql_ro is likely absent or its password diverged from the collection's reader key:
+$bridge_out"
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -43,13 +43,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/* Effective host for the lwql_postgres bridge (ClickHouse -> PostgreSQL).
-     An explicit lwqlAccessModel.postgres.host wins (required for an external
-     PostgreSQL). Empty auto-derives to the langwatch chart's own PostgreSQL
-     Service (<release>-postgresql, the same name the app's DATABASE_URL dials),
-     so the named collection renders and works out of the box on the default
-     chart-managed path instead of being silently omitted. Rendering it here is
-     the only place the release name is in scope — a parent values.yaml cannot
-     compose it. */}}
+     An explicit lwqlAccessModel.postgres.host wins (set by an external PostgreSQL).
+     Empty auto-derives to the langwatch chart's own PostgreSQL Service
+     (<release>-postgresql, the same name the app's DATABASE_URL dials), so the
+     named collection renders and works out of the box on the default chart-managed
+     path instead of being silently omitted.
+
+     Deriving here is not the same as OWNING the decision. A subchart cannot see
+     the parent's postgresql.chartManaged (its .Values is only its own subtree plus
+     global — verified), so it cannot tell an external PostgreSQL from a
+     chart-managed one. The parent's validateSecrets makes that call: it refuses
+     the render when postgresql.chartManaged=false and this host is left empty. So
+     an empty host reaches this helper ONLY on the chart-managed path, where
+     <release>-postgresql is exactly right. The empty->omit branch below therefore
+     never fires for a completed render (the render already failed for the one case
+     it would have mattered) — it stays only as the standalone-subchart default. */}}
 {{- define "clickhouse-serverless.lwqlPgHost" -}}
   {{- if .Values.lwqlAccessModel.postgres.host -}}
     {{- tpl .Values.lwqlAccessModel.postgres.host . -}}

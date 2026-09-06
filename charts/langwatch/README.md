@@ -228,11 +228,16 @@ repair statement (including `DROP ... IF EXISTS`) with ClickHouse error 495.
   `LWQL_TENANT_SETTING` (`custom_api_key_hash`) and the two passwords —
   *without* `LWQL_SELF_PROVISION`. All five are required together;
   `LWQL_SELF_PROVISION` is off so the subchart stays the only owner of the
-  access-model entity names. The `lwql_postgres` bridge defaults to the chart's
-  own PostgreSQL out of the box (`clickhouse.lwqlAccessModel.postgres.host`
-  auto-derives to `<release>-postgresql`, with `database`/`user` from the
-  chart-managed PostgreSQL); an **external PostgreSQL** must set
-  `clickhouse.lwqlAccessModel.postgres.{host,database,user}` explicitly.
+  access-model entity names. The `lwql_postgres` bridge works out of the box on
+  chart-managed PostgreSQL: `clickhouse.lwqlAccessModel.postgres.host`
+  auto-derives to `<release>-postgresql`, `database` must equal
+  `postgresql.auth.database` (the render fails if they diverge), and the bridge
+  connects as a dedicated read-only role `lwql_ro` — never the superuser — that
+  the app converges from the reader password at deploy time. An **external
+  PostgreSQL** (`postgresql.chartManaged: false`) must set
+  `clickhouse.lwqlAccessModel.postgres.host` (the render fails if it is left
+  empty) and its `database`; keep `user: lwql_ro` unless you provision your own
+  reader.
 - **`clickhouse.chartManaged: false` (BYO / external ClickHouse):** the chart
   cannot render config into a server it does not run, so the application
   self-provisions the same objects via SQL DDL at startup, and fails closed

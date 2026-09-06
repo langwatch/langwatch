@@ -462,13 +462,47 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        so the default-named case requires the chart-managed url-secret to
        still render. */}}
   {{- $chSecretName := include "langwatch.clickhouse.secretName" . }}
-  {{- $chDefaultName := printf "%s-clickhouse" .Release.Name }}
+  {{- $chDefaultName := include "langwatch.clickhouse.serviceName" . }}
   {{- if and (not .Values.autogen.enabled) (eq $chSecretName $chDefaultName) }}
     {{- $errors = append $errors (printf "clickhouse.chartManaged=true with autogen.enabled=false requires clickhouse.auth.existingSecret to be set to an operator-owned Secret name different from the default %q. The deployment composes CLICKHOUSE_URL at runtime from the password key when a custom name is used; with the default name the deployment expects the chart-rendered url key, which is gated off when autogen.enabled=false. Either set autogen.enabled=true OR override clickhouse.auth.existingSecret." $chDefaultName) }}
   {{- end }}
   {{- if or $chValues.cold.enabled $chValues.backup.enabled }}
     {{- if empty $chValues.objectStorage.bucket }}
       {{- $errors = append $errors "clickhouse.objectStorage.bucket is required when cold.enabled or backup.enabled" }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{/* LangWatchQL PostgreSQL bridge (lwql_postgres named collection), chart-managed
+     ClickHouse only — for external ClickHouse the app self-provisions the bridge
+     from DATABASE_URL and none of this applies.
+
+     The subchart derives the bridge host from the release name, which is only a
+     real address when this chart also manages PostgreSQL. So:
+
+       - EXTERNAL PostgreSQL with no explicit host: refuse. A blank host would
+         silently render the in-cluster <release>-postgresql Service, which does
+         not exist for a BYO PostgreSQL, and every postgres-resident LWQL view
+         would fail at query time with no signal. postgresql.chartManaged is a
+         parent value the subchart cannot see, so this guard is the only place the
+         two facts meet.
+
+       - CHART-MANAGED PostgreSQL: the bridge reads the app's own database, so its
+         database name must equal postgresql.auth.database. Helm cannot derive one
+         subchart value from a parent one, so instead of silently duplicating it we
+         fail loudly when the two drift. */}}
+{{- $chLwql := (.Values.clickhouse.lwqlAccessModel | default dict) }}
+{{- if and .Values.lwql.enabled .Values.clickhouse.chartManaged $chLwql.enabled }}
+  {{- $bridge := ($chLwql.postgres | default dict) }}
+  {{- if not .Values.postgresql.chartManaged }}
+    {{- if empty $bridge.host }}
+      {{- $errors = append $errors "clickhouse.lwqlAccessModel.postgres.host is required when postgresql.chartManaged=false and LangWatchQL is enabled: the ClickHouse->PostgreSQL bridge (the lwql_postgres named collection) cannot reach an external PostgreSQL without it, and a blank host silently targets the non-existent in-cluster <release>-postgresql Service. Set clickhouse.lwqlAccessModel.postgres.host, .database and .user to your external PostgreSQL." }}
+    {{- end }}
+  {{- else }}
+    {{- $bridgeDb := $bridge.database | default "langwatch" }}
+    {{- $pgDb := (.Values.postgresql.auth | default dict).database | default "langwatch" }}
+    {{- if ne $bridgeDb $pgDb }}
+      {{- $errors = append $errors (printf "clickhouse.lwqlAccessModel.postgres.database (%q) must equal postgresql.auth.database (%q) for chart-managed PostgreSQL: the lwql_postgres bridge reads the app's own database, and Helm cannot derive one subchart value from a parent one. Set both to the same name." $bridgeDb $pgDb) }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -877,7 +911,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # ClickHouse connection
 {{- if .Values.clickhouse.chartManaged }}
 {{- $chSecretName := include "langwatch.clickhouse.secretName" . }}
-{{- $chDefaultName := printf "%s-clickhouse" .Release.Name }}
+{{- $chDefaultName := include "langwatch.clickhouse.serviceName" . }}
 {{- if eq $chSecretName $chDefaultName }}
 {{/* Langwatch-owned secret — URL is stored as a secret key */}}
 - name: CLICKHOUSE_URL
@@ -893,7 +927,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       name: {{ $chSecretName }}
       key: {{ include "langwatch.clickhouse.secretKey" . }}
 - name: CLICKHOUSE_URL
-  value: "http://default:$(CLICKHOUSE_PASSWORD)@{{ .Release.Name }}-clickhouse:8123/langwatch"
+  value: "http://default:$(CLICKHOUSE_PASSWORD)@{{ include "langwatch.clickhouse.serviceName" . }}:8123/langwatch"
 {{- end }}
 {{- if gt (int (.Values.clickhouse).replicas) 1 }}
 - name: CLICKHOUSE_CLUSTER
@@ -1276,11 +1310,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* ============================================================ */}}
 
 {{/* ClickHouse: Secret name — langwatch chart owns the secret (passed to subchart via auth.existingSecret) */}}
+{{/* The chart-managed ClickHouse Service name — its in-cluster DNS name and the
+     stem of the credentials-Secret name. Must equal clickhouse-serverless.fullname
+     EXACTLY: the subchart truncates the release name to 36 chars (leaving room for
+     a -keeper-headless suffix), so any parent reference that did NOT truncate would
+     name a Service that does not exist on a release name past 36 chars — every
+     in-cluster URL would dial a closed host and the default-Secret-name comparison
+     would flip. Single source for both, so the parent and subchart cannot disagree. */}}
+{{- define "langwatch.clickhouse.serviceName" -}}
+  {{- printf "%s-clickhouse" (.Release.Name | trunc 36 | trimSuffix "-") -}}
+{{- end -}}
+
 {{- define "langwatch.clickhouse.secretName" -}}
   {{- if .Values.clickhouse.auth.existingSecret -}}
     {{- tpl .Values.clickhouse.auth.existingSecret . -}}
   {{- else -}}
-    {{- printf "%s-clickhouse" .Release.Name -}}
+    {{- include "langwatch.clickhouse.serviceName" . -}}
   {{- end -}}
 {{- end -}}
 
@@ -1297,16 +1342,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
      Both this helper and the subchart's clickhouse-serverless.lwqlSecretName key
      off `clickhouse.auth.existingSecret` for that credentials Secret, and the
-     parent's default for it ({{ printf "%s-clickhouse" .Release.Name }}, see
-     values.yaml) is shared and NON-empty — so on every supported path the two
-     resolve to the same name, verified against a >36-char release name.
-
-     LIMIT: the subchart's own fallback is clickhouse-serverless.fullname, which
-     `trunc 36`s the release name, while this helper's fallback does not. That
-     fallback is reached only if clickhouse.auth.existingSecret is emptied — an
-     unsupported config the autogen=false validation already forbids — so the
-     truncation never bites in practice, but a hand-emptied existingSecret on a
-     >36-char release would diverge. Keep auth.existingSecret set. */}}
+     parent's default for it (langwatch.clickhouse.serviceName, see values.yaml)
+     is shared and NON-empty — so on every supported path the two resolve to the
+     same name. Both fallbacks now truncate the release name to 36 chars
+     identically (this helper via langwatch.clickhouse.serviceName, the subchart
+     via clickhouse-serverless.fullname), so a >36-char release name no longer
+     diverges even if clickhouse.auth.existingSecret is hand-emptied. */}}
 {{- define "langwatch.clickhouse.lwqlSecretName" -}}
   {{- $lwql := .Values.clickhouse.lwqlAccessModel | default dict -}}
   {{- if $lwql.existingSecret -}}
@@ -1327,13 +1368,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      of the access model, so they live in ONE place here rather than being
      retyped at each env var, and any change to the baked identity changes with
      them. The in-cluster URL mirrors the CLICKHOUSE_URL host the chart already
-     dials ({{ .Release.Name }}-clickhouse:8123), stripped of credentials and
+     dials (langwatch.clickhouse.serviceName :8123), stripped of credentials and
      database path — the client is handed user, password and database
      separately. */}}
 {{- define "langwatch.lwql.restrictedUser" -}}langwatch_lwql{{- end -}}
 {{- define "langwatch.lwql.tenantSetting" -}}custom_api_key_hash{{- end -}}
 {{- define "langwatch.lwql.inClusterClickhouseUrl" -}}
-  {{- printf "http://%s-clickhouse:8123" .Release.Name -}}
+  {{- printf "http://%s:8123" (include "langwatch.clickhouse.serviceName" .) -}}
 {{- end -}}
 
 {{/* ============================================================ */}}

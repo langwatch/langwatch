@@ -340,18 +340,39 @@ export default async function execute() {
     await runPostgresStatements(
       productionPostgresApprovedViewStatements({ schema: postgresSchema }),
     );
-    // Immediately after creation, in the same step: the reader role is
-    // provisioned out of band and its grants were issued against whatever
-    // views existed then, so a view added by this deploy would otherwise have
-    // no grant on it and every query touching it would fail ACCESS_DENIED
-    // until someone re-ran the out-of-band job by hand. A no-op where the
-    // role does not exist.
-    await runPostgresStatements(
-      productionPostgresReaderGrantStatements({
-        schema: postgresSchema,
-        role: process.env.LWQL_POSTGRES_READER_ROLE,
-      }),
-    );
+    // The reader role the named collection dials PostgreSQL as. Two ownership
+    // models on the non-self-provision path, told apart by whether the deploy
+    // handed us the reader password:
+    //   - chart-managed ClickHouse (Helm, issue #6635): the clickhouse-serverless
+    //     subchart renders the ClickHouse access model and the lwql_postgres
+    //     named collection, but nothing on that path creates the PostgreSQL
+    //     reader role — so the app converges lwql_ro here, from
+    //     LWQL_POSTGRES_READER_PASSWORD (the same Secret key the subchart mounts
+    //     the collection's password from), before ClickHouse dials it. Shares
+    //     selfProvisioning's builder so the role's isolation (read-only,
+    //     statement timeout, connection budget, approved-view-only grants) is
+    //     identical to the self-provisioned server's.
+    //   - SaaS/terraform: the reader role is owned out of band and the app holds
+    //     no credential for it, so it only re-issues the view grants against
+    //     whatever views exist now (a view added by this deploy would otherwise
+    //     have no grant until someone re-ran the out-of-band job). A no-op where
+    //     the role is absent.
+    const readerPassword = process.env.LWQL_POSTGRES_READER_PASSWORD;
+    if (readerPassword) {
+      await runPostgresStatements(
+        selfHostedPostgresReaderStatements({
+          schema: postgresSchema,
+          readerPassword,
+        }),
+      );
+    } else {
+      await runPostgresStatements(
+        productionPostgresReaderGrantStatements({
+          schema: postgresSchema,
+          role: process.env.LWQL_POSTGRES_READER_ROLE,
+        }),
+      );
+    }
   } catch (error) {
     logger.error(
       { error },

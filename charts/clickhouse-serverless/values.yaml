@@ -189,13 +189,17 @@ lwqlAccessModel:
   # auto-derives to the parent langwatch chart's own PostgreSQL Service
   # (<release>-postgresql — see clickhouse-serverless.lwqlPgHost), so the
   # collection renders on the default chart-managed path; set host to point at
-  # an external PostgreSQL. The password key must be present in the Secret (the
-  # reader password cannot be hashed — ClickHouse dials PostgreSQL with it).
+  # an external PostgreSQL. It dials as a dedicated read-only role (lwql_ro),
+  # never the superuser; the application converges that role from the reader
+  # password. The password key must be present in the Secret (the reader
+  # password cannot be hashed — ClickHouse dials PostgreSQL with it). The parent
+  # langwatch chart overrides database/user to match its own PostgreSQL; these
+  # defaults are for standalone subchart installs.
   postgres:
     host: ""
     port: 5432
-    database: ""
-    user: ""
+    database: langwatch
+    user: lwql_ro
     passwordSecretKey: lwql_pg_password
 
 # Keeper resources (only used when replicas > 1)
