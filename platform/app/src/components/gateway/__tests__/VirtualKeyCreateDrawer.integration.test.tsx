@@ -283,7 +283,7 @@ describe("given the new-virtual-key drawer", () => {
 
     /** @scenario the secret shows as soon as the create answers */
     it("hands the secret over while the key list is still refreshing", async () => {
-      listInvalidate.mockReturnValue(new Promise<void>(() => undefined));
+      listInvalidate.mockReturnValue(new Promise<undefined>(() => undefined));
       const onCreated = vi.fn();
       renderDrawer(onCreated);
       const request = submitThroughTheTour();
