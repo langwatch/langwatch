@@ -317,7 +317,7 @@ const langwatch = new LangWatch({
   Configuration options for the LangWatch client.
 </ParamField>
 
-An endpoint written with `http://` that answers with a redirect to the same URL over `https://` is followed once, with a warning asking you to configure the https URL directly. Any other redirect, such as a different host or path, a downgrade to http, or a 303, is refused with a `LangWatchRedirectError` that names the request URL, the `Location` and the status. Set the endpoint to the final URL to fix it.
+GET requests follow redirects, up to five hops, and drop credential headers when the target is another origin. Every other request only follows an `http://` endpoint's redirect to the same URL over `https://`, once, with a warning asking you to configure the https URL directly. A refused redirect throws a `LangWatchRedirectError` that names the request URL, the `Location` and the status. Set the endpoint to the final URL to fix it.
 
 #### Properties
 

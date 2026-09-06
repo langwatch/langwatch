@@ -6,6 +6,10 @@ Feature: TypeScript SDK HTTP client redirects
   Background:
     Given every request the SDK sends to the LangWatch API goes through the shared langwatchFetch
     And langwatchFetch sends with redirects disabled and inspects the response itself
+    And a GET or HEAD follows a 301, 302, 303, 307 or 308 with the same method, up to five hops
+    And every other method follows one redirect only, and only an http to https upgrade of the same URL
+
+  # --- The upgrade every method follows ---
 
   @unit
   Scenario: follows a redirect that only upgrades http to https
@@ -29,37 +33,96 @@ Feature: TypeScript SDK HTTP client redirects
     Then the SDK logger warns exactly once
     And the warning names "https://app.langwatch.ai" as the endpoint to configure
 
+  # --- What a GET or HEAD follows ---
+
   @unit
-  Scenario: refuses a redirect to another host
-    Given the platform answers with a 301 to "https://other.example.com" on the same path
+  Scenario: a GET follows a redirect to another path
+    Given the platform answers a GET with a 301 to another path on the same host
+    When the SDK sends the request
+    Then the request is sent again as a GET to the new path
+    And the caller receives the response of the new path
+
+  @unit
+  Scenario: a GET follows a chain of redirects up to five hops
+    Given the platform answers a GET with five redirects in a row and then a 200
+    When the SDK sends the request
+    Then six requests are sent, each one as a GET
+    And the caller receives the final 200
+
+  @unit
+  Scenario: a GET refuses a sixth hop
+    Given the platform answers a GET with six redirects in a row
+    When the SDK sends the request
+    Then the request fails with a LangWatchRedirectError carrying the fifth target as the URL and the sixth Location and status
+    And no seventh request is sent
+
+  @unit
+  Scenario: a GET keeps its headers on a same origin redirect
+    Given a GET with Authorization, X-Auth-Token, X-Project-Id and Accept headers
+    And the platform answers with a 302 to another path on the same origin
+    When the SDK sends the request
+    Then the second request carries every header of the first
+
+  @unit
+  Scenario: a GET drops credential headers on a cross origin redirect
+    Given a GET with Authorization, X-Auth-Token, X-Project-Id and Accept headers
+    And the platform answers with a 302 to another host
+    When the SDK sends the request
+    Then the second request carries the Accept header and none of the credential headers
+
+  @unit
+  Scenario: a GET refuses a downgrade from https to http
+    Given the endpoint is "https://app.langwatch.ai"
+    And the platform answers a GET with a 301 to the same URL over http
+    When the SDK sends the request
+    Then the request fails with a LangWatchRedirectError
+    And no second request is sent
+
+  @unit
+  Scenario: a GET follows a 303
+    Given the platform answers a GET with a 303 to another path
+    When the SDK sends the request
+    Then the request is sent again as a GET to the new path
+
+  @unit
+  Scenario: a HEAD follows a redirect like a GET
+    Given the platform answers a HEAD with a 301 to another path
+    When the SDK sends the request
+    Then the request is sent again as a HEAD to the new path
+
+  # --- What every other method refuses ---
+
+  @unit
+  Scenario: a POST refuses a redirect to another host
+    Given the platform answers a POST with a 301 to "https://other.example.com" on the same path
     When the SDK sends the request
     Then the request fails with a LangWatchRedirectError carrying the request URL, the Location and the status
     And the error message asks to set the endpoint to the final URL
     And no second request is sent
 
   @unit
-  Scenario: refuses a redirect that changes the path or query
-    Given the platform answers with a 308 to the same host over https on a different path or query
+  Scenario: a POST still refuses a redirect to another path
+    Given the platform answers a POST with a 308 to the same host over https on a different path or query
     When the SDK sends the request
     Then the request fails with a LangWatchRedirectError
     And no second request is sent
 
   @unit
-  Scenario: refuses a downgrade from https to http
+  Scenario: a POST refuses a downgrade from https to http
     Given the endpoint is "https://app.langwatch.ai"
-    And the platform answers with a 301 to the same URL over http
+    And the platform answers a POST with a 301 to the same URL over http
     When the SDK sends the request
     Then the request fails with a LangWatchRedirectError
 
   @unit
-  Scenario: refuses a 303
-    Given the platform answers with a 303 to the same URL over https
+  Scenario: a POST refuses a 303
+    Given the platform answers a POST with a 303 to the same URL over https
     When the SDK sends the request
     Then the request fails with a LangWatchRedirectError
 
   @unit
-  Scenario: refuses a second redirect after the upgrade
-    Given the platform answers the http request with a 301 to the same URL over https
+  Scenario: a POST refuses a second redirect after the upgrade
+    Given the platform answers the http POST with a 301 to the same URL over https
     And the https request is answered with another redirect
     When the SDK sends the request
     Then the request fails with a LangWatchRedirectError carrying the https URL and the second Location
@@ -85,6 +148,8 @@ Feature: TypeScript SDK HTTP client redirects
     Then the request fails with a LangWatchRedirectError
     And no second request is sent
 
+  # --- Every request goes through the shared client ---
+
   @unit
   Scenario: the generated API client uses the shared transport
     Given the OpenAPI client is created for "http://app.langwatch.ai"
@@ -97,5 +162,5 @@ Feature: TypeScript SDK HTTP client redirects
   Scenario: every hand written request uses the shared transport
     Given the SDK source outside tests and generated code
     When it is scanned for direct fetch calls and fetch defaults
-    Then every file that talks to the LangWatch API uses langwatchFetch
-    And only calls to other servers, a tunnel, a user's own agent or the docs site, use fetch directly
+    Then every file that talks to the LangWatch API or the docs site uses langwatchFetch
+    And only calls to other servers, a tunnel or a user's own agent, use fetch directly

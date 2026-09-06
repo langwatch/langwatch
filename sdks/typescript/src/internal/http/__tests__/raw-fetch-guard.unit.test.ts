@@ -11,11 +11,10 @@ import { join, relative, resolve } from "node:path";
 
 const SRC_ROOT = resolve(__dirname, "..", "..", "..");
 
-/** Files that call another server: a tunnel, a user's own HTTP agent, the docs site. */
+/** Files that call another server: a tunnel, a user's own HTTP agent. */
 const NOT_LANGWATCH = new Set([
   "cli/commands/agents/dev.ts",
   "cli/commands/agents/run.ts",
-  "cli/commands/docs.ts",
 ]);
 
 /** Test folders, the generated OpenAPI types, and the shared client itself. */
