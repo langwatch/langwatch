@@ -7,7 +7,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
-import { SHARE_MAX_FULL_SPANS } from "@langwatch/trace-contract";
+import { SHARE_MAX_FULL_SPANS, type Span, type TraceSummaryData } from "@langwatch/trace-contract";
 import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -1127,6 +1127,45 @@ describe("given the anonymous share read composed on this process", () => {
 });
 
 /**
+ * The mapping, redaction and content-privacy passes the share assembly runs,
+ * taken from the process's REAL read stack rather than declared here: the
+ * anonymous payload must go through the same passes the authenticated explorer
+ * does, and an empty `mappers` bag would let a broken assembly pass for a
+ * redacted one.
+ */
+function realTraceReadMappers() {
+  return composeApiTraceReadStack({
+    prisma: testPrisma(),
+    resolveClickHouseClient: testClickHouse([]).resolveClient,
+    defaultRetentionDays: 90,
+    authz: testAuthz(),
+    projects: {
+      tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
+      tryGetById: async () => ({ id: "project-1" }),
+    } as unknown as ProjectService,
+    dataPrivacy: {
+      getResolvedForProject: async () =>
+        resolveDataPrivacy({
+          rows: [],
+          facts: {
+            organizationId: "org-1",
+            teamId: "team-1",
+            projectId: "project-1",
+            departmentId: null,
+            isPersonal: false,
+          },
+        }),
+    },
+    plans: composeApiPlanProvider({ isSaas: false }),
+    dataRetention: stub("dataRetention"),
+    topics: stub("topics"),
+    modelProviders: undefined,
+    executionProxyBaseUrl: "http://127.0.0.1:5561",
+    processName: "langwatch-api",
+  }).readPorts().mappers;
+}
+
+/**
  * The share payload the anonymous viewer actually receives, assembled rather
  * than replayed from cache: what the read costs, what it is allowed to see,
  * and what it must never carry.
@@ -1147,7 +1186,7 @@ describe("given the anonymous share read assembles its payload", () => {
         evaluatorTypeSchema: anySchema,
         preconditionSchema: anySchema,
       }),
-      readPorts: () => ({ mappers: {} }),
+      readPorts: () => ({ mappers: realTraceReadMappers() }),
       explorerPorts: () => ({}),
       editOverlayRedaction: () => ({}),
       getViewerProtections: async () => ({ visibilityCutoffMs: null, canSeeCosts: true }),
@@ -1159,21 +1198,77 @@ describe("given the anonymous share read assembles its payload", () => {
     });
   }
 
-  function spanFixture(index: number) {
+  /** One stored span, in the shape `TraceApp.readSpans` answers with. */
+  function spanFixture(index: number): Span {
     return {
-      spanId: `span-${index}`,
-      parentSpanId: null,
-      traceId: TRACE_ID,
+      span_id: `span-${index}`,
+      parent_id: null,
+      trace_id: TRACE_ID,
       name: `span-${index}`,
       type: "llm",
-      startTimeMs: 1_700_000_000_000,
-      endTimeMs: 1_700_000_000_010,
-      durationMs: 10,
-      statusCode: 1,
-      statusMessage: null,
-      spanAttributes: {},
-      events: [],
-      links: [],
+      input: { type: "text", value: "the question" },
+      output: { type: "text", value: "the answer" },
+      error: null,
+      timestamps: { started_at: 1_700_000_000_000, finished_at: 1_700_000_000_010 },
+      metrics: { prompt_tokens: 3, completion_tokens: 4, cost: 0.5 },
+      params: null,
+    };
+  }
+
+  /**
+   * The folded summary the read answers with. The conversation id rides in the
+   * attributes, where the internal header read finds it — which is what makes
+   * "a shared link never reveals the surrounding conversation" a real claim
+   * rather than an assertion about a field nothing set.
+   */
+  function summaryFixture(spanCount: number): TraceSummaryData {
+    return {
+      traceId: TRACE_ID,
+      spanCount,
+      totalDurationMs: 10,
+      computedIOSchemaVersion: "1",
+      computedInput: "the question",
+      computedOutput: "the answer",
+      timeToFirstTokenMs: null,
+      timeToLastTokenMs: null,
+      tokensPerSecond: null,
+      containsErrorStatus: false,
+      containsOKStatus: true,
+      errorMessage: null,
+      models: ["gpt-5-mini"],
+      totalCost: 4.2,
+      nonBilledCost: null,
+      tokensEstimated: false,
+      totalPromptTokenCount: 3,
+      totalCompletionTokenCount: 4,
+      outputFromRootSpan: true,
+      outputSpanEndTimeMs: 1_700_000_000_010,
+      blockedByGuardrail: false,
+      rootSpanType: "llm",
+      containsAi: true,
+      containsPrompt: false,
+      selectedPromptId: null,
+      selectedPromptSpanId: null,
+      selectedPromptStartTimeMs: null,
+      lastUsedPromptId: null,
+      lastUsedPromptVersionNumber: null,
+      lastUsedPromptVersionId: null,
+      lastUsedPromptSpanId: null,
+      lastUsedPromptStartTimeMs: null,
+      topicId: null,
+      subTopicId: null,
+      annotationIds: [],
+      attributes: {
+        "langwatch.span.name": "trace",
+        "service.name": "svc",
+        "gen_ai.conversation.id": "conversation-1",
+        "langwatch.user_id": "end-user-1",
+      },
+      traceName: "trace",
+      occurredAt: 1_700_000_000_000,
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_000_000,
+      LastEventOccurredAt: 1_700_000_000_000,
     };
   }
 
@@ -1204,14 +1299,7 @@ describe("given the anonymous share read assembles its payload", () => {
       writeCachedSharePayload: async () => undefined,
       readTraceSummary: async (input: { visibilityCutoffMs: number | null }) => {
         summaryReads.push(input);
-        return {
-          traceId: TRACE_ID,
-          occurredAt: 1_700_000_000_000,
-          traceName: "trace",
-          spanCount,
-          totalCost: 4.2,
-          conversationId: "conversation-1",
-        };
+        return summaryFixture(spanCount);
       },
       readProject: async () => ({
         name: "Acme",
@@ -1263,16 +1351,23 @@ describe("given the anonymous share read assembles its payload", () => {
     };
   }
 
+  /**
+   * One page load by one reader. The address is the SOCKET peer, because that
+   * is the only address this process trusts: a forwarding header the caller
+   * merely asserted is not one, and a viewer key built from it could be
+   * rotated at will.
+   */
   async function readShare(
     application: ApiApplication,
     token: string,
-    headers: Record<string, string>,
+    reader: { address: string; userAgent: string },
   ): Promise<{ status: number; payload: Record<string, unknown> }> {
     if (!application.hono) throw new Error("HTTP composition was not created.");
     const encoded = encodeURIComponent(JSON.stringify({ json: { token } }));
     const response = await application.hono.request(
       `http://127.0.0.1/api/trpc/sharedTrace.get?input=${encoded}`,
-      { headers },
+      { headers: { "user-agent": reader.userAgent } },
+      { incoming: { socket: { remoteAddress: reader.address, remoteFamily: "IPv4" } } },
     );
     const body = (await response.json()) as {
       result?: { data?: { json?: Record<string, unknown> } };
@@ -1280,7 +1375,7 @@ describe("given the anonymous share read assembles its payload", () => {
     return { status: response.status, payload: body.result?.data?.json ?? {} };
   }
 
-  const viewerHeaders = { "x-forwarded-for": CLIENT_IP, "user-agent": "Reader/1.0" };
+  const viewer = { address: CLIENT_IP, userAgent: "Reader/1.0" };
 
   describe("when one reader opens the link twice from the same session", () => {
     /** @scenario One viewing session counts as a single view */
@@ -1288,8 +1383,8 @@ describe("given the anonymous share read assembles its payload", () => {
     it("resolves the token once per page load, under one stable viewer key", async () => {
       const { application, resolveCalls } = composeAssemblingShare({ spanCount: 2 });
 
-      await readShare(application, "share-token-1", viewerHeaders);
-      await readShare(application, "share-token-1", viewerHeaders);
+      await readShare(application, "share-token-1", viewer);
+      await readShare(application, "share-token-1", viewer);
 
       // One resolution per page load — never one per read the assembly makes...
       expect(resolveCalls).toHaveLength(2);
@@ -1302,10 +1397,10 @@ describe("given the anonymous share read assembles its payload", () => {
     it("mints a different viewer key for a different reader", async () => {
       const { application, resolveCalls } = composeAssemblingShare({ spanCount: 2 });
 
-      await readShare(application, "share-token-1", viewerHeaders);
+      await readShare(application, "share-token-1", viewer);
       await readShare(application, "share-token-1", {
-        "x-forwarded-for": "203.0.113.10",
-        "user-agent": "Other/2.0",
+        address: "203.0.113.10",
+        userAgent: "Other/2.0",
       });
 
       expect(resolveCalls[1]?.viewerKey).not.toBe(resolveCalls[0]?.viewerKey);
@@ -1317,7 +1412,7 @@ describe("given the anonymous share read assembles its payload", () => {
     it("carries the viewer's visibility cutoff into the trace read", async () => {
       const { application, summaryReads } = composeAssemblingShare({ spanCount: 2 });
 
-      const { status } = await readShare(application, "share-token-1", viewerHeaders);
+      const { status } = await readShare(application, "share-token-1", viewer);
 
       expect(status).toBe(200);
       // The cutoff the share viewer's protections resolved to reaches the read
@@ -1327,14 +1422,18 @@ describe("given the anonymous share read assembles its payload", () => {
   });
 
   describe("given the trace belongs to a conversation", () => {
-    /** @scenario A shared link never reveals the surrounding conversation */
-    it("carries no conversation in the payload", async () => {
+    it("names the conversation the trace is in and carries none of it", async () => {
       const { application } = composeAssemblingShare({ spanCount: 2 });
 
-      const { payload } = await readShare(application, "share-token-1", viewerHeaders);
+      const { payload } = await readShare(application, "share-token-1", viewer);
 
+      // The shared header carries the conversation's ID, which the share
+      // schema picks deliberately: it is metadata of the trace the link was
+      // minted for. What it must never carry is the conversation ITSELF —
+      // there is no section for the surrounding turns, so a viewer holding
+      // the id still has no second trace to read.
+      expect(payload.header).toMatchObject({ conversationId: "conversation-1" });
       expect(payload).not.toHaveProperty("conversation");
-      expect(payload.header).not.toHaveProperty("conversationId");
     });
   });
 
@@ -1348,7 +1447,7 @@ describe("given the anonymous share read assembles its payload", () => {
     it("caps the span detail and flags the truncation", async () => {
       const { application } = composeAssemblingShare({ spanCount: SHARE_MAX_FULL_SPANS + 25 });
 
-      const { payload } = await readShare(application, "share-token-1", viewerHeaders);
+      const { payload } = await readShare(application, "share-token-1", viewer);
 
       expect((payload.spansFull as unknown[]).length).toBe(SHARE_MAX_FULL_SPANS);
       expect(payload.isSpanDetailTruncated).toBe(true);
@@ -1357,7 +1456,7 @@ describe("given the anonymous share read assembles its payload", () => {
     it("carries every span and flags no truncation when the trace fits", async () => {
       const { application } = composeAssemblingShare({ spanCount: 3 });
 
-      const { payload } = await readShare(application, "share-token-1", viewerHeaders);
+      const { payload } = await readShare(application, "share-token-1", viewer);
 
       expect((payload.spansFull as unknown[]).length).toBe(3);
       expect(payload.isSpanDetailTruncated).toBe(false);

@@ -153,7 +153,8 @@ describe("ApiApplication Agent tRPC composition", () => {
 
     // The ADR-128 view every read carries now: this process composed no
     // `connected` dependency, so a non-connected agent degrades to no
-    // declared parameters, no owner and offline presence with no instances.
+    // declared parameters, no owner and offline presence with no instances —
+    // and, holding no owner, it is one anybody may choose.
     await expect(agentCaller.getAll({ projectId: "project-1" })).resolves.toEqual([
       {
         ...agent,
@@ -163,6 +164,8 @@ describe("ApiApplication Agent tRPC composition", () => {
         owner: null,
         status: "offline",
         instances: [],
+        selectable: true,
+        notSelectableReason: null,
       },
     ]);
     expect(agents.observedContexts).toEqual([{ userId: "user-1" }]);

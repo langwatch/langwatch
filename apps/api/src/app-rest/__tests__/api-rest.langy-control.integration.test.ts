@@ -157,6 +157,11 @@ describe("given a network that blocks WebSockets", () => {
 });
 
 /** The register frame's environment checklist, as the approval carries it. */
+/** A collaborator no route in this suite reaches, refused by name if one does. */
+function refuseLangyDoor(capability: string): never {
+  throw new Error(`this suite composed no ${capability}`);
+}
+
 function workspace() {
   return { root: "/Users/dev/acme-app", name: "acme-app", gitBranch: "main", os: "darwin" };
 }
@@ -202,8 +207,25 @@ function mount() {
       rateLimit: async () => ({ allowed: true }),
       publicBaseUrl: "https://app.langwatch.test",
       langy: {
-        turns: null as never,
-        internal: null as never,
+        // The turns door and the internal door are mounted unconditionally
+        // beside local control, so both need ports that BUILD. Neither is
+        // exercised here: the turns door refuses by name, and the internal
+        // door holds no secret, which is the 503 an unconfigured deployment
+        // answers with rather than an open gate.
+        turns: {
+          readCredential: () => null,
+          apiKeys: () => refuseLangyDoor("the credential directory"),
+          enforceCeiling: () => refuseLangyDoor("the key ceiling"),
+          featureFlags: () => refuseLangyDoor("the flag store"),
+          actors: () => refuseLangyDoor("the user directory"),
+          langy: () => refuseLangyDoor("the Langy application"),
+          openTurnBuffer: () => null,
+        } as never,
+        internal: {
+          langy: () => refuseLangyDoor("the Langy application"),
+          internalSecret: () => undefined,
+          metrics: { turnResult: () => undefined, sessionKeyRevokeRefused: () => undefined },
+        },
         localControl: {
           runtime: () => runtime,
           longPoll: () => longPoll,

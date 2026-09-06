@@ -128,7 +128,7 @@ describe("given the simulation pipeline this process composes for itself", () =>
         "job:deferredComputeRunMetrics",
       ]);
       expect([...registered].filter((key) => !frozen.includes(key))).toEqual([]);
-      expect(frozen).toHaveLength(16);
+      expect(frozen).toHaveLength(17);
     });
 
     /** @scenario "The worker mounts every simulation routing key" */

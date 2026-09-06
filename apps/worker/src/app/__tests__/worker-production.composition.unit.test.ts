@@ -1271,8 +1271,12 @@ describe("WorkerProductionComposition", () => {
 
   describe("when the monthly billing roll-up is composed", () => {
     function reportingSubstrate() {
+      // A row the roll-up can actually report: `SEAT_EVENT` is what makes an
+      // organization usage-billed at all, and the read skips every other
+      // pricing model before it reaches a checkpoint or a ClickHouse client.
       const organizationFindFirst = vi.fn(async () => ({
         id: "organization_acme",
+        pricingModel: "SEAT_EVENT",
         stripeCustomerId: "cus_1",
         subscriptions: [{ id: "sub_1" }],
       }));

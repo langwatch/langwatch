@@ -161,7 +161,7 @@ describe("given the langy conversation pipeline this process composes for itself
       const frozen = frozenLangyRoutingKeys();
       expect(frozen.filter((key) => !registered.has(key))).toEqual([]);
       expect([...registered].filter((key) => !frozen.includes(key))).toEqual([]);
-      expect(frozen).toHaveLength(24);
+      expect(frozen).toHaveLength(30);
     });
 
     /** @scenario "The worker mounts every langy conversation routing key" */

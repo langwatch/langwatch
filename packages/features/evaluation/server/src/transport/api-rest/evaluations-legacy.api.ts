@@ -599,8 +599,8 @@ export function createEvaluationsLegacyRestApp(options: {
       "post",
       "/evaluations/:evaluator/evaluate",
       MANAGEMENT_API_VERSION,
-      async (c, input: { path: { evaluator: string } }) =>
-        handleEvaluatorCall(c, run, input.path.evaluator, false),
+      async (c, input: { evaluator: string }) =>
+        handleEvaluatorCall(c, run, input.evaluator, false),
       (b) =>
         policy(legacyEvaluationAuth)(b)
           .withMiddleware(bodyLimit({ maxSize: 30 * 1024 * 1024 }))
@@ -621,8 +621,8 @@ export function createEvaluationsLegacyRestApp(options: {
       "post",
       "/evaluations/:evaluator/:subpath/evaluate",
       MANAGEMENT_API_VERSION,
-      async (c, input: { path: { evaluator: string; subpath: string } }) =>
-        handleEvaluatorCall(c, run, `${input.path.evaluator}/${input.path.subpath}`, false),
+      async (c, input: { evaluator: string; subpath: string }) =>
+        handleEvaluatorCall(c, run, `${input.evaluator}/${input.subpath}`, false),
       (b) =>
         policy(legacyEvaluationAuth)(b)
           .withMiddleware(bodyLimit({ maxSize: 30 * 1024 * 1024 }))
@@ -643,8 +643,7 @@ export function createEvaluationsLegacyRestApp(options: {
       "post",
       "/guardrails/:evaluator/evaluate",
       MANAGEMENT_API_VERSION,
-      async (c, input: { path: { evaluator: string } }) =>
-        handleEvaluatorCall(c, run, input.path.evaluator, true),
+      async (c, input: { evaluator: string }) => handleEvaluatorCall(c, run, input.evaluator, true),
       (b) =>
         policy(legacyEvaluationAuth)(b)
           .withMiddleware(bodyLimit({ maxSize: 30 * 1024 * 1024 }))

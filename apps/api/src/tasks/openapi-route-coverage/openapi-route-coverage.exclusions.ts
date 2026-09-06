@@ -170,6 +170,29 @@ export const UNPUBLISHED = [
     category: "internal",
     why: "the stop button next to execute, session authenticated for the same reason",
   },
+  // A versioned family answers each of its endpoints at three addresses — the
+  // bare one, every dated one, and `latest` — and the audit counts all three,
+  // so an unpublished endpoint of one needs an entry per address.
+  {
+    match: "POST /api/v1/experiments/2026-08-07/execute",
+    category: "internal",
+    why: "the dated address of the same session-authenticated workbench execute; the version namespace does not make it callable with an API key",
+  },
+  {
+    match: "POST /api/v1/experiments/latest/execute",
+    category: "internal",
+    why: "the `latest` address of the same session-authenticated workbench execute",
+  },
+  {
+    match: "POST /api/v1/experiments/2026-08-07/abort",
+    category: "internal",
+    why: "the dated address of the stop button next to execute",
+  },
+  {
+    match: "POST /api/v1/experiments/latest/abort",
+    category: "internal",
+    why: "the `latest` address of the stop button next to execute",
+  },
   {
     match: "POST /api/v1/export/scenario-runs/download",
     category: "internal",
@@ -196,6 +219,35 @@ export const UNPUBLISHED = [
     match: "POST /api/track_event",
     category: "alias",
     why: "the original spelling of the tracked-event intake, kept alive for SDKs that still post to it; POST /api/v1/events/track is the documented equivalent",
+  },
+  // The two wildcard re-dispatchers. Each terminates nothing: it rewrites a
+  // path a misconfigured client produced and forwards into the canonical
+  // family, which is what authenticates and answers. There is no operation to
+  // describe — the operation is the one they forward to.
+  {
+    match: "ALL /api/evaluations/v3/*",
+    category: "alias",
+    why: "the experiments family's older name, forwarded into /api/experiments; the documented operations are that family's own",
+  },
+  {
+    match: "ALL /api/v1/otel/*",
+    category: "alias",
+    why: "OTLP path canonicalisation: an exporter that appended the wrong suffix is rewritten onto the canonical OTLP route rather than answering the SPA shell with a 200 it reads as success",
+  },
+  {
+    match: "ALL /api/v1/collector/*",
+    category: "alias",
+    why: "the same canonicalisation for exporters aimed at the SDK collector's namespace",
+  },
+  {
+    match: "ALL /api/v1/*",
+    category: "alias",
+    why: "the same canonicalisation for a root-level OTLP path under /api/v1. It matches only what canonicalOtlpPath recognises and otherwise declines, so it shadows no sibling family",
+  },
+  {
+    match: "ALL /v1/*",
+    category: "alias",
+    why: "the same canonicalisation for the bare /v1 OTLP paths an exporter produces when it is given the host with no base path",
   },
 
   // ── Elsewhere: public, documented outside the API reference ────────────
