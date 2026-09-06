@@ -74,6 +74,23 @@ export function listSkills(skillsDir: string | undefined): SkillEntry[] {
   return skills;
 }
 
+/** The SKILL.md of one installed skill, or undefined when it is not installed. */
+export function readSkillBody({
+  skillsDir,
+  name,
+}: {
+  skillsDir: string | undefined;
+  name: string;
+}): string | undefined {
+  const skill = listSkills(skillsDir).find((s) => s.name === name);
+  if (!skill) return undefined;
+  try {
+    return readFileSync(skill.filePath, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
 export function renderSkillInventory(skills: SkillEntry[]): string {
   if (skills.length === 0) return "No skills installed.";
   return ["Installed skills:", ...skills.map((s) => `- ${s.name}: ${s.description}`)].join("\n");

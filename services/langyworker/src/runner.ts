@@ -23,6 +23,11 @@ import {
   type TerminalEvent,
   type TurnCommand,
 } from "./protocol.js";
+import {
+  GUIDED_ONBOARDING_SKILL_NAME,
+  isGuidedKickoffPrompt,
+  prependSkillBody,
+} from "./guided-kickoff.js";
 import { prependResumeSeed } from "./system-prompt.js";
 import type { TurnContext } from "./tools/turn-context.js";
 import type { ProtocolWriter } from "./writer.js";
@@ -71,6 +76,12 @@ export type TurnRunnerOptions = {
    * digest of it would re-tell the story and break the byte-stable prefix.
    */
   sessionResumed?: boolean;
+  /**
+   * Reads an installed skill's SKILL.md by name. A guided onboarding kickoff
+   * turn gets the guided-onboarding skill placed ahead of its message, so the
+   * script is in context before the model chooses anything.
+   */
+  loadSkill?: (name: string) => string | undefined;
 };
 
 export class TurnRunner {
@@ -187,10 +198,7 @@ export class TurnRunner {
 
       await writer.emit({ type: "turn_started", turnId: command.turnId });
 
-      const prompt =
-        command.resumeToken && !this.options.sessionResumed
-          ? prependResumeSeed({ prompt: command.prompt, seed: command.resumeToken })
-          : command.prompt;
+      const prompt = this.composePrompt(command);
 
       let thrown: unknown;
       try {
@@ -215,6 +223,28 @@ export class TurnRunner {
     if (this.options.turnContext) this.options.turnContext.turnId = null;
     // The terminal is flushed to the pipe before anything else can run.
     await writer.emit(terminal);
+  }
+
+  /**
+   * The message as the model reads it: a kickoff brief behind its skill, and
+   * a handoff digest ahead of everything when the turn resumes one.
+   */
+  private composePrompt(command: TurnCommand): string {
+    let prompt = command.prompt;
+    if (this.options.loadSkill && isGuidedKickoffPrompt(prompt)) {
+      const body = this.options.loadSkill(GUIDED_ONBOARDING_SKILL_NAME);
+      if (body) {
+        prompt = prependSkillBody({ prompt, name: GUIDED_ONBOARDING_SKILL_NAME, body });
+      } else {
+        this.warn(
+          `skill "${GUIDED_ONBOARDING_SKILL_NAME}" is not installed; the kickoff runs on the routing row alone`,
+        );
+      }
+    }
+    if (command.resumeToken && !this.options.sessionResumed) {
+      prompt = prependResumeSeed({ prompt, seed: command.resumeToken });
+    }
+    return prompt;
   }
 
   private deriveTerminal(state: TurnState, thrown: unknown): TerminalEvent {

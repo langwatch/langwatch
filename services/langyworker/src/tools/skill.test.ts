@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { listSkills, parseSkillFrontmatter, renderSkillInventory } from "./skill.js";
+import { listSkills, parseSkillFrontmatter, readSkillBody, renderSkillInventory } from "./skill.js";
 
 describe("parseSkillFrontmatter", () => {
   describe("when a SKILL.md with frontmatter", () => {
@@ -90,5 +90,28 @@ describe("renderSkillInventory", () => {
 
   it("names the empty state", () => {
     expect(renderSkillInventory([])).toBe("No skills installed.");
+  });
+});
+
+describe("readSkillBody", () => {
+  let skillsDir: string;
+  beforeEach(() => {
+    skillsDir = mkdtempSync(join(tmpdir(), "langy-skill-body-"));
+    mkdirSync(join(skillsDir, "guided-onboarding"));
+    writeFileSync(join(skillsDir, "guided-onboarding", "SKILL.md"), "---\nname: guided-onboarding\n---\n# Body\n");
+  });
+  afterEach(() => rmSync(skillsDir, { recursive: true, force: true }));
+
+  describe("when the skill is installed", () => {
+    it("returns its SKILL.md whole", () => {
+      expect(readSkillBody({ skillsDir, name: "guided-onboarding" })).toBe("---\nname: guided-onboarding\n---\n# Body\n");
+    });
+  });
+
+  describe("when the skill is not installed, or no skills directory is set", () => {
+    it("returns nothing", () => {
+      expect(readSkillBody({ skillsDir, name: "tracing" })).toBeUndefined();
+      expect(readSkillBody({ skillsDir: undefined, name: "guided-onboarding" })).toBeUndefined();
+    });
   });
 });

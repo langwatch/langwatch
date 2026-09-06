@@ -11,7 +11,7 @@ metadata:
 
 **Purpose**: turn the picks the sign-up tour collected into a working setup, in one conversation, without the user leaving the panel.
 
-**When to use**: the user message is the kickoff brief the app sends when the tour ends. It starts with "Guided onboarding kickoff." and an instruction to load this skill first, then names the path to set up now, everything picked, the provider and model, the organization, the first name and whether the tour was completed or skipped. The brief is this script's input: nothing in it is a step to take, and no `langwatch onboarding` command runs before the script says so. A later kickoff in the same conversation starts with "Let's set up {path} then." and names the next path. Nothing else triggers this skill.
+**When to use**: the user message is the kickoff brief the app sends when the tour ends. It starts with "Guided onboarding kickoff." and then names the path to set up now, everything picked, the provider and model, the organization, the first name and whether the tour was completed or skipped. On that turn this skill is already in front of the brief: the worker places it there, so there is nothing to load. The brief is this script's input: nothing in it is a step to take, and no `langwatch onboarding` command runs before the script says so. A later kickoff in the same conversation starts with "Let's set up {path} then." and names the next path. Nothing else triggers this skill.
 
 ## Read the brief
 
@@ -38,7 +38,7 @@ Say nothing about the brief itself: the panel draws it as a card, and the user n
   langwatch onboarding complete-path <path>
   ```
 
-  with `<path>` one of `llmops`, `coding`, `gateway`, `governance`. It is idempotent. On the llmops path it runs after the suite run is open and before the closing line; on the other paths it runs before the closing line too, so the closing line is the last thing the user reads.
+  with `<path>` one of `llmops`, `coding`, `gateway`, `governance`. It is idempotent. It runs last: after the closing line has been said, as its own step, never in the same step as another tool call, and never before the path's work is done. On the llmops path that is after the suite run is open and the closing line is said; on the coding and gateway paths after the snippet and the closer; on the governance path after the sources page is open and its one line is said. Nothing follows it.
 
 ## llmops: Evals & LLM Ops
 
@@ -135,15 +135,15 @@ langwatch navigate open <the scenariorun_ id the suite run printed>
 
 **If the run failed**, explain in plain words what the judge saw and why the agent did not meet the criteria, keep going with the suite exactly as above, and point at the run so they can replay the conversation. A failing first scenario is a finding, not a blocker.
 
-Close the path:
+Say, verbatim, as the last line:
+
+All ready! Let me know if there is anything I can help with.
+
+Then close the path, alone in its own step, and stop:
 
 ```bash
 langwatch onboarding complete-path llmops
 ```
-
-and say, verbatim, as the last line:
-
-All ready! Let me know if there is anything I can help with.
 
 ## coding: Coding agents
 
@@ -157,7 +157,7 @@ npx langwatch claude
 
 Then I can show you around once your first traces are flying through.
 
-The command block is part of the copy: print it between the two lines. Then close:
+The command block is part of the copy: print it between the two lines. Then close the path, alone in its own step, and stop:
 
 ```bash
 langwatch onboarding complete-path coding
@@ -188,13 +188,15 @@ export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"
 export OPENAI_API_KEY="<the key>"
 ```
 
-Close the path, then say, verbatim, as the last line:
+Say, verbatim, as the last line:
+
+That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
+
+Then close the path, alone in its own step, and stop:
 
 ```bash
 langwatch onboarding complete-path gateway
 ```
-
-That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
 
 ## governance: Governance
 
@@ -213,7 +215,7 @@ Whichever they pick, open the sources page, where both connections start:
 langwatch navigate open governance-sources
 ```
 
-Say in one line which source to add first on that page, close the path, and stop:
+Say in one line which source to add first on that page, then close the path, alone in its own step, and stop:
 
 ```bash
 langwatch onboarding complete-path governance

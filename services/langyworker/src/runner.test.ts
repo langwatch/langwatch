@@ -71,7 +71,12 @@ function makeRunner({
 }: {
   session: SessionLike;
   appliedSystemPrompts?: string[];
-  options?: { sessionResumed?: boolean; turnContext?: TurnContext };
+  options?: {
+    sessionResumed?: boolean;
+    turnContext?: TurnContext;
+    loadSkill?: (name: string) => string | undefined;
+    warn?: (message: string) => void;
+  };
 }) {
   const { writer, events } = makeWriter();
   const runner = new TurnRunner({
@@ -121,6 +126,92 @@ describe("TurnRunner", () => {
       ]);
       expect(fake.promptCalls[0]?.systemPrompt).toBe("PERSONA\n\nAGENTS\n\nSYS");
       expect(fake.promptCalls[0]?.prompt).toBe("hi");
+    });
+  });
+
+  describe("when the turn is a guided onboarding kickoff", () => {
+    const KICKOFF = "Guided onboarding kickoff.\nPath to set up now: coding (Coding Agent Tracking).\nTour: completed.";
+    const SKILL = "---\nname: guided-onboarding\n---\n\n# Guided onboarding\n\nSay the two lines.";
+
+    /** @scenario "The worker places the skill ahead of the kickoff brief" */
+    it("prepends the guided-onboarding skill's body, then the brief", async () => {
+      const fake = makeFakeSession();
+      const loaded: string[] = [];
+      const { runner } = makeRunner({
+        session: fake.session,
+        options: {
+          loadSkill: (name) => {
+            loaded.push(name);
+            return SKILL;
+          },
+        },
+      });
+      const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: KICKOFF });
+      await until(() => fake.promptCalls.length === 1);
+      fake.finish();
+      await done;
+      expect(loaded).toEqual(["guided-onboarding"]);
+      const prompt = fake.promptCalls[0]?.prompt ?? "";
+      expect(prompt.startsWith('[Skill "guided-onboarding"')).toBe(true);
+      expect(prompt.indexOf("Say the two lines.")).toBeLessThan(prompt.indexOf("Guided onboarding kickoff."));
+      expect(prompt.endsWith(KICKOFF)).toBe(true);
+    });
+
+    it("places a handoff digest ahead of the skill when the turn resumes one", async () => {
+      const fake = makeFakeSession();
+      const { runner } = makeRunner({
+        session: fake.session,
+        options: { loadSkill: () => SKILL },
+      });
+      const done = runner.submitTurn({
+        type: "turn",
+        turnId: "t1",
+        prompt: KICKOFF,
+        resumeToken: "user: earlier",
+      });
+      await until(() => fake.promptCalls.length === 1);
+      fake.finish();
+      await done;
+      const prompt = fake.promptCalls[0]?.prompt ?? "";
+      expect(prompt.startsWith("[Resumed conversation")).toBe(true);
+      expect(prompt.indexOf("user: earlier")).toBeLessThan(prompt.indexOf('[Skill "guided-onboarding"'));
+      expect(prompt.endsWith(KICKOFF)).toBe(true);
+    });
+
+    /** @scenario "A kickoff without the skill installed runs on the routing row alone" */
+    it("passes the brief through and warns when the skill is not installed", async () => {
+      const fake = makeFakeSession();
+      const warnings: string[] = [];
+      const { runner } = makeRunner({
+        session: fake.session,
+        options: { loadSkill: () => undefined, warn: (message) => warnings.push(message) },
+      });
+      const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: KICKOFF });
+      await until(() => fake.promptCalls.length === 1);
+      fake.finish();
+      await done;
+      expect(fake.promptCalls[0]?.prompt).toBe(KICKOFF);
+      expect(warnings.join("\n")).toContain('skill "guided-onboarding" is not installed');
+    });
+
+    it("leaves an ordinary message alone and loads nothing", async () => {
+      const fake = makeFakeSession();
+      const loaded: string[] = [];
+      const { runner } = makeRunner({
+        session: fake.session,
+        options: {
+          loadSkill: (name) => {
+            loaded.push(name);
+            return SKILL;
+          },
+        },
+      });
+      const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "show me traces" });
+      await until(() => fake.promptCalls.length === 1);
+      fake.finish();
+      await done;
+      expect(loaded).toEqual([]);
+      expect(fake.promptCalls[0]?.prompt).toBe("show me traces");
     });
   });
 

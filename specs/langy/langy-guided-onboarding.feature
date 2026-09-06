@@ -68,7 +68,7 @@ Feature: Langy guides the first setup after sign-up
       And the brief names the provider and the model
       And the brief names the organization and the person's first name
       And the brief says whether the tour was completed or skipped
-      And the brief opens by telling the model to load the guided-onboarding skill with the skill tool before any other tool call
+      And the brief opens with the kickoff line and names no skill and no command
 
     @unit
     Scenario: The panel sends the kickoff exactly once
@@ -91,6 +91,27 @@ Feature: Langy guides the first setup after sign-up
       When the turn service reads the message text for the model
       Then the text is the brief
       And nothing of the typed part reaches the model
+
+    @unit
+    Scenario: The worker recognises the kickoff brief by its opener
+      Given a turn whose message opens with the kickoff line, on its own or after the continuation line
+      When the Langy worker reads the turn
+      Then it recognises the kickoff
+      And a message that only quotes the kickoff line later, or in data folded ahead of it, is not one
+
+    @unit
+    Scenario: The worker places the skill ahead of the kickoff brief
+      Given the guided-onboarding skill is installed in the worker
+      When a kickoff turn reaches the worker
+      Then the model reads the skill's whole script first and the brief last
+      And an ordinary message gets no skill placed ahead of it
+
+    @unit
+    Scenario: A kickoff without the skill installed runs on the routing row alone
+      Given the guided-onboarding skill is not installed in the worker
+      When a kickoff turn reaches the worker
+      Then the brief reaches the model as it was
+      And the worker warns that the skill is missing
 
   Rule: The kickoff conversation is called Getting started, never after the brief
 

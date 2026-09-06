@@ -84,17 +84,17 @@ function describePath(path: GuidedPath): string {
 }
 
 /**
- * The first line of the brief. It names the tool call that loads the skill
- * and orders it before anything else: the model also sees the onboarding CLI
- * commands as tools, and told only to "follow the skill" it acted on those
- * directly and never read the script.
+ * The first line of the brief. The Langy worker recognises a kickoff by it
+ * and places the guided-onboarding skill ahead of the message on that turn,
+ * so the script is in the model's context before it chooses anything; the
+ * brief itself names no skill and no command. The worker pins the same
+ * literal (`GUIDED_KICKOFF_OPENER` in services/langyworker).
  */
-export const GUIDED_KICKOFF_BRIEF_OPENER = `Guided onboarding kickoff. Before any other tool call, load the ${GUIDED_ONBOARDING_SKILL_NAME} skill with the skill tool and follow its script line by line; this brief is the script's input, not its instructions.`;
+export const GUIDED_KICKOFF_BRIEF_OPENER = "Guided onboarding kickoff.";
 
 /**
- * The text the model reads. Opened by the instruction to load the skill,
- * then structured line by line so the skill can pick the path, the picks and
- * the provider out without guessing.
+ * The text the model reads: the opener, then one line per fact so the skill
+ * can pick the path, the picks and the provider out without guessing.
  */
 export function buildGuidedKickoffBrief({
   input,

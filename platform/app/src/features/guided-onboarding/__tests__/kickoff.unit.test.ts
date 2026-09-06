@@ -43,9 +43,9 @@ describe("the guided onboarding kickoff", () => {
     it("writes a brief naming the path, every pick in order, the provider, the names, the tour and the skill", () => {
       const brief = buildGuidedKickoffBrief({ input: KICKOFF });
       const lines = brief.split("\n");
-      expect(lines[0]).toBe(
-        "Guided onboarding kickoff. Before any other tool call, load the guided-onboarding skill with the skill tool and follow its script line by line; this brief is the script's input, not its instructions.",
-      );
+      expect(lines[0]).toBe("Guided onboarding kickoff.");
+      expect(brief).not.toContain("skill");
+      expect(brief).not.toContain("langwatch ");
       expect(lines).toContain("Path to set up now: llmops (Evals & LLM Ops).");
       expect(lines).toContain(
         "Everything picked, in the order it was picked: llmops (Evals & LLM Ops), governance (Governance).",
