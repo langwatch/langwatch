@@ -25,7 +25,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
 
-import type { WebhookService } from "../../services/billing-webhook.service";
+import type { WebhookService } from "../../services/billing-stripe-webhook.service";
 
 const logger = createLogger("langwatch:billing:stripe-webhook");
 

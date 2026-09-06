@@ -52,10 +52,6 @@ export function hasMigratableChunkCount(
   return dataset.chunkCount != null && dataset.chunkCount >= 0;
 }
 
-export function newerVersionTimestamp(previous: Date, candidate: Date): Date {
-  return new Date(Math.max(candidate.getTime(), previous.getTime() + 1));
-}
-
 export async function copyVerified({
   source,
   sourceUri,

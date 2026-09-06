@@ -115,19 +115,25 @@ type Widen<V> = V extends string
       ? boolean
       : V;
 
+/** The value type when neither `options` nor `type` pin one down: widened from `default`. */
+type ParameterValueFallback<D extends ParameterDefinition> = D extends { default: infer V }
+  ? Widen<V>
+  : string;
+
+/** The value type driven by the declared `type`, falling back to `default`'s widened type. */
+type ParameterValueByType<D extends ParameterDefinition> = D extends { type: "number" }
+  ? number
+  : D extends { type: "boolean" }
+    ? boolean
+    : D extends { type: "string" }
+      ? string
+      : ParameterValueFallback<D>;
+
 type ParameterValueOf<D extends ParameterDefinition> = D extends {
   options: readonly (infer O extends string)[];
 }
   ? O
-  : D extends { type: "number" }
-    ? number
-    : D extends { type: "boolean" }
-      ? boolean
-      : D extends { type: "string" }
-        ? string
-        : D extends { default: infer V }
-          ? Widen<V>
-          : string;
+  : ParameterValueByType<D>;
 
 /** The `params` type a definition map gives the handler. */
 export type InferParameters<P extends ParameterDefinitions> = {

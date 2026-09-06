@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DeliveredCalls } from "../langy-local-delivered-calls.rules";
+import { DeliveredCallsService } from "../langy-local-delivered-calls.service";
 import { LOCAL_CONTROL_PROTOCOL_VERSION, type PlatformFrame } from "@langwatch/langy-contract";
 
 function callFrame(callId: string): PlatformFrame {
@@ -17,11 +17,11 @@ function callFrame(callId: string): PlatformFrame {
   };
 }
 
-describe("DeliveredCalls", () => {
+describe("DeliveredCallsService", () => {
   describe("given a call that reaches the connection twice", () => {
     /** @scenario "A call written while the folder registers is handed over once" */
     it("admits the first copy and refuses the second", () => {
-      const delivered = new DeliveredCalls();
+      const delivered = DeliveredCallsService.create();
 
       expect(delivered.admit(callFrame("lcall_1"))).toBe(true);
       expect(delivered.admit(callFrame("lcall_1"))).toBe(false);
@@ -31,7 +31,7 @@ describe("DeliveredCalls", () => {
 
   describe("given a call whose result arrived", () => {
     it("admits the same id again, the set holds only calls in flight", () => {
-      const delivered = new DeliveredCalls();
+      const delivered = DeliveredCallsService.create();
       delivered.admit(callFrame("lcall_1"));
       delivered.settle("lcall_1");
 
@@ -41,7 +41,7 @@ describe("DeliveredCalls", () => {
 
   describe("given frames that are not calls", () => {
     it("admits every one of them", () => {
-      const delivered = new DeliveredCalls();
+      const delivered = DeliveredCallsService.create();
       const disconnect: PlatformFrame = {
         type: "disconnect",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,

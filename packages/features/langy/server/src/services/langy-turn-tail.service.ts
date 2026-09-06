@@ -65,7 +65,7 @@ export class LangyTurnTailService {
    * resolves to what should end the tail — or null if the stream ended first (aborted) or the
    * turn is still going.
    */
-  async watchForMissedTerminal({
+  async tryWatchForMissedTerminal({
     readHealth,
     signal,
     onAbandoned,
@@ -153,7 +153,7 @@ export class LangyTurnTailService {
     const followSignal = AbortSignal.any([signal, settle.signal]);
     let synthesized: LangyStreamEntry | null = null;
 
-    const watcher = this.watchForMissedTerminal({
+    const watcher = this.tryWatchForMissedTerminal({
       readHealth,
       signal: followSignal,
       onAbandoned,

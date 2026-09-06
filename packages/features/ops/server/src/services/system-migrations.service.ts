@@ -14,11 +14,11 @@ import { SystemMigrationRollbackService } from "./system-migration-rollback.serv
 import { SystemMigrationRunService } from "./system-migration-run.service";
 import {
   ATTENTION_LIMIT,
-  requireRegisteredMigration,
   type MigrationEnrollmentRecord,
   type MigrationOverview,
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules";
+import { systemMigrationLookup } from "./system-migration-lookup.service";
 
 export type {
   MigrationEnrollmentRecord,
@@ -145,7 +145,8 @@ export class SystemMigrationsService {
    * dangerous; an unknown name is refused before any confirmation question arises.
    */
   requiresOperatorConfirmation({ migrationName }: { migrationName: string }): boolean {
-    return requireRegisteredMigration(this.deps, migrationName).requiresOperatorConfirmation;
+    return systemMigrationLookup.registeredMigration(this.deps, migrationName)
+      .requiresOperatorConfirmation;
   }
 
   /**

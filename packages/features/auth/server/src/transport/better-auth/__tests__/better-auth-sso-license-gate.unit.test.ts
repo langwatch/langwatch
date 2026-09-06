@@ -82,7 +82,7 @@ const deployment: BetterAuthDeploymentConfiguration = {
 
 function buildHook(federation: StubFederationPort) {
   const authOptions = createAuthOptions({
-    prisma: {} as never,
+    repo: {} as never,
     deployment,
     storage: new StubStoragePort(),
     federation,

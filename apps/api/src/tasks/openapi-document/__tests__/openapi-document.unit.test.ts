@@ -364,23 +364,7 @@ describe("given routes that declare a media type and no schema", () => {
 
     /** @scenario "No published response describes a body it cannot name" */
     it("publishes no response media object without a schema", () => {
-      const unnamed: string[] = [];
-      for (const [path, item] of Object.entries(generated.document.paths ?? {})) {
-        for (const [method, operation] of Object.entries(item)) {
-          const responses = (
-            operation as {
-              responses?: Record<string, { content?: Record<string, { schema?: unknown }> }>;
-            }
-          ).responses;
-          for (const [status, response] of Object.entries(responses ?? {})) {
-            for (const [mediaType, media] of Object.entries(response?.content ?? {})) {
-              if (media?.schema === undefined) {
-                unnamed.push(`${method.toUpperCase()} ${path} ${status} ${mediaType}`);
-              }
-            }
-          }
-        }
-      }
+      const unnamed = unnamedResponseMediaObjects(generated.document.paths);
 
       expect(unnamed).toEqual([]);
     });
@@ -537,10 +521,15 @@ describe("given the access policy every mounted route declares", () => {
         // A function, a closure or a class instance does not survive the
         // round trip; the reviewer's `reason` describes how a handler is
         // built and never belongs in a document a customer reads.
-        if (JSON.stringify(JSON.parse(JSON.stringify(policy))) !== JSON.stringify(policy)) {
+        const roundTripsCleanly =
+          JSON.stringify(JSON.parse(JSON.stringify(policy))) === JSON.stringify(policy);
+        if (!roundTripsCleanly) {
           unserialisable.push(operationKey);
         }
-        if (Object.keys(policy).some((member) => !PUBLISHED_POLICY_MEMBERS.includes(member))) {
+        const hasUnpublishedMember = Object.keys(policy).some(
+          (member) => !PUBLISHED_POLICY_MEMBERS.includes(member),
+        );
+        if (hasUnpublishedMember) {
           prose.push(`${operationKey}: ${Object.keys(policy).join(", ")}`);
         }
       }
@@ -565,6 +554,40 @@ const POLICY_KINDS = [
 
 /** Every member the extension is allowed to publish. `reason` is not one. */
 const PUBLISHED_POLICY_MEMBERS = ["kind", "credential", "permission", "param", "permissions"];
+
+/** One response's media objects that publish no schema, as `METHOD path status media`. */
+function unnamedMediaObjects(
+  method: string,
+  path: string,
+  status: string,
+  content: Record<string, { schema?: unknown }> | undefined,
+): string[] {
+  const unnamed: string[] = [];
+  for (const [mediaType, media] of Object.entries(content ?? {})) {
+    if (media?.schema === undefined) {
+      unnamed.push(`${method.toUpperCase()} ${path} ${status} ${mediaType}`);
+    }
+  }
+  return unnamed;
+}
+
+/** Every response media object across the document that publishes no schema. */
+function unnamedResponseMediaObjects(paths: OpenApiDocument["paths"]): string[] {
+  const unnamed: string[] = [];
+  for (const [path, item] of Object.entries(paths ?? {})) {
+    for (const [method, operation] of Object.entries(item)) {
+      const responses = (
+        operation as {
+          responses?: Record<string, { content?: Record<string, { schema?: unknown }> }>;
+        }
+      ).responses;
+      for (const [status, response] of Object.entries(responses ?? {})) {
+        unnamed.push(...unnamedMediaObjects(method, path, status, response?.content));
+      }
+    }
+  }
+  return unnamed;
+}
 
 /** Every published operation's `x-access-policy`, keyed the way the registry keys it. */
 function* publishedPolicies(): Generator<{

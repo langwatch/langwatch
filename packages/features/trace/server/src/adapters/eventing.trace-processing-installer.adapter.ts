@@ -6,7 +6,7 @@ import {
   type DatasetNormalizePayload,
 } from "@langwatch/dataset-contract";
 import type { AssignTopicCommandData, ResolveOriginCommandData } from "@langwatch/trace-contract";
-import { EventingTraceTopicAssignmentPort } from "./eventing.trace-topic.adapter";
+import { EventingTraceTopicAssignmentPort } from "./eventing.trace-topic-assignment.adapter";
 import {
   DEFERRED_ORIGIN_CHECK_DELAY_MS,
   type DeferredOriginPayload,

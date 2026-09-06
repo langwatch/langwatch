@@ -48,7 +48,7 @@ import {
 } from "@langwatch/prisma-client/generated";
 import { LedgerShareRepository } from "../ledger.share.repository";
 import { PrismaShareRepository } from "../../prisma/prisma.share.repository";
-import { AuthzCollectorService, PostgresAuthzAdapter } from "@langwatch/authz-server";
+import { AuthzCollectorService, PostgresAuthzAdapter } from "@langwatch/authz-server/testing";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

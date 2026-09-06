@@ -25,9 +25,9 @@ import {
   type AuthzUpdateBindingInput,
   type AuthzUpdateGrantInput,
 } from "@langwatch/authz-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { afterUserCreate } from "../better-auth-hooks.api";
+import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository";
 import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
@@ -107,11 +107,13 @@ class StubAnnouncementsPort implements BetterAuthAnnouncementsPort {
   }
 }
 
-function organizationPrisma(organization: { id: string; ssoDomain: string } | null): PrismaClient {
+function organizationRepo(
+  organization: { id: string; ssoDomain: string } | null,
+): BetterAuthHooksRepository {
   return {
-    organization: { findUnique: vi.fn().mockResolvedValue(organization) },
-    organizationUser: { create: vi.fn().mockResolvedValue(undefined) },
-  } as unknown as PrismaClient;
+    tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
+    createOrganizationMembership: vi.fn().mockResolvedValue("created"),
+  } as unknown as BetterAuthHooksRepository;
 }
 
 describe("afterUserCreate", () => {
@@ -134,7 +136,7 @@ describe("afterUserCreate", () => {
     /** @scenario BetterAuth signup tracks the PostHog signed_up milestone */
     it("tracks the signed_up analytics event with the user id", async () => {
       await afterUserCreate({
-        prisma: organizationPrisma(null),
+        repo: organizationRepo(null),
         user: { id: "user_1", email: "u@other.com", name: "User" },
         collaborators: collaborators(),
       });
@@ -149,7 +151,7 @@ describe("afterUserCreate", () => {
     /** @scenario PostHog signed_up still fires when the SSO auto-add path runs */
     it("tracks signed_up even when the SSO auto-add path runs", async () => {
       await afterUserCreate({
-        prisma: organizationPrisma({ id: "org_1", ssoDomain: "acme.com" }),
+        repo: organizationRepo({ id: "org_1", ssoDomain: "acme.com" }),
         user: { id: "user_2", email: "new@acme.com", name: "New User" },
         collaborators: collaborators(),
       });
@@ -164,7 +166,7 @@ describe("afterUserCreate", () => {
     /** @scenario PostHog signed_up still fires when the email has no parsable domain */
     it("tracks signed_up even when the user has no parsable email domain", async () => {
       await afterUserCreate({
-        prisma: organizationPrisma(null),
+        repo: organizationRepo(null),
         user: { id: "user_3", email: "", name: "User" },
         collaborators: collaborators(),
       });

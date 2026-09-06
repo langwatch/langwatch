@@ -122,7 +122,9 @@ export class LangyService extends LangyServiceContract {
   }
 
   /** Writes one line into the transcript without starting a turn (ADR-129). */
-  recordUserMessage(input: Parameters<LangyConversationService["recordUserMessage"]>[0]) {
+  recordUserMessage(
+    input: Parameters<LangyConversationService["recordUserMessage"]>[0],
+  ): ReturnType<LangyConversationService["recordUserMessage"]> {
     return this.conversations.recordUserMessage(input);
   }
 

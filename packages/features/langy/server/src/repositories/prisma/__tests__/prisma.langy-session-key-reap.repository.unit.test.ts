@@ -12,7 +12,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangyDatabase } from "../prisma.langy-database";
+import type { LangyDatabase } from "../langy-database.mapper";
 import {
   PrismaLangySessionKeyReapRepository,
   type PrismaLangySessionKeyReapDatabase,

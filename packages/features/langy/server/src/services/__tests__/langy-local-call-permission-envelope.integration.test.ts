@@ -64,7 +64,7 @@ async function callWaitingOnACard(clock: { now: number }) {
     timeoutMs: COMMAND_TIMEOUT_MS,
   });
   await dispatcher.ack(call.callId);
-  await dispatcher.awaitPermission({ callId: call.callId, waitId: "lwait_1" });
+  await dispatcher.tryAwaitPermission({ callId: call.callId, waitId: "lwait_1" });
   return { dispatcher, store, callId: call.callId };
 }
 
@@ -77,9 +77,9 @@ describe("given a call waiting on a permission card", () => {
 
       clock.now += ANSWER_DELAY_MS;
 
-      const waiting = await dispatcher.read(callId);
+      const waiting = await dispatcher.tryRead(callId);
       expect(waiting?.state).toBe("awaiting_permission");
-      const polled = await dispatcher.poll({ callId, holdMs: 0 });
+      const polled = await dispatcher.tryPoll({ callId, holdMs: 0 });
       expect(polled).not.toBeNull();
       expect(polled?.state).toBe("awaiting_permission");
 
@@ -89,7 +89,7 @@ describe("given a call waiting on a permission card", () => {
         decision: "allow_once",
       });
 
-      const running = await dispatcher.read(callId);
+      const running = await dispatcher.tryRead(callId);
       expect(running?.state).toBe("running");
       expect(running?.deadlineAt).toBe(clock.now + COMMAND_TIMEOUT_MS);
     });

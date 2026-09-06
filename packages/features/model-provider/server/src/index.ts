@@ -38,7 +38,7 @@ export type {
 export {
   EncryptedModelProviderCredentialAdapter,
   type CustomKeysRead,
-} from "./adapters/encrypted.model-provider-credential.adapter";
+} from "./adapters/encrypted.model-provider-api-key-credential.adapter";
 export {
   RegistryModelProviderCatalogAdapter,
   UnmanagedModelProviderGatewayAdapter,

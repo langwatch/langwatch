@@ -3,7 +3,7 @@
 import { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { DefaultGovernanceRoutingPolicyService } from "./governance-routing.service";
 import type { DefaultGovernancePersonalVirtualKeyService } from "./governance-personal-key.service";
-import type { DefaultGovernanceCliBootstrapService } from "./cli-bootstrap.service";
+import type { DefaultGovernanceCliBootstrapService } from "./governance-cli-tool-bootstrap.service";
 import type { DefaultGovernanceCliSessionInventoryService } from "./cli-session-inventory.service";
 import type { DefaultGovernanceCliTokenRevocationService } from "./cli-token-revocation.service";
 import type { DefaultGovernanceAdminWorkspaceViewAuditService } from "./admin-workspace-view-audit.service";

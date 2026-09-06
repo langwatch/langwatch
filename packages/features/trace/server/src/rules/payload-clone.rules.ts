@@ -20,8 +20,8 @@ function cloneUnknown(value: unknown): unknown {
   if (value === null || typeof value !== "object") return value;
 
   if (Array.isArray(value)) {
-    const copy = new Array(value.length);
-    for (let index = 0; index < value.length; index++) copy[index] = cloneUnknown(value[index]);
+    const copy: unknown[] = [];
+    for (let index = 0; index < value.length; index++) copy.push(cloneUnknown(value[index]));
     return copy;
   }
 

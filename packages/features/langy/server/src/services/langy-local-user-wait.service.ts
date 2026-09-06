@@ -226,7 +226,7 @@ export class UserWaitService {
    * pass refreshes the live stream when the keepalive interval has gone by, so
    * a turn that waits ten minutes is still readable on a reload.
    */
-  async poll({
+  async tryPoll({
     waitId,
     holdMs = CALL_POLL_HOLD_MS,
     signal,
@@ -373,7 +373,7 @@ export class UserWaitService {
     const ids = await this.store.zrangebyscore(turnWaitsKey(conversationId, turnId), 0);
     const pending: StoredUserWait[] = [];
     for (const id of ids) {
-      const wait = await this.read(id);
+      const wait = await this.tryRead(id);
       if (wait?.state === "pending") {
         pending.push(wait);
       }
@@ -382,7 +382,7 @@ export class UserWaitService {
     return pending;
   }
 
-  async read(waitId: string): Promise<StoredUserWait | null> {
+  async tryRead(waitId: string): Promise<StoredUserWait | null> {
     const raw = await this.store.tryGet(waitKey(waitId));
     if (!raw) {
       return null;
@@ -399,7 +399,7 @@ export class UserWaitService {
 
   /** The wait, with its budget applied: a card past its time reads expired. */
   private async readSettlingExpiry(waitId: string): Promise<StoredUserWait | null> {
-    const wait = await this.read(waitId);
+    const wait = await this.tryRead(waitId);
     if (!wait) {
       return null;
     }

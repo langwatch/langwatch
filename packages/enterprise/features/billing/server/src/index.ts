@@ -109,7 +109,10 @@ export {
   type LicenseEmailDelivery,
   type LicensePurchaseNotification,
 } from "./services/license-purchase.service";
-export { NotificationService, type UsageLimitEmailData } from "./services/notification.service";
+export {
+  NotificationService,
+  type UsageLimitEmailData,
+} from "./services/billing-usage-notice.service";
 export { NurturingService, type NurturingServiceOptions } from "./services/nurturing.service";
 export { NUMERIC_OVERRIDE_FIELDS, SaaSPlanProviderService } from "./services/plan-provider.service";
 export {
@@ -141,7 +144,7 @@ export {
   type HandleEventResult,
   type LicensePurchaseHandler,
   type WebhookService,
-} from "./services/billing-webhook.service";
+} from "./services/billing-stripe-webhook.service";
 export { BillingWebhookOrganizationPort } from "./ports/billing-webhook-organization.port";
 export {
   BillingWebhookHostPort,

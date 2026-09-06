@@ -144,7 +144,7 @@ export {
   EventingRecordSpanAdapter as RecordSpanCommand,
   type RecordSpanCommandOptions,
 } from "./adapters/eventing.record-span.adapter";
-export { EventingTraceTopicAdapter as AssignTopicCommand } from "./adapters/eventing.trace-topic.adapter";
+export { EventingTraceTopicAdapter as AssignTopicCommand } from "./adapters/eventing.trace-topic-assignment.adapter";
 
 export { EventingTraceLogContributionAdapter as RecordLogContributionCommand } from "./adapters/eventing.trace-log-contribution.adapter";
 export { EventingTraceMetricCorrelationAdapter as RecordMetricCorrelationCommand } from "./adapters/eventing.trace-metric-correlation.adapter";

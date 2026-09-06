@@ -1,17 +1,25 @@
 /**
  * @vitest-environment node
  */
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 import { beforeSessionCreate } from "../better-auth-hooks.api";
+import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
-function prismaAnswering(deactivatedAt: Date | null) {
-  const findUnique = vi.fn(async () => ({ deactivatedAt }));
-  return { prisma: { user: { findUnique } } as unknown as PrismaClient, findUnique };
+function repoAnswering(deactivatedAt: Date | null) {
+  const tryFindUserForHooks = vi.fn(async () => ({
+    id: "user-1",
+    email: "user@example.com",
+    deactivatedAt,
+    pendingSsoSetup: false,
+  }));
+  return {
+    repo: { tryFindUserForHooks } as unknown as BetterAuthHooksRepository,
+    tryFindUserForHooks,
+  };
 }
 
 describe("beforeSessionCreate", () => {
@@ -20,9 +28,9 @@ describe("beforeSessionCreate", () => {
       /** @scenario "Deactivated user is blocked from signing in" */
       /** @scenario "Deactivated user is blocked" */
       it("denies the sign-in", async () => {
-        const { prisma } = prismaAnswering(new Date("2026-01-01T00:00:00.000Z"));
+        const { repo } = repoAnswering(new Date("2026-01-01T00:00:00.000Z"));
 
-        await expect(beforeSessionCreate({ prisma, session: { userId: "user-1" } })).resolves.toBe(
+        await expect(beforeSessionCreate({ repo, session: { userId: "user-1" } })).resolves.toBe(
           false,
         );
       });
@@ -33,12 +41,12 @@ describe("beforeSessionCreate", () => {
     describe("when a session is about to be created for them", () => {
       /** @scenario "Active user is not blocked from signing in" */
       it("leaves the sign-in to continue", async () => {
-        const { prisma, findUnique } = prismaAnswering(null);
+        const { repo, tryFindUserForHooks } = repoAnswering(null);
 
         await expect(
-          beforeSessionCreate({ prisma, session: { userId: "user-1" } }),
+          beforeSessionCreate({ repo, session: { userId: "user-1" } }),
         ).resolves.toBeUndefined();
-        expect(findUnique).toHaveBeenCalled();
+        expect(tryFindUserForHooks).toHaveBeenCalled();
       });
     });
   });

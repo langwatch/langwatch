@@ -19,7 +19,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { CliAdminContactPort, CliBudgetOverviewPort } from "../../ports/cli-bootstrap.port";
-import { DefaultGovernanceCliBootstrapService } from "../cli-bootstrap.service";
+import { DefaultGovernanceCliBootstrapService } from "../governance-cli-tool-bootstrap.service";
 import { OrganizationSupportContactService } from "../organization-support-contact.service";
 import { PrismaOrganizationSupportContactRepository } from "../../repositories/prisma/prisma.organization-support-contact.repository";
 

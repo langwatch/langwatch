@@ -63,17 +63,21 @@ export interface StandardJsonSchema<O = unknown> {
   };
 }
 
+/** The `output` field of a Standard Schema `types` entry, narrowed to a param record. */
+type StandardOutputOf<T> =
+  NonNullable<T> extends { readonly output: infer O }
+    ? O extends Record<string, unknown>
+      ? O
+      : Record<string, AgentParameterValue>
+    : Record<string, AgentParameterValue>;
+
 /** The `params` type a Standard Schema object gives the handler: its parsed output. */
 export type InferStandardOutput<S> = S extends {
   readonly "~standard": { readonly types?: infer T };
 }
   ? [NonNullable<T>] extends [never]
     ? Record<string, AgentParameterValue>
-    : NonNullable<T> extends { readonly output: infer O }
-      ? O extends Record<string, unknown>
-        ? O
-        : Record<string, AgentParameterValue>
-      : Record<string, AgentParameterValue>
+    : StandardOutputOf<T>
   : Record<string, AgentParameterValue>;
 
 /** Every form `parameters` accepts. */

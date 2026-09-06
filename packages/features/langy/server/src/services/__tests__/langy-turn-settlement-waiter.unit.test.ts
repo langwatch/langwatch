@@ -8,7 +8,7 @@ const mockFollow = vi.fn();
 
 const { LangyTurnSettlementWaiterService } =
   await import("../langy-turn-settlement-waiter.service");
-const awaitTurnSettlement = LangyTurnSettlementWaiterService.awaitTurnSettlement;
+const tryAwaitTurnSettlement = LangyTurnSettlementWaiterService.tryAwaitTurnSettlement;
 
 const emptyPage = {
   events: [],
@@ -50,7 +50,7 @@ const args = {
   userId: "user-1",
 };
 
-describe("awaitTurnSettlement", () => {
+describe("tryAwaitTurnSettlement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockReadTail.mockResolvedValue({ reads: [], lastId: "0" });
@@ -62,7 +62,7 @@ describe("awaitTurnSettlement", () => {
       yield { id: "1-1", entry: { type: "end" } };
     });
 
-    const settlement = await awaitTurnSettlement({
+    const settlement = await tryAwaitTurnSettlement({
       ...args,
       signal: AbortSignal.timeout(5_000),
       pollIntervalMs: 5,
@@ -84,7 +84,7 @@ describe("awaitTurnSettlement", () => {
     });
     mockGetEventsAfter.mockResolvedValue(settledPage);
 
-    const settlement = await awaitTurnSettlement({
+    const settlement = await tryAwaitTurnSettlement({
       ...args,
       signal: AbortSignal.timeout(5_000),
       pollIntervalMs: 5,
@@ -101,7 +101,7 @@ describe("awaitTurnSettlement", () => {
       );
     });
 
-    const settlement = await awaitTurnSettlement({
+    const settlement = await tryAwaitTurnSettlement({
       ...args,
       signal: AbortSignal.timeout(50),
       pollIntervalMs: 5,

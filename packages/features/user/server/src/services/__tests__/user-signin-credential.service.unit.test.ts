@@ -13,8 +13,8 @@ import {
   type UserCredentialAccount,
   UserCredentialRepository,
   type UserLinkedAccount,
-} from "../../repositories/user-credential.repository";
-import { UserCredentialService } from "../user-credential.service";
+} from "../../repositories/user-signin-credential.repository";
+import { UserCredentialService } from "../user-signin-credential.service";
 
 const USER_ID = "user-1";
 const ACCOUNT_ID = "account-credential";

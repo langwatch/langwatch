@@ -171,7 +171,7 @@ export class LocalCallDispatcherService {
    * refreshes turn liveness here rather than on a timer, so a dead worker's
    * turn ends once it stops polling.
    */
-  async poll({
+  async tryPoll({
     callId,
     holdMs = CALL_POLL_HOLD_MS,
     signal,
@@ -183,7 +183,7 @@ export class LocalCallDispatcherService {
     const until = this.now() + holdMs;
     const beat = this.beater();
     for (;;) {
-      const call = await this.read(callId);
+      const call = await this.tryRead(callId);
       if (!call) {
         return null;
       }
@@ -262,7 +262,7 @@ export class LocalCallDispatcherService {
 
   /** The command line started the call. */
   async ack(callId: string): Promise<void> {
-    const call = await this.read(callId);
+    const call = await this.tryRead(callId);
     if (call?.state !== "pending") {
       return;
     }
@@ -275,14 +275,14 @@ export class LocalCallDispatcherService {
    * it now stands so the caller can raise the card against it. The envelope
    * now has to outlive the CARD's wait budget, not the command's own deadline.
    */
-  async awaitPermission({
+  async tryAwaitPermission({
     callId,
     waitId,
   }: {
     callId: string;
     waitId: string;
   }): Promise<StoredLocalCall | null> {
-    const call = await this.read(callId);
+    const call = await this.tryRead(callId);
     if (!call || call.state === "done") {
       return null;
     }
@@ -308,7 +308,7 @@ export class LocalCallDispatcherService {
     callId: string;
     decision: "allow_once" | "allow_pattern" | "deny" | "expired";
   }): Promise<void> {
-    const call = await this.read(callId);
+    const call = await this.tryRead(callId);
     if (call && call.state === "awaiting_permission") {
       // The command starts now, so its time limit starts now. Counting the
       // minutes the developer spent reading the card against the command left
@@ -338,7 +338,7 @@ export class LocalCallDispatcherService {
     callId: string;
     frame: Pick<ResultFrame, "ok" | "text" | "output" | "error">;
   }): Promise<void> {
-    const call = await this.read(callId);
+    const call = await this.tryRead(callId);
     if (!call || call.state === "done") {
       return;
     }
@@ -357,7 +357,7 @@ export class LocalCallDispatcherService {
    * folder left, or the permission card expired. Idempotent, because the turn
    * cancel path and the worker's own cancel both reach here.
    */
-  async cancel({
+  async tryCancel({
     callId,
     code = "cancelled",
     message = "The turn was stopped, so the command did not finish.",
@@ -366,7 +366,7 @@ export class LocalCallDispatcherService {
     code?: "cancelled" | "timeout" | "permission_expired" | "exec_failed";
     message?: string;
   }): Promise<StoredLocalCall | null> {
-    const call = await this.read(callId);
+    const call = await this.tryRead(callId);
     if (!call || call.state === "done") {
       return null;
     }
@@ -397,7 +397,7 @@ export class LocalCallDispatcherService {
     const ids = await this.store.zrangebyscore(pendingCallsKey(conversationId), 0);
     const calls: StoredLocalCall[] = [];
     for (const id of ids) {
-      const call = await this.read(id);
+      const call = await this.tryRead(id);
       if (call && call.state !== "done") {
         calls.push(call);
       }
@@ -416,7 +416,7 @@ export class LocalCallDispatcherService {
     const ids = await this.store.zrangebyscore(pendingCallsKey(conversationId), now);
     const envelopes: CallEnvelope[] = [];
     for (const id of ids) {
-      const call = await this.read(id);
+      const call = await this.tryRead(id);
       if (call && call.state !== "done") {
         envelopes.push(toEnvelope(call));
       }
@@ -425,7 +425,7 @@ export class LocalCallDispatcherService {
     return envelopes;
   }
 
-  async read(callId: string): Promise<StoredLocalCall | null> {
+  async tryRead(callId: string): Promise<StoredLocalCall | null> {
     const raw = await this.store.tryGet(callKey(callId));
     if (!raw) {
       return null;

@@ -3,9 +3,9 @@
  * federation, and it rides the same platform SSO license gate as every other provider — a
  * domain-matched organization must not gain a member off a licensing store answer of "no
  */
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 
+import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository";
 import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
@@ -49,21 +49,23 @@ class StubAnnouncementsPort implements BetterAuthAnnouncementsPort {
   }
 }
 
-function organizationPrisma(organization: { id: string; ssoDomain: string } | null): PrismaClient {
+function organizationRepo(
+  organization: { id: string; ssoDomain: string } | null,
+): BetterAuthHooksRepository {
   return {
-    organization: { findUnique: vi.fn().mockResolvedValue(organization) },
-    organizationUser: { create: vi.fn() },
-  } as unknown as PrismaClient;
+    tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
+    createOrganizationMembership: vi.fn(),
+  } as unknown as BetterAuthHooksRepository;
 }
 
 describe("the ssoDomain auto-join on an unlicensed deployment", () => {
   /** @scenario "Unlicensed-mode signup does not auto-join a domain-matched organization" */
   it("creates the account and skips the domain-matched organization entirely", async () => {
     const federation = new StubFederationPort(false);
-    const prisma = organizationPrisma({ id: "org_1", ssoDomain: "acme.com" });
+    const repo = organizationRepo({ id: "org_1", ssoDomain: "acme.com" });
 
     await afterUserCreate({
-      prisma,
+      repo,
       user: { id: "user_1", email: "new@acme.com", name: "New User" },
       collaborators: {
         federation,
@@ -73,7 +75,7 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
       },
     });
 
-    expect(prisma.organization.findUnique).not.toHaveBeenCalled();
-    expect(prisma.organizationUser.create).not.toHaveBeenCalled();
+    expect(repo.tryFindOrganizationBySsoDomain).not.toHaveBeenCalled();
+    expect(repo.createOrganizationMembership).not.toHaveBeenCalled();
   });
 });

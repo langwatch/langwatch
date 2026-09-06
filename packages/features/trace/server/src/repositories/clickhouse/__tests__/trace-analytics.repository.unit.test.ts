@@ -39,7 +39,7 @@ import {
   orderingClient,
   TestWindowedReadMetrics,
 } from "../../../ports/__tests__/repositories/clickhouse-test-helpers";
-import { TraceAnalyticsClickHouseRepository } from "../trace-analytics.repository";
+import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository";
 
 const TENANT_ID = "project_analyticsreadbackunit";
 const TRACE_ID = "trace-tz";

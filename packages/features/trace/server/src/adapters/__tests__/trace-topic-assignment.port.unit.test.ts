@@ -1,7 +1,7 @@
 import type { AssignTopicCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { EventingTraceTopicAssignmentPort } from "../eventing.trace-topic.adapter";
+import { EventingTraceTopicAssignmentPort } from "../eventing.trace-topic-assignment.adapter";
 import { TraceTopicAssignmentCommandPort } from "../../ports/trace-topic-assignment-command.port";
 
 class Commands extends TraceTopicAssignmentCommandPort {

@@ -10,7 +10,7 @@ import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ConnectUpgradeRouterPort as UpgradeRouter } from "@langwatch/api";
 import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
-import { DeliveredCalls } from "../../rules/langy-local-delivered-calls.rules";
+import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service";
 import type { PresenceHeartbeat } from "../../ports/langy-local-presence.port";
 import {
   type CliFrame,
@@ -40,7 +40,7 @@ interface LiveSocket {
   session: ControlSession;
   unsubscribe: (() => Promise<void>) | null;
   /** The calls this socket was handed, so none goes out twice. */
-  delivered: DeliveredCalls;
+  delivered: DeliveredCallsService;
   pongs: number;
   ping: NodeJS.Timeout | null;
   heartbeat: NodeJS.Timeout | null;
@@ -156,7 +156,7 @@ export class LocalControlGateway {
       socket: ws,
       session: registered.session,
       unsubscribe: null,
-      delivered: new DeliveredCalls(),
+      delivered: DeliveredCallsService.create(),
       pongs: 0,
       ping: null,
       heartbeat: null,

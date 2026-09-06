@@ -6,7 +6,7 @@ import {
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsRow,
 } from "../../projections/trace-derived.projection";
-import type { TraceAnalyticsRepository } from "../trace-analytics.repository";
+import type { TraceAnalyticsRepository } from "../trace-metrics-analytics.repository";
 import { queryWindowed } from "./windowed-read.mapper";
 
 const TABLE_NAME = "trace_analytics" as const;

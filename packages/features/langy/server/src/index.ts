@@ -15,7 +15,7 @@ export {
   navigateResourceKindFor,
 } from "./rules/langy-navigate-resources.rules";
 export type { LangyRelayCompositionOptions } from "./adapters/langy.langy.adapter";
-export type { LangyDatabase } from "./repositories/prisma/prisma.langy-database";
+export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper";
 export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service";
 export {
   LANGY_CANDIDATE_PERMISSIONS,
@@ -315,7 +315,6 @@ export {
   type ControlRequestProjects,
   type StoredControlRequest,
 } from "./services/langy-local-control-request.service";
-export { toControlRequestWire } from "./rules/langy-local-control-request-wire.rules";
 export {
   LocalControlSessionCoreService,
   type ControlConversations,
@@ -358,7 +357,7 @@ export {
 export {
   LocalControlLongPoll,
   type LocalControlLongPollOptions,
-} from "./transport/api-rest/langy-local-control-long-poll";
+} from "./transport/api-rest/langy-local-control-long-poll.api";
 export {
   CONTROL_CONNECT_PATH,
   LocalControlGateway,

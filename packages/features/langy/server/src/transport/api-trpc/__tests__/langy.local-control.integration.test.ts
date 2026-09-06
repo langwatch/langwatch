@@ -154,7 +154,7 @@ async function permissionCard(): Promise<{ waitId: string; callId: string }> {
     workspaceName: "acme-app",
     hostname: "rogerio-mbp",
   });
-  await runtime.dispatcher.awaitPermission({
+  await runtime.dispatcher.tryAwaitPermission({
     callId: call.callId,
     waitId: wait.waitId,
   });
@@ -211,7 +211,7 @@ describe("given a permission card waiting in the chat", () => {
         decision: "allow_once",
       });
 
-      expect(await runtime.waits.read(waitId)).toMatchObject({
+      expect(await runtime.waits.tryRead(waitId)).toMatchObject({
         state: "answered",
         decision: "allow_once",
         answeredBy: userId,
@@ -221,7 +221,7 @@ describe("given a permission card waiting in the chat", () => {
         decision: "allow_once",
       });
       // The card released the command, so the call is running again.
-      expect((await runtime.dispatcher.read(callId))?.state).toBe("running");
+      expect((await runtime.dispatcher.tryRead(callId))?.state).toBe("running");
     });
   });
 
@@ -293,7 +293,7 @@ describe("given a question Langy asked mid-task", () => {
         ],
       });
 
-      expect(await runtime.waits.poll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
+      expect(await runtime.waits.tryPoll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
         state: "answered",
         answers: [{ selected: ["acme-free"] }],
       });
@@ -379,7 +379,7 @@ describe("given a folder shared with the conversation", () => {
 
       expect(answer).toEqual({ disconnected: true });
       expect(await runtime.presence.read(conversationId)).toBeNull();
-      expect((await runtime.dispatcher.read(call.callId))?.state).toBe("done");
+      expect((await runtime.dispatcher.tryRead(call.callId))?.state).toBe("done");
       expect(
         commands.find((command) => command.name === "local_workspace_disconnected")?.data,
       ).toMatchObject({ reason: "panel" });
@@ -410,7 +410,7 @@ describe("given a folder shared with the conversation", () => {
       const answer = await caller.disconnectLocalWorkspace({ projectId, conversationId });
 
       expect(answer).toEqual({ disconnected: false });
-      expect(await runtime.requests.readKeyBinding(apiKeyId)).toBeNull();
+      expect(await runtime.requests.tryReadKeyBinding(apiKeyId)).toBeNull();
     });
   });
 

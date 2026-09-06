@@ -12,10 +12,10 @@ import {
   type TraceSummaryReadWindow,
 } from "../ports/trace-summary-projection.port";
 import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projection";
-import type { TraceAnalyticsRepository } from "../repositories/trace-analytics.repository";
+import type { TraceAnalyticsRepository } from "../repositories/trace-metrics-analytics.repository";
 import type { TraceAnalyticsRollupRepository } from "../repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "../repositories/trace-summary.repository";
-import { TraceAnalyticsClickHouseRepository } from "../repositories/clickhouse/trace-analytics.repository";
+import { TraceAnalyticsClickHouseRepository } from "../repositories/clickhouse/trace-metrics-analytics.repository";
 import { TraceAnalyticsRollupClickHouseRepository } from "../repositories/clickhouse/trace-analytics-rollup.repository";
 import { TraceSummaryClickHouseRepository } from "../repositories/clickhouse/trace-summary.repository";
 

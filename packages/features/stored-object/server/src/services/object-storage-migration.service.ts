@@ -8,10 +8,19 @@ import {
   assertUriDigest,
   copyVerified,
   hasMigratableChunkCount,
-  newerVersionTimestamp,
   paginate,
   sha256OfStream,
 } from "../rules/object-storage-migration-transfer.rules";
+
+/**
+ * The later of two version timestamps, nudged a millisecond past `previous`
+ * so a re-run of the same instant still advances the row's version. Kept
+ * beside the service (not the rules module) because it constructs a `Date`,
+ * which the rules module may not do even for a pure computation like this.
+ */
+function newerVersionTimestamp(previous: Date, candidate: Date): Date {
+  return new Date(Math.max(candidate.getTime(), previous.getTime() + 1));
+}
 
 export type MigrationProvider = "s3" | "azure";
 

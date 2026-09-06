@@ -124,7 +124,7 @@ async function pollFor({
 }): Promise<void> {
   const until = now + forMs;
   while (now < until) {
-    await dispatcher.poll({ callId, holdMs: 0 });
+    await dispatcher.tryPoll({ callId, holdMs: 0 });
     now += CALL_POLL_HOLD_MS;
   }
 }

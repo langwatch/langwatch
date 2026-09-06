@@ -15,7 +15,7 @@ import {
   RedisBetterAuthSecondaryStorageAdapter,
 } from "../../adapters/better-auth-secondary-storage.adapter";
 import type { SignInMethodPolicy } from "@langwatch/identity-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository";
 import type { UserService } from "@langwatch/user-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
@@ -122,7 +122,7 @@ function refusesCredentialRoute({
  * Builds the Better Auth transport around the process-owned mailer.
  */
 export const createAuthOptions = ({
-  prisma,
+  repo,
   deployment,
   storage,
   federation,
@@ -130,7 +130,7 @@ export const createAuthOptions = ({
   shadow,
   hooks,
 }: {
-  prisma: PrismaClient;
+  repo: BetterAuthHooksRepository;
   deployment: BetterAuthDeploymentConfiguration;
   storage: BetterAuthStoragePort;
   federation: BetterAuthFederationPort;
@@ -313,7 +313,7 @@ export const createAuthOptions = ({
       create: {
         before: async (user) =>
           beforeUserCreate({
-            prisma,
+            repo,
             user: user as {
               email: string;
               deactivatedAt?: Date | null;
@@ -321,7 +321,7 @@ export const createAuthOptions = ({
           }),
         after: async (user) => {
           await afterUserCreate({
-            prisma,
+            repo,
             user: user as { id: string; email: string; name: string },
             collaborators: hooks,
           });
@@ -342,7 +342,7 @@ export const createAuthOptions = ({
       create: {
         before: async (account) => {
           await tryBeforeAccountCreate({
-            prisma,
+            repo,
             account: {
               userId: account.userId,
               providerId: account.providerId,
@@ -359,7 +359,7 @@ export const createAuthOptions = ({
         after: async (account) => {
           if (!account.userId || !account.providerId || !account.accountId) return;
           await afterAccountCreate({
-            prisma,
+            repo,
             account: {
               userId: account.userId as string,
               providerId: account.providerId as string,
@@ -375,7 +375,7 @@ export const createAuthOptions = ({
           // for users whose correct-provider account is already linked.
           if (!account.userId || !account.providerId || !account.accountId) return;
           await afterAccountUpdate({
-            prisma,
+            repo,
             account: {
               userId: account.userId as string,
               providerId: account.providerId as string,
@@ -396,12 +396,12 @@ export const createAuthOptions = ({
       create: {
         before: async (session) =>
           beforeSessionCreate({
-            prisma,
+            repo,
             session: { userId: session.userId },
           }),
         after: async (session) => {
           await afterSessionCreate({
-            prisma,
+            repo,
             userId: session.userId,
             announcements: hooks.announcements,
           });
@@ -516,8 +516,8 @@ function genericOAuthPlugins(
 export type BetterAuthTransportOptions = Readonly<{
   /** The Auth service whose sessions this instance mints and revokes. */
   auth: AuthService;
-  /** The typed client every database hook reads and writes through. */
-  database: PrismaClient;
+  /** The persistence boundary every database hook reads and writes through. */
+  database: BetterAuthHooksRepository;
   /** The instance's storage engine — see {@link BetterAuthStoragePort}. */
   storage: BetterAuthStoragePort;
   deployment: BetterAuthDeploymentConfiguration;
@@ -559,7 +559,7 @@ export const createBetterAuthTransport = ({
 }: BetterAuthTransportOptions) => {
   const secondaryStorage = createSecondaryStorage(redis);
   const authOptions = createAuthOptions({
-    prisma: database,
+    repo: database,
     deployment,
     storage,
     federation,

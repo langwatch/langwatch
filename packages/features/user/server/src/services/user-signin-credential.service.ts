@@ -3,7 +3,7 @@ import type {
   UnlinkUserAccountOutcome,
   UserCredentialRepository,
   UserLinkedAccount,
-} from "../repositories/user-credential.repository";
+} from "../repositories/user-signin-credential.repository";
 
 /**
  * What a password rotation did, or why it did nothing. Three outcomes rather than three

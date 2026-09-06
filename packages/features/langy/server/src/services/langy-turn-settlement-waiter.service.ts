@@ -67,7 +67,7 @@ export class LangyTurnSettlementWaiterService {
     });
   }
 
-  static settlementFromEvents(
+  static trySettlementFromEvents(
     events: LangyConversationTurnWireEvent[],
     turnId: string,
   ): TurnSettlement | null {
@@ -150,7 +150,7 @@ export class LangyTurnSettlementWaiterService {
         return null;
       }
 
-      const settlement = LangyTurnSettlementWaiterService.settlementFromEvents(
+      const settlement = LangyTurnSettlementWaiterService.trySettlementFromEvents(
         page.events,
         input.turnId,
       );
@@ -241,7 +241,7 @@ export class LangyTurnSettlementWaiterService {
     return Promise.race([terminal, delay]);
   }
 
-  static async awaitTurnSettlement(input: {
+  static async tryAwaitTurnSettlement(input: {
     langy: LangyTurnSettlementReader;
     openBuffer: OpenLangyTurnBuffer | null;
     projectId: string;

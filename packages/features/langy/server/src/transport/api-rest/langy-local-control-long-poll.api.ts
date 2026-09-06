@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { Unsubscribe } from "@langwatch/agent-contract";
 import { CALL_POLL_HOLD_MS, POLL_INTERVAL_MS } from "@langwatch/langy-contract";
-import { DeliveredCalls } from "../../rules/langy-local-delivered-calls.rules";
+import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service";
 import {
   type CliFrame,
   LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -168,7 +168,7 @@ export class LocalControlLongPoll {
   private async orphanedCalls(inFlightCallIds: string[]): Promise<PlatformFrame[]> {
     const frames: PlatformFrame[] = [];
     for (const callId of inFlightCallIds) {
-      const call = await this.core.dispatcher.read(callId);
+      const call = await this.core.dispatcher.tryRead(callId);
       if (call && call.state !== "done") continue;
       frames.push({
         type: "cancel",
@@ -264,8 +264,8 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
  * A delivered set that already holds what the command line says it is
  * running, so a reconnect never starts a second copy of a call in flight.
  */
-function deliveredWith(inFlightCallIds: readonly string[]): DeliveredCalls {
-  const delivered = new DeliveredCalls();
+function deliveredWith(inFlightCallIds: readonly string[]): DeliveredCallsService {
+  const delivered = DeliveredCallsService.create();
   for (const callId of inFlightCallIds) delivered.reserve(callId);
   return delivered;
 }

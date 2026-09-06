@@ -9,7 +9,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service";
 import { PostgresAnomalyRuleAdapter } from "./postgres.anomaly-rule.adapter";
 import { PostgresDepartmentAdapter } from "./postgres.department.adapter";
-import { DefaultGovernanceCliBootstrapService } from "../services/cli-bootstrap.service";
+import { DefaultGovernanceCliBootstrapService } from "../services/governance-cli-tool-bootstrap.service";
 import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service";
 import { DefaultGovernanceCliTokenRevocationService } from "../services/cli-token-revocation.service";
 import { DefaultGovernancePersonalUsageService } from "../services/personal-usage.service";

@@ -8,7 +8,11 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
-import { CONTROL_REQUEST_TTL_MS, SHARE_CONTROL_COMMAND } from "@langwatch/langy-contract";
+import {
+  CONTROL_REQUEST_TTL_MS,
+  SHARE_CONTROL_COMMAND,
+  type ControlRequest,
+} from "@langwatch/langy-contract";
 import {
   LangyLocalRequestExpiredError,
   LangyLocalRequestInvalidError,
@@ -94,6 +98,26 @@ export class ControlRequestService {
     return new ControlRequestService(options);
   }
 
+  /**
+   * The wire shape of one request, as the command line lists it.
+   *
+   * A static method (not a `rules/` function) because it constructs a
+   * `Date` to format the stored epoch millis as ISO strings — a rules
+   * module may not construct one even for a pure formatting use.
+   */
+  static toWire(request: StoredControlRequest): ControlRequest {
+    return {
+      id: request.id,
+      conversationId: request.conversationId,
+      conversationTitle: request.conversationTitle,
+      conversationUrl: request.conversationUrl,
+      projectId: request.projectId,
+      projectName: request.projectName,
+      createdAt: new Date(request.createdAt).toISOString(),
+      expiresAt: new Date(request.expiresAt).toISOString(),
+    };
+  }
+
   private constructor(options: ControlRequestServiceOptions) {
     this.store = options.store;
     this.projects = options.projects;
@@ -176,7 +200,7 @@ export class ControlRequestService {
     const ids = await this.store.zrangebyscore(key, now);
     const requests: StoredControlRequest[] = [];
     for (const id of ids) {
-      const request = await this.read(id);
+      const request = await this.tryRead(id);
       if (!request) {
         continue;
       }
@@ -192,7 +216,7 @@ export class ControlRequestService {
   }
 
   /** The open request of one conversation, for the card that is waiting on it. */
-  async findOpenForConversation({
+  async tryFindOpenForConversation({
     projectId,
     userId,
     conversationId,
@@ -207,7 +231,7 @@ export class ControlRequestService {
   }
 
   /** The conversation one minted key controls, or nothing when it controls none. */
-  async readKeyBinding(apiKeyId: string): Promise<SessionKeyBinding | null> {
+  async tryReadKeyBinding(apiKeyId: string): Promise<SessionKeyBinding | null> {
     const raw = await this.store.tryGet(sessionKeyBindingKey(apiKeyId));
     if (!raw) {
       return null;
@@ -224,7 +248,7 @@ export class ControlRequestService {
 
   /** Drops the binding, so the key stops answering for the conversation. */
   async revokeKeyBinding(apiKeyId: string): Promise<void> {
-    const binding = await this.readKeyBinding(apiKeyId);
+    const binding = await this.tryReadKeyBinding(apiKeyId);
     await this.store.del(sessionKeyBindingKey(apiKeyId));
     if (binding) {
       await this.store.zrem(conversationKeyBindingsKey(binding.conversationId), apiKeyId);
@@ -247,7 +271,7 @@ export class ControlRequestService {
     return apiKeyIds;
   }
 
-  async read(requestId: string): Promise<StoredControlRequest | null> {
+  async tryRead(requestId: string): Promise<StoredControlRequest | null> {
     const raw = await this.store.tryGet(controlRequestKey(requestId));
     if (!raw) {
       return null;
@@ -345,7 +369,7 @@ export class ControlRequestService {
     userId: string;
     projectId: string;
   }): Promise<StoredControlRequest> {
-    const request = await this.read(requestId);
+    const request = await this.tryRead(requestId);
     // A request that belongs to somebody else answers exactly like one that
     // never existed, so the id cannot be used to probe another person's chat.
     if (!request || request.userId !== userId || request.projectId !== projectId) {

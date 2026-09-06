@@ -29,9 +29,9 @@ import {
 import { z } from "zod";
 
 import type { LocalControlRuntime } from "#adapters/langy-local-control-runtime.adapter";
-import { toControlRequestWire } from "#rules/langy-local-control-request-wire.rules";
+import { ControlRequestService } from "#services/langy-local-control-request.service";
 import { conversationUrl } from "#rules/langy-local-session-text.rules";
-import type { LocalControlLongPoll } from "./langy-local-control-long-poll";
+import type { LocalControlLongPoll } from "./langy-local-control-long-poll.api";
 
 /** Everything the control family reaches that Langy does not own. */
 export type LangyLocalControlRestPorts = Readonly<{
@@ -130,7 +130,7 @@ export function createLangyLocalControlRestApp(options: {
       projectId: projectOf(c).id,
       userId: requireUser(c),
     });
-    return { requests: requests.map(toControlRequestWire) };
+    return { requests: requests.map((request) => ControlRequestService.toWire(request)) };
   };
 
   const approveHandler = async (c: ControlContext, input: { id: string }) => {

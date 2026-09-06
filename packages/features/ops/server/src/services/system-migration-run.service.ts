@@ -12,10 +12,10 @@ import {
   MigrationRunRequiresEnrollmentError,
 } from "@langwatch/ops-contract";
 import {
-  requireRegisteredMigration,
   statusOfMemberSummary,
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules";
+import { systemMigrationLookup } from "./system-migration-lookup.service";
 
 export class SystemMigrationRunService {
   static create(deps: SystemMigrationsServiceDependencies): SystemMigrationRunService {
@@ -33,7 +33,7 @@ export class SystemMigrationRunService {
     migrationName: string;
     actorUserId: string;
   }): Promise<{ status: TenantMigrationStatus | null; waiting: boolean }> {
-    const migration = requireRegisteredMigration(this.deps, migrationName);
+    const migration = systemMigrationLookup.registeredMigration(this.deps, migrationName);
     await this.requireRunnableForOrganization({
       migration,
       organizationId,

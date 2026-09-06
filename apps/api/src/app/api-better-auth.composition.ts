@@ -7,6 +7,7 @@ import {
   BetterAuthStoragePort,
   createBetterAuthTransport,
   isEmailPasswordEnabled,
+  PrismaBetterAuthHooksRepository,
   SignInRouterShadowPort,
   type BetterAuthAccountRow,
   type PendingOrganizationInvite,
@@ -356,7 +357,7 @@ export function composeApiBetterAuth(options: ApiBetterAuthCompositionOptions) {
   return createBetterAuthTransport({
     auth: options.auth,
     users: options.users,
-    database: options.database,
+    database: PrismaBetterAuthHooksRepository.create(options.database),
     redis: options.redis,
     storage: ApiPrismaBetterAuthStorage.create(options.database),
     deployment: {

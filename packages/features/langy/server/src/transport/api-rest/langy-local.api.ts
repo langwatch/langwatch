@@ -34,7 +34,7 @@ import type { LocalControlRuntime } from "#adapters/langy-local-control-runtime.
 import { LangyKeyIdentityService } from "#services/langy-key-identity.service";
 import type { ControlSkipGate } from "#services/langy-local-session.service";
 import { conversationTitle, conversationUrl } from "#rules/langy-local-session-text.rules";
-import { toControlRequestWire } from "#rules/langy-local-control-request-wire.rules";
+import { ControlRequestService } from "#services/langy-local-control-request.service";
 import { reconcileSkipPolicy } from "#rules/langy-local-skip-policy.rules";
 import type { UserWaitEvents } from "#services/langy-local-user-wait.service";
 import type { LangyRestCredentialPorts } from "./langy-rest-credentials.api";
@@ -202,7 +202,7 @@ export function createLangyLocalRestApp(options: {
 
     const runtime = ports.runtime();
     const connected = await runtime.presence.read(conversationId);
-    const pendingRequest = await runtime.requests.findOpenForConversation({
+    const pendingRequest = await runtime.requests.tryFindOpenForConversation({
       projectId: auth.projectId,
       userId: auth.userId,
       conversationId,
@@ -216,7 +216,7 @@ export function createLangyLocalRestApp(options: {
         ...(connected ? { workspace: connected.workspace } : {}),
         codeAccessPreference: preference === "github" ? "github" : null,
         github,
-        ...(pendingRequest ? { pendingRequest: toControlRequestWire(pendingRequest) } : {}),
+        ...(pendingRequest ? { pendingRequest: ControlRequestService.toWire(pendingRequest) } : {}),
       }),
       200,
     );
@@ -252,7 +252,7 @@ export function createLangyLocalRestApp(options: {
 
     return c.json(
       createControlRequestResponseSchema.parse({
-        request: toControlRequestWire(request),
+        request: ControlRequestService.toWire(request),
         command: SHARE_CONTROL_COMMAND,
       }),
       200,
@@ -305,11 +305,11 @@ export function createLangyLocalRestApp(options: {
   const readCallHandler = async (c: ServiceContext<EndpointVariables>) => {
     const auth = await authorize(c);
     const runtime = ports.runtime();
-    const call = await runtime.dispatcher.read(c.req.param("id") ?? "");
+    const call = await runtime.dispatcher.tryRead(c.req.param("id") ?? "");
     if (!call || call.projectId !== auth.projectId) return c.notFound();
     await requireConversation({ ...auth, conversationId: call.conversationId });
 
-    const answer = await runtime.dispatcher.poll({
+    const answer = await runtime.dispatcher.tryPoll({
       callId: call.callId,
       holdMs: CALL_POLL_HOLD_MS,
       signal: c.req.raw.signal,
@@ -321,11 +321,11 @@ export function createLangyLocalRestApp(options: {
   const cancelCallHandler = async (c: ServiceContext<EndpointVariables>) => {
     const auth = await authorize(c);
     const runtime = ports.runtime();
-    const call = await runtime.dispatcher.read(c.req.param("id") ?? "");
+    const call = await runtime.dispatcher.tryRead(c.req.param("id") ?? "");
     if (!call || call.projectId !== auth.projectId) return c.notFound();
     await requireConversation({ ...auth, conversationId: call.conversationId });
 
-    await runtime.dispatcher.cancel({ callId: call.callId });
+    await runtime.dispatcher.tryCancel({ callId: call.callId });
     await runtime.waits.cancelTurn({
       conversationId: call.conversationId,
       turnId: call.turnId,
@@ -353,11 +353,11 @@ export function createLangyLocalRestApp(options: {
   const readWaitHandler = async (c: ServiceContext<EndpointVariables>) => {
     const auth = await authorize(c);
     const runtime = ports.runtime();
-    const wait = await runtime.waits.read(c.req.param("id") ?? "");
+    const wait = await runtime.waits.tryRead(c.req.param("id") ?? "");
     if (!wait || wait.projectId !== auth.projectId) return c.notFound();
     await requireConversation({ ...auth, conversationId: wait.conversationId });
 
-    const answer = await runtime.waits.poll({
+    const answer = await runtime.waits.tryPoll({
       waitId: wait.waitId,
       holdMs: CALL_POLL_HOLD_MS,
       signal: c.req.raw.signal,

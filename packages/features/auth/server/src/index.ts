@@ -1,6 +1,8 @@
 export { PostgresAuthAdapter } from "./adapters/postgres.auth.adapter";
 export { PostgresAuthDirectoryAdapter } from "./adapters/postgres.auth-directory.adapter";
 export { AuthDirectoryPort, type AuthDirectoryProject } from "./ports/auth-directory.port";
+export { BetterAuthHooksRepository } from "./repositories/better-auth-hooks.repository";
+export { PrismaBetterAuthHooksRepository } from "./repositories/prisma/prisma.better-auth-hooks.repository";
 export { AuthService } from "./services/auth.service";
 export {
   AuthApp,

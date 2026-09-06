@@ -89,14 +89,14 @@ describe("given a folder connected to the conversation", () => {
       expect(nudges).toContainEqual({ call: call.callId });
 
       await dispatcher.ack(call.callId);
-      expect((await dispatcher.read(call.callId))?.state).toBe("running");
+      expect((await dispatcher.tryRead(call.callId))?.state).toBe("running");
 
       await dispatcher.result({
         callId: call.callId,
         frame: { ok: true, text: "README.md\npackage.json" },
       });
 
-      const answer = await dispatcher.poll({ callId: call.callId, holdMs: 0 });
+      const answer = await dispatcher.tryPoll({ callId: call.callId, holdMs: 0 });
       expect(answer).toMatchObject({
         state: "done",
         ok: true,
@@ -128,7 +128,7 @@ describe("given a folder connected to the conversation", () => {
         callId: call.callId,
         frame: { ok: true, text: "listed" },
       });
-      expect(await dispatcher.poll({ callId: call.callId, holdMs: 0 })).toMatchObject({
+      expect(await dispatcher.tryPoll({ callId: call.callId, holdMs: 0 })).toMatchObject({
         state: "done",
         text: "listed",
       });
@@ -147,11 +147,11 @@ describe("given a folder connected to the conversation", () => {
       });
       await dispatcher.ack(call.callId);
 
-      await dispatcher.awaitPermission({
+      await dispatcher.tryAwaitPermission({
         callId: call.callId,
         waitId: "lwait_1",
       });
-      expect((await dispatcher.read(call.callId))?.state).toBe("awaiting_permission");
+      expect((await dispatcher.tryRead(call.callId))?.state).toBe("awaiting_permission");
 
       await dispatcher.sendPermission({
         conversationId,
@@ -160,7 +160,7 @@ describe("given a folder connected to the conversation", () => {
       });
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect((await dispatcher.read(call.callId))?.state).toBe("running");
+      expect((await dispatcher.tryRead(call.callId))?.state).toBe("running");
       expect(nudges).toContainEqual({
         permission: { callId: call.callId, decision: "allow_once" },
       });
@@ -179,11 +179,11 @@ describe("given a folder connected to the conversation", () => {
         timeoutMs: 60_000,
       });
 
-      await dispatcher.cancel({ callId: call.callId });
+      await dispatcher.tryCancel({ callId: call.callId });
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(nudges).toContainEqual({ cancel: call.callId });
-      expect(await dispatcher.poll({ callId: call.callId, holdMs: 0 })).toMatchObject({
+      expect(await dispatcher.tryPoll({ callId: call.callId, holdMs: 0 })).toMatchObject({
         state: "done",
         ok: false,
         error: { code: "cancelled" },
@@ -203,8 +203,8 @@ describe("given a folder connected to the conversation", () => {
         frame: { ok: true, text: "listed" },
       });
 
-      expect(await dispatcher.cancel({ callId: call.callId })).toBeNull();
-      expect(await dispatcher.poll({ callId: call.callId, holdMs: 0 })).toMatchObject({
+      expect(await dispatcher.tryCancel({ callId: call.callId })).toBeNull();
+      expect(await dispatcher.tryPoll({ callId: call.callId, holdMs: 0 })).toMatchObject({
         ok: true,
         text: "listed",
       });

@@ -34,7 +34,7 @@ import {
   type NlpLambdaInvokeResult,
   NlpPayloadStagingPort,
   type StagedNlpPayload,
-} from "@langwatch/workflow-server";
+} from "@langwatch/workflow-server/testing";
 
 import { hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "../nlpgo-subprocess";
 

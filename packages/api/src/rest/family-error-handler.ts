@@ -21,6 +21,18 @@ import { errorSchema } from "./schemas.js";
  * installing an `onError` REPLACES the one the spine installed, so a family
  * that did not delegate would silently stop rendering handled errors.
  */
+/**
+ * The status the caller actually received, in the same precedence as the
+ * response dispatch below: a family's own {@link HttpError}, a handled
+ * error's own status, a framework refusal's status, else an internal 500.
+ */
+function resolveResponseStatus(error: unknown): ContentfulStatusCode {
+  if (error instanceof HttpError) return error.status;
+  if (HandledError.isHandled(error)) return error.httpStatus as ContentfulStatusCode;
+  if (isFrameworkRefusal(error)) return error.status;
+  return 500;
+}
+
 export function createFamilyErrorHandler(options: {
   /** e.g. `langwatch:api:api-keys:errors`. */
   loggerName: string;
@@ -33,14 +45,7 @@ export function createFamilyErrorHandler(options: {
   return async (error, c) => {
     // Same order as the response dispatch below, so the logged status is
     // always the status the caller received.
-    const status =
-      error instanceof HttpError
-        ? error.status
-        : HandledError.isHandled(error)
-          ? (error.httpStatus as ContentfulStatusCode)
-          : isFrameworkRefusal(error)
-            ? error.status
-            : 500;
+    const status = resolveResponseStatus(error);
 
     // A refusal the caller can act on is their fact, not our outage: logging
     // a 404 or a 422 at error level with a "[500]" in the sentence buries the
@@ -74,7 +79,8 @@ export function createFamilyErrorHandler(options: {
     // A framework refusal — Hono's own `HTTPException` — carries a status the
     // caller can act on, and the boundary renders it. Collapsing it here would
     // answer a handler's 404 as our outage.
-    if (HandledError.isHandled(error) || isFrameworkRefusal(error)) {
+    const isDomainOrFrameworkHandled = HandledError.isHandled(error) || isFrameworkRefusal(error);
+    if (isDomainOrFrameworkHandled) {
       return options.boundary(error, c);
     }
 

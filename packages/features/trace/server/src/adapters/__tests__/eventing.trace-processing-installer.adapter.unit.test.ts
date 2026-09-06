@@ -8,7 +8,7 @@ import { TRACE_PROCESSING_EVENT_TYPES, type TraceProcessingEvent } from "@langwa
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventingTraceOriginAdapter } from "../eventing.trace-origin.adapter";
 import { type TraceDeferredOriginSchedulerPort } from "../eventing.deferred-origin.adapter";
-import { EventingTraceTopicAdapter } from "../eventing.trace-topic.adapter";
+import { EventingTraceTopicAdapter } from "../eventing.trace-topic-assignment.adapter";
 import { TraceProcessingServerInstallerAdapter } from "../eventing.trace-processing-installer.adapter";
 import {
   TraceProcessingPipelinePort,

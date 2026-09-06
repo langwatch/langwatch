@@ -7,10 +7,10 @@
 import { createLogger } from "@langwatch/observability";
 import type { TenantMigrationRecord } from "@langwatch/system-migrations";
 import {
-  requireRegisteredMigration,
   ROLLBACK_EFFECT_STATUSES,
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules";
+import { systemMigrationLookup } from "./system-migration-lookup.service";
 
 const logger = createLogger("langwatch:ops:system-migrations");
 
@@ -35,7 +35,7 @@ export class SystemMigrationRollbackService {
     tenantId: string;
     actorUserId: string;
   }): Promise<void> {
-    requireRegisteredMigration(this.deps, migrationName);
+    systemMigrationLookup.registeredMigration(this.deps, migrationName);
     const record = await this.deps.state.tryFindRecord({
       migrationName,
       tenantId,

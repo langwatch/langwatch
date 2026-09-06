@@ -14,7 +14,7 @@ import type {
   NotificationService as NotificationRecordService,
   Notification,
 } from "@langwatch/notification-contract";
-import type { NotificationService, UsageLimitEmailData } from "./notification.service";
+import type { NotificationService, UsageLimitEmailData } from "./billing-usage-notice.service";
 
 const logger = createLogger("langwatch:notifications:usageWarning");
 

@@ -83,7 +83,7 @@ describe("given a code access card that asked for a folder", () => {
 
       const open = await service.listOpen({ projectId, userId });
       expect(open.map((row) => row.id).sort()).toEqual([second.id, other.id].sort());
-      expect(await service.read(first.id)).toBeNull();
+      expect(await service.tryRead(first.id)).toBeNull();
       await expect(
         service.approve({ requestId: first.id, userId, projectId }),
       ).rejects.toMatchObject({ code: "langy_local_request_invalid" });
@@ -120,7 +120,7 @@ describe("given a code access card that asked for a folder", () => {
         projectId,
         organizationId: "org_1",
       });
-      const binding = await service.readKeyBinding(approved.apiKeyId);
+      const binding = await service.tryReadKeyBinding(approved.apiKeyId);
       expect(binding).toMatchObject({ conversationId, projectId, userId });
 
       await expect(
@@ -168,7 +168,7 @@ describe("given a code access card that asked for a folder", () => {
 
       await service.revokeKeyBinding(approved.apiKeyId);
 
-      expect(await service.readKeyBinding(approved.apiKeyId)).toBeNull();
+      expect(await service.tryReadKeyBinding(approved.apiKeyId)).toBeNull();
     });
 
     /** @scenario "Disconnecting revokes the key even when the command line cannot be reached" */
@@ -185,7 +185,7 @@ describe("given a code access card that asked for a folder", () => {
       const revoked = await service.revokeConversationBindings(conversationId);
 
       expect(revoked).toEqual([approved.apiKeyId]);
-      expect(await service.readKeyBinding(approved.apiKeyId)).toBeNull();
+      expect(await service.tryReadKeyBinding(approved.apiKeyId)).toBeNull();
       expect(await service.revokeConversationBindings(conversationId)).toEqual([]);
     });
   });
@@ -195,7 +195,7 @@ describe("given a code access card that asked for a folder", () => {
       const mine = await create();
       await create({ conversationId: "conv_2" });
 
-      const found = await service.findOpenForConversation({
+      const found = await service.tryFindOpenForConversation({
         projectId,
         userId,
         conversationId,

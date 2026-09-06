@@ -1,6 +1,6 @@
 import type { Logger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
-import type { Cluster, Redis } from "ioredis";
+import type { SchedulerWakeRedis } from "./scheduler-wake.repository";
 import { computeCatchUp, computeNextRunAt } from "./next-run-at";
 import type { SchedulerRegistry } from "./scheduler.registry";
 import type { ScheduledJobRecord, ScheduledJobStore } from "./scheduler.types";
@@ -78,7 +78,7 @@ export interface SchedulerServiceDeps {
    * create/edit. Omit it and the scheduler is 100% Postgres — correctness is
    * identical, only cross-pod reaction latency changes (poll backstop).
    */
-  redis?: Redis | Cluster | null;
+  redis?: SchedulerWakeRedis | null;
 }
 
 /**
@@ -119,7 +119,7 @@ export class SchedulerService {
   private readonly runsWorkers: boolean;
   private readonly logger: Logger;
   private readonly maxSleepMs: number;
-  private readonly redis: Redis | Cluster | null;
+  private readonly redis: SchedulerWakeRedis | null;
   private readonly workerId = randomUUID();
 
   /** Reset on every `start()` so a stop/start cycle gets a fresh signal. */
@@ -129,7 +129,7 @@ export class SchedulerService {
   /** Resolver for the current interruptible sleep; `wake()` pokes it. */
   private wakeCurrentSleep: (() => void) | null = null;
   /** Dedicated subscriber connection for the cross-pod wake (null = poll-only). */
-  private subscriber: Redis | Cluster | null = null;
+  private subscriber: SchedulerWakeRedis | null = null;
 
   constructor(deps: SchedulerServiceDeps) {
     this.repo = deps.repo;
@@ -146,7 +146,7 @@ export class SchedulerService {
    * upsert). Fire-and-forget — a publish failure is swallowed because the poll
    * backstop still fires the job.
    */
-  static publishWake(redis: Redis | Cluster | null | undefined): void {
+  static publishWake(redis: SchedulerWakeRedis | null | undefined): void {
     if (!redis) return;
     void redis.publish(WAKE_CHANNEL, "1").catch(() => {
       // swallow — the poll backstop covers a missed wake (best-effort)

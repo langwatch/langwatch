@@ -25,7 +25,7 @@ import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
 import type { UpgradeHandler } from "@langwatch/api";
 import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.api";
-import { LocalControlLongPoll } from "../../api-rest/langy-local-control-long-poll";
+import { LocalControlLongPoll } from "../../api-rest/langy-local-control-long-poll.api";
 import { presenceKey } from "../../../rules/langy-local-control-keys.rules";
 import { LOCAL_CONTROL_PROTOCOL_VERSION } from "@langwatch/langy-contract";
 import {
@@ -616,7 +616,7 @@ describe("given a folder shared with the conversation", () => {
         text: "package.json\nsrc",
       });
 
-      const answer = await podA.runtime.dispatcher.poll({
+      const answer = await podA.runtime.dispatcher.tryPoll({
         callId: call.callId,
         holdMs: 5_000,
       });
@@ -647,7 +647,7 @@ describe("given a folder shared with the conversation", () => {
         ok: true,
         text: "export const app = 1;",
       });
-      const answer = await podB.runtime.dispatcher.poll({
+      const answer = await podB.runtime.dispatcher.tryPoll({
         callId: call.callId,
         holdMs: 5_000,
       });
@@ -685,7 +685,7 @@ describe("given a folder shared with the conversation", () => {
         },
       });
 
-      const answer = await podA.runtime.dispatcher.poll({
+      const answer = await podA.runtime.dispatcher.tryPoll({
         callId: call.callId,
         holdMs: 5_000,
       });
@@ -731,7 +731,9 @@ describe("given a folder shared with the conversation", () => {
         hostname: "rogerio-mbp",
         status: "pending",
       });
-      expect((await podA.runtime.dispatcher.read(call.callId))?.state).toBe("awaiting_permission");
+      expect((await podA.runtime.dispatcher.tryRead(call.callId))?.state).toBe(
+        "awaiting_permission",
+      );
     });
 
     /** @scenario "The session grant button names every pattern the click covers" */
@@ -905,7 +907,7 @@ describe("given a folder shared with the conversation", () => {
       });
 
       await expect
-        .poll(() => podA.runtime.waits.read(waitId), { timeout: 5_000 })
+        .poll(() => podA.runtime.waits.tryRead(waitId), { timeout: 5_000 })
         .toMatchObject({
           state: "answered",
           decision: "allow_pattern",
@@ -940,7 +942,7 @@ describe("given a folder shared with the conversation", () => {
       // Nothing to poll for on a frame that changes nothing, so the assertion
       // waits out the round trip the frame would have needed.
       await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(await podA.runtime.waits.read(waitId)).toMatchObject({
+      expect(await podA.runtime.waits.tryRead(waitId)).toMatchObject({
         state: "answered",
         decision: "allow_once",
         source: "panel",
@@ -1050,7 +1052,7 @@ describe("given a folder the developer stops sharing", () => {
         timeout: 5_000,
       })
       .toBeNull();
-    const answer = await podA.runtime.dispatcher.poll({
+    const answer = await podA.runtime.dispatcher.tryPoll({
       callId: call.callId,
       holdMs: 2_000,
     });
@@ -1135,7 +1137,7 @@ describe("given a network that blocks WebSockets", () => {
         },
       ],
     });
-    const answer = await podB.runtime.dispatcher.poll({
+    const answer = await podB.runtime.dispatcher.tryPoll({
       callId: call.callId,
       holdMs: 5_000,
     });
@@ -1182,7 +1184,7 @@ describe("given a command line that reconnects while a command still runs", () =
         text: "4 migrations applied",
       });
       await expect
-        .poll(async () => (await podA.runtime.dispatcher.read(call.callId))?.state, {
+        .poll(async () => (await podA.runtime.dispatcher.tryRead(call.callId))?.state, {
           timeout: 5_000,
         })
         .toBe("done");
@@ -1195,7 +1197,7 @@ describe("given a command line that reconnects while a command still runs", () =
         text: "sent again after the reconnect",
       });
       await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(await podA.runtime.dispatcher.read(call.callId)).toMatchObject({
+      expect(await podA.runtime.dispatcher.tryRead(call.callId)).toMatchObject({
         state: "done",
         ok: true,
         text: "4 migrations applied",
@@ -1259,7 +1261,7 @@ describe("given a folder replaced by a newer one", () => {
           text: "written on the machine that was replaced",
         },
       );
-      expect((await podA.runtime.dispatcher.read(call.callId))?.state).not.toBe("done");
+      expect((await podA.runtime.dispatcher.tryRead(call.callId))?.state).not.toBe("done");
 
       // The folder the panel shows still answers it.
       fresh.cli.send({
@@ -1269,7 +1271,7 @@ describe("given a folder replaced by a newer one", () => {
         text: "written",
       });
       await expect
-        .poll(async () => (await podA.runtime.dispatcher.read(call.callId))?.state, {
+        .poll(async () => (await podA.runtime.dispatcher.tryRead(call.callId))?.state, {
           timeout: 5_000,
         })
         .toBe("done");

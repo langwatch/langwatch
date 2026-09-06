@@ -11,7 +11,7 @@ import {
   NotificationService as NotificationRecordService,
   type Notification,
 } from "@langwatch/notification-contract";
-import { NotificationService } from "./notification.service";
+import { NotificationService } from "./billing-usage-notice.service";
 import { UsageWarningService } from "./usage-warning.service";
 import type { BillingErrorReporter } from "../ports/error-reporter.port";
 import {

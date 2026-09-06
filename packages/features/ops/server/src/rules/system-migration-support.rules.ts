@@ -10,7 +10,6 @@ import type {
   TenantMigrationRecord,
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
-import { MigrationUnknownError } from "@langwatch/ops-contract";
 
 /**
  * The statuses a tenant may be rolled back from. What `migrated` means is each migration's own
@@ -188,19 +187,6 @@ export function sample<T>({ pool, count }: { pool: T[]; count: number }): T[] {
   }
 
   return copy.slice(0, size);
-}
-
-/** The migration a name refers to, or the refusal the operator can act on. */
-export function requireRegisteredMigration(
-  deps: SystemMigrationsServiceDependencies,
-  migrationName: string,
-): ReturnType<SystemMigrationsServiceDependencies["migrations"]>[number] {
-  const migration = deps.migrations().find((candidate) => candidate.name === migrationName);
-  if (!migration) {
-    throw new MigrationUnknownError();
-  }
-
-  return migration;
 }
 
 /**

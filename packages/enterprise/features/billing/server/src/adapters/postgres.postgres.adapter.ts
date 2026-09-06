@@ -9,7 +9,7 @@ import {
 import {
   PrismaBillingOrganizationRepository,
   type BillingOrganizationDatabase,
-} from "../repositories/prisma/prisma.organization.repository";
+} from "../repositories/prisma/prisma.billing-account-facts.repository";
 import {
   PrismaBillingCheckpointRepository,
   type BillingCheckpointDatabase,

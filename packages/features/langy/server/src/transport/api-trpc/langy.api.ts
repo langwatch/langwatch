@@ -53,7 +53,7 @@ import { LangySessionRequiredError, type LangyApp } from "#app/langy.app";
 import type { LocalControlRuntime } from "../../adapters/langy-local-control-runtime.adapter";
 import { workspaceChannel } from "../../rules/langy-local-control-keys.rules";
 import { reconcileSkipPolicy } from "../../rules/langy-local-skip-policy.rules";
-import { toControlRequestWire } from "../../rules/langy-local-control-request-wire.rules";
+import { ControlRequestService } from "../../services/langy-local-control-request.service";
 import type { SkipPermissionsDecision } from "../../services/langy-skip-permissions.service";
 
 const logger = createLogger("langwatch:langy:router");
@@ -295,7 +295,7 @@ async function* followMissedTerminal({
   let synthesized: LangyStreamEntry | null = null;
 
   const watcher = app
-    .watchForMissedTerminal({
+    .tryWatchForMissedTerminal({
       projectId,
       conversationId,
       turnId,
@@ -1135,7 +1135,7 @@ export class LangyTrpcApi {
       input: { projectId: string; conversationId: string; waitId: string },
     ): Promise<void> => {
       await requireOwn(ctx, input);
-      const wait = await ports.local.runtime.waits.read(input.waitId);
+      const wait = await ports.local.runtime.waits.tryRead(input.waitId);
       if (
         !wait ||
         wait.projectId !== input.projectId ||
@@ -1190,7 +1190,7 @@ export class LangyTrpcApi {
             const conversation = await requireOwn(ctx, input);
             const runtime = ports.local.runtime;
             const connected = await runtime.presence.read(input.conversationId);
-            const pendingRequest = await runtime.requests.findOpenForConversation({
+            const pendingRequest = await runtime.requests.tryFindOpenForConversation({
               projectId: input.projectId,
               userId,
               conversationId: input.conversationId,
@@ -1222,7 +1222,7 @@ export class LangyTrpcApi {
                 changePolicy: (args) =>
                   recordPolicy({ ...args, projectId: input.projectId }).then(() => undefined),
               }),
-              pendingRequest: pendingRequest ? toControlRequestWire(pendingRequest) : null,
+              pendingRequest: pendingRequest ? ControlRequestService.toWire(pendingRequest) : null,
               codeAccessPreference: preference === "github" ? ("github" as const) : null,
             };
           }),
@@ -1368,7 +1368,7 @@ export class LangyTrpcApi {
             for (const call of await runtime.dispatcher.listPendingForConversation(
               input.conversationId,
             )) {
-              await runtime.dispatcher.cancel({
+              await runtime.dispatcher.tryCancel({
                 callId: call.callId,
                 message: "The shared folder was disconnected, so the command did not finish.",
               });

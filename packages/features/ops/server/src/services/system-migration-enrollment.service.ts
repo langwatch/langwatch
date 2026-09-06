@@ -11,11 +11,11 @@ import {
   MigrationEnrollmentOrganizationNotFoundError,
 } from "@langwatch/ops-contract";
 import {
-  requireRegisteredMigration,
   sample,
   type MigrationEnrollmentRecord,
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules";
+import { systemMigrationLookup } from "./system-migration-lookup.service";
 
 const logger = createLogger("langwatch:ops:system-migrations");
 
@@ -80,7 +80,7 @@ export class SystemMigrationEnrollmentService {
       throw new MigrationEnrollmentCloudOnlyError();
     }
 
-    requireRegisteredMigration(this.deps, migrationName);
+    systemMigrationLookup.registeredMigration(this.deps, migrationName);
     this.requireEnrollmentDecidesSomething(migrationName);
     const organization = await this.deps.enrollments.tryFindOrganizationById({
       organizationId,
@@ -133,7 +133,7 @@ export class SystemMigrationEnrollmentService {
       throw new MigrationEnrollmentCloudOnlyError();
     }
 
-    requireRegisteredMigration(this.deps, migrationName);
+    systemMigrationLookup.registeredMigration(this.deps, migrationName);
     this.requireEnrollmentDecidesSomething(migrationName);
     // The steps run as an ordered pipeline per organization, so a later
     // step's pool is the step before it: an organization enrolled for a

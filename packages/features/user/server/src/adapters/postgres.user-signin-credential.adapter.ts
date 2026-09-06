@@ -2,8 +2,8 @@ import type { UserPasswordHasherPort } from "../ports/user.port";
 import {
   PrismaUserCredentialRepository,
   type UserCredentialDatabase,
-} from "../repositories/prisma/prisma.user-credential.repository";
-import { UserCredentialService } from "../services/user-credential.service";
+} from "../repositories/prisma/prisma.user-signin-credential.repository";
+import { UserCredentialService } from "../services/user-signin-credential.service";
 
 export type { UserCredentialDatabase };
 

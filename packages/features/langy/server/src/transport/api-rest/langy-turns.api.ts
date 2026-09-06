@@ -187,7 +187,7 @@ export function createLangyTurnsRestApp(options: {
     if (waitSeconds && waitSeconds > 0) {
       // Client disconnect and the wait deadline are one signal: an abandoned
       // hold stops consuming fold reads (and its blocking Redis read) at once.
-      const settlement = await LangyTurnSettlementWaiterService.awaitTurnSettlement({
+      const settlement = await LangyTurnSettlementWaiterService.tryAwaitTurnSettlement({
         langy: langy.langyService,
         openBuffer: ports.openTurnBuffer,
         projectId: caller.projectId,

@@ -1,15 +1,14 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/auth-contract";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import {
+  RoleBindingScopeType,
+  TeamUserRole,
+  type AuthzGrantsService,
+} from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
-import {
-  Prisma,
-  type PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository";
 import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
@@ -35,42 +34,12 @@ export type BetterAuthHookCollaborators = Readonly<{
 const logger = createLogger("langwatch:better-auth:hooks");
 
 /**
- * Atomically deletes every OAuth account row for the user EXCEPT the one being
- * linked/refreshed, and clears `pendingSsoSetup`.
- */
-const reconcileSsoAccounts = async ({
-  prisma,
-  userId,
-  providerId,
-  accountId,
-}: {
-  prisma: PrismaClient;
-  userId: string;
-  providerId: string;
-  accountId: string;
-}): Promise<void> => {
-  await prisma.$transaction([
-    prisma.account.deleteMany({
-      where: {
-        userId,
-        provider: { not: "credential" },
-        OR: [{ provider: { not: providerId } }, { providerAccountId: { not: accountId } }],
-      },
-    }),
-    prisma.user.update({
-      where: { id: userId },
-      data: { pendingSsoSetup: false },
-    }),
-  ]);
-};
-
-/**
  * Called before a new user is created (via OAuth signup or email+password signup).
  */
 export const beforeUserCreate = async ({
   user,
 }: {
-  prisma: PrismaClient;
+  repo: BetterAuthHooksRepository;
   user: { email: string; deactivatedAt?: Date | null } & Record<string, unknown>;
 }): Promise<boolean | undefined> => {
   if (user.deactivatedAt) {
@@ -157,12 +126,12 @@ const announceSsoAutoJoin = ({
  * MEMBER membership plus the organization- scoped grant beside it.
  */
 const joinSsoOrganization = async ({
-  prisma,
+  repo,
   collaborators,
   user,
   org,
 }: {
-  prisma: PrismaClient;
+  repo: BetterAuthHooksRepository;
   collaborators: BetterAuthHookCollaborators;
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
@@ -182,23 +151,11 @@ const joinSsoOrganization = async ({
   // The membership row is not a grant fact and keeps its imperative
   // write; the organization-scoped grant that comes with it is a ledger
   // command, emitted once the membership exists (ADR-092).
-  try {
-    await prisma.organizationUser.create({
-      data: {
-        userId: user.id,
-        organizationId: org.id,
-        role: "MEMBER",
-      },
-    });
-  } catch (err) {
-    // P2002 (unique constraint) on THIS insert means another concurrent OAuth callback or a
-    // retry already created this membership. Idempotent success. The catch guards the
-    // membership write alone — a P2002 from any other constraint (an applied invite's rows,
-    // the grant below) is a real failure and propagates instead of being logged as an
-    // already-present membership.
-    if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
-      throw err;
-    }
+  const outcome = await repo.createOrganizationMembership({
+    userId: user.id,
+    organizationId: org.id,
+  });
+  if (outcome === "already-exists") {
     logger.info(
       { userId: user.id, organizationId: org.id },
       "Auto-add SSO membership was already present (P2002) — treating as success",
@@ -229,11 +186,11 @@ const joinSsoOrganization = async ({
  * access via a re-assertable ledger command (ADR-092 delivery-plan PR 2).
  */
 export const afterUserCreate = async ({
-  prisma,
+  repo,
   user,
   collaborators,
 }: {
-  prisma: PrismaClient;
+  repo: BetterAuthHooksRepository;
   user: { id: string; email: string; name: string };
   collaborators: BetterAuthHookCollaborators;
 }): Promise<void> => {
@@ -262,12 +219,10 @@ export const afterUserCreate = async ({
   }
 
   try {
-    const org = await prisma.organization.findUnique({
-      where: { ssoDomain: domain },
-    });
+    const org = await repo.tryFindOrganizationBySsoDomain({ domain });
     if (!org) return;
 
-    await joinSsoOrganization({ prisma, collaborators, user, org });
+    await joinSsoOrganization({ repo, collaborators, user, org });
   } catch (err) {
     logger.error(
       { err, userId: user.id, domain },
@@ -281,11 +236,11 @@ export const afterUserCreate = async ({
  * pendingSsoSetup logic from the NextAuth signIn callback.
  */
 export const tryBeforeAccountCreate = async ({
-  prisma,
+  repo,
   account,
   federation,
 }: {
-  prisma: PrismaClient;
+  repo: BetterAuthHooksRepository;
   account: {
     userId: string;
     providerId: string;
@@ -293,10 +248,7 @@ export const tryBeforeAccountCreate = async ({
   };
   federation: BetterAuthFederationPort;
 }): Promise<void> => {
-  const user = await prisma.user.findUnique({
-    where: { id: account.userId },
-    select: { id: true, email: true, deactivatedAt: true },
-  });
+  const user = await repo.tryFindUserForHooks({ userId: account.userId });
   if (!user?.email) return;
 
   if (user.deactivatedAt) {
@@ -325,9 +277,7 @@ export const tryBeforeAccountCreate = async ({
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
 
-  const org = await prisma.organization.findUnique({
-    where: { ssoDomain: domain },
-  });
+  const org = await repo.tryFindOrganizationBySsoDomain({ domain });
   if (!org) return;
 
   const matchesSso = isSsoProviderMatch(org, {
@@ -347,9 +297,7 @@ export const tryBeforeAccountCreate = async ({
   // signup (hard block) or an existing user trying a different provider
   // (soft block via pendingSsoSetup banner).
   if (account.providerId !== "credential" && org.ssoProvider) {
-    const existingAccountCount = await prisma.account.count({
-      where: { userId: user.id },
-    });
+    const existingAccountCount = await repo.countAccountsForUser({ userId: user.id });
     if (existingAccountCount === 0) {
       logger.warn(
         {
@@ -370,10 +318,7 @@ export const tryBeforeAccountCreate = async ({
   }
 
   // Existing user with wrong provider → soft block via banner.
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { pendingSsoSetup: true },
-  });
+  await repo.flagPendingSsoSetup({ userId: user.id });
   logger.info(
     {
       userId: user.id,
@@ -390,27 +335,22 @@ export const tryBeforeAccountCreate = async ({
  * only commits once the new Account row exists.
  */
 export const afterAccountCreate = async ({
-  prisma,
+  repo,
   account,
 }: {
-  prisma: PrismaClient;
+  repo: BetterAuthHooksRepository;
   account: { userId: string; providerId: string; accountId: string };
 }): Promise<void> => {
   try {
     if (account.providerId === "credential") return;
 
-    const user = await prisma.user.findUnique({
-      where: { id: account.userId },
-      select: { id: true, email: true },
-    });
+    const user = await repo.tryFindUserForHooks({ userId: account.userId });
     if (!user?.email) return;
 
     const domain = extractEmailDomain(user.email);
     if (!domain) return;
 
-    const org = await prisma.organization.findUnique({
-      where: { ssoDomain: domain },
-    });
+    const org = await repo.tryFindOrganizationBySsoDomain({ domain });
     if (!org) return;
 
     const matchesSso = isSsoProviderMatch(org, {
@@ -419,8 +359,7 @@ export const afterAccountCreate = async ({
     });
     if (!matchesSso) return;
 
-    await reconcileSsoAccounts({
-      prisma,
+    await repo.reconcileSsoAccounts({
       userId: user.id,
       providerId: account.providerId,
       accountId: account.accountId,
@@ -439,25 +378,20 @@ export const afterAccountCreate = async ({
  * (`internalAdapter.updateAccount`), which fires this hook.
  */
 export const afterAccountUpdate = async ({
-  prisma,
+  repo,
   account,
 }: {
-  prisma: PrismaClient;
+  repo: BetterAuthHooksRepository;
   account: { userId: string; providerId: string; accountId: string };
 }): Promise<void> => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: account.userId },
-      select: { id: true, email: true, pendingSsoSetup: true },
-    });
+    const user = await repo.tryFindUserForHooks({ userId: account.userId });
     if (!user?.email || !user.pendingSsoSetup) return;
 
     const domain = extractEmailDomain(user.email);
     if (!domain) return;
 
-    const org = await prisma.organization.findUnique({
-      where: { ssoDomain: domain },
-    });
+    const org = await repo.tryFindOrganizationBySsoDomain({ domain });
     if (!org) return;
 
     const matchesSso = isSsoProviderMatch(org, {
@@ -466,8 +400,7 @@ export const afterAccountUpdate = async ({
     });
     if (!matchesSso) return;
 
-    await reconcileSsoAccounts({
-      prisma,
+    await repo.reconcileSsoAccounts({
       userId: user.id,
       providerId: account.providerId,
       accountId: account.accountId,
@@ -491,16 +424,13 @@ export const afterAccountUpdate = async ({
  * user has a different email than the incoming one, reject.
  */
 export const beforeSessionCreate = async ({
-  prisma,
+  repo,
   session,
 }: {
-  prisma: PrismaClient;
+  repo: BetterAuthHooksRepository;
   session: { userId: string };
 }): Promise<boolean | undefined> => {
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { deactivatedAt: true },
-  });
+  const user = await repo.tryFindUserForHooks({ userId: session.userId });
   if (user?.deactivatedAt) {
     logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
     return false;
@@ -514,12 +444,12 @@ export const beforeSessionCreate = async ({
  * for subsequent requests on the same session. Ported from the NextAuth session callback.
  */
 export const afterSessionCreate = async ({
-  prisma,
+  repo,
   userId,
   isImpersonationSession = false,
   announcements,
 }: {
-  prisma: PrismaClient;
+  repo: BetterAuthHooksRepository;
   userId: string;
   isImpersonationSession?: boolean;
   announcements: BetterAuthAnnouncementsPort;
@@ -527,27 +457,17 @@ export const afterSessionCreate = async ({
   // lastLoginAt is only updated for "real" sessions — not admin impersonation.
   if (!isImpersonationSession) {
     try {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { lastLoginAt: new Date() },
-      });
+      await repo.recordLastLogin({ userId });
     } catch (err) {
       logger.error({ err, userId }, "Failed to update lastLoginAt after session create");
     }
   }
 
   // Nurturing hooks: fire-and-forget, must never block the response.
-  // Query via User._count.orgMemberships to bypass the
-  // dbOrganizationIdProtection middleware which blocks direct
-  // OrganizationUser queries without an organizationId in the where clause.
-  void prisma.user
-    .findUnique({
-      where: { id: userId },
-      select: { _count: { select: { orgMemberships: true } } },
-    })
-    .then((userWithCount) => {
-      const hasOrganization = (userWithCount?._count.orgMemberships ?? 0) > 0;
-      announcements.sessionNurturing({ userId, hasOrganization });
+  void repo
+    .countOrgMembershipsForUser({ userId })
+    .then((count) => {
+      announcements.sessionNurturing({ userId, hasOrganization: count > 0 });
     })
     .catch((err) => {
       logger.error({ err, userId }, "Failed to fire nurturing hooks after session create");

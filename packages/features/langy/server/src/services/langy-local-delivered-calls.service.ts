@@ -5,8 +5,14 @@ import type { PlatformFrame } from "@langwatch/langy-contract";
  * calls via both a subscription and a pending-calls scan, which can overlap,
  * so each connection dedupes by id and drops it once the result arrives.
  */
-export class DeliveredCalls {
+export class DeliveredCallsService {
   private readonly ids = new Set<string>();
+
+  static create(): DeliveredCallsService {
+    return new DeliveredCallsService();
+  }
+
+  private constructor() {}
 
   /**
    * Claim an id without sending anything: the command line said it is already
@@ -18,9 +24,16 @@ export class DeliveredCalls {
 
   /** True when the frame should go out: a call already handed over does not. */
   admit(frame: PlatformFrame): boolean {
-    if (frame.type !== "call") return true;
-    if (this.ids.has(frame.call.callId)) return false;
+    if (frame.type !== "call") {
+      return true;
+    }
+
+    if (this.ids.has(frame.call.callId)) {
+      return false;
+    }
+
     this.ids.add(frame.call.callId);
+
     return true;
   }
 

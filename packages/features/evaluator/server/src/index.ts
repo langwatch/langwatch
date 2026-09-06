@@ -10,7 +10,7 @@ export {
 export {
   PrismaEvaluatorAuditLogAdapter,
   type EvaluatorAuditLogDatabase,
-} from "./adapters/prisma.evaluator-audit-log.adapter";
+} from "./adapters/prisma.evaluator-change-history.adapter";
 
 /**
  * The feature's application: the one typed thing its transports are given.

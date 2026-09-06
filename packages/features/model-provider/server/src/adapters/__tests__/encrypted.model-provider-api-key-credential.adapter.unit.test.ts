@@ -11,7 +11,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import { ModelProviderCredentialCipherPort } from "../../ports/model-provider.port";
-import { EncryptedModelProviderCredentialAdapter } from "../encrypted.model-provider-credential.adapter";
+import { EncryptedModelProviderCredentialAdapter } from "../encrypted.model-provider-api-key-credential.adapter";
 
 /**
  * A cipher with the real one's shape and none of its cryptography: the two

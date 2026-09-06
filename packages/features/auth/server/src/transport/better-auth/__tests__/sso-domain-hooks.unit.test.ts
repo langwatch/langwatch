@@ -4,9 +4,9 @@
  * arriving through the wrong provider.
  * @see specs/auth/phase-1-better-auth-config.feature
  */
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 
+import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository";
 import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
@@ -45,14 +45,14 @@ class RecordingAnnouncementsPort implements BetterAuthAnnouncementsPort {
 
 const ACME = { id: "org_acme", name: "Acme", ssoDomain: "acme.com", ssoProvider: "google" };
 
-function signupPrisma(organization: typeof ACME | null) {
+function signupRepo(organization: typeof ACME | null): BetterAuthHooksRepository {
   return {
-    organization: { findUnique: vi.fn().mockResolvedValue(organization) },
-    organizationUser: { create: vi.fn().mockResolvedValue({}) },
-  } as unknown as PrismaClient;
+    tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
+    createOrganizationMembership: vi.fn().mockResolvedValue("created"),
+  } as unknown as BetterAuthHooksRepository;
 }
 
-function accountPrisma({
+function accountRepo({
   organization,
   accountCount,
   user = { id: "user_1", email: "existing@acme.com", deactivatedAt: null },
@@ -60,23 +60,24 @@ function accountPrisma({
   organization: typeof ACME | null;
   accountCount: number;
   user?: { id: string; email: string; deactivatedAt: Date | null };
-}) {
+}): BetterAuthHooksRepository {
   return {
-    user: { findUnique: vi.fn().mockResolvedValue(user), update: vi.fn().mockResolvedValue({}) },
-    organization: { findUnique: vi.fn().mockResolvedValue(organization) },
-    account: { count: vi.fn().mockResolvedValue(accountCount) },
-  } as unknown as PrismaClient;
+    tryFindUserForHooks: vi.fn().mockResolvedValue({ ...user, pendingSsoSetup: false }),
+    tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
+    countAccountsForUser: vi.fn().mockResolvedValue(accountCount),
+    flagPendingSsoSetup: vi.fn().mockResolvedValue(undefined),
+  } as unknown as BetterAuthHooksRepository;
 }
 
 describe("signing in through a domain-matched organization's identity provider", () => {
   describe("given nobody with that email has an account yet", () => {
     /** @scenario New user with matching SSO domain joins the SSO org */
     it("joins the new user to the organization as a member", async () => {
-      const prisma = signupPrisma(ACME);
+      const repo = signupRepo(ACME);
       const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
-        prisma,
+        repo,
         user: { id: "user_new", email: "new@acme.com", name: "New User" },
         collaborators: {
           federation: new LicensedFederationPort(),
@@ -86,8 +87,9 @@ describe("signing in through a domain-matched organization's identity provider",
         },
       });
 
-      expect(prisma.organizationUser.create).toHaveBeenCalledWith({
-        data: { userId: "user_new", organizationId: "org_acme", role: "MEMBER" },
+      expect(repo.createOrganizationMembership).toHaveBeenCalledWith({
+        userId: "user_new",
+        organizationId: "org_acme",
       });
       expect(attachBindings).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: "org_acme" }),
@@ -98,36 +100,33 @@ describe("signing in through a domain-matched organization's identity provider",
   describe("given an existing user signs in through the organization's own provider", () => {
     /** @scenario Existing user with correct SSO provider auto-links */
     it("lets the account row be created and leaves the pending flag alone", async () => {
-      const prisma = accountPrisma({ organization: ACME, accountCount: 1 });
+      const repo = accountRepo({ organization: ACME, accountCount: 1 });
 
       await tryBeforeAccountCreate({
-        prisma,
+        repo,
         account: { userId: "user_1", providerId: "google", accountId: "google|123" },
         federation: new LicensedFederationPort(),
       });
 
-      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(repo.flagPendingSsoSetup).not.toHaveBeenCalled();
     });
   });
 
   describe("given an existing user signs in through a provider the organization does not use", () => {
     /** @scenario Existing user with wrong SSO provider gets pending flag */
     it("lets them in, and flags the account for setup", async () => {
-      const prisma = accountPrisma({
+      const repo = accountRepo({
         organization: { ...ACME, ssoProvider: "okta" },
         accountCount: 1,
       });
 
       await tryBeforeAccountCreate({
-        prisma,
+        repo,
         account: { userId: "user_1", providerId: "google", accountId: "google|123" },
         federation: new LicensedFederationPort(),
       });
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: "user_1" },
-        data: { pendingSsoSetup: true },
-      });
+      expect(repo.flagPendingSsoSetup).toHaveBeenCalledWith({ userId: "user_1" });
     });
   });
 });
