@@ -25,6 +25,8 @@ function agent(
     status: "online",
     instances: [],
     owner: null,
+    selectable: true,
+    notSelectableReason: null,
     parameters: [],
     config: {},
     ...overrides,

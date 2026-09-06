@@ -15,6 +15,10 @@ import { generate } from "@langwatch/ksuid";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import {
+  type PresenceReads,
+  runtimePresence,
+} from "~/server/connected-agents/presence.read";
+import {
   AGENT_TEST_SCENARIO_ID,
   agentTestScenarioConfig,
   getAgentTestSetId,
@@ -26,7 +30,10 @@ import {
 } from "~/server/scenarios/execution/data-prefetcher";
 import { type RunActor, withActor } from "~/server/scenarios/run-actor";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
-import { assertConnectedAgentsRunnable } from "~/server/suites/connected-targets";
+import {
+  assertConnectedAgentsOnline,
+  assertConnectedAgentsRunnable,
+} from "~/server/suites/connected-targets";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type { AgentWithFields } from "./agent-fields";
 import { AgentNotFoundError, AgentTestRefusedError } from "./errors";
@@ -45,6 +52,8 @@ export interface AgentTestRunDeps {
     id: string;
   }) => Promise<AgentWithFields | null>;
   users: Pick<PrismaClient, "user">;
+  /** Whether a process is holding a connected agent right now. */
+  presence: PresenceReads;
   prefetchDeps: () => DataPrefetcherDependencies;
   queueRun: (
     params: Parameters<ReturnType<typeof getApp>["simulations"]["queueRun"]>[0],
@@ -81,6 +90,8 @@ export function agentTestTarget(agent: {
  *   cannot be run
  * @throws {AgentOwnerOnlyError} when the agent is a personal development
  *   agent of someone other than the actor
+ * @throws {AgentOfflineError} when the agent is a connected agent that no
+ *   process is holding
  */
 export async function scheduleAgentTestRun({
   projectId,
@@ -103,17 +114,22 @@ export async function scheduleAgentTestRun({
     });
   }
 
+  const row = {
+    id: agent.id,
+    name: agent.name,
+    type: agent.type,
+    environment: agent.environment,
+    ownerUserId: agent.ownerUserId,
+  };
   await assertConnectedAgentsRunnable({
-    agents: [
-      {
-        id: agent.id,
-        name: agent.name,
-        type: agent.type,
-        ownerUserId: agent.ownerUserId,
-      },
-    ],
+    agents: [row],
     actor,
     users: deps.users,
+  });
+  await assertConnectedAgentsOnline({
+    agents: [row],
+    projectId,
+    presence: deps.presence,
   });
 
   const batchRunId = generateBatchRunId();
@@ -172,6 +188,7 @@ export function createAgentTestRunDeps({
   return {
     readAgent,
     users: prisma,
+    presence: runtimePresence,
     prefetchDeps: createDataPrefetcherDependencies,
     queueRun: (params) => getApp().simulations.queueRun(params),
   };

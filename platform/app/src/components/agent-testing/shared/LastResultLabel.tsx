@@ -6,15 +6,25 @@
  *
  * A case that never ran says so, and a case that is running right now shows a
  * spinner instead of a verdict it does not have yet.
+ *
+ * The verdict is the one the run stores. A run that met every criterion and
+ * failed a required evaluator reads "Failed" with a full criteria count, and
+ * hovering it names the evaluator that failed it.
  */
 import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { formatRunStatusLabel } from "~/components/suites/format-run-status-label";
 import type { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import {
+  failedRequiredEvaluatorName,
+  type RunEvaluation,
+} from "../results/evaluation-summaries";
 
 export type LastResultCriteria = {
   metCriteria: string[];
   unmetCriteria: string[];
+  /** The evaluators that ran on the scenario, when any did. */
+  evaluations?: RunEvaluation[] | null;
 };
 
 export type LastResultLabelProps = {
@@ -41,6 +51,10 @@ export function LastResultLabel({
 
   const config = SCENARIO_RUN_STATUS_CONFIG[status];
   const label = formatRunStatusLabel({ status, results });
+  const failedEvaluator = results?.evaluations
+    ? failedRequiredEvaluatorName(results.evaluations)
+    : null;
+  const title = failedEvaluator ? `Failed · ${failedEvaluator}` : undefined;
 
   if (!config.isComplete) {
     return (
@@ -54,7 +68,7 @@ export function LastResultLabel({
   }
 
   return (
-    <HStack gap={1.5} whiteSpace="nowrap">
+    <HStack gap={1.5} whiteSpace="nowrap" title={title}>
       <Box
         width="8px"
         height="8px"

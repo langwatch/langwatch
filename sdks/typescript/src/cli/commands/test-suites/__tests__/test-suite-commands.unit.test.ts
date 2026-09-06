@@ -15,6 +15,7 @@ const listSpy = vi.hoisted(() => vi.fn());
 const createSpy = vi.hoisted(() => vi.fn());
 const getSpy = vi.hoisted(() => vi.fn());
 const renameSpy = vi.hoisted(() => vi.fn());
+const updateSpy = vi.hoisted(() => vi.fn());
 const archiveSpy = vi.hoisted(() => vi.fn());
 const runSpy = vi.hoisted(() => vi.fn());
 
@@ -24,6 +25,7 @@ vi.mock("../cli-test-suites-service", () => ({
     create: createSpy,
     get: getSpy,
     rename: renameSpy,
+    update: updateSpy,
     archive: archiveSpy,
     run: runSpy,
   })),
@@ -51,6 +53,7 @@ import { listTestSuitesCommand } from "../list";
 import { createTestSuiteCommand } from "../create";
 import { getTestSuiteCommand } from "../get";
 import { renameTestSuiteCommand } from "../rename";
+import { updateTestSuiteCommand } from "../update";
 import { archiveTestSuiteCommand } from "../archive";
 import { runTestSuiteCommand } from "../run";
 
@@ -124,6 +127,7 @@ beforeEach(() => {
     ],
   });
   renameSpy.mockResolvedValue(makeSuite({ name: "Refunds and credits" }));
+  updateSpy.mockResolvedValue(makeSuite());
   archiveSpy.mockResolvedValue({ id: "suite_abc", archived: true });
   runSpy.mockResolvedValue(makeRunResult());
   vi.spyOn(console, "log").mockImplementation(noop);
@@ -201,9 +205,236 @@ describe("createTestSuiteCommand()", () => {
     expect(createSpy).toHaveBeenCalledWith({ name: "Refunds" });
     expect(result?.data).toMatchObject({ scenarioCount: 0 });
   });
+
+  describe("when fields are given", () => {
+    /** @scenario "Create a test suite with fields" */
+    it("creates it with those fields, in order", async () => {
+      createSpy.mockResolvedValue(
+        makeSuite({
+          scenarioCount: 0,
+          fields: [
+            { identifier: "golden_sql", type: "text" },
+            { identifier: "row_limit", type: "number" },
+          ],
+        }),
+      );
+
+      const result = await createTestSuiteCommand("Case lookups", {
+        field: ["golden_sql:text", "row_limit:number"],
+      });
+
+      expect(createSpy).toHaveBeenCalledWith({
+        name: "Case lookups",
+        fields: [
+          { identifier: "golden_sql", type: "text" },
+          { identifier: "row_limit", type: "number" },
+        ],
+      });
+      result?.table();
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((call) => String(call[0]))
+        .join("\n");
+      expect(printed).toContain("golden_sql");
+      expect(printed).toContain("(number)");
+    });
+
+    /** @scenario "A field with a type the platform does not have is refused" */
+    it("refuses a type the platform does not have before creating anything", async () => {
+      await expect(
+        createTestSuiteCommand("Case lookups", { field: ["golden_sql:json"] }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the attachment list is given as JSON", () => {
+    /** @scenario "The full attachment list comes from --evaluators-json" */
+    it("creates it with that attachment as written", async () => {
+      await createTestSuiteCommand("Case lookups", {
+        field: ["golden_sql:text"],
+        evaluatorsJson: JSON.stringify([
+          {
+            evaluatorId: "evaluator_sql",
+            required: true,
+            mappings: {
+              output: {
+                type: "source",
+                sourceId: "trace",
+                path: ["tool_calls", "run_sql", "input"],
+              },
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+            },
+          },
+        ]),
+      });
+
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Case lookups",
+          fields: [{ identifier: "golden_sql", type: "text" }],
+          evaluators: [
+            expect.objectContaining({
+              evaluatorId: "evaluator_sql",
+              required: true,
+              mappings: expect.objectContaining({
+                output: {
+                  type: "source",
+                  sourceId: "trace",
+                  path: ["tool_calls", "run_sql", "input"],
+                },
+              }),
+            }),
+          ],
+        }),
+      );
+    });
+
+    /** @scenario "A mapping to a field the suite does not declare is refused" */
+    it("refuses a mapping to a field the suite does not declare", async () => {
+      await expect(
+        createTestSuiteCommand("Case lookups", {
+          evaluatorsJson: JSON.stringify([
+            {
+              evaluatorId: "evaluator_sql",
+              mappings: {
+                expected_output: {
+                  type: "source",
+                  sourceId: "scenario",
+                  path: ["fields", "golden_sql"],
+                },
+              },
+            },
+          ]),
+        }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("updateTestSuiteCommand()", () => {
+  describe("when fields are given", () => {
+    /** @scenario "Update the fields of a test suite" */
+    it("patches the field list and nothing else", async () => {
+      await updateTestSuiteCommand("Refunds", {
+        field: ["golden_sql:text", "table_schema:text"],
+      });
+
+      expect(updateSpy).toHaveBeenCalledWith("suite_abc", {
+        fields: [
+          { identifier: "golden_sql", type: "text" },
+          { identifier: "table_schema", type: "text" },
+        ],
+      });
+    });
+  });
+
+  describe("when a name is given", () => {
+    /** @scenario "Update the name of a test suite" */
+    it("patches the name alone", async () => {
+      await updateTestSuiteCommand("suite_abc", { name: "Case lookups v2" });
+
+      expect(updateSpy).toHaveBeenCalledWith("suite_abc", {
+        name: "Case lookups v2",
+      });
+    });
+  });
+
+  describe("when the attachment list is given as JSON", () => {
+    /** @scenario "Update the evaluators of a test suite against its own fields" */
+    it("checks the mappings against the fields the suite already declares", async () => {
+      listSpy.mockResolvedValue([
+        makeSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }),
+      ]);
+
+      await updateTestSuiteCommand("Refunds", {
+        evaluatorsJson: JSON.stringify([
+          {
+            evaluatorId: "evaluator_sql",
+            mappings: {
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+            },
+          },
+        ]),
+      });
+
+      expect(updateSpy).toHaveBeenCalledWith("suite_abc", {
+        evaluators: [
+          expect.objectContaining({ evaluatorId: "evaluator_sql", required: true }),
+        ],
+      });
+    });
+  });
+
+  describe("when nothing is given", () => {
+    /** @scenario "An update with nothing to change is refused" */
+    it("refuses before sending anything", async () => {
+      await expect(updateTestSuiteCommand("Refunds")).rejects.toThrow(
+        ProcessExitError,
+      );
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the suite does not exist", () => {
+    it("refuses before patching anything", async () => {
+      await expect(
+        updateTestSuiteCommand("Nope", { name: "x" }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("getTestSuiteCommand()", () => {
+  describe("when the suite declares fields and evaluators", () => {
+    /** @scenario "Get a test suite shows its fields and evaluators" */
+    it("shows each field with its type and each evaluator with its mappings", async () => {
+      getSpy.mockResolvedValue({
+        ...makeSuite(),
+        scenarios: [],
+        fields: [{ identifier: "golden_sql", type: "text" }],
+        evaluators: [
+          {
+            id: "att_1",
+            evaluatorId: "evaluator_sql",
+            required: true,
+            mappings: {
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+              output: { type: "value", value: "literal" },
+            },
+          },
+        ],
+      });
+
+      const result = await getTestSuiteCommand("suite_abc");
+      result?.table();
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((call) => String(call[0]))
+        .join("\n");
+      expect(printed).toContain("golden_sql");
+      expect(printed).toContain("evaluator_sql");
+      expect(printed).toContain("required");
+      expect(printed).toContain("scenario.fields.golden_sql");
+      expect(printed).toContain('"literal"');
+    });
+  });
+
   describe("when named by ID", () => {
     /** @scenario "Get a test suite by ID" */
     it("reads it and names the scenarios filed in it", async () => {

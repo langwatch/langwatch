@@ -37,6 +37,7 @@ function makeScenario(
     situation: "test situation",
     version: 1,
     testSuiteId: null,
+    fields: null,
     criteria: [],
     labels: [],
     parameters: null,

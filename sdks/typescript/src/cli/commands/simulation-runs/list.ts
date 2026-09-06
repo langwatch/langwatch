@@ -9,6 +9,7 @@ import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 type SimulationRunListItem = {
   scenarioRunId: string;
@@ -69,7 +70,7 @@ export const listSimulationRunsCommand = async (options: {
       if (limit) params.set("limit", limit);
       if (cursor) params.set("cursor", cursor);
 
-      const response = await fetch(
+      const response = await langwatchFetch(
         `${endpoint}/api/simulation-runs?${params.toString()}`,
         {
           method: "GET",

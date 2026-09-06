@@ -267,7 +267,6 @@ const LEGACY_UNBOUND: string[] = [
 const LEGACY_INERT: string[] = [
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
-  "specs/ai-gateway/azure-endpoint-from-api-base.feature",
   "specs/ai-gateway/budgets-principal-cascade.feature",
   "specs/ai-gateway/cache-control-rules.feature",
   "specs/ai-gateway/caching-passthrough.feature",

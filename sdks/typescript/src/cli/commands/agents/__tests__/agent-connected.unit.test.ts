@@ -144,6 +144,22 @@ describe("listAgentsCommand()", () => {
       expect(agentOwnerLabel(connectedAgent({ hostLabel: "ada-laptop" }))).toBe("ada-laptop");
       expect(agentOwnerLabel(connectedAgent())).toBe("");
     });
+
+    /** @scenario "A row the key cannot choose reads as not selectable" */
+    it("marks the owner cell of a row this key cannot run", () => {
+      expect(
+        agentOwnerLabel(
+          connectedAgent({
+            owner: { userId: "u1", name: "Ada" },
+            selectable: false,
+            notSelectableReason: "owned_by_another_person",
+          }),
+        ),
+      ).toBe("Ada (owner only)");
+      expect(agentOwnerLabel(connectedAgent({ selectable: false }))).toBe(
+        "owner only",
+      );
+    });
   });
 });
 
@@ -193,6 +209,26 @@ describe("getAgentCommand()", () => {
 
     it("describes one parameter on one line", () => {
       expect(describeParameter({ name: "n", type: "number", default: 5 })).toBe("n: number, default 5");
+    });
+  });
+
+  describe("when the agent belongs to another person", () => {
+    /** @scenario "The detail says whether the key can choose the agent" */
+    it("names the owner and says only its owner can run it", async () => {
+      service.get.mockResolvedValue(
+        connectedAgent({
+          owner: { userId: "u1", name: "Ada" },
+          selectable: false,
+          notSelectableReason: "owned_by_another_person",
+        }),
+      );
+
+      const result = await getAgentCommand("agent_conn");
+      result?.table?.();
+
+      const output = printed();
+      expect(output).toContain("Ada");
+      expect(output).toContain("only its owner can run this agent");
     });
   });
 });
