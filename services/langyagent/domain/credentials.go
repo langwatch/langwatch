@@ -70,14 +70,6 @@ type Credentials struct {
 	// turns under a stale one. Empty ⇒ skip (fail-safe: an unset policy mirrors
 	// nothing).
 	MirrorTier string `json:"mirrorTier,omitempty"`
-	// Harness names the coding-agent harness the worker runs on ("opencode" |
-	// "pi"), resolved per project by the control plane and threaded through the
-	// envelope like MirrorTier. Folded into the worker signature (via
-	// NormalizeHarness, see SignatureOf) so a harness change replaces the worker
-	// rather than reusing one built for the other harness. Empty ⇒ opencode, the
-	// default: a control plane that predates harness selection keeps every
-	// running worker.
-	Harness string `json:"harness,omitempty"`
 	// DeleteGate is whether the pi worker registers the pre-execution delete
 	// gate (release_langy_delete_gate, issue #7608), resolved per project by the
 	// control plane and threaded through the envelope. Written into the worker

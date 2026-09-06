@@ -256,14 +256,6 @@ export type LangyCredentials = {
    */
   mirrorTier?: LangyMirrorTier;
   /**
-   * Which worker harness serves this turn (`release_langy_pi_harness`,
-   * resolved once per turn, see `langyHarness.ts`). Part of the worker
-   * credential signature on the Go side, where absent and "opencode" collapse
-   * so pre-flag workers never respawn on deploy; a flag flip is a probe MISS
-   * and the worker re-warms on the other harness.
-   */
-  harness?: LangyHarness;
-  /**
    * Whether the worker registers the pre-execution delete gate
    * (`release_langy_delete_gate`, resolved once per turn, see
    * `langyDeleteGate.ts`, issue #7608). Rides the credentials envelope into the

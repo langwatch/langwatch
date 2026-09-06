@@ -201,7 +201,28 @@ describe("tool-surface completeness", () => {
   // Read-only or non-destructive tools that provably cannot reach a destructive
   // LangWatch operation. Their union with the gated tools must equal
   // ENABLED_TOOLS exactly — a newly added tool fails this until classified.
-  const EXEMPT_TOOLS = new Set(["read", "grep", "find", "ls", "todowrite", "skill"]);
+  const EXEMPT_TOOLS = new Set([
+    "read",
+    "grep",
+    "find",
+    "ls",
+    "todowrite",
+    "skill",
+    // Posts a question and long-polls for the answer (src/tools/question.ts) —
+    // only an HTTP call to the app's own wait endpoint, no bash/write/edit/
+    // destructive call in its implementation.
+    "question",
+    // Read-only / discovery twins that run on the developer's own machine
+    // (src/tools/local-workspace.ts). Provably cannot reach a destructive
+    // LangWatch call, same as their built-in `read`/`grep`/`find`/`ls`
+    // counterparts. `local_bash`/`local_write`/`local_edit` are deliberately
+    // NOT here — they are GATED (picked up from GATED_TOOL_NAMES).
+    "code_access",
+    "local_read",
+    "local_grep",
+    "local_find",
+    "local_ls",
+  ]);
   const GATED = new Set<string>(GATED_TOOL_NAMES);
 
   /** @scenario Every enabled tool is classified as gated or exempt */

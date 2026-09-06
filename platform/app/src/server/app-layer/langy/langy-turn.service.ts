@@ -384,18 +384,6 @@ export interface LangyTurnServiceDeps {
    */
   checkPermit?: (args: { userId: string }) => Promise<{ allowed: boolean }>;
   /**
-   * Which worker harness serves this turn (`release_langy_pi_harness`),
-   * resolved once per turn in the base-dependency phase. Contract:
-   * never throws (see `resolveLangyHarness`). Optional: absent (tests,
-   * minimal compositions) leaves `credentials.harness` unset, which the
-   * manager treats as its default harness.
-   */
-  resolveHarness?: (args: {
-    userId: string;
-    projectId: string;
-    organizationId: string;
-  }) => Promise<LangyHarness>;
-  /**
    * Whether the worker registers the pre-execution delete gate (#7608),
    * resolved once per turn in the base-dependency phase. Contract: never throws
    * (see `resolveLangyDeleteGate`). Optional: absent (tests, minimal

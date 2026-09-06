@@ -51,8 +51,13 @@ export type GateDecision =
   | { allow: true; confirmationSignature?: string }
   | { allow: false; reason: string };
 
-/** Tool inputs whose written content is scanned for a destructive command. */
-const WRITE_TOOL_NAMES = new Set(["write", "edit"]);
+/**
+ * Tool inputs whose written content is scanned for a destructive command. The
+ * `local_write`/`local_edit` twins put content on the developer's own machine
+ * (`src/tools/local-workspace.ts`) with the same `content`/`edits` shape, so
+ * their write-then-exec risk is identical and they are scanned the same way.
+ */
+const WRITE_TOOL_NAMES = new Set(["write", "edit", "local_write", "local_edit"]);
 
 const BLOCK_REASON =
   "Blocked: this command deletes LangWatch data and no confirmation from the user is on record. " +

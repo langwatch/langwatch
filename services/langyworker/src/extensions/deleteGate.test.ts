@@ -805,6 +805,51 @@ describe("matcher regressions", () => {
   });
 });
 
+describe("local-workspace twins are gated like their built-ins", () => {
+  const localBash = (command: unknown, entries: BranchEntryLike[] = noHistory) =>
+    evaluateToolCall({ toolName: "local_bash", input: { command }, entries });
+
+  /** @scenario A destructive command via local_bash is blocked without a confirmation */
+  it("blocks a destructive local_bash delete with no confirmation on record", () => {
+    expect(localBash("langwatch dashboard delete d1").allow).toBe(false);
+  });
+
+  /** @scenario local_bash is released by the same bound confirmation that releases bash */
+  it("releases a local_bash delete backed by a bound confirmation, and blocks a mismatch", () => {
+    expect(localBash("langwatch dashboard delete d1", confirmedForD1).allow).toBe(true);
+    expect(localBash("langwatch dashboard delete d2", confirmedForD1).allow).toBe(false);
+  });
+
+  /** @scenario local_write/local_edit content carrying a destructive command is held */
+  it("holds a local_write/local_edit whose content carries a destructive command, even with a valid confirmation", () => {
+    const write = evaluateToolCall({
+      toolName: "local_write",
+      input: { path: "cleanup.sh", content: "#!/bin/sh\nlangwatch dashboard delete d1\n" },
+      entries: confirmedForD1,
+    });
+    expect(write.allow).toBe(false);
+
+    const edit = evaluateToolCall({
+      toolName: "local_edit",
+      input: {
+        path: "cleanup.sh",
+        edits: [{ oldText: "echo hi", newText: "langwatch dataset delete d2" }],
+      },
+      entries: confirmedForD1,
+    });
+    expect(edit.allow).toBe(false);
+
+    // A benign local_write is untouched.
+    expect(
+      evaluateToolCall({
+        toolName: "local_write",
+        input: { path: "notes.md", content: "TODO: ask before deleting anything" },
+        entries: noHistory,
+      }).allow,
+    ).toBe(true);
+  });
+});
+
 describe("isUserConfirmation", () => {
   it("accepts a short leading affirmative and rejects buried prose or refusals", () => {
     expect(isUserConfirmation("yes")).toBe(true);

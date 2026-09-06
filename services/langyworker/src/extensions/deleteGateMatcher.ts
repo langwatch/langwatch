@@ -54,8 +54,23 @@ export type DestructiveMatch =
       cause?: "obfuscated-command-name";
     };
 
-/** Tool names whose input can reach a destructive command. */
-export const GATED_TOOL_NAMES = ["bash", "write", "edit"] as const;
+/**
+ * Tool names whose input can reach a destructive command. The `local_*` twins
+ * mirror pi's built-ins but run on the developer's own machine via long-poll
+ * (`src/tools/local-workspace.ts`); their params are shape-identical
+ * (`local_bash` carries `command`, `local_write` carries `content`,
+ * `local_edit` carries `edits`), so a destructive `langwatch` call routed
+ * through them must be gated exactly as `bash`/`write`/`edit` are — otherwise
+ * the gate is bypassed by running the delete on the local workspace surface.
+ */
+export const GATED_TOOL_NAMES = [
+  "bash",
+  "write",
+  "edit",
+  "local_bash",
+  "local_write",
+  "local_edit",
+] as const;
 
 /**
  * Destructive verbs as the LangWatch CLI spells them. A verb counts when it
@@ -120,6 +135,10 @@ export const REVIEWED_BENIGN = [
   "health",
   "init",
   "install",
+  // CLI root/session-start command for local dev control sharing
+  // (`langwatch langy --share-control`), not an action verb — nothing to
+  // classify as destructive.
+  "langy",
   "list",
   "list-runs",
   "permissions",
@@ -145,6 +164,9 @@ export const REVIEWED_BENIGN = [
   "tail",
   "test",
   "transcript",
+  // `agent tunnel` opens a dev tunnel to expose a local agent — a reversible
+  // network operation that doesn't delete or mutate any resource.
+  "tunnel",
   "types",
   "unplace",
   "unset",

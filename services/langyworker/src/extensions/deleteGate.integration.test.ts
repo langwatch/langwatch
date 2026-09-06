@@ -16,6 +16,7 @@ import type { AgentSession, ToolCallEvent } from "@earendil-works/pi-coding-agen
 import { beforeAll, describe, expect, it } from "vitest";
 import type { LangyWorkerConfig } from "../config.js";
 import { createLangySession } from "../session.js";
+import { createTurnContext } from "../tools/turn-context.js";
 
 function userMessage(text: string): UserMessage {
   return { role: "user", content: [{ type: "text", text }], timestamp: Date.now() };
@@ -63,6 +64,7 @@ async function bootSession(deleteGateEnabled?: boolean): Promise<AgentSession> {
   const home = mkdtempSync(join(tmpdir(), "langy-gate-"));
   const { session } = await createLangySession({
     config: configFor(join(home, "sessions"), deleteGateEnabled),
+    turnContext: createTurnContext(),
     home,
     systemPrompt: { current: "you are langy" },
   });

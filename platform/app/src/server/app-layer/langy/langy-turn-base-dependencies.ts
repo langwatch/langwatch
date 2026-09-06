@@ -22,7 +22,6 @@ export async function resolveLangyTurnBaseDependencies(args: {
     | "conversations"
     | "credentials"
     | "resolveModel"
-    | "resolveHarness"
     | "resolveDeleteGate"
   >;
   projectId: string;
@@ -117,19 +116,6 @@ export async function resolveLangyTurnBaseDependencies(args: {
       "failed to resolve Langy mirror tier — mirroring nothing for this turn",
     );
     credentials.mirrorTier = "skip";
-  }
-  // Which worker harness serves this turn, evaluated exactly once per turn so
-  // probe, handoff stash and dispatch all carry the same answer. Needs the
-  // organizationId the credentials just resolved, so it runs after the batch;
-  // the resolver's contract is never-throws (a flag-store blip falls back to
-  // the default harness inside it). Absent resolver (tests, minimal
-  // compositions) means the manager's default harness.
-  if (deps.resolveHarness) {
-    credentials.harness = await deps.resolveHarness({
-      userId,
-      projectId,
-      organizationId: credentials.organizationId,
-    });
   }
   // Whether the worker registers the pre-execution delete gate (#7608),
   // resolved once per turn alongside the harness. Contract: never throws (a
