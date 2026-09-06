@@ -1,12 +1,11 @@
 import { openai } from "@ai-sdk/openai";
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import {
-	assertSkillWasRead,
 	copyFixtureToWorkDir,
 	createClaudeCodeAgent,
 	createSkillTestWorkDir,
@@ -14,7 +13,6 @@ import {
 	removeSkillTestWorkDir,
 	SKILL_TESTS_SET_ID,
 	setupLocalCli,
-	toolCallFix,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -139,17 +137,14 @@ describe("Dataset Generation Skill", () => {
 							),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 							},
 							scenario.user(),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 							},
 							scenario.user(),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 								assertSkillWasRead(state, "datasets");
 
 								// Check a CSV file was created
@@ -252,17 +247,14 @@ describe("Dataset Generation Skill", () => {
 							),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 							},
 							scenario.user(),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 							},
 							scenario.user(),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 								assertSkillWasRead(state, "datasets");
 
 								const csvFiles = findGeneratedFiles({
@@ -355,17 +347,14 @@ describe("Dataset Generation Skill", () => {
 							scenario.user("create an evaluation dataset for my project"),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 							},
 							scenario.user(),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 							},
 							scenario.user(),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 								assertSkillWasRead(state, "datasets");
 							},
 							scenario.judge(),
@@ -435,17 +424,14 @@ describe("Dataset Generation Skill", () => {
 							),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 							},
 							scenario.user(),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 							},
 							scenario.user(),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 								assertSkillWasRead(state, "datasets");
 
 								const csvFiles = findGeneratedFiles({
@@ -535,17 +521,14 @@ describe("Dataset Generation Skill", () => {
 							),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 							},
 							scenario.user(),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 							},
 							scenario.user(),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 								assertSkillWasRead(state, "datasets");
 
 								const csvFiles = findGeneratedFiles({

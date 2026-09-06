@@ -9,7 +9,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
-  toolCallFix,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
@@ -77,7 +76,6 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             expect(
               fs.existsSync(path.join(tempFolder, "prompts.json")),
@@ -152,7 +150,6 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const promptsDir = path.join(tempFolder, "prompts");
             const yamlFiles = fs.existsSync(promptsDir)
@@ -228,7 +225,6 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             // Verify prompt was created
             const promptsDir = path.join(tempFolder, "prompts");
@@ -294,7 +290,6 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const promptsDir = path.join(tempFolder, "prompts");
             const yamlFiles = fs.existsSync(promptsDir)

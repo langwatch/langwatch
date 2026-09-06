@@ -9,7 +9,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   setupLocalCli,
-  toolCallFix,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
@@ -80,7 +79,6 @@ Workflow to exercise (in order):
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) =>
@@ -155,7 +153,6 @@ Workflow:
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) =>
@@ -227,7 +224,6 @@ Your goal: report back which top-level command groups are available and what the
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) =>
