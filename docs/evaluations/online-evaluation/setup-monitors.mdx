@@ -4,7 +4,7 @@ sidebarTitle: Setting up Monitors
 description: Create an online evaluation that scores every incoming trace or thread with an evaluator, filter and sample the traffic it runs on, and read the results on the trace and in analytics.
 ---
 
-A monitor is an evaluator attached to your production traffic. Every trace that matches its preconditions and sampling rate is scored as it arrives, asynchronously, so the score never delays the response to your user.
+A monitor is an evaluator attached to your production traffic. Traces that match its preconditions and sampling rate are scored asynchronously, so the score never delays the response to your user. A Trace Level monitor scores each trace as it arrives; a Thread Level monitor waits for the thread to go idle first.
 
 This guide sets up an LLM-as-a-Judge monitor named `Off-topic reply` that flags replies that drift away from the customer's question. The same steps apply to any evaluator, for example PII detection or jailbreak detection.
 
