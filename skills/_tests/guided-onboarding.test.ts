@@ -39,7 +39,7 @@ const VERBATIM_LINES = {
     "Then I can show you around once your first traces are flying through.",
   "the gateway opener":
     "Your key production-app is live. Point your app at the gateway with it and every call gets budgets, routing and tracing for free:",
-  "the gateway base url": 'OPENAI_BASE_URL="<the Gateway line of the brief>"',
+  "the gateway base url": 'OPENAI_BASE_URL="<the address after Gateway: in the brief>"',
   "the gateway closer":
     "That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.",
   "the governance opener":
@@ -109,7 +109,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The gateway snippet points at the instance's own gateway" */
     it("takes the gateway address from the brief and never from a remembered host", () => {
       expect(rendered).not.toContain("gateway.langwatch.ai");
-      expect(rendered).toContain("The gateway address is the `Gateway:` line of the brief");
+      expect(rendered).toContain("The gateway address is the value after `Gateway:` in the brief, exactly as it stands there");
     });
 
     /** @scenario "A key the tour minted gets the live line, not an apology" */
@@ -202,7 +202,10 @@ describe("the guided-onboarding skill", () => {
       const failed = rendered.indexOf("### When a step fails");
       expect(failed).toBeGreaterThan(-1);
       const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
-      expect(section).toContain("Say in one line what is not done and what it needs, and end the turn.");
+      expect(section).toContain(
+        "say in one line what is not done and what the error names as the cause, and end the turn",
+      );
+      expect(section).toContain("stop there, without diagnosing");
       expect(section).toContain("`langwatch onboarding complete-path` does not run");
       expect(section).toContain("the why-a-scenario line and the closing line are not said");
       expect(section).toContain("a scenario or suite run answers an error instead of a verdict");

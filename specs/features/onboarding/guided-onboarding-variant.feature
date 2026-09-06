@@ -228,14 +228,23 @@ Feature: Guided onboarding variant
   @unit
   Scenario: the CLI completes a path by name
     When "langwatch onboarding complete-path llmops" runs
-    Then it asks the platform to complete the llmops path and prints the updated state
+    Then it asks the platform to complete the llmops path
+    And it prints one line, the path's title followed by "set up", as the panel's done marker
+
+  @unit
+  Scenario: the complete-path card is one line naming the path
+    Given Langy runs "langwatch onboarding complete-path" inside the panel, where the output is a card
+    When the command prints
+    Then the card carries that one line and none of the state the platform answered
 
   @unit
   Scenario: the onboarding card carries what the person reads and nothing else
-    Given Langy runs an onboarding command inside the panel, where the output is a card
-    When "langwatch onboarding state" or "langwatch onboarding complete-path" prints
-    Then the card carries the picks, the current and done paths, the provider and where the tour stands
-    And no conversation id, timestamp or replay count is on it
+    Given Langy runs "langwatch onboarding state" inside the panel, where the output is a card
+    When the command prints
+    Then the card names the picks, the current path and the done paths by their titles
+    And the provider reads the vendor's way with the model beside it
+    And the tour reads Completed or Skipped, with no row when the path had no tour
+    And no conversation id, timestamp, replay count or internal value is on it
 
   @unit
   Scenario: the CLI boot graph does not change for the onboarding commands

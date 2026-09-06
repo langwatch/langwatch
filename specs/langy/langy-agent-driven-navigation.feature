@@ -185,6 +185,15 @@ Feature: Langy opens the resource it surfaced in the browser
       Then the user is taken to that resource
       And they land on the same page the product's own links open
 
+    # The link a scenario create prints is remembered only when the command's
+    # stdout is trusted, and the provenance check refuses a command whose
+    # quoted text carries parentheses. A scenario whose situation reads
+    # "(WELCOME10)" is then reachable only through the fallback.
+    @unit
+    Scenario: A scenario opens in its editor through the platform fallback
+      When Langy asks to open a scenario the project can see, and the conversation remembered no link for it
+      Then the user is taken to that scenario's editor, resolved with the project's own access
+
     # A prompt used to open as a drawer stacked over the playground's own "no
     # prompts open" empty state, so the page behind the form was blank and the
     # one surface built for reading a prompt and running it was the surface the

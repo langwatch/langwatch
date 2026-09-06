@@ -107,29 +107,31 @@ export function buildGuidedKickoffBrief({
 }): string {
   const lines: string[] = [];
   if (continuing) lines.push(guidedPathContinuationLine(input.path));
+  // Every line after the opener is a label, a colon and its value, and the
+  // value is the whole rest of the line: a sentence stop after the gateway
+  // address was copied into the snippet with it.
   lines.push(
     GUIDED_KICKOFF_BRIEF_OPENER,
-    `Path to set up now: ${describePath(input.path)}.`,
+    `Path to set up now: ${describePath(input.path)}`,
   );
   const picks = input.paths.length > 0 ? input.paths : [input.path];
   lines.push(
     `Everything picked, in the order it was picked: ${picks
       .map(describePath)
-      .join(", ")}.`,
+      .join(", ")}`,
   );
   lines.push(
     input.provider
-      ? `Provider: ${input.provider}${input.providerModel ? `, model ${input.providerModel}` : ""}.`
-      : "Provider: none connected yet.",
+      ? `Provider: ${input.provider}${input.providerModel ? `, model ${input.providerModel}` : ""}`
+      : "Provider: none connected yet",
   );
-  lines.push(
-    `Organization: ${input.orgName ?? "unknown"}. First name: ${input.firstName ?? "unknown"}.`,
-  );
-  lines.push(`Tour: ${input.tourStatus}.`);
+  lines.push(`Organization: ${input.orgName ?? "unknown"}`);
+  lines.push(`First name: ${input.firstName ?? "unknown"}`);
+  lines.push(`Tour: ${input.tourStatus}`);
   lines.push(
     input.gatewayUrl
-      ? `Gateway: ${input.gatewayUrl}.`
-      : "Gateway: none configured on this instance.",
+      ? `Gateway: ${input.gatewayUrl}`
+      : "Gateway: none configured on this instance",
   );
   return lines.join("\n");
 }

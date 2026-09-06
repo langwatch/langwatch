@@ -23,6 +23,7 @@ const {
   getAgentByIdOrThrow,
   workflowFindFirst,
   getMonitorById,
+  getScenarioById,
 } = vi.hoisted(() => ({
   getScenarioRunData: vi.fn(),
   getProjectById: vi.fn(),
@@ -33,6 +34,7 @@ const {
   getAgentByIdOrThrow: vi.fn(),
   workflowFindFirst: vi.fn(),
   getMonitorById: vi.fn(),
+  getScenarioById: vi.fn(),
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -71,6 +73,10 @@ vi.mock("~/server/evaluators/evaluator.service", () => ({
 
 vi.mock("~/server/agents/agent.service", () => ({
   AgentService: { create: () => ({ getByIdOrThrow: getAgentByIdOrThrow }) },
+}));
+
+vi.mock("~/server/scenarios/scenario.service", () => ({
+  ScenarioService: { create: () => ({ getById: getScenarioById }) },
 }));
 
 import { resolveNavigateFallbackUrl } from "../langyNavigateFallback";
@@ -122,6 +128,29 @@ describe("resolveNavigateFallbackUrl", () => {
         projectId: "proj_1",
         scenarioRunId: RUN_ID,
       });
+    });
+  });
+
+  describe("given a scenario id the project can see", () => {
+    /** @scenario "A scenario opens in its editor through the platform fallback" */
+    it("looks the scenario up with the project's own access and returns its editor url", async () => {
+      const scenarioId = "scenario_0004fsoNCG1uM9sYw63veXXTqza49";
+      getScenarioById.mockResolvedValue({ id: scenarioId });
+
+      expect(await resolve(scenarioId)).toBe(
+        "https://app.langwatch.ai/acme/simulations/scenarios?drawer.open=scenarioEditor" +
+          `&drawer.scenarioId=${scenarioId}`,
+      );
+      expect(getScenarioById).toHaveBeenCalledWith({
+        id: scenarioId,
+        projectId: "proj_1",
+      });
+    });
+
+    it("returns null for a scenario the project cannot see", async () => {
+      getScenarioById.mockResolvedValue(null);
+
+      expect(await resolve("scenario_0004missing")).toBeNull();
     });
   });
 

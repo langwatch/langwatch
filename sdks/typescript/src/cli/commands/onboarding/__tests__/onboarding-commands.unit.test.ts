@@ -32,7 +32,7 @@ const STATE = {
   providerModel: "gpt-5",
 };
 
-/** What the platform answers: the card fields plus what stays the platform's. */
+/** What the platform answers: the picks plus what stays the platform's. */
 const ANSWERED = {
   ...STATE,
   tourCompletedAt: "2026-09-06T10:00:00.000Z",
@@ -40,8 +40,13 @@ const ANSWERED = {
   tourReplays: 2,
 };
 
-/** What the card shows for that answer. */
-const CARD = { ...STATE, tour: "completed" };
+/** What the card shows for that answer, in customer copy. */
+const CARD = {
+  paths: "Evals & LLM Ops, Gateway",
+  currentPath: "Evals & LLM Ops",
+  provider: "OpenAI · gpt-5",
+  tour: "Completed",
+};
 
 const noop = () => {
   // suppresses output during tests
@@ -72,7 +77,7 @@ describe("langwatch onboarding", () => {
     });
 
     /** @scenario "the onboarding card carries what the person reads and nothing else" */
-    it("keeps the conversation id, the timestamps and the replay count off the card", async () => {
+    it("keeps the platform's own fields and every internal value off the card", async () => {
       getGuidedState.mockResolvedValue(ANSWERED);
 
       const result = await onboardingStateCommand();
@@ -82,46 +87,96 @@ describe("langwatch onboarding", () => {
       expect(printed).not.toContain("2026-09-06");
       expect(printed).not.toContain("tourReplays");
       expect(printed).not.toContain("conversationId");
-      expect((result?.data as { tour: string }).tour).toBe("completed");
+      expect(printed).not.toContain("llmops");
+      expect(printed).not.toContain("openai");
+      expect(printed).not.toContain("donePaths");
     });
 
-    it("reads a skipped tour and one that never ran", async () => {
+    it("names the done paths by their titles once there are any", async () => {
+      getGuidedState.mockResolvedValue({
+        ...ANSWERED,
+        currentPath: "gateway",
+        donePaths: ["llmops"],
+      });
+
+      const result = await onboardingStateCommand();
+
+      expect(result?.data).toEqual({
+        ...CARD,
+        currentPath: "Gateway",
+        donePaths: "Evals & LLM Ops",
+      });
+    });
+
+    it("writes the provider the vendor's way, with or without a model", async () => {
+      getGuidedState.mockResolvedValueOnce({
+        ...STATE,
+        provider: "vertex_ai",
+        providerModel: undefined,
+      });
+      expect(((await onboardingStateCommand())?.data as { provider: string }).provider).toBe(
+        "Vertex AI",
+      );
+      getGuidedState.mockResolvedValueOnce({ ...STATE, provider: undefined });
+      expect("provider" in ((await onboardingStateCommand())?.data as object)).toBe(false);
+    });
+
+    it("reads a skipped tour as Skipped and leaves the row out when there was no tour", async () => {
       getGuidedState.mockResolvedValueOnce({
         ...STATE,
         tourSkippedAt: "2026-09-06T10:00:00.000Z",
       });
-      expect(((await onboardingStateCommand())?.data as { tour: string }).tour).toBe(
-        "skipped",
+      expect(((await onboardingStateCommand())?.data as { tour?: string }).tour).toBe(
+        "Skipped",
       );
       getGuidedState.mockResolvedValueOnce(STATE);
-      expect(((await onboardingStateCommand())?.data as { tour: string }).tour).toBe(
-        "none",
-      );
+      const card = (await onboardingStateCommand())?.data as object;
+      expect("tour" in card).toBe(false);
+      expect(JSON.stringify(card)).not.toContain("none");
     });
   });
 
   describe("given `langwatch onboarding complete-path llmops` runs", () => {
     /** @scenario "the CLI completes a path by name" */
-    it("asks the platform to complete the llmops path and prints the updated state", async () => {
-      const done = {
+    it("asks the platform to complete the llmops path and prints the done marker", async () => {
+      completePath.mockResolvedValue({
         ...ANSWERED,
         currentPath: undefined,
         donePaths: ["llmops"],
-      };
-      const doneCard = { ...CARD, donePaths: ["llmops"] };
-      delete (doneCard as { currentPath?: string }).currentPath;
-      completePath.mockResolvedValue(done);
+      });
       const log = vi.spyOn(console, "log").mockImplementation(noop);
 
       const result = await onboardingCompletePathCommand("llmops");
 
       expect(resolveCredentials).toHaveBeenCalledTimes(1);
       expect(completePath).toHaveBeenCalledWith("llmops");
-      expect(result?.data).toEqual(doneCard);
-      expect(JSON.stringify(result?.data)).not.toContain("langyconv_1");
+      expect(result?.data).toEqual({ text: "Evals & LLM Ops set up" });
 
       result?.table();
-      expect(JSON.parse(log.mock.calls[0]![0] as string)).toEqual(doneCard);
+      expect(log.mock.calls[0]![0]).toBe("Evals & LLM Ops set up");
+    });
+
+    /** @scenario "the complete-path card is one line naming the path" */
+    it("carries nothing of the state the platform answered", async () => {
+      completePath.mockResolvedValue({ ...ANSWERED, donePaths: ["coding"] });
+
+      const result = await onboardingCompletePathCommand("coding");
+
+      expect(result?.data).toEqual({ text: "Coding Agent Tracking set up" });
+      const printed = JSON.stringify(result?.data);
+      expect(printed).not.toContain("provider");
+      expect(printed).not.toContain("tour");
+      expect(printed).not.toContain("langyconv_1");
+    });
+
+    it("prints nothing for a path the platform refuses", async () => {
+      completePath.mockRejectedValue(new Error("guided_path_unknown"));
+      const log = vi.spyOn(console, "log").mockImplementation(noop);
+
+      await expect(onboardingCompletePathCommand("nope")).rejects.toThrow(
+        "guided_path_unknown",
+      );
+      expect(log).not.toHaveBeenCalled();
     });
   });
 });

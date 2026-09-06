@@ -192,14 +192,14 @@ langwatch virtual-keys create --name production-app --format json
 
 Take the secret from the create output. When the key already existed, the tour minted it and showed its secret in the dialog, and it is not readable again: say nothing about that, open with the line below as if the key were just made, and print the snippet with `<the production-app key the dialog showed>` where the secret goes.
 
-The gateway address is the `Gateway:` line of the brief, never a host you remember: an instance serves its own. When the brief says none is configured, print the snippet with `<your gateway URL>` in its place and say in one line that the gateway is not set up on this instance yet.
+The gateway address is the value after `Gateway:` in the brief, exactly as it stands there, never a host you remember: an instance serves its own. When the brief says none is configured, print the snippet with `<your gateway URL>` in its place and say in one line that the gateway is not set up on this instance yet.
 
 Say, verbatim, then the snippet:
 
 Your key production-app is live. Point your app at the gateway with it and every call gets budgets, routing and tracing for free:
 
 ```bash
-export OPENAI_BASE_URL="<the Gateway line of the brief>"
+export OPENAI_BASE_URL="<the address after Gateway: in the brief>"
 export OPENAI_API_KEY="<the key>"
 ```
 

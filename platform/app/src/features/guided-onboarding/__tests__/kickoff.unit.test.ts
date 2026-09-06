@@ -47,23 +47,36 @@ describe("the guided onboarding kickoff", () => {
       expect(lines[0]).toBe("Guided onboarding kickoff.");
       expect(brief).not.toContain("skill");
       expect(brief).not.toContain("langwatch ");
-      expect(lines).toContain("Path to set up now: llmops (Evals & LLM Ops).");
+      expect(lines).toContain("Path to set up now: llmops (Evals & LLM Ops)");
       expect(lines).toContain(
-        "Everything picked, in the order it was picked: llmops (Evals & LLM Ops), governance (Governance).",
+        "Everything picked, in the order it was picked: llmops (Evals & LLM Ops), governance (Governance)",
       );
-      expect(lines).toContain("Provider: OpenAI, model gpt-5.");
-      expect(lines).toContain("Organization: ACME. First name: Ada.");
-      expect(lines).toContain("Tour: completed.");
+      expect(lines).toContain("Provider: OpenAI, model gpt-5");
+      expect(lines).toContain("Organization: ACME");
+      expect(lines).toContain("First name: Ada");
+      expect(lines).toContain("Tour: completed");
+    });
+
+    /** @scenario "The brief's data lines end on their values" */
+    it("ends every data line on its value, with no sentence stop after it", () => {
+      const lines = buildGuidedKickoffBrief({ input: KICKOFF })
+        .split("\n")
+        .slice(1);
+      expect(lines.length).toBeGreaterThanOrEqual(6);
+      for (const line of lines) {
+        expect(line, line).toMatch(/^[A-Z][^:]+: \S/);
+        expect(line.endsWith("."), line).toBe(false);
+      }
     });
 
     /** @scenario "The brief names the instance's gateway" */
     it("names the gateway URL the instance serves, or that none is configured", () => {
       expect(buildGuidedKickoffBrief({ input: KICKOFF }).split("\n")).toContain(
-        "Gateway: https://gateway.acme.example/v1.",
+        "Gateway: https://gateway.acme.example/v1",
       );
       const { gatewayUrl: _omitted, ...withoutGateway } = KICKOFF;
       expect(buildGuidedKickoffBrief({ input: withoutGateway })).toContain(
-        "Gateway: none configured on this instance.",
+        "Gateway: none configured on this instance",
       );
       expect(buildGuidedKickoffBrief({ input: KICKOFF })).not.toContain(
         "gateway.langwatch.ai",
@@ -74,7 +87,7 @@ describe("the guided onboarding kickoff", () => {
       const brief = buildGuidedKickoffBrief({
         input: { ...KICKOFF, provider: undefined, providerModel: undefined },
       });
-      expect(brief).toContain("Provider: none connected yet.");
+      expect(brief).toContain("Provider: none connected yet");
     });
 
     it("treats a lone path as its own pick when the picks are empty", () => {
@@ -82,7 +95,7 @@ describe("the guided onboarding kickoff", () => {
         input: { ...KICKOFF, paths: [] },
       });
       expect(brief).toContain(
-        "Everything picked, in the order it was picked: llmops (Evals & LLM Ops).",
+        "Everything picked, in the order it was picked: llmops (Evals & LLM Ops)",
       );
     });
   });

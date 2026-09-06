@@ -404,6 +404,16 @@ export const CAPABILITY_CATALOG = {
       },
     },
   },
+  // ── Guided onboarding ──────────────────────────────────────────────────────
+  // `onboarding complete-path` is the panel's done marker at the end of a
+  // guided path: its result is one line, drawn as text. `onboarding state` is
+  // the organization's picks in customer copy, drawn as facts.
+  onboarding: {
+    surface: "platform",
+    digestStrategy: "reduced",
+    noun: { singular: "guided onboarding", plural: "guided onboarding" },
+    body: { byVerb: { "complete-path": "text" } },
+  },
 } as const satisfies Record<string, CapabilityCatalogEntry>;
 
 export type CatalogResource = keyof typeof CAPABILITY_CATALOG;

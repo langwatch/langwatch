@@ -70,6 +70,14 @@ Feature: Langy guides the first setup after sign-up
       And the brief says whether the tour was completed or skipped
       And the brief opens with the kickoff line and names no skill and no command
 
+    # A value copied out of the brief must be the value alone. A sentence stop
+    # after the gateway address was copied into the snippet with it.
+    @unit
+    Scenario: The brief's data lines end on their values
+      When the panel builds the kickoff brief
+      Then every line after the opener is a label, a colon and its value
+      And no line ends with a sentence stop
+
     @unit
     Scenario: The brief names the instance's gateway
       When the panel builds the kickoff brief on an instance that serves a gateway
@@ -80,7 +88,7 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: The gateway snippet points at the instance's own gateway
       When the compiled guided-onboarding skill is read
-      Then the snippet's base URL is the Gateway line of the brief
+      Then the snippet's base URL is the address after "Gateway:" in the brief, as it stands
       And the skill names no gateway host of its own
 
     @unit
@@ -542,3 +550,22 @@ Feature: Langy guides the first setup after sign-up
       When Langy reaches the end of any path
       Then Langy runs "langwatch onboarding complete-path <path>"
       And the organization's guided onboarding lists that path as done
+
+  # ===========================================================================
+  # The done marker: what complete-path shows in the panel
+  # ===========================================================================
+
+  Rule: The complete-path result renders as one line, the panel's done marker
+
+    @integration
+    Scenario: The done marker is one line
+      Given Langy ran "langwatch onboarding complete-path coding" inside the panel
+      When its card renders
+      Then it reads "Coding Agent Tracking set up" and nothing else
+      And no label and value rows are drawn
+
+    @integration
+    Scenario: The onboarding state card reads in customer copy
+      Given Langy ran "langwatch onboarding state" inside the panel
+      When its card renders
+      Then the rows read the paths by their titles, the provider the vendor's way and the tour as Completed

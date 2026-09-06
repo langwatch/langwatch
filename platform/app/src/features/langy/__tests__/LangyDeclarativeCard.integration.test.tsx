@@ -363,6 +363,46 @@ describe("LangyDeclarativeCard", () => {
     });
   });
 
+  describe("given the onboarding commands Langy runs at the end of a guided path", () => {
+    describe("when the complete-path card renders", () => {
+      /** @scenario "The done marker is one line" */
+      it("draws the one line the result carries, and no label and value rows", () => {
+        renderCard({
+          name: "langwatch.onboarding.complete-path",
+          input: {
+            command: "langwatch onboarding complete-path coding --format json",
+          },
+          output: { text: "Coding Agent Tracking set up" },
+        });
+
+        expect(screen.getByText("Coding Agent Tracking set up")).toBeTruthy();
+        expect(screen.queryByText("text")).toBeNull();
+        expect(screen.queryByText(/Couldn.t read this result/)).toBeNull();
+      });
+    });
+
+    describe("when the state card renders", () => {
+      /** @scenario "The onboarding state card reads in customer copy" */
+      it("draws the picks, the provider and the tour as label and value rows", () => {
+        renderCard({
+          name: "langwatch.onboarding.state",
+          input: { command: "langwatch onboarding state --format json" },
+          output: {
+            paths: "Evals & LLM Ops, Gateway",
+            currentPath: "Evals & LLM Ops",
+            provider: "OpenAI · gpt-5.2",
+            tour: "Completed",
+          },
+        });
+
+        expect(screen.getByText("current path")).toBeTruthy();
+        expect(screen.getByText("Evals & LLM Ops, Gateway")).toBeTruthy();
+        expect(screen.getByText("OpenAI · gpt-5.2")).toBeTruthy();
+        expect(screen.getByText("Completed")).toBeTruthy();
+      });
+    });
+  });
+
   describe("given a collection read whose references hydrate fresh data", () => {
     const digest: CliResultDigest = {
       resource: "prompt",
