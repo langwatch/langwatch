@@ -21,6 +21,13 @@ Feature: Evaluators reach the Azure deployment and the embeddings provider a pro
   #    never picked, with an error naming that provider rather than the
   #    setting that carried it.
   #
+  # Scope of what these scenarios observe: the seam either side of the handoff
+  # between the platform and the evaluator service. On the platform side they
+  # watch what the environment is built to say, taking the model-to-deployment
+  # mapping itself as given — it is resolved and covered a layer below. On the
+  # service side they watch what the call ends up addressed to. Nothing here
+  # calls a real provider.
+  #
   # Bindings:
   #   platform/app/src/server/app-layer/evaluations/evaluation-execution.factories.ts
   #   platform/app/src/server/app-layer/evaluations/__tests__/evaluation-execution.factories.unit.test.ts

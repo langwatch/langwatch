@@ -57,6 +57,9 @@ describe("setupModelEnv", () => {
   beforeEach(() => {
     vi.mocked(getResolvedDefaultForFeature).mockReset();
     vi.mocked(getResolvedDefaultForFeature).mockResolvedValue(null);
+    // Which model the env was built for is read off this call, so a call from
+    // the test before must not answer for the one under it.
+    vi.mocked(prepareLitellmParams).mockClear();
   });
 
   describe("when model is in the registry list", () => {
@@ -244,13 +247,11 @@ describe("setupModelEnv", () => {
         scope: "project" as never,
       });
 
-      const env = await setupModelEnv(
-        "openai/text-embedding-ada-002",
-        true,
-        "proj-1",
-      );
+      await setupModelEnv("openai/text-embedding-ada-002", true, "proj-1");
 
-      expect(env.X_LITELLM_EMBEDDINGS_model).toBeDefined();
+      expect(prepareLitellmParams).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "azure/text-embedding-ada-002" }),
+      );
     });
 
     /** @scenario "A judge model is never swapped for the project's default" */
