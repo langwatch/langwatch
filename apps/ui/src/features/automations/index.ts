@@ -29,5 +29,12 @@ export const automationsFeature = uiFeature({
       factory: () => import("./ui/sections/automations-drawers"),
       key: "ViewAutomationDrawer",
     }),
+    /** The name the authoring drawer answered to before it replaced the
+     *  filter-only editor. REST responses and alert emails handed it out, so
+     *  those links must keep opening it. */
+    editAutomationFilter: lazyDrawer({
+      factory: () => import("./ui/sections/automations-drawers"),
+      key: "AutomationDrawer",
+    }),
   },
 });

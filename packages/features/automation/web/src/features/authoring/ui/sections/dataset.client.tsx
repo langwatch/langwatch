@@ -6,6 +6,8 @@ import { useEffect } from "react";
 import { DatasetSelector } from "../blocks/dataset-selector";
 import { type DatasetColumns, datasetColumnsSchema } from "@langwatch/dataset-contract";
 import { api } from "../../../../behavior/automation-api";
+import { useAutomationHost } from "../../../../model/automation-host";
+import { keepDraftOnSubFlowReturn, announceSubFlowDeparture } from "../../behavior/sub-flow";
 import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../../../../model/provider-types";
 
 /** A single dataset column's trace source. Mirrors the `traceMappingEntrySchema`
@@ -128,6 +130,7 @@ function DatasetConfigForm({ slice, onChange, ctx }: ConfigFormProps<DatasetSlic
     { projectId: ctx.projectId },
     { enabled: !!ctx.projectId, refetchOnWindowFocus: false },
   );
+  const host = useAutomationHost();
   // Picking a dataset derives a default column mapping from that dataset's
   // columns and stores it on the slice, so the saved trigger carries a
   // non-empty mapping. The dataset-view editor can refine it later; here we
@@ -164,6 +167,7 @@ function DatasetConfigForm({ slice, onChange, ctx }: ConfigFormProps<DatasetSlic
         isError={datasets.isError}
         value={slice.datasetId}
         onChange={selectDataset}
+        onCreateNew={createDataset}
       />
       <Text color="fg.muted" textStyle="xs">
         Columns map to the matching trace fields automatically; refine the mapping from the dataset
@@ -171,6 +175,33 @@ function DatasetConfigForm({ slice, onChange, ctx }: ConfigFormProps<DatasetSlic
       </Text>
     </VStack>
   );
+
+  /** Hands over to the dataset drawer and comes back. `returned` runs on both
+   *  endings, so an ending without a created dataset puts the previous target
+   *  back rather than leaving the section silently incomplete. */
+  function createDataset() {
+    const previousDatasetId = slice.datasetId;
+    let hasCreatedDataset = false;
+
+    announceSubFlowDeparture();
+    host.createDataset({
+      created: ({ datasetId, columnTypes }) => {
+        hasCreatedDataset = true;
+        void datasets.refetch();
+        onChange({
+          ...slice,
+          datasetId,
+          mapping: deriveMappingFromColumns(columnTypes),
+        });
+      },
+      returned: () => {
+        if (!hasCreatedDataset && previousDatasetId) {
+          onChange({ ...slice, datasetId: previousDatasetId });
+        }
+        keepDraftOnSubFlowReturn();
+      },
+    });
+  }
 }
 
 const client: ClientDef<DatasetSlice> = {

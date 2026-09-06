@@ -24,7 +24,11 @@ Feature: Simulation Run Cost and Latency Metrics
   # Role Attribution (SDK side)
   # ---------------------------------------------------------------------------
 
-  @unit
+  # PARKED. The executor that stamps `scenario.role` is the scenario SDK's, in
+  # its own repository; this repository only READS the attribute (the read is
+  # bound by `scenario-role-metrics.rules`' tests). Nothing here, or on main,
+  # can make this scenario true.
+  @unit @unimplemented
   Scenario: Scenario executor sets role attribute on agent spans
     Given a scenario with an AgentAdapter, UserSimulatorAgent, and JudgeAgent
     When the scenario executor calls each agent

@@ -56,23 +56,32 @@ Feature: OTEL Trace Context Propagation for HTTP Scenario Targets
     When the adapter makes requests for turn 1, turn 2, and turn 3
     Then all requests carry the same trace ID in their traceparent headers
 
-  @unit
+  @unit @unimplemented
   Scenario: Adapter records the propagated trace ID for later ES query
     When the HTTP adapter makes a request with trace context
     Then the trace ID is recorded and accessible for span collection
 
   # ---------------------------------------------------------------------------
   # ES Span Query (with timing awareness)
+  #
+  # SUPERSEDED, AND PARKED RATHER THAN DELETED. ADR-009 put span collection in
+  # the platform, querying the span store by the propagated trace id before the
+  # judge ran. ADR-097 moved remote-trace judging into the scenario SDKs and
+  # deletes the platform's own path, so nothing here — or in the two sections
+  # below it — is built on this branch or on main. The behaviour customers get
+  # is specified by specs/scenarios/remote-trace-judging.feature. These
+  # scenarios stay @unimplemented until someone rules on retiring them with
+  # ADR-009; header injection above is live and stays bound.
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Spans are queried from ES by trace ID after conversation completes
     Given the HTTP adapter propagated a trace ID across multiple turns
     And the user's service has reported spans to ES under that trace ID
     When span collection is triggered before judge evaluation
     Then the system queries ES for spans matching the propagated trace ID
 
-  @integration
+  @integration @unimplemented
   Scenario: Span query retries when spans have not yet arrived
     Given the HTTP adapter propagated a trace ID
     And the user's service has not yet flushed spans to ES
@@ -80,7 +89,7 @@ Feature: OTEL Trace Context Propagation for HTTP Scenario Targets
     Then the system retries the ES query with backoff
     And returns whatever spans are available after the retry window
 
-  @integration
+  @integration @unimplemented
   Scenario: Span query filters out scenario infrastructure spans
     Given the ES contains both user agent spans and scenario execution spans
     When spans are queried by trace ID
@@ -91,13 +100,13 @@ Feature: OTEL Trace Context Propagation for HTTP Scenario Targets
   # Feeding Spans to Judge
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: ES-backed spans are provided to the judge via span collector
     Given spans have been collected from ES for a scenario run
     When the judge agent is created for evaluation
     Then it receives a span collector pre-populated with the ES spans
 
-  @integration
+  @integration @unimplemented
   Scenario: Judge can evaluate tool call behavior from collected spans
     Given the collected spans include tool call information
     And the scenario criteria include tool usage requirements
@@ -112,14 +121,14 @@ Feature: OTEL Trace Context Propagation for HTTP Scenario Targets
   # criteria naturally. No special warning infrastructure needed.
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Empty span collection does not fail the scenario
     Given a scenario run where the user's service did not report spans
     When spans are queried from ES and none are found after retries
     Then the span collector is populated with an empty set
     And the judge evaluates normally with no span digest
 
-  @integration
+  @integration @unimplemented
   Scenario: ES query failure produces a synthetic error span
     Given a scenario run with a valid trace ID
     When the ES span query fails with a network error
@@ -128,7 +137,7 @@ Feature: OTEL Trace Context Propagation for HTTP Scenario Targets
     And the error span attributes include the failure reason
     And the error is logged as a warning
 
-  @integration
+  @integration @unimplemented
   Scenario: Span collection timeout does not block scenario indefinitely
     Given a configurable span collection timeout (default 10 seconds)
     When spans have not arrived within the timeout window

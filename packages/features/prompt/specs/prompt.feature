@@ -31,7 +31,13 @@ Feature: Prompt service
     Then the Prompt contract interprets the attributes consistently
     And Trace retains ownership of locating the reference in a trace
 
-  @integration
+  # PARKED, NOT BUILT. The premise is a referential check the database does not
+  # make: `packages/prisma-client/prisma/schema.prisma` sets
+  # `relationMode = "prisma"`, so `LlmPromptConfigVersion.author` emits no
+  # foreign key and a version written for an unknown author is accepted. Making
+  # this scenario true means adding an author-existence read to every version
+  # write, which is a product decision rather than a binding.
+  @integration @unimplemented
   Scenario: A rejected version write leaves the prompt on its last good version
     Given a prompt whose only version is the one it was created with
     When a new version is written for an author the database does not hold

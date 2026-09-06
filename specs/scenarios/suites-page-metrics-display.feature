@@ -22,7 +22,11 @@ Feature: Suites Page Metrics Display
     And a clock icon with "3.2s"
     And a cost label showing "$0.024"
 
-  @integration
+  # PARKED, NOT BUILT. The summary tooltip shows the pass rate, the completed
+  # count, the average agent latency and cost, and the totals; it has no
+  # per-role section, and neither did `platform/app`. Adding one is a product
+  # decision about what the pill is for rather than a binding.
+  @integration @unimplemented
   Scenario: Accordion header tooltip shows per-role cost breakdown
     Given a run group with metrics including agent cost $0.018, judge cost $0.004, user simulator cost $0.002
     When the user hovers over the summary pill

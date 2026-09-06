@@ -41,6 +41,7 @@ import type { AutomationToast, AutomationToaster } from "./behavior/automation-f
 import {
   AutomationHostPort,
   AutomationHostProvider,
+  type AutomationDatasetCreation,
   type AutomationDrawer,
   type AutomationFailureNotice,
   type AutomationOrganization,
@@ -60,6 +61,12 @@ export type RecordedAutomationDrawerOpen = {
 };
 
 /** Everything a surface wrote through the host, in the order it wrote it. */
+/** One request to create a dataset without leaving the automation. */
+export type AutomationDatasetHandover = {
+  created: (dataset: AutomationDatasetCreation) => void;
+  returned: () => void;
+};
+
 export type AutomationHostRecording = {
   navigations: string[];
   queries: Array<{ next: AutomationQuery; replace: boolean }>;
@@ -71,6 +78,13 @@ export type AutomationHostRecording = {
    * and with what. The shape the model-provider family's double already takes.
    */
   drawerOpens: RecordedAutomationDrawerOpen[];
+  /**
+   * The dataset hand-overs a section asked for, with the handlers still
+   * attached. A sub-flow only means something once one of its two endings
+   * happens, so the double records the request and lets the test play the
+   * ending it is about rather than choosing one.
+   */
+  datasetHandovers: AutomationDatasetHandover[];
   successes: AutomationSuccessNotice[];
   failures: AutomationFailureNotice[];
 };
@@ -120,6 +134,7 @@ export class FakeAutomationHost extends AutomationHostPort {
         navigations: [],
         queries: [],
         drawerOpens: [],
+        datasetHandovers: [],
         successes: [],
         failures: [],
       },
@@ -243,6 +258,10 @@ export class FakeAutomationHost extends AutomationHostPort {
       drawer: request.drawer,
       params: request.params ?? {},
     });
+  }
+
+  createDataset(handover: AutomationDatasetHandover): void {
+    this.recording.datasetHandovers.push(handover);
   }
 
   succeeded(notice: AutomationSuccessNotice): void {

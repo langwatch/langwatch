@@ -9,20 +9,27 @@
  * form shape because it serves form-backed callers, and this family's one
  * caller passed a hand-written shim to bridge the two.
  *
- * "+ Create New" is gone. It opened the application's dataset drawer, which is
- * composition this package may not reach, and writing the drawer's address into
- * the query string would change the URL and open nothing while the automations
- * screen is served from `apps/ui` — the same chrome gap the me family recorded.
- * Picking an existing dataset is unaffected; creating one is done from the
- * datasets page. Recorded in `dev/docs/plans/ui-family-move-manifests.md`.
+ * Creating a dataset is offered as a hand-over rather than a second form: the
+ * caller passes `onCreateNew` and the host takes the reader to the dataset
+ * drawer and back. A project with no dataset has nothing to pick, so without
+ * it that section has no way out.
  *
  * The three-way state is kept: an empty dropdown renders identically whether
  * the list is still coming, genuinely empty, or failed to arrive, and only one
  * of the three is "you have no datasets".
  */
 
-import { createListCollection, Field, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  createListCollection,
+  Field,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Select } from "@langwatch/design-system/select";
+import { Plus } from "lucide-react";
 
 type DatasetOption = { id: string; name: string };
 
@@ -73,12 +80,15 @@ export function DatasetSelector({
   onChange,
   isLoading = false,
   isError = false,
+  onCreateNew,
 }: {
   datasets: DatasetOption[] | undefined;
   value: string;
   onChange: (datasetId: string) => void;
   isLoading?: boolean;
   isError?: boolean;
+  /** Hands over to the dataset drawer. Omitted where there is nowhere to hand over to. */
+  onCreateNew?: () => void;
 }) {
   const state = pickerStateOf({ datasets, isLoading, isError });
 
@@ -111,7 +121,12 @@ export function DatasetSelector({
             </Select.Content>
           </Select.Root>
         )}
-        <Field.HelperText>Add matched traces to an existing dataset.</Field.HelperText>
+        {onCreateNew ? (
+          <Button alignSelf="flex-start" onClick={onCreateNew} size="xs" variant="ghost">
+            <Plus size={14} /> Create a new dataset
+          </Button>
+        ) : null}
+        <Field.HelperText>Add matched traces to a dataset.</Field.HelperText>
       </VStack>
     </Field.Root>
   );

@@ -26,6 +26,7 @@
  * every other surface wants.
  */
 
+import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { createContext, useContext } from "react";
 
 /** The organization, team and project the current page is about. */
@@ -101,6 +102,14 @@ export type AutomationFailureNotice = {
  */
 export type AutomationDrawer = "automation" | "viewAutomation";
 
+/** A dataset the reader created without leaving the automation they were
+ *  authoring. `columnTypes` is the dataset's column list, which the automation
+ *  turns into its trace mapping. */
+export type AutomationDatasetCreation = {
+  datasetId: string;
+  columnTypes: DatasetColumns;
+};
+
 export abstract class AutomationHostPort {
   /** The organization, team and project this page is about. */
   abstract scope(): AutomationScope;
@@ -159,6 +168,21 @@ export abstract class AutomationHostPort {
   abstract openDrawer(request: {
     drawer: AutomationDrawer;
     params?: Readonly<Record<string, string | undefined>>;
+  }): void;
+
+  /**
+   * Hands over to the dataset drawer and comes back, for the one section that
+   * needs a dataset the project does not have yet.
+   */
+  /* `openDrawer` above writes an address and forgets it, which is all a one-way
+     open needs. A sub-flow needs the return trip: the application pushes the
+     dataset drawer onto its navigation stack, reports what was created, and goes
+     back rather than closing the stack out from under this drawer. Naming the
+     capability rather than the drawer keeps another family's overlay out of this
+     package's vocabulary; `returned` runs on BOTH endings. */
+  abstract createDataset(handover: {
+    created: (dataset: AutomationDatasetCreation) => void;
+    returned: () => void;
   }): void;
 
   /**

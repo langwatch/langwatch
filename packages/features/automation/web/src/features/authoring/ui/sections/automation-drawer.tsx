@@ -62,6 +62,7 @@ import {
 } from "./draft-model";
 import { useGraphAlertLabels } from "./use-graph-alert-labels";
 import { useAutomationStore } from "./automation-store";
+import { consumeDraftKeptOnSubFlowReturn, isHandingOverToSubFlow } from "../../behavior/sub-flow";
 import { useConditionsSet, useConfigComplete, useDraft, useSection } from "./automation-selectors";
 
 /** Maps template-validation field metadata to the editor-specific headline. */
@@ -235,23 +236,29 @@ export function AutomationDrawer({
   const pushAttempt = useAutomationStore((s) => s.pushTestAttempt);
   const testHistory = useAutomationStore((s) => s.testHistory);
 
-  // Wipe the singleton store when the drawer closes, so the next open never
-  // paints the previous draft.
-  //
-  // `platform/app` had to ask the drawer stack whether this unmount was a close
-  // or a hand-over to the dataset-creation drawer, and kept the draft for the
-  // second. That sub-flow does not travel: creating a dataset means opening
-  // another feature's overlay, which this package cannot address, so there is
-  // one kind of unmount again and the reset is unconditional.
-  useEffect(() => () => reset(), [reset]);
+  // Wipe the singleton store when the drawer really closes, so the next open
+  // never paints the previous draft. A hand-over to the dataset drawer unmounts
+  // this one the same way closing it does, and announces itself so the draft
+  // survives the round trip.
+  useEffect(
+    () => () => {
+      if (isHandingOverToSubFlow()) return;
+      reset();
+    },
+    [reset],
+  );
 
-  // Open on a blank draft. Latched in a ref and run before paint, because
-  // StrictMode replays effects in development and a second reset would wipe the
-  // draft the first render already started.
+  // Open on a blank draft unless this mount is the return leg of a sub-flow.
+  // A sub-flow the reader walks away from never announces a return, so the
+  // draft it left behind is discarded here rather than seeding the next
+  // automation. Latched in a ref and run before paint, because StrictMode
+  // replays effects in development and a replayed read would find the one-shot
+  // intent spent and blank the draft that just came back.
   const decidedOnMountDraft = useRef(false);
   useLayoutEffect(() => {
     if (decidedOnMountDraft.current) return;
     decidedOnMountDraft.current = true;
+    if (consumeDraftKeptOnSubFlowReturn()) return;
     reset();
     // Mount only: running this again would wipe the draft being written.
     // eslint-disable-next-line react-hooks/exhaustive-deps

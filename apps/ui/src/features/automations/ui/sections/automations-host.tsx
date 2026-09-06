@@ -7,9 +7,11 @@
 import {
   automationApi,
   AutomationHostProvider,
+  type AutomationDatasetCreation,
   type AutomationFailureNotice,
   type AutomationHostPort,
 } from "@langwatch/automation-web/screens/automations";
+import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
@@ -34,6 +36,7 @@ function readAppBaseUrl(): string {
 
 export function AutomationsHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
+  const { openDrawer, goBack } = useDrawer();
   const scope = session.activeScope();
 
   const organizations = automationApi.organization.getAll.useQuery({ isDemo: false });
@@ -91,6 +94,20 @@ export function AutomationsHost({ children }: { children: ReactNode }) {
             openParam: DRAWER_OPEN_PARAM,
           }),
         ),
+      /**
+       * The one sub-flow this family runs: the dataset section hands over and
+       * comes back. Returned with `goBack`, never `closeDrawer` — closing
+       * clears the whole stack and would drop the authoring drawer with it.
+       */
+      createDataset: ({ created, returned }) => {
+        openDrawer("addOrEditDataset", {
+          onSuccess: (dataset: AutomationDatasetCreation) => created(dataset),
+          onClose: () => {
+            returned();
+            goBack();
+          },
+        });
+      },
       succeeded: (notice) => feedback.succeeded(notice),
       failed: (failure) => feedback.failed(failure),
       // The one line a surface too tight for a toast prints. Same copy the
@@ -112,6 +129,8 @@ export function AutomationsHost({ children }: { children: ReactNode }) {
       route,
       navigation,
       feedback,
+      openDrawer,
+      goBack,
     ],
   );
 

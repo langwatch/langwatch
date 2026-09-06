@@ -349,6 +349,18 @@ describe("given a link the product already sent out", () => {
     });
   });
 
+  describe("when it names the superseded automation drawer", () => {
+    /** @scenario "A link issued before the drawer changed still opens the automation" */
+    it("opens the authoring drawer on the automation it names", async () => {
+      const props = await openAddress(
+        "?drawer.open=editAutomationFilter&drawer.automationId=trigger_1",
+        "AutomationDrawer",
+      );
+
+      expect(JSON.parse(props).automationId).toBe("trigger_1");
+    });
+  });
+
   describe("when it is a monitor's platform link", () => {
     /** @scenario "A monitor's platform link opens the online evaluation it names" */
     it("opens the online evaluation drawer on that monitor", async () => {
