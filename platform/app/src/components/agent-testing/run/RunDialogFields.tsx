@@ -9,15 +9,16 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, VStack } from "@chakra-ui/react";
+import { Box, chakra, VStack } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
-import { HandledErrorAlert } from "~/features/errors";
+import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { CustomizeChips } from "../shared/CustomizeChips";
 import { FieldLabel } from "../shared/DialogFields";
 import { CompareAgentsSection } from "./CompareAgentsSection";
 import { MissingProviderNotice } from "./MissingProviderNotice";
 import { OfflineTargetsNotice } from "./OfflineTargetsNotice";
 import { ParameterRowsEditor } from "./ParameterRowsEditor";
+import { RunEvaluatorsSection } from "./RunEvaluatorsSection";
 import { RunNameField } from "./RunNameField";
 import { RunNoteField } from "./RunNoteField";
 import {
@@ -61,6 +62,19 @@ function AddedBlocks({
             form.setShowRepeat(false);
             form.setRepeatCount(1);
           }}
+        />
+      )}
+
+      {form.showEvaluatorsSection && (
+        <RunEvaluatorsSection
+          inherited={form.inherited}
+          extras={form.extras}
+          evaluatorsById={form.evaluatorsById}
+          missingOf={form.missingOf}
+          onOpenInherited={form.openInherited}
+          onEditExtra={form.editExtra}
+          onAddExtra={form.addExtra}
+          onRemove={form.hasInherited ? undefined : form.removeEvaluatorsBlock}
         />
       )}
 
@@ -169,6 +183,22 @@ function RunDialogNotices({ form }: { form: RunDialogForm }) {
             error={inlineError}
             fallbackTitle="Couldn't start the run"
           />
+          {readHandledError(inlineError)?.code ===
+            "suite_evaluator_mappings_missing" && (
+            <chakra.button
+              type="button"
+              marginTop={1}
+              fontSize="12px"
+              fontWeight="medium"
+              color="blue.fg"
+              cursor="pointer"
+              _hover={{ textDecoration: "underline" }}
+              onClick={() => form.openMappingsMissingRefusal(inlineError)}
+              data-testid="run-dialog-open-evaluator"
+            >
+              Configure the evaluator
+            </chakra.button>
+          )}
         </Box>
       )}
     </>

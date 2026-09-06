@@ -9,11 +9,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-import Parse from "papaparse";
 import React, { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
 import { showErrorToast } from "~/features/errors";
 import type { Experiment, Project } from "~/generated/prisma/client";
+import { downloadCsv } from "~/utils/downloadCsv";
 import { Menu } from "../../../components/ui/menu";
 import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
 import { api } from "../../../utils/api";
@@ -309,15 +309,6 @@ export const useBatchEvaluationDownloadCSV = ({
       },
     );
 
-    const csvBlob = Parse.unparse({
-      fields: csvHeaders,
-      data: csvData,
-    });
-
-    const url = window.URL.createObjectURL(new Blob([csvBlob]));
-
-    const link = document.createElement("a");
-    link.href = url;
     // Non-null per the `isDownloadCSVEnabled` guard above (the early
     // throw on line 208 ensures `run.data` is populated by the time we
     // get here). `getRun` returns `ExperimentRunWithItems | null` since
@@ -326,11 +317,12 @@ export const useBatchEvaluationDownloadCSV = ({
     const formattedDate = new Date(run.data!.timestamps.createdAt)
       .toISOString()
       .split("T")[0];
-    const fileName = `${formattedDate}_${experiment.name}_${runId}.csv`;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+
+    downloadCsv({
+      fields: csvHeaders,
+      rows: csvData,
+      fileName: `${formattedDate}_${experiment.name}_${runId}.csv`,
+    });
   };
 
   return { downloadCSV, isDownloadCSVEnabled };

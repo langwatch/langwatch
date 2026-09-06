@@ -21,7 +21,7 @@ import {
 import {
   agentTargetLabel,
   isAgentTarget,
-  ownerOnlyCopy,
+  notRunnableCopy,
   type ScenarioAgent,
   useFilteredAgents,
 } from "./useFilteredScenarioTargets";
@@ -413,9 +413,9 @@ function AgentOptionRow({
  * One agent in the list: its kind, its label, and, for a connected agent,
  * whether a process is holding it right now.
  *
- * A development agent of another person is drawn but cannot be picked: only
- * its owner can run it, and hiding the reason would leave the reader clicking
- * a row that does nothing.
+ * A development agent of another person, or an agent no process is holding,
+ * is drawn but cannot be picked: hiding the reason would leave the reader
+ * clicking a row that does nothing.
  */
 function AgentOption({
   agent,
@@ -432,7 +432,7 @@ function AgentOption({
 
   if (agent.isRunnable) return row;
   return (
-    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
+    <Tooltip content={notRunnableCopy(agent)}>
       <Box>{row}</Box>
     </Tooltip>
   );

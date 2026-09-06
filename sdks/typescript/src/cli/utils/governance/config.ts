@@ -204,9 +204,11 @@ export interface GovernanceConfig {
   daemon?: "on" | "off";
 
   /**
-   * The agent last chosen by `langwatch agent dev`, keyed by the project
+   * The agent last chosen by `langwatch agent tunnel`, keyed by the project
    * directory (absolute path) the command ran in, so the next run in the
-   * same folder skips the picker. `--agent` always overrides.
+   * same folder skips the picker. `--agent` always overrides. The field name
+   * on disk is fixed as `agent_dev_agents`: changing it would drop every
+   * user's remembered agents.
    */
   agent_dev_agents?: Record<string, string>;
 }

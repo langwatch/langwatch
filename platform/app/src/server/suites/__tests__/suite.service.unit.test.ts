@@ -32,6 +32,8 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     labels: [],
     simulatorModel: null,
     judgeModel: null,
+    fields: null,
+    evaluators: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -54,6 +56,7 @@ function makeMockRepository(
     findSlugsByPrefix: vi.fn().mockResolvedValue([]),
     findFirstByLabel: vi.fn().mockResolvedValue(null),
     findNamesByIds: vi.fn(async () => []),
+    findAllByIdsIncludingArchived: vi.fn(async () => []),
     // No plan answers to a name unless a scenario says one does.
     findPlanByName: vi.fn().mockResolvedValue(null),
     update: vi.fn(),
@@ -67,6 +70,7 @@ type MockScenarioRepository = {
   findNamesByIds: ReturnType<typeof vi.fn>;
   findActiveNamesByIds: ReturnType<typeof vi.fn>;
   findRunConfigByIds: ReturnType<typeof vi.fn>;
+  findTestSuiteIdsByIds: ReturnType<typeof vi.fn>;
   findManyByTestSuite: ReturnType<typeof vi.fn>;
   findAll: ReturnType<typeof vi.fn>;
 };
@@ -74,6 +78,8 @@ type MockScenarioRepository = {
 type MockAgentRepository = {
   findManyIncludingArchived: ReturnType<typeof vi.fn>;
   findNamesByIds: ReturnType<typeof vi.fn>;
+  findConnectedByNameAndEnvironment: ReturnType<typeof vi.fn>;
+  findConnectedByName: ReturnType<typeof vi.fn>;
 };
 
 type MockLlmConfigRepository = {
@@ -100,6 +106,9 @@ function makeMockScenarioRepository(
         version: 1,
       })),
     ),
+    findTestSuiteIdsByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+      ids.map((id) => ({ id, testSuiteId: null })),
+    ),
     findManyByTestSuite: vi.fn(async () => []),
     findAll: vi.fn(async () => []),
     ...overrides,
@@ -114,6 +123,8 @@ function makeMockAgentRepository(
       Promise.resolve(ids.map((id) => ({ id, archivedAt: null }))),
     ),
     findNamesByIds: vi.fn(async () => []),
+    findConnectedByNameAndEnvironment: vi.fn(async () => []),
+    findConnectedByName: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -1557,6 +1568,8 @@ describe("SuiteService", () => {
           targets: [],
           repeatCount: 1,
           labels: [],
+          fields: [],
+          evaluators: [],
         });
       });
     });
@@ -1906,6 +1919,33 @@ describe("SuiteService", () => {
             data: { scenarioIds: ["scen_x"] },
           }),
         ).rejects.toMatchObject({ code: "validation_error" });
+      });
+    });
+  });
+});
+
+describe("SuiteService fields and evaluators on a run plan", () => {
+  describe("given a run plan", () => {
+    describe("when fields are written on it", () => {
+      /** @scenario "A run plan takes evaluators but no fields" */
+      it("refuses with validation_error naming the fields", async () => {
+        const { service, suiteRepo } = createService({
+          suiteRepository: {
+            findById: vi.fn(async () => makeSuite({ kind: "run_plan" })),
+          },
+        });
+
+        await expect(
+          service.update({
+            id: "suite_abc123",
+            projectId: "proj_1",
+            data: { fields: [{ identifier: "golden_sql", type: "text" }] },
+          }),
+        ).rejects.toMatchObject({
+          code: "validation_error",
+          meta: { fieldErrors: { fields: expect.any(Array) } },
+        });
+        expect(suiteRepo.update).not.toHaveBeenCalled();
       });
     });
   });

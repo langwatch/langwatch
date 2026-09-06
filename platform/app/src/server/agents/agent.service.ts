@@ -372,6 +372,7 @@ export class AgentService {
    * @throws {AgentNotFoundError} when no such agent is in the project
    * @throws {AgentTestRefusedError} when the agent cannot be run as it is
    * @throws {AgentOwnerOnlyError} when the agent belongs to someone else
+   * @throws {AgentOfflineError} when no process is holding the connected agent
    */
   async testRun(input: {
     projectId: string;

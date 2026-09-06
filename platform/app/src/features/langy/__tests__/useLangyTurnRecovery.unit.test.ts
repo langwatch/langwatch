@@ -48,7 +48,7 @@ describe("useLangyTurnRecovery", () => {
       const { result, onRetry } = setup({});
 
       expect(result.current.isRecovering).toBe(true);
-      expect(result.current.message).toContain("picking up where it left off");
+      expect(result.current.message).toContain("Picking up where it left off");
       expect(onRetry).not.toHaveBeenCalled();
 
       act(() => {

@@ -124,6 +124,7 @@
                 "pages": [
                   "agent-testing/scenarios",
                   "agent-testing/test-suites",
+                  "agent-testing/evaluators",
                   "agent-testing/run-parameters"
                 ]
               },
@@ -134,6 +135,17 @@
                   "agent-testing/results",
                   "agent-testing/compare-agents",
                   "agent-testing/run-from-ci"
+                ]
+              },
+              {
+                "group": "Improve your agent",
+                "pages": [
+                  "improve-your-agent/overview",
+                  "improve-your-agent/reduce-turns",
+                  "improve-your-agent/fix-tool-calls",
+                  "improve-your-agent/reduce-cost-and-latency",
+                  "improve-your-agent/optimize-with-dspy",
+                  "improve-your-agent/algorithms"
                 ]
               },
               "agent-testing/voice-agents",
@@ -722,6 +734,7 @@
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/audio",
+              "ai-gateway/api/images",
               "ai-gateway/api/realtime",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
@@ -949,6 +962,7 @@
               "langy/prompt-optimization",
               "langy/scenario-tests-and-evals",
               "langy/pull-requests",
+              "langy/local-development",
               "langy/insights"
             ]
           },
@@ -1691,7 +1705,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1788364549",
+      "source": "/ci/cache/busted/1788688362",
       "destination": "/introduction"
     },
     {

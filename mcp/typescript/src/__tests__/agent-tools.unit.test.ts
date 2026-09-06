@@ -80,6 +80,21 @@ describe("handleListAgents()", () => {
       expect(http).not.toContain("Status");
     });
   });
+
+  describe("when a listed agent belongs to another person", () => {
+    /** @scenario "A listed agent the key cannot choose says so" */
+    it("lists it with its owner and says only its owner can run it", async () => {
+      mockRequest.mockResolvedValueOnce({
+        data: [connectedAgent({ selectable: false, notSelectableReason: "owned_by_another_person" })],
+        pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+      });
+
+      const output = await handleListAgents();
+
+      expect(output).toContain("**Owner**: Ada");
+      expect(output).toContain("**Run**: only its owner can run this agent");
+    });
+  });
 });
 
 describe("handleGetAgent()", () => {

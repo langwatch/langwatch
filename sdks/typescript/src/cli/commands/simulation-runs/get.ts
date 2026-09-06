@@ -6,6 +6,7 @@ import { readFetchFailure } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { SimulationRunEvaluation } from "@/client-sdk/services/simulation-runs";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /**
@@ -55,6 +56,44 @@ function renderContent(raw: unknown): string {
   return "";
 }
 
+const EVALUATION_STATUS_COLOR: Record<
+  SimulationRunEvaluation["status"],
+  (text: string) => string
+> = {
+  passed: chalk.green,
+  failed: chalk.red,
+  scored: chalk.cyan,
+  skipped: chalk.gray,
+  error: chalk.red,
+};
+
+/**
+ * One line per evaluator that ran after the conversation: its status, its
+ * score when it produced one, whether it gates the scenario, and the reason
+ * it gave. A skipped one names the field the scenario left blank; a failed
+ * required one is what failed the scenario.
+ */
+function printEvaluations(
+  evaluations: SimulationRunEvaluation[] | undefined,
+): void {
+  if (!evaluations || evaluations.length === 0) return;
+  console.log();
+  console.log(chalk.bold("  Evaluators:"));
+  for (const evaluation of evaluations) {
+    const color = EVALUATION_STATUS_COLOR[evaluation.status] ?? chalk.white;
+    const parts = [color(evaluation.status)];
+    if (evaluation.score !== undefined) parts.push(`score ${evaluation.score}`);
+    if (evaluation.label !== undefined) parts.push(evaluation.label);
+    if (evaluation.required) parts.push(chalk.gray("required"));
+    console.log(
+      `    ${chalk.gray("•")} ${evaluation.name} ${chalk.gray("·")} ${parts.join(chalk.gray(" · "))}`,
+    );
+    if (evaluation.details) {
+      console.log(`        ${chalk.gray(evaluation.details)}`);
+    }
+  }
+}
+
 export const getSimulationRunCommand = async (
   runId: string,
   options?: { full?: boolean },
@@ -97,6 +136,7 @@ export const getSimulationRunCommand = async (
         metCriteria?: string[];
         unmetCriteria?: string[];
         error?: string | null;
+        evaluations?: SimulationRunEvaluation[];
       } | null;
       messages: Array<{ role: string; content: string }>;
       timestamp: number;
@@ -158,6 +198,7 @@ export const getSimulationRunCommand = async (
           if (run.results.error) {
             console.log(`    ${chalk.gray("Error:")}      ${chalk.red(run.results.error)}`);
           }
+          printEvaluations(run.results.evaluations);
         }
 
         if (run.messages && run.messages.length > 0) {
