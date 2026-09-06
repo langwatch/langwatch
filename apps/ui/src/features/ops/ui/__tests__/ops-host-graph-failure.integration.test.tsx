@@ -134,7 +134,7 @@ describe("given the organization graph refuses for a reason the reader can read"
       mountOps();
 
       expect(departures).toEqual([]);
-      expect(screen.getByText("Search is temporarily unavailable")).toBeTruthy();
+      expect(screen.getByText("This could not be loaded right now")).toBeTruthy();
       expect(screen.queryByText("the ops screen")).toBeNull();
     });
   });
