@@ -274,8 +274,10 @@ langyagent:
 
 With no identity override, the pod defaults to UID 1000 with `runAsNonRoot: true`,
 `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`.
-This satisfies PSA `restricted` with no exemption, no RuntimeClass and no
-separate namespace. For clusters requiring a different UID, set
+This satisfies PSA `restricted` without requiring an exemption, a RuntimeClass or a
+separate namespace. Any configured `runtimeClassName` is retained.
+
+For clusters requiring a different UID, set
 `langyagent.podSecurityContext.runAsUser` to an allowed nonzero UID. The
 container inherits that UID unless `langyagent.containerSecurityContext.runAsUser`
 sets a nonzero override. Omitting the acknowledgement fails the render with a message

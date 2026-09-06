@@ -197,12 +197,15 @@ describe("Feature: the Azure drawer explains which AI Gateway endpoints use the 
         primeQueries([azureDirectRow()]);
         renderDrawer({ providerKey: "azure" });
 
-        const description = azureEntry?.fieldMetadata?.AZURE_OPENAI_API_VERSION?.description;
+        const description =
+          azureEntry?.fieldMetadata?.AZURE_OPENAI_API_VERSION?.description;
         expect(description).toBeTruthy();
         expect(description).toMatch(
           /uses this value for chat \(except Claude\), embeddings, speech, and transcription/i,
         );
-        expect(description).toMatch(/ignored for Responses and other endpoint types/i);
+        expect(description).toMatch(
+          /ignored for Responses and other endpoint types/i,
+        );
         expect(description).toMatch(
           /Passthrough requests use it where the Azure endpoint supports api-version/i,
         );
@@ -219,12 +222,15 @@ describe("Feature: the Azure drawer explains which AI Gateway endpoints use the 
         primeQueries([azureGatewayRow()]);
         renderDrawer({ providerKey: "azure" });
 
-        const description = azureEntry?.fieldMetadata?.AZURE_API_GATEWAY_VERSION?.description;
+        const description =
+          azureEntry?.fieldMetadata?.AZURE_API_GATEWAY_VERSION?.description;
         expect(description).toBeTruthy();
         expect(description).toMatch(
           /uses this value for chat \(except Claude\), embeddings, speech, and transcription/i,
         );
-        expect(description).toMatch(/ignored for Responses and other endpoint types/i);
+        expect(description).toMatch(
+          /ignored for Responses and other endpoint types/i,
+        );
         expect(description).toMatch(
           /Passthrough requests use it where the Azure endpoint supports api-version/i,
         );

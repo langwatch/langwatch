@@ -965,6 +965,7 @@ YAML
 # @scenario "An operator on a non-root cluster can choose the assistant anyway"
 # @scenario "An operator can accept the reduced isolation and render a non-root pod"
 # @scenario "The default install keeps per-worker identity isolation"
+# @scenario "Per-worker identity isolation requires the supported capability set"
 test_langy_isolation_postures() {
   sep; info "Suite: Langy worker isolation postures"
 
@@ -1060,6 +1061,29 @@ test_langy_isolation_postures() {
       pass "langy per-uid: a forced non-root ${forced} is refused by name"
     fi
   done
+
+  local capability_override
+  for capability_override in \
+    'add=[]' \
+    'add=["CHOWN","DAC_OVERRIDE","FOWNER","SETUID"]' \
+    'add=["CHOWN","DAC_OVERRIDE","FOWNER","SETUID","SETGID","SYS_ADMIN"]' \
+    'drop=[]' \
+    'drop=["NET_RAW"]'; do
+    out=$(tmpl_only "$tpl" --set autogen.enabled=true \
+      --set-json "langyagent.containerSecurityContext.capabilities.${capability_override}" 2>&1) && rc=0 || rc=$?
+    if [[ "$rc" -eq 0 ]]; then
+      fail "langy per-uid: unsupported capabilities ${capability_override} must be refused"
+    else
+      assert_contains "langy per-uid: capability refusal explains the supported set" "$out" 'requires capabilities.drop=[ALL]'
+    fi
+  done
+
+  local sandboxed_none
+  sandboxed_none=$(tmpl_only "$tpl" --set autogen.enabled=true \
+    --set langyagent.workerIsolation=none \
+    --set langyagent.acceptWorkerIsolationDisabled=true \
+    --set langyagent.runtimeClassName=gvisor)
+  assert_contains "langy none: retains the configured RuntimeClass" "$sandboxed_none" 'runtimeClassName: gvisor'
 
   # 5. Under `none` the operator's uid must be HONOURED, not discarded.
   #    OpenShift's restricted-v2 SCC assigns each project a uid range that never

@@ -162,9 +162,18 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     And the pod runs as a non-root user
     And the container drops ALL capabilities with no additions
     And RuntimeDefault seccomp is set at both pod and container level
+    And any configured RuntimeClass is retained
     # The point of the posture: this spec is admissible under Pod Security
     # Admission "restricted" and the common policy-engine rules without any
     # per-namespace or per-RuntimeClass exemption.
+
+  @e2e
+  Scenario: Per-worker identity isolation requires the supported capability set
+    Given the chart uses per-worker identity isolation
+    And the operator removes a required capability or adds an extra capability
+    When the chart renders
+    Then the render fails and names the supported capability set
+    And the container must drop ALL capabilities and add exactly CHOWN, DAC_OVERRIDE, FOWNER, SETUID and SETGID
 
   @e2e
   Scenario: The default install keeps per-worker identity isolation
@@ -182,6 +191,7 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     Then the agent pod is admitted
     And the container drops ALL capabilities with no additions
     And RuntimeDefault seccomp is set at both pod and container level
+    And any configured RuntimeClass is retained
     And it starts and serves conversations
     # This is the scenario the whole posture exists for. Without it the install
     # is refused at admission; with the default posture on such a cluster there

@@ -48,6 +48,13 @@
 {{- if eq $isolation "per-uid" }}
 {{- $forcedNonRoot := or (eq (toString (dig "runAsNonRoot" false $podSCVals)) "true") (eq (toString (dig "runAsNonRoot" false $ctrSCVals)) "true") }}
 {{- $forcedUser := or (and (hasKey $podSCVals "runAsUser") (ne (toString $podSCVals.runAsUser) "0")) (and (hasKey $ctrSCVals "runAsUser") (ne (toString $ctrSCVals.runAsUser) "0")) }}
+{{- $caps := $ctrSCVals.capabilities | default dict }}
+{{- $expectedAdd := list "CHOWN" "DAC_OVERRIDE" "FOWNER" "SETGID" "SETUID" }}
+{{- $actualAdd := $caps.add | default list | sortAlpha }}
+{{- $actualDrop := $caps.drop | default list | sortAlpha }}
+{{- if or (ne (toJson $actualAdd) (toJson $expectedAdd)) (ne (toJson $actualDrop) (toJson (list "ALL"))) }}
+{{- fail "langyagent.workerIsolation=per-uid requires capabilities.drop=[ALL] and capabilities.add containing exactly CHOWN, DAC_OVERRIDE, FOWNER, SETUID and SETGID. Restore the supported capability set, or select workerIsolation=none with acceptWorkerIsolationDisabled=true for the non-root, zero-capability posture." }}
+{{- end }}
 {{- if or $forcedNonRoot $forcedUser }}
 {{- fail "langyagent.workerIsolation=per-uid requires the chart's supported configuration: a manager running as UID 0 with CHOWN, DAC_OVERRIDE, FOWNER, SETUID and SETGID for worker file ownership and setuid/setgid. Non-root manager overrides are not supported. Note that Helm MERGES the capability map, so your own drop:[ALL] does not remove the chart's add: list either. The supported way to run on a cluster that refuses root is langyagent.workerIsolation=none with langyagent.acceptWorkerIsolationDisabled=true, which renders this pod as a non-root, zero-capability, seccomp-RuntimeDefault spec that Pod Security Admission \"restricted\" admits — at the cost of per-worker identity isolation (see ADR-130). To run without the assistant entirely, set langyagent.chartManaged=false." }}
 {{- end }}
