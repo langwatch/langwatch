@@ -1,3 +1,4 @@
+import { Box, chakra, Checkbox, Fieldset, Stack, Text, Textarea } from "@chakra-ui/react";
 import type { JSX } from "react";
 
 /**
@@ -10,6 +11,10 @@ import type { JSX } from "react";
  */
 
 type Node = Record<string, unknown>;
+
+const HtmlSelect = chakra("select");
+const HtmlInput = chakra("input");
+const HtmlLabel = chakra("label");
 
 const isObject = (value: unknown): value is Node =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -30,7 +35,9 @@ const unwrapNullable = (node: Node): Node => {
   const branches = node.anyOf ?? node.oneOf;
   if (!Array.isArray(branches)) return node;
   const real = branches.filter((branch) => isObject(branch) && branch.type !== "null");
-  return real.length === 1 && isObject(real[0]) ? { ...real[0], ...(node.description ? { description: node.description } : {}) } : node;
+  return real.length === 1 && isObject(real[0])
+    ? { ...real[0], ...(node.description ? { description: node.description } : {}) }
+    : node;
 };
 
 const setIn = (target: unknown, path: readonly string[], value: unknown): unknown => {
@@ -56,7 +63,7 @@ export const PropsForm = ({
     return <JsonBox value={props} onChange={onChange} label="Props" />;
   }
   return (
-    <div className="form">
+    <Stack gap={3}>
       <Field
         node={schema}
         root={schema}
@@ -66,7 +73,7 @@ export const PropsForm = ({
         props={props}
         onChange={onChange}
       />
-    </div>
+    </Stack>
   );
 };
 
@@ -96,14 +103,26 @@ const Field = ({
   if (Array.isArray(node.enum)) {
     return (
       <Labelled id={id} label={label} required={required} description={description}>
-        <select id={id} value={String(value ?? "")} onChange={(event) => set(event.target.value)}>
+        <HtmlSelect
+          id={id}
+          value={String(value ?? "")}
+          onChange={(event: React.ChangeEvent<HTMLSelectElement>) => set(event.target.value)}
+          width="full"
+          fontSize="xs"
+          padding="1"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="sm"
+          bg="bg.panel"
+          color="fg"
+        >
           {!required && <option value="">(not set)</option>}
           {node.enum.map((option) => (
             <option key={String(option)} value={String(option)}>
               {String(option)}
             </option>
           ))}
-        </select>
+        </HtmlSelect>
       </Labelled>
     );
   }
@@ -128,13 +147,17 @@ const Field = ({
     );
     if (path.length === 0) return <>{body}</>;
     return (
-      <fieldset className="group">
-        <legend>
+      <Fieldset.Root borderWidth="1px" borderColor="border" borderRadius="md" padding={2.5}>
+        <Fieldset.Legend fontSize="xs" fontWeight="semibold">
           {label}
-          {!required && <span className="optional">optional</span>}
-        </legend>
-        {body}
-      </fieldset>
+          {!required && (
+            <Text as="span" fontWeight="normal" color="fg.muted" marginLeft={1.5}>
+              optional
+            </Text>
+          )}
+        </Fieldset.Legend>
+        <Stack gap={3}>{body}</Stack>
+      </Fieldset.Root>
     );
   }
 
@@ -144,8 +167,10 @@ const Field = ({
       const lines = Array.isArray(value) ? value.map((entry) => String(entry)) : [];
       return (
         <Labelled id={id} label={label} required={required} description="One per line">
-          <textarea
+          <Textarea
             id={id}
+            size="sm"
+            fontSize="xs"
             rows={Math.max(3, lines.length + 1)}
             value={lines.join("\n")}
             onChange={(event) =>
@@ -160,28 +185,37 @@ const Field = ({
 
   if (node.type === "boolean") {
     return (
-      <label className="check" htmlFor={id}>
-        <input
-          id={id}
-          type="checkbox"
-          checked={value === true}
-          onChange={(event) => set(event.target.checked)}
-        />
-        <span>{label}</span>
-      </label>
+      <Checkbox.Root
+        checked={value === true}
+        onCheckedChange={(details) => set(details.checked === true)}
+      >
+        <Checkbox.HiddenInput id={id} />
+        <Checkbox.Control>
+          <Checkbox.Indicator />
+        </Checkbox.Control>
+        <Checkbox.Label fontSize="xs">{label}</Checkbox.Label>
+      </Checkbox.Root>
     );
   }
 
   if (node.type === "number" || node.type === "integer") {
     return (
       <Labelled id={id} label={label} required={required} description={description}>
-        <input
+        <HtmlInput
           id={id}
           type="number"
           value={typeof value === "number" ? value : ""}
-          onChange={(event) =>
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
             set(event.target.value === "" ? undefined : Number(event.target.value))
           }
+          width="full"
+          fontSize="xs"
+          padding="1.5"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="sm"
+          bg="bg.panel"
+          color="fg"
         />
       </Labelled>
     );
@@ -193,13 +227,30 @@ const Field = ({
     return (
       <Labelled id={id} label={label} required={required} description={description}>
         {multiline ? (
-          <textarea id={id} rows={4} value={text} onChange={(event) => set(event.target.value)} />
+          <Textarea
+            id={id}
+            size="sm"
+            fontSize="xs"
+            rows={4}
+            value={text}
+            onChange={(event) => set(event.target.value)}
+          />
         ) : (
-          <input
+          <HtmlInput
             id={id}
             type="text"
             value={text}
-            onChange={(event) => set(event.target.value === "" && !required ? undefined : event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              set(event.target.value === "" && !required ? undefined : event.target.value)
+            }
+            width="full"
+            fontSize="xs"
+            padding="1.5"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="sm"
+            bg="bg.panel"
+            color="fg"
           />
         )}
       </Labelled>
@@ -222,14 +273,22 @@ const Labelled = ({
   description?: string | undefined;
   children: JSX.Element;
 }): JSX.Element => (
-  <div className="field">
-    <label htmlFor={id}>
+  <Box>
+    <HtmlLabel htmlFor={id} display="block" fontSize="xs" fontWeight="semibold" marginBottom={1}>
       {label}
-      {!required && <span className="optional">optional</span>}
-    </label>
+      {!required && (
+        <Text as="span" fontWeight="normal" color="fg.muted" marginLeft={1.5}>
+          optional
+        </Text>
+      )}
+    </HtmlLabel>
     {children}
-    {description && <p className="hint">{description}</p>}
-  </div>
+    {description && (
+      <Text fontSize="2xs" color="fg.muted" marginTop={1}>
+        {description}
+      </Text>
+    )}
+  </Box>
 );
 
 /** The ending for anything the walker will not pretend to understand. */
@@ -242,13 +301,24 @@ const JsonBox = ({
   onChange: (next: unknown) => void;
   label: string;
 }): JSX.Element => (
-  <div className="field">
-    <label htmlFor={`json-${label}`}>
+  <Box>
+    <HtmlLabel
+      htmlFor={`json-${label}`}
+      display="block"
+      fontSize="xs"
+      fontWeight="semibold"
+      marginBottom={1}
+    >
       {label}
-      <span className="optional">JSON</span>
-    </label>
-    <textarea
+      <Text as="span" fontWeight="normal" color="fg.muted" marginLeft={1.5}>
+        JSON
+      </Text>
+    </HtmlLabel>
+    <Textarea
       id={`json-${label}`}
+      size="sm"
+      fontFamily="mono"
+      fontSize="xs"
       rows={6}
       defaultValue={JSON.stringify(value ?? null, null, 2)}
       onChange={(event) => {
@@ -260,5 +330,5 @@ const JsonBox = ({
         }
       }}
     />
-  </div>
+  </Box>
 );

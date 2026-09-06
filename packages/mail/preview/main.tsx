@@ -1,63 +1,45 @@
-import { StrictMode, useCallback, useEffect, useMemo, useState, type JSX } from "react";
+import { Box, Flex, Heading } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { useTheme } from "next-themes";
+import { StrictMode, useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { createRoot } from "react-dom/client";
-import { PropsForm } from "./props-form";
-import "./studio.css";
+import { GalleryView, type Density } from "./gallery-view";
+import { InspectView } from "./inspect-view";
+import {
+  type PreviewScheme,
+  type GalleryEntry,
+  type TemplateSummary,
+  WIDTHS,
+} from "./studio-shared";
+import { buildSearch, decodePropsFragment, encodePropsFragment, parseUrlState } from "./studio-url";
+import type { View } from "./studio-url";
 
-interface TemplateSummary {
-  id: string;
-  title: string;
-  sentWhen: string;
-  fixtures: { name: string; props: unknown }[];
-  formSchema: unknown;
-}
-
-interface Rendered {
-  subject: string;
-  html: string;
-  text: string;
-}
-
-const WIDTHS = { desktop: 680, mobile: 375 } as const;
-
-/**
- * Shows the dark half of an email without asking the operating system to change.
- *
- * Nothing lets a page force `prefers-color-scheme` on a frame, so the studio
- * promotes the dark rules the email already carries to unconditional ones. It
- * reads the real stylesheet the message ships, so what appears is what a client
- * in dark mode composes — not a second theme written for the preview.
- */
-const promoteDarkRules = (html: string): string => {
-  const marker = "@media (prefers-color-scheme: dark)";
-  let out = "";
-  let cursor = 0;
-  for (;;) {
-    const start = html.indexOf(marker, cursor);
-    if (start === -1) return out + html.slice(cursor);
-    const open = html.indexOf("{", start + marker.length);
-    if (open === -1) return out + html.slice(cursor);
-    let depth = 1;
-    let index = open + 1;
-    while (index < html.length && depth > 0) {
-      if (html[index] === "{") depth += 1;
-      else if (html[index] === "}") depth -= 1;
-      index += 1;
-    }
-    out += html.slice(cursor, start) + html.slice(open + 1, index - 1);
-    cursor = index;
-  }
-};
+const initialUrl = parseUrlState(window.location.search);
+const initialPropsOverride = decodePropsFragment(window.location.hash);
 
 const Studio = (): JSX.Element => {
   const [templates, setTemplates] = useState<TemplateSummary[] | null>(null);
+  const templatesRef = useRef<TemplateSummary[] | null>(null);
+  templatesRef.current = templates;
   const [failure, setFailure] = useState<string | null>(null);
+  const [view, setView] = useState<View>(initialUrl.view);
   const [selected, setSelected] = useState<{ id: string; fixture: string } | null>(null);
-  const [props, setProps] = useState<unknown>(null);
-  const [rendered, setRendered] = useState<Rendered | null>(null);
-  const [renderError, setRenderError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"html" | "text">("html");
-  const [width, setWidth] = useState<keyof typeof WIDTHS>("desktop");
-  const [dark, setDark] = useState(false);
+  const [currentProps, setCurrentProps] = useState<unknown>(null);
+
+  const [previewScheme, setPreviewScheme] = useState<PreviewScheme>(initialUrl.theme);
+  const { resolvedTheme, setTheme } = useTheme();
+  const previewDark = resolvedTheme === "dark";
+
+  const [galleryEntries, setGalleryEntries] = useState<GalleryEntry[] | null>(null);
+  const [galleryFailure, setGalleryFailure] = useState<string | null>(null);
+  const [everyFixture, setEveryFixture] = useState(initialUrl.everyFixture);
+  const [width, setWidth] = useState<keyof typeof WIDTHS>(initialUrl.width);
+  const [density, setDensity] = useState<Density>(initialUrl.density);
+
+  useEffect(() => {
+    setTheme(previewScheme);
+  }, [previewScheme, setTheme]);
 
   useEffect(() => {
     fetch("/__templates")
@@ -68,162 +50,228 @@ const Studio = (): JSX.Element => {
           return;
         }
         setTemplates(body);
-        const first = body[0];
-        const fixture = first?.fixtures[0];
-        if (first && fixture) {
-          setSelected({ id: first.id, fixture: fixture.name });
-          setProps(fixture.props);
+        const wanted = initialUrl.templateId
+          ? (body.find((entry) => entry.id === initialUrl.templateId) ?? body[0])
+          : body[0];
+        const fixture = initialUrl.fixtureName
+          ? (wanted?.fixtures.find((entry) => entry.name === initialUrl.fixtureName) ??
+            wanted?.fixtures[0])
+          : wanted?.fixtures[0];
+        if (wanted && fixture) {
+          setSelected({ id: wanted.id, fixture: fixture.name });
+          setCurrentProps(
+            initialPropsOverride !== undefined ? initialPropsOverride : fixture.props,
+          );
         }
       })
       .catch((error: unknown) => setFailure(String(error)));
   }, []);
 
-  const template = useMemo(
-    () => templates?.find((entry) => entry.id === selected?.id) ?? null,
-    [templates, selected],
+  useEffect(() => {
+    if (view !== "gallery") return;
+    setGalleryEntries(null);
+    setGalleryFailure(null);
+    const controller = new AbortController();
+    fetch(`/__gallery${everyFixture ? "?fixtures=all" : ""}`, { signal: controller.signal })
+      .then((response) => response.json())
+      .then((body: GalleryEntry[] | { error: string }) => {
+        if ("error" in body) {
+          setGalleryFailure(body.error);
+          return;
+        }
+        setGalleryEntries(body);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setGalleryFailure(String(error));
+      });
+    return () => controller.abort();
+  }, [view, everyFixture]);
+
+  const choose = useCallback(
+    (templateId: string, fixtureName: string) => {
+      const template = templates?.find((entry) => entry.id === templateId);
+      const fixture = template?.fixtures.find((entry) => entry.name === fixtureName);
+      if (!template || !fixture) return;
+      setSelected({ id: template.id, fixture: fixture.name });
+      setCurrentProps(fixture.props);
+    },
+    [templates],
   );
+
+  const openInInspect = useCallback(
+    (templateId: string, fixtureName: string) => {
+      choose(templateId, fixtureName);
+      setView("inspect");
+    },
+    [choose],
+  );
+
+  const inspectTemplates = useMemo(() => templates ?? [], [templates]);
+
+  // Address-bar sync: template/fixture/view changes are places worth a back
+  // button entry; width, density, theme and prop edits are preferences that
+  // replace the current entry instead of piling up a new one per keystroke.
+  const historyReady = useRef(false);
+  const suppressNextPush = useRef(false);
 
   useEffect(() => {
-    if (!selected || props === null) return;
-    const controller = new AbortController();
-    fetch("/__render", {
-      method: "POST",
-      body: JSON.stringify({ id: selected.id, props }),
-      signal: controller.signal,
-    })
-      .then(async (response) => ({ ok: response.ok, body: await response.json() }))
-      .then(({ ok, body }) => {
-        if (ok) {
-          setRendered(body as Rendered);
-          setRenderError(null);
-        } else {
-          setRenderError((body as { error: string }).error);
-        }
-      })
-      .catch(() => undefined);
-    return () => controller.abort();
-  }, [selected, props]);
+    if (!selected) return;
+    const search = buildSearch({
+      view,
+      templateId: selected.id,
+      fixtureName: selected.fixture,
+      width,
+      density,
+      theme: previewScheme,
+      everyFixture,
+    });
+    const hash = encodePropsFragment(currentProps);
+    if (!historyReady.current) {
+      historyReady.current = true;
+      window.history.replaceState(null, "", `${search}${hash}`);
+      return;
+    }
+    if (suppressNextPush.current) {
+      suppressNextPush.current = false;
+      window.history.replaceState(null, "", `${search}${hash}`);
+      return;
+    }
+    window.history.pushState(null, "", `${search}${hash}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, selected?.id, selected?.fixture]);
 
-  const choose = useCallback((entry: TemplateSummary, fixture: { name: string; props: unknown }) => {
-    setSelected({ id: entry.id, fixture: fixture.name });
-    setProps(fixture.props);
-    setRenderError(null);
+  useEffect(() => {
+    if (!selected || !historyReady.current) return;
+    const search = buildSearch({
+      view,
+      templateId: selected.id,
+      fixtureName: selected.fixture,
+      width,
+      density,
+      theme: previewScheme,
+      everyFixture,
+    });
+    const hash = encodePropsFragment(currentProps);
+    window.history.replaceState(null, "", `${search}${hash}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, density, previewScheme, everyFixture, currentProps]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const state = parseUrlState(window.location.search);
+      const props = decodePropsFragment(window.location.hash);
+      suppressNextPush.current = true;
+      setView(state.view);
+      setWidth(state.width);
+      setDensity(state.density);
+      setPreviewScheme(state.theme);
+      setEveryFixture(state.everyFixture);
+      const current = templatesRef.current;
+      const template = current?.find((entry) => entry.id === state.templateId) ?? current?.[0];
+      const fixture = state.fixtureName
+        ? (template?.fixtures.find((entry) => entry.name === state.fixtureName) ??
+          template?.fixtures[0])
+        : template?.fixtures[0];
+      if (template && fixture) {
+        setSelected({ id: template.id, fixture: fixture.name });
+        setCurrentProps(props !== undefined ? props : fixture.props);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  if (failure) return <p className="failure">The studio could not load the templates: {failure}</p>;
-  if (!templates) return <p className="loading">Loading templates…</p>;
-
-  const documentUrl = selected
-    ? `/__document?id=${encodeURIComponent(selected.id)}&props=${encodeURIComponent(JSON.stringify(props))}`
-    : "#";
-  const frameHtml = rendered ? (dark ? promoteDarkRules(rendered.html) : rendered.html) : "";
+  if (failure) {
+    return (
+      <Box padding={6} color="red.700">
+        The studio could not load the templates: {failure}
+      </Box>
+    );
+  }
+  if (!templates) {
+    return (
+      <Box padding={6} color="fg.muted">
+        Loading templates…
+      </Box>
+    );
+  }
 
   return (
-    <div className="studio">
-      <nav className="rail">
-        <h1>LangWatch mail</h1>
-        <p className="rail-note">{templates.length} messages</p>
-        {templates.map((entry) => (
-          <section key={entry.id} className={entry.id === selected?.id ? "entry current" : "entry"}>
-            <h2>{entry.title}</h2>
-            <p className="sent-when">{entry.sentWhen}</p>
-            <ul>
-              {entry.fixtures.map((fixture) => (
-                <li key={fixture.name}>
-                  <button
-                    type="button"
-                    className={
-                      entry.id === selected?.id && fixture.name === selected.fixture
-                        ? "fixture on"
-                        : "fixture"
-                    }
-                    onClick={() => choose(entry, fixture)}
-                  >
-                    {fixture.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </nav>
+    <Flex direction="column" height="100vh" bg="bg">
+      <Flex
+        as="header"
+        align="center"
+        justify="space-between"
+        gap={4}
+        paddingX={4}
+        paddingY={2}
+        borderBottomWidth="1px"
+        borderColor="border"
+        bg="bg.panel"
+        flexWrap="wrap"
+      >
+        <Heading size="sm">LangWatch mail</Heading>
+        <Flex gap={4} align="center" flexWrap="wrap">
+          <SegmentedControl
+            size="xs"
+            items={[
+              { value: "inspect", label: "Inspect" },
+              { value: "gallery", label: "Gallery" },
+            ]}
+            value={view}
+            onValueChange={(details) => setView(details.value as View)}
+          />
+          <SegmentedControl
+            size="xs"
+            items={[
+              { value: "light", label: "Light" },
+              { value: "system", label: "System" },
+              { value: "dark", label: "Dark" },
+            ]}
+            value={previewScheme}
+            onValueChange={(details) => setPreviewScheme(details.value as PreviewScheme)}
+          />
+        </Flex>
+      </Flex>
 
-      <main className="stage">
-        <header>
-          <p className="subject-label">Subject</p>
-          <p className="subject">{rendered?.subject ?? "—"}</p>
-          <div className="toolbar">
-            <Toggle options={["html", "text"] as const} value={tab} onChange={setTab} />
-            <Toggle options={["desktop", "mobile"] as const} value={width} onChange={setWidth} />
-            <button
-              type="button"
-              className={dark ? "chip on" : "chip"}
-              onClick={() => setDark((was) => !was)}
-            >
-              Dark
-            </button>
-            <button
-              type="button"
-              className="chip"
-              onClick={() => void navigator.clipboard.writeText(rendered?.html ?? "")}
-            >
-              Copy HTML
-            </button>
-            <a className="chip" href={documentUrl} target="_blank" rel="noreferrer">
-              Open in new tab
-            </a>
-          </div>
-        </header>
-        {renderError && <p className="reject">These props were rejected: {renderError}</p>}
-        <div className={dark ? "canvas dark" : "canvas"}>
-          {tab === "html" ? (
-            <iframe title="Rendered email" srcDoc={frameHtml} style={{ width: WIDTHS[width] }} />
-          ) : (
-            <pre className="plain" style={{ width: WIDTHS[width] }}>
-              {rendered?.text ?? ""}
-            </pre>
-          )}
-        </div>
-      </main>
-
-      <aside className="inspector">
-        <h2>Props</h2>
-        {template && (
-          <PropsForm schema={template.formSchema} props={props} onChange={setProps} />
+      <Box flex="1" minHeight={0}>
+        {view === "inspect" ? (
+          <InspectView
+            templates={inspectTemplates}
+            selected={selected}
+            currentProps={currentProps}
+            onPropsChange={setCurrentProps}
+            onSelect={choose}
+            previewDark={previewDark}
+            width={width}
+            onWidthChange={setWidth}
+          />
+        ) : (
+          <GalleryView
+            entries={galleryEntries}
+            failure={galleryFailure}
+            everyFixture={everyFixture}
+            onEveryFixtureChange={setEveryFixture}
+            width={width}
+            onWidthChange={setWidth}
+            density={density}
+            onDensityChange={setDensity}
+            previewDark={previewDark}
+            onOpen={openInInspect}
+          />
         )}
-      </aside>
-    </div>
+      </Box>
+    </Flex>
   );
 };
-
-const Toggle = <Option extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: readonly Option[];
-  value: Option;
-  onChange: (next: Option) => void;
-}): JSX.Element => (
-  <div className="toggle">
-    {options.map((option) => (
-      <button
-        key={option}
-        type="button"
-        className={option === value ? "chip on" : "chip"}
-        onClick={() => onChange(option)}
-      >
-        {option}
-      </button>
-    ))}
-  </div>
-);
 
 const mount = document.getElementById("studio");
 if (mount) {
   createRoot(mount).render(
     <StrictMode>
-      <Studio />
+      <DesignSystemProvider>
+        <Studio />
+      </DesignSystemProvider>
     </StrictMode>,
   );
 }

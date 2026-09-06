@@ -19,6 +19,12 @@ It renders in Node through the same `@react-email` call the product sends with, 
 the preview cannot drift from the mail that arrives. Editing a template file
 re-renders it without a restart.
 
+A **Gallery** toggle next to Inspect shows every registered template's first
+fixture at once as a grid of scaled thumbnails (a "every fixture" toggle shows
+all twenty); clicking a card opens it in Inspect. Both views follow the
+system colour scheme by default, with a light / system / dark override to
+preview the other scheme on demand.
+
 ## Adding a template
 
 Five things, all in one file under `src/templates/`:

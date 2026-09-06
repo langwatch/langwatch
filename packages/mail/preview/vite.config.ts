@@ -2,6 +2,7 @@ import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
+import { buildGalleryEntries } from "./gallery-render";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(here, "..");
@@ -53,15 +54,30 @@ const templateRenderer = (): Plugin => {
           .catch((error: unknown) => respondJson(response, 422, { error: describe(error) }));
       });
 
+      // The gallery: every fixture rendered in one round trip, so the grid view
+      // never re-renders per card the way the single-template view does.
+      server.middlewares.use("/__gallery", (request, response) => {
+        const query = new URL(request.url ?? "", "http://studio").searchParams;
+        const everyFixture = query.get("fixtures") === "all";
+        void load(server)
+          .then(async (registry) => {
+            const entries = await buildGalleryEntries(
+              registry.mailTemplates,
+              registry.renderMailTemplate,
+              { everyFixture },
+            );
+            respondJson(response, 200, entries);
+          })
+          .catch((error: unknown) => respondJson(response, 500, { error: describe(error) }));
+      });
+
       // "Open in new tab": the rendered document on its own, so a browser shows
       // it the way a mail client would rather than inside the studio's chrome.
       server.middlewares.use("/__document", (request, response) => {
         const props = new URL(request.url ?? "", "http://studio").searchParams;
         void load(server)
           .then(async (registry) => {
-            const template = registry.mailTemplates.find(
-              (entry) => entry.id === props.get("id"),
-            );
+            const template = registry.mailTemplates.find((entry) => entry.id === props.get("id"));
             if (!template) {
               response.statusCode = 404;
               response.end("No such template.");
@@ -84,7 +100,11 @@ const templateRenderer = (): Plugin => {
 };
 
 const respondJson = (
-  response: { statusCode: number; setHeader: (k: string, v: string) => void; end: (b: string) => void },
+  response: {
+    statusCode: number;
+    setHeader: (k: string, v: string) => void;
+    end: (b: string) => void;
+  },
   status: number,
   body: unknown,
 ) => {
@@ -93,7 +113,9 @@ const respondJson = (
   response.end(JSON.stringify(body));
 };
 
-const readJson = async (request: AsyncIterable<Buffer>): Promise<{ id: string; props: unknown }> => {
+const readJson = async (
+  request: AsyncIterable<Buffer>,
+): Promise<{ id: string; props: unknown }> => {
   const chunks: Buffer[] = [];
   for await (const chunk of request) chunks.push(chunk);
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as { id: string; props: unknown };
