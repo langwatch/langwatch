@@ -234,8 +234,8 @@ func dispatchCredential(cred domain.Credential, model string) domain.Credential 
 // deployment itself. The rewrite is a no-op unless the deployment differs from
 // the body's model, so the common self-map case stays byte-identical and keeps
 // Azure's prompt-cache prefix identity intact.
-func applyAzureRawForwardDeployment(req *domain.Request, provider bfschemas.ModelProvider, model string, cred domain.Credential) {
-	if provider != bfschemas.Azure {
+func applyAzureRawForwardDeployment(req *domain.Request, model string, cred domain.Credential) {
+	if cred.ProviderID != domain.ProviderAzure {
 		return
 	}
 	deployment := cred.DeploymentMap[model]
@@ -323,7 +323,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	}
 
 	provider := r.mapProviderForDispatch(cred)
-	applyAzureRawForwardDeployment(req, provider, model, cred)
+	applyAzureRawForwardDeployment(req, model, cred)
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponses(ctx, req, provider, model, cred)
@@ -706,7 +706,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	}
 
 	provider := r.mapProviderForDispatch(cred)
-	applyAzureRawForwardDeployment(req, provider, model, cred)
+	applyAzureRawForwardDeployment(req, model, cred)
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponsesStream(ctx, req, provider, model, cred)
