@@ -407,4 +407,43 @@ describe("the repo is a single pnpm workspace", () => {
       }
     });
   });
+
+  describe("when the applications are started from a fresh clone", () => {
+    const ensureBuilt = "dev/scripts/ensure-built.mjs";
+
+    /** @scenario A fresh clone starts the applications without a manual build step */
+    it("hooks the bundle build onto every application's dev script", () => {
+      for (const app of ["apps/ui", "apps/api", "apps/worker"]) {
+        const scripts = readJson(`${app}/package.json`).scripts as Record<string, string>;
+        expect(scripts.dev).toBeDefined();
+        expect(scripts.predev).toContain(ensureBuilt);
+      }
+      expect(existsSync(join(repoRoot, ensureBuilt))).toBe(true);
+    });
+
+    /** @scenario A fresh clone starts the applications without a manual build step */
+    it("leaves only generation in the repository's file-generation step", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+
+      // The two bundles are the only workspace packages consumed as `dist`;
+      // everything else exports its own `src`. Building them inside the
+      // generator chain made a build a thing you had to know to run.
+      expect(scripts["start:prepare:files"]).not.toMatch(/--filter\s+langwatch\s+build/);
+      expect(scripts["start:prepare:files"]).not.toMatch(/mcp-server\s+build/);
+      expect(scripts["ensure:built"]).toContain(ensureBuilt);
+    });
+
+    /** @scenario A stale SDK build is rebuilt before the browser application starts */
+    it("decides by comparing the bundle against the source it was built from", () => {
+      const source = readFileSync(join(repoRoot, ensureBuilt), "utf8");
+
+      // Named entry points, not directories: a half-written `dist` passes a
+      // directory check and fails minutes later inside a dependency scan.
+      expect(source).toContain("sdks/typescript");
+      expect(source).toContain("dist/index.mjs");
+      expect(source).toContain("mcp/typescript");
+      expect(source).toContain("dist/index.js");
+      expect(source).toMatch(/mtime/);
+    });
+  });
 });

@@ -33,6 +33,7 @@
   },
   "scripts": {
     "start": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/worker.entrypoint.ts",
+    "predev": "node ../../dev/scripts/ensure-built.mjs",
     "dev": "tsx watch $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/worker.entrypoint.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "build": "node scripts/build-server.mjs",

@@ -266,7 +266,7 @@ jobs:
       # video recording is off in CI, so no ffmpeg binary is needed.
 
       - name: Prepare files
-        run: pnpm start:prepare:files
+        run: pnpm start:prepare:files && pnpm ensure:built
 
       - name: Install goose
         run: bash .github/scripts/install-goose.sh

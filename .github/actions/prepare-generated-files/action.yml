@@ -3,10 +3,10 @@ description: >-
   Runs the repository root's `start:prepare:files`, reusing a cached result when
   none of its inputs changed.
 
-# `start:prepare:files` is a chain of six generators — the langevals evaluator
-# types, the Prisma client, the TypeScript SDK build, the MCP server build, the
-# langy skill catalogue and the setup-skill bodies. (The task registry was the
-# seventh; the task lane it scanned no longer exists.)
+# `start:prepare:files` is a chain of four generators — the langevals evaluator
+# types, the Prisma client, the langy skill catalogue and the setup-skill
+# bodies. `ensure:built` then builds the two workspace packages that resolve a
+# bundle rather than their own source: the TypeScript SDK and the MCP server.
 # It costs 30-35s and every test, build and check job in this workflow pays it.
 # Across the shards that was several runner-minutes per push spent regenerating
 # byte-identical output from byte-identical committed inputs.
@@ -39,7 +39,7 @@ runs:
           packages/prisma-client/src/generated
           packages/features/evaluator/contract/src/evaluators.generated.ts
           packages/features/langy/web/src/model/shared/langy/langySkills.generated.json
-          packages/features/langy/server/src/services/setup-skill-bodies.generated.ts
+          packages/features/langy/server/src/rules/setup-skill-bodies.rules.ts
           sdks/typescript/dist
           mcp/typescript/dist
         key: >-
@@ -64,7 +64,12 @@ runs:
     - name: Generate files
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      run: pnpm start:prepare:files
+      # `ensure:built` is the same hook the dev lanes run before they start, so
+      # the SDK and MCP bundles are produced by one mechanism rather than by a
+      # build step spelled out again here. It is scoped to the miss: a restored
+      # `dist` predates the checkout that wrote `src`, so on a hit the staleness
+      # comparison would rebuild exactly what the cache just handed back.
+      run: pnpm start:prepare:files && pnpm ensure:built
 
     # A cache hit is only useful if it actually produced the files. A key that
     # silently stops covering a new generator would otherwise hand every job a

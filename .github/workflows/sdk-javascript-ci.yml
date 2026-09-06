@@ -281,7 +281,7 @@ jobs:
 
       - name: Prepare LangWatch files
         working-directory: .
-        run: pnpm start:prepare:files
+        run: pnpm start:prepare:files && pnpm ensure:built
 
       - name: Setup database
         working-directory: .

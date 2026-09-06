@@ -34,6 +34,7 @@
   "scripts": {
     "start:prepare:db": "cd ../tasks && pnpm -s task prisma-migrate && pnpm -s task clickhouse-migrate && pnpm -s task lwql-provision",
     "start": "pnpm -s run start:prepare:db && tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/api.entrypoint.ts",
+    "predev": "node ../../dev/scripts/ensure-built.mjs",
     "dev": "pnpm -s run start:prepare:db && tsx watch $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/api.entrypoint.ts",
     "task": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/tasks/tasks.entrypoint.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",

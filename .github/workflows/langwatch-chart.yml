@@ -225,7 +225,7 @@ jobs:
         with:
           install: "@langwatch/platform-api..."
       - name: Generate required files
-        run: pnpm start:prepare:files
+        run: pnpm start:prepare:files && pnpm ensure:built
       # The integration config's globalSetup runs ClickHouse migrations via
       # goose before any test file executes, helm-backed or not.
       - name: Install Goose migration tool

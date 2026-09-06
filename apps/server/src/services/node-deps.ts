@@ -193,20 +193,20 @@ export async function ensureLangwatchDeps(
   // `pnpm pack`-driven local dogfood and dev checkouts where dist/
   // doesn't exist yet.
   if (!distAlreadyBuilt) {
-    // Full prod build, in the two steps the image runs: the root's
-    // start:prepare:files (Prisma client, langevals evaluator types, the
-    // TypeScript SDK's dist, the mcp-server bundle, the langy skill
-    // catalogue), then the browser bundle. `--filter "@langwatch/ui..."`
-    // builds the UI's workspace dependencies first, in topological order.
-    // Without dist/client every browser route 404s and only /api/* answers.
-    // Neither Node process is built: both run their entry point through tsx.
-    await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
-      ...pnpm.args,
-      "-C",
-      rootDir,
-      "run",
-      "start:prepare:files",
-    ]);
+    // Full prod build, in the three steps the image runs: start:prepare:files
+    // (Prisma client, langevals evaluator types, the langy skill catalogue),
+    // ensure:built (the SDK and mcp-server bundles, which no --filter closure
+    // below reaches), then the browser bundle — without dist/client every
+    // browser route 404s. Neither Node process is built; both run under tsx.
+    for (const script of ["start:prepare:files", "ensure:built"]) {
+      await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
+        ...pnpm.args,
+        "-C",
+        rootDir,
+        "run",
+        script,
+      ]);
+    }
     await execAndPipe(
       bus,
       "prepare:langwatch",

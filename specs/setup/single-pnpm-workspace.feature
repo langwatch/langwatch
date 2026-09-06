@@ -228,6 +228,29 @@ Feature: One workspace for every JavaScript project in the repo
   # Building
   # ===========================================================================
 
+  @unit
+  Scenario: A fresh clone starts the applications without a manual build step
+    Given someone has cloned the repo and installed once from the root
+    And two workspace packages are consumed as a bundle rather than as source
+    When they start any of the three Node applications
+    Then those two bundles are produced first, without being asked for
+    And the repository's file-generation step no longer builds them
+    # They used to be built by the same `&&` chain that generates the Prisma
+    # client and the evaluator types, so a contributor who did not know that
+    # chain existed got a dependency-scan failure from the browser build tool
+    # and an unresolvable import in the API — neither of which names a build.
+
+  @unit
+  Scenario: A stale SDK build is rebuilt before the browser application starts
+    Given the TypeScript SDK's source has changed since its bundle was built
+    When the browser application is started
+    Then the SDK is rebuilt before the application starts
+    And an application whose bundles are already current starts without
+      rebuilding anything
+    # The check is a modification-time comparison, not a build system: the
+    # point is that a lane never serves a bundle older than the source it was
+    # built from, and never pays for a build it does not need.
+
   @unimplemented
   Scenario: Building a project builds what it depends on first
     Given a project that depends on another project in the repo

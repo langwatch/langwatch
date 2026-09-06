@@ -25,7 +25,7 @@ require_dir() {
 
 require_file "packages/features/evaluator/contract/src/evaluators.generated.ts"
 require_file "packages/features/langy/web/src/model/shared/langy/langySkills.generated.json"
-require_file "packages/features/langy/server/src/services/setup-skill-bodies.generated.ts"
+require_file "packages/features/langy/server/src/rules/setup-skill-bodies.rules.ts"
 
 # Name the ENTRYPOINTS, not just the directories that hold them. A directory
 # check passes for an empty or half-written one, so a partially restored cache
