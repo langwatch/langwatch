@@ -8,7 +8,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Get Started
 
-- [LangWatch: The Complete LLMOps Platform](https://langwatch.ai/docs/introduction.md): Accelerate your agent development lifecycle with comprehensive observability, evaluations and agent testing. Open-source platform, with over 3k stars on GitHub.
+- [The open-source platform for AI in production](https://langwatch.ai/docs/introduction.md): Trace, test, route and govern every LLM call in your company, from your own agents to the coding assistants your engineers use.
 
 ### LangWatch Skills
 
@@ -82,27 +82,26 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Evaluations
 
-- [Evaluations Overview](https://langwatch.ai/docs/evaluations/overview.md): Ensure quality and safety for your LLM applications with experiments, online evaluation, guardrails, and evaluators.
+- [Evaluations Overview](https://langwatch.ai/docs/evaluations/overview.md): Score your prompts and agents on a dataset before you ship, score production traffic as it arrives, and block unsafe responses before they reach the user.
 
 ### Experiments
 
-- [Experiments Overview](https://langwatch.ai/docs/evaluations/experiments/overview.md): Run batch tests on your LLM applications to measure quality, compare configurations, and catch regressions before production.
+- [Experiments Overview](https://langwatch.ai/docs/evaluations/experiments/overview.md): Run a dataset through your prompts and agents in the workbench, score every row with evaluators, and compare runs before you ship a change.
 - [Experiments via SDK](https://langwatch.ai/docs/evaluations/experiments/sdk.md): Run experiments programmatically from notebooks or scripts to batch test your LLM applications.
 
 #### Via UI
 
-- [How to evaluate that your LLM answers correctly](https://langwatch.ai/docs/evaluations/experiments/ui/answer-correctness.md): Measure correctness in LLM answers using LangWatch’s Experiments to compare outputs and support AI agent evaluations.
-- [How to evaluate an LLM when you don't have defined answers](https://langwatch.ai/docs/evaluations/experiments/ui/llm-as-a-judge.md): Measure LLM performance using LLM-as-a-Judge when no ground-truth answers exist to support scalable AI agent evaluations.
-- [How to compare two or more prompts, models, or agents head-to-head](https://langwatch.ai/docs/evaluations/experiments/ui/pairwise-compare.md): Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation.
+- [Answer Correctness: check LLM answers against the expected output](https://langwatch.ai/docs/evaluations/experiments/ui/answer-correctness.md): Score every answer against the expected output in your dataset with the Exact Match or the LLM Answer Match evaluator, and compare runs as you change the prompt.
+- [LLM-as-a-Judge: score outputs on criteria without expected answers](https://langwatch.ai/docs/evaluations/experiments/ui/llm-as-a-judge.md): Score outputs against written criteria with an LLM-as-a-Judge evaluator when your dataset has inputs but no expected answers, and read the reason behind each verdict.
+- [Pairwise Comparison: judge prompts, models or agents head-to-head](https://langwatch.ai/docs/evaluations/experiments/ui/pairwise-compare.md): Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation, and rank three or more candidates on a Bradley-Terry leaderboard.
 
 - [Running Experiments in CI/CD](https://langwatch.ai/docs/evaluations/experiments/ci-cd.md): Automate LLM quality gates by running experiments in your CI/CD pipelines.
-- [Multimodal Evaluation Images, PDFs, and Vision](https://langwatch.ai/docs/evaluations/experiments/multimodal-evaluation.md): Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
+- [Multimodal Evaluation: images, PDFs and vision models in experiments](https://langwatch.ai/docs/evaluations/experiments/multimodal-evaluation.md): Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
 
 ### Online Evaluation
 
-- [Online Evaluation Overview](https://langwatch.ai/docs/evaluations/online-evaluation/overview.md): Continuously score and monitor your LLM's production traffic for quality and safety with online evaluation.
-- [Setting up Monitors](https://langwatch.ai/docs/evaluations/online-evaluation/setup-monitors.md): Set up online evaluation monitors in LangWatch to score outputs instantly and support continuous AI agent testing.
-- [Evaluation by Thread](https://langwatch.ai/docs/evaluations/online-evaluation/by-thread.md): Evaluate LLM applications by thread in LangWatch to analyze conversation-level performance in agent testing setups.
+- [Online Evaluation Overview](https://langwatch.ai/docs/evaluations/online-evaluation/overview.md): Score your production traffic as it arrives with monitors that run an evaluator on every matching trace or thread, and read the results on the trace, in the list and in analytics.
+- [Online Evaluations: set up a monitor on your production traffic](https://langwatch.ai/docs/evaluations/online-evaluation/setup-monitors.md): Create an online evaluation that scores every incoming trace or thread with an evaluator, filter and sample the traffic it runs on, and read the results on the trace and in analytics.
 
 ### Guardrails
 
@@ -119,14 +118,17 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Datasets
 
-- [Datasets](https://langwatch.ai/docs/datasets/overview.md): Create and manage datasets in LangWatch to build evaluation sets for LLMs and structured AI agent testing.
-- [Programmatic Access](https://langwatch.ai/docs/datasets/programmatic-access.md): Manage datasets from LangWatch using the SDK, MCP, or REST API for offline evaluations and automated workflows.
-- [Generating a dataset with AI](https://langwatch.ai/docs/datasets/ai-dataset-generation.md): Generate datasets with AI to bootstrap LLM evaluations, regression tests, and simulation-based agent testing.
-- [Automatically build datasets from real-time traces](https://langwatch.ai/docs/datasets/automatically-from-traces.md): Automatically build datasets from real-time traces to power LLM evaluations, regression tests, and AI agent testing workflows.
-- [Add trace threads to datasets](https://langwatch.ai/docs/datasets/dataset-threads.md): Add full conversation threads to datasets in LangWatch to generate richer evaluation inputs for AI agent testing.
-- [View images in datasets](https://langwatch.ai/docs/datasets/dataset-images.md): View image datasets in LangWatch to support multimodal evaluations and agent testing scenarios.
+- [Datasets](https://langwatch.ai/docs/datasets/overview.md): Create a dataset by hand, from a CSV or JSON file, or from your traces, edit it in the grid, and run an experiment on it.
+- [Datasets: programmatic access from the SDKs, CLI and MCP server](https://langwatch.ai/docs/datasets/programmatic-access.md): Manage datasets from the Python and TypeScript SDKs, the CLI and the MCP server for offline evaluations and automated workflows.
+- [Automations: build a dataset from your traces](https://langwatch.ai/docs/datasets/automatically-from-traces.md): Create an automation that adds every new trace matching a filter to a dataset, mapped to the columns you choose.
+- [Threads in datasets](https://langwatch.ai/docs/datasets/dataset-threads.md): Add whole conversations to a dataset, one row per thread, with every trace of the thread in one column.
+- [Images in datasets](https://langwatch.ai/docs/datasets/dataset-images.md): Store image URLs in a dataset column of type image (URL), see them as thumbnails in the grid, and pass them to a vision model in an experiment.
 
-- [Annotations](https://langwatch.ai/docs/features/annotations.md): Use annotations in LangWatch for expert labeling, trace review, and structured evaluation workflows for AI agent testing.
+### Annotations
+
+- [Annotations](https://langwatch.ai/docs/annotations/overview.md): Review traces by hand with a comment, scores and a corrected output, and read every review in the annotations inbox.
+- [Annotation queues](https://langwatch.ai/docs/annotations/queues.md): Create a queue with reviewers and score types, send traces to it, work through the items one by one, correct a trace, and send the reviewed traces to a dataset.
+- [Annotation scores](https://langwatch.ai/docs/annotations/scores.md): Define the score types reviewers fill in on every annotation, as a single choice or a set of checkboxes, each with an optional reason.
 
 ## Prompt Management
 
@@ -161,13 +163,17 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Administration
 
+- [Members and Teams](https://langwatch.ai/docs/platform/members-and-teams.md): Invite people to your organization, put them on teams, give them a role per team or per project, and remove their access.
+- [Access Control (RBAC)](https://langwatch.ai/docs/platform/rbac.md): Roles, permissions, custom roles and role bindings: who can do what in an organization, a team or a project.
 - [API Keys](https://langwatch.ai/docs/platform/api-keys.md): Create and manage API keys in LangWatch. Use personal keys for development and AI assistants, or service keys for CI/CD and automation.
-- [Access Control (RBAC)](https://langwatch.ai/docs/platform/rbac.md): Manage user permissions and access levels in LangWatch with RBAC to secure evaluation workflows and agent testing environments.
-- [Audit Log](https://langwatch.ai/docs/platform/audit-log.md): Track user actions and changes in LangWatch
-- [SCIM Provisioning](https://langwatch.ai/docs/platform/scim.md): Automatically provision and deprovision users in LangWatch using SCIM 2.0 with your identity provider (Okta, Azure AD, etc.).
-- [SCIM Groups & Role Mapping](https://langwatch.ai/docs/platform/scim-groups.md): Automatically assign roles to users in LangWatch based on groups pushed from your identity provider.
-- [Model Providers](https://langwatch.ai/docs/platform/model-providers.md): Configure LLM credentials once at the organisation, team, or project scope, and let every project that needs them inherit.
-- [Data Retention](https://langwatch.ai/docs/platform/data-retention.md): Control how long LangWatch keeps your event data before it's deleted.
+- [Audit Log](https://langwatch.ai/docs/platform/audit-log.md): Every change made through the LangWatch settings, API and AI Gateway, with who did it, from where, and what changed.
+- [Data Privacy](https://langwatch.ai/docs/platform/data-privacy.md): One policy that controls which trace content LangWatch stores, who can read it, and how personal data and secrets are redacted, set at the organization, department, team or project level.
+- [Data Retention](https://langwatch.ai/docs/platform/data-retention.md): Set how long LangWatch keeps traces, scenario runs and experiment runs per organization, team or project before it deletes them.
+- [Secrets](https://langwatch.ai/docs/platform/secrets.md): Encrypted, write-only credentials stored per project and referenced by name from workflow code blocks and HTTP agents.
+- [SCIM Provisioning](https://langwatch.ai/docs/platform/scim.md): Provision and deprovision LangWatch users from your identity provider (Okta, Entra ID and others) over SCIM 2.0.
+- [SCIM Groups & Role Mapping](https://langwatch.ai/docs/platform/scim-groups.md): Bind roles to the groups your identity provider pushes over SCIM, so every member of a group holds the same access.
+- [Model Providers](https://langwatch.ai/docs/platform/model-providers.md): Store the LLM credentials that LangWatch uses for evaluators, Workflows, the playground, Agent Testing and Langy once, at the organization, team or project scope.
+- [Command Bar](https://langwatch.ai/docs/platform/command-bar.md): Press Cmd+K to open any page, jump to an entity by id, search by name, switch project or theme, and ask Langy.
 
 ## Examples & Cookbooks
 
@@ -397,39 +403,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [TypeScript](https://langwatch.ai/docs/ai-gateway/sdks/typescript.md): Call the LangWatch AI Gateway from TypeScript with the OpenAI SDK, the Anthropic SDK, the Vercel AI SDK or LangChain.js, and link the gateway span to your own trace.
 
-## Coding CLI Integrations
-
-- [Coding CLI Integrations](https://langwatch.ai/docs/ai-gateway/cli/overview.md): Use the LangWatch AI Gateway from Claude Code, Codex, opencode, Cursor, Aider.
-
-### Claude Code
-
-- [Claude Code](https://langwatch.ai/docs/ai-gateway/cli/claude-code.md): Route Claude Code through the LangWatch AI Gateway for centrally-governed agentic coding.
-
-### Codex
-
-- [Codex CLI](https://langwatch.ai/docs/ai-gateway/cli/codex.md): Route the OpenAI Codex CLI through the LangWatch AI Gateway.
-
-### Gemini CLI
-
-- [Gemini CLI](https://langwatch.ai/docs/ai-gateway/cli/gemini-cli.md): Route Google's Gemini CLI through the LangWatch AI Gateway for centrally-governed Gemini coding sessions.
-
-### OpenCode
-
-- [opencode](https://langwatch.ai/docs/ai-gateway/cli/opencode.md): Route the opencode terminal agent through the LangWatch AI Gateway.
-
-### Cursor
-
-- [Cursor](https://langwatch.ai/docs/ai-gateway/cli/cursor.md): Route Cursor IDE's AI features through the LangWatch AI Gateway.
-
-### Aider
-
-- [Aider](https://langwatch.ai/docs/ai-gateway/cli/aider.md): Route Aider through the LangWatch AI Gateway for team governance and tracing.
-
 ## Virtual Keys & Budgets
 
 - [Virtual Keys](https://langwatch.ai/docs/ai-gateway/virtual-keys.md): Create, scope, rotate, disable and revoke the keys your applications use to call the LangWatch AI Gateway.
 - [Budgets](https://langwatch.ai/docs/ai-gateway/budgets.md): Spend caps in USD on an organization, a team, a project, a virtual key, a person, a group or an end user, enforced by the LangWatch AI Gateway before the request reaches the provider.
-- [Gateway provider settings](https://langwatch.ai/docs/ai-gateway/provider-bindings.md): Gateway-specific settings (Fallback priority, Provider config (JSON)) now live in each model provider's Advanced (Gateway) section.
 - [Rate limits](https://langwatch.ai/docs/ai-gateway/rate-limits.md): Requests per minute and requests per day on a virtual key, enforced by each LangWatch AI Gateway replica.
 - [RBAC](https://langwatch.ai/docs/ai-gateway/rbac.md): The permissions that gate the LangWatch AI Gateway, the resources they cover and what each built-in role holds.
 
@@ -437,19 +414,18 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Billing and spend events](https://langwatch.ai/docs/ai-gateway/billing-events.md): One spend event per request that reaches the LangWatch AI Gateway pipeline, with token counts, cost and attribution, delivered to your webhook endpoints and served over REST for reconciliation and rebilling.
 - [Webhooks](https://langwatch.ai/docs/features/webhooks.md): Signed, retried, replayable event delivery to your endpoints, with per-endpoint subscriptions, a delivery log, health, and automatic disabling of dead receivers.
-- [Metering and rebilling your customers through the gateway](https://langwatch.ai/docs/ai-gateway/cookbooks/metering-and-rebilling.md): The end-to-end pattern for platforms that rebill their own customers, provision a tenant key and caps, ingest signed spend events, reconcile, handle breaches, and close periods.
+- [Metering and rebilling your customers through the gateway](https://langwatch.ai/docs/ai-gateway/cookbooks/metering-and-rebilling.md): Give each customer their own virtual key and caps, ingest signed spend events into your billing ledger, reconcile, handle breaches, and close periods.
 - [Demo: a rebilling agent platform](https://langwatch.ai/docs/ai-gateway/demo-agent-platform.md): The open-source agent-billing-demo repository, a small agent SaaS that meters and rebills its customers through the LangWatch AI Gateway, in TypeScript and Python.
 
 ## Governance
 
-- [Governance overview](https://langwatch.ai/docs/ai-gateway/governance/overview.md): One control plane for every AI tool in your enterprise, with virtual keys, SSO, per-user identity, policy, and budgets across Claude Code, Codex, Cursor, Gemini CLI, and your custom agents.
-- [Personal IDE keys: your AI tools, governed by your company](https://langwatch.ai/docs/ai-gateway/governance/personal-keys.md): Install LangWatch, run `langwatch login`, and use Claude Code / Cursor / Codex with org-attributed spend, a personal budget, and no per-tool configuration.
-- [Admin setup](https://langwatch.ai/docs/ai-gateway/governance/admin-setup.md): One-time SSO, provider, routing-policy, and budget configuration for an organization rolling out LangWatch Governance.
-- [Routing policies](https://langwatch.ai/docs/ai-gateway/governance/routing-policies.md): An admin decides once which providers and models a key can reach. Virtual keys point at that decision instead of carrying their own copy.
-- [Retention](https://langwatch.ai/docs/ai-gateway/governance/retention.md): How long governance and gateway data lives, tenant retention policies, what is deliberately exempt, and what that means for compliance evidence.
-- [OCSF / SIEM export](https://langwatch.ai/docs/ai-gateway/governance/ocsf-export.md): Pull LangWatch governance events into Splunk, Datadog Security, AWS Security Hub, Microsoft Sentinel, Elastic Security, or Sumo Logic CSE. Cursor-paginated OCSF v1.1 read API. Auth-scoped to org admin or auditor. Cron-pull pattern.
-- [LangWatch governance architecture](https://langwatch.ai/docs/ai-gateway/governance/architecture.md): How the personal-keys flow, AI Gateway, Activity Monitor, RoutingPolicy admin, and IngestionSource pipeline fit into one control plane.
-- [Activity Monitor event-sourcing architecture](https://langwatch.ai/docs/ai-gateway/governance/activity-monitor-event-sourcing.md): Why the receiver → event_log → projection subscriber → anomaly subscriber pipeline replaces the original direct-CH-write design, and how to extend it.
+- [Governance overview](https://langwatch.ai/docs/ai-gateway/governance/overview.md): Set up the LangWatch AI Gateway for an organization, give every member a personal key with its own budget, and keep the audit and export trail your security team needs.
+- [Personal keys](https://langwatch.ai/docs/ai-gateway/governance/personal-keys.md): Sign in from the LangWatch CLI and get a personal virtual key that Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot CLI and OpenCode use, with your spend attributed to you and capped by your own budget.
+- [Admin setup](https://langwatch.ai/docs/ai-gateway/governance/admin-setup.md): Add model providers, set the routing handle and the fallback order, create a routing policy, set budgets, then verify the LangWatch AI Gateway with one request.
+- [Routing Policies](https://langwatch.ai/docs/ai-gateway/governance/routing-policies.md): A routing policy decides once which providers a virtual key routes through, what the model tiers mean, and which tools, servers, addresses and models a request may name.
+- [Retention](https://langwatch.ai/docs/ai-gateway/governance/retention.md): What the LangWatch AI Gateway stores for each request, and which setting governs how long each record lives.
+- [OCSF / SIEM export](https://langwatch.ai/docs/ai-gateway/governance/ocsf-export.md): Pull governance events into your SIEM as OCSF 1.1 records through a cursor-paginated read procedure.
+- [LangWatch AI Gateway architecture](https://langwatch.ai/docs/ai-gateway/governance/architecture.md): The components of the LangWatch AI Gateway and how they connect, from the request pipeline in the gateway service to the control plane routes, the change feed, the spend spool and the auth cache.
 
 ## Providers
 
@@ -468,40 +444,42 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [ElevenLabs](https://langwatch.ai/docs/ai-gateway/providers/elevenlabs.md): Add an ElevenLabs API key under Settings, Model Providers and call speech and transcription through the LangWatch AI Gateway with the OpenAI audio routes or the ElevenLabs SDKs.
 - [OpenAI account](https://langwatch.ai/docs/ai-gateway/providers/openai-account.md): Sign in with a ChatGPT account under Settings, Model Providers and call the Responses API through the LangWatch AI Gateway on that subscription.
 - [Custom OpenAI-compatible](https://langwatch.ai/docs/ai-gateway/providers/custom-openai-compatible.md): Add any OpenAI-compatible endpoint, for example vLLM, Ollama or an internal inference server, under Settings, Model Providers and call it through the LangWatch AI Gateway.
-- [Fallback Chains](https://langwatch.ai/docs/ai-gateway/providers/fallback-chains.md): Survive provider outages, rate limits, and timeouts transparently.
+- [Fallback Chains](https://langwatch.ai/docs/ai-gateway/providers/fallback-chains.md): When a provider fails, the LangWatch AI Gateway retries the request on the next provider the virtual key can reach.
 
 ## Features
 
 ### Caching & Performance
 
-- [Caching Passthrough](https://langwatch.ai/docs/ai-gateway/caching-passthrough.md): How the LangWatch AI Gateway protects your provider-native prompt caching discounts.
-- [Cache Control](https://langwatch.ai/docs/ai-gateway/cache-control.md): Provider-agnostic cache control for every gateway request, passthrough, per-VK defaults, per-request headers, and rule-based overrides.
-- [Streaming](https://langwatch.ai/docs/ai-gateway/streaming.md): SSE semantics, byte-for-byte passthrough, and mid-stream behaviour.
+- [Cache Control](https://langwatch.ai/docs/ai-gateway/cache-control.md): Cache rules decide, per request, whether the LangWatch AI Gateway forwards, strips, or injects provider prompt-cache markers.
+- [Streaming](https://langwatch.ai/docs/ai-gateway/streaming.md): Read a completion as Server-Sent Events through the gateway, and know what the caller gets when a stream stops early.
 
 ### Safety & Governance
 
-- [Guardrails](https://langwatch.ai/docs/ai-gateway/guardrails.md): Run LangWatch evaluators inline on gateway traffic, pre, post, and per-stream-chunk.
-- [Security & Trust](https://langwatch.ai/docs/ai-gateway/security.md): How the LangWatch AI Gateway protects secrets, isolates tenants, and audits privileged actions.
-- [Policy Rules](https://langwatch.ai/docs/ai-gateway/policy-rules.md): Per-VK regex allow/deny lists for tool calls, MCP servers, and outbound URLs.
-- [Audit log](https://langwatch.ai/docs/ai-gateway/audit.md): Who did what, when, to which resource, gateway mutations land in the same audit log as the rest of the platform.
+- [Guardrails](https://langwatch.ai/docs/ai-gateway/guardrails.md): Run LangWatch evaluators on gateway traffic and block a request, a response or a stream before it reaches the other side.
+- [Security & Trust](https://langwatch.ai/docs/ai-gateway/security.md): What the LangWatch AI Gateway records, what it never logs, where provider credentials live, and how each hop is authenticated.
+- [Policy Rules](https://langwatch.ai/docs/ai-gateway/policy-rules.md): Regex deny and allow lists on a routing policy that refuse a request by the tools, MCP servers, web addresses or models it names.
+- [Audit log](https://langwatch.ai/docs/ai-gateway/audit.md): Who changed which gateway resource, when, and what the values were before and after.
 
 - [Model Naming](https://langwatch.ai/docs/ai-gateway/model-naming.md): How to name a model in a request, and which provider the gateway sends it to.
 - [Parameter mapping](https://langwatch.ai/docs/ai-gateway/parameter-mapping.md): How every OpenAI chat-completions parameter behaves on each provider lane, and how to control dropping with drop_tuning_params.
-- [Model Aliases](https://langwatch.ai/docs/ai-gateway/model-aliases.md): Per-VK redirects from client-facing model names to specific provider/model/deployment combinations.
+- [Model Aliases](https://langwatch.ai/docs/ai-gateway/model-aliases.md): Map the model name a client sends to the model the gateway serves, without a client change.
 
 ### Operations
 
-- [Observability](https://langwatch.ai/docs/ai-gateway/observability.md): Every gateway request emits a per-tenant LangWatch trace, what attributes, how routing works, how to use them.
-- [Troubleshooting](https://langwatch.ai/docs/ai-gateway/troubleshooting.md): Diagnostic paths for the most common LangWatch AI Gateway failure modes.
+- [Observability](https://langwatch.ai/docs/ai-gateway/observability.md): The trace attributes, response headers and Prometheus metrics the LangWatch AI Gateway emits for every request.
+- [Troubleshooting](https://langwatch.ai/docs/ai-gateway/troubleshooting.md): Symptoms you can search for on the LangWatch AI Gateway, with the check that confirms each cause and the fix.
 
 ## API Reference
 
 - [POST /v1/chat/completions](https://langwatch.ai/docs/ai-gateway/api/chat-completions.md): OpenAI-compatible chat completions through the LangWatch AI Gateway.
 - [POST /v1/messages](https://langwatch.ai/docs/ai-gateway/api/messages.md): Anthropic-compatible Messages endpoint through the LangWatch AI Gateway.
+- [POST /v1/responses](https://langwatch.ai/docs/ai-gateway/api/responses.md): OpenAI Responses API through the LangWatch AI Gateway, for OpenAI, Azure OpenAI and codex models.
 - [POST /v1/embeddings](https://langwatch.ai/docs/ai-gateway/api/embeddings.md): OpenAI-compatible embeddings endpoint through the LangWatch AI Gateway.
-- [POST /v1/audio/*](https://langwatch.ai/docs/ai-gateway/api/audio.md): Speech synthesis and transcription through the LangWatch AI Gateway, on OpenAI's wire and on ElevenLabs' own.
+- [POST /v1/audio/*](https://langwatch.ai/docs/ai-gateway/api/audio.md): Speech synthesis and transcription through the LangWatch AI Gateway on OpenAI's wire, served by OpenAI and ElevenLabs.
 - [POST /v1/images/*](https://langwatch.ai/docs/ai-gateway/api/images.md): Image generation and editing through the LangWatch AI Gateway, on OpenAI's wire.
+- [ElevenLabs API paths](https://langwatch.ai/docs/ai-gateway/api/elevenlabs.md): ElevenLabs' own synthesis, transcription and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
 - [Realtime voice](https://langwatch.ai/docs/ai-gateway/api/realtime.md): Mint a vendor session credential on a virtual key, so voice spend lands under a budget while the media socket runs client to vendor.
+- [Gemini native (/v1beta)](https://langwatch.ai/docs/ai-gateway/api/gemini-native.md): Google's generative-language API paths, forwarded by the LangWatch AI Gateway to a Gemini or Vertex credential without translation.
 - [GET /v1/models](https://langwatch.ai/docs/ai-gateway/api/models.md): List the models a virtual key can access through the LangWatch AI Gateway.
 - [Error Envelope](https://langwatch.ai/docs/ai-gateway/api/errors.md): OpenAI-compatible error shapes and a complete type enum.
 - [Management REST API](https://langwatch.ai/docs/ai-gateway/api/management.md): Manage virtual keys, budgets, and routing policies programmatically via /api/gateway/v1/*.
@@ -509,30 +487,27 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Self-Hosting
 
 - [Helm chart](https://langwatch.ai/docs/ai-gateway/self-hosting/helm.md): Deploy the LangWatch AI Gateway alongside your self-hosted LangWatch.
-- [Post-install checklist](https://langwatch.ai/docs/ai-gateway/self-hosting/post-install-checklist.md): What to do after `helm install` to get personal keys, the AI Gateway, and the unified `langwatch` CLI working end-to-end.
+- [Post-install checklist](https://langwatch.ai/docs/ai-gateway/self-hosting/post-install-checklist.md): Verify a self-hosted LangWatch AI Gateway with curl, from the pod to a completed chat request.
 - [Config](https://langwatch.ai/docs/ai-gateway/self-hosting/config.md): Environment variables and configuration for self-hosted LangWatch AI Gateway deployments.
-- [DNS and TLS](https://langwatch.ai/docs/ai-gateway/self-hosting/dns-and-tls.md): Point a public hostname at the AI Gateway, AWS ELB, NLB + Cloudflare + cert-manager.
+- [DNS and TLS](https://langwatch.ai/docs/ai-gateway/self-hosting/dns-and-tls.md): Point a public hostname at the LangWatch AI Gateway and terminate TLS in front of it.
 - [Health Checks](https://langwatch.ai/docs/ai-gateway/self-hosting/health-checks.md): Kubernetes probes and the public status endpoint for the LangWatch AI Gateway.
-- [Scaling](https://langwatch.ai/docs/ai-gateway/self-hosting/scaling.md): Horizontal scaling, autoscaling, capacity, and benchmarks for the LangWatch AI Gateway.
+- [Scaling](https://langwatch.ai/docs/ai-gateway/self-hosting/scaling.md): Replicas, autoscaling, resource sizing and per-pod caches for the LangWatch AI Gateway.
 
 ## Cookbooks
 
-- [CI smoke test end-to-end gateway health check](https://langwatch.ai/docs/ai-gateway/cookbooks/ci-smoke-test.md): Provision a short-lived VK, make a real call, verify the response, then revoke. Runs in under 10 seconds.
+- [CI smoke test](https://langwatch.ai/docs/ai-gateway/cookbooks/ci-smoke-test.md): Create a short-lived virtual key, send a real completion through the LangWatch AI Gateway, check the response, then revoke the key.
 - [Migrate from direct provider calls](https://langwatch.ai/docs/ai-gateway/cookbooks/migrate-from-direct.md): Move an application that calls OpenAI, Anthropic or Google directly onto the LangWatch AI Gateway by changing the base URL and the key, then add budgets and routing without touching the code again.
 - [Migrate from Portkey](https://langwatch.ai/docs/ai-gateway/cookbooks/migrate-from-portkey.md): Map Portkey virtual keys, API keys, configs, caching, guardrails and metadata to their LangWatch AI Gateway equivalents and move an application over with a base URL change.
 - [Migrate from LiteLLM](https://langwatch.ai/docs/ai-gateway/cookbooks/migrate-from-litellm.md): Map LiteLLM proxy keys, model lists, budgets, end-user ids and fallbacks to their LangWatch AI Gateway equivalents and move an application over with a base URL change.
-- [Credential-leak incident response](https://langwatch.ai/docs/ai-gateway/cookbooks/credential-leak-incident.md): End-to-end playbook for when a virtual key (or the underlying provider credential) has leaked, containment, communication, rotation, and post-incident forensics.
-- [Multi-tenant SaaS reseller pattern](https://langwatch.ai/docs/ai-gateway/cookbooks/multi-tenant-reseller.md): Provision per-customer virtual keys and budgets from your application backend, audit everything, and bill accurately.
-- [Cache-control rollout](https://langwatch.ai/docs/ai-gateway/cookbooks/cache-control-rollout.md): Force, disable, or override cache behaviour for specific virtual keys, models, or traffic classes without changing any client code.
-- [Prometheus alert rules](https://langwatch.ai/docs/ai-gateway/cookbooks/prometheus-alerts.md): Production-ready PromQL alert rules for the LangWatch AI Gateway.
-- [Grafana dashboard](https://langwatch.ai/docs/ai-gateway/cookbooks/grafana-dashboard.md): Importable Grafana dashboard JSON for the LangWatch AI Gateway, request rate, provider health, auth cache, budget, guardrail, streaming, and routing.
-- [Production runbook](https://langwatch.ai/docs/ai-gateway/cookbooks/production-runbook.md): Diagnose p99 spikes, goroutine leaks, memory growth, and other "why is the gateway slow?" incidents using the loopback-bound pprof admin listener.
+- [Credential-leak incident response](https://langwatch.ai/docs/ai-gateway/cookbooks/credential-leak-incident.md): What to do when a LangWatch AI Gateway virtual key leaks, from containment to rotation and the audit trail afterwards.
+- [Prometheus alert rules](https://langwatch.ai/docs/ai-gateway/cookbooks/prometheus-alerts.md): A PromQL ruleset for the LangWatch AI Gateway, covering reliability, provider health, budget enforcement and the auth cache.
+- [Grafana dashboard](https://langwatch.ai/docs/ai-gateway/cookbooks/grafana-dashboard.md): An importable Grafana dashboard for the LangWatch AI Gateway, covering request health, provider health, the auth cache, budgets, guardrails, streaming and the drain.
 
 # AI Governance
 
 ## Get Started
 
-- [AI Governance Overview](https://langwatch.ai/docs/ai-governance/overview.md): A personal tool home for developers and a governance home for admins.
+- [AI Governance](https://langwatch.ai/docs/ai-governance/overview.md): An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
 - [Your first 5 minutes (developer)](https://langwatch.ai/docs/ai-governance/getting-started-developer.md): A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
 - [From zero to first detected anomaly (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, watch their first request land, and write the spend-spike rule that catches the next outlier. Each step links into the deeper admin docs.
 - [Open-core licensing](https://langwatch.ai/docs/ai-governance/open-core-licensing.md): LangWatch is open-core. The Apache 2.0 floor covers Personal Virtual Keys, the AI Tools Portal, Routing Policies, and CLI debugging. Multi-source ingestion, anomaly detection, OCSF, SIEM export, and extended retention require an Enterprise plan.
@@ -547,19 +522,15 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Workspaces & Access
 
 - [Workspaces Personal, Team, Project](https://langwatch.ai/docs/ai-governance/workspaces.md): The three scopes every LangWatch artifact lives in. Personal for you, Team for groups of humans, Project for shared applications. How they nest, how budgets and routing policies attach, and how the workspace switcher in the chrome routes between them.
-- [Members & invites](https://langwatch.ai/docs/ai-governance/members-and-invites.md): Add people to your organization, assign organization roles, scope team memberships, manage invite requests, and self-service per-user sign-in methods. Lives at /settings/members + /settings/authentication.
-- [Roles & permissions](https://langwatch.ai/docs/ai-governance/roles-and-permissions.md): The org-role, team-role, permission catalog and how role bindings stitch them together. Pre-built ADMIN, MEMBER, EXTERNAL, VIEWER roles plus custom roles via the CustomRolePermissions JSON column. Lives at /settings/roles + /settings/role-bindings.
 - [Personas and default landing](https://langwatch.ai/docs/ai-governance/personas.md): LangWatch detects four personas based on org membership + activity signals, and routes each to the home that fits their work, admin to the bird-eye, personal-only user to /me, project-only LLMOps user to their project, mixed user to /me with a workspace switcher.
-- [Audit log](https://langwatch.ai/docs/ai-governance/audit-log.md): Every governance and gateway mutation in one append-only log. Timestamp, actor, action, target kind + ID, project context, IP, and error, searchable by user, action, project, and date range. Lives at /settings/audit-log.
 
 ## Dashboards
 
 - [/governance dashboard](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /governance/*. Available only after the org's setup-state OR-of-flags trips.
-- [Departments](https://langwatch.ai/docs/ai-governance/departments.md): A single-valued accounting dimension for attributing AI spend across people, teams, and projects, including personal AI use. Separate from RBAC; pure accounting.
+- [People](https://langwatch.ai/docs/ai-governance/people.md): Departments group the people, teams and projects of your organization for spend accounting, so every request rolls up to exactly one department, including personal AI use.
 
 ## Privacy
 
-- [Data privacy policy](https://langwatch.ai/docs/ai-governance/data-privacy.md): One scoped, cascading policy that controls which trace content is stored, who can read it, and how PII and secrets are redacted, written once at the organization, department, team, or project level.
 - [No-spy mode (drop conversational content)](https://langwatch.ai/docs/ai-governance/no-spy-mode.md): The privacy posture for organizations that must not store employee conversational content, one Organization rule in the data privacy policy that drops input, output, and system instructions at ingestion while keeping cost and usage metadata.
 
 ## Sources
@@ -1176,7 +1147,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## API Keys
 
-- [Overview](https://langwatch.ai/docs/api-reference/api-keys/overview.md): Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation).
+- [Overview](https://langwatch.ai/docs/api-reference/api-keys/overview.md): Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (bound to organization, team or project scopes, for automation).
 - [List API keys](https://langwatch.ai/docs/api-reference/api-keys/list-api-keys.md)
 - [Create API key](https://langwatch.ai/docs/api-reference/api-keys/create-api-key.md)
 - [Get an API key](https://langwatch.ai/docs/api-reference/api-keys/get-api-key.md)

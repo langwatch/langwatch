@@ -10,6 +10,7 @@ import pytest
 
 import langwatch
 import langwatch.dspy
+from langwatch.http_client import create_client
 from langwatch.dspy import (
     DSPyOptimizer,
     LangWatchGEPACallback,
@@ -26,12 +27,12 @@ class Posts:
         self.statuses: list[int] = []
         self.bodies: list[list[dict]] = []
 
-    def post(self, url, **kwargs):
-        self.bodies.append(json.loads(kwargs["data"]))
-        return httpx.Response(
-            self.statuses.pop(0) if self.statuses else 200,
-            request=httpx.Request("POST", url),
-        )
+    def handle(self, request: httpx.Request) -> httpx.Response:
+        self.bodies.append(json.loads(request.content))
+        return httpx.Response(self.statuses.pop(0) if self.statuses else 200)
+
+    def client(self, **kwargs) -> httpx.Client:
+        return create_client(transport=httpx.MockTransport(self.handle))
 
 
 @pytest.fixture
@@ -44,7 +45,7 @@ def posts(monkeypatch) -> Posts:
     langwatch_dspy.workflow_version_id = None
     langwatch_dspy.reset()
     monkeypatch.setattr(langwatch, "get_api_key", lambda: "key")
-    monkeypatch.setattr(langwatch.dspy.httpx, "post", posts.post)
+    monkeypatch.setattr(langwatch.dspy, "create_client", posts.client)
     monkeypatch.setattr(langwatch.dspy.time, "sleep", lambda seconds: None)
     return posts
 

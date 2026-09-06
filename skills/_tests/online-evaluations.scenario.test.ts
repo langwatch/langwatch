@@ -1,17 +1,14 @@
-import scenario, { type ScenarioExecutionStateLike } from "@langwatch/scenario";
+import scenario, { type ScenarioExecutionStateLike, assertSkillWasRead, bashCommands } from "@langwatch/scenario";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import {
-	assertSkillWasRead,
-	bashCommands,
 	createClaudeCodeAgent,
 	createSkillTestWorkDir,
 	installSkillToWorkDir,
 	removeSkillTestWorkDir,
 	SKILL_TESTS_SET_ID,
-	toolCallFix,
 } from "./helpers/claude-code-adapter";
 import { createSkillJudgeModel } from "./helpers/judge-model";
 
@@ -158,7 +155,6 @@ describe("Online Evaluations Skill", () => {
 								const commands = executedCommands(state);
 							expect(commands).toMatch(/langwatch monitor create/);
 							expect(commands).toMatch(/langwatch monitor (get|list)/);
-							toolCallFix(state);
 							assertSkillWasRead(state, "online-evaluations");
 						},
 						scenario.judge(),
@@ -237,7 +233,6 @@ describe("Online Evaluations Skill", () => {
 					(state) => {
 						const commands = executedCommands(state);
 						expect(commands).not.toMatch(/langwatch monitor create/);
-						toolCallFix(state);
 						assertSkillWasRead(state, "online-evaluations");
 					},
 					scenario.judge(),
