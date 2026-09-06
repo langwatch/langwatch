@@ -72,7 +72,7 @@ With the workspace facts from `code_access`, follow the `code-changes` skill to 
 Then, still through `code-changes`, work on a branch of your own, never on the branch the user has checked out: pick the name from both lists and `git checkout -b langy/<slug> origin/<default>` (a worktree when the tree is dirty), exactly as step 2 of `code-changes` says. On that branch apply two skills to the code:
 
 1. `tracing` for the detected framework, so every call is traced. The docs page is `langwatch docs integration/<python|typescript>/integrations/<framework>`, for example `integration/python/integrations/langgraph`.
-2. `connect-agent`, so the platform can run scenarios against the agent: the connect call with a stable agent name and the environment the process runs in.
+2. `connect-agent`, so the platform can run scenarios against the agent: the connect call with a stable agent name and the environment the process runs in. The connect function is an adapter you write beside the startup code: it calls the app's own function and returns the reply text, or one message, or a list of messages. Never put the decorator on a function the app already has that returns its own result, for example a dict with the output and a few ids: the SDK cannot turn that into a reply, and every turn of the run times out.
 
 Then call `local_langwatch_env` once, with the env file the app loads (`.env` next to the manifest unless the code loads another). The command line writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT there with the user's own login. The key never reaches you: never ask for it, never write it yourself and never read the file back for it.
 
