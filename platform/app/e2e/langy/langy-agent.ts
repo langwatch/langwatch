@@ -593,6 +593,17 @@ export type LangyAdapter = AgentAdapter & {
    * replays.
    */
   resetSession: () => void;
+  /**
+   * Send these parts on the next turn instead of the scenario's own text.
+   *
+   * The guided onboarding kickoff is a user message the app composes, not
+   * words the person typed: a typed part the panel renders as the tour card
+   * beside a text brief the model reads. A scenario that starts on the
+   * kickoff queues the parts and calls `scenario.agent()`; the turn goes
+   * through the same create or continue mutation as every other, and the
+   * override is spent once.
+   */
+  queueNextTurn: (input: { parts: Array<Record<string, unknown>> }) => void;
 };
 
 export function makeLangyAdapter(
@@ -615,6 +626,7 @@ export function makeLangyAdapter(
     toolNames: [],
     toolOutputs: [],
   };
+  let queuedParts: Array<Record<string, unknown>> | null = null;
   const adapter: AgentAdapter = {
     role: AgentRole.AGENT,
     call: async (input: AgentInput): Promise<AgentReturnTypes> => {
@@ -622,10 +634,13 @@ export function makeLangyAdapter(
       // Tool traffic from earlier turns stays out of the product payload: the
       // panel transport sends only the text history, and a role:"tool" message
       // would otherwise reach the API as an empty user message.
-      const messages = input.messages
+      const scriptedMessages = input.messages
         .filter((m: any) => m.role !== "tool")
         .map((m: any) => toTurnMessage(m))
         .filter((m) => m.parts.length > 0 || m.role === "user");
+      const messages: Array<{ role: TurnMessage["role"]; parts: unknown[] }> =
+        queuedParts ? [{ role: "user", parts: queuedParts }] : scriptedMessages;
+      queuedParts = null;
       const turnInput = {
         requestId: crypto.randomUUID(),
         messages,
@@ -683,6 +698,9 @@ export function makeLangyAdapter(
       state.toolCommands.length = 0;
       state.toolNames.length = 0;
       state.toolOutputs.length = 0;
+    },
+    queueNextTurn: ({ parts }: { parts: Array<Record<string, unknown>> }) => {
+      queuedParts = parts;
     },
   });
   return adapterWithState;

@@ -799,7 +799,10 @@ export interface PermissionAsk {
 /** One question card the panel showed, and what the fixture answered. */
 export interface QuestionAsk {
   waitId: string;
-  questions: Array<{ question: string; options?: Array<{ label: string }> }>;
+  questions: Array<{
+    question: string;
+    options?: Array<{ label: string; quiet?: boolean }>;
+  }>;
   answered: Array<{ question: string; selected: string[] }>;
   turnId: string;
 }
@@ -814,11 +817,16 @@ export interface PermissionPolicy {
   fallback?: "allow_once" | "deny";
 }
 
-/** Picks the answer to one question card. Default: the first option. */
+/**
+ * Picks the answer to one question card. Default: the first option.
+ *
+ * It may read the world before it answers: the guided onboarding suite
+ * checks that nothing was created yet while Langy's proposal is still open.
+ */
 export type QuestionAnswerPicker = (question: {
   question: string;
-  options?: Array<{ label: string }>;
-}) => string[];
+  options?: Array<{ label: string; quiet?: boolean }>;
+}) => string[] | Promise<string[]>;
 
 /** One message in the shape the scenario judge reads. */
 export type JudgeMessage =
@@ -873,6 +881,13 @@ export interface ConversationWatcher {
   leaveNextPermissionToTerminal: (match: RegExp) => void;
   /** `connected` and `disconnected` entries, in order. */
   workspaceEvents: Array<{ state: string; name: string; root: string }>;
+  /**
+   * Every `navigate` instruction on the turns the watcher followed, in order.
+   *
+   * A turn the panel starts on its own never passes through the adapter, so
+   * its navigations are readable here and nowhere else.
+   */
+  navigateHrefs: string[];
   /** Every turn the watcher observed, in the order it observed them. */
   turnIds: string[];
   /** The turns the panel started on its own, without a message from the test. */
@@ -1084,6 +1099,7 @@ export function watchLangyConversation({
     root: string;
   }> = [];
   const turnIds: string[] = [];
+  const navigateHrefs: string[] = [];
   const answeredWaits = new Set<string>();
   const watchedTurns = new Set<string>();
   const controller = new AbortController();
@@ -1158,12 +1174,15 @@ export function watchLangyConversation({
     const asked = (
       Array.isArray(entry.questions) ? entry.questions : []
     ) as QuestionAsk["questions"];
-    const answers = asked.map((question) => ({
-      question: question.question,
-      selected:
-        answerQuestion?.(question) ??
-        (question.options?.[0]?.label ? [question.options[0].label] : []),
-    }));
+    const answers: Array<{ question: string; selected: string[] }> = [];
+    for (const question of asked) {
+      answers.push({
+        question: question.question,
+        selected:
+          (await answerQuestion?.(question)) ??
+          (question.options?.[0]?.label ? [question.options[0].label] : []),
+      });
+    }
     const ask: QuestionAsk = {
       waitId,
       questions: asked,
@@ -1203,6 +1222,11 @@ export function watchLangyConversation({
             void answerPermission(entry, turnId);
           } else if (entry.type === "question") {
             void answerQuestionCard(entry, turnId);
+          } else if (
+            entry.type === "navigate" &&
+            typeof entry.href === "string"
+          ) {
+            navigateHrefs.push(entry.href);
           } else if (entry.type === "local_workspace") {
             workspaceEvents.push({
               state: String(entry.state ?? ""),
@@ -1363,6 +1387,7 @@ export function watchLangyConversation({
       leftToTerminal = match;
     },
     workspaceEvents,
+    navigateHrefs,
     turnIds,
     turnsStartedWithoutUs: (knownTurnIds) =>
       turnIds.filter((id) => !knownTurnIds.includes(id)),

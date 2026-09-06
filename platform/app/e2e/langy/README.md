@@ -196,6 +196,65 @@ documented environment path of `resolveCredentials`, and `LANGWATCH_CLI_CONFIG`
 points at a scratch file so the developer's own `~/.langwatch/config.json` is
 never touched.
 
+## The guided onboarding (guided-onboarding-*.scenario.test.ts)
+
+Nine files cover `specs/langy/langy-guided-onboarding.feature`, the
+conversation Langy runs after the guided sign-up: the kickoff message the tour
+sends when it ends, and each path's script from the `guided-onboarding` skill.
+
+| File | What it covers |
+|---|---|
+| `guided-onboarding-coding.scenario.test.ts` | the one command, and the completion recorded |
+| `guided-onboarding-gateway.scenario.test.ts` | the key the tour minted is reused; a skipped tour gets the no-worries line and mints the key once |
+| `guided-onboarding-governance.scenario.test.ts` | the sources question, the pick, the navigate to the sources page |
+| `guided-onboarding-home-offer.scenario.test.ts` | a second kickoff ("Let's set up Gateway then.") into the attached conversation |
+| `guided-onboarding-llmops-share-folder.scenario.test.ts` | code access first, a typed question mid-setup, the folder shared, tracing and the connect call, the proposal, the scenario in the drawer, the run, the suite, the completion |
+| `guided-onboarding-llmops-describe.scenario.test.ts` | "I'd rather describe it", the one line, the second code access ask |
+| `guided-onboarding-llmops-never-connects.scenario.test.ts` | the request runs out, GitHub is offered, nothing is created |
+| `guided-onboarding-llmops-chat-and-failure.scenario.test.ts` | "Chat about this" ends the turn with nothing created; a scenario the agent cannot pass keeps the suite |
+
+`guided-onboarding-fixture.ts` is what they share:
+
+- `seedGuidedOrganization` creates a fresh organization in the guided variant
+  (the picks, the current path, the tour outcome) with one project and the
+  OpenAI provider attached at organization scope as the Langy model, then
+  points the whole suite at that project with `useProject` (config.ts keeps
+  the project id as a live binding for exactly this). Every file seeds its
+  own organization, so one run's scenarios and keys never change what the next
+  run's kickoff finds.
+- `queueGuidedKickoff` builds the kickoff parts the panel sends (the typed
+  `guided-onboarding-kickoff` part beside the text brief, from the app's own
+  `kickoff.ts`) and hands them to `adapter.queueNextTurn`, so the next
+  `scenario.agent()` sends the kickoff through the same create or continue
+  mutation as any message. `attachKickoffConversation` then records the
+  conversation on the organization, which is what the panel does once the
+  transport names it.
+- `GUIDED_LINES` and `GUIDED_OPTIONS` are the skill's verbatim lines and
+  option labels; `saysVerbatim` compares them allowing for curly quotes and
+  wrapping. The judge gets the same lines as criteria, but every verbatim
+  line is also asserted structurally on the stored text, because a judge will
+  accept a paraphrase.
+- The reads: `readGuidedState`, `listProjectScenarios`, `listProjectSuites`,
+  `listVirtualKeys`, `conversationTitle`, `conversationMessages`.
+
+The watcher answers the `question` cards (the proposal, the governance
+sources) through an async picker, so a file can read the world before it
+answers: the share-folder file lists the project's scenarios while the
+proposal is still open and asserts the list is empty. The watcher also records
+every `navigate` instruction of the turns it follows (`navigateHrefs`), which
+is how the scenario editor drawer and the run opening are proved without a
+browser.
+
+The Langy worker runs whatever `langwatch` is first on the PATH the app
+inherited, so the stack under test needs the CLI built from this checkout
+(`pnpm run generate` in `sdks/typescript`, then `pnpm --filter langwatch exec
+tsup`) ahead of any published one, or the `onboarding` commands are missing
+and no path can record its completion.
+
+Run one file per vitest invocation, same as every other suite here, with
+`LANGY_ADMIN_EMAIL` and `LANGY_ADMIN_PASSWORD` naming a user allowed to
+create organizations on the stack.
+
 ## Red team
 
 `langy-redteam.scenario.test.ts` uses `@langwatch/scenario`'s `redTeamCrescendo()`

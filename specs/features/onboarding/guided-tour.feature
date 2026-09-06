@@ -349,3 +349,17 @@ Feature: Guided onboarding tour
     And each carries the path, the step carries its index and target, and the completion carries the duration
     And Skip emits "clicked tour_skip"
     And a replay emits "replayed tour"
+
+  # ============================================================================
+  # End to end, in a real browser (platform/app/e2e/guided-onboarding.spec.ts)
+  # ============================================================================
+
+  @e2e
+  Scenario: the llmops tour runs through its four steps on Next and hands off to the panel
+    Given I just landed from the guided sign-up with Evals & LLM Ops picked first
+    When the tour starts over the navigation
+    Then the caption shows the first step and "1 of 4"
+    When I press Next on each of the four steps
+    Then the spotlight moves onto the Langy panel
+    And the panel shows the "Guided tour" card
+    And the tour is recorded as completed on my organization

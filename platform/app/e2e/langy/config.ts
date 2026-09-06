@@ -6,9 +6,18 @@
 export const APP_BASE =
   process.env.LANGY_APP_URL ??
   "https://app.langy-workspace.langwatch.localhost:1355";
-export const PROJECT_ID = process.env.LANGY_PROJECT_ID ?? "local-dev-project";
-export const PROJECT_SLUG =
+// Live bindings: a suite that seeds its own project (the guided onboarding
+// files create a fresh organization per run) points every helper at it with
+// `useProject`, and each importer reads the current value at call time.
+export let PROJECT_ID = process.env.LANGY_PROJECT_ID ?? "local-dev-project";
+export let PROJECT_SLUG =
   process.env.LANGY_PROJECT_SLUG ?? process.env.LANGY_PROJECT_ID ?? PROJECT_ID;
+
+/** Point the whole suite at another project for the rest of the process. */
+export function useProject({ id, slug }: { id: string; slug: string }): void {
+  PROJECT_ID = id;
+  PROJECT_SLUG = slug;
+}
 export const ADMIN_EMAIL =
   process.env.LANGY_ADMIN_EMAIL ?? "admin@haven.localhost";
 export const ADMIN_PASSWORD =
