@@ -82,6 +82,31 @@ export const CANCELLED_PUSHBACK =
 const STATUS_UNAVAILABLE_PUSHBACK =
   "LangWatch did not answer the code access check. Tell the user in one line and end your turn.";
 
+/**
+ * How long the folder-state read waits out a "not found" on the worker's own
+ * conversation.
+ *
+ * The conversation this worker runs on was accepted before the worker was
+ * created, but the app answers its reads from a projection that is folded
+ * asynchronously, so in the first seconds of a conversation the row may not
+ * be there yet and the read says "not found". Under load that fold has taken
+ * over ten seconds. A "not found" on this worker's own conversation inside
+ * this window means "not yet", never "no such conversation", so `code_access`
+ * repeats the read, and only that read: a 404 on a call envelope still means
+ * the app lost the call, and the folder check behind a lost call is
+ * mid-conversation, long after the fold. After the window the answer is the
+ * usual pushback.
+ */
+export const WORKSPACE_READ_NOT_FOUND_WINDOW_MS = 30_000;
+const WORKSPACE_READ_RETRY_MS = 2_000;
+
+/** The bounded wait for the folder-state read, overridable by tests. */
+export type WorkspaceReadRetry = { windowMs: number; beatMs: number };
+const CODE_ACCESS_READ_RETRY: WorkspaceReadRetry = {
+  windowMs: WORKSPACE_READ_NOT_FOUND_WINDOW_MS,
+  beatMs: WORKSPACE_READ_RETRY_MS,
+};
+
 type BashOutput = {
   exitCode: number | null;
   stdout: string;
@@ -299,6 +324,41 @@ export function renderWorkspaceFacts(workspace: WorkspaceInfo): string {
 }
 
 /**
+ * The folder's state for this worker's own conversation. With `retry`, a
+ * "not found" inside the window is read again, see
+ * `WORKSPACE_READ_NOT_FOUND_WINDOW_MS`; without it, and for any other failure,
+ * the error is thrown as it is.
+ */
+async function readWorkspaceStatus({
+  signal,
+  retry,
+}: {
+  signal?: AbortSignal;
+  retry?: WorkspaceReadRetry;
+}): Promise<WorkspaceStatus> {
+  const path = `/api/langy/local/workspace?conversationId=${encodeURIComponent(conversationId())}`;
+  const deadline = retry === undefined ? 0 : Date.now() + retry.windowMs;
+  for (;;) {
+    try {
+      return await callApp<WorkspaceStatus>({
+        path,
+        method: "GET",
+        signal,
+        timeoutMs: REQUEST_TIMEOUT_MS,
+      });
+    } catch (error) {
+      const notFolded =
+        retry !== undefined &&
+        error instanceof CallLostError &&
+        !signal?.aborted &&
+        Date.now() < deadline;
+      if (!notFolded) throw error;
+      await sleep(retry.beatMs, signal);
+    }
+  }
+}
+
+/**
  * The folder's own state, read from the app. False when the app could not
  * answer at all, so a failed read never claims the folder is there.
  */
@@ -308,12 +368,7 @@ async function isWorkspaceConnected({
   signal?: AbortSignal;
 }): Promise<boolean> {
   try {
-    const status = await callApp<WorkspaceStatus>({
-      path: `/api/langy/local/workspace?conversationId=${encodeURIComponent(conversationId())}`,
-      method: "GET",
-      signal,
-      timeoutMs: REQUEST_TIMEOUT_MS,
-    });
+    const status = await readWorkspaceStatus({ signal });
     return status.connected === true;
   } catch {
     return false;
@@ -413,8 +468,11 @@ export async function runLocalCall({
 export async function readCodeAccess({
   signal,
   offerDescribe = false,
+  retry = CODE_ACCESS_READ_RETRY,
 }: {
   signal?: AbortSignal;
+  /** The bounded wait for the folder-state read; the default is the window above. */
+  retry?: WorkspaceReadRetry;
   /**
    * The card also offers "I'd rather describe it". A skill that asks for it
    * has already said its opener, so the turn ends on the card without a word.
@@ -424,12 +482,7 @@ export async function readCodeAccess({
   const conversation = conversationId();
   let status: WorkspaceStatus;
   try {
-    status = await callApp<WorkspaceStatus>({
-      path: `/api/langy/local/workspace?conversationId=${encodeURIComponent(conversation)}`,
-      method: "GET",
-      signal,
-      timeoutMs: REQUEST_TIMEOUT_MS,
-    });
+    status = await readWorkspaceStatus({ signal, retry });
   } catch (error) {
     if (error instanceof CallCancelledError) throw error;
     return STATUS_UNAVAILABLE_PUSHBACK;

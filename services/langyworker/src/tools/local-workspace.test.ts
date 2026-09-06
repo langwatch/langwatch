@@ -6,6 +6,7 @@ import {
   CALL_LOST_PUSHBACK,
   OFFLINE_PUSHBACK,
   createLocalWorkspaceExtension,
+  readCodeAccess,
 } from "./local-workspace.js";
 import { createTurnContext, type TurnContext } from "./turn-context.js";
 
@@ -370,6 +371,74 @@ describe("the local workspace tools", () => {
       expect(
         calls.some((call) => call.url.endsWith("/api/langy/local/calls/call_6/cancel")),
       ).toBe(true);
+    });
+  });
+
+  describe("when code access is asked for in the conversation's first seconds", () => {
+    /** One app whose workspace read says "not found" a given number of times first. */
+    function appWithLaggingProjection(notFoundReads: number) {
+      let workspaceReads = 0;
+      const fetchMock = vi.fn(async (url: string) => {
+        const path = new URL(url).pathname;
+        if (path === "/api/langy/local/workspace") {
+          workspaceReads += 1;
+          if (workspaceReads <= notFoundReads) {
+            return {
+              ok: false,
+              status: 404,
+              json: async () => ({ error: { code: "langy_conversation_not_found" } }),
+            };
+          }
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              connected: false,
+              codeAccessPreference: null,
+              github: { installed: false },
+            }),
+          };
+        }
+        if (path === "/api/langy/local/requests") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              request: { id: "req_1", expiresAt: "2026-09-03T10:00:00.000Z" },
+              command: "npx langwatch@latest langy --share-control",
+            }),
+          };
+        }
+        throw new Error(`no fake answer for ${path}`);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      return { fetchMock, workspaceReads: () => workspaceReads };
+    }
+
+    /** @scenario "A code access check that beats the conversation projection waits for it" */
+    it("repeats the read until the projection answers, then raises the card", async () => {
+      const app = appWithLaggingProjection(2);
+
+      const text = await readCodeAccess({ retry: { windowMs: 2_000, beatMs: 5 } });
+
+      expect(app.workspaceReads()).toBe(3);
+      expect(text.startsWith("The code access card is shown to the user.")).toBe(true);
+      expect(text).toContain("npx langwatch@latest langy --share-control");
+    });
+
+    /** @scenario "A code access check whose conversation never appears says the app did not answer" */
+    it("gives the usual pushback once the window is over", async () => {
+      const app = appWithLaggingProjection(Number.MAX_SAFE_INTEGER);
+
+      const text = await readCodeAccess({ retry: { windowMs: 40, beatMs: 5 } });
+
+      expect(app.workspaceReads()).toBeGreaterThan(1);
+      expect(text).toBe(
+        "LangWatch did not answer the code access check. Tell the user in one line and end your turn.",
+      );
+      expect(
+        app.fetchMock.mock.calls.some(([url]) => String(url).includes("/api/langy/local/requests")),
+      ).toBe(false);
     });
   });
 

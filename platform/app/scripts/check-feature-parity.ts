@@ -458,7 +458,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-command-bar-activation.feature",
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
-  "specs/langy/langy-event-sourced-conversations.feature",
   "specs/langy/langy-panel-fold-motion.feature",
   "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",

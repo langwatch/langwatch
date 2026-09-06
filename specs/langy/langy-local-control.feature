@@ -253,6 +253,23 @@ Feature: Langy works in a folder shared from the developer's machine
       Then the tool result says no folder is connected and names the code access step
       And Langy asks for code access instead of retrying
 
+    # The worker's own conversation was accepted before the worker existed,
+    # but the app reads it from a projection folded afterwards; the first
+    # code access check of a conversation can land before that fold.
+    @unit
+    Scenario: A code access check that beats the conversation projection waits for it
+      Given a worker on a conversation whose projection row has not been folded yet
+      When Langy asks for code access and the app answers not found
+      Then the worker reads the folder state again until the app answers
+      And the code access card is raised as usual
+
+    @unit
+    Scenario: A code access check whose conversation never appears says the app did not answer
+      Given a worker whose conversation the app keeps answering not found for
+      When Langy asks for code access and the wait runs out
+      Then the tool result says the app did not answer the code access check
+      And no control request is created
+
     @unit
     Scenario: A command stopped at its time limit says the limit and how to raise it
       Given a connected folder

@@ -45,6 +45,7 @@ function makeConversationRepo(
     findActiveOwnedIds: vi.fn().mockResolvedValue([]),
     findPendingHandoff: vi.fn().mockResolvedValue(null),
     findRunToken: vi.fn().mockResolvedValue(null),
+    hasAdmittedTurn: vi.fn().mockResolvedValue(false),
     turnExists: vi.fn().mockResolvedValue(false),
     ...overrides,
   };
