@@ -468,7 +468,13 @@ func TestControlPlaneMaterialiserEmitsTheKeyExpiry(t *testing.T) {
 	if !regexp.MustCompile(`expires_at:\s*expiresAtWire\(\s*vk\.expiresAt\s*\)`).MatchString(src) {
 		t.Error("gateway-config-materialisation.service.ts no longer emits expires_at from the key's own date")
 	}
-	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.getTime\(\)\s*/\s*1000\s*\)`).MatchString(src) {
-		t.Error("gateway-config-materialisation.service.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
+
+	// expiresAtWire's own seconds conversion now lives in the shared
+	// wire-rules module the materialiser calls through to.
+	rulesSrc := readControlPlaneSource(t,
+		"packages", "features", "gateway", "server", "src", "rules",
+		"gateway-config-wire.rules.ts")
+	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.getTime\(\)\s*/\s*1000\s*\)`).MatchString(rulesSrc) {
+		t.Error("gateway-config-wire.rules.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
 	}
 }

@@ -18,6 +18,7 @@ vi.mock("@langwatch/observability", () => ({
     error: vi.fn(),
     debug: vi.fn(),
   }),
+  createWarnThrottle: () => ({ claim: () => 0, reset: () => {} }),
 }));
 
 describe("NurturingService app wiring", () => {

@@ -162,8 +162,6 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 		"gateway-config-materialisation.service.ts")
 
 	for _, needle := range []string{
-		`provider_key: b.providerKey`,
-		`scope_id: bucketScopeId`,
 		`principal_id`,
 		`providers_allowed: config.providersAllowed`,
 		`routing_mode: routingModeToWire(vk.routingMode)`,
@@ -173,6 +171,21 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 	} {
 		if !strings.Contains(src, needle) {
 			t.Errorf("gateway-config-materialisation.service.ts no longer emits %q: the bundle contract has drifted", needle)
+		}
+	}
+
+	// The per-bucket wire shape (provider_key, scope_id) was extracted into
+	// the shared wire-rules module; read it there rather than off the
+	// materialiser, which now only calls through to it.
+	rulesSrc := readControlPlaneSource(t,
+		"packages", "features", "gateway", "server", "src", "rules",
+		"gateway-config-wire.rules.ts")
+	for _, needle := range []string{
+		`provider_key: b.providerKey`,
+		`scope_id: bucketScopeId`,
+	} {
+		if !strings.Contains(rulesSrc, needle) {
+			t.Errorf("gateway-config-wire.rules.ts no longer emits %q: the bundle contract has drifted", needle)
 		}
 	}
 	// routing_mode none must arrive with a one-attempt fallback budget so
@@ -190,14 +203,14 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 // group bucket as <groupId>:<userId>.
 func TestControlPlaneBucketSeparatorsAreStable(t *testing.T) {
 	src := readControlPlaneSource(t,
-		"packages", "features", "gateway", "server", "src", "adapters",
-		"gateway-bucket-scope.adapter.ts")
+		"packages", "features", "gateway", "contract", "src",
+		"gateway.budget-bucket-scope.ts")
 
 	if !strings.Contains(src, `const PROVIDER_BUCKET_SEPARATOR = "|provider:"`) {
-		t.Error("gateway-bucket-scope.adapter.ts changed the provider bucket separator")
+		t.Error("gateway.budget-bucket-scope.ts changed the provider bucket separator")
 	}
 	if !strings.Contains(src, "`${groupId}:${principalUserId}`") {
-		t.Error("gateway-bucket-scope.adapter.ts changed the group bucket key shape")
+		t.Error("gateway.budget-bucket-scope.ts changed the group bucket key shape")
 	}
 	// A dispatch with no reported provider must debit unfiltered budgets
 	// only: attribution by guess mis-bills a governance control.

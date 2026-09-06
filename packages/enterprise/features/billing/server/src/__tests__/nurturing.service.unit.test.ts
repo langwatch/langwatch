@@ -10,6 +10,7 @@ vi.mock("@langwatch/observability", () => ({
     error: vi.fn(),
     debug: vi.fn(),
   }),
+  createWarnThrottle: () => ({ claim: () => 0, reset: () => {} }),
 }));
 class FakeErrorReporter extends BillingErrorReporter {
   private constructor(readonly capture = vi.fn()) {

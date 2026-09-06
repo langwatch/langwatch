@@ -19,6 +19,7 @@ vi.mock("@langwatch/observability", () => ({
     info: vi.fn(),
     debug: vi.fn(),
   }),
+  createWarnThrottle: () => ({ claim: () => 0, reset: () => {} }),
 }));
 
 import {

@@ -18,6 +18,7 @@ import type { SocketLike } from "../../../../agent/transport";
 import type { ApprovalCard, ApprovalPrompt, TerminalApproval } from "../approval";
 import { startLangySession, type LangySession } from "../session";
 import { createUi, type UiWriter } from "../ui";
+import { stripAnsi } from "../../../utils/formatting";
 
 const CONVERSATION = {
   id: "conv_1",
@@ -147,7 +148,7 @@ describe("given a folder connected to a Langy conversation", () => {
   let lines: string[];
   let session: LangySession;
 
-  const writer: UiWriter = { line: (text) => lines.push(text) };
+  const writer: UiWriter = { line: (text) => lines.push(stripAnsi(text)) };
 
   const start = (options: { withoutGit?: boolean; approvals?: ApprovalPrompt } = {}) => {
     socket = new FakeSocket();
@@ -817,7 +818,7 @@ describe("given a folder whose connection drops while Langy is working", () => {
       sessionKey: "sk-lw-langy-session",
       workspace: { root, name: path.basename(root), os: "test" },
       conversation: CONVERSATION,
-      ui: createUi({ line: (text) => lines.push(text) }),
+      ui: createUi({ line: (text) => lines.push(stripAnsi(text)) }),
       socketFactory: () => {
         const socket = new FakeSocket();
         sockets.push(socket);

@@ -398,9 +398,9 @@ describe("createGovernanceRestApp", () => {
         body: JSON.stringify({ source_type: "valid_source" }),
       });
 
-      expect(response.status).toBe(400);
-      const body = (await response.json()) as { error: { code: string } };
-      expect(body.error.code).toBe("validation_error");
+      expect(response.status).toBe(422);
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe("validation_error");
       expect(templateCreateOrg).not.toHaveBeenCalled();
     });
   });
