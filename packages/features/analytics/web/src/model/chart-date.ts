@@ -1,9 +1,9 @@
-import { format } from "date-fns";
+import { format } from "@langwatch/time";
 
 /**
  * Formats a date string for chart axis ticks and tooltips.
  * Returns empty string for falsy or unparseable values so recharts
- * never receives an invalid Date (which would crash date-fns format).
+ * never receives an invalid Date, which the formatter rejects.
  */
 export const formatChartDate = ({
   date,

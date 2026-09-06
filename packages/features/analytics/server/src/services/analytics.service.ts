@@ -1,5 +1,5 @@
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
-import { addDays, differenceInCalendarDays } from "date-fns";
+import { addDays, differenceInCalendarDays } from "@langwatch/time";
 import {
   analyticsEvaluationReadInputSchema,
   analyticsEvaluationRollupAppendBatchInputSchema,

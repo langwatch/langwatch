@@ -1,0 +1,40 @@
+{
+  "name": "@langwatch/time",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The one clock LangWatch reads: date and time arithmetic, calendar differences, relative-time wording and the date patterns the screens print, over Temporal.",
+  "keywords": [
+    "langwatch",
+    "temporal",
+    "time"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "src"
+  ],
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./polyfill": {
+      "types": "./src/polyfill.ts",
+      "default": "./src/polyfill.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "temporal-polyfill": "^1.0.4"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

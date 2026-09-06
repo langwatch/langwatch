@@ -22,8 +22,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
-    "date-fns": "^4.4.0"
+    "@langwatch/ui-host": "workspace:*"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",

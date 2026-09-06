@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2022"],
+    "types": [],
+    "noUncheckedIndexedAccess": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/time.tsbuildinfo",
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/__tests__/**"]
+}

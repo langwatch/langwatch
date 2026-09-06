@@ -19,7 +19,7 @@
  * relative.
  */
 
-import { differenceInCalendarDays, startOfDay, subDays } from "date-fns";
+import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";
 
 /** The window a read is taken over. */
 export type AuditPeriod = { startDate: Date; endDate: Date };

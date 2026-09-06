@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
-import { format } from "date-fns";
+import { format } from "@langwatch/time";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { LuShield } from "react-icons/lu";

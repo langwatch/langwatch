@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "@langwatch/time";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {

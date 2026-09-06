@@ -5,7 +5,7 @@
  * dataset with entry/column counts and last-edit date.
  */
 import { Box, chakra, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@langwatch/time";
 import { useMemo, useState } from "react";
 import { Database, Search } from "lucide-react";
 

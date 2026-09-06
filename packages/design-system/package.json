@@ -279,7 +279,6 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "date-fns": "^4.4.0",
     "lodash-es": "^4.17.21",
     "lucide-react": "^1.22.0",
     "motion": "^12.42.2",

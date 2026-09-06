@@ -9,7 +9,7 @@ import {
   differenceInWeeks,
   format,
   formatDistanceToNow,
-} from "date-fns";
+} from "@langwatch/time";
 
 /** Beyond this, an absolute date reads better than "27 days ago". */
 const RELATIVE_WINDOW_HOURS = 24;

@@ -1,5 +1,5 @@
 import { Box, Button, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@langwatch/time";
 import {
   Bot,
   Code,

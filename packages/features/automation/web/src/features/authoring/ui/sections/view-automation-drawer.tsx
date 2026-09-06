@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { differenceInMinutes, differenceInSeconds } from "date-fns";
+import { differenceInMinutes, differenceInSeconds } from "@langwatch/time";
 import { parseAutomationFiltersWire } from "@langwatch/automation-contract";
 import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";

@@ -1,5 +1,5 @@
 import { Box, Circle, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@langwatch/time";
 import { MoreVertical, Pencil } from "lucide-react";
 import numeral from "numeral";
 import { useMemo } from "react";

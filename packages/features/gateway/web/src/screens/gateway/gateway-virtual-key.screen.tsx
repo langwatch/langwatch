@@ -14,7 +14,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keepPreviousData } from "../../model/keep-previous-data";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@langwatch/time";
 import {
   ArrowLeft,
   Bird,

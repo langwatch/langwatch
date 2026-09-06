@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { addDays, differenceInCalendarDays } from "date-fns";
+import { addDays, differenceInCalendarDays } from "@langwatch/time";
 import type {
   AnalyticsEvaluationRow,
   AnalyticsTable,

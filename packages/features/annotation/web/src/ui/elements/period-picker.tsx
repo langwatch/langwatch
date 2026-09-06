@@ -14,7 +14,7 @@
 
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
-import { format } from "date-fns";
+import { format } from "@langwatch/time";
 import { Calendar, ChevronDown } from "lucide-react";
 import {
   ANNOTATION_PERIOD_PRESETS,

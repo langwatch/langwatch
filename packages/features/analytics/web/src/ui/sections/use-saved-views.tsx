@@ -4,7 +4,7 @@
  * endpoints.
  */
 
-import { differenceInCalendarDays, subDays } from "date-fns";
+import { differenceInCalendarDays, subDays } from "@langwatch/time";
 import type React from "react";
 import {
   createContext,

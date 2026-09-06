@@ -3,7 +3,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { formatDistanceStrict } from "date-fns";
+import { formatDistanceStrict } from "@langwatch/time";
 import type { ConnectedAgentView } from "@langwatch/agent-contract";
 
 /** The scope a development card belongs to: a person, or a machine. */

@@ -13,7 +13,7 @@
  * to find this the hard way and the pin beside it says so.
  */
 
-import { differenceInCalendarDays, startOfDay, subDays } from "date-fns";
+import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";
 
 /** Date range used for time-based filtering across the analytics pages. */
 export type AnalyticsPeriod = { startDate: Date; endDate: Date };

@@ -5,7 +5,7 @@
  */
 
 import { Box, Button, Checkbox, chakra, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { format } from "date-fns";
+import { format } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
 import { TagList } from "../../../elements/tag-list";

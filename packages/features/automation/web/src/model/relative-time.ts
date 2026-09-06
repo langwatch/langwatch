@@ -2,7 +2,7 @@
  * How long ago something happened, in the two shapes this family prints.
  *
  * A family-local copy of `platform/app`'s `~/utils/formatTimeAgo`, taken rather
- * than promoted: it is nine lines of `date-fns` around a threshold, and the
+ * than promoted: it is nine lines of `@langwatch/time` around a threshold, and the
  * application still has half a dozen callers that deletes-only forbids
  * repointing. The same call the me family made for its own copies.
  */
@@ -14,7 +14,7 @@ import {
   differenceInWeeks,
   format,
   formatDistanceToNow,
-} from "date-fns";
+} from "@langwatch/time";
 
 /**
  * "12 minutes ago" while it is recent, an absolute stamp once it is not.

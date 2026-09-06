@@ -121,6 +121,7 @@
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/stored-object-server": "workspace:*",
     "@langwatch/suite-server": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/topic-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

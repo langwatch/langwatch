@@ -19,7 +19,7 @@ import type {
 import { useRunPlanCancel } from "./use-run-plan-cancel";
 import { useRunPlanRunDialog } from "./use-run-plan-run-dialog";
 import { useRunPlanViewMode } from "./use-run-plan-view-mode";
-import { format } from "date-fns";
+import { format } from "@langwatch/time";
 import { useCallback, useMemo, useState } from "react";
 import type { RunActor, ScenarioRunData } from "@langwatch/scenario-contract";
 import { api } from "../../../../behavior/scenario-api";

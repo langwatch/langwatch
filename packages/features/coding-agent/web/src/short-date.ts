@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format } from "@langwatch/time";
 
 /**
  * A date as a table cell wants it: "Aug 3" within the current year, "Aug 3,

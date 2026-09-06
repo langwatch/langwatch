@@ -13,7 +13,7 @@ import {
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "@langwatch/experiment-web/surfaces/workbench-types";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 

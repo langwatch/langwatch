@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { format } from "date-fns";
+import { format } from "@langwatch/time";
 import { Check, Clock, Copy } from "lucide-react";
 import type React from "react";
 import { Fragment, useEffect, useMemo, useState } from "react";

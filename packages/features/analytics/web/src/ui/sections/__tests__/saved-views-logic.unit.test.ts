@@ -1,4 +1,4 @@
-import { subDays } from "date-fns";
+import { subDays } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import type { FilterField } from "../../../model/filters/types";
 import {

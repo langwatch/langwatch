@@ -46,6 +46,7 @@
     "@langwatch/stored-object-server": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
     "@langwatch/user-server": "workspace:*",
     "ioredis": "5.10.1",

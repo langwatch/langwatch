@@ -1,4 +1,4 @@
-import { differenceInDays, isToday, isYesterday } from "date-fns";
+import { differenceInDays, isToday, isYesterday } from "@langwatch/time";
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { MAX_RECENT_ITEMS } from "../model/command-bar-constants";

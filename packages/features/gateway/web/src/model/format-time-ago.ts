@@ -6,7 +6,7 @@
  * for its own callers and dies with them.
  */
 
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "@langwatch/time";
 
 export const formatTimeAgo = (timestamp: number, dateFormat = "dd/MMM HH:mm", maxHours = 24) => {
   const timestampDate = timestamp ? new Date(timestamp) : undefined;

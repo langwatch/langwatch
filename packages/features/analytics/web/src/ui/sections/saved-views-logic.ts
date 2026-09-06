@@ -5,7 +5,7 @@
  * importing React or server-side dependencies (Prisma, registry).
  */
 
-import { differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays } from "@langwatch/time";
 import type { FilterField } from "../../model/filters/types";
 import type { FilterParam } from "./use-filter-params";
 

@@ -20,7 +20,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { UiSlot } from "@langwatch/ui-host/slots";
 import type { EnrichedAuditLog } from "@langwatch/organization-contract";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@langwatch/time";
 import { ArrowLeft, Download, Search } from "lucide-react";
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 import Parse from "papaparse";

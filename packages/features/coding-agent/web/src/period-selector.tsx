@@ -1,6 +1,6 @@
 import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
-import { differenceInCalendarDays, format, startOfDay, subDays } from "date-fns";
+import { differenceInCalendarDays, format, startOfDay, subDays } from "@langwatch/time";
 import { ChevronDown } from "lucide-react";
 import { LuCalendar } from "react-icons/lu";
 import { Popover } from "@langwatch/design-system/popover";

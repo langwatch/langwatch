@@ -39,7 +39,6 @@
     "@langwatch/ui-host": "workspace:*",
     "@paper-design/shaders-react": "^0.0.76",
     "@tanstack/react-query": "5.101.4",
-    "date-fns": "^4.1.0",
     "lodash-es": "^4.17.21",
     "lucide-react": "^1.22.0",
     "motion": "^12.42.2",

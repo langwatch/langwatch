@@ -3,7 +3,7 @@
  * request's own dates and nothing else: it takes a start and an end, and answers where the
  * window immediately before them begins.
  */
-import { addDays, differenceInCalendarDays } from "date-fns";
+import { addDays, differenceInCalendarDays } from "@langwatch/time";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;

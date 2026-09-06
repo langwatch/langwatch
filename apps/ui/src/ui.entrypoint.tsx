@@ -4,6 +4,9 @@
  * named in `core-application-feature-extraction-plan.md`.
  */
 
+// Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
+import "@langwatch/time/polyfill";
+
 import type { ReactNode } from "react";
 import { configureDocsRuntime } from "@langwatch/config/docs-url";
 import { registerChunkReloadListener } from "./behavior/chunk-reload";

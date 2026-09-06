@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays } from "@langwatch/time";
 import type {
   Period,
   RelativePresetKey,

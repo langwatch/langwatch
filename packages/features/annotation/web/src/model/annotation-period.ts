@@ -17,7 +17,7 @@
  * analytics surfaces read and no annotation list does.
  */
 
-import { differenceInCalendarDays, startOfDay, subDays } from "date-fns";
+import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";
 
 /** Date range used for time-based filtering. */
 export type AnnotationPeriod = { startDate: Date; endDate: Date };

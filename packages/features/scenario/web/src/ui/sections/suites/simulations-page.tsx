@@ -3,7 +3,7 @@
  */
 
 import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
-import { subDays } from "date-fns";
+import { subDays } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DashboardLayout } from "../dashboard-layout";

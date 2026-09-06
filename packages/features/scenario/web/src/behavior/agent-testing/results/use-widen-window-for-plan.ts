@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { subDays } from "date-fns";
+import { subDays } from "@langwatch/time";
 import { useEffect } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import { widenedWindowDays } from "./run-plans";

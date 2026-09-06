@@ -80,8 +80,8 @@
     "@chakra-ui/react": "^3.36.0",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
-    "date-fns": "^4.4.0",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
