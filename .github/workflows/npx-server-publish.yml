@@ -38,7 +38,7 @@ on:
     types: [published]
   workflow_dispatch:
 
-# A publish run drains — see publish-docker-app. This job uploads monobinaries
+# A publish run drains — see publish-docker-app. This job uploads service binaries
 # onto the GitHub release AND publishes to npm, so a cancelled run can leave a
 # release carrying a partial set of assets that nothing reconciles.
 concurrency:
@@ -46,8 +46,15 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write # for creating/updating GH release with aigateway monobinaries
+  contents: write # for creating/updating GH release with service binaries
   id-token: write # for npm provenance + Trusted Publishers OIDC exchange
+
+env:
+  # Kept in lockstep with Dockerfile.langyagent and
+  # cli-binary-publish.yml. The checksum pins the compiler that produces the
+  # executable fetched by the server installer.
+  BUN_VERSION: 1.3.13
+  BUN_LINUX_X64_SHA256: 79c0771fa8b92c33aae41e15a0e0d307ea99d0e2f00317c71c6c53237a78e25a
 
 jobs:
   publish:
@@ -118,6 +125,21 @@ jobs:
           go-version-file: "go.mod"
           cache: true
 
+      - name: Install pinned Bun compiler
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          curl -fsSL --retry 3 --retry-all-errors -o "${tmp}/bun.zip" \
+            "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip"
+          echo "${BUN_LINUX_X64_SHA256}  ${tmp}/bun.zip" | sha256sum -c -
+          unzip -q "${tmp}/bun.zip" -d "${tmp}"
+          mkdir -p "${HOME}/.bun/bin"
+          mv "${tmp}/bun-linux-x64/bun" "${HOME}/.bun/bin/bun"
+          chmod +x "${HOME}/.bun/bin/bun"
+          rm -rf "${tmp}"
+          echo "${HOME}/.bun/bin" >> "$GITHUB_PATH"
+          "${HOME}/.bun/bin/bun" --version
+
       # Build the aigateway monobinary for all 4 platforms and create a
       # GitHub release with them attached at tag v$VERSION. The aigateway
       # predep at runtime fetches:
@@ -146,7 +168,35 @@ jobs:
         env:
           VERSION: ${{ steps.versions.outputs.version }}
 
-      - name: Create GH release v$VERSION with aigateway binaries
+      # The Langy manager is part of the Go monobinary, but every conversation
+      # runs in a separate Bun-compiled worker. The server predep downloads the
+      # asset whose suffix exactly matches its SupportedPlatform value.
+      - name: Build langy-worker binaries (6 platforms)
+        working-directory: services/langyworker
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/_pack"
+          for target in bun-linux-x64 bun-linux-arm64 bun-linux-x64-musl bun-linux-arm64-musl bun-darwin-x64 bun-darwin-arm64; do
+            platform="${target#bun-}"
+            echo "→ building langy-worker-${platform}"
+            bun run scripts/build-binary.ts \
+              --target="${target}" \
+              --outfile="$GITHUB_WORKSPACE/_pack/langy-worker-${platform}"
+          done
+          ls -lh "$GITHUB_WORKSPACE"/_pack/langy-worker-*
+
+      - name: Smoke-test native langy-worker
+        run: |
+          set -euo pipefail
+          expected="$(node -p "require('./services/langyworker/package.json').version")"
+          actual="$(_pack/langy-worker-linux-x64 --version)"
+          echo "langy-worker --version → ${actual}"
+          if [ "${actual}" != "${expected}" ]; then
+            echo "✗ langy-worker version mismatch: expected ${expected}, got ${actual}" >&2
+            exit 1
+          fi
+
+      - name: Create GH release v$VERSION with server binaries
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.versions.outputs.version }}
@@ -155,16 +205,42 @@ jobs:
           tag="v$VERSION"
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "→ release $tag exists, uploading binaries (clobber)"
-            gh release upload "$tag" _pack/aigateway-* --clobber
+            gh release upload "$tag" _pack/aigateway-* _pack/langy-worker-* --clobber
           else
             echo "→ creating release $tag"
             prerelease_flag=""
             if [[ "$VERSION" == *"-"* ]]; then prerelease_flag="--prerelease"; fi
             gh release create "$tag" \
               --title "v$VERSION" \
-              --notes "@langwatch/server@$VERSION — aigateway monobinaries" \
+              --notes "@langwatch/server@$VERSION — service binaries" \
               $prerelease_flag \
-              _pack/aigateway-*
+              _pack/aigateway-* _pack/langy-worker-*
+          fi
+
+      - name: Verify all server release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release view "v$VERSION" --json assets --jq '.assets[].name' | sort > /tmp/server-assets.txt
+          cat /tmp/server-assets.txt
+
+          missing=0
+          for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            if ! grep -Fxq "aigateway-${platform}" /tmp/server-assets.txt; then
+              echo "missing release asset: aigateway-${platform}" >&2
+              missing=1
+            fi
+          done
+          for platform in linux-x64 linux-arm64 linux-x64-musl linux-arm64-musl darwin-x64 darwin-arm64; do
+            if ! grep -Fxq "langy-worker-${platform}" /tmp/server-assets.txt; then
+              echo "missing release asset: langy-worker-${platform}" >&2
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
           fi
 
       - name: Build @langwatch/server CLI
@@ -194,7 +270,7 @@ jobs:
         run: |
           mkdir -p _pack
           bash dev/scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
-          tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
+          tarball="$(find "$GITHUB_WORKSPACE/_pack" -maxdepth 1 -name 'langwatch-server-*.tgz' -print -quit)"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
           echo "tarball size:"; ls -lh "$tarball"
           echo ""

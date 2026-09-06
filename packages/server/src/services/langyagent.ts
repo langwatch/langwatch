@@ -45,15 +45,6 @@ const UNSAFE_ISOLATION_ENVIRONMENTS = new Set(["local", "development", "dev", "t
  * conversation. Same `cmd/service` mono-binary as the gateway and the NLP
  * engine, dispatched as `langyagent`.
  *
- * KNOWN GAP: nothing here installs the `langy-worker` binary the manager
- * spawns. The opencode predep used to put a worker runtime in ~/.langwatch/bin;
- * ADR-131 deleted it and no predep replaced it, so the manager boots and
- * reports healthy and the first message fails at spawn with exec-not-found.
- * This predates ADR-131 — the pi harness has been the default for a while and
- * already spawned `langy-worker` — but the deletion removed the last artefact
- * that made the omission visible. Fixing it means either a `langy-worker`
- * predep or setting LANGY_PI_WORKER_BINARY_PATH from here.
- *
  * Health: /health.
  *
  * WHAT IS DIFFERENT ABOUT A LAPTOP. In a cluster this pod runs under a
@@ -77,6 +68,8 @@ export async function startLangyagent(
 
   const binary = ctx.predeps.aigateway?.resolvedPath;
   if (!binary) throw new Error("aigateway/langyagent monobinary predep not resolved");
+  const workerBinary = ctx.predeps["langy-worker"]?.resolvedPath;
+  if (!workerBinary) throw new Error("langy-worker predep not resolved");
 
   // Per-conversation homes and the shared workspace. The manager's defaults
   // point at the container image's /workspace, which does not exist here.
@@ -102,6 +95,7 @@ export async function startLangyagent(
         PORT: String(ctx.ports.langyagent),
         SESSIONS_ROOT: sessionsRoot,
         LANGY_WORKSPACE_ROOT: workspaceRoot,
+        LANGY_PI_WORKER_BINARY_PATH: workerBinary,
         // Workers spawn as the user who ran the installer, sharing one
         // identity. A laptop install is single-tenant by construction, and the
         // per-uid posture needs root plus five capabilities it does not have.
@@ -115,9 +109,8 @@ export async function startLangyagent(
         LANGY_MAX_WORKERS: envFromFile.LANGY_MAX_WORKERS ?? "2",
         LANGY_WORKER_IDLE_MS: envFromFile.LANGY_WORKER_IDLE_MS ?? "120000",
         // The `langwatch` CLI lives in ~/.langwatch/bin and the workers inherit
-        // exactly this PATH (the manager's allowlist passes it through), which is
-        // how their tool calls resolve. The worker binary itself is NOT installed
-        // here — see the gap noted on this function.
+        // exactly this PATH (the manager's allowlist passes it through), which
+        // is how their tool calls resolve.
         PATH: [ctx.paths.bin, process.env.PATH ?? ""].filter(Boolean).join(delimiter),
         LOG_FORMAT: "pretty",
       },

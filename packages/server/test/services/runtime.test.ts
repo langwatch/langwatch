@@ -142,6 +142,11 @@ function fakeCtx(): RuntimeContext {
 				resolvedPath: "/fake/bin/aigateway",
 				preInstalled: false,
 			},
+			"langy-worker": {
+				version: "test",
+				resolvedPath: "/fake/bin/langy-worker",
+				preInstalled: false,
+			},
 		},
 		envFile: "/tmp/.langwatch-test/.env",
 		version: "test",
@@ -161,6 +166,7 @@ describe("services/runtime", () => {
 			langevalsStub.fn,
 			gatewayStub.fn,
 			langwatchStub.fn,
+			langyStub.fn,
 			migrateFn,
 			venvsFn,
 			nodeDepsFn,
@@ -335,6 +341,36 @@ describe("services/runtime", () => {
 					),
 			);
 			expect(warning).toBeDefined();
+		});
+	});
+
+	describe("when the assistant worker is unavailable", () => {
+		it("disables Langy before startup and gives the user a recovery command", async () => {
+			const ctx = fakeCtx();
+			delete ctx.predeps["langy-worker"];
+			const events: RuntimeEvent[] = [];
+			const bus = runtime.events(ctx) as { emit(event: RuntimeEvent): void };
+			const originalEmit = bus.emit.bind(bus);
+			bus.emit = (event) => {
+				events.push(event);
+				originalEmit(event);
+			};
+
+			await runtime.startAll(ctx);
+
+			expect(langyStub.fn).not.toHaveBeenCalled();
+			const warning = events.find(
+				(event) =>
+					event.type === "log" &&
+					event.service === "langyagent" &&
+					event.line.includes("npx @langwatch/server install"),
+			);
+			expect(warning).toBeDefined();
+			const childEnv = langwatchStub.fn.mock.calls.at(-1)![2] as Record<
+				string,
+				string
+			>;
+			expect(childEnv.LANGWATCH_ENABLE_LANGY).toBe("false");
 		});
 	});
 

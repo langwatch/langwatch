@@ -14,10 +14,10 @@ import { readEnvFile } from "../services/env-file.ts";
 
 export type FeatureToggles = {
   /**
-   * The Langy assistant. Costs ~45MB (the opencode runtime, fetched once) and
-   * nothing at rest: the manager itself already ships inside the mono-binary
-   * the gateway downloads regardless. Default ON: it is a headline feature of
-   * the product, and the download is small next to the rest of the install.
+   * The Langy assistant. Downloads one platform-specific `langy-worker`
+   * executable; the manager itself already ships inside the gateway
+   * mono-binary. Default ON: it is a headline feature of the product, and the
+   * worker is small next to the rest of the install.
    */
   isLangyEnabled: boolean;
   /**

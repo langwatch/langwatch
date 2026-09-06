@@ -48,7 +48,14 @@ describe("CLI doctor command", () => {
     });
 
     it("lists every predep regardless of install status", () => {
-      for (const id of ["uv", "postgres", "redis", "clickhouse", "aigateway"]) {
+      for (const id of [
+        "uv",
+        "postgres",
+        "redis",
+        "clickhouse",
+        "aigateway",
+        "langy-worker",
+      ]) {
         expect(stdout).toContain(id);
       }
     });
