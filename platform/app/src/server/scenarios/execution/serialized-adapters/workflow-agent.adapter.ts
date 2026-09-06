@@ -107,7 +107,7 @@ function engineErrorMessage(body: NlpErrorBody): string {
  * Returns "" when the body cannot be read; the caller appends nothing then and
  * the status code stands on its own.
  */
-async function httpErrorMessage(response: Response): Promise<string> {
+async function httpErrorMessage(response: UndiciResponse): Promise<string> {
   let bodyStr: string;
   try {
     bodyStr = await response.text();
