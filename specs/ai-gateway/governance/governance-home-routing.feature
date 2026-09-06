@@ -36,6 +36,32 @@ Feature: Governance home — route, nav promotion, persona detection
     And the URL stays at "/governance"
     And the setup-checklist OR live-metrics view is rendered
 
+  # The activity monitor and anomaly rules routers refuse an organization that
+  # is not on an Enterprise plan. The plan is known before any read is sent, so
+  # the dashboard treats it as a state of the account rather than a failure.
+  @bdd @ui @governance-home @route @plan @integration
+  Scenario: The dashboard shows no error banner for a plan without the enterprise features
+    Given the organization is not on an Enterprise plan
+    When the admin navigates to "/governance"
+    Then no error banner is shown
+    And the "Define anomaly rules" checklist step says it needs an Enterprise plan
+    And the spend and activity section says it needs an Enterprise plan
+    And no anomaly rules or activity monitor read is sent
+
+  @bdd @ui @governance-home @route @plan @integration
+  Scenario: The dashboard keeps the checklist neutral while the plan is loading
+    Given the organization's plan has not loaded yet
+    When the admin navigates to "/governance"
+    Then no checklist step says it needs an Enterprise plan
+    And no anomaly rules or activity monitor read is sent
+
+  @bdd @ui @governance-home @route @plan @integration
+  Scenario: A setup read that fails still shows the error banner
+    Given the organization is on an Enterprise plan
+    And the ingestion sources cannot be read
+    When the admin navigates to "/governance"
+    Then the "Couldn't load the setup state" banner is shown
+
   @bdd @ui @governance-home @route @alias
   Scenario: Legacy /settings/governance keeps working as a redirect
     When the admin navigates to "/settings/governance"

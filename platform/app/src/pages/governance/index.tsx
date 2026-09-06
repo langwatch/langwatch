@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
+import { EnterprisePlanRequiredNotice } from "~/components/enterprise/EnterprisePlanRequiredNotice";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { QuarantineFillAlert } from "~/components/governance/QuarantineFillAlert";
 import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
@@ -33,6 +34,7 @@ import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
+import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Permission } from "~/server/api/rbac";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -54,7 +56,14 @@ import { getHexColorForString } from "~/utils/rotatingColors";
  * and the rest name the grant they need. A viewer delegated part of the
  * surface gets the part they hold instead of one refusal for the lot.
  *
+ * The plan is the other gate. The activity monitor and anomaly rules routers
+ * refuse any organization that is not on an Enterprise plan, and that refusal
+ * is an account state we can read up front, not a failure: the panels behind
+ * it say which plan they need and their reads are never sent. The error
+ * banners stay for reads that actually fail.
+ *
  * Spec: specs/ai-gateway/governance/admin-oversight.feature,
+ * specs/ai-gateway/governance/governance-home-routing.feature,
  * specs/ai-governance/rbac/delegated-governance-viewer.feature
  */
 
@@ -107,6 +116,14 @@ function GovernanceOverviewPage() {
   const canReadSessionPolicy = hasAnyPermission("organization:view");
   const canManageSessionPolicy = hasAnyPermission("organization:manage");
 
+  // The plan gate the activity monitor and anomaly rules routers apply, read
+  // here so a refusal the plan already answers is never sent as a query. The
+  // rows stay neutral while the plan is still loading rather than flashing a
+  // lock the tier may not deserve.
+  const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
+  const needsEnterprisePlan = !isPlanLoading && !isEnterprise;
+  const canReadActivityPanels = !!orgId && canReadActivity && isEnterprise;
+
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId && canReadSources, refetchOnWindowFocus: false },
@@ -117,7 +134,10 @@ function GovernanceOverviewPage() {
   );
   const anomalyRulesQuery = api.anomalyRules.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId && canReadAnomalyRules, refetchOnWindowFocus: false },
+    {
+      enabled: !!orgId && canReadAnomalyRules && isEnterprise,
+      refetchOnWindowFocus: false,
+    },
   );
   const catalogQuery = api.aiTools.adminList.useQuery(
     { organizationId: orgId },
@@ -125,32 +145,32 @@ function GovernanceOverviewPage() {
   );
   const summaryQuery = api.activityMonitor.summary.useQuery(
     { organizationId: orgId, windowDays: 30 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
+    { enabled: canReadActivityPanels, refetchOnWindowFocus: false },
   );
   const usersQuery = api.activityMonitor.spendByUser.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 50 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
+    { enabled: canReadActivityPanels, refetchOnWindowFocus: false },
   );
   const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 50 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
+    { enabled: canReadActivityPanels, refetchOnWindowFocus: false },
   );
   const departmentsQuery = api.activityMonitor.spendByDepartment.useQuery(
     { organizationId: orgId, windowDays: 30 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
+    { enabled: canReadActivityPanels, refetchOnWindowFocus: false },
   );
   const healthQuery = api.activityMonitor.ingestionSourcesHealth.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
+    { enabled: canReadActivityPanels, refetchOnWindowFocus: false },
   );
   const anomaliesQuery = api.activityMonitor.recentAnomalies.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
+    { enabled: canReadActivityPanels, refetchOnWindowFocus: false },
   );
   const [chartGroupBy, setChartGroupBy] = useState<GroupBy>("team");
   const spendOverTimeQuery = api.activityMonitor.spendOverTime.useQuery(
     { organizationId: orgId, windowDays: 30, groupBy: chartGroupBy },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
+    { enabled: canReadActivityPanels, refetchOnWindowFocus: false },
   );
 
   // The activity-monitor panels share one gate and one enterprise plan check,
@@ -277,6 +297,7 @@ function GovernanceOverviewPage() {
                 missingPermission={
                   canReadAnomalyRules ? undefined : "anomalyRules:view"
                 }
+                needsEnterprisePlan={needsEnterprisePlan}
                 title="Define anomaly rules"
                 description="Set thresholds that page on-call when activity drifts."
                 href="/governance/anomaly-rules"
@@ -308,7 +329,16 @@ function GovernanceOverviewPage() {
           </SectionCard>
         )}
 
-        {canReadActivity && (
+        {canReadActivity && needsEnterprisePlan && (
+          <SectionCard
+            title="Spend and activity"
+            subline="Spend, active users, anomalies, and ingestion-source health for the organization."
+          >
+            <EnterprisePlanRequiredNotice detail="Spend, active users, anomalies, and ingestion-source health are available on Enterprise plans. The rest of this page still works." />
+          </SectionCard>
+        )}
+
+        {canReadActivity && !needsEnterprisePlan && (
           <>
             <HandledErrorAlert
               error={activityError}
@@ -676,6 +706,7 @@ function SetupItem({
   ctaLabel,
   upcoming,
   missingPermission,
+  needsEnterprisePlan,
 }: {
   done: boolean;
   title: string;
@@ -684,6 +715,12 @@ function SetupItem({
   ctaLabel: string;
   upcoming?: boolean;
   /**
+   * The step's resource is only offered on an Enterprise plan and the
+   * organization is not on one. The row names the plan instead of a state it
+   * was never allowed to read.
+   */
+  needsEnterprisePlan?: boolean;
+  /**
    * The grant this step's state is read with, when the viewer does not hold
    * it. A tick or a count is a claim about the organization, and the viewer
    * who cannot read the resource gets the name of the grant instead of a
@@ -691,7 +728,7 @@ function SetupItem({
    */
   missingPermission?: Permission;
 }) {
-  const isDone = done && !missingPermission;
+  const isDone = done && !missingPermission && !needsEnterprisePlan;
   return (
     <HStack
       borderWidth="1px"
@@ -728,6 +765,15 @@ function SetupItem({
         <Text fontSize="xs" color="fg.muted" flexShrink={0}>
           Needs {missingPermission}
         </Text>
+      ) : needsEnterprisePlan ? (
+        <Link
+          href="/settings/subscription"
+          fontSize="xs"
+          color="fg.muted"
+          flexShrink={0}
+        >
+          Needs an Enterprise plan
+        </Link>
       ) : (
         <Link href={href} color="blue.600">
           {ctaLabel}
