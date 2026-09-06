@@ -333,12 +333,20 @@ def patch_litellm_params(kwargs):
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
 
+    # A caller may name the deployment the litellm-shaped way, as a
+    # `deployment` argument. litellm has no such argument — it takes the
+    # deployment from the model string — so it is read here and dropped
+    # before the call rather than travelling on as dead weight.
+    deployment_argument = kwargs.pop("deployment", None)
+
     # Azure patches. Kept before the rewrite: a deployment name is arbitrary
     # ("prod-judge"), so after this block there is nothing left in the model
     # string to recognise a family by.
     requested_model = kwargs.get("model")
-    deployment_name = request_env.get("AZURE_DEPLOYMENT_NAME") or os.environ.get(
-        "AZURE_DEPLOYMENT_NAME"
+    deployment_name = (
+        request_env.get("AZURE_DEPLOYMENT_NAME")
+        or os.environ.get("AZURE_DEPLOYMENT_NAME")
+        or deployment_argument
     )
     if (
         deployment_name is not None
@@ -386,12 +394,6 @@ def patch_litellm_embedding_params(kwargs):
 
     request_env = current_request_env()
 
-    embeddings_deployment = request_env.get(
-        "AZURE_EMBEDDINGS_DEPLOYMENT_NAME"
-    ) or os.environ.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
-    if embeddings_deployment is not None:
-        kwargs["model"] = "azure/" + embeddings_deployment
-
     request_credentials(kwargs)
 
     for key, value in {**os.environ, **request_env}.items():
@@ -401,6 +403,24 @@ def patch_litellm_embedding_params(kwargs):
             if replaced_key.isupper():
                 continue
             kwargs[replaced_key] = convert_param_type(replaced_key, value)
+
+    deployment_argument = kwargs.pop("deployment", None)
+
+    # After the loop, not before it, and the same way round as the completion
+    # path: X_LITELLM_EMBEDDINGS_model carries the caller's model and used to
+    # land on top of the rewrite, putting the model id back where the
+    # deployment name belonged. Only an azure model is rewritten — an
+    # embeddings deployment left in the server environment has nothing to say
+    # about a call to any other provider.
+    embeddings_deployment = (
+        request_env.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
+        or os.environ.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
+        or deployment_argument
+    )
+    if embeddings_deployment is not None and str(
+        kwargs.get("model") or ""
+    ).startswith("azure/"):
+        kwargs["model"] = "azure/" + embeddings_deployment
 
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
