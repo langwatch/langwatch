@@ -134,4 +134,51 @@ describe("useDrawer URL fragment", () => {
       expect(pushed).not.toContain("#");
     });
   });
+
+  describe("given the router already knows about a fragment carrying bar state", () => {
+    beforeEach(() => {
+      // A full page load on a shared link: React Router sees the whole
+      // fragment, `preset` and all, so nothing is stale here.
+      staleRouterHash = "#all-traces?preset=24h";
+      window.history.replaceState({}, "", "/acme/traces#all-traces?preset=24h");
+    });
+
+    describe("when a drawer is opened", () => {
+      it("leaves the bar state in the fragment instead of copying it into the query", () => {
+        const { result } = renderHook(() => useDrawer());
+
+        act(() => {
+          result.current.openDrawer("traceV2Details", { traceId: "trace-1" });
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        expect(pushed).toContain("#all-traces?preset=24h");
+        const [beforeHash] = pushed.split("#");
+        expect(beforeHash).not.toContain("preset");
+      });
+    });
+  });
+
+  describe("given drawer params were parked after the fragment", () => {
+    it("still lifts them back into the real query string", () => {
+      // The case the fragment/query split exists for: a malformed URL where
+      // `drawer.*` sits after the `#`, where `router.query` cannot see it.
+      staleRouterHash = "#conversations?drawer.open=traceV2Details";
+      window.history.replaceState(
+        {},
+        "",
+        "/acme/traces#conversations?drawer.open=traceV2Details",
+      );
+      const { result } = renderHook(() => useUpdateDrawerParams());
+
+      act(() => {
+        result.current({ mode: "conversation" });
+      });
+
+      const pushed = mockPush.mock.calls[0]?.[0] as string;
+      const [beforeHash] = pushed.split("#");
+      expect(beforeHash).toContain("drawer.open=traceV2Details");
+      expect(beforeHash).toContain("drawer.mode=conversation");
+    });
+  });
 });

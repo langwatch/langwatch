@@ -344,6 +344,13 @@ export const useDrawerParams = () => {
  * `#h?q` orderings — important for lens routes like `/traces#conversations`
  * where naive concatenation can leave drawer query params parked after the
  * hash, which Next's `router.query` (backed by `location.search`) cannot see.
+ *
+ * A `?` inside the fragment is not automatically a misplaced query, though: the
+ * traces bar keeps its own state there (`#conversations?preset=24h`), and
+ * lifting that into the real query string would both duplicate it and leave a
+ * stale `preset` parked on the URL. So the rescue only fires for a fragment
+ * query that actually carries `drawer.` params — everything else stays in the
+ * fragment, where its owner reads it from.
  */
 function splitAsPath(asPath: string): {
   path: string;
@@ -365,7 +372,11 @@ function splitAsPath(asPath: string): {
   if (rest.startsWith("#")) {
     const q = rest.indexOf("?");
     if (q === -1) return { path, queryString: "", hash: rest.slice(1) };
-    return { path, queryString: rest.slice(q + 1), hash: rest.slice(1, q) };
+    const fragmentQuery = rest.slice(q + 1);
+    if (!/(^|&)drawer\./.test(fragmentQuery)) {
+      return { path, queryString: "", hash: rest.slice(1) };
+    }
+    return { path, queryString: fragmentQuery, hash: rest.slice(1, q) };
   }
   return { path, queryString: "", hash: "" };
 }
