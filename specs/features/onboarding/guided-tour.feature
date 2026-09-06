@@ -295,6 +295,15 @@ Feature: Guided onboarding tour
     And the kickoff is queued with the tour status "skipped", so Langy opens with the no-worries line
 
   @unit
+  Scenario: a kickoff owed right away waits for Langy to announce the page's scope
+    Given the landing owes the panel its kickoff with no tour to run first
+    And Langy has not announced the page's scope yet, which it does after the host mounts and which resets everything scoped
+    When the host mounts
+    Then the panel opens and nothing is queued yet
+    When the layout announces the user, the organization and the project
+    Then one kickoff is queued and a later announcement of the same scope keeps it
+
+  @unit
   Scenario: the tour never runs twice for the same path
     Given the tour was completed for the current path
     When the host mounts

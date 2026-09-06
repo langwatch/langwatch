@@ -61,9 +61,22 @@ vi.mock("~/utils/api", () => ({
 const queueGuidedKickoff = vi.fn();
 const openPanel = vi.fn();
 const setPanelMode = vi.fn();
+/* the scope is already announced here, as the layout does before the
+   landing settles; the real-store file covers the announcement itself */
 vi.mock("~/features/langy/stores/langyStore", () => ({
   useLangyStore: {
-    getState: () => ({ queueGuidedKickoff, openPanel, setPanelMode }),
+    getState: () => ({
+      queueGuidedKickoff,
+      openPanel,
+      setPanelMode,
+      scopeAnnounced: true,
+      activeConversationScope: {
+        userId: "user_1",
+        organizationId: "org_1",
+        projectId: "proj_1",
+      },
+    }),
+    subscribe: () => () => undefined,
   },
 }));
 

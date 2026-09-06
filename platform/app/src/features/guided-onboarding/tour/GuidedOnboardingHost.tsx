@@ -13,7 +13,7 @@
  *
  * @see specs/features/onboarding/guided-tour.feature
  */
-import { useEffect, useMemo, useRef } from "react";
+import { type MutableRefObject, useEffect, useMemo, useRef } from "react";
 import { useSidebarSectionOverrides } from "~/components/sidebar/sidebarSectionOverrides";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -80,6 +80,60 @@ export function landingNeedsKickoff(state: GuidedOnboardingState): boolean {
   return !!state.currentPath && !state.conversationId;
 }
 
+/**
+ * Whether Langy has announced this page's scope for `organizationId`. The
+ * layout announces it from an effect that runs after the host's, and the
+ * announcement resets every scoped field of the store, a queued kickoff
+ * included, so a kickoff handed over before it is lost.
+ */
+export function langyScopedTo(
+  langy: Pick<
+    ReturnType<typeof useLangyStore.getState>,
+    "activeConversationScope" | "scopeAnnounced"
+  >,
+  organizationId: string,
+): boolean {
+  const scope = langy.activeConversationScope;
+  return (
+    langy.scopeAnnounced &&
+    scope?.organizationId === organizationId &&
+    !!scope.userId &&
+    !!scope.projectId
+  );
+}
+
+/**
+ * Queues the kickoff once Langy is scoped to `organizationId`: right away
+ * when it already is, otherwise on the announcement. Returns the release for
+ * the pending case.
+ */
+function queueKickoffOnceScoped({
+  organizationId,
+  kickoff,
+}: {
+  organizationId: string;
+  kickoff: GuidedKickoff;
+}): () => void {
+  const queue = () => useLangyStore.getState().queueGuidedKickoff(kickoff);
+  if (langyScopedTo(useLangyStore.getState(), organizationId)) {
+    queue();
+    return () => undefined;
+  }
+  const release = useLangyStore.subscribe((langy) => {
+    if (!langyScopedTo(langy, organizationId)) return;
+    release();
+    queue();
+  });
+  return release;
+}
+
+/** A release to run when the component unmounts, set by whoever waits. */
+function useReleaseOnUnmount(): MutableRefObject<() => void> {
+  const release = useRef<() => void>(() => undefined);
+  useEffect(() => () => release.current(), []);
+  return release;
+}
+
 export function GuidedOnboardingHost() {
   const pathname = usePathname();
   const onOnboarding = pathname?.startsWith("/onboarding") ?? false;
@@ -115,6 +169,8 @@ export function GuidedOnboardingHost() {
      and StrictMode's double effects must not start a second tour or queue a
      second kickoff */
   const handled = useRef<Set<GuidedPath>>(new Set());
+  /* a kickoff still waiting for the scope announcement when the host unmounts */
+  const releasePending = useReleaseOnUnmount();
 
   useEffect(() => {
     if (onOnboarding || !guided || !state || !organizationId) return;
@@ -125,12 +181,12 @@ export function GuidedOnboardingHost() {
     const orgName = organization?.name ?? "";
     const firstName = firstNameOf(session.data?.user?.name);
     const langy = useLangyStore.getState();
-    const queue = (tourStatus: GuidedKickoffTourStatus) =>
-      useLangyStore
-        .getState()
-        .queueGuidedKickoff(
-          buildKickoff({ path, state, orgName, firstName, tourStatus }),
-        );
+    const queue = (tourStatus: GuidedKickoffTourStatus) => {
+      releasePending.current = queueKickoffOnceScoped({
+        organizationId,
+        kickoff: buildKickoff({ path, state, orgName, firstName, tourStatus }),
+      });
+    };
 
     if (landingNeedsTour(state)) {
       langy.openPanel();
