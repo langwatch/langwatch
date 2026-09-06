@@ -34,15 +34,6 @@ import {
 export const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Keys the product provisions and owns rather than the customer — today only
- * the Langy VK. Absent from customer-facing reads; refuses customer-facing
- * mutations (`rotate` would break Langy's own auth against the secret).
- */
-export function isProductManaged(vk: Pick<VirtualKey, "purpose">): boolean {
-  return vk.purpose !== "USER";
-}
-
-/**
  * The budget a key carries on itself, created in the same transaction as the
  * key. `null` on update removes the cap by archiving. The zod schema is the
  * single validation source, shared by tRPC and REST.
@@ -162,7 +153,136 @@ export type CreatedVirtualKey = {
   secret: string;
 };
 
+type GuardrailPair = { direction: GuardrailDirection; guardrailId: string };
+
 export class VirtualKeyValidationService {
+  /**
+   * Keys the product provisions and owns rather than the customer — today only
+   * the Langy VK. Absent from customer-facing reads; refuses customer-facing
+   * mutations (`rotate` would break Langy's own auth against the secret).
+   */
+  static isProductManaged(vk: Pick<VirtualKey, "purpose">): boolean {
+    return vk.purpose !== "USER";
+  }
+
+  /**
+   * Reconcile the requested routing mode with the policy reference: one
+   * decision expressed in two columns, enforced here rather than trusted
+   * from every caller.
+   */
+  static resolveRoutingMode(
+    requested: VirtualKeyRoutingMode | undefined,
+    routingPolicyId: string | null,
+  ): VirtualKeyRoutingMode {
+    const mode = requested ?? (routingPolicyId ? "POLICY" : "NONE");
+    if (mode === "POLICY" && !routingPolicyId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "routing_policy_required: routingMode POLICY needs a routingPolicyId",
+      });
+    }
+
+    if (mode !== "POLICY" && routingPolicyId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `routing_policy_conflict: routingMode ${mode} cannot carry a routingPolicyId`,
+      });
+    }
+
+    return mode;
+  }
+
+  /**
+   * "No providers selected" is never a valid saved state. Absence means
+   * every provider in scope; an empty list would mean a key that can serve
+   * nothing, which is always a mis-click rather than an intent.
+   */
+  static assertProvidersAllowedShape(providersAllowed: string[] | null | undefined): void {
+    if (providersAllowed === undefined || providersAllowed === null) {
+      return;
+    }
+
+    if (providersAllowed.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "providers_allowed_empty: select at least one provider, or allow all providers",
+      });
+    }
+  }
+
+  /**
+   * A key is never written already expired. Absence leaves the stored date
+   * alone and null clears it, so only a real date is checked, against the
+   * moment of the write — "now" itself is a refusal.
+   */
+  static assertExpiryInFuture({ expiresAt }: { expiresAt: Date | null | undefined }): void {
+    if (!expiresAt) {
+      return;
+    }
+
+    if (expiresAt.getTime() <= Date.now()) {
+      throw new VirtualKeyExpiryInPastError();
+    }
+  }
+
+  /**
+   * Flatten `[{direction, guardrailIds[]}]` tuples into per-(direction, id)
+   * pairs and diff old vs new so the update path can emit one
+   * attach/detach audit row per wire change.
+   */
+  static diffGuardrailAttachments(
+    before: GuardrailAttachment[],
+    after: GuardrailAttachment[],
+  ): { attached: GuardrailPair[]; detached: GuardrailPair[] } {
+    const flatten = (attachments: GuardrailAttachment[]): Set<string> => {
+      const set = new Set<string>();
+      for (const a of attachments) {
+        for (const id of a.guardrailIds) {
+          set.add(`${a.direction} ${id}`);
+        }
+      }
+
+      return set;
+    };
+    const toPair = (key: string): GuardrailPair => {
+      const [direction, guardrailId] = key.split(" ");
+
+      return {
+        direction: direction as GuardrailDirection,
+        guardrailId: guardrailId!,
+      };
+    };
+    const beforeSet = flatten(before);
+    const afterSet = flatten(after);
+    const attached: GuardrailPair[] = [];
+    const detached: GuardrailPair[] = [];
+    for (const key of afterSet) {
+      if (!beforeSet.has(key)) {
+        attached.push(toPair(key));
+      }
+    }
+
+    for (const key of beforeSet) {
+      if (!afterSet.has(key)) {
+        detached.push(toPair(key));
+      }
+    }
+
+    return { attached, detached };
+  }
+
+  static serialiseForAudit(vk: VirtualKeyWithScopes): GatewayAuditJson {
+    // Strip secret material. The base serializer already handles BigInt
+    // (revision) safely — see auditSerializer.ts.
+    const {
+      hashedSecret: _hashedSecret,
+      previousHashedSecret: _previousHashedSecret,
+      ...safe
+    } = vk;
+
+    return serializeRowForAudit(safe as unknown as Record<string, unknown>);
+  }
+
   private constructor(
     private readonly repository: GatewayVirtualKeysPort,
     private readonly scopeResolution: GatewayScopeResolutionService,
@@ -184,7 +304,7 @@ export class VirtualKeyValidationService {
    */
   async ownedForMutation(id: string, organizationId: string): Promise<VirtualKeyWithScopes> {
     const existing = await this.repository.tryFindById({ id, organizationId });
-    if (!existing || isProductManaged(existing)) {
+    if (!existing || VirtualKeyValidationService.isProductManaged(existing)) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "Virtual key not found",
@@ -288,120 +408,4 @@ export class VirtualKeyValidationService {
       });
     }
   }
-}
-
-/**
- * Reconcile the requested routing mode with the policy reference: one
- * decision expressed in two columns, enforced here rather than trusted
- * from every caller.
- */
-export function resolveRoutingMode(
-  requested: VirtualKeyRoutingMode | undefined,
-  routingPolicyId: string | null,
-): VirtualKeyRoutingMode {
-  const mode = requested ?? (routingPolicyId ? "POLICY" : "NONE");
-  if (mode === "POLICY" && !routingPolicyId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "routing_policy_required: routingMode POLICY needs a routingPolicyId",
-    });
-  }
-
-  if (mode !== "POLICY" && routingPolicyId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `routing_policy_conflict: routingMode ${mode} cannot carry a routingPolicyId`,
-    });
-  }
-
-  return mode;
-}
-
-/**
- * "No providers selected" is never a valid saved state. Absence means
- * every provider in scope; an empty list would mean a key that can serve
- * nothing, which is always a mis-click rather than an intent.
- */
-export function assertProvidersAllowedShape(providersAllowed: string[] | null | undefined): void {
-  if (providersAllowed === undefined || providersAllowed === null) {
-    return;
-  }
-
-  if (providersAllowed.length === 0) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "providers_allowed_empty: select at least one provider, or allow all providers",
-    });
-  }
-}
-
-/**
- * A key is never written already expired. Absence leaves the stored date
- * alone and null clears it, so only a real date is checked, against the
- * moment of the write — "now" itself is a refusal.
- */
-export function assertExpiryInFuture({ expiresAt }: { expiresAt: Date | null | undefined }): void {
-  if (!expiresAt) {
-    return;
-  }
-
-  if (expiresAt.getTime() <= Date.now()) {
-    throw new VirtualKeyExpiryInPastError();
-  }
-}
-
-type GuardrailPair = { direction: GuardrailDirection; guardrailId: string };
-
-/**
- * Flatten `[{direction, guardrailIds[]}]` tuples into per-(direction, id)
- * pairs and diff old vs new so the update path can emit one
- * attach/detach audit row per wire change.
- */
-export function diffGuardrailAttachments(
-  before: GuardrailAttachment[],
-  after: GuardrailAttachment[],
-): { attached: GuardrailPair[]; detached: GuardrailPair[] } {
-  const flatten = (attachments: GuardrailAttachment[]): Set<string> => {
-    const set = new Set<string>();
-    for (const a of attachments) {
-      for (const id of a.guardrailIds) {
-        set.add(`${a.direction}\u0000${id}`);
-      }
-    }
-
-    return set;
-  };
-  const toPair = (key: string): GuardrailPair => {
-    const [direction, guardrailId] = key.split("\u0000");
-
-    return {
-      direction: direction as GuardrailDirection,
-      guardrailId: guardrailId!,
-    };
-  };
-  const beforeSet = flatten(before);
-  const afterSet = flatten(after);
-  const attached: GuardrailPair[] = [];
-  const detached: GuardrailPair[] = [];
-  for (const key of afterSet) {
-    if (!beforeSet.has(key)) {
-      attached.push(toPair(key));
-    }
-  }
-
-  for (const key of beforeSet) {
-    if (!afterSet.has(key)) {
-      detached.push(toPair(key));
-    }
-  }
-
-  return { attached, detached };
-}
-
-export function serialiseForAudit(vk: VirtualKeyWithScopes): GatewayAuditJson {
-  // Strip secret material. The base serializer already handles BigInt
-  // (revision) safely — see auditSerializer.ts.
-  const { hashedSecret: _hashedSecret, previousHashedSecret: _previousHashedSecret, ...safe } = vk;
-
-  return serializeRowForAudit(safe as unknown as Record<string, unknown>);
 }

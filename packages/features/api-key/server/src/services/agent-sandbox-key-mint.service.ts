@@ -80,10 +80,13 @@ export class AgentSandboxKeyMintService {
    */
   async getOrMint(input: { projectId: string; organizationId: string }): Promise<string> {
     const held = await this.share.tryGet({ projectId: input.projectId });
-    if (held !== undefined) return held;
+    if (held !== undefined) {
+      return held;
+    }
 
     const token = await this.mint(input);
     await this.share.hold({ projectId: input.projectId, token });
+
     return token;
   }
 

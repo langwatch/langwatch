@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   InvokePayloadTooLargeError,
-  NlpInvokeTransport,
+  NlpInvokeTransportAdapter,
   type NlpInvokeStagingConfig,
 } from "../workflow-nlp-lambda.adapter";
 import {
@@ -62,7 +62,7 @@ function transport(overrides: Partial<NlpInvokeStagingConfig> = {}) {
   return {
     lambda,
     staging,
-    subject: NlpInvokeTransport.create({
+    subject: NlpInvokeTransportAdapter.create({
       target: ARN,
       config: { ...BASE_CONFIG, ...overrides },
       lambda,
@@ -227,7 +227,7 @@ describe("given a plain HTTP NLP target instead of a Lambda ARN", () => {
       const lambda = new RecordingLambda();
       const staging = new RecordingStaging();
       const call = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
-      const subject = NlpInvokeTransport.create({
+      const subject = NlpInvokeTransportAdapter.create({
         target: "http://localhost:5561",
         config: BASE_CONFIG,
         lambda,

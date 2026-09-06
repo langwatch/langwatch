@@ -191,7 +191,7 @@ export class LangWatchQLService {
     await this.deps.executor?.close();
   }
 
-  constructor(private readonly deps: LangWatchQLServiceDependencies) {
+  private constructor(private readonly deps: LangWatchQLServiceDependencies) {
     this.views = deps.views ?? LWQL_VIEW_CATALOG;
     this.limits = deps.limits ?? DEFAULT_LWQL_RESULT_LIMITS;
     this.now = deps.now ?? (() => new Date());

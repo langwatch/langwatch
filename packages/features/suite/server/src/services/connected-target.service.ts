@@ -276,6 +276,7 @@ async function pickAgentByNameAlone({
   if (development) {
     return development.row;
   }
+
   if (online.length === 1) {
     return online[0]?.row;
   }

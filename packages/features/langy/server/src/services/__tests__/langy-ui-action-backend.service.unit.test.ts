@@ -3,7 +3,7 @@
  * applied to the SAVED document through the backend port
  * (specs/langy/langy-ui-actions-fallback.feature).
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   type LangyBackendActor,
   type LangyBackendRunResult,

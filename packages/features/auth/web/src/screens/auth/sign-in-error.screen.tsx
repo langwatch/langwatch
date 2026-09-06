@@ -5,7 +5,7 @@ import { hardNavigate } from "../../behavior/browser-navigation";
 import Link from "../../ui/elements/router-link";
 import { useSearchParams } from "../../behavior/use-route";
 import { LogoIcon } from "../../ui/elements/logo-icon";
-import { usePublicEnv } from "../../behavior/use-public-env";
+import { usePublicEnvWithCapabilities } from "../../behavior/use-public-env";
 
 /**
  * BetterAuth emits granular low-level error codes (e.g. `email_doesn't_match`,
@@ -68,7 +68,7 @@ export default function Error() {
   const { data: session } = useSession();
   const query = useSearchParams();
   const error = normalizeErrorCode(query?.get("error"));
-  const publicEnv = usePublicEnv({ includeCapabilities: true });
+  const publicEnv = usePublicEnvWithCapabilities();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
   useEffect(() => {

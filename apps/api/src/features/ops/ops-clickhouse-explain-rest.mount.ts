@@ -5,7 +5,7 @@
 import {
   OpsClickHouseRuntime,
   OpsExplainClickHouseRepository,
-  OpsExplainClientResolver,
+  OpsExplainClientPort,
   OpsExplainService,
   type OpsExplainClientResolution,
   type OpsClickHouseExplainRestPorts,
@@ -37,7 +37,7 @@ export function composeApiOpsExplainRest(options: {
   const runtime = OpsClickHouseRuntime.create({ url, buildTime: false });
   const service = OpsExplainService.create({
     repository: OpsExplainClickHouseRepository.create({
-      resolver: new ApiOpsExplainClientResolver(runtime),
+      resolver: new ApiOpsExplainClientPort(runtime),
     }),
   });
 
@@ -54,7 +54,7 @@ export function composeApiOpsExplainRest(options: {
 /**
  * The dedicated account, and never a fallback.
  */
-class ApiOpsExplainClientResolver extends OpsExplainClientResolver {
+class ApiOpsExplainClientPort extends OpsExplainClientPort {
   constructor(private readonly runtime: OpsClickHouseRuntime) {
     super();
   }

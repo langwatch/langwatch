@@ -50,8 +50,6 @@ export class SuiteTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: SuiteTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
-
     return (
       createTrpcService({ root: trpc, procedures })
         .router("testSuites", createTestSuiteRouter(trpc, procedures))

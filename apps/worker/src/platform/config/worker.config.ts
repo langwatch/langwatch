@@ -74,7 +74,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    */
   github: {
     ...githubAppConfigDefinition,
-    privateKey: Config.secret({ optional: true, env: "GITHUB_LANGY_PRIVATE_KEY" }),
+    privateKey: Config.optionalSecret({ env: "GITHUB_LANGY_PRIVATE_KEY" }),
   },
   /**
    * The one variable both graphs gate their cross-pipeline billing meter on.
@@ -102,7 +102,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * `AppStripeRuntime.create`.
    */
   stripe: {
-    secretKey: Config.secret({ optional: true, env: "STRIPE_SECRET_KEY" }),
+    secretKey: Config.optionalSecret({ env: "STRIPE_SECRET_KEY" }),
   },
   /**
    * PostHog vars read at the app's spelling since both graphs feed one
@@ -150,7 +150,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
     tenantDailyCap: Config.value(z.coerce.number().int().positive().default(10000), {
       env: "TRIGGER_EMAIL_TENANT_DAILY_CAP",
     }),
-    credentialsEncryptionKey: Config.secret({ optional: true, env: "CREDENTIALS_SECRET" }),
+    credentialsEncryptionKey: Config.optionalSecret({ env: "CREDENTIALS_SECRET" }),
     /**
      * All three carried though only one tier is used, since the tier is
      * resolved per-project. Defaults match `automation.persistCapUsage`,
@@ -172,10 +172,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * and its degrade-on-invalid-JSON behaviour live in `resolveWorkerTracePrivacyConfig`.
    */
   tracePrivacy: {
-    googleApplicationCredentials: Config.secret({
-      optional: true,
-      env: "GOOGLE_APPLICATION_CREDENTIALS",
-    }),
+    googleApplicationCredentials: Config.optionalSecret({ env: "GOOGLE_APPLICATION_CREDENTIALS" }),
     /**
      * Raw boolean-or-string, not parsed: `environmentBooleanSchema` reads
      * "1" as true (app reads it false) and refuses any other spelling,
@@ -222,7 +219,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    */
   langy: {
     agentUrl: Config.value(optionalEnvironmentString, { env: "OPENCODE_AGENT_URL" }),
-    internalSecret: Config.secret({ optional: true, env: "LANGY_INTERNAL_SECRET" }),
+    internalSecret: Config.optionalSecret({ env: "LANGY_INTERNAL_SECRET" }),
   },
   /**
    * Carried raw (not a number): `settlementGraceMs` in
@@ -276,7 +273,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    */
   liveness: {
     metricsPort: Config.value(optionalEnvironmentString, { env: "WORKER_METRICS_PORT" }),
-    metricsToken: Config.secret({ optional: true, env: "METRICS_API_KEY" }),
+    metricsToken: Config.optionalSecret({ env: "METRICS_API_KEY" }),
   },
   /**
    * Same var/default the app reads: both graphs stamp rows in one

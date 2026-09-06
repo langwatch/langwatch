@@ -8,7 +8,10 @@ import {
   type WorkflowNlpDispatchResponse,
 } from "../ports/workflow.port";
 import type { NlpLambdaInvokePort, NlpPayloadStagingPort } from "../ports/workflow-nlp-lambda.port";
-import { NlpInvokeTransport, type NlpInvokeStagingConfig } from "./workflow-nlp-lambda.adapter";
+import {
+  NlpInvokeTransportAdapter,
+  type NlpInvokeStagingConfig,
+} from "./workflow-nlp-lambda.adapter";
 
 /**
  * Origin tag for the `X-LangWatch-Origin` header. Set at the request boundary
@@ -106,7 +109,7 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
     return new HttpWorkflowNlpRuntimeAdapter(options);
   }
 
-  private readonly transport: NlpInvokeTransport;
+  private readonly transport: NlpInvokeTransportAdapter;
 
   private constructor(
     private readonly options: {
@@ -118,7 +121,7 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
     },
   ) {
     super();
-    this.transport = NlpInvokeTransport.create({
+    this.transport = NlpInvokeTransportAdapter.create({
       target: options.serviceUrl,
       // A deployment that named no staging policy still gets the built-in
       // threshold, so an ARN target cannot silently re-expose the 6 MiB cap.

@@ -37,7 +37,11 @@ describe("UiDesignSystemShell", () => {
       let seen: unknown = null;
       render(
         <UiDesignSystemShell system={uiDesignSystem}>
-          <SystemProbe onSystem={(system) => (seen = system)} />
+          <SystemProbe
+            onSystem={(system) => {
+              seen = system;
+            }}
+          />
         </UiDesignSystemShell>,
       );
 

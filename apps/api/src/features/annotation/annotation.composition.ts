@@ -18,9 +18,9 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import {
   ClickHouseTraceExistenceRepository,
-  PrismaTraceEditOverlayRepository,
   TraceEditOverlayService,
 } from "@langwatch/trace-server";
+import { PrismaTraceEditOverlayRepository } from "@langwatch/trace-server/composition/trace-edit-overlay";
 import type { UserService } from "@langwatch/user-contract";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";

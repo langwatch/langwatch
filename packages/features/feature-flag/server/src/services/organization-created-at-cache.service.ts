@@ -11,9 +11,9 @@ import type { FeatureFlagRepository } from "../repositories/feature-flag.reposit
 const ORGANIZATION_CREATED_AT_TTL_MS = 10 * 60_000;
 const ORGANIZATION_CREATED_AT_MAX_KEYS = 10_000;
 
-export class OrganizationCreatedAtCache {
-  static create(options: { repository: FeatureFlagRepository }): OrganizationCreatedAtCache {
-    return new OrganizationCreatedAtCache(options.repository);
+export class OrganizationCreatedAtCacheService {
+  static create(options: { repository: FeatureFlagRepository }): OrganizationCreatedAtCacheService {
+    return new OrganizationCreatedAtCacheService(options.repository);
   }
 
   private readonly organizationCreatedAt = new Map<

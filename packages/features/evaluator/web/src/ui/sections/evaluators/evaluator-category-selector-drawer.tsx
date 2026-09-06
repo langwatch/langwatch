@@ -15,10 +15,7 @@ import {
   EvaluatorEditorHeading,
   useEvaluatorEditorController,
 } from "./evaluator-editor-shared";
-import {
-  categoryNames,
-  EvaluatorTypeSelectorContent,
-} from "../../elements/evaluators/evaluator-type-selector-content";
+import { categoryNames, EvaluatorTypeSelectorContent } from "./evaluator-type-selector-content";
 
 export type { EvaluatorCategoryId } from "../../..";
 

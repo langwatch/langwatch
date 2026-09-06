@@ -11,7 +11,6 @@ import {
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
 } from "@langwatch/api/rest";
-import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
@@ -43,7 +42,6 @@ import type { GatewayConfigMaterialiserService } from "../../services/gateway-co
 import {
   GatewayGuardrailEvaluationService,
   GUARDRAIL_WIRE_DIRECTIONS,
-  type EvaluatorRunner,
 } from "../../services/gateway-guardrail-evaluation.service";
 import {
   GatewayRealtimeSessionService,
@@ -51,7 +49,6 @@ import {
 } from "../../services/gateway-realtime-session.service";
 import type { VirtualKeyService } from "../../services/virtual-key.service";
 import type { GatewayBudget } from "@langwatch/gateway-contract";
-import type { GatewayGuardrailRepository } from "../../repositories/gateway-guardrail.repository";
 
 const realtimeSessionService = GatewayRealtimeSessionService.create();
 const logger = createLogger("langwatch:gateway-internal");
@@ -101,13 +98,7 @@ export type GatewayInternalRestPorts = Readonly<{
   /**
    * Monitor directory + evaluator runtime for one guardrail check, or none — all three together or none, since a guardrail names a monitor (carrying the check type), the attachment scoping it, and the evaluator to run it. Partial composition refuses the route by name rather than allowing every request — a guardrail that can't verdict and answers allow has quietly stopped protecting.
    */
-  guardrails?:
-    | (() => {
-        repository: GatewayGuardrailRepository;
-        monitors: MonitorService;
-        runEvaluator: EvaluatorRunner;
-      })
-    | undefined;
+  guardrails?: (() => GatewayGuardrailEvaluationService) | undefined;
   /**
    * Gateway spend pipeline's commands and its one pricing seam, or none — absent where this process registered no spend pipeline, so /spend-commands answers 503 spend_pipeline_disabled, the code the data plane's drainer already spools against.
    */
@@ -1160,11 +1151,7 @@ export function createGatewayInternalRestApp(options: {
             503,
           );
         }
-        const verdict = await GatewayGuardrailEvaluationService.create({
-          repository: guardrails.repository,
-          monitors: guardrails.monitors,
-          runEvaluator: guardrails.runEvaluator,
-        }).check({
+        const verdict = await guardrails.check({
           projectId: parsed.data.project_id,
           guardrailIds: parsed.data.guardrail_ids,
           direction: parsed.data.direction,

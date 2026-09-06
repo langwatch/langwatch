@@ -18,6 +18,7 @@ function concatBytes(
   const merged = new Uint8Array(first.length + second.length);
   merged.set(first, 0);
   merged.set(second, first.length);
+
   return merged;
 }
 
@@ -43,18 +44,22 @@ export class LambdaWebAdapterStreamService {
   }
 
   read(chunk: Uint8Array<ArrayBufferLike>): Uint8Array<ArrayBufferLike> {
-    if (this.preludeRead) return chunk;
+    if (this.preludeRead) {
+      return chunk;
+    }
 
     const merged = concatBytes(this.buffered, chunk);
     const separator = findLwaPreludeSeparator(merged);
     if (separator === -1) {
       this.buffered = merged;
+
       return new Uint8Array(0);
     }
 
     this.status = readLwaPreludeStatus(merged.slice(0, separator));
     this.preludeRead = true;
     this.buffered = new Uint8Array(0);
+
     return merged.slice(separator + LWA_PRELUDE_SEPARATOR_LENGTH);
   }
 }

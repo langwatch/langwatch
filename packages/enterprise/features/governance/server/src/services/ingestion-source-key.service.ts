@@ -106,10 +106,12 @@ export class IngestionKeyService {
     if (!(PERSONAL_INGEST_SOURCE_TYPES as readonly string[]).includes(input.sourceType)) {
       throw new PersonalSourceTypeNotAllowedError(input.sourceType);
     }
+
     const workspace = await this.organizations.tryFindPersonalWorkspace(input);
     if (!workspace) {
       throw new PersonalWorkspaceMissingError();
     }
+
     const projectId = workspace.project.id;
     const ingestionTemplateId = input.ingestionTemplateId ?? null;
 
@@ -166,7 +168,9 @@ export class IngestionKeyService {
     );
     // The kept key counts toward the cap, so the others may fill cap - 1.
     const excess = live.length - (PERSONAL_INGEST_KEYS_PER_TOOL_CAP - 1);
-    if (excess <= 0) return;
+    if (excess <= 0) {
+      return;
+    }
 
     const lastActivityMs = (key: (typeof live)[number]): number =>
       (key.lastUsedAt ?? key.createdAt ?? new Date(0)).getTime();
@@ -216,6 +220,7 @@ export class IngestionKeyService {
     ) {
       return null;
     }
+
     return {
       sourceType: key.ingestSourceType,
       live: key.revokedAt === null,

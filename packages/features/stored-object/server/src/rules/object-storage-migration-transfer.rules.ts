@@ -16,7 +16,7 @@ import type {
   MigrationPageRequest,
   MigrationProvider,
   MigrationStorageEndpoint,
-} from "./object-storage-migration.service";
+} from "../services/object-storage-migration.service";
 
 const INVENTORY_PAGE_SIZE = 250;
 

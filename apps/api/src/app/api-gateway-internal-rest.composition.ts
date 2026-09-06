@@ -7,6 +7,7 @@ import {
   createGatewayInternalRestApp,
   GatewayConfigAssemblyAdapter,
   GatewayConfigMaterialiserService,
+  GatewayGuardrailEvaluationService,
   GatewayJwtAdapter,
   GatewayModelProviderCredentialsPort,
   ModelCatalogGatewaySpendRatingAdapter,
@@ -145,11 +146,12 @@ export function composeApiGatewayInternalRest(
     ...(options.refreshCodex ? { refreshCodex: options.refreshCodex } : {}),
     ...(monitors && runEvaluator
       ? {
-          guardrails: () => ({
-            repository: PrismaGatewayGuardrailRepository.create(prisma),
-            monitors,
-            runEvaluator,
-          }),
+          guardrails: () =>
+            GatewayGuardrailEvaluationService.create({
+              repository: PrismaGatewayGuardrailRepository.create(prisma),
+              monitors,
+              runEvaluator,
+            }),
         }
       : {}),
     ...(spendCommands ? { spend: () => ({ commands: spendCommands, rating }) } : {}),

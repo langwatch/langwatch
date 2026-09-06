@@ -1,4 +1,7 @@
-import { AgentAuditLogIdsBackfillTask } from "@langwatch/agent-server";
+import {
+  AgentAuditLogBackfillRepository,
+  AgentAuditLogIdsBackfillTask,
+} from "@langwatch/agent-server";
 import { LwqlProvisionTask } from "@langwatch/analytics-server";
 import { SlackAlertTask } from "@langwatch/automation-server";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
@@ -21,12 +24,9 @@ import {
   ModelProviderCustomModelsMigrateTask,
   ModelRegistrySyncTask,
 } from "@langwatch/model-provider-server";
-import {
-  PostgresProcessManagerPurgeAdapter,
-  ProcessManagerPurgeTask,
-} from "@langwatch/ops-server";
+import { PostgresProcessManagerPurgeAdapter, ProcessManagerPurgeTask } from "@langwatch/ops-server";
 import type { Task } from "@langwatch/task";
-import { UserDataEraseTask } from "@langwatch/user-server";
+import { GdprUserDataEraseRepository, UserDataEraseTask } from "@langwatch/user-server";
 import { buildAnnotationClickHouseBackfillTask } from "./platform/annotation-clickhouse-backfill.composition";
 import { buildDatasetContentBackfillTask } from "./platform/dataset-content-backfill.composition";
 import { buildObjectStorageMigrateTask } from "./platform/object-storage-migrate.composition";
@@ -73,7 +73,9 @@ export function buildTasksCatalogue({
       repository: () =>
         PostgresProcessManagerPurgeAdapter.create({ database: host.requirePrisma() }),
     }),
-    AgentAuditLogIdsBackfillTask.create({ database: () => host.requirePrisma() }),
+    AgentAuditLogIdsBackfillTask.create({
+      repository: () => AgentAuditLogBackfillRepository.create({ database: host.requirePrisma() }),
+    }),
     DuplicateSubscriptionsReportTask.create({
       repository: () =>
         PostgresDuplicateSubscriptionsReportAdapter.create({ database: host.requirePrisma() }),
@@ -89,7 +91,9 @@ export function buildTasksCatalogue({
     GroupQueueReapStrandedGroupsTask.create({ redis: () => host.requireRedis() }),
     StripePricesSyncTask.create({ secretKey: () => process.env.STRIPE_SECRET_KEY }),
     TieredFreeToSeatEventMigrateTask.create({ database: () => host.requirePrisma() }),
-    UserDataEraseTask.create({ database: () => host.requirePrisma() }),
+    UserDataEraseTask.create({
+      repository: () => GdprUserDataEraseRepository.create({ database: host.requirePrisma() }),
+    }),
     ModelRegistrySyncTask.create({ apiKey: () => process.env.OPENROUTER_API_KEY }),
   ];
 }

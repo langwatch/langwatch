@@ -140,7 +140,7 @@ import {
 import { WorkerRuntime } from "../platform/lifecycle/worker.runtime";
 import type { WorkerFeatureInstallerPort } from "../features/worker-feature.installer";
 import { WorkerApplication } from "./worker.application";
-import type { DatasetContentDatabase } from "@langwatch/dataset-server";
+import type { DatasetContentDatabase } from "@langwatch/dataset-server/composition/dataset-content";
 import {
   AutomationGraphActivityPort,
   AutomationTriggerMatchRecorderPort,

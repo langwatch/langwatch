@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 import type { ReplayRepository } from "../repositories/replay.repository";
 import type { OpsReplayRuntime, OpsReplayRuntimePort } from "../ports/replay-runtime.port";
-import { ReplayLockHeartbeat } from "./replay-lock-heartbeat.service";
+import { ReplayLockHeartbeatService } from "./replay-lock-heartbeat.service";
 
 const logger = createLogger("langwatch:ops:replay-service");
 
@@ -281,7 +281,7 @@ export class ReplayService {
     params: { runId: string; since: string; tenantIds: string[]; aggregateIds?: string[] };
     selection: ReplaySelection;
   }) {
-    const heartbeat = ReplayLockHeartbeat.create({ repo: this.repo, runId: params.runId });
+    const heartbeat = ReplayLockHeartbeatService.create({ repo: this.repo, runId: params.runId });
     heartbeat.start();
     try {
       // One entry point for every selection: folds and maps run through the shared batch engine,

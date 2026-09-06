@@ -3,7 +3,7 @@ import {
   type RedisConnection,
   type RedisLogger,
 } from "@langwatch/redis-client";
-import { Cluster, type Redis } from "ioredis";
+import { Cluster } from "ioredis";
 import {
   GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
@@ -27,90 +27,6 @@ type MigrationCutoverAuditLeaseFactory = (
   logger: RedisLogger,
 ) => Promise<MigrationCutoverAuditLease>;
 
-class RedisNodeQueueAuditAdapter implements QueueAuditRedis {
-  static create(connection: Redis): RedisNodeQueueAuditAdapter {
-    return new RedisNodeQueueAuditAdapter(connection);
-  }
-
-  private constructor(private readonly connection: Redis) {}
-
-  get(key: string): Promise<string | null> {
-    return this.connection.get(key);
-  }
-
-  hvals(key: string): Promise<string[]> {
-    return this.connection.hvals(key);
-  }
-
-  scard(key: string): Promise<number> {
-    return this.connection.scard(key);
-  }
-
-  scan(
-    cursor: string,
-    matchToken: "MATCH",
-    pattern: string,
-    countToken: "COUNT",
-    count: number,
-  ): Promise<[string, string[]]> {
-    return this.connection.scan(cursor, matchToken, pattern, countToken, count);
-  }
-
-  smembers(key: string): Promise<string[]> {
-    return this.connection.smembers(key);
-  }
-
-  zcard(key: string): Promise<number> {
-    return this.connection.zcard(key);
-  }
-
-  zcount(key: string, min: number | string, max: number | string): Promise<number> {
-    return this.connection.zcount(key, min, max);
-  }
-}
-
-class ClusterQueueAuditAdapter implements QueueAuditRedis {
-  static create(connection: Cluster): ClusterQueueAuditAdapter {
-    return new ClusterQueueAuditAdapter(connection);
-  }
-
-  private constructor(private readonly connection: Cluster) {}
-
-  get(key: string): Promise<string | null> {
-    return this.connection.get(key);
-  }
-
-  hvals(key: string): Promise<string[]> {
-    return this.connection.hvals(key);
-  }
-
-  scard(key: string): Promise<number> {
-    return this.connection.scard(key);
-  }
-
-  scan(
-    cursor: string,
-    matchToken: "MATCH",
-    pattern: string,
-    countToken: "COUNT",
-    count: number,
-  ): Promise<[string, string[]]> {
-    return this.connection.scan(cursor, matchToken, pattern, countToken, count);
-  }
-
-  smembers(key: string): Promise<string[]> {
-    return this.connection.smembers(key);
-  }
-
-  zcard(key: string): Promise<number> {
-    return this.connection.zcard(key);
-  }
-
-  zcount(key: string, min: number | string, max: number | string): Promise<number> {
-    return this.connection.zcount(key, min, max);
-  }
-}
-
 /** Task-local Redis owner for the final GroupQueue cutover audit. */
 export class MigrationCutoverRedisAuditAdapter {
   /**
@@ -123,8 +39,11 @@ export class MigrationCutoverRedisAuditAdapter {
     logger?: RedisLogger,
   ): Promise<MigrationCutoverAuditLease> {
     if (!(sharedConnection instanceof Cluster)) {
-      const redis = RedisNodeQueueAuditAdapter.create(sharedConnection);
-      return { redis, scanNodes: [redis], cleanup: () => void 0 };
+      return {
+        redis: sharedConnection,
+        scanNodes: [sharedConnection],
+        cleanup: () => void 0,
+      };
     }
 
     const masterOnly = sharedConnection.duplicate([], { scaleReads: "master" });
@@ -144,11 +63,9 @@ export class MigrationCutoverRedisAuditAdapter {
       }
     }
 
-    const redis = ClusterQueueAuditAdapter.create(masterOnly);
-    const scanNodes = masterOnly.nodes("master").map(RedisNodeQueueAuditAdapter.create);
     return {
-      redis,
-      scanNodes,
+      redis: masterOnly,
+      scanNodes: masterOnly.nodes("master"),
       cleanup: () => masterOnly.disconnect(),
     };
   }

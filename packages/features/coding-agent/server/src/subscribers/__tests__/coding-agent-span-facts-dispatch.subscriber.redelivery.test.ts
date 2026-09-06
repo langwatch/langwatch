@@ -8,9 +8,8 @@ import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import {
-  mapChRowToNormalized,
-  serializeAttributes,
   SpanNormalizationPipelineService,
+  storedSpanReadBack,
   TraceCanonicalisationService,
 } from "@langwatch/trace-server/testing";
 import {
@@ -123,40 +122,12 @@ function normalizedFrom(event: SpanReceivedEvent): NormalizedSpan {
 }
 
 /**
- * What the claim-check path reads: the normalized span rebuilt via the
- * REPOSITORY's `mapChRowToNormalized`, not spread from the original — that
- * mapping is where the two paths diverge, so a copy would mask regressions.
+ * What the claim-check path reads: the normalized span rebuilt through the
+ * stored ClickHouse row, not spread from the original — that mapping is where
+ * the two paths diverge, so a copy would mask regressions.
  */
 function storeReadBackFrom(event: SpanReceivedEvent): NormalizedSpan {
-  const span = normalizedFrom(event);
-  return mapChRowToNormalized({
-    SpanId: span.spanId,
-    TraceId: span.traceId,
-    TenantId: span.tenantId,
-    ParentSpanId: span.parentSpanId ?? null,
-    ParentTraceId: span.parentTraceId ?? null,
-    ParentIsRemote: span.parentIsRemote ?? null,
-    Sampled: span.sampled,
-    StartTimeMs: span.startTimeUnixMs,
-    EndTimeMs: span.endTimeUnixMs,
-    DurationMs: span.durationMs,
-    SpanName: span.name,
-    SpanKind: span.kind,
-    ResourceAttributes: serializeAttributes(span.resourceAttributes),
-    SpanAttributes: serializeAttributes(span.spanAttributes),
-    StatusCode: span.statusCode,
-    StatusMessage: span.statusMessage ?? null,
-    ScopeName: span.instrumentationScope?.name ?? null,
-    ScopeVersion: span.instrumentationScope?.version ?? null,
-    Cost: span.cost ?? null,
-    NonBilledCost: span.nonBilledCost ?? null,
-    Events_Timestamp: span.events.map((spanEvent) => spanEvent.timeUnixMs),
-    Events_Name: span.events.map((spanEvent) => spanEvent.name),
-    Events_Attributes: span.events.map((spanEvent) => serializeAttributes(spanEvent.attributes)),
-    Links_TraceId: span.links.map((link) => link.traceId),
-    Links_SpanId: span.links.map((link) => link.spanId),
-    Links_Attributes: span.links.map((link) => serializeAttributes(link.attributes)),
-  }) as NormalizedSpan;
+  return storedSpanReadBack(normalizedFrom(event));
 }
 
 /**

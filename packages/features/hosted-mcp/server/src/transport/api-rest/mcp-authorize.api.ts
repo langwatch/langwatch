@@ -13,7 +13,7 @@ import {
 import { randomUUID } from "node:crypto";
 
 import type { HostedMcpRedis } from "../../ports/hosted-mcp.port";
-import { RedisOAuthClientRepository } from "../../repositories/redis/redis.oauth-client.repository";
+import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service";
 
 const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 const AUTH_CODE_TTL_SECONDS = 600;
@@ -136,7 +136,7 @@ export function createMcpAuthorizeRestApp(options: {
     // that was registered for this client_id — otherwise whoever crafts the authorization
     // request (which can be an attacker, not the approving user) can point it at a URI they
     // control and the approved code is exfiltrated there.
-    const registeredClient = await RedisOAuthClientRepository.tryGet({
+    const registeredClient = await McpOAuthClientRegistryService.tryGet({
       redis: ports.redis,
       clientId,
     });

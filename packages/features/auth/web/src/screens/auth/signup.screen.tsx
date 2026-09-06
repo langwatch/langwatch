@@ -24,7 +24,7 @@ import { useSearchParams } from "../../behavior/use-route";
 import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control";
 import { LogoIcon } from "../../ui/elements/logo-icon";
 import { Link } from "../../ui/elements/link";
-import { usePublicEnv } from "../../behavior/use-public-env";
+import { usePublicEnvWithCapabilities } from "../../behavior/use-public-env";
 import { authApi as api } from "../../behavior/auth-api";
 import { authFailureMessage, isCredentialRejection } from "../../model/auth-failure-message";
 
@@ -80,7 +80,7 @@ export default function SignUp() {
 
 function LegacySignUp() {
   const { data: session } = useSession();
-  const publicEnv = usePublicEnv({ includeCapabilities: true });
+  const publicEnv = usePublicEnvWithCapabilities();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
 

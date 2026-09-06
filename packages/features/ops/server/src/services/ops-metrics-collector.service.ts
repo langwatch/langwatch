@@ -23,7 +23,7 @@ import { OpsMetricsPublicationService } from "./ops-metrics-publication.service"
 import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service";
 import {
   METRICS_COLLECT_INTERVAL_MS,
-  OpsMetricsWindow,
+  OpsMetricsWindowService,
   THROUGHPUT_BUFFER_SIZE,
 } from "./ops-metrics-window.service";
 
@@ -69,7 +69,7 @@ export class OpsMetricsCollectorService {
   /** The one collector this process runs, once `getSingleton` has built it. */
   private static singleton: OpsMetricsCollectorService | null = null;
 
-  private readonly window = OpsMetricsWindow.create();
+  private readonly window = OpsMetricsWindowService.create();
   private readonly sampling: OpsMetricsSamplingService;
   private readonly publication: OpsMetricsPublicationService;
 

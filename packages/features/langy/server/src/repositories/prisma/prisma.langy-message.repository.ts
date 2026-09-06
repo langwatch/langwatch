@@ -1,5 +1,5 @@
 import { langyMessagePartSchema } from "@langwatch/langy-contract";
-import type { LangyDatabase } from "./prisma.langy-database.repository";
+import type { LangyDatabase } from "./prisma.langy-database";
 import { LangyMessageRepository } from "../langy-message.repository";
 import type { LangyMessageRow, MessageRole } from "../langy-message.repository";
 

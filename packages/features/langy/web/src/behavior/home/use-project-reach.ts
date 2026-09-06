@@ -1,4 +1,4 @@
-import type { ProjectReach } from "../../ui/sections/langy-home-suggestions";
+import type { ProjectReach } from "../../model/langy-project-reach";
 import { api } from "../langy-api";
 import { useOrganizationTeamProject } from "../use-organization-team-project";
 

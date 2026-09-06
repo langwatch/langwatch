@@ -168,10 +168,6 @@ const listScenarioVersionsQuerySchema = z.object({
     .describe("Read the page below this version number."),
 });
 
-const versionPathSchema = z.object({
-  version: z.coerce.number().int().min(1),
-});
-
 const parametersDescription =
   "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.";
 
@@ -307,10 +303,7 @@ export function registerScenarioRoutes(
   };
 
   /** Create a scenario. */
-  const createHandler = async (
-    c: ScenarioContext,
-    body: z.infer<typeof createScenarioSchema>,
-  ) => {
+  const createHandler = async (c: ScenarioContext, body: z.infer<typeof createScenarioSchema>) => {
     const project = projectOf(c);
     logger.info({ projectId: project.id }, "Creating scenario");
 

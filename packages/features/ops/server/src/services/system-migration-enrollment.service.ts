@@ -15,7 +15,7 @@ import {
   sample,
   type MigrationEnrollmentRecord,
   type SystemMigrationsServiceDependencies,
-} from "./system-migration-support.service";
+} from "../rules/system-migration-support.rules";
 
 const logger = createLogger("langwatch:ops:system-migrations");
 

@@ -20,12 +20,12 @@ import Link from "../../ui/elements/router-link";
 import { AuthCard } from "../../ui/elements/auth-card";
 import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control";
 import { LogoIcon } from "../../ui/elements/logo-icon";
-import { usePublicEnv } from "../../behavior/use-public-env";
+import { usePublicEnvWithCapabilities } from "../../behavior/use-public-env";
 
 const forgotPasswordSchema = z.object({ email: z.string().email() });
 
 export default function ForgotPassword() {
-  const publicEnv = usePublicEnv({ includeCapabilities: true });
+  const publicEnv = usePublicEnvWithCapabilities();
   const frontDoor = useIdentityFrontDoor();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
 

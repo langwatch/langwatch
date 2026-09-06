@@ -49,6 +49,40 @@ export class StoredObjectUploadService {
     this.operationId = options.operationId;
   }
 
+  static async storageCall<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (
+        error instanceof DirectUploadUnavailableError ||
+        error instanceof StoredObjectBytesMissingError
+      ) {
+        throw error;
+      }
+
+      throw new StorageUnavailableError();
+    }
+  }
+
+  static async ignoreStorageFailure(operation: () => Promise<void>): Promise<void> {
+    try {
+      await operation();
+    } catch {
+      // The row remains a durable cleanup record for the next bounded pass.
+    }
+  }
+
+  static assertByteFacts(value: StoredObjectRecord, byteLength: number): void {
+    if (value.byteLength !== byteLength) {
+      throw new StoredObjectIntegrityConflictError(
+        value.tenantId,
+        value.id,
+        value.byteLength,
+        byteLength,
+      );
+    }
+  }
+
   async storeFromBytes(
     input: StoreStoredObjectFromBytesInput,
   ): Promise<StoreStoredObjectFromBytesResult> {
@@ -63,7 +97,7 @@ export class StoredObjectUploadService {
       id,
     });
     if (existing?.status === "available") {
-      assertByteFacts(existing, bytes.byteLength);
+      StoredObjectUploadService.assertByteFacts(existing, bytes.byteLength);
       if (!existing.audiences.includes(input.audience)) {
         await this.options.store.save({
           ...existing,
@@ -75,7 +109,7 @@ export class StoredObjectUploadService {
       return { reference: storedObjectReferenceOf(existing), isDuplicate: true };
     }
 
-    const address = await storageCall(() =>
+    const address = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.write({
         projectId: input.projectId,
         objectId: id,
@@ -110,7 +144,7 @@ export class StoredObjectUploadService {
     try {
       await this.options.store.save(record);
     } catch (error) {
-      await ignoreStorageFailure(() =>
+      await StoredObjectUploadService.ignoreStorageFailure(() =>
         this.options.storage.delete({ projectId: input.projectId, address }),
       );
 
@@ -136,7 +170,7 @@ export class StoredObjectUploadService {
       id,
     });
     if (existing?.status === "available") {
-      assertByteFacts(existing, input.byteLength);
+      StoredObjectUploadService.assertByteFacts(existing, input.byteLength);
 
       return { status: "existing", reference: storedObjectReferenceOf(existing) };
     }
@@ -144,7 +178,7 @@ export class StoredObjectUploadService {
     const operationId = this.operationId();
     const now = this.now();
     const expiresAt = new Date(now.getTime() + this.options.uploadExpiryMs);
-    const upload = await storageCall(() =>
+    const upload = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.tryCreateUpload({
         projectId: input.projectId,
         objectId: id,
@@ -162,7 +196,7 @@ export class StoredObjectUploadService {
     try {
       await this.options.store.save(record);
     } catch (error) {
-      await ignoreStorageFailure(() =>
+      await StoredObjectUploadService.ignoreStorageFailure(() =>
         this.options.storage.delete({
           projectId: input.projectId,
           address: upload.address,
@@ -213,7 +247,7 @@ export class StoredObjectUploadService {
       throw new UploadExpiredError(claims.operationId);
     }
 
-    const stat = await storageCall(() =>
+    const stat = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.tryStat({
         projectId: claims.projectId,
         address: claims.address,
@@ -272,40 +306,6 @@ export class StoredObjectUploadService {
     } catch {
       throw new UploadTokenInvalidError();
     }
-  }
-}
-
-export async function storageCall<T>(operation: () => Promise<T>): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    if (
-      error instanceof DirectUploadUnavailableError ||
-      error instanceof StoredObjectBytesMissingError
-    ) {
-      throw error;
-    }
-
-    throw new StorageUnavailableError();
-  }
-}
-
-export async function ignoreStorageFailure(operation: () => Promise<void>): Promise<void> {
-  try {
-    await operation();
-  } catch {
-    // The row remains a durable cleanup record for the next bounded pass.
-  }
-}
-
-export function assertByteFacts(value: StoredObjectRecord, byteLength: number): void {
-  if (value.byteLength !== byteLength) {
-    throw new StoredObjectIntegrityConflictError(
-      value.tenantId,
-      value.id,
-      value.byteLength,
-      byteLength,
-    );
   }
 }
 

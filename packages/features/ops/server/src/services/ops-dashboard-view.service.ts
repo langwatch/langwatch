@@ -14,8 +14,8 @@ import type {
   QueueSummaryInfo,
 } from "@langwatch/ops-contract";
 import { normalizeErrorMessage } from "../rules/ops-error-normalizer.rules";
-import { normalizeJobType } from "./ops-metrics-sampling.service";
-import type { OpsMetricsWindow } from "./ops-metrics-window.service";
+import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service";
+import type { OpsMetricsWindowService } from "./ops-metrics-window.service";
 
 export class OpsDashboardViewService {
   private constructor() {}
@@ -42,7 +42,7 @@ export class OpsDashboardViewService {
       }
 
       if (jType) {
-        const normalized = normalizeJobType(jType);
+        const normalized = OpsMetricsSamplingService.normalizeJobType(jType);
         const typeMap = pipelineMap.get(pName)!;
         if (!typeMap.has(normalized)) {
           typeMap.set(normalized, new Map());
@@ -67,7 +67,7 @@ export class OpsDashboardViewService {
     for (const queue of queues) {
       for (const group of queue.groups) {
         const pName = group.pipelineName ?? queue.displayName;
-        const jType = normalizeJobType(group.jobType ?? "default");
+        const jType = OpsMetricsSamplingService.normalizeJobType(group.jobType ?? "default");
         const jName = group.jobName ?? "default";
 
         ensurePath(pName, jType, jName);
@@ -142,7 +142,7 @@ export class OpsDashboardViewService {
     writerId,
     leaseEpoch,
   }: {
-    window: OpsMetricsWindow;
+    window: OpsMetricsWindowService;
     latestDetail: DetailSnapshot | null;
     writerId: string;
     leaseEpoch: number;
@@ -207,7 +207,7 @@ export class OpsDashboardViewService {
     window,
     redisInfo,
   }: {
-    window: OpsMetricsWindow;
+    window: OpsMetricsWindowService;
     redisInfo: RedisInfo;
   }): Pick<
     DashboardData,

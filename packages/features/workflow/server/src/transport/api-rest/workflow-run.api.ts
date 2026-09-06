@@ -311,6 +311,7 @@ export function createWorkflowRunRestApp(options: {
             description:
               "Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one stays for callers written against it. The body is the workflow's own input fields, named as its entry node names them.",
             tags: ["Workflows"],
+            requestBody: workflowRunRequestBody,
             responses: workflowRunResponses,
           }),
     )
@@ -326,6 +327,7 @@ export function createWorkflowRunRestApp(options: {
           description:
             "Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's published version; address a specific version with the `{versionId}` form of this path. The body is the workflow's own input fields, named as its entry node names them.",
           tags: ["Workflows"],
+          requestBody: workflowRunRequestBody,
           responses: workflowRunResponses,
         }),
     )
@@ -346,6 +348,7 @@ export function createWorkflowRunRestApp(options: {
             description:
               "Run one pinned version of an Optimization Studio workflow synchronously and return its output. Use this when a caller must keep hitting the same version as the workflow is edited. The body is the workflow's own input fields, named as its entry node names them.",
             tags: ["Workflows"],
+            requestBody: workflowRunRequestBody,
             responses: workflowRunResponses,
           }),
     )

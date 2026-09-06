@@ -44,6 +44,7 @@ const {
 
 vi.mock("../../../behavior/use-public-env", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
+  usePublicEnvWithCapabilities: () => ({ data: publicEnvRef.current }),
 }));
 
 vi.mock("../../../behavior/auth-api", () => ({

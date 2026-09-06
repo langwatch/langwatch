@@ -7,9 +7,9 @@ import {
   ObjectStorageMigrateTask,
   parseMigrationTaskConfig,
   StoredObjectsClickHousePort,
-  ClickHouseStoredObjectsRepository,
   type StoredObjectsClickHouseClient,
 } from "@langwatch/stored-object-server";
+import { ClickHouseStoredObjectsRepository } from "@langwatch/stored-object-server/composition/stored-objects";
 import type { TasksHost } from "./tasks-host.composition";
 
 /**

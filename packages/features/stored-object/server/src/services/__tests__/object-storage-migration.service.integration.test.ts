@@ -16,7 +16,7 @@ import {
   ObjectStorageMigrationService,
   type QueueMigrationBlocker,
 } from "../object-storage-migration.service";
-import { createMigrationStorageEndpoint } from "../object-storage-migration-transfer.service";
+import { createMigrationStorageEndpoint } from "../../rules/object-storage-migration-transfer.rules";
 
 class MemoryDriver implements StoredObjectStorageDriver {
   readonly objects = new Map<string, Buffer>();

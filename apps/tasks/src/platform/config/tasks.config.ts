@@ -19,7 +19,7 @@ export const tasksConfigDefinition = RuntimeConfig.define({
   storage: { ...objectStorageConfigDefinition },
   /** Consumed by `ModelProviderCredentialsMigrateTask`; absent means that
    * task refuses at run time rather than at catalogue construction. */
-  credentialsSecret: Config.secret({ optional: true, env: "CREDENTIALS_SECRET" }),
+  credentialsSecret: Config.optionalSecret({ env: "CREDENTIALS_SECRET" }),
   /**
    * Whether this is the managed cloud. The system-migration pass reads it to decide pacing:
    * cloud is paced per organization by enrollment rows, a self-hosted installation admits every

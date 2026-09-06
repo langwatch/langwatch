@@ -13,7 +13,6 @@ import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-s
 import type { GatewayVirtualKeysPort } from "../ports/gateway-virtual-key.port";
 import {
   ROTATION_GRACE_MS,
-  serialiseForAudit,
   VirtualKeyValidationService,
   type CreatedVirtualKey,
   type RotateVirtualKeyInput,
@@ -59,7 +58,7 @@ export class VirtualKeyRotationService {
       });
     }
 
-    const before = serialiseForAudit(existing);
+    const before = VirtualKeyValidationService.serialiseForAudit(existing);
     const newSecret = this.crypto.mintSecret();
     const { displayPrefix: newDisplayPrefix } = this.crypto.parseSecret(newSecret);
     const newHashedSecret = this.crypto.hashSecret(newSecret);
@@ -94,7 +93,7 @@ export class VirtualKeyRotationService {
           targetKind: "virtual_key",
           targetId: vk.id,
           before,
-          after: serialiseForAudit(vk),
+          after: VirtualKeyValidationService.serialiseForAudit(vk),
         },
         tx,
       );

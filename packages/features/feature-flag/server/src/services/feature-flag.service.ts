@@ -32,10 +32,10 @@ import type {
 } from "../repositories/feature-flag-experiment-setting.repository";
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository";
 import type { FeatureFlagRowStore } from "../stores/feature-flag-row.store";
-import { OrganizationCreatedAtCache } from "./organization-created-at-cache.service";
+import { OrganizationCreatedAtCacheService } from "./organization-created-at-cache.service";
 
 export class FeatureFlagService extends FeatureFlagServiceContract {
-  private readonly organizationAges: OrganizationCreatedAtCache;
+  private readonly organizationAges: OrganizationCreatedAtCacheService;
 
   private constructor(
     private readonly rows: FeatureFlagRowStore,
@@ -45,7 +45,7 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     private readonly registry: FeatureFlagRegistry,
   ) {
     super();
-    this.organizationAges = OrganizationCreatedAtCache.create({ repository });
+    this.organizationAges = OrganizationCreatedAtCacheService.create({ repository });
   }
 
   static create(options: {

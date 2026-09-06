@@ -74,14 +74,6 @@ const EMPTY_PHASE = {
   peakLatencyP99Ms: 0,
 } as const;
 
-export function emptyPhases(): DashboardData["phases"] {
-  return {
-    commands: { ...EMPTY_PHASE },
-    projections: { ...EMPTY_PHASE },
-    reactions: { ...EMPTY_PHASE },
-  };
-}
-
 /**
  * Raw `__jobType` values become the projection-kind node names the health join looks up: folds enqueue as `projection`, maps
  * as `handler`, state projections as `stateProjection`. Filing `handler` under `fold` (as this did until #7322) left every map
@@ -94,53 +86,60 @@ export interface PeakBucket {
   latencyP99Ms: number;
 }
 
-/** Field-wise max, so neither side of a handover loses a peak it observed. */
-export function mergePeakBucket(mine: PeakBucket | undefined, theirs: PeakBucket): PeakBucket {
-  if (!mine) {
-    return { ...theirs };
-  }
-
-  return {
-    completedPerSec: Math.max(mine.completedPerSec, theirs.completedPerSec),
-    failedPerSec: Math.max(mine.failedPerSec, theirs.failedPerSec),
-    latencyP50Ms: Math.max(mine.latencyP50Ms, theirs.latencyP50Ms),
-    latencyP99Ms: Math.max(mine.latencyP99Ms, theirs.latencyP99Ms),
-  };
-}
-
-/**
- * Union two rolling histories by timestamp, newest window kept.
- */
-export function mergeThroughput({
-  mine,
-  theirs,
-}: {
-  mine: ThroughputPoint[];
-  theirs: ThroughputPoint[];
-}): ThroughputPoint[] {
-  const byTimestamp = new Map<number, ThroughputPoint>();
-  for (const point of mine) {
-    byTimestamp.set(point.timestamp, point);
-  }
-
-  for (const point of theirs) {
-    byTimestamp.set(point.timestamp, point);
-  }
-
-  const cutoff = Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
-
-  return Array.from(byTimestamp.values())
-    .filter((point) => point.timestamp > cutoff)
-    .sort((a, b) => a.timestamp - b.timestamp)
-    .slice(-THROUGHPUT_BUFFER_SIZE);
-}
-
 /**
  * One collector's live accumulators, folded with the fleet's persisted copy on takeover. Only the
  * pod holding the snapshot lease scans and publishes (ADR-090), and readers read the artifacts it
  * persists, so tabs served by different pods cannot disagree.
  */
-export class OpsMetricsWindow {
+export class OpsMetricsWindowService {
+  /** An all-zero phase rollup, the shape every phase-derived figure starts from. */
+  static emptyPhases(): DashboardData["phases"] {
+    return {
+      commands: { ...EMPTY_PHASE },
+      projections: { ...EMPTY_PHASE },
+      reactions: { ...EMPTY_PHASE },
+    };
+  }
+
+  /** Field-wise max, so neither side of a handover loses a peak it observed. */
+  static mergePeakBucket(mine: PeakBucket | undefined, theirs: PeakBucket): PeakBucket {
+    if (!mine) {
+      return { ...theirs };
+    }
+
+    return {
+      completedPerSec: Math.max(mine.completedPerSec, theirs.completedPerSec),
+      failedPerSec: Math.max(mine.failedPerSec, theirs.failedPerSec),
+      latencyP50Ms: Math.max(mine.latencyP50Ms, theirs.latencyP50Ms),
+      latencyP99Ms: Math.max(mine.latencyP99Ms, theirs.latencyP99Ms),
+    };
+  }
+
+  /** Union two rolling histories by timestamp, newest window kept. */
+  static mergeThroughput({
+    mine,
+    theirs,
+  }: {
+    mine: ThroughputPoint[];
+    theirs: ThroughputPoint[];
+  }): ThroughputPoint[] {
+    const byTimestamp = new Map<number, ThroughputPoint>();
+    for (const point of mine) {
+      byTimestamp.set(point.timestamp, point);
+    }
+
+    for (const point of theirs) {
+      byTimestamp.set(point.timestamp, point);
+    }
+
+    const cutoff = Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
+
+    return Array.from(byTimestamp.values())
+      .filter((point) => point.timestamp > cutoff)
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(-THROUGHPUT_BUFFER_SIZE);
+  }
+
   throughputBuffer: ThroughputPoint[] = [];
   lastTotalInFlight = 0;
   lastTimestamp = Date.now();
@@ -148,7 +147,7 @@ export class OpsMetricsWindow {
   currentIngestedPerSec = 0;
   currentCompletedPerSec = 0;
   currentFailedPerSec = 0;
-  currentPhases: DashboardData["phases"] = emptyPhases();
+  currentPhases: DashboardData["phases"] = OpsMetricsWindowService.emptyPhases();
   currentLatencyP50Ms = 0;
   currentLatencyP99Ms = 0;
   peakCompletedPerSec = 0;
@@ -218,8 +217,8 @@ export class OpsMetricsWindow {
   prevCompleted = new Map<string, number>();
   prevFailed = new Map<string, number>();
 
-  static create(): OpsMetricsWindow {
-    return new OpsMetricsWindow();
+  static create(): OpsMetricsWindowService {
+    return new OpsMetricsWindowService();
   }
 
   async restore(metrics: OpsMetricsRepository): Promise<void> {
@@ -241,11 +240,14 @@ export class OpsMetricsWindow {
       this.peakLatencyP99Ms = Math.max(this.peakLatencyP99Ms, state.peakLatencyP99Ms);
 
       for (const [key, value] of Object.entries(state.peakPhases)) {
-        this.peakPhases[key] = mergePeakBucket(this.peakPhases[key], value);
+        this.peakPhases[key] = OpsMetricsWindowService.mergePeakBucket(this.peakPhases[key], value);
       }
 
       for (const [key, value] of state.peakJobNames) {
-        this.peakJobNames.set(key, mergePeakBucket(this.peakJobNames.get(key), value));
+        this.peakJobNames.set(
+          key,
+          OpsMetricsWindowService.mergePeakBucket(this.peakJobNames.get(key), value),
+        );
       }
 
       // Backfill parkedCount on points persisted before the Parked series
@@ -253,7 +255,7 @@ export class OpsMetricsWindow {
       // state version is intentionally not bumped: this keeps the rolling
       // history AND the accumulated peaks across the deploy (a bump would zero
       // them, including the freshly-added Completed/s peak tile).
-      this.throughputBuffer = mergeThroughput({
+      this.throughputBuffer = OpsMetricsWindowService.mergeThroughput({
         mine: this.throughputBuffer,
         theirs: state.throughputBuffer.map((p) => ({
           ...p,

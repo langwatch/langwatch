@@ -159,6 +159,7 @@ export class AdminBackofficeService {
         `legacy sso columns are derived: ${retiredColumns.join(", ")}`,
       );
     }
+
     if (typeof data.ssoDomain === "string" && data.ssoDomain.trim() !== "") {
       data.ssoDomain = data.ssoDomain.trim().toLowerCase();
     }

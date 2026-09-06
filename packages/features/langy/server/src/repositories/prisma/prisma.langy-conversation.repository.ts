@@ -1,5 +1,5 @@
 import type { Prisma } from "@langwatch/prisma-client/generated";
-import type { LangyDatabase } from "./prisma.langy-database.repository";
+import type { LangyDatabase } from "./prisma.langy-database";
 
 import { LangyConversationRepository } from "../langy-conversation-projection.repository";
 import type {

@@ -13,6 +13,7 @@ import {
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
+  projectOf,
   type ServiceContext,
 } from "@langwatch/api/rest";
 import {
@@ -102,11 +103,6 @@ export function createModelProvidersRestApp(options: {
   // authenticates and sets `project`), so it is applied per route rather than
   // app-wide.
   const organizationMiddleware = resolveOrganization(organizations);
-
-  const projectOf = (c: ServiceContext<EndpointVariables>): AppRestProjectVariables["project"] =>
-    (c as unknown as { get: (key: "project") => AppRestProjectVariables["project"] }).get(
-      "project",
-    );
 
   const listProvidersHandler = async (c: ServiceContext<EndpointVariables>) => {
     const project = projectOf(c);

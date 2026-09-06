@@ -15,6 +15,7 @@ export * from "./model/langy-conversation-date";
 export * from "./model/langy-empty-state-metrics";
 export * from "./model/langy-feedback-directive";
 export * from "./model/langy-feature-map";
+export * from "./model/langy-project-reach";
 export * from "./ui/sections/langy-home-suggestions";
 export * from "./model/langy-model-profile";
 export * from "./model/langy-model-suggestions";

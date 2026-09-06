@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import type { GdprUserDataEraseDatabase } from "../repositories/prisma/prisma.user-data-erase.repository";
+import type { GdprUserDataEraseRepository } from "../repositories/prisma/prisma.user-data-erase.repository";
 
 const logger = createLogger("langwatch:task:user-data-erase");
 
@@ -16,66 +16,23 @@ export type GdprUserDataEraseOutcome = {
   blockers: string[];
 };
 
-async function getSoleOwnedOrganizations(database: GdprUserDataEraseDatabase, userId: string) {
-  return database.organization.findMany({
-    where: { members: { some: { userId }, every: { userId } } },
-    select: { id: true, name: true },
-  });
-}
-
-async function getSharedOrganizations(database: GdprUserDataEraseDatabase, userId: string) {
-  return database.organization.findMany({
-    where: { members: { some: { userId } }, NOT: { members: { every: { userId } } } },
-    select: { id: true, name: true, _count: { select: { members: true } } },
-  });
-}
-
-async function getSoleOwnedTeams(database: GdprUserDataEraseDatabase, userId: string) {
-  return database.team.findMany({
-    where: { members: { some: { userId }, every: { userId } } },
-    select: { id: true, name: true },
-  });
-}
-
-async function getSharedTeams(database: GdprUserDataEraseDatabase, userId: string) {
-  return database.team.findMany({
-    where: { members: { some: { userId } }, NOT: { members: { every: { userId } } } },
-    select: { id: true, name: true, _count: { select: { members: true } } },
-  });
-}
-
-async function getProjectsUnderTeams(database: GdprUserDataEraseDatabase, teamIds: string[]) {
-  if (teamIds.length === 0) return [];
-  return database.project.findMany({
-    where: { teamId: { in: teamIds } },
-    select: { id: true, name: true, slug: true, teamId: true },
-  });
-}
-
 /**
  * The two ways a deletion would strand someone else: this user is the last
  * ADMIN of an organization they don't solely own, or a sole-owned
  * organization has a team someone else still belongs to.
  */
 async function checkBlockingConditions(
-  database: GdprUserDataEraseDatabase,
+  repository: GdprUserDataEraseRepository,
   userId: string,
   soleOwnedOrgs: { id: string }[],
 ): Promise<string[]> {
   const blockers: string[] = [];
 
-  const sharedOrgsWhereUserIsSoleAdmin = await database.organization.findMany({
-    where: {
-      members: { some: { userId, role: "ADMIN" } },
-      NOT: { members: { every: { userId } } },
-    },
-    select: { id: true, name: true },
-  });
+  const sharedOrgsWhereUserIsSoleAdmin =
+    await repository.findSharedOrgsWhereUserIsSoleAdmin(userId);
 
   for (const org of sharedOrgsWhereUserIsSoleAdmin) {
-    const otherAdmins = await database.organizationUser.count({
-      where: { organizationId: org.id, role: "ADMIN", NOT: { userId } },
-    });
+    const otherAdmins = await repository.countOtherAdmins({ organizationId: org.id, userId });
     if (otherAdmins === 0) {
       blockers.push(
         `User is sole ADMIN of shared organization "${org.name}" (${org.id}). Assign another admin first.`,
@@ -84,10 +41,11 @@ async function checkBlockingConditions(
   }
 
   const soleOwnedOrgIds = soleOwnedOrgs.map((org) => org.id);
-  const teamsUnderSoleOrgsWithOtherMembers = await database.team.findMany({
-    where: { organizationId: { in: soleOwnedOrgIds }, members: { some: { NOT: { userId } } } },
-    select: { id: true, name: true },
-  });
+  const teamsUnderSoleOrgsWithOtherMembers =
+    await repository.findTeamsUnderSoleOrgsWithOtherMembers({
+      organizationIds: soleOwnedOrgIds,
+      userId,
+    });
 
   for (const team of teamsUnderSoleOrgsWithOtherMembers) {
     blockers.push(
@@ -104,30 +62,30 @@ async function checkBlockingConditions(
  * deleting would strand another member.
  */
 export async function runGdprUserDataErase({
-  database,
+  repository,
   email,
   execute,
 }: {
-  database: GdprUserDataEraseDatabase;
+  repository: GdprUserDataEraseRepository;
   email: string;
   execute: boolean;
 }): Promise<GdprUserDataEraseOutcome> {
-  const user = await database.user.findUnique({ where: { email } });
+  const user = await repository.findUserByEmail(email);
   if (!user) {
     throw new Error(`No user found with email: ${email}`);
   }
   const userId = user.id;
 
   const [soleOwnedOrgs, sharedOrgs, soleOwnedTeams, sharedTeams] = await Promise.all([
-    getSoleOwnedOrganizations(database, userId),
-    getSharedOrganizations(database, userId),
-    getSoleOwnedTeams(database, userId),
-    getSharedTeams(database, userId),
+    repository.findSoleOwnedOrganizations(userId),
+    repository.findSharedOrganizations(userId),
+    repository.findSoleOwnedTeams(userId),
+    repository.findSharedTeams(userId),
   ]);
 
   const soleOwnedTeamIds = soleOwnedTeams.map((team) => team.id);
-  const projects = await getProjectsUnderTeams(database, soleOwnedTeamIds);
-  const blockers = await checkBlockingConditions(database, userId, soleOwnedOrgs);
+  const projects = await repository.findProjectsUnderTeams(soleOwnedTeamIds);
+  const blockers = await checkBlockingConditions(repository, userId, soleOwnedOrgs);
 
   const outcome: GdprUserDataEraseOutcome = {
     userId,
@@ -155,109 +113,14 @@ export async function runGdprUserDataErase({
   const soleOwnedOrgIds = soleOwnedOrgs.map((org) => org.id);
   const projectIds = projects.map((project) => project.id);
 
-  // In dependency order: nullify what points at the user from entities that
-  // outlive them, delete sole-owned projects and their children, delete
-  // sole-owned teams and organizations, drop shared memberships, then the
-  // user's own rows and the user itself.
-  await database.$transaction(
-    async (tx) => {
-      await tx.annotation.updateMany({ where: { userId }, data: { userId: null } });
-      await tx.shareLink.updateMany({ where: { userId }, data: { userId: null } });
-      await tx.workflow.updateMany({
-        where: { publishedById: userId },
-        data: { publishedById: null },
-      });
-      await tx.workflowVersion.deleteMany({ where: { authorId: userId } });
-      await tx.llmPromptConfigVersion.updateMany({
-        where: { authorId: userId },
-        data: { authorId: null },
-      });
-      await tx.annotationQueueItem.updateMany({ where: { userId }, data: { userId: null } });
-      await tx.annotationQueueItem.updateMany({
-        where: { createdByUserId: userId },
-        data: { createdByUserId: null },
-      });
-      await tx.auditLog.updateMany({
-        where: { userId },
-        data: { userId: "[deleted]", ipAddress: null, userAgent: null },
-      });
-      await tx.annotationQueueMembers.deleteMany({ where: { userId } });
+  await repository.eraseUserAndOwnedResources({
+    userId,
+    projectIds,
+    soleOwnedTeamIds,
+    soleOwnedOrgIds,
+  });
 
-      if (projectIds.length > 0) {
-        const configIds = (
-          await tx.llmPromptConfig.findMany({
-            where: { projectId: { in: projectIds } },
-            select: { id: true },
-          })
-        ).map((config) => config.id);
-        await tx.llmPromptConfigVersion.deleteMany({ where: { configId: { in: configIds } } });
-        await tx.llmPromptConfig.deleteMany({ where: { projectId: { in: projectIds } } });
-
-        await tx.workflow.updateMany({
-          where: { projectId: { in: projectIds } },
-          data: { latestVersionId: null, currentVersionId: null },
-        });
-        await tx.workflowVersion.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.workflow.deleteMany({ where: { projectId: { in: projectIds } } });
-
-        await tx.batchEvaluation.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.monitor.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.experiment.deleteMany({ where: { projectId: { in: projectIds } } });
-
-        const queueIds = (
-          await tx.annotationQueue.findMany({
-            where: { projectId: { in: projectIds } },
-            select: { id: true },
-          })
-        ).map((queue) => queue.id);
-        await tx.annotationQueueItem.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.annotationQueueScores.deleteMany({
-          where: { annotationQueueId: { in: queueIds } },
-        });
-        await tx.annotationQueueMembers.deleteMany({
-          where: { annotationQueueId: { in: queueIds } },
-        });
-        await tx.annotationQueue.deleteMany({ where: { projectId: { in: projectIds } } });
-
-        await tx.datasetRecord.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.dataset.deleteMany({ where: { projectId: { in: projectIds } } });
-
-        await tx.customGraph.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.dashboard.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.trigger.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.annotation.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.shareLink.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.topic.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.cost.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.modelProviderScope.deleteMany({
-          where: { scopeType: "PROJECT", scopeId: { in: projectIds } },
-        });
-
-        await tx.project.deleteMany({ where: { id: { in: projectIds } } });
-      }
-
-      if (soleOwnedTeamIds.length > 0) {
-        await tx.teamUser.deleteMany({ where: { teamId: { in: soleOwnedTeamIds } } });
-        await tx.team.deleteMany({ where: { id: { in: soleOwnedTeamIds } } });
-      }
-
-      if (soleOwnedOrgIds.length > 0) {
-        await tx.organizationUser.deleteMany({
-          where: { organizationId: { in: soleOwnedOrgIds } },
-        });
-        await tx.organization.deleteMany({ where: { id: { in: soleOwnedOrgIds } } });
-      }
-
-      await tx.teamUser.deleteMany({ where: { userId } });
-      await tx.organizationUser.deleteMany({ where: { userId } });
-      await tx.account.deleteMany({ where: { userId } });
-      await tx.session.deleteMany({ where: { userId } });
-      await tx.user.delete({ where: { id: userId } });
-    },
-    { timeout: 120_000, maxWait: 30_000 },
-  );
-
-  const remaining = await database.user.findUnique({ where: { id: userId } });
+  const remaining = await repository.findUserById(userId);
   if (remaining) {
     throw new Error("Deletion verification failed: user still exists");
   }
@@ -275,12 +138,16 @@ export class UserDataEraseTask extends Task {
   readonly description =
     "Deletes a user's Postgres data for a GDPR erasure request. Pass the email, then --execute to write.";
 
-  private constructor(private readonly database: () => GdprUserDataEraseDatabase) {
+  private constructor(private readonly repository: () => GdprUserDataEraseRepository) {
     super();
   }
 
-  static create({ database }: { database: () => GdprUserDataEraseDatabase }): UserDataEraseTask {
-    return new UserDataEraseTask(database);
+  static create({
+    repository,
+  }: {
+    repository: () => GdprUserDataEraseRepository;
+  }): UserDataEraseTask {
+    return new UserDataEraseTask(repository);
   }
 
   async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -291,7 +158,7 @@ export class UserDataEraseTask extends Task {
       );
     }
     await runGdprUserDataErase({
-      database: this.database(),
+      repository: this.repository(),
       email,
       execute: args.includes("--execute"),
     });

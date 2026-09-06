@@ -15,7 +15,7 @@ import {
   requireRegisteredMigration,
   statusOfMemberSummary,
   type SystemMigrationsServiceDependencies,
-} from "./system-migration-support.service";
+} from "../rules/system-migration-support.rules";
 
 export class SystemMigrationRunService {
   static create(deps: SystemMigrationsServiceDependencies): SystemMigrationRunService {

@@ -651,7 +651,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
   const runPath = "/api/v1/query";
 
   const shippedService = () =>
-    new LangWatchQLService({
+    LangWatchQLService.create({
       executor: ClickHouseLangWatchQLExecutorAdapter.create({
         connection: {
           ...harness.restrictedConnection(),
@@ -1292,7 +1292,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       // Half an hour into the newest seeded bucket. Injected rather than waited
       // for: the claim is about the relationship between the result and the
       // instant, and a wall clock would make it true only once.
-      service = new LangWatchQLService({
+      service = LangWatchQLService.create({
         executor: ClickHouseLangWatchQLExecutorAdapter.create({
           connection: {
             ...harness.restrictedConnection(),

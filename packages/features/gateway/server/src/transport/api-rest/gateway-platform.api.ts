@@ -3,6 +3,7 @@
  */
 
 import { apiKeyPermission } from "@langwatch/api";
+import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import {
   apiErrorBody,
   apiErrorSchema,
@@ -531,8 +532,12 @@ type GatewayErrorContext = Parameters<RestErrorHandler>[1];
 /**
  * Identity this request authorizes as, plus the id audit rows record. Which principal a credential stands for is the process's decision (a scoped API key acts as its owning user; a legacy project key carries none and acts as a synthetic machine principal for its project) — the application answers it, this transport only supplies the two facts it holds.
  */
+type ActorRequestReader = Parameters<typeof projectOf>[0] & {
+  get(key: "resolvedToken"): ResolvedApiKeyToken | undefined;
+};
+
 function actorForRequest(
-  c: GatewayContext,
+  c: ActorRequestReader,
   app: GatewayApp,
 ): { actor: GatewayActor; actorUserId: string } {
   return app.actorForCredential({
@@ -546,7 +551,7 @@ function actorForRequest(
  * Budgets and cache rules are org-owned rows a project credential addresses by id, so every write reaches the whole tenant. The route's declared permission resolves at the caller's OWN project; this resolves the same permission at the organization the write actually acts on.
  */
 async function authorizeOrganizationWide(
-  c: GatewayContext,
+  c: ActorRequestReader,
   app: GatewayApp,
   input: { organizationId: string; permission: AuthzPermission },
 ): Promise<void> {
@@ -697,13 +702,12 @@ export function createGatewayPlatformRestApp(options: {
    * permission, declared as a pre-flight so it runs on a replay too.
    */
   const organizationWidePreflight = async (
-    c: Parameters<RestErrorHandler>[1],
+    c: ActorRequestReader,
     permission: AuthzPermission,
   ): Promise<void> => {
     const app = gateway();
-    const context = c as GatewayContext;
-    await authorizeOrganizationWide(context, app, {
-      organizationId: await app.organizationIdForProject(projectOf(context).id),
+    await authorizeOrganizationWide(c, app, {
+      organizationId: await app.organizationIdForProject(projectOf(c).id),
       permission,
     });
   };
@@ -824,7 +828,7 @@ export function createGatewayPlatformRestApp(options: {
               const data = input as z.infer<typeof createVirtualKeySchema>;
               const project = projectOf(c);
               const organizationId = await app.organizationIdForProject(project.id);
-              const { actor } = actorForRequest(c as GatewayContext, app);
+              const { actor } = actorForRequest(c, app);
               await app.authorizeVirtualKeyCreate({
                 actor,
                 organizationId,

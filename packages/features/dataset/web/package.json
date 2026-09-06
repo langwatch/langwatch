@@ -19,8 +19,8 @@
       "default": "./src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx"
     },
     "./surfaces/dataset-picker-list": {
-      "types": "./src/ui/elements/datasets/dataset-picker-list.tsx",
-      "default": "./src/ui/elements/datasets/dataset-picker-list.tsx"
+      "types": "./src/ui/sections/dataset-picker-list.tsx",
+      "default": "./src/ui/sections/dataset-picker-list.tsx"
     },
     "./surfaces/dataset-editor-table": {
       "types": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx",

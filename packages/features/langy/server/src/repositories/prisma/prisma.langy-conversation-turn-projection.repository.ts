@@ -14,7 +14,7 @@ import {
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 import { Prisma } from "@langwatch/prisma-client/generated";
-import type { LangyDatabase } from "./prisma.langy-database.repository";
+import type { LangyDatabase } from "./prisma.langy-database";
 
 /**
  * The status values this column accepts, derived from the ONE definition rather

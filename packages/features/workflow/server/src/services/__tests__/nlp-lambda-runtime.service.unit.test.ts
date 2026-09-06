@@ -4,7 +4,10 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { NlpLambdaArnCachePort, NlpLambdaArnResolverPort } from "../../ports/nlp-lambda-arn.port";
-import { NLP_LAMBDA_ARN_CACHE_TTL_SECONDS, NlpLambdaRuntime } from "../nlp-lambda-runtime.service";
+import {
+  NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
+  NlpLambdaRuntimeService,
+} from "../nlp-lambda-runtime.service";
 
 const IMAGE = "ecr/foo:v1";
 const NEXT_IMAGE = "ecr/foo:v2";
@@ -47,7 +50,7 @@ function runtime(options: {
   resolver: NlpLambdaArnResolverPort;
   imageUri?: string;
 }) {
-  return NlpLambdaRuntime.create({
+  return NlpLambdaRuntimeService.create({
     cache: options.cache,
     resolver: options.resolver,
     imageUri: options.imageUri ?? IMAGE,

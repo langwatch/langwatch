@@ -28,7 +28,7 @@ export class LangWatchQLAdapter {
   ): LangWatchQLService {
     const { connection, ...overrides } = options;
 
-    return new LangWatchQLService({
+    return LangWatchQLService.create({
       executor: connection ? ClickHouseLangWatchQLExecutorAdapter.create({ connection }) : null,
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
       ...overrides,

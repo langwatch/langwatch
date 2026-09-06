@@ -1,4 +1,5 @@
-import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
+import type { ClickHouseSettings } from "@clickhouse/client";
+import type { OpsExplainClientResolution } from "../ports/ops-explain-client.port";
 
 /**
  * The one call this repository makes, as it asks for it. Narrower than the
@@ -11,19 +12,6 @@ export interface OpsExplainQueryClient {
     clickhouse_settings?: ClickHouseSettings;
     unscoped?: { reason: string };
   }): Promise<{ json(): Promise<unknown[]> }>;
-}
-
-export interface OpsExplainClientResolution {
-  client: ClickHouseClient;
-  /** True when the dedicated `langwatch_ops` readonly user is not
-   *  configured on this instance and the call fell back to the
-   *  default-user shared client. */
-  usingFallback: boolean;
-}
-
-/** Complete composition port for selecting the dedicated or shared client. */
-export abstract class OpsExplainClientResolver {
-  abstract tryResolve(): OpsExplainClientResolution | null;
 }
 
 /**

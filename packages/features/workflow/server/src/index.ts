@@ -26,7 +26,7 @@ export {
 } from "./adapters/workflow-nlp-runtime.adapter";
 export {
   InvokePayloadTooLargeError,
-  NlpInvokeTransport,
+  NlpInvokeTransportAdapter,
   type NlpInvokeRequest,
   type NlpInvokeResponse,
   type NlpInvokeStagingConfig,
@@ -46,7 +46,7 @@ export {
 export {
   NLP_LAMBDA_ARN_CACHE_PREFIX,
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
-  NlpLambdaRuntime,
+  NlpLambdaRuntimeService,
 } from "./services/nlp-lambda-runtime.service";
 export {
   LWA_DEFAULT_STATUS,

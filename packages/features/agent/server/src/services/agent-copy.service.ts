@@ -60,6 +60,7 @@ export class AgentCopyService {
     if (source.type === "connected") {
       throw new AgentRegisterOnlyError();
     }
+
     let workflowId: string | undefined;
     const sourceWorkflowId = linkedWorkflowId(source);
     if (source.type === "workflow" && sourceWorkflowId) {

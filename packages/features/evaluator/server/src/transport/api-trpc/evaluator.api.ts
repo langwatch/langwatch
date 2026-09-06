@@ -396,12 +396,13 @@ export class EvaluatorTrpcApi {
             .handle(async ({ ctx, input }) => {
               const copies = await ctx.app.evaluatorApp.getCopies(input);
 
-              const authorizedCopies = await Promise.all(
+              const results = await Promise.all(
                 copies.map(async (c) => ({
                   copy: c,
                   hasPermission: await ctx.can("evaluations:view", { projectId: c.projectId }),
                 })),
-              ).then((results) => results.filter((r) => r.hasPermission).map((r) => r.copy));
+              );
+              const authorizedCopies = results.filter((r) => r.hasPermission).map((r) => r.copy);
 
               return authorizedCopies;
             }),

@@ -14,40 +14,36 @@ import type {
   RedisInfo,
 } from "@langwatch/ops-contract";
 import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository";
-import {
-  emptyPhases,
-  JOB_NAME_COUNTER_PREFIX,
-  type OpsMetricsWindow,
-} from "./ops-metrics-window.service";
+import { JOB_NAME_COUNTER_PREFIX, OpsMetricsWindowService } from "./ops-metrics-window.service";
 
 const logger = createLogger("langwatch:ops:metrics-sampling");
-
-export function normalizeJobType(jobType: string): string {
-  const lower = jobType.toLowerCase();
-  if (lower === "projection") {
-    return "fold";
-  }
-
-  if (lower === "handler") {
-    return "map";
-  }
-
-  if (lower === "stateprojection") {
-    return "state";
-  }
-
-  if (lower === "reaction") {
-    return "reactor";
-  }
-
-  return jobType;
-}
 
 export class OpsMetricsSamplingService {
   private constructor(private readonly metrics: OpsMetricsRepository) {}
 
   static create({ metrics }: { metrics: OpsMetricsRepository }): OpsMetricsSamplingService {
     return new OpsMetricsSamplingService(metrics);
+  }
+
+  static normalizeJobType(jobType: string): string {
+    const lower = jobType.toLowerCase();
+    if (lower === "projection") {
+      return "fold";
+    }
+
+    if (lower === "handler") {
+      return "map";
+    }
+
+    if (lower === "stateprojection") {
+      return "state";
+    }
+
+    if (lower === "reaction") {
+      return "reactor";
+    }
+
+    return jobType;
   }
 
   static mapJobTypeToPhase(
@@ -100,7 +96,7 @@ export class OpsMetricsSamplingService {
   }
 
   aggregatePhaseCounts(queues: QueueInfo[]): DashboardData["phases"] {
-    const phases = emptyPhases();
+    const phases = OpsMetricsWindowService.emptyPhases();
     for (const q of queues) {
       for (const g of q.groups) {
         const phase = OpsMetricsSamplingService.mapJobTypeToPhase(g.jobType);
@@ -161,7 +157,7 @@ export class OpsMetricsSamplingService {
     queues,
     elapsed,
   }: {
-    window: OpsMetricsWindow;
+    window: OpsMetricsWindowService;
     queueNames: string[];
     queues: QueueInfo[];
     elapsed: number;
@@ -229,7 +225,7 @@ export class OpsMetricsSamplingService {
     queues,
     elapsed,
   }: {
-    window: OpsMetricsWindow;
+    window: OpsMetricsWindowService;
     queueNames: string[];
     queues: QueueInfo[];
     elapsed: number;

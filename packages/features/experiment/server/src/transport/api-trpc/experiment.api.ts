@@ -256,6 +256,13 @@ const datasetIdOf = (dsl: unknown): string | undefined => {
   return (entry?.data as { dataset?: { id?: string } } | undefined)?.dataset?.id;
 };
 
+/** The most recently created run in a list, or undefined for an empty list. */
+function latestRunOf<T extends { timestamps: { createdAt: number } }>(
+  runs: readonly T[],
+): T | undefined {
+  return runs.slice().sort((a, b) => b.timestamps.createdAt - a.timestamps.createdAt)[0];
+}
+
 const projectScopeSchema = z.object({ projectId: z.string() });
 
 /**
@@ -436,24 +443,26 @@ export class ExperimentTrpcApi {
           .withOutput(experimentWorkbenchPageSchema)
           .withPermission("experiments:view")
           .handle(async ({ ctx, input }) => {
-            const workbench = await ctx.app.experiments
+            const workbenchState = await ctx.app.experiments
               .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
               .catch(mapExperimentError);
             return {
-              id: workbench.experimentId,
-              slug: workbench.slug,
-              workbenchState: workbench.state,
-              version: workbench.version,
-              updatedAt: workbench.updatedAt,
+              id: workbenchState.experimentId,
+              slug: workbenchState.slug,
+              workbenchState: workbenchState.state,
+              version: workbenchState.version,
+              updatedAt: workbenchState.updatedAt,
               // Who wrote the version the probing tab is comparing against. A tab
               // that has to tell its reader their work is out of date owes them the
               // name: Langy usually wrote it, on their behalf, in the page they are
               // looking at, and "somewhere else" reads as a stranger.
-              ...(workbench.actorLabel !== undefined ? { actorLabel: workbench.actorLabel } : {}),
+              ...(workbenchState.actorLabel !== undefined
+                ? { actorLabel: workbenchState.actorLabel }
+                : {}),
               // The run that wrote it, when a run did. A tab coming back from the
               // background adopts a version its own run wrote instead of standing
               // down over a write it already holds every cell of.
-              ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
+              ...(workbenchState.runId !== undefined ? { runId: workbenchState.runId } : {}),
             };
           }),
       )
@@ -470,22 +479,24 @@ export class ExperimentTrpcApi {
           .withOutput(experimentWorkbenchVersionProbeSchema)
           .withPermission("experiments:view")
           .handle(async ({ ctx, input }) => {
-            const workbench = await ctx.app.experiments
+            const workbenchState = await ctx.app.experiments
               .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
               .catch(mapExperimentError);
             return {
-              experimentId: workbench.experimentId,
-              version: workbench.version,
-              updatedAt: workbench.updatedAt,
+              experimentId: workbenchState.experimentId,
+              version: workbenchState.version,
+              updatedAt: workbenchState.updatedAt,
               // Who wrote the version the probing tab is comparing against. A tab
               // that has to tell its reader their work is out of date owes them the
               // name: Langy usually wrote it, on their behalf, in the page they are
               // looking at, and "somewhere else" reads as a stranger.
-              ...(workbench.actorLabel !== undefined ? { actorLabel: workbench.actorLabel } : {}),
+              ...(workbenchState.actorLabel !== undefined
+                ? { actorLabel: workbenchState.actorLabel }
+                : {}),
               // The run that wrote it, when a run did. A tab coming back from the
               // background adopts a version its own run wrote instead of standing
               // down over a write it already holds every cell of.
-              ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
+              ...(workbenchState.runId !== undefined ? { runId: workbenchState.runId } : {}),
             };
           }),
       )
@@ -785,9 +796,9 @@ export class ExperimentTrpcApi {
             const totalHits = nonLegacyExperiments.length;
 
             // Pagination is applied after excluding legacy online evaluations.
-            const experiments = nonLegacyExperiments.slice(pageOffset, pageOffset + pageSize);
+            const pagedExperiments = nonLegacyExperiments.slice(pageOffset, pageOffset + pageSize);
 
-            const datasetIds = experiments
+            const datasetIds = pagedExperiments
               .map((experiment) => datasetIdOf(experiment.workflow?.currentVersion?.dsl))
               .filter((id): id is string => !!id);
 
@@ -799,15 +810,13 @@ export class ExperimentTrpcApi {
 
             const runsByExperimentId = await ctx.app.experiments.listRuns({
               projectId: input.projectId,
-              experimentIds: experiments.map((experiment) => experiment.id),
+              experimentIds: pagedExperiments.map((experiment) => experiment.id),
             });
 
-            const experimentsWithDatasetsAndRuns = experiments
+            const experimentsWithDatasetsAndRuns = pagedExperiments
               .map((experiment) => {
                 const runs = runsByExperimentId[experiment.id] ?? [];
-                const latestRun = runs.sort(
-                  (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
-                )[0];
+                const latestRun = latestRunOf(runs);
                 const primaryMetric = latestRun
                   ? Object.values(latestRun.summary.evaluations)[0]
                   : undefined;

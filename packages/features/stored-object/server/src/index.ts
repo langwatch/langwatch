@@ -106,8 +106,6 @@ export {
   type StoredObjectS3Target,
 } from "./ports/stored-object-s3-target.port";
 export { storedObjectSchema, type StoredObject } from "./rules/stored-object-row.rules";
-export { StoredObjectsRepository } from "./repositories/stored-objects.repository";
-export { ClickHouseStoredObjectsRepository } from "./repositories/clickhouse/stored-objects.repository";
 export {
   StoredObjectsService,
   deriveStoredObjectId,

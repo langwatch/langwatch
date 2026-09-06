@@ -14,8 +14,8 @@ import { Config, RuntimeConfig } from "./runtime-config";
  * know.
  */
 export const observabilityConfigDefinition = RuntimeConfig.define({
-  apiKey: Config.secret({ optional: true, env: "LANGWATCH_API_KEY" }),
-  endpoint: Config.url({ optional: true, env: "LANGWATCH_ENDPOINT" }),
+  apiKey: Config.optionalSecret({ env: "LANGWATCH_API_KEY" }),
+  endpoint: Config.optionalUrl({ env: "LANGWATCH_ENDPOINT" }),
   processorType: Config.value(z.enum(["simple", "batch"]).default("batch"), {
     env: "LANGWATCH_PROCESSOR_TYPE",
   }),

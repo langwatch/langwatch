@@ -153,17 +153,9 @@ export type ConfigValue<Definition> =
     ? Value
     : Definition extends readonly unknown[]
       ? Definition
-      : Definition extends string
-        ? string
-        : Definition extends number
-          ? number
-          : Definition extends boolean
-            ? boolean
-            : Definition extends Record<string, unknown>
-              ? {
-                  [Key in keyof Definition]: ConfigValue<Definition[Key]>;
-                }
-              : Definition;
+      : Definition extends Record<string, unknown>
+        ? { [Key in keyof Definition]: ConfigValue<Definition[Key]> }
+        : WidenPrimitive<Definition>;
 
 type DefinitionRuntimeConfigOptions<Definition extends RuntimeConfigDefinition> = {
   name: string;
@@ -377,31 +369,22 @@ type WidenPrimitive<Value> = Value extends string
       ? boolean
       : Value;
 
-function configUrl(options?: { env?: string; optional?: false }): ConfigLeaf<string>;
-function configUrl(options: { env?: string; optional: true }): ConfigLeaf<string | undefined>;
-function configUrl(options?: { env?: string; optional?: boolean }): ConfigLeaf<string | undefined> {
-  const schema = z.string().url();
-
-  return {
-    _configLeaf: true,
-    schema: options?.optional ? schema.optional() : schema,
-    env: options?.env,
-  };
+function configUrl(options?: { env?: string }): ConfigLeaf<string> {
+  return { _configLeaf: true, schema: z.string().url(), env: options?.env };
 }
 
-function configSecret(options?: { env?: string; optional?: false }): ConfigLeaf<string>;
-function configSecret(options: { env?: string; optional: true }): ConfigLeaf<string | undefined>;
-function configSecret(options?: {
-  env?: string;
-  optional?: boolean;
-}): ConfigLeaf<string | undefined> {
-  const schema = z.string().min(1);
+/** The same URL, absent where the deployment does not set it. */
+function configOptionalUrl(options?: { env?: string }): ConfigLeaf<string | undefined> {
+  return { _configLeaf: true, schema: z.string().url().optional(), env: options?.env };
+}
 
-  return {
-    _configLeaf: true,
-    schema: options?.optional ? schema.optional() : schema,
-    env: options?.env,
-  };
+/** The same secret, absent where the deployment does not set it. */
+function configOptionalSecret(options?: { env?: string }): ConfigLeaf<string | undefined> {
+  return { _configLeaf: true, schema: z.string().min(1).optional(), env: options?.env };
+}
+
+function configSecret(options?: { env?: string }): ConfigLeaf<string> {
+  return { _configLeaf: true, schema: z.string().min(1), env: options?.env };
 }
 
 function configInteger(defaultValue?: number, options?: { env?: string }): ConfigLeaf<number> {
@@ -424,7 +407,9 @@ function configEnum<const Values extends readonly [string, ...string[]]>(
 export const Config = {
   value: configValue,
   url: configUrl,
+  optionalUrl: configOptionalUrl,
   secret: configSecret,
+  optionalSecret: configOptionalSecret,
   integer: configInteger,
   enum: configEnum,
 };

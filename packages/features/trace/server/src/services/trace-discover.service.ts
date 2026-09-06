@@ -25,6 +25,7 @@ import {
   snapToWindowPreset,
   type DiscoverParams,
 } from "../rules/trace-list-cache-key.rules";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules";
 import { TtlCache } from "./trace-ttl-cache.service";
 import type { TraceTopicNamingService } from "./trace-topic-naming.service";
 import { TraceFacetDescriptorService } from "./trace-facet-descriptor.service";
@@ -65,10 +66,6 @@ export type DiscoverBroadcaster = (tenantId: string) => void;
 let discoverBroadcaster: DiscoverBroadcaster | null = null;
 
 const discoverLogger = createLogger("langwatch:app-layer:traces:trace-list-discover");
-
-export function isExpressionCategorical(def: FacetDefinition): def is ExpressionCategoricalDef {
-  return def.kind === "categorical" && "expression" in def;
-}
 
 /** Top values fetched per categorical facet during discovery. */
 const DISCOVER_TOP_N = 50;

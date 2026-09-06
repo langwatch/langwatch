@@ -20,9 +20,15 @@ const CANCEL_CHECK_INTERVAL_MS = 3000;
  * cancel request, and notices a takeover by another run — all three answered through one
  * `cancelled` flag, because for this run they mean the same thing: stop.
  */
-export class ReplayLockHeartbeat {
-  static create({ repo, runId }: { repo: ReplayRepository; runId: string }): ReplayLockHeartbeat {
-    return new ReplayLockHeartbeat(repo, runId);
+export class ReplayLockHeartbeatService {
+  static create({
+    repo,
+    runId,
+  }: {
+    repo: ReplayRepository;
+    runId: string;
+  }): ReplayLockHeartbeatService {
+    return new ReplayLockHeartbeatService(repo, runId);
   }
 
   private constructor(

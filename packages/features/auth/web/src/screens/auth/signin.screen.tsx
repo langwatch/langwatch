@@ -24,7 +24,7 @@ import Link from "../../ui/elements/router-link";
 import { useSearchParams } from "../../behavior/use-route";
 import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control";
 import { LogoIcon } from "../../ui/elements/logo-icon";
-import { usePublicEnv } from "../../behavior/use-public-env";
+import { usePublicEnvWithCapabilities } from "../../behavior/use-public-env";
 import { authFailureMessage } from "../../model/auth-failure-message";
 import { isStableAuthError, normalizeErrorCode, SignInError } from "./sign-in-error.screen";
 
@@ -66,7 +66,7 @@ function LegacySignIn() {
   // e.g. "account_already_linked_to_different_user" → "OAuthAccountNotLinked"
   const error = normalizeErrorCode(rawError);
 
-  const publicEnv = usePublicEnv({ includeCapabilities: true });
+  const publicEnv = usePublicEnvWithCapabilities();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
 

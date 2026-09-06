@@ -33,17 +33,17 @@ export const mailConfigDefinition = RuntimeConfig.define({
     endpoint: Config.value(z.string().optional(), { env: "AWS_SES_ENDPOINT" }),
   },
   sendgrid: {
-    apiKey: Config.secret({ optional: true, env: "SENDGRID_API_KEY" }),
+    apiKey: Config.optionalSecret({ env: "SENDGRID_API_KEY" }),
   },
   smtp: {
-    url: Config.secret({ optional: true, env: "SMTP_URL" }),
+    url: Config.optionalSecret({ env: "SMTP_URL" }),
     host: Config.value(z.string().optional(), { env: "SMTP_HOST" }),
     port: Config.value(z.string().optional(), { env: "SMTP_PORT" }),
     user: Config.value(z.string().optional(), { env: "SMTP_USER" }),
-    password: Config.secret({ optional: true, env: "SMTP_PASSWORD" }),
+    password: Config.optionalSecret({ env: "SMTP_PASSWORD" }),
     secure: Config.value(z.string().optional(), { env: "SMTP_SECURE" }),
   },
   resend: {
-    apiKey: Config.secret({ optional: true, env: "RESEND_API_KEY" }),
+    apiKey: Config.optionalSecret({ env: "RESEND_API_KEY" }),
   },
 });

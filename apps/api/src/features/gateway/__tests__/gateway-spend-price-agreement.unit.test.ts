@@ -27,13 +27,13 @@ import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_EVENT_VERSION_LATEST,
-  GatewaySpendFoldProjection,
   GatewaySpendRatingPort,
   type SpendUsage,
   type ConfirmSpendCommandData as GatewayConfirmSpendCommandData,
   type GatewaySpendConfirmedEvent,
   type GatewaySpendState,
 } from "@langwatch/gateway-server";
+import { GatewaySpendFoldProjection } from "@langwatch/gateway-server/composition/gateway-spend-fold";
 import {
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitPort,

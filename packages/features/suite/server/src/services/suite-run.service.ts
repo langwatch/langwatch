@@ -6,11 +6,9 @@ import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,
   declaredDefaults,
-  derivePlanName,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
   isDynamicScope,
-  normalizePlanScope,
   parseSuiteScope,
   RUN_ALL_SUITE_LABEL,
   RUN_ALL_SUITE_NAME,
@@ -20,11 +18,8 @@ import {
   suiteRunPlanInputSchema,
   suiteRunStateInputSchema,
   sortSuiteTargets,
-  SuiteNotFoundError,
   SuiteScopeEmptyError,
-  SuiteScopeNotAllowedError,
   SuiteTargetsRequiredError,
-  targetLabels,
   withCanonicalOverrides,
   type Suite,
   type SuiteBatchHistoryInput,
@@ -40,22 +35,16 @@ import {
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
-import type { AgentService } from "@langwatch/agent-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import type { PromptService } from "@langwatch/prompt-contract";
-import type { ScenarioService } from "@langwatch/scenario-contract";
 import {
-  jsonValueSchema,
   parseScenarioParameterDefinitions,
-  ScenarioTestSuiteNotFoundError,
   type ScenarioTestSuite,
 } from "@langwatch/scenario-contract";
-import { ConnectedTargetService, type ConnectedTargetAgent } from "./connected-target.service";
+import { ConnectedTargetService } from "./connected-target.service";
 import type { SuiteExecutionPort } from "../ports/suite-execution.port";
 import type { SuiteServiceOptions } from "./suite.service";
 import {
   defaultSuiteId,
-  isAgentTarget,
   suiteSlugOf,
   TARGET_SECRET_REFUSAL,
   targetsOverrideASecret,
@@ -98,7 +87,7 @@ export class SuiteRunService {
       id: parsed.id,
       projectId: parsed.projectId,
     });
-    const { scenarios, agents, prompts, execution } = this.options;
+    const { scenarios } = this.options;
     if (suite.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
@@ -147,7 +136,7 @@ export class SuiteRunService {
    */
   async runPlan(input: SuiteRunPlanInput): Promise<SuiteRunPlanResult> {
     const parsed = suiteRunPlanInputSchema.parse(input);
-    const { scenarios, agents, prompts, execution, repository } = this.options;
+    const { scenarios, repository } = this.options;
 
     if (parsed.config.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
@@ -298,7 +287,9 @@ export class SuiteRunService {
     scenarios: readonly { parameters: unknown }[];
     targets: readonly SuiteTarget[];
   }): void {
-    if (!targetsOverrideASecret(input)) return;
+    if (!targetsOverrideASecret(input)) {
+      return;
+    }
 
     throw new ValidationError(TARGET_SECRET_REFUSAL, {
       meta: { fieldErrors: { targets: [TARGET_SECRET_REFUSAL] } },

@@ -42,8 +42,8 @@ export const publicAppConfigProjectionDefinition = RuntimeConfig.define({
   demoProjectSlug: Config.value(z.string().min(1).optional(), { env: "DEMO_PROJECT_SLUG" }),
   isSaas: Config.value(exactTrue, { env: "IS_SAAS" }),
   gateway: {
-    publicUrl: Config.url({ optional: true, env: "LW_GATEWAY_PUBLIC_URL" }),
-    legacyUrl: Config.url({ optional: true, env: "LW_GATEWAY_BASE_URL" }),
+    publicUrl: Config.optionalUrl({ env: "LW_GATEWAY_PUBLIC_URL" }),
+    legacyUrl: Config.optionalUrl({ env: "LW_GATEWAY_BASE_URL" }),
   },
   telemetry: {
     rumEnabled: Config.value(exactTrue, { env: "RUM_ENABLED" }),
@@ -58,10 +58,10 @@ export const publicAppConfigProjectionDefinition = RuntimeConfig.define({
       env: "USE_AWS_SES",
     }),
     awsRegion: Config.value(z.string().optional(), { env: "AWS_REGION" }),
-    sendgridApiKey: Config.secret({ optional: true, env: "SENDGRID_API_KEY" }),
+    sendgridApiKey: Config.optionalSecret({ env: "SENDGRID_API_KEY" }),
     smtpUrl: Config.value(z.string().optional(), { env: "SMTP_URL" }),
     smtpHost: Config.value(z.string().optional(), { env: "SMTP_HOST" }),
-    resendApiKey: Config.secret({ optional: true, env: "RESEND_API_KEY" }),
+    resendApiKey: Config.optionalSecret({ env: "RESEND_API_KEY" }),
     nlpService: Config.value(z.string().optional(), { env: "LANGWATCH_NLP_SERVICE" }),
     nlpLambdaConfig: Config.value(z.string().optional(), { env: "LANGWATCH_NLP_LAMBDA_CONFIG" }),
     langevalsEndpoint: Config.value(z.string().optional(), { env: "LANGEVALS_ENDPOINT" }),

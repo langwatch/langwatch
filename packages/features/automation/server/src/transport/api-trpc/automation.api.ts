@@ -339,6 +339,10 @@ export class AutomationTrpcApi {
       ),
     });
 
+    /** The monitors a trigger's filters name, looked up in the project's already-fetched map. */
+    const checksForTrigger = (checkIds: string[], checksMap: Record<string, unknown>): unknown[] =>
+      checkIds.map((id) => checksMap[id]).filter(Boolean);
+
     return (
       createTrpcService({
         root: trpc,
@@ -474,7 +478,7 @@ export class AutomationTrpcApi {
               const enhancedTriggers = triggers.map((trigger) => {
                 const checkIds = extractCheckKeys(trigger.filters);
 
-                const checks = checkIds.map((id) => checksMap[id]).filter(Boolean);
+                const checks = checksForTrigger(checkIds, checksMap);
 
                 const customGraph = trigger.customGraphId
                   ? (customGraphsById.get(trigger.customGraphId) ?? null)

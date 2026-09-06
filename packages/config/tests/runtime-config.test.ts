@@ -44,7 +44,7 @@ describe("RuntimeConfig", () => {
     expect(environmentOneOrTrueSchema.parse("true")).toBe(true);
     expect(environmentOneOrTrueSchema.parse("TRUE")).toBe(true);
     expect(environmentOneOrTrueSchema.parse("True")).toBe(true);
-    expect(environmentOneOrTrueSchema.parse(true)).toBe(true);
+    expect(environmentOneOrTrueSchema.safeParse(true).success).toBe(true);
     expect(environmentOneOrTrueSchema.parse("yes")).toBe(false);
     expect(environmentOneOrTrueSchema.parse("0")).toBe(false);
     expect(environmentOneOrTrueSchema.parse("")).toBe(false);
@@ -55,7 +55,7 @@ describe("RuntimeConfig", () => {
   it("resolves nested semantic definitions from environment bindings", () => {
     const definition = RuntimeConfig.define({
       rateLimit: { ttlMs: 15_000, enabled: true },
-      endpoint: Config.url({ optional: true }),
+      endpoint: Config.optionalUrl(),
     });
 
     const config = RuntimeConfig.create({
@@ -105,8 +105,8 @@ describe("RuntimeConfig", () => {
       const config = RuntimeConfig.create({
         name: "optional service",
         definition: RuntimeConfig.define({
-          endpoint: Config.url({ optional: true }),
-          token: Config.secret({ optional: true }),
+          endpoint: Config.optionalUrl(),
+          token: Config.optionalSecret(),
         }),
         source: {},
       });
@@ -118,7 +118,7 @@ describe("RuntimeConfig", () => {
       expect(() =>
         RuntimeConfig.create({
           name: "optional service",
-          definition: RuntimeConfig.define({ endpoint: Config.url({ optional: true }) }),
+          definition: RuntimeConfig.define({ endpoint: Config.optionalUrl() }),
           source: { ENDPOINT: "not a url" },
         }),
       ).toThrow(InvalidRuntimeConfigError);
@@ -162,8 +162,8 @@ describe("RuntimeConfig", () => {
 
   it("exports the inferred value shape for service factories", () => {
     const definition = RuntimeConfig.define({
-      endpoint: Config.url({ optional: true }),
-      token: Config.secret({ optional: true }),
+      endpoint: Config.optionalUrl(),
+      token: Config.optionalSecret(),
       retries: Config.integer(2),
       region: Config.value("local"),
     });

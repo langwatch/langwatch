@@ -9,7 +9,6 @@ import {
 import {
   AzureDatasetStorageAdapter,
   DatasetAzureConfigResolver,
-  PrismaDatasetContentRepository,
   DatasetNormalizationService,
   DatasetNormalizeAdapter,
   DatasetS3ClientResolver,
@@ -18,10 +17,13 @@ import {
   PostgresDatasetAdapter,
   S3DatasetStorageAdapter,
   type DatasetAzureConfig,
-  type DatasetContentDatabase,
   type DatasetS3ClientLease,
   type DatasetStorage,
 } from "@langwatch/dataset-server";
+import {
+  PrismaDatasetContentRepository,
+  type DatasetContentDatabase,
+} from "@langwatch/dataset-server/composition/dataset-content";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
 import { createWorkerAzureBlobDriver } from "./worker-object-storage.composition";

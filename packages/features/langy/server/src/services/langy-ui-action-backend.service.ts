@@ -58,7 +58,10 @@ export class LangyUiActionBackendService {
     payload: unknown;
     experimentSlug?: string;
   }): Promise<unknown> {
-    if (!experimentSlug) throw new LangyUiExperimentRequiredError(kind);
+    if (!experimentSlug) {
+      throw new LangyUiExperimentRequiredError(kind);
+    }
+
     const actor: LangyBackendActor = { userId, label: LANGY_ACTOR_LABEL };
 
     switch (definition.backend) {
@@ -71,6 +74,7 @@ export class LangyUiActionBackendService {
           target: experimentSlug,
           payload,
         });
+
         return { source: "saved", version: read.version, ...read.projection };
       }
       case "transform":
@@ -113,17 +117,24 @@ export class LangyUiActionBackendService {
     isRetry?: boolean;
   }): Promise<unknown> {
     const transform = definition.transform;
-    if (!transform) throw new LangyUiHandlerFailedError(kind);
+    if (!transform) {
+      throw new LangyUiHandlerFailedError(kind);
+    }
 
     const current = await this.backend.readState({ projectId, target });
-    if (!current.state) throw new LangyUiHandlerFailedError(kind, "empty_state");
+    if (!current.state) {
+      throw new LangyUiHandlerFailedError(kind, "empty_state");
+    }
 
     let applied: { state: unknown; result?: unknown };
     try {
       applied = transform({ state: current.state, payload });
     } catch (error) {
       const refusal = tryReadTransformRefusalCode(error);
-      if (refusal) throw new LangyUiHandlerFailedError(kind, refusal);
+      if (refusal) {
+        throw new LangyUiHandlerFailedError(kind, refusal);
+      }
+
       throw error;
     }
 
@@ -142,8 +153,12 @@ export class LangyUiActionBackendService {
     // One retry on a concurrent write: re-read, re-apply, re-save. The
     // transform is pure, so replaying it over the fresh state is exactly what
     // a second attempt by hand would do. A second stale answer propagates.
-    if (isRetry) throw new LangyUiHandlerFailedError(kind, "stale_state");
+    if (isRetry) {
+      throw new LangyUiHandlerFailedError(kind, "stale_state");
+    }
+
     logger.info({ kind, target }, "stale save, retrying transform once");
+
     return await this.applyTransform({
       projectId,
       kind,
@@ -177,6 +192,7 @@ export class LangyUiActionBackendService {
     if (!started.started) {
       throw new LangyUiHandlerFailedError(kind, started.refusal);
     }
+
     return { runId: started.runId, status: "running", total: started.total };
   }
 }
@@ -185,5 +201,6 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     return value as Record<string, unknown>;
   }
+
   return null;
 }

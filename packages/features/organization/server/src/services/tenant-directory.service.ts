@@ -36,11 +36,17 @@ export class TenantDirectoryService {
    */
   async tryFindOrganizationForTenant(tenantId: string): Promise<string | null> {
     const projectOrganizationId = await this.reader.tryFindProjectOrganizationId(tenantId);
-    if (projectOrganizationId) return projectOrganizationId;
+    if (projectOrganizationId) {
+      return projectOrganizationId;
+    }
 
-    if (await this.reader.organizationExists(tenantId)) return tenantId;
+    if (await this.reader.organizationExists(tenantId)) {
+      return tenantId;
+    }
 
-    if (await this.reader.userExists(tenantId)) return PLATFORM_TENANT;
+    if (await this.reader.userExists(tenantId)) {
+      return PLATFORM_TENANT;
+    }
 
     return null;
   }

@@ -17,7 +17,7 @@ import {
   ObjectStorageMigrationService,
   type ObjectStorageMigrationDeps,
 } from "../services/object-storage-migration.service";
-import { createMigrationStorageEndpoint } from "../services/object-storage-migration-transfer.service";
+import { createMigrationStorageEndpoint } from "../rules/object-storage-migration-transfer.rules";
 import {
   MigrationCutoverRedisAuditAdapter,
   type MigrationCutoverRedisConfig,

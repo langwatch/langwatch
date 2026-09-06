@@ -46,6 +46,7 @@ vi.mock("../../../behavior/use-route", () => ({
 
 vi.mock("../../../behavior/use-public-env", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
+  usePublicEnvWithCapabilities: () => ({ data: publicEnvRef.current }),
 }));
 
 import Error from "../sign-in-error.screen";

@@ -3,9 +3,9 @@ import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import {
   DatasetPickerList as DatasetPickerListView,
   type DatasetPickerSelection,
-} from "../../blocks/dataset-picker-list";
+} from "../blocks/dataset-picker-list";
 
-export type { DatasetPickerSelection } from "../../..";
+export type { DatasetPickerSelection };
 
 /** App transport adapter for the browser-safe Dataset picker view. */
 export function DatasetPickerList({

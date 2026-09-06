@@ -259,10 +259,43 @@ function withArticle(noun: string): string {
 }
 
 /** Whether `node`, anywhere in its subtree, declares a class or instantiates one. */
+/**
+ * Built-ins a rules module may construct: a value, not a collaborator and not
+ * a reading of the world. `Date` is deliberately absent — `new Date()` is the
+ * clock, which is exactly the impurity this check exists to keep out of rules.
+ */
+const PURE_VALUE_CONSTRUCTORS = new Set([
+  "Error",
+  "TypeError",
+  "RangeError",
+  "Map",
+  "Set",
+  "WeakMap",
+  "WeakSet",
+  "RegExp",
+  "URL",
+  "URLSearchParams",
+  "TextEncoder",
+  "TextDecoder",
+  "Uint8Array",
+  "Uint16Array",
+  "Uint32Array",
+  "Int8Array",
+  "Int16Array",
+  "Int32Array",
+  "Float32Array",
+  "Float64Array",
+  "ArrayBuffer",
+  "DataView",
+]);
+
+function constructsPureValue(node: ts.NewExpression): boolean {
+  return ts.isIdentifier(node.expression) && PURE_VALUE_CONSTRUCTORS.has(node.expression.text);
+}
+
 function findClassOrNew(node: ts.Node): ts.Node | undefined {
-  if (ts.isClassDeclaration(node) || ts.isClassExpression(node) || ts.isNewExpression(node)) {
-    return node;
-  }
+  if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) return node;
+  if (ts.isNewExpression(node) && !constructsPureValue(node)) return node;
   let found: ts.Node | undefined;
   ts.forEachChild(node, (child) => {
     found ??= findClassOrNew(child);

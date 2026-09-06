@@ -26,22 +26,17 @@ import type {
 } from "../ports/gateway-virtual-key.port";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service";
 import {
-  assertExpiryInFuture,
-  assertProvidersAllowedShape,
-  diffGuardrailAttachments,
-  resolveRoutingMode,
-  serialiseForAudit,
   VirtualKeyValidationService,
   type CreatedVirtualKey,
   type CreateVirtualKeyInput,
   type UpdateVirtualKeyInput,
 } from "./virtual-key-validation.service";
 
-type GuardrailDelta = ReturnType<typeof diffGuardrailAttachments>;
+type GuardrailDelta = ReturnType<typeof VirtualKeyValidationService.diffGuardrailAttachments>;
 
 /** What an edit resolves to before the write: the merged config and every derived column. */
 interface UpdatePlan {
-  before: ReturnType<typeof serialiseForAudit>;
+  before: ReturnType<typeof VirtualKeyValidationService.serialiseForAudit>;
   config: VirtualKeyConfig;
   guardrailDelta: GuardrailDelta;
   routingMode: VirtualKeyRoutingMode;
@@ -105,9 +100,12 @@ export class VirtualKeyProvisioningService {
       );
     }
 
-    const routingMode = resolveRoutingMode(input.routingMode, input.routingPolicyId ?? null);
-    assertProvidersAllowedShape(input.config?.providersAllowed);
-    assertExpiryInFuture({ expiresAt: input.expiresAt });
+    const routingMode = VirtualKeyValidationService.resolveRoutingMode(
+      input.routingMode,
+      input.routingPolicyId ?? null,
+    );
+    VirtualKeyValidationService.assertProvidersAllowedShape(input.config?.providersAllowed);
+    VirtualKeyValidationService.assertExpiryInFuture({ expiresAt: input.expiresAt });
 
     const traceProjectId = await this.validation.resolveStoredTraceDestination({
       organizationId: input.organizationId,
@@ -209,7 +207,7 @@ export class VirtualKeyProvisioningService {
         action: "gateway.virtual_key.created",
         targetKind: "virtual_key",
         targetId: vk.id,
-        after: serialiseForAudit(vk),
+        after: VirtualKeyValidationService.serialiseForAudit(vk),
       },
       tx,
     );
@@ -251,7 +249,7 @@ export class VirtualKeyProvisioningService {
     const config = input.config
       ? virtualKeyConfigSchema.parse({ ...previousConfig, ...input.config })
       : previousConfig;
-    const guardrailDelta = diffGuardrailAttachments(
+    const guardrailDelta = VirtualKeyValidationService.diffGuardrailAttachments(
       previousConfig.guardrailAttachments,
       config.guardrailAttachments,
     );
@@ -275,13 +273,16 @@ export class VirtualKeyProvisioningService {
           : existing.routingPolicyId;
     const routingMode =
       input.routingMode !== undefined || input.routingPolicyId !== undefined
-        ? resolveRoutingMode(input.routingMode ?? existing.routingMode, nextRoutingPolicyId)
+        ? VirtualKeyValidationService.resolveRoutingMode(
+            input.routingMode ?? existing.routingMode,
+            nextRoutingPolicyId,
+          )
         : existing.routingMode;
-    assertProvidersAllowedShape(input.config?.providersAllowed);
-    assertExpiryInFuture({ expiresAt: input.expiresAt });
+    VirtualKeyValidationService.assertProvidersAllowedShape(input.config?.providersAllowed);
+    VirtualKeyValidationService.assertExpiryInFuture({ expiresAt: input.expiresAt });
 
     return {
-      before: serialiseForAudit(existing),
+      before: VirtualKeyValidationService.serialiseForAudit(existing),
       config,
       guardrailDelta,
       routingMode,
@@ -347,7 +348,7 @@ export class VirtualKeyProvisioningService {
         targetKind: "virtual_key",
         targetId: vk.id,
         before: plan.before,
-        after: serialiseForAudit(vk),
+        after: VirtualKeyValidationService.serialiseForAudit(vk),
       },
       tx,
     );

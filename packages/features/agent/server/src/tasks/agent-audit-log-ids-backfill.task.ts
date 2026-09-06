@@ -4,7 +4,7 @@ import type {
   AgentAuditLogArgs,
   AgentAuditLogArgsInput,
   AgentAuditLogArgsValue,
-  AgentAuditLogBackfillDatabase,
+  AgentAuditLogBackfillRepository,
   AgentAuditLogRow,
 } from "../repositories/prisma/prisma.agent-audit-log-backfill.repository";
 
@@ -26,21 +26,21 @@ export type AgentAuditLogBackfillOutcome = Readonly<{
  * in the history drawer. Ported from main's `backfill-agent-audit-log-ids.ts`.
  */
 export async function backfillAgentAuditLogIds({
-  database,
+  repository,
   execute,
 }: {
-  database: AgentAuditLogBackfillDatabase;
+  repository: AgentAuditLogBackfillRepository;
   execute: boolean;
 }): Promise<AgentAuditLogBackfillOutcome> {
   const create = await backfillAction({
-    database,
+    repository,
     execute,
     action: "agents.create",
     missingKey: "id",
     candidates: ({ log }) => ({ projectId: log.projectId ?? "", window: windowOf(log) }),
   });
   const copy = await backfillAction({
-    database,
+    repository,
     execute,
     action: "agents.copy",
     missingKey: "newAgentId",
@@ -68,13 +68,13 @@ function windowOf(log: AgentAuditLogRow): { gte: Date; lte: Date } {
  * wrong id into the audit trail, which is worse than the missing one.
  */
 async function backfillAction({
-  database,
+  repository,
   execute,
   action,
   missingKey,
   candidates,
 }: {
-  database: AgentAuditLogBackfillDatabase;
+  repository: AgentAuditLogBackfillRepository;
   execute: boolean;
   action: string;
   missingKey: string;
@@ -84,10 +84,7 @@ async function backfillAction({
     copiedFromAgentId?: string;
   } | null;
 }): Promise<{ action: string; missing: number; patched: number; skipped: number }> {
-  const logs = await database.auditLog.findMany({
-    where: { action },
-    select: { id: true, projectId: true, createdAt: true, args: true },
-  });
+  const logs = await repository.findLogsByAction(action);
   const missing = logs.filter((log) => argsOf(log)[missingKey] === undefined);
 
   let patched = 0;
@@ -99,15 +96,7 @@ async function backfillAction({
       skipped += 1;
       continue;
     }
-    const matches = await database.agent.findMany({
-      where: {
-        projectId: query.projectId,
-        createdAt: query.window,
-        copiedFromAgentId: query.copiedFromAgentId,
-      },
-      orderBy: { createdAt: "asc" },
-      select: { id: true },
-    });
+    const matches = await repository.findCandidateAgents(query);
     const only = matches.length === 1 ? matches[0] : undefined;
     if (!only) {
       skipped += 1;
@@ -118,9 +107,9 @@ async function backfillAction({
       continue;
     }
     if (execute) {
-      await database.auditLog.update({
-        where: { id: log.id },
-        data: { args: { ...args, [missingKey]: only.id } as AgentAuditLogArgsInput },
+      await repository.patchLogArgs({
+        logId: log.id,
+        args: { ...args, [missingKey]: only.id } as AgentAuditLogArgsInput,
       });
     }
     patched += 1;
@@ -146,21 +135,21 @@ export class AgentAuditLogIdsBackfillTask extends Task {
   readonly description =
     "Adds the missing agent id to pre-fix agents.create and agents.copy audit logs. Dry-run unless --execute.";
 
-  private constructor(private readonly database: () => AgentAuditLogBackfillDatabase) {
+  private constructor(private readonly repository: () => AgentAuditLogBackfillRepository) {
     super();
   }
 
   static create({
-    database,
+    repository,
   }: {
-    database: () => AgentAuditLogBackfillDatabase;
+    repository: () => AgentAuditLogBackfillRepository;
   }): AgentAuditLogIdsBackfillTask {
-    return new AgentAuditLogIdsBackfillTask(database);
+    return new AgentAuditLogIdsBackfillTask(repository);
   }
 
   async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     const outcome = await backfillAgentAuditLogIds({
-      database: this.database(),
+      repository: this.repository(),
       execute: args.includes("--execute"),
     });
     logger.info({ outcome }, "agent audit-log id backfill finished");

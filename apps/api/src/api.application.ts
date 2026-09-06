@@ -456,7 +456,7 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
     rest: Hono | undefined,
     readonly topic: TopicApiFeature | undefined,
     private readonly features: ApiTrpcFeaturesPort<TRecord>,
-    private readonly validateOutput: boolean = false,
+    private readonly validateOutput = false,
   ) {
     this.root = createTrpcRoot(http?.errorFormatter ?? defaultErrorFormatter);
     const protectedProcedure = this.createProtectedProcedure();

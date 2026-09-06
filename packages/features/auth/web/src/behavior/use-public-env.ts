@@ -8,8 +8,8 @@
  * (which sign-in provider this installation is configured for, whether it can
  * send mail) needs a request, so it is a query on the transport.
  *
- * The same two overloads `platform/app`'s hook had, so no call site changed:
- * without `includeCapabilities` the answer is synchronous and never loading.
+ * Two hooks, because the answers differ in kind: `usePublicEnv` is synchronous
+ * and never loading, `usePublicEnvWithCapabilities` is a query.
  */
 
 import { authApi, type AuthViewerCapabilities } from "./auth-api";
@@ -26,26 +26,22 @@ type StaticEnvironmentResult = {
   isLoading: false;
 };
 
-export function usePublicEnv(options: { includeCapabilities: true }): CapabilityEnvironmentQuery;
-export function usePublicEnv(options?: { includeCapabilities?: false }): StaticEnvironmentResult;
-export function usePublicEnv(
-  options: { includeCapabilities?: boolean } = {},
-): CapabilityEnvironmentQuery | StaticEnvironmentResult {
-  const includeCapabilities = options.includeCapabilities ?? false;
+/** The static half alone: resolved by the shell, so never loading. */
+export function usePublicEnv(): StaticEnvironmentResult {
+  return { data: useAuthHost().publicEnvironment(), isLoading: false };
+}
+
+/** The static half plus the per-viewer capabilities the transport answers. */
+export function usePublicEnvWithCapabilities(): CapabilityEnvironmentQuery {
   const staticValues = useAuthHost().publicEnvironment();
   const capabilities = authApi.publicEnv.useQuery(
     {},
     {
-      enabled: includeCapabilities,
       staleTime: Infinity,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
     },
   );
-
-  if (!includeCapabilities) {
-    return { data: staticValues, isLoading: false } as const;
-  }
 
   return {
     ...capabilities,

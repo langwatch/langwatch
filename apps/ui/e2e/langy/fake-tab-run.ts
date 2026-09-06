@@ -169,10 +169,11 @@ async function streamRunEvents({
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      let index: number;
-      while ((index = buffer.indexOf("\n\n")) >= 0) {
+      let index = buffer.indexOf("\n\n");
+      while (index >= 0) {
         handleFrame(buffer.slice(0, index));
         buffer = buffer.slice(index + 2);
+        index = buffer.indexOf("\n\n");
       }
       if (outcome.terminal) break;
     }

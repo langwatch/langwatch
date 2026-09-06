@@ -1,8 +1,9 @@
 /**
- * Redis-backed registry binding an MCP OAuth `client_id` (RFC 7591 dynamic client registration)
- * to the `redirect_uris` it registered with.
+ * The MCP OAuth client registry: binds a `client_id` (RFC 7591 dynamic client
+ * registration) to the `redirect_uris` it registered with, over the Redis
+ * handle the caller already holds.
  */
-import type { HostedMcpRedis } from "../../ports/hosted-mcp.port";
+import type { HostedMcpRedis } from "../ports/hosted-mcp.port";
 
 const REDIS_CLIENT_PREFIX = "mcp:oauth:client:";
 
@@ -19,14 +20,14 @@ export interface RegisteredOAuthClient {
 }
 
 /**
- * The registry itself. Static members: a registration is addressed by the
- * Redis handle the caller already holds, so there is no per-instance state.
+ * Static members: a registration is addressed by the Redis handle the caller
+ * already holds, so there is no per-instance state.
  */
-export class RedisOAuthClientRepository {
+export class McpOAuthClientRegistryService {
   private constructor() {}
 
-  static create(): RedisOAuthClientRepository {
-    return new RedisOAuthClientRepository();
+  static create(): McpOAuthClientRegistryService {
+    return new McpOAuthClientRegistryService();
   }
 
   static async register({

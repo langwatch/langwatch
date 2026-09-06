@@ -23,7 +23,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { HostedMcpRedis } from "../../ports/hosted-mcp.port";
 import type { HostedMcpDependencies } from "../../ports/hosted-mcp.port";
-import { RedisOAuthClientRepository } from "../../repositories/redis/redis.oauth-client.repository";
+import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service";
 import { McpRateLimitService } from "../../services/mcp-rate-limit.service";
 
 const logger = createLogger("langwatch:mcp");
@@ -1076,7 +1076,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     const clientName = typeof body.client_name === "string" ? body.client_name : "MCP Client";
 
     try {
-      await RedisOAuthClientRepository.register({
+      await McpOAuthClientRegistryService.register({
         redis,
         clientId,
         client: { redirectUris: body.redirect_uris, clientName },
@@ -1201,7 +1201,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       // registration is gone that its *code* was bad sends it round the
       // authorize loop forever; `invalid_client` is the code that makes it
       // register again (RFC 6749 §5.2).
-      const registeredClient = await RedisOAuthClientRepository.tryGet({
+      const registeredClient = await McpOAuthClientRegistryService.tryGet({
         redis,
         clientId: clientIdParam,
       }).catch(() => null);

@@ -19,7 +19,7 @@ export const NLP_LAMBDA_ARN_CACHE_PREFIX = "lambda_arn:";
  */
 export const NLP_LAMBDA_ARN_CACHE_TTL_SECONDS = 600;
 
-export class NlpLambdaRuntime {
+export class NlpLambdaRuntimeService {
   static create(options: {
     cache: NlpLambdaArnCachePort;
     resolver: NlpLambdaArnResolverPort;
@@ -27,8 +27,8 @@ export class NlpLambdaRuntime {
     imageUri: string;
     ttlSeconds?: number;
     logger?: Pick<Logger, "warn">;
-  }): NlpLambdaRuntime {
-    return new NlpLambdaRuntime(options);
+  }): NlpLambdaRuntimeService {
+    return new NlpLambdaRuntimeService(options);
   }
 
   private readonly inFlight = new Map<string, Promise<string>>();
@@ -46,15 +46,20 @@ export class NlpLambdaRuntime {
   /** The function this project's engine answers on. */
   async resolveArn(projectId: string): Promise<string> {
     const shared = await this.tryReadShared(projectId);
-    if (shared) return shared;
+    if (shared) {
+      return shared;
+    }
 
     const running = this.inFlight.get(projectId);
-    if (running) return running;
+    if (running) {
+      return running;
+    }
 
     const resolution = this.resolveAndShare(projectId).finally(() => {
       this.inFlight.delete(projectId);
     });
     this.inFlight.set(projectId, resolution);
+
     return resolution;
   }
 
@@ -70,19 +75,27 @@ export class NlpLambdaRuntime {
       raw = await this.options.cache.tryGet(key);
     } catch (error) {
       this.options.logger?.warn({ error, projectId }, "shared NLP Lambda ARN cache is unreadable");
+
       return null;
     }
-    if (raw === null) return null;
 
-    const entry = NlpLambdaRuntime.parseEntry(raw);
-    if (!entry) return null;
+    if (raw === null) {
+      return null;
+    }
+
+    const entry = NlpLambdaRuntimeService.parseEntry(raw);
+    if (!entry) {
+      return null;
+    }
 
     if (entry.imageUri !== this.options.imageUri) {
       // Removed rather than left to expire: the stale ARN is the answer every
       // other pod would keep serving for the rest of the window.
       await this.forget(key, projectId);
+
       return null;
     }
+
     return entry.arn;
   }
 
@@ -102,6 +115,7 @@ export class NlpLambdaRuntime {
         "could not share the resolved NLP Lambda ARN",
       );
     }
+
     return arn;
   }
 
@@ -116,10 +130,19 @@ export class NlpLambdaRuntime {
   private static parseEntry(raw: string): NlpLambdaArnEntry | null {
     try {
       const parsed: unknown = JSON.parse(raw);
-      if (typeof parsed !== "object" || parsed === null) return null;
+      if (typeof parsed !== "object" || parsed === null) {
+        return null;
+      }
+
       const { arn, imageUri } = parsed as Record<string, unknown>;
-      if (typeof arn !== "string" || arn === "") return null;
-      if (typeof imageUri !== "string" || imageUri === "") return null;
+      if (typeof arn !== "string" || arn === "") {
+        return null;
+      }
+
+      if (typeof imageUri !== "string" || imageUri === "") {
+        return null;
+      }
+
       return { arn, imageUri };
     } catch {
       return null;

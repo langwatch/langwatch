@@ -358,6 +358,17 @@ function occurredAtFromInput(input: {
   return input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {};
 }
 
+/** One event's detail and metric key/value pairs, flattened for `Object.fromEntries`. */
+function eventAttributeEntries(event: {
+  event_details: readonly { key: string; value: unknown }[];
+  metrics: readonly { key: string; value: unknown }[];
+}): [string, unknown][] {
+  return [
+    ...event.event_details.map((d): [string, unknown] => [d.key, d.value]),
+    ...event.metrics.map((m): [string, unknown] => [m.key, m.value]),
+  ];
+}
+
 /**
  * Shared filter-translation step for the list/facets/newCount procedures.
  * Each one accepts the same `query` text + `projectId` + `timeRange` and
@@ -1294,7 +1305,7 @@ export class TracesV2TrpcApi {
             const protections = await ports.getViewerProtections(ctx, {
               projectId: input.projectId,
             });
-            const spans = await ctx.app.traces.readSpansSince({
+            const sinceSpans = await ctx.app.traces.readSpansSince({
               projectId: input.projectId,
               traceId: input.traceId,
               sinceStartTimeMs: input.sinceStartTimeMs,
@@ -1302,11 +1313,11 @@ export class TracesV2TrpcApi {
               occurredAtMs: input.occurredAtMs,
             });
             const redactions = buildSpanContentRedactions(
-              spans,
+              sinceSpans,
               protections,
               ports.mappers.spanProtection,
             );
-            return spans.map((span) =>
+            return sinceSpans.map((span) =>
               ports.mappers.spanProtection.applySpanProtections(span, protections, redactions),
             );
           }),
@@ -1574,7 +1585,7 @@ export class TracesV2TrpcApi {
               redactions,
             );
 
-            const detail = mapSpanToDetail(
+            const spanDetail = mapSpanToDetail(
               protectedSpan,
               rawEvents.map((e) => ({
                 name: e.event_type,
@@ -1583,10 +1594,7 @@ export class TracesV2TrpcApi {
                     ? e.timestamps.started_at
                     : parseInt(String(e.timestamps.started_at), 10),
                 attributes: ports.mappers.spanProtection.redactObject(
-                  Object.fromEntries([
-                    ...e.event_details.map((d) => [d.key, d.value]),
-                    ...e.metrics.map((m) => [m.key, m.value]),
-                  ]),
+                  Object.fromEntries(eventAttributeEntries(e)),
                   redactions,
                 ),
               })),
@@ -1600,42 +1608,42 @@ export class TracesV2TrpcApi {
             // SpanDetails). One extra trace-scoped read, only when the llm
             // span has no own prompt attrs.
             if (
-              detail.type === "llm" &&
+              spanDetail.type === "llm" &&
               // Coding-agent traces carry no `langwatch.prompt.*` anywhere, so the
               // full-trace ancestor walk is a guaranteed miss — skipping it makes
               // the enriched spanDetail read CHEAPER than before for these spans.
               !ports.codingAgentEnrichment.isCodingAgentShapedSpan(span) &&
-              !ports.hasOwnPromptAttrs(detail.params as Record<string, unknown> | null)
+              !ports.hasOwnPromptAttrs(spanDetail.params as Record<string, unknown> | null)
             ) {
               const enriched = await ports.resolveAncestorPromptParams({
                 tenantId: input.projectId,
                 traceId: input.traceId,
                 targetSpanId: input.spanId,
                 ...occurredAtFromInput(input),
-                currentParams: detail.params as Record<string, unknown> | null,
+                currentParams: spanDetail.params as Record<string, unknown> | null,
               });
               if (enriched) {
-                detail.params = enriched;
+                spanDetail.params = enriched;
               }
             }
 
             // Token usage with no price on it, offer the user a cost mapping.
             // The cheap guards run first; the rule lookup only fires for spans
             // that actually present the unmapped-cost symptom.
-            detail.costSuggestion = await ports.tryDeriveUnmappedCostSuggestion({
+            spanDetail.costSuggestion = await ports.tryDeriveUnmappedCostSuggestion({
               projectId: input.projectId,
-              model: detail.model ?? null,
-              cost: detail.metrics?.cost,
-              promptTokens: detail.metrics?.promptTokens,
-              completionTokens: detail.metrics?.completionTokens,
+              model: spanDetail.model ?? null,
+              cost: spanDetail.metrics?.cost,
+              promptTokens: spanDetail.metrics?.promptTokens,
+              completionTokens: spanDetail.metrics?.completionTokens,
             });
 
             const redactedDetail = redactV2Content(
-              detail,
+              spanDetail,
               protections,
               ports.mappers.contentPrivacy,
             );
-            const detailParams = detail.params as Record<string, unknown> | null;
+            const detailParams = spanDetail.params as Record<string, unknown> | null;
             redactedDetail.contentPrivacy = buildContentPrivacy(
               protections,
               readDroppedFromParams(detailParams, ports.mappers.contentPrivacy),
@@ -1676,7 +1684,7 @@ export class TracesV2TrpcApi {
               occurredAtMs: input.occurredAtMs,
             });
 
-            const spans = rows.map((r) => ({
+            const resourceSpans = rows.map((r) => ({
               spanId: r.spanId,
               parentSpanId: r.parentSpanId,
               resourceAttributes: withoutHiddenResourceAttrs(r.resourceAttributes),
@@ -1695,7 +1703,7 @@ export class TracesV2TrpcApi {
                 rootSpanId: root?.spanId ?? null,
                 resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
                 scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
-                spans,
+                spans: resourceSpans,
               },
               protections,
             });

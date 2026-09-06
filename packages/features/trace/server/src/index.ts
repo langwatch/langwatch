@@ -369,11 +369,7 @@ export {
   ClickHouseTraceLegacyReadAdapter,
   type ClickHouseTraceLegacyReadOptions,
 } from "./adapters/clickhouse.trace-legacy-read.adapter";
-export {
-  TraceEditOverlayRepository,
-  type TraceEditOverlayRow,
-} from "./repositories/trace-edit-overlay.repository";
-export { PrismaTraceEditOverlayRepository } from "./repositories/prisma/prisma.trace-edit-overlay.repository";
+export type { TraceEditOverlayRow } from "./repositories/trace-edit-overlay.repository";
 export {
   TraceService as TraceLegacyReadService,
   type BlobResolutionDeps,

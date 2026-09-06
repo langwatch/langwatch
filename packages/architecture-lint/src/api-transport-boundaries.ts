@@ -77,7 +77,7 @@ function transportSources(packages: readonly ClassifiedPackage[]): TransportSour
           join(pkg.root, "src", "features"),
         ];
     const isScannedApiApplicationSource = (file: string): boolean =>
-      isProductionSource(file) && !/\.mount\.ts$/.test(file);
+      isProductionSource(file) && !/\.(?:mount|composition)\.ts$/.test(file);
     for (const sourceRoot of sourceRoots) {
       for (const file of walkFiles(
         sourceRoot,
@@ -598,6 +598,20 @@ function parameterIsString(parameter: ts.ParameterDeclaration | undefined): bool
   return parameter?.type?.kind === ts.SyntaxKind.StringKeyword;
 }
 
+/**
+ * A procedure dispatcher answers over the wire, so it returns a Promise. A
+ * synchronous `query(name: string): string | undefined` is the request's own
+ * query-string reader, which names no procedure at all.
+ */
+function returnsPromise(type: ts.TypeNode | undefined): boolean {
+  if (!type) return true;
+  return (
+    ts.isTypeReferenceNode(type) &&
+    ts.isIdentifier(type.typeName) &&
+    type.typeName.text === "Promise"
+  );
+}
+
 function stringDispatchMember(node: ts.Expression): "query" | "mutate" | null {
   if (ts.isPropertyAccessExpression(node)) {
     return node.name.text === "query" || node.name.text === "mutate" ? node.name.text : null;
@@ -627,8 +641,11 @@ function stringLocatorViolations(file: string, source: ts.SourceFile): Architect
     if (
       (isMethod &&
         (methodName === "query" || methodName === "mutate") &&
-        parameterIsString(node.parameters[0])) ||
-      (isFunctionProperty && parameterIsString(node.type.parameters[0]))
+        parameterIsString(node.parameters[0]) &&
+        returnsPromise(node.type)) ||
+      (isFunctionProperty &&
+        parameterIsString(node.type.parameters[0]) &&
+        returnsPromise(node.type.type))
     ) {
       const dispatchName = methodName ?? functionPropertyName;
       violations.push({

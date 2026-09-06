@@ -36,7 +36,6 @@ import {
   langyTurnContextSchema,
   type LangyConversationDetail as ConversationDetail,
   type LangyConversationDetailDto,
-  type LangyConversationListCursorDto,
   type LangyConversationListItem as ConversationListItem,
   type LangyConversationListItemDto,
   type LangyCredentialSession,
@@ -55,7 +54,6 @@ import type { LocalControlRuntime } from "../../adapters/langy-local-control-run
 import { workspaceChannel } from "../../rules/langy-local-control-keys.rules";
 import { reconcileSkipPolicy } from "../../rules/langy-local-skip-policy.rules";
 import { toControlRequestWire } from "../../services/langy-local-control-request.service";
-import type { SkipPermissionsProviderRows } from "../../services/langy-skip-permissions.service";
 import type { SkipPermissionsDecision } from "../../services/langy-skip-permissions.service";
 
 const logger = createLogger("langwatch:langy:router");

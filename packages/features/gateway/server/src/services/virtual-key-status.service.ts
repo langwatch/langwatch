@@ -15,7 +15,6 @@ import type {
 } from "../ports/gateway-virtual-key.port";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service";
 import {
-  serialiseForAudit,
   VirtualKeyValidationService,
   type RevokeVirtualKeyInput,
 } from "./virtual-key-validation.service";
@@ -57,7 +56,7 @@ export class VirtualKeyStatusService {
       return existing;
     }
 
-    const before = serialiseForAudit(existing);
+    const before = VirtualKeyValidationService.serialiseForAudit(existing);
 
     return this.transactions
       .run(async (tx) => {
@@ -97,7 +96,7 @@ export class VirtualKeyStatusService {
             targetKind: "virtual_key",
             targetId: vk.id,
             before,
-            after: serialiseForAudit(vk),
+            after: VirtualKeyValidationService.serialiseForAudit(vk),
           },
           tx,
         );
@@ -137,7 +136,7 @@ export class VirtualKeyStatusService {
       });
     }
 
-    const before = serialiseForAudit(existing);
+    const before = VirtualKeyValidationService.serialiseForAudit(existing);
 
     return this.transactions
       .run(async (tx) => {
@@ -167,7 +166,7 @@ export class VirtualKeyStatusService {
             targetKind: "virtual_key",
             targetId: vk.id,
             before,
-            after: serialiseForAudit(vk),
+            after: VirtualKeyValidationService.serialiseForAudit(vk),
           },
           tx,
         );
@@ -203,7 +202,7 @@ export class VirtualKeyStatusService {
       });
     }
 
-    const before = serialiseForAudit(existing);
+    const before = VirtualKeyValidationService.serialiseForAudit(existing);
 
     return this.transactions
       .run(async (tx) => {
@@ -233,7 +232,7 @@ export class VirtualKeyStatusService {
             targetKind: "virtual_key",
             targetId: vk.id,
             before,
-            after: serialiseForAudit(vk),
+            after: VirtualKeyValidationService.serialiseForAudit(vk),
           },
           tx,
         );

@@ -15,6 +15,7 @@ import {
   type ScenarioExecutionPreparation,
   type ScenarioUnsuccessfulExecutionInput,
   type SimulationCancelRun,
+  type SimulationRecordAgentInstance,
   type SimulationDeleteRun,
   type SimulationFinishRun,
   type SimulationMessageSnapshot,
@@ -100,6 +101,9 @@ class UnreachableTasksAgentService extends AgentService {
   getConnectedByNameAndEnvironment(): Promise<never> {
     return this.refuse("getConnectedByNameAndEnvironment");
   }
+  getConnectedByName(): Promise<never> {
+    return this.refuse("getConnectedByName");
+  }
 }
 
 /**
@@ -145,6 +149,9 @@ class TasksSimulationExecution extends SimulationExecutionPort {
   deleteRun(_input: SimulationDeleteRun): Promise<void> {
     return this.refuse("deleteRun");
   }
+  recordAgentInstance(_input: SimulationRecordAgentInstance): Promise<void> {
+    return this.refuse("recordAgentInstance");
+  }
 }
 
 /**
@@ -182,6 +189,9 @@ class TasksScenarioExecution extends ScenarioExecutionService {
     throw new Error(
       "stalled-runs-backfill never dispatches prepare; only finishUnsuccessfulRun is wired.",
     );
+  }
+  recordAgentInstance(): Promise<void> {
+    return this.refuse("recordAgentInstance");
   }
 }
 

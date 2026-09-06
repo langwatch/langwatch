@@ -15,7 +15,7 @@ export {
   navigateResourceKindFor,
 } from "./rules/langy-navigate-resources.rules";
 export type { LangyRelayCompositionOptions } from "./adapters/langy.langy.adapter";
-export type { LangyDatabase } from "./repositories/prisma/prisma.langy-database.repository";
+export type { LangyDatabase } from "./repositories/prisma/prisma.langy-database";
 export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service";
 export {
   LANGY_CANDIDATE_PERMISSIONS,

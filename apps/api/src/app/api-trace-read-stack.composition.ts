@@ -10,6 +10,7 @@ import {
   TraceEditOverlayRestoreService,
   TraceMetadataWriteService,
 } from "@langwatch/trace-server";
+import { PrismaTraceEditOverlayRepository } from "@langwatch/trace-server/composition/trace-edit-overlay";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
@@ -68,7 +69,6 @@ import {
   SpanStorageService,
   TraceCanonicalisationService,
   ClickHouseTraceLegacyReadAdapter,
-  PrismaTraceEditOverlayRepository,
   TraceEditOverlayService,
   TraceIOExtractionService,
   TraceListClickHouseRepository,

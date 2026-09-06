@@ -13,7 +13,7 @@ import type {
 import { ClickHouseFacetRegistryAdapter } from "@langwatch/trace-server";
 
 import { facetValuesCacheKey, type FacetValuesParams } from "../rules/trace-list-cache-key.rules";
-import { isExpressionCategorical } from "./trace-discover.service";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules";
 import { TtlCache } from "./trace-ttl-cache.service";
 import type { TraceTopicNamingService } from "./trace-topic-naming.service";
 

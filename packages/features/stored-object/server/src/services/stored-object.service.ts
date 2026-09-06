@@ -30,7 +30,7 @@ import {
 } from "../ports/stored-object.port";
 import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store";
 import { storedObjectMetadataOf } from "../rules/stored-object-view.rules";
-import { StoredObjectUploadService, storageCall } from "./stored-object-upload.service";
+import { StoredObjectUploadService } from "./stored-object-upload.service";
 
 export type StoredObjectServiceOptions = Readonly<{
   store: StoredObjectStore;
@@ -97,7 +97,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
   async getById(input: { projectId: string; id: string }): Promise<ReadStoredObjectResult> {
     const value = await this.getAvailable(input);
     const address = this.getStorage(value);
-    const bytes = await storageCall(() =>
+    const bytes = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.tryRead({ projectId: input.projectId, address }),
     );
     if (!bytes) {

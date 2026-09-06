@@ -20,6 +20,10 @@
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"
+    },
+    "./composition/trace-edit-overlay": {
+      "types": "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts",
+      "default": "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts"
     }
   },
   "scripts": {

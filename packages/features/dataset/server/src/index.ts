@@ -70,11 +70,6 @@ export {
 export { DatasetNormalizeAdapter } from "./adapters/dataset-normalize.adapter";
 export { DatasetNormalizePort } from "./ports/dataset-normalize.port";
 export { DatasetNormalizationService } from "./services/dataset-normalization.service";
-export { DatasetContentRepository } from "./repositories/dataset-content.repository";
-export {
-  PrismaDatasetContentRepository,
-  type DatasetContentDatabase,
-} from "./repositories/prisma/prisma.dataset-content.repository";
 export * from "./rules/dataset-chunking.rules";
 export { DatasetChunkService } from "./services/dataset-chunk.service";
 export type {

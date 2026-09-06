@@ -16,7 +16,7 @@ import type {
 } from "@langwatch/ops-contract";
 import { OpsDashboardViewService } from "./ops-dashboard-view.service";
 import type { OpsMetricsSamplingService } from "./ops-metrics-sampling.service";
-import type { OpsMetricsWindow } from "./ops-metrics-window.service";
+import type { OpsMetricsWindowService } from "./ops-metrics-window.service";
 
 const logger = createLogger("langwatch:ops:metrics-publication");
 
@@ -40,7 +40,7 @@ export class OpsMetricsPublicationService {
   private constructor(
     private readonly ops: OpsService,
     private readonly sampling: OpsMetricsSamplingService,
-    private readonly window: OpsMetricsWindow,
+    private readonly window: OpsMetricsWindowService,
     private readonly writerId: string,
     private readonly queueNames: () => string[],
     private readonly lease: () => { token: string | null; epoch: number },
@@ -50,7 +50,7 @@ export class OpsMetricsPublicationService {
   static create(params: {
     ops: OpsService;
     sampling: OpsMetricsSamplingService;
-    window: OpsMetricsWindow;
+    window: OpsMetricsWindowService;
     writerId: string;
     queueNames: () => string[];
     lease: () => { token: string | null; epoch: number };

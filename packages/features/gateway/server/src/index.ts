@@ -19,8 +19,6 @@ export * from "./adapters/gateway-budget-ledger.adapter";
 export * from "./intents/gateway-spend.intent";
 export * from "./adapters/gateway-spend-events-clickhouse.adapter";
 export * from "./adapters/gateway-spend-cursor.adapter";
-export { GatewaySpendStore } from "./stores/gateway-spend/gateway-spend.store";
-export { GatewaySpendFoldProjection } from "./projections/gateway-spend.projection";
 export * from "./adapters/gateway-budget-dto.adapter";
 export * from "./adapters/gateway-virtual-key-dto.adapter";
 export {
@@ -157,6 +155,10 @@ export { VirtualKeyDirectBudgetService } from "./services/virtual-key-direct-bud
 export { GatewayConfigMaterialiserService } from "./services/gateway-config-materialisation.service";
 export { GatewayScopeResolutionService } from "./services/gateway-scope-resolution.service";
 export {
+  GatewayGuardrailEvaluationService,
+  type EvaluatorRunner,
+} from "./services/gateway-guardrail-evaluation.service";
+export {
   GatewayElevenLabsCredentialService,
   ELEVENLABS_DEFAULT_BASE_URL,
   ELEVENLABS_WEBHOOK_SECRET_KEY,
@@ -170,10 +172,7 @@ export {
   type GatewayRealtimeSessionCollaborators,
   type ReserveInput,
 } from "./services/gateway-realtime-session.service";
-export {
-  GatewayRealtimeSessionRepository,
-  type ReserveResult,
-} from "./repositories/gateway-realtime-session.repository";
+export type { ReserveResult } from "./repositories/gateway-realtime-session.repository";
 export { GatewaySpendScopeAdapter } from "./adapters/postgres.gateway-spend-scope.adapter";
 export {
   GatewayJwtAdapter,

@@ -26,6 +26,7 @@ vi.mock("../../../behavior/auth-client", () => ({
 
 vi.mock("../../../behavior/use-public-env", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
+  usePublicEnvWithCapabilities: () => ({ data: publicEnvRef.current }),
 }));
 
 vi.mock("../../../ui/elements/router-link", () => ({

@@ -62,7 +62,7 @@ export type NlpInvokeResponse = Readonly<{
  * behind a per-project Lambda ARN. Only the ARN path stages: a self-hosted
  * engine has no 6 MiB cap, so S3 there costs a round trip for nothing.
  */
-export class NlpInvokeTransport {
+export class NlpInvokeTransportAdapter {
   static create(options: {
     /** A plain base URL, or a Lambda function ARN. */
     target: string;
@@ -71,8 +71,8 @@ export class NlpInvokeTransport {
     staging: NlpPayloadStagingPort;
     /** Injected so a test drives the wire without a listener. */
     fetch?: typeof fetch;
-  }): NlpInvokeTransport {
-    return new NlpInvokeTransport(options);
+  }): NlpInvokeTransportAdapter {
+    return new NlpInvokeTransportAdapter(options);
   }
 
   private constructor(

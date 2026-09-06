@@ -2,4 +2,3 @@
 export abstract class SchedulerWakePort {
   abstract wake(): void;
 }
-

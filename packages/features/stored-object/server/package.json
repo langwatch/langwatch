@@ -24,6 +24,10 @@
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"
+    },
+    "./composition/stored-objects": {
+      "types": "./src/repositories/clickhouse/stored-objects.repository.ts",
+      "default": "./src/repositories/clickhouse/stored-objects.repository.ts"
     }
   },
   "scripts": {

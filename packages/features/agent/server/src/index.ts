@@ -123,4 +123,7 @@ export {
   backfillAgentAuditLogIds,
   type AgentAuditLogBackfillOutcome,
 } from "./tasks/agent-audit-log-ids-backfill.task";
-export type { AgentAuditLogBackfillDatabase } from "./repositories/prisma/prisma.agent-audit-log-backfill.repository";
+export {
+  AgentAuditLogBackfillRepository,
+  type AgentAuditLogBackfillDatabase,
+} from "./repositories/prisma/prisma.agent-audit-log-backfill.repository";

@@ -1,5 +1,5 @@
 import { Prisma } from "@langwatch/prisma-client/generated";
-import type { LangyDatabase } from "./prisma.langy-database.repository";
+import type { LangyDatabase } from "./prisma.langy-database";
 
 import { LangyCredentialRepository } from "../langy-credential.repository";
 

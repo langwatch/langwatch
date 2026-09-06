@@ -11,7 +11,7 @@ import {
   newerVersionTimestamp,
   paginate,
   sha256OfStream,
-} from "./object-storage-migration-transfer.service";
+} from "../rules/object-storage-migration-transfer.rules";
 
 export type MigrationProvider = "s3" | "azure";
 

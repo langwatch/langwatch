@@ -43,6 +43,7 @@ vi.mock("../../../behavior/use-required-session", () => ({
 // at the flip has its own tests.
 vi.mock("../../../behavior/use-public-env", () => ({
   usePublicEnv: () => ({ data: { IDENTITY_FRONT_DOOR: false } }),
+  usePublicEnvWithCapabilities: () => ({ data: { IDENTITY_FRONT_DOOR: false } }),
 }));
 
 vi.mock("../../../behavior/use-accept-invite-once", () => ({

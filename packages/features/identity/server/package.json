@@ -22,6 +22,10 @@
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"
+    },
+    "./composition/sso-connection-backoffice": {
+      "types": "./src/repositories/prisma/prisma.sso-connection-backoffice.repository.ts",
+      "default": "./src/repositories/prisma/prisma.sso-connection-backoffice.repository.ts"
     }
   },
   "scripts": {

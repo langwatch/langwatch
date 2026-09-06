@@ -238,10 +238,6 @@ export { InProcessBreakGlassLimiterAdapter } from "./adapters/in-process-break-g
 export { LocalDoorBreakGlassBindingAdapter } from "./adapters/local-door-break-glass-binding.adapter";
 export { PrismaIdentityVerificationRepository } from "./repositories/prisma/prisma.identity-verification.repository";
 export { PrismaIdentityProjectionRepository } from "./repositories/prisma/prisma.identity-projection.repository";
-export {
-  PrismaSsoConnectionBackofficeRepository,
-  type PrismaSsoConnectionBackofficeDatabase,
-} from "./repositories/prisma/prisma.sso-connection-backoffice.repository";
 export type {
   SsoConnectionBackofficePage,
   SsoConnectionBackofficeRepository,

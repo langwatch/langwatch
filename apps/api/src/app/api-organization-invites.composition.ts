@@ -6,7 +6,6 @@
 import {
   buildInviteAcceptUrl,
   InviteService,
-  PrismaOrganizationInviteRepository,
   InviteSendThrottleService,
   OrganizationInviteRateLimitPort,
   OrganizationInviteSeatCensusPort,
@@ -14,6 +13,7 @@ import {
   type OrganizationRestInviteService,
   type OrganizationTrpcPorts,
 } from "@langwatch/organization-server";
+import { PrismaOrganizationInviteRepository } from "@langwatch/organization-server/composition/organization-invites";
 import {
   MemberClassificationService,
   PrismaUsageMembershipRepository,

@@ -20,7 +20,7 @@ export * from "./langy.deep-link";
 export * from "./langy.github-pr-url";
 export * from "./langy.local-control-budgets";
 export * from "./langy.local-control-http";
-export * from "./langy.local-control.errors";
+export * from "./langy-local-control.errors";
 export * from "./langy.local-control-protocol";
 export * from "./credential";
 export * from "./langy.service";

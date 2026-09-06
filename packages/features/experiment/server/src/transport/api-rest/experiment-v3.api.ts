@@ -10,7 +10,6 @@ import {
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
   resolver,
-  type RestApiVersionedFamily,
   type ServiceContext,
 } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -252,10 +251,7 @@ const slugVersionParamsSchema = z.object({
  * declared required here.
  */
 const listRunsQuerySchema = z.object({
-  experimentSlug: z
-    .string()
-    .optional()
-    .describe("Slug of the experiment whose runs you want"),
+  experimentSlug: z.string().optional().describe("Slug of the experiment whose runs you want"),
   page: z.string().optional().describe("1-based page number"),
   pageSize: z.string().optional().describe("Runs per page, capped at 200"),
 });
@@ -357,7 +353,6 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     c: ExperimentV3Context,
     input: z.infer<typeof executionRequestSchema>,
   ) => {
-
     const request = input;
     const { projectId } = request;
 
@@ -517,11 +512,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     });
   };
 
-  const abortHandler = async (
-    c: ExperimentV3Context,
-    input: { body: string },
-  ) => {
-
+  const abortHandler = async (c: ExperimentV3Context, input: { body: string }) => {
     let body: { projectId?: string; runId?: string };
     try {
       body = JSON.parse(input.body) as { projectId?: string; runId?: string };
@@ -564,7 +555,6 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     c: ExperimentV3Context,
     input: z.infer<typeof slugParamsSchema> & { body: string },
   ) => {
-
     const { slug } = input;
 
     // Starting a run CREATES a run row against an experiment that already exists; it does not administer
@@ -596,9 +586,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
       throw new ExperimentNotFoundError(slug);
     }
 
-    const parseResult = persistedEvaluationsV3StateSchema.safeParse(
-      savedExperiment.workbenchState,
-    );
+    const parseResult = persistedEvaluationsV3StateSchema.safeParse(savedExperiment.workbenchState);
     if (!parseResult.success) {
       logger.error({ slug, errors: parseResult.error.issues }, "Invalid workbenchState");
       // The stored workbench state no longer matches its schema. The customer
@@ -626,10 +614,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     }
     const inputsParse = runInputsBodySchema.safeParse(rawBody);
     if (!inputsParse.success) {
-      return c.json(
-        { error: inputsParse.error.issues[0]?.message ?? "Invalid request body" },
-        400,
-      );
+      return c.json({ error: inputsParse.error.issues[0]?.message ?? "Invalid request body" }, 400);
     }
     const runInputs = inputsParse.data;
 
@@ -755,7 +740,6 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     c: ExperimentV3Context,
     input: z.infer<typeof listRunsQuerySchema>,
   ) => {
-
     const credential = await ports.authenticateCredential({
       request: c.req.raw,
       permission: "evaluations:view",
@@ -812,7 +796,6 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     c: ExperimentV3Context,
     input: z.infer<typeof runIdParamsSchema>,
   ) => {
-
     const { runId } = input;
 
     const credential = await ports.authenticateCredential({
@@ -910,7 +893,6 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     c: ExperimentV3Context,
     input: z.infer<typeof runIdParamsSchema> & z.infer<typeof runResultsQuerySchema>,
   ) => {
-
     const { runId } = input;
 
     const credential = await ports.authenticateCredential({
@@ -993,7 +975,6 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     c: ExperimentV3Context,
     input: z.infer<typeof slugParamsSchema> & z.infer<typeof workbenchStateQuerySchema>,
   ) => {
-
     const { slug } = input;
 
     const credential = await ports.authenticateCredential({
@@ -1033,7 +1014,6 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     c: ExperimentV3Context,
     input: z.infer<typeof slugParamsSchema> & z.infer<typeof saveWorkbenchStateBodySchema>,
   ) => {
-
     const { slug } = input;
 
     const credential = await ports.authenticateCredential({
@@ -1066,7 +1046,6 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     c: ExperimentV3Context,
     input: z.infer<typeof slugParamsSchema> & z.infer<typeof listVersionsQuerySchema>,
   ) => {
-
     const { slug } = input;
 
     const credential = await ports.authenticateCredential({
@@ -1118,7 +1097,6 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     c: ExperimentV3Context,
     input: z.infer<typeof slugVersionParamsSchema>,
   ) => {
-
     const { slug, version } = input;
 
     const credential = await ports.authenticateCredential({
@@ -1213,8 +1191,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
                   "text/event-stream": {
                     schema: {
                       type: "string",
-                      description:
-                        "Progress events, ending with a done event carrying the summary",
+                      description: "Progress events, ending with a done event carrying the summary",
                     },
                   },
                 },

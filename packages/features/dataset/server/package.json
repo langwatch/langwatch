@@ -16,6 +16,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./composition/dataset-content": {
+      "types": "./src/repositories/prisma/prisma.dataset-content.repository.ts",
+      "default": "./src/repositories/prisma/prisma.dataset-content.repository.ts"
     }
   },
   "scripts": {

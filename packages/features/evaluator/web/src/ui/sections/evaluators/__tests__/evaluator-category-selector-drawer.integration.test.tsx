@@ -10,7 +10,7 @@ import { EvaluatorCategorySelectorDrawer } from "../evaluator-category-selector-
 
 // Stub the inline type-selector content so this test suite stays focused on
 // category-step behavior without pulling in tRPC-backed dependencies.
-vi.mock("../../../elements/evaluators/evaluator-type-selector-content", () => ({
+vi.mock("../evaluator-type-selector-content", () => ({
   categoryNames: {
     expected_answer: "Expected Answer",
     llm_judge: "LLM as Judge",

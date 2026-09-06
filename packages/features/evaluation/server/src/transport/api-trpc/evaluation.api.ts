@@ -39,6 +39,18 @@ import { z } from "zod";
 
 const logger = createLogger("langwatch:evaluations");
 
+/** One warmup probe, its failure swallowed: a cold Lambda is a nudge, not a request anyone waits on. */
+function warmupProbe(
+  ports: Pick<EvaluationTrpcPorts<unknown, unknown, unknown>, "sendKeepAliveProbe">,
+  ctx: EvaluationTrpcContext,
+  projectId: string,
+): Promise<void> {
+  return ports.sendKeepAliveProbe(ctx, { projectId }).catch((error: unknown) => {
+    // Silently ignore errors - this is just warmup
+    logger.debug({ error, projectId }, "Lambda warmup request failed");
+  });
+}
+
 /**
  * The KSUID resource prefix a re-evaluation's id carries — the app's
  * `KSUID_RESOURCES.EVALUATION`.
@@ -324,10 +336,7 @@ export class EvaluationTrpcApi {
 
               // Send parallel warmup requests
               const warmupPromises = Array.from({ length: count }, () =>
-                ports.sendKeepAliveProbe(ctx, { projectId }).catch((error: unknown) => {
-                  // Silently ignore errors - this is just warmup
-                  logger.debug({ error, projectId }, "Lambda warmup request failed");
-                }),
+                warmupProbe(ports, ctx, projectId),
               );
 
               await Promise.allSettled(warmupPromises);

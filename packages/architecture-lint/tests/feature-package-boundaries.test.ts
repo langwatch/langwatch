@@ -973,6 +973,17 @@ describe("strict feature source layout", () => {
     ).toBe(true);
   });
 
+  it("accepts a rules module constructing a pure value", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({ feature: "agent", role: "server" });
+    write(
+      "packages/features/agent/server/src/rules/agent-eligibility.rules.ts",
+      'export function names(): Set<string> {\n  return new Set(["a"]);\n}\n',
+    );
+
+    expect(policies()).not.toContain("feature-source-layout");
+  });
+
   it("rejects a rules module importing a service", () => {
     featurePackage({ feature: "agent", role: "server" });
     write(

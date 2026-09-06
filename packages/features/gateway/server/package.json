@@ -72,6 +72,10 @@
     "./composition/gateway-provider-labels": {
       "types": "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts",
       "default": "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts"
+    },
+    "./composition/gateway-spend-fold": {
+      "types": "./src/projections/gateway-spend.projection.ts",
+      "default": "./src/projections/gateway-spend.projection.ts"
     }
   },
   "scripts": {

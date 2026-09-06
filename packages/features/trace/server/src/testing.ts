@@ -11,10 +11,7 @@ import { TracePayloadReaderPort } from "./ports/trace-payload-reader.port";
 
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
 export { SpanNormalizationPipelineService } from "./services/span-normalization.service";
-export {
-  mapChRowToNormalized,
-  serializeAttributes,
-} from "./repositories/clickhouse/stored-span-row.mapper";
+export { storedSpanReadBack } from "./repositories/clickhouse/__tests__/stored-span-row.test-fakes";
 export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matching.service";
 export { ClickHouseTraceQuerySubqueryAdapter } from "./adapters/trace-query-subquery.clickhouse.adapter";
 

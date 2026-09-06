@@ -32,7 +32,9 @@ export class TraceEdgeSpoolService extends TraceIngressPayloadPort {
   async prepare(data: RecordSpanCommandData): Promise<RecordSpanCommandData> {
     const serialized = JSON.stringify(data);
     const byteLength = Buffer.byteLength(serialized, "utf8");
-    if (byteLength <= COMMAND_INLINE_THRESHOLD) return data;
+    if (byteLength <= COMMAND_INLINE_THRESHOLD) {
+      return data;
+    }
 
     const projectId = data.tenantId;
     const traceId = String(data.span.traceId);
@@ -56,6 +58,7 @@ export class TraceEdgeSpoolService extends TraceIngressPayloadPort {
         { error, projectId, traceId, spanId, byteLength },
         "oversize protection skipped; queue carries full payload",
       );
+
       return data;
     }
   }

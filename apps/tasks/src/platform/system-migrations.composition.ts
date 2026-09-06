@@ -32,7 +32,11 @@ export function buildSystemMigrationsPassTask({
   // the sweep: registering the identity pipeline again would register the
   // same producer repeatedly.
   let identity: TasksIdentityEventing | undefined;
-  const identityEventing = () => (identity ??= TasksIdentityEventing.create({ eventing }));
+  const identityEventing = () => {
+    identity ??= TasksIdentityEventing.create({ eventing });
+
+    return identity;
+  };
   let sweep: ReturnType<PostgresIdentityNewbornSweepAdapter["build"]> | undefined;
   return SystemMigrationsPassTask.create({
     pass: () => {
@@ -45,8 +49,11 @@ export function buildSystemMigrationsPassTask({
         isSaaS: () => host.config.isSaaS,
         migrations: () => migrations,
         userMigrations: () => userMigrations,
-        newbornSweep: () =>
-          (sweep ??= newbornSweep({ database, eventing: identityEventing() })).runPass(),
+        newbornSweep: () => {
+          sweep ??= newbornSweep({ database, eventing: identityEventing() });
+
+          return sweep.runPass();
+        },
       });
       return ({ signal }) => runner.runPass({ signal });
     },

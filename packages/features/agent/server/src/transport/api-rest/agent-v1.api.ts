@@ -39,7 +39,6 @@ import {
   NO_PRESENCE,
   type AgentPresence,
 } from "../../services/connected-agent-presence.service";
-import { AgentService } from "../../services/agent.service";
 import { agentListRowOf, type AgentListRow } from "../../rules/agent-view.rules";
 import { registerCallEndpoint, type AgentCallDeps } from "./agent-call.api";
 import { registerConnectEndpoints } from "./agent-connect.api";

@@ -114,9 +114,9 @@ export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process
 export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository";
 export { OpsExplainClickHouseRepository } from "./repositories/clickhouse/clickhouse.ops-explain.repository";
 export {
-  OpsExplainClientResolver,
+  OpsExplainClientPort,
   type OpsExplainClientResolution,
-} from "./repositories/ops-explain.repository";
+} from "./ports/ops-explain-client.port";
 
 /** Public intake for the reports customers' coding agents file. */
 export {

@@ -26,7 +26,6 @@ import {
   StoredObjectStorageRegistryAdapter,
   StoredObjectStorageRuntimeAdapter,
   StoredObjectsClickHousePort,
-  ClickHouseStoredObjectsRepository,
   StoredObjectsService,
   PayloadStagingPort,
   PayloadStagingS3TargetPort,
@@ -37,6 +36,7 @@ import {
   type StoredObjectsClickHouseClient,
   AzureBlobCredentialsAdapter,
 } from "@langwatch/stored-object-server";
+import { ClickHouseStoredObjectsRepository } from "@langwatch/stored-object-server/composition/stored-objects";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";

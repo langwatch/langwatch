@@ -2,7 +2,7 @@ import {
   parseScenarioParameterDefinitions,
   partitionParameterDefinitions,
 } from "@langwatch/scenario-contract";
-import { targetLabels, type SuiteTarget } from "@langwatch/suite-contract";
+import type { SuiteTarget } from "@langwatch/suite-contract";
 
 /** A suite id, when the caller did not supply one. */
 export function defaultSuiteId(): string {

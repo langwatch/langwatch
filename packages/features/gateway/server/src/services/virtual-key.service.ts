@@ -22,7 +22,6 @@ import { VirtualKeyProvisioningService } from "./virtual-key-provisioning.servic
 import { VirtualKeyRotationService } from "./virtual-key-rotation.service";
 import { VirtualKeyStatusService } from "./virtual-key-status.service";
 import {
-  isProductManaged,
   VirtualKeyValidationService,
   type CreatedVirtualKey,
   type CreateVirtualKeyInput,
@@ -139,7 +138,7 @@ export class VirtualKeyService {
    */
   async tryGetById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null> {
     const vk = await this.repository.tryFindById({ id, organizationId });
-    if (!vk || isProductManaged(vk)) {
+    if (!vk || VirtualKeyValidationService.isProductManaged(vk)) {
       return null;
     }
 

@@ -328,6 +328,53 @@ const cloneDsl = (dsl: unknown): StudioWorkflow =>
   parseStudioWorkflow(JSON.parse(JSON.stringify(dsl)));
 
 /**
+ * The project's workflows, with copy lineage redacted to what the caller may
+ * see: a source workflow in a project they cannot view is hidden entirely,
+ * and the copy count only counts copies they can view.
+ */
+async function visibleWorkflowsWithLineage({
+  ctx,
+  input,
+  ports,
+}: {
+  ctx: WorkflowTrpcContext;
+  input: Readonly<{ projectId: string }>;
+  ports: WorkflowTrpcPorts;
+}) {
+  const workflows = await ports.listWorkflowsWithCopyLineage(ctx, {
+    projectId: input.projectId,
+  });
+
+  const relatedProjectIds = [...new Set(workflows.flatMap(relatedProjectIdsOf))];
+  const probed = await ports.hasProjectPermissions(ctx, {
+    projectIds: relatedProjectIds.filter((projectId) => projectId !== input.projectId),
+    permission: "workflows:view",
+  });
+  const isVisible = (projectId: string) =>
+    projectId === input.projectId || probed.get(projectId) === true;
+
+  return workflows.map(({ copiedWorkflows, ...workflow }) => {
+    const canSeeSource = workflow.copiedFrom && isVisible(workflow.copiedFrom.projectId);
+    return {
+      ...workflow,
+      copiedFromWorkflowId: canSeeSource ? workflow.copiedFromWorkflowId : null,
+      copiedFrom: canSeeSource ? workflow.copiedFrom : null,
+      _count: {
+        copiedWorkflows: copiedWorkflows.filter((copy) => isVisible(copy.projectId)).length,
+      },
+    };
+  });
+}
+
+/** Every project id a workflow's copy lineage names, source and copies alike. */
+function relatedProjectIdsOf(workflow: WorkflowListRow): readonly string[] {
+  return [
+    ...(workflow.copiedFrom ? [workflow.copiedFrom.projectId] : []),
+    ...workflow.copiedWorkflows.map((copy) => copy.projectId),
+  ];
+}
+
+/**
  * Installs the complete `workflow.*` tRPC surface on a host-owned root. The
  * procedure and the policy are injected by the host so its auth, audit, error,
  * logging and tracing policies wrap every feature procedure consistently.
@@ -452,40 +499,7 @@ export class WorkflowTrpcApi {
             .withInput(workflowApiProjectInputSchema)
             .withOutput(workflowListRowSchema.array())
             .withPermission("workflows:view")
-            .handle(async ({ ctx, input }) => {
-              const workflows = await ports.listWorkflowsWithCopyLineage(ctx, {
-                projectId: input.projectId,
-              });
-
-              const relatedProjectIds = [
-                ...new Set(
-                  workflows.flatMap((workflow) => [
-                    ...(workflow.copiedFrom ? [workflow.copiedFrom.projectId] : []),
-                    ...workflow.copiedWorkflows.map((copy) => copy.projectId),
-                  ]),
-                ),
-              ];
-              const probed = await ports.hasProjectPermissions(ctx, {
-                projectIds: relatedProjectIds.filter((projectId) => projectId !== input.projectId),
-                permission: "workflows:view",
-              });
-              const isVisible = (projectId: string) =>
-                projectId === input.projectId || probed.get(projectId) === true;
-
-              return workflows.map(({ copiedWorkflows, ...workflow }) => {
-                const canSeeSource =
-                  workflow.copiedFrom && isVisible(workflow.copiedFrom.projectId);
-                return {
-                  ...workflow,
-                  copiedFromWorkflowId: canSeeSource ? workflow.copiedFromWorkflowId : null,
-                  copiedFrom: canSeeSource ? workflow.copiedFrom : null,
-                  _count: {
-                    copiedWorkflows: copiedWorkflows.filter((copy) => isVisible(copy.projectId))
-                      .length,
-                  },
-                };
-              });
-            }),
+            .handle(async ({ ctx, input }) => visibleWorkflowsWithLineage({ ctx, input, ports })),
         )
 
         /**

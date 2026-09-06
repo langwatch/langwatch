@@ -112,6 +112,15 @@ describe("strict feature API transport boundaries", () => {
     expect(violations([apiApplication()])).toEqual([]);
   });
 
+  it("does not scan a feature composition root under apps/api's features", () => {
+    write(
+      "apps/api/src/features/thing/thing.composition.ts",
+      'import type { PrismaClient } from "@langwatch/prisma-client/generated";\nexport type T = PrismaClient;',
+    );
+
+    expect(violations([apiApplication()])).toEqual([]);
+  });
+
   it("does not treat apps/api's composition roots or platform/infrastructure as transport", () => {
     write(
       "apps/api/src/app/api-usage.composition.ts",
@@ -214,6 +223,21 @@ describe("strict feature API transport boundaries", () => {
     );
 
     expect(policy("api-transport-service-locator")).toHaveLength(4);
+  });
+
+  it("accepts a synchronous request query-string reader", () => {
+    write(
+      "packages/features/widget/server/src/api/public/widget.api.ts",
+      `
+        type RequestQuery = {
+          query(name: string): string | undefined;
+        };
+        declare const request: RequestQuery;
+        void request.query("anchor");
+      `,
+    );
+
+    expect(policy("api-transport-service-locator")).toEqual([]);
   });
 
   it("keeps endpoint handlers to one service call without domain control flow", () => {

@@ -1,13 +1,5 @@
 import { type LangySuggestion, SETUP_SUGGESTIONS, SUGGESTIONS } from "./langy-empty-state";
-
-/**
- * What the project has reached, as far as choosing an ask is concerned.
- */
-export interface ProjectReach {
-  hasTraces: boolean;
-  hasEvaluations: boolean;
-  hasExperiments: boolean;
-}
+import type { ProjectReach } from "../../model/langy-project-reach";
 
 /**
  * How many asks the home page's capability row shows.

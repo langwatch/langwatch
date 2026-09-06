@@ -117,6 +117,7 @@ export class ContentDropPolicyService {
   // the customer asked it not to keep.
   dropsAnyContent(policy: ResolvedDataPrivacy): boolean {
     const { roles, stripToolCalls } = this.rolesDroppedFromChatArrays(policy);
+
     return (
       this.droppedKeys(policy).size > 0 ||
       this.dropMatchers(policy).length > 0 ||

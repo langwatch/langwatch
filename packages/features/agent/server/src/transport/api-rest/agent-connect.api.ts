@@ -14,7 +14,6 @@ import {
   POLL_WAIT_MS,
   refusedFrameSchema,
   registeredFrameSchema,
-  registerFrameSchema,
   relayPayloadCaps,
   resultFrameSchema,
 } from "@langwatch/agent-contract";

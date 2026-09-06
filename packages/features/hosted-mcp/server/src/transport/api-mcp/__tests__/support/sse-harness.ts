@@ -41,6 +41,22 @@ export interface OpenSseStream {
   close: () => void;
 }
 
+interface SseWaiter {
+  match: (m: JsonRpcMessage) => boolean;
+  resolve: (m: JsonRpcMessage) => void;
+}
+
+/** Settles, and drops, every waiter whose match predicate the newly parsed message satisfies. */
+function resolveMatchingWaiters(waiters: SseWaiter[], parsed: JsonRpcMessage): void {
+  for (let i = waiters.length - 1; i >= 0; i--) {
+    const waiter = waiters[i]!;
+    if (waiter.match(parsed)) {
+      waiters.splice(i, 1);
+      waiter.resolve(parsed);
+    }
+  }
+}
+
 /**
  * The Redis these suites talk to. Opened by the suite, so the suite closes it.
  * Native Redis is the local default; CI hands the URL in.
@@ -235,10 +251,7 @@ export async function openSseStream({
   }
 
   const messages: JsonRpcMessage[] = [];
-  const waiters: {
-    match: (m: JsonRpcMessage) => boolean;
-    resolve: (m: JsonRpcMessage) => void;
-  }[] = [];
+  const waiters: SseWaiter[] = [];
   let resolveEndpoint!: (path: string) => void;
   const endpointArrived = new Promise<string>((resolve) => {
     resolveEndpoint = resolve;
@@ -270,13 +283,7 @@ export async function openSseStream({
           try {
             const parsed = JSON.parse(data) as JsonRpcMessage;
             messages.push(parsed);
-            for (let i = waiters.length - 1; i >= 0; i--) {
-              const waiter = waiters[i]!;
-              if (waiter.match(parsed)) {
-                waiters.splice(i, 1);
-                waiter.resolve(parsed);
-              }
-            }
+            resolveMatchingWaiters(waiters, parsed);
           } catch {
             // Not a JSON-RPC frame — keep reading.
           }

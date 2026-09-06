@@ -107,11 +107,11 @@ function mount(
     webhook: (
       path: string,
       body: unknown,
-      options: { signature?: string; event?: string } = {},
+      webhookOptions: { signature?: string; event?: string } = {},
     ) => {
       const raw = JSON.stringify(body);
       const signature =
-        options.signature ??
+        webhookOptions.signature ??
         `sha256=${createHmac("sha256", WEBHOOK_SECRET).update(raw).digest("hex")}`;
       return hono.fetch(
         new Request(`http://api.test/api${path}`, {
@@ -119,7 +119,7 @@ function mount(
           body: raw,
           headers: {
             "content-type": "application/json",
-            "x-github-event": options.event ?? "installation_repositories",
+            "x-github-event": webhookOptions.event ?? "installation_repositories",
             "x-hub-signature-256": signature,
           },
         }),

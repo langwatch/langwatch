@@ -1,25 +1,20 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
-import {
-  OpsExplainRepository,
-  type OpsExplainClientResolution,
-  type OpsExplainClientResolver,
-  type OpsExplainQueryClient,
-} from "../ops-explain.repository";
+import { OpsExplainRepository, type OpsExplainQueryClient } from "../ops-explain.repository";
+import type {
+  OpsExplainClientPort,
+  OpsExplainClientResolution,
+} from "../../ports/ops-explain-client.port";
 
 /**
  * Resolves and queries the ClickHouse client behind the operator-only
  * `/api/ops/clickhouse/explain` endpoint.
  */
 export class OpsExplainClickHouseRepository extends OpsExplainRepository {
-  static create({
-    resolver,
-  }: {
-    resolver: OpsExplainClientResolver;
-  }): OpsExplainClickHouseRepository {
+  static create({ resolver }: { resolver: OpsExplainClientPort }): OpsExplainClickHouseRepository {
     return new OpsExplainClickHouseRepository(resolver);
   }
 
-  private constructor(private readonly resolver: OpsExplainClientResolver) {
+  private constructor(private readonly resolver: OpsExplainClientPort) {
     super();
   }
 
