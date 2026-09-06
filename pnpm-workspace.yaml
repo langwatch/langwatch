@@ -22,6 +22,9 @@ packages:
   - "plugins/*"
   - "sdks/typescript"
   - "services/langyworker"
+  # The capture half of visualdiff (tools/visualdiff): Playwright is Node, so
+  # the Go CLI orchestrates and this package drives the browsers.
+  - "tools/*/runner"
   - "skills"
   - "dev/tests/agentic-e2e"
   - "dev/tests/e2e-stack"

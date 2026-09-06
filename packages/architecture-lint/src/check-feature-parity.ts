@@ -100,6 +100,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // this root, every scenario describing what the published plugin does could
   // only be @unimplemented.
   "plugins",
+  // The capture half of visualdiff (@langwatch/visual-diff-runner): the settle
+  // and per-step recording scenarios are proved by its vitest suite, which
+  // lives beside it under tools/ rather than in packages/.
+  "tools/visualdiff/runner/src",
   // What we SHIP as instructions is behavior too: the skill sources and the
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
@@ -188,6 +192,10 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
+  // visualdiff: the boot, classification and teardown rules in
+  // specs/tooling/visual-diff.feature are asserted by these Go tests and by
+  // nothing else. Its Playwright half binds from the TS roots below.
+  "tools/visualdiff",
 ];
 
 /**

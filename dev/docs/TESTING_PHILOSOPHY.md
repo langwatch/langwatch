@@ -240,6 +240,22 @@ When a scenario in a legacy feature file describes behavior that has no matching
 
 `@unimplemented` is a lightweight promise that the gap is tracked, not ignored. Every removal of an `@unimplemented` tag must land with either a new `@scenario` binding or a feature-file edit that removes the scenario entirely.
 
+### Screen parity between two refs
+
+Feature-file parity says every scenario has a test. It says nothing about the
+several hundred screens a large refactor moves, because a screen that still
+renders and quietly lost the endpoint behind it fails no test at all. That gap
+is what `visualdiff` covers: it boots two refs side by side, drives the same
+route list and the same flow list on both with Playwright, and reports every
+screen whose pixels, console errors, failed requests or step outcomes differ —
+classifying each row as a regression, a restore gap, an intended restore or
+noise. It is a parity check you run against a branch, not a suite that runs in
+CI, and its own behaviour is specified in `specs/tooling/visual-diff.feature`
+and bound by Go and runner unit tests. Start with
+`go run ./cmd/visualdiff run -dry-run`; the routes and flows it renders live in
+`visualdiff.yaml` at the repository root, so widening the coverage is editing
+YAML. See `tools/visualdiff/README.md`.
+
 ## Workflow
 
 See `specs/README.md` for detailed BDD guidance.

@@ -1,0 +1,25 @@
+{
+  "name": "@langwatch/visual-diff-runner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright capture half of visualdiff: drives the same routes and flows on two running stacks and reports every screenshot, console error, failed request and pixel diff as JSON lines.",
+  "type": "module",
+  "scripts": {
+    "capture": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "pixelmatch": "^7.2.0",
+    "playwright": "1.61.1",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/pngjs": "^6.0.5",
+    "tsx": "^4.22.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}
