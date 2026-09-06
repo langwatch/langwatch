@@ -14,6 +14,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Bot, ExternalLink, Laptop, Play, User } from "lucide-react";
 import { LuTrash2 } from "react-icons/lu";
+import { ownerOnlyCopy } from "~/components/scenarios/useFilteredScenarioTargets";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
@@ -117,27 +118,42 @@ function EnvironmentLabel({ environment }: { environment: string }) {
   );
 }
 
-/** The chip that names the person or the machine a card belongs to. */
+/**
+ * The chip that names the person or the machine a card belongs to.
+ *
+ * Two cards of one name and one environment are told apart by this chip
+ * alone, so a card the reader cannot run carries it too and says why on
+ * hover, in the words the refused run itself uses.
+ */
 function ScopeChip({ agent }: { agent: ConnectedAgentView }) {
   const scope = scopeOf(agent);
   if (!scope) return null;
   return (
-    <HStack
-      gap={1}
-      display="inline-flex"
-      paddingX={1.5}
-      paddingY={0.5}
-      borderRadius="full"
-      background="bg.muted"
-      minWidth={0}
-      flexShrink={0}
-      maxWidth="50%"
+    <Tooltip
+      content={ownerOnlyCopy(agent.owner?.name)}
+      disabled={agent.selectable}
     >
-      {scope.kind === "owner" ? <User size={10} /> : <Laptop size={10} />}
-      <Text fontSize="11px" truncate>
-        {scope.label}
-      </Text>
-    </HStack>
+      <HStack
+        gap={1}
+        display="inline-flex"
+        paddingX={1.5}
+        paddingY={0.5}
+        borderRadius="full"
+        background="bg.muted"
+        minWidth={0}
+        flexShrink={0}
+        maxWidth="50%"
+        data-testid="connected-agent-scope-chip"
+        aria-label={
+          agent.selectable ? undefined : ownerOnlyCopy(agent.owner?.name)
+        }
+      >
+        {scope.kind === "owner" ? <User size={10} /> : <Laptop size={10} />}
+        <Text fontSize="11px" truncate>
+          {scope.label}
+        </Text>
+      </HStack>
+    </Tooltip>
   );
 }
 

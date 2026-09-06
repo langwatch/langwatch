@@ -50,6 +50,8 @@ function agent(
     status: "online",
     instances: [instance()],
     owner: null,
+    selectable: true,
+    notSelectableReason: null,
     parameters: [],
     config: {
       sdk: { name: "langwatch-python", version: "1.2.3", language: "python" },
@@ -178,6 +180,40 @@ describe("<ConnectedAgentsSection />", () => {
       ]);
 
       expect(screen.getByText("Ana")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a development agent that belongs to another person", () => {
+    /** @scenario "A card the reader cannot choose says who holds it" */
+    it("carries the owner's name and says only that person can run it", () => {
+      renderSection([
+        agent({
+          environment: "development",
+          owner: { userId: "user_1", name: "Ana" },
+          selectable: false,
+          notSelectableReason: "owned_by_another_person",
+        }),
+      ]);
+
+      const chip = screen.getByTestId("connected-agent-scope-chip");
+      expect(within(chip).getByText("Ana")).toBeInTheDocument();
+      expect(chip.getAttribute("aria-label")).toContain("Ana");
+    });
+  });
+
+  describe("given a development agent that belongs to the reader", () => {
+    /** @scenario "A card the reader can choose carries no refusal" */
+    it("carries the owner's name and no refusal", () => {
+      renderSection([
+        agent({
+          environment: "development",
+          owner: { userId: "user_1", name: "Ana" },
+        }),
+      ]);
+
+      const chip = screen.getByTestId("connected-agent-scope-chip");
+      expect(within(chip).getByText("Ana")).toBeInTheDocument();
+      expect(chip.getAttribute("aria-label")).toBeNull();
     });
   });
 

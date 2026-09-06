@@ -625,6 +625,12 @@ export class ApiKeyRepository {
    * The attach itself, with the outcome intact: which ids were written and
    * which identical rows were already there. `replaceRoleBindings` needs both
    * to know what its revoke must spare.
+   *
+   * `requireProjection` because both callers act on these rows next: a create
+   * activates the credential, and a replace revokes whatever the attach did
+   * not keep. An append that is durable but not yet readable is fine for a
+   * caller that only writes; here it would hand out a token the resolver
+   * refuses, or drop the grants the key already had.
    */
   private async attachRoleBindings({
     apiKeyId,
@@ -651,6 +657,7 @@ export class ApiKeyRepository {
       })),
       actor,
       onDuplicate: "skip",
+      requireProjection: true,
     });
   }
 }

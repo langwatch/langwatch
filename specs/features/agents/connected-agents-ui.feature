@@ -67,6 +67,20 @@ Feature: Connected agents in the product
     Then it carries a chip with the owner's name
 
   @integration
+  Scenario: A card the reader cannot choose says who holds it
+    Given "support-agent" in "development" belongs to another person
+    When the card is drawn
+    Then it carries a chip with the owner's name
+    And the chip says only that person can run the agent
+
+  @integration
+  Scenario: A card the reader can choose carries no refusal
+    Given "support-agent" in "development" belongs to the reader
+    When the card is drawn
+    Then it carries a chip with the owner's name
+    And the chip says nothing about who can run the agent
+
+  @integration
   Scenario: A shared development agent reads the machine that holds it
     Given "support-agent" in "development" belongs to no person and names a machine
     When the card is drawn

@@ -3279,6 +3279,21 @@
                             },
                             "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
                           },
+                          "selectable": {
+                            "type": "boolean",
+                            "description": "Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name."
+                          },
+                          "notSelectableReason": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "owned_by_another_person",
+                              null
+                            ],
+                            "description": "Why the agent cannot be run by this credential. Null when it can."
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -3303,6 +3318,8 @@
                           "owner",
                           "status",
                           "instances",
+                          "selectable",
+                          "notSelectableReason",
                           "createdAt",
                           "updatedAt",
                           "platformUrl"
@@ -3599,6 +3616,21 @@
                       },
                       "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
                     },
+                    "selectable": {
+                      "type": "boolean",
+                      "description": "Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name."
+                    },
+                    "notSelectableReason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "owned_by_another_person",
+                        null
+                      ],
+                      "description": "Why the agent cannot be run by this credential. Null when it can."
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -3623,6 +3655,8 @@
                     "owner",
                     "status",
                     "instances",
+                    "selectable",
+                    "notSelectableReason",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -3910,6 +3944,21 @@
                       },
                       "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
                     },
+                    "selectable": {
+                      "type": "boolean",
+                      "description": "Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name."
+                    },
+                    "notSelectableReason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "owned_by_another_person",
+                        null
+                      ],
+                      "description": "Why the agent cannot be run by this credential. Null when it can."
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -3934,6 +3983,8 @@
                     "owner",
                     "status",
                     "instances",
+                    "selectable",
+                    "notSelectableReason",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -4191,6 +4242,21 @@
                       },
                       "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
                     },
+                    "selectable": {
+                      "type": "boolean",
+                      "description": "Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name."
+                    },
+                    "notSelectableReason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "owned_by_another_person",
+                        null
+                      ],
+                      "description": "Why the agent cannot be run by this credential. Null when it can."
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -4215,6 +4281,8 @@
                     "owner",
                     "status",
                     "instances",
+                    "selectable",
+                    "notSelectableReason",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -4510,6 +4578,21 @@
                       },
                       "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
                     },
+                    "selectable": {
+                      "type": "boolean",
+                      "description": "Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name."
+                    },
+                    "notSelectableReason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "owned_by_another_person",
+                        null
+                      ],
+                      "description": "Why the agent cannot be run by this credential. Null when it can."
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -4534,6 +4617,8 @@
                     "owner",
                     "status",
                     "instances",
+                    "selectable",
+                    "notSelectableReason",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -36022,6 +36107,38 @@
                             },
                             "skipOffered": {
                               "type": "boolean"
+                            },
+                            "segments": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 4000
+                                  },
+                                  "pattern": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "readOnly": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "command",
+                                  "pattern",
+                                  "readOnly"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "maxItems": 50
+                            },
+                            "timeoutSeconds": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0,
+                              "maximum": 3600
                             }
                           },
                           "required": [
@@ -36032,6 +36149,49 @@
                             "pattern",
                             "reason",
                             "skipOffered"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "permission_answered"
+                              ]
+                            },
+                            "callId": {
+                              "type": "string"
+                            },
+                            "decision": {
+                              "type": "string",
+                              "enum": [
+                                "allow_once",
+                                "allow_pattern",
+                                "deny"
+                              ]
+                            },
+                            "patterns": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 500
+                              },
+                              "maxItems": 50
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "callId",
+                            "decision"
                           ],
                           "additionalProperties": false
                         },

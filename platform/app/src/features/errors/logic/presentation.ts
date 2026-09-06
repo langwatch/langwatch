@@ -1568,6 +1568,11 @@ const presentations = {
     describe: () =>
       "It may have been removed already. Reload to see the current bindings.",
   },
+  authz_grant_not_confirmed: {
+    title: "Access could not be confirmed",
+    describe: () =>
+      "We could not confirm the access change in time, so nothing was granted. Try again in a moment.",
+  },
   authz_ledger_unavailable: {
     title: "Access changes are paused",
     describe: () =>

@@ -318,6 +318,11 @@ export class ApiKeyService {
     // is that a failed create leaves less-or-equal access, never a live token
     // with no grants (which is also the shape the read-through mint refuses
     // to widen, see ./legacy-grant-mint.ts).
+    //
+    // "Facts" means readable, not merely appended. The grant writes below
+    // require the projection, so a durable append that the fold has not
+    // landed yet throws AuthzGrantNotConfirmedError and the key is never
+    // activated: the row stays revoked and the token cannot authenticate.
     const apiKey = await this.repo.create({
       name,
       description,
@@ -343,6 +348,7 @@ export class ApiKeyService {
           kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
         },
         actor,
+        requireProjection: true,
       });
       effectiveBindings = effectiveBindings.map((b) =>
         b.role === TeamUserRole.CUSTOM
@@ -509,6 +515,7 @@ export class ApiKeyService {
           kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
         },
         actor,
+        requireProjection: true,
       });
       effectiveBindings = effectiveBindings.map((b) =>
         b.role === TeamUserRole.CUSTOM
