@@ -153,5 +153,7 @@ async function runInProcess(argv: string[]): Promise<void> {
   // The "Cli" variant also marks the holder's surface, so every request this
   // command makes through the shared request-header builders carries the CLI
   // surface header, matching the daemon-served path.
-  await runWithCliCredentialHolder(() => buildProgram().parseAsync(argv));
+  await runWithCliCredentialHolder({
+    fn: () => buildProgram().parseAsync(argv),
+  });
 }

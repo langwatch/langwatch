@@ -171,7 +171,7 @@ export function withExecutionContext<T>(
   // holder's surface, so every request this daemon-served command makes
   // through the shared request-header builders carries the CLI surface header.
   return storage.run(context, () =>
-    withOutputScope(() => runWithCliCredentialHolder(fn)),
+    withOutputScope(() => runWithCliCredentialHolder({ fn })),
   );
 }
 

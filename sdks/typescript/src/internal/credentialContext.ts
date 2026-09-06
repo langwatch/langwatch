@@ -70,7 +70,7 @@ export function runWithCredentialHolder<T>(fn: () => T): T {
  * traffic apart from a plain SDK embed and attach the `x-langwatch-surface: cli`
  * header the platform's traffic-attribution reads.
  */
-export function runWithCliCredentialHolder<T>(fn: () => T): T {
+export function runWithCliCredentialHolder<T>({ fn }: { fn: () => T }): T {
   return runWithCredentialHolder(() => {
     setScopedSurface("cli");
     return fn();

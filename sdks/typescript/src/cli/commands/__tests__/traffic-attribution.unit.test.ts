@@ -29,9 +29,11 @@ describe("CLI request attribution", () => {
       };
       vi.stubGlobal("fetch", fetchImpl);
 
-      await runWithCliCredentialHolder(async () => {
-        setResolvedApiKey("sk-lw-test");
-        await listMonitorsCommand();
+      await runWithCliCredentialHolder({
+        fn: async () => {
+          setResolvedApiKey("sk-lw-test");
+          await listMonitorsCommand();
+        },
       });
 
       expect(requests).toHaveLength(1);

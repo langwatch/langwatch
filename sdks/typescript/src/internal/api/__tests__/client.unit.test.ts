@@ -42,8 +42,10 @@ describe("createLangWatchApiClient", () => {
       it("sends x-langwatch-surface: cli alongside the SDK identity headers", () => {
         createClientCalls.length = 0;
 
-        runWithCliCredentialHolder(() => {
-          createLangWatchApiClient();
+        runWithCliCredentialHolder({
+          fn: () => {
+            createLangWatchApiClient();
+          },
         });
 
         expect(createClientCalls).toHaveLength(1);
