@@ -1,9 +1,11 @@
-"""Unit coverage for the shared HTTP client: an http to https upgrade of the
-same URL is followed once with the same method, headers and body, every other
-redirect raises RedirectRefusedError, the generated REST client carries the
-transport, and no hand written call builds its own httpx client. The inner
-transport is httpx.MockTransport, so the assertions are on the requests that
-leave the process.
+"""Unit coverage for the shared HTTP client: a GET or HEAD follows redirects
+with the same method up to five hops and drops credentials when it leaves the
+origin, every other method follows only an http to https upgrade of the same
+URL with the same method, headers and body, every refused redirect raises
+RedirectRefusedError, the generated REST client carries the transport, and no
+hand written call builds its own httpx client. The inner transport is
+httpx.MockTransport, so the assertions are on the requests that leave the
+process.
 
 Spec: specs/python-sdk/http-client-redirects.feature
 """
@@ -30,6 +32,15 @@ from langwatch.http_client import (
 
 HTTP_URL = "http://langwatch.test/api/v1/things?page=2"
 HTTPS_URL = "https://langwatch.test/api/v1/things?page=2"
+OTHER_PATH = "https://langwatch.test/api/v2/things?page=2"
+OTHER_HOST = "https://other.test/api/v1/things?page=2"
+
+CREDENTIALS = {
+    "Authorization": "Bearer sk-lw-test",
+    "X-Auth-Token": "sk-lw-test",
+    "X-Project-Id": "project_1",
+    "X-Trace": "abc",
+}
 
 
 @pytest.fixture(autouse=True)
@@ -60,6 +71,23 @@ def redirecting(
     return handler, seen
 
 
+def scripted(*responses: httpx.Response):
+    """A handler answering each request from the script, in order, plus the
+    requests it saw."""
+    seen: list[httpx.Request] = []
+    queue = list(responses)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return queue.pop(0)
+
+    return handler, seen
+
+
+def redirect(status: int, location: str) -> httpx.Response:
+    return httpx.Response(status, headers={"location": location})
+
+
 def sync_client(handler) -> httpx.Client:
     return create_client(transport=httpx.MockTransport(handler))
 
@@ -68,17 +96,22 @@ def async_client(handler) -> httpx.AsyncClient:
     return create_async_client(transport=httpx.MockTransport(handler))
 
 
+# --- The upgrade every method follows ---
+
+
 # @scenario "follows a redirect that only upgrades http to https"
 @pytest.mark.parametrize("status", [301, 302, 307, 308])
-def test_follows_the_scheme_upgrade_once(status: int):
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_follows_the_scheme_upgrade_once(status: int, method: str):
     handler, seen = redirecting(status=status)
 
     with sync_client(handler) as client:
-        response = client.get(HTTP_URL)
+        response = client.request(method, HTTP_URL)
 
     assert response.status_code == 200
     assert response.json() == {"ok": True}
     assert [str(r.url) for r in seen] == [HTTP_URL, HTTPS_URL]
+    assert [r.method for r in seen] == [method, method]
 
 
 # @scenario "follows a redirect that only upgrades http to https"
@@ -160,7 +193,7 @@ def test_warns_once_per_process(caplog: pytest.LogCaptureFixture):
         sync_client(handler) as client,
     ):
         client.get(HTTP_URL)
-        client.get(HTTP_URL)
+        client.post(HTTP_URL, json={})
 
     warnings = [r for r in caplog.records if r.name == "langwatch.http_client"]
     assert len(warnings) == 1
@@ -170,64 +203,162 @@ def test_warns_once_per_process(caplog: pytest.LogCaptureFixture):
     )
 
 
-# @scenario "refuses a redirect to another host"
-def test_refuses_another_host():
-    other = "https://other.test/api/v1/things?page=2"
-    handler, seen = redirecting(location=other)
+# --- What a GET or HEAD follows ---
+
+
+# @scenario "a GET follows a redirect to another path"
+def test_get_follows_another_path():
+    handler, seen = scripted(
+        redirect(301, OTHER_PATH), httpx.Response(200, json={"moved": True})
+    )
+
+    with sync_client(handler) as client:
+        response = client.get(HTTPS_URL)
+
+    assert response.json() == {"moved": True}
+    assert [str(r.url) for r in seen] == [HTTPS_URL, OTHER_PATH]
+    assert [r.method for r in seen] == ["GET", "GET"]
+
+
+# @scenario "a GET follows a redirect to another path"
+def test_get_follows_a_relative_location():
+    handler, seen = scripted(redirect(302, "/api/other"), httpx.Response(200))
+
+    with sync_client(handler) as client:
+        client.get(HTTPS_URL)
+
+    assert str(seen[1].url) == "https://langwatch.test/api/other"
+
+
+# @scenario "a GET follows a redirect to another path"
+@pytest.mark.asyncio
+async def test_get_follows_another_path_async():
+    handler, seen = scripted(redirect(301, OTHER_PATH), httpx.Response(200))
+
+    async with async_client(handler) as client:
+        response = await client.get(HTTPS_URL)
+
+    assert response.status_code == 200
+    assert [str(r.url) for r in seen] == [HTTPS_URL, OTHER_PATH]
+
+
+# @scenario "a GET follows a chain of redirects up to five hops"
+def test_get_follows_five_hops():
+    hops = [f"https://langwatch.test/hop/{n}" for n in range(1, 6)]
+    handler, seen = scripted(
+        *(redirect(301 if i % 2 == 0 else 307, hop) for i, hop in enumerate(hops)),
+        httpx.Response(200, text="final"),
+    )
+
+    with sync_client(handler) as client:
+        response = client.get(HTTPS_URL)
+
+    assert response.text == "final"
+    assert [str(r.url) for r in seen] == [HTTPS_URL, *hops]
+    assert {r.method for r in seen} == {"GET"}
+
+
+# @scenario "a GET refuses a sixth hop"
+def test_get_refuses_a_sixth_hop():
+    hops = [f"https://langwatch.test/hop/{n}" for n in range(1, 7)]
+    handler, seen = scripted(
+        *(redirect(302 if i == 5 else 301, hop) for i, hop in enumerate(hops)),
+        httpx.Response(200),
+    )
 
     with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
-        client.get(HTTP_URL)
+        client.get(HTTPS_URL)
 
-    error = raised.value
-    assert error.url == HTTP_URL
-    assert error.location == other
-    assert error.status == 301
-    assert str(error) == (
-        f"LangWatch refused to follow a redirect from {HTTP_URL} to {other} "
-        "(HTTP 301). Set the endpoint to the final URL."
-    )
-    assert len(seen) == 1
+    assert len(seen) == 6
+    assert raised.value.url == hops[4]
+    assert raised.value.location == hops[5]
+    assert raised.value.status == 302
 
 
-# @scenario "refuses a redirect to another host"
+# @scenario "a GET refuses a sixth hop"
 @pytest.mark.asyncio
-async def test_refuses_another_host_async():
-    handler, seen = redirecting(location="https://other.test/api/v1/things?page=2")
+async def test_get_refuses_a_sixth_hop_async():
+    hops = [f"https://langwatch.test/hop/{n}" for n in range(1, 7)]
+    handler, seen = scripted(*(redirect(301, hop) for hop in hops), httpx.Response(200))
 
     async with async_client(handler) as client:
         with pytest.raises(RedirectRefusedError) as raised:
-            await client.post(HTTP_URL, json={})
+            await client.get(HTTPS_URL)
 
-    assert raised.value.status == 301
-    assert len(seen) == 1
-
-
-# @scenario "refuses a redirect that changes the path or query"
-@pytest.mark.parametrize(
-    "location",
-    [
-        "https://langwatch.test/api/v2/things?page=2",
-        "https://langwatch.test/api/v1/things?page=3",
-        "https://langwatch.test/api/v1/things",
-    ],
-)
-def test_refuses_a_changed_path_or_query(location: str):
-    handler, _ = redirecting(status=308, location=location)
-
-    with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
-        client.get(HTTP_URL)
-
-    assert raised.value.location == location
-    assert raised.value.status == 308
+    assert len(seen) == 6
+    assert raised.value.url == hops[4]
 
 
-# @scenario "refuses a downgrade from https to http"
-def test_refuses_a_downgrade():
-    seen: list[httpx.Request] = []
+# @scenario "a GET keeps its headers on a same origin redirect"
+def test_get_keeps_headers_on_the_same_origin():
+    handler, seen = scripted(redirect(302, OTHER_PATH), httpx.Response(200))
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen.append(request)
-        return httpx.Response(301, headers={"location": HTTP_URL})
+    with sync_client(handler) as client:
+        client.get(HTTPS_URL, headers=CREDENTIALS)
+
+    first, second = seen
+    for name in CREDENTIALS:
+        assert second.headers[name] == first.headers[name]
+    assert second.headers["host"] == "langwatch.test"
+
+
+# @scenario "a GET keeps its headers on a same origin redirect"
+def test_get_keeps_headers_on_the_scheme_upgrade_of_the_same_host(
+    caplog: pytest.LogCaptureFixture,
+):
+    handler, seen = scripted(redirect(301, OTHER_PATH), httpx.Response(200))
+
+    with (
+        caplog.at_level(logging.WARNING, logger="langwatch.http_client"),
+        sync_client(handler) as client,
+    ):
+        client.get(HTTP_URL, headers=CREDENTIALS)
+
+    second = seen[1]
+    assert second.headers["authorization"] == "Bearer sk-lw-test"
+    assert second.headers["x-auth-token"] == "sk-lw-test"
+    assert second.headers["x-project-id"] == "project_1"
+    assert len([r for r in caplog.records if r.name == "langwatch.http_client"]) == 1
+
+
+# @scenario "a GET drops credential headers on a cross origin redirect"
+def test_get_drops_credentials_on_another_host(caplog: pytest.LogCaptureFixture):
+    handler, seen = scripted(redirect(302, OTHER_HOST), httpx.Response(200))
+
+    with (
+        caplog.at_level(logging.WARNING, logger="langwatch.http_client"),
+        sync_client(handler) as client,
+    ):
+        client.get(HTTPS_URL, headers=CREDENTIALS)
+
+    second = seen[1]
+    assert str(second.url) == OTHER_HOST
+    assert "authorization" not in second.headers
+    assert "x-auth-token" not in second.headers
+    assert "x-project-id" not in second.headers
+    assert second.headers["x-trace"] == "abc"
+    assert second.headers["host"] == "other.test"
+    assert [r for r in caplog.records if r.name == "langwatch.http_client"] == []
+
+
+# @scenario "a GET drops credential headers on a cross origin redirect"
+def test_get_drops_credentials_on_another_port():
+    handler, seen = scripted(
+        redirect(302, "https://langwatch.test:8443/api/v1/things?page=2"),
+        httpx.Response(200),
+    )
+
+    with sync_client(handler) as client:
+        client.get(HTTPS_URL, headers=CREDENTIALS)
+
+    second = seen[1]
+    assert "authorization" not in second.headers
+    assert second.headers["host"] == "langwatch.test:8443"
+
+
+# @scenario "a GET refuses a downgrade from https to http"
+def test_get_refuses_a_downgrade():
+    handler, seen = scripted(redirect(301, HTTP_URL), httpx.Response(200))
 
     with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
         client.get(HTTPS_URL)
@@ -237,8 +368,125 @@ def test_refuses_a_downgrade():
     assert len(seen) == 1
 
 
-# @scenario "refuses a 303"
-def test_refuses_a_303():
+# @scenario "a GET refuses a downgrade from https to http"
+def test_get_refuses_a_downgrade_in_the_middle_of_a_chain():
+    plain = "http://langwatch.test/api/plain"
+    handler, seen = scripted(
+        redirect(301, OTHER_PATH), redirect(301, plain), httpx.Response(200)
+    )
+
+    with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
+        client.get(HTTPS_URL)
+
+    assert raised.value.url == OTHER_PATH
+    assert raised.value.location == plain
+    assert len(seen) == 2
+
+
+# @scenario "a GET follows a 303"
+def test_get_follows_a_303():
+    handler, seen = scripted(redirect(303, OTHER_PATH), httpx.Response(200))
+
+    with sync_client(handler) as client:
+        client.get(HTTPS_URL)
+
+    assert [str(r.url) for r in seen] == [HTTPS_URL, OTHER_PATH]
+    assert seen[1].method == "GET"
+
+
+# @scenario "a HEAD follows a redirect like a GET"
+def test_head_follows_like_a_get():
+    handler, seen = scripted(redirect(301, OTHER_PATH), httpx.Response(200))
+
+    with sync_client(handler) as client:
+        response = client.head(HTTPS_URL, headers=CREDENTIALS)
+
+    assert response.status_code == 200
+    assert [str(r.url) for r in seen] == [HTTPS_URL, OTHER_PATH]
+    assert seen[1].method == "HEAD"
+    assert seen[1].headers["authorization"] == "Bearer sk-lw-test"
+
+
+# --- What every other method refuses ---
+
+
+# @scenario "a POST refuses a redirect to another host"
+def test_post_refuses_another_host():
+    handler, seen = redirecting(location=OTHER_HOST)
+
+    with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
+        client.post(HTTP_URL, json={})
+
+    error = raised.value
+    assert error.url == HTTP_URL
+    assert error.location == OTHER_HOST
+    assert error.status == 301
+    assert str(error) == (
+        f"LangWatch refused to follow a redirect from {HTTP_URL} to {OTHER_HOST} "
+        "(HTTP 301). Set the endpoint to the final URL."
+    )
+    assert len(seen) == 1
+
+
+# @scenario "a POST refuses a redirect to another host"
+@pytest.mark.asyncio
+async def test_post_refuses_another_host_async():
+    handler, seen = redirecting(location=OTHER_HOST)
+
+    async with async_client(handler) as client:
+        with pytest.raises(RedirectRefusedError) as raised:
+            await client.post(HTTP_URL, json={})
+
+    assert raised.value.status == 301
+    assert len(seen) == 1
+
+
+# @scenario "a POST still refuses a redirect to another path"
+@pytest.mark.parametrize(
+    "location",
+    [
+        OTHER_PATH,
+        "https://langwatch.test/api/v1/things?page=3",
+        "https://langwatch.test/api/v1/things",
+    ],
+)
+def test_post_refuses_a_changed_path_or_query(location: str):
+    handler, seen = redirecting(status=308, location=location)
+
+    with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
+        client.post(HTTP_URL, json={})
+
+    assert raised.value.location == location
+    assert raised.value.status == 308
+    assert len(seen) == 1
+
+
+# @scenario "a POST still refuses a redirect to another path"
+@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])
+def test_other_methods_refuse_another_path(method: str):
+    handler, seen = scripted(redirect(301, OTHER_PATH), httpx.Response(200))
+
+    with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
+        client.request(method, HTTPS_URL)
+
+    assert raised.value.location == OTHER_PATH
+    assert len(seen) == 1
+
+
+# @scenario "a POST refuses a downgrade from https to http"
+def test_post_refuses_a_downgrade():
+    handler, seen = scripted(redirect(301, HTTP_URL), httpx.Response(200))
+
+    with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
+        client.post(HTTPS_URL, json={})
+
+    assert raised.value.url == HTTPS_URL
+    assert raised.value.location == HTTP_URL
+    assert len(seen) == 1
+
+
+# @scenario "a POST refuses a 303"
+def test_post_refuses_a_303():
     handler, seen = redirecting(status=303)
 
     with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
@@ -249,35 +497,37 @@ def test_refuses_a_303():
     assert len(seen) == 1
 
 
-# @scenario "refuses a second redirect after the upgrade"
-def test_refuses_a_second_redirect():
-    second_hop = "https://langwatch.test/api/v2/things?page=2"
+# @scenario "a POST refuses a second redirect after the upgrade"
+def test_post_refuses_a_second_redirect():
     handler, seen = redirecting(
         status=307,
-        after_upgrade=lambda request: httpx.Response(
-            307, headers={"location": second_hop}
-        ),
+        after_upgrade=lambda request: redirect(307, OTHER_PATH),
     )
 
     with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
-        client.get(HTTP_URL)
+        client.post(HTTP_URL, json={})
 
     assert raised.value.url == HTTPS_URL
-    assert raised.value.location == second_hop
+    assert raised.value.location == OTHER_PATH
     assert raised.value.status == 307
     assert len(seen) == 2
 
 
 # @scenario "refuses a redirect without a location"
-def test_refuses_a_redirect_without_a_location():
-    handler, _ = redirecting(location=None)
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_refuses_a_redirect_without_a_location(method: str):
+    handler, seen = redirecting(location=None)
 
     with sync_client(handler) as client, pytest.raises(RedirectRefusedError) as raised:
-        client.get(HTTP_URL)
+        client.request(method, HTTP_URL)
 
     assert raised.value.location is None
     assert raised.value.status == 301
     assert "<no Location header>" in str(raised.value)
+    assert len(seen) == 1
+
+
+# --- Every request goes through the shared client ---
 
 
 # @scenario "the generated API client uses the shared transport"

@@ -1,13 +1,21 @@
 """The one HTTP client for every request the SDK sends to the LangWatch API.
 
 httpx never follows a redirect on its own here. The transports in this module
-follow exactly one kind: a 301, 302, 307 or 308 whose Location is the same
-URL with the scheme changed from http to https. That is what an endpoint set
-to `http://app.langwatch.ai` answers with, and following it with the default
-client would turn a POST into a GET and drop the body. The replay keeps the
-method, the headers and the body bytes. Every other redirect is refused with
-`RedirectRefusedError`, so a misconfigured endpoint fails where the caller can
-read it instead of losing the request.
+apply a rule per method to a 301, 302, 303, 307 or 308.
+
+GET and HEAD follow the redirect with the same method, up to five hops. A hop
+that keeps the origin, or only upgrades http to https on the same host and
+port, keeps every header; any other hop drops the credential headers first.
+A hop from https to http and a hop without a Location are refused.
+
+Every other method follows exactly one redirect, and only when the Location is
+the same URL with the scheme changed from http to https. That is what an
+endpoint set to `http://app.langwatch.ai` answers with, and following it with
+the default client would turn a POST into a GET and drop the body. The replay
+keeps the method, the headers and the body bytes.
+
+Every refused redirect raises `RedirectRefusedError`, so a misconfigured
+endpoint fails where the caller can read it instead of losing the request.
 
 Use `create_client` and `create_async_client` instead of `httpx.Client` and
 `httpx.AsyncClient` anywhere the SDK talks to LangWatch.
@@ -21,10 +29,17 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# Every status the rule inspects. A 303 is in the set so it is refused with
-# the typed error instead of reaching the caller as a bare response.
+# Every status the rule inspects.
 REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+# The statuses a method other than GET or HEAD may follow for the upgrade.
 UPGRADE_STATUSES = frozenset({301, 302, 307, 308})
+
+# Methods that follow a redirect to any http or https URL.
+FOLLOWING_METHODS = frozenset({"GET", "HEAD"})
+# The most redirects a GET or HEAD follows before the next one is refused.
+MAX_FOLLOW_HOPS = 5
+# Headers dropped when a GET or HEAD hop leaves the origin.
+CREDENTIAL_HEADERS = ("authorization", "x-auth-token", "x-project-id")
 
 _SCHEME_DEFAULT_PORTS = {"http": 80, "https": 443}
 
@@ -83,6 +98,27 @@ def _effective_port(url: httpx.URL) -> int | None:
     return url.port
 
 
+def _same_host_and_port(request_url: httpx.URL, target: httpx.URL) -> bool:
+    return request_url.host == target.host and _effective_port(
+        request_url
+    ) == _effective_port(target)
+
+
+def _is_scheme_upgrade(request_url: httpx.URL, target: httpx.URL) -> bool:
+    """Same host and port, with the scheme changed from http to https."""
+    return (
+        request_url.scheme == "http"
+        and target.scheme == "https"
+        and _same_host_and_port(request_url, target)
+    )
+
+
+def _same_origin(request_url: httpx.URL, target: httpx.URL) -> bool:
+    return request_url.scheme == target.scheme and _same_host_and_port(
+        request_url, target
+    )
+
+
 def scheme_upgrade_target(request_url: httpx.URL, location: str) -> httpx.URL | None:
     """The https URL to replay against when `location` is the request URL with
     only its scheme upgraded from http to https, otherwise None."""
@@ -90,13 +126,23 @@ def scheme_upgrade_target(request_url: httpx.URL, location: str) -> httpx.URL | 
         target = request_url.join(location)
     except httpx.InvalidURL:
         return None
-    if request_url.scheme != "http" or target.scheme != "https":
-        return None
-    if request_url.host != target.host:
-        return None
-    if _effective_port(request_url) != _effective_port(target):
+    if not _is_scheme_upgrade(request_url, target):
         return None
     if request_url.raw_path != target.raw_path:
+        return None
+    return target.copy_with(fragment=None)
+
+
+def follow_target(request_url: httpx.URL, location: str) -> httpx.URL | None:
+    """The URL a GET or HEAD follows to, or None when the hop is refused: a
+    target that is not http or https, or a downgrade from https to http."""
+    try:
+        target = request_url.join(location)
+    except httpx.InvalidURL:
+        return None
+    if target.scheme not in _SCHEME_DEFAULT_PORTS:
+        return None
+    if request_url.scheme == "https" and target.scheme == "http":
         return None
     return target.copy_with(fragment=None)
 
@@ -116,14 +162,49 @@ def _refusal(request: httpx.Request, response: httpx.Response) -> RedirectRefuse
     )
 
 
-def _plan_replay(
-    request: httpx.Request, response: httpx.Response
-) -> httpx.Request | None:
-    """The request to send once more, or None when the response is not a
-    redirect. Raises RedirectRefusedError for every redirect that is not an
-    http to https upgrade of the same URL with a replayable body."""
-    if response.status_code not in REDIRECT_STATUSES:
-        return None
+def _follow_headers(request: httpx.Request, target: httpx.URL) -> httpx.Headers:
+    """The headers a GET or HEAD hop sends. Credentials survive the same origin
+    and an https upgrade of the same host; the Host header follows the target."""
+    headers = httpx.Headers(request.headers)
+    if _same_origin(request.url, target):
+        return headers
+    if not _is_scheme_upgrade(request.url, target):
+        for name in CREDENTIAL_HEADERS:
+            headers.pop(name, None)
+    headers["Host"] = target.netloc.decode("ascii")
+    return headers
+
+
+def _plan_follow(
+    request: httpx.Request, response: httpx.Response, hops: int
+) -> httpx.Request:
+    """The next GET or HEAD hop. Raises RedirectRefusedError past the hop
+    limit, without a Location, for a downgrade or a target that is not http
+    or https."""
+    if hops >= MAX_FOLLOW_HOPS:
+        raise _refusal(request, response)
+    location = response.headers.get("location")
+    if location is None:
+        raise _refusal(request, response)
+    target = follow_target(request.url, location)
+    if target is None:
+        raise _refusal(request, response)
+    return httpx.Request(
+        request.method,
+        target,
+        headers=_follow_headers(request, target),
+        extensions=request.extensions,
+    )
+
+
+def _plan_upgrade(
+    request: httpx.Request, response: httpx.Response, hops: int
+) -> httpx.Request:
+    """The one replay for a method other than GET or HEAD. Raises
+    RedirectRefusedError for every redirect that is not an http to https
+    upgrade of the same URL with a replayable body, and for a second hop."""
+    if hops >= 1:
+        raise _refusal(request, response)
     location = response.headers.get("location")
     if location is None or response.status_code not in UPGRADE_STATUSES:
         raise _refusal(request, response)
@@ -142,6 +223,15 @@ def _plan_replay(
     )
 
 
+def _plan_next(
+    request: httpx.Request, response: httpx.Response, hops: int
+) -> httpx.Request:
+    """The request to send after a redirect, per the method's rule."""
+    if request.method in FOLLOWING_METHODS:
+        return _plan_follow(request, response, hops)
+    return _plan_upgrade(request, response, hops)
+
+
 class SchemeUpgradeTransport(httpx.BaseTransport):
     """Wraps a sync transport and applies the redirect rule to its answers."""
 
@@ -150,19 +240,18 @@ class SchemeUpgradeTransport(httpx.BaseTransport):
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         response = self.transport.handle_request(request)
-        try:
-            replay = _plan_replay(request, response)
-        finally:
-            if response.status_code in REDIRECT_STATUSES:
+        hops = 0
+        while response.status_code in REDIRECT_STATUSES:
+            try:
+                next_request = _plan_next(request, response, hops)
+            finally:
                 response.close()
-        if replay is None:
-            return response
-        _warn_once(request.url)
-        upgraded = self.transport.handle_request(replay)
-        if upgraded.status_code in REDIRECT_STATUSES:
-            upgraded.close()
-            raise _refusal(replay, upgraded)
-        return upgraded
+            if _is_scheme_upgrade(request.url, next_request.url):
+                _warn_once(request.url)
+            request = next_request
+            hops += 1
+            response = self.transport.handle_request(request)
+        return response
 
     def close(self) -> None:
         self.transport.close()
@@ -178,19 +267,18 @@ class AsyncSchemeUpgradeTransport(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         response = await self.transport.handle_async_request(request)
-        try:
-            replay = _plan_replay(request, response)
-        finally:
-            if response.status_code in REDIRECT_STATUSES:
+        hops = 0
+        while response.status_code in REDIRECT_STATUSES:
+            try:
+                next_request = _plan_next(request, response, hops)
+            finally:
                 await response.aclose()
-        if replay is None:
-            return response
-        _warn_once(request.url)
-        upgraded = await self.transport.handle_async_request(replay)
-        if upgraded.status_code in REDIRECT_STATUSES:
-            await upgraded.aclose()
-            raise _refusal(replay, upgraded)
-        return upgraded
+            if _is_scheme_upgrade(request.url, next_request.url):
+                _warn_once(request.url)
+            request = next_request
+            hops += 1
+            response = await self.transport.handle_async_request(request)
+        return response
 
     async def aclose(self) -> None:
         await self.transport.aclose()
