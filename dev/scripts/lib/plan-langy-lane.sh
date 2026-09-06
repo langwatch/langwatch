@@ -91,16 +91,16 @@ plan_langy_lane() {
     return 0
   fi
 
-  resolve_service_address OPENCODE_AGENT_URL "$app_dir" langy
+  resolve_service_address LANGY_AGENT_URL "$app_dir" langy
 
   local port=""
-  if [ -z "${OPENCODE_AGENT_URL:-}" ]; then
+  if [ -z "${LANGY_AGENT_URL:-}" ]; then
     port=$((app_port + LANGY_PORT_OFFSET))
-    export OPENCODE_AGENT_URL="http://localhost:${port}"
-  elif [[ "${OPENCODE_AGENT_URL:-}" =~ ^https?://(localhost|127\.0\.0\.1):([0-9]+) ]]; then
+    export LANGY_AGENT_URL="http://localhost:${port}"
+  elif [[ "${LANGY_AGENT_URL:-}" =~ ^https?://(localhost|127\.0\.0\.1):([0-9]+) ]]; then
     port="${BASH_REMATCH[2]}"
   else
-    _langy_skip "external OPENCODE_AGENT_URL=${OPENCODE_AGENT_URL}, not starting a local one"
+    _langy_skip "external LANGY_AGENT_URL=${LANGY_AGENT_URL}, not starting a local one"
     return 0
   fi
   LANGY_LANE_PORT="$port"

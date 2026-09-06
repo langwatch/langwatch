@@ -37,6 +37,7 @@ import {
 } from "./errors";
 import { mintLegacyKeyGrant } from "./legacy-grant-mint";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
+import type { ApiKeyRevocationCause } from "./revocation-cause";
 
 const logger = createLogger("langwatch:api-key:service");
 
@@ -1027,8 +1028,16 @@ export class ApiKeyService {
     callerIsAdmin,
     organizationId,
     awaitProjection = true,
+    cause = "user",
   }: {
     id: string;
+    /**
+     * Why the key dies, recorded on the row. Defaults to a person's decision,
+     * which is what every user-facing path is; the platform's own revocations
+     * (a hard-cut rotation, the personal ingest-key cap) name themselves so
+     * the CLI can tell a key it may re-mint from one it must leave dead.
+     */
+    cause?: ApiKeyRevocationCause;
     /**
      * Null when the caller is a service credential. Ownership then never
      * matches, so a null caller revokes a key only through `callerIsAdmin`.
@@ -1067,7 +1076,7 @@ export class ApiKeyService {
       ),
     ];
 
-    const result = await this.repo.revoke({ id });
+    const result = await this.repo.revoke({ id, cause });
 
     if (customRoleIds.length > 0) {
       await this.roleRepo.deleteExclusiveToApiKey({

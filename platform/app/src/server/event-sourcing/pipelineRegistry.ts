@@ -439,7 +439,7 @@ export interface PipelineRegistryDeps {
   broadcast: BroadcastService;
   langy: {
     buffer: Pick<LangyTokenBuffer, "liveness" | "appendStatus" | "markError">;
-    handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
+    handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash" | "isStopped">;
     worker: Pick<LangyWorkerPort, "dispatch">;
     titleGenerator: LangyTitleGenerator;
   };

@@ -624,7 +624,7 @@
                 "agent create",
                 "agent run",
                 "agent test",
-                "agent dev",
+                "agent tunnel",
                 "agent update",
                 "agent delete"
               ],
@@ -1721,6 +1721,35 @@
             },
             "api": "/api/bug-reports",
             "docs": "https://langwatch.ai/docs/support.md"
+          },
+          "sync": null,
+          "produces": [],
+          "consumes": []
+        },
+        {
+          "id": "support.langy-local-control",
+          "name": "Langy local control",
+          "description": "Langy works directly in the developer's local folder through the CLI, reading and changing files on the machine the conversation asked about",
+          "surfaces": {
+            "code": {
+              "sdk": null,
+              "cli": [
+                "langy"
+              ],
+              "hints": {
+                "langy": "langwatch langy --share-control"
+              },
+              "skill": "code-changes",
+              "docs": "https://langwatch.ai/docs/langy/local-development.md"
+            },
+            "platform": {
+              "ui": null,
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": null,
+            "docs": "https://langwatch.ai/docs/langy/local-development.md"
           },
           "sync": null,
           "produces": [],

@@ -14,6 +14,7 @@ import type { LangyConversationUpdateSignal } from "../../data/langy.dtos";
 const PROJECT_ID = "project_test";
 
 const messagesInvalidate = vi.fn(() => Promise.resolve());
+const recordInvalidate = vi.fn(() => Promise.resolve());
 const listInvalidate = vi.fn(() => Promise.resolve());
 const listCancel = vi.fn(() => Promise.resolve());
 
@@ -32,6 +33,7 @@ vi.mock("~/utils/api", () => ({
     useUtils: () => ({
       langy: {
         messages: { invalidate: messagesInvalidate },
+        localRecord: { invalidate: recordInvalidate },
         list: { cancel: listCancel, invalidate: listInvalidate },
       },
     }),
@@ -54,6 +56,7 @@ const signal = (conversationId: string): LangyConversationUpdateSignal =>
 describe("useLangyFreshness", () => {
   beforeEach(() => {
     messagesInvalidate.mockClear();
+    recordInvalidate.mockClear();
     listInvalidate.mockClear();
     listCancel.mockClear();
     capturedOnUpdate = null;
