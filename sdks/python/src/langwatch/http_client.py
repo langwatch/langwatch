@@ -7,7 +7,8 @@ transport the caller mounted) from the URL of every hop.
 
 GET and HEAD follow the redirect with the same method, up to five hops. A hop
 that keeps the origin, or only upgrades http to https on the same host and
-port, keeps every header; any other hop drops the credential headers first.
+port, keeps every header; any other hop drops the credential headers and the
+auth the client was built with, so httpx does not sign the hop back in.
 A hop from https to http and a hop without a Location are refused.
 
 Every other method follows exactly one redirect, and only when the Location is
@@ -167,13 +168,19 @@ def _refusal(request: httpx.Request, response: httpx.Response) -> RedirectRefuse
     )
 
 
+def _keeps_credentials(request_url: httpx.URL, target: httpx.URL) -> bool:
+    """Whether a hop may carry the caller's credentials: the same origin, or an
+    https upgrade of the same host and port."""
+    return _same_origin(request_url, target) or _is_scheme_upgrade(request_url, target)
+
+
 def _follow_headers(request: httpx.Request, target: httpx.URL) -> httpx.Headers:
     """The headers a GET or HEAD hop sends. Credentials survive the same origin
     and an https upgrade of the same host; the Host header follows the target."""
     headers = httpx.Headers(request.headers)
     if _same_origin(request.url, target):
         return headers
-    if not _is_scheme_upgrade(request.url, target):
+    if not _keeps_credentials(request.url, target):
         for name in CREDENTIAL_HEADERS:
             headers.pop(name, None)
     headers["Host"] = target.netloc.decode("ascii")
@@ -257,8 +264,9 @@ class LangWatchClient(httpx.Client):
         auth: Any = httpx.USE_CLIENT_DEFAULT,
         follow_redirects: Any = httpx.USE_CLIENT_DEFAULT,
     ) -> httpx.Response:
+        hop_auth = auth
         response = super().send(
-            request, stream=stream, auth=auth, follow_redirects=False
+            request, stream=stream, auth=hop_auth, follow_redirects=False
         )
         hops = 0
         while response.status_code in REDIRECT_STATUSES:
@@ -266,12 +274,14 @@ class LangWatchClient(httpx.Client):
                 next_request = _plan_next(request, response, hops)
             finally:
                 response.close()
+            if not _keeps_credentials(request.url, next_request.url):
+                hop_auth = None
             if _is_scheme_upgrade(request.url, next_request.url):
                 _warn_once(request.url)
             request = next_request
             hops += 1
             response = super().send(
-                request, stream=stream, auth=auth, follow_redirects=False
+                request, stream=stream, auth=hop_auth, follow_redirects=False
             )
         return response
 
@@ -292,8 +302,9 @@ class LangWatchAsyncClient(httpx.AsyncClient):
         auth: Any = httpx.USE_CLIENT_DEFAULT,
         follow_redirects: Any = httpx.USE_CLIENT_DEFAULT,
     ) -> httpx.Response:
+        hop_auth = auth
         response = await super().send(
-            request, stream=stream, auth=auth, follow_redirects=False
+            request, stream=stream, auth=hop_auth, follow_redirects=False
         )
         hops = 0
         while response.status_code in REDIRECT_STATUSES:
@@ -301,12 +312,14 @@ class LangWatchAsyncClient(httpx.AsyncClient):
                 next_request = _plan_next(request, response, hops)
             finally:
                 await response.aclose()
+            if not _keeps_credentials(request.url, next_request.url):
+                hop_auth = None
             if _is_scheme_upgrade(request.url, next_request.url):
                 _warn_once(request.url)
             request = next_request
             hops += 1
             response = await super().send(
-                request, stream=stream, auth=auth, follow_redirects=False
+                request, stream=stream, auth=hop_auth, follow_redirects=False
             )
         return response
 

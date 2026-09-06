@@ -82,6 +82,18 @@ Feature: Python SDK HTTP client redirects
     Then the second request carries X-Trace and the new Host and none of the credential headers
 
   @unit
+  Scenario: a GET drops the client's auth on a cross origin redirect
+    Given a client built with httpx auth whose endpoint answers a GET with a 302 to another host
+    When the SDK sends the GET
+    Then the second request carries no Authorization header
+
+  @unit
+  Scenario: a GET keeps the client's auth on an https upgrade
+    Given a client built with httpx auth whose endpoint answers a GET with a 301 to the same https URL
+    When the SDK sends the GET
+    Then the second request carries the Authorization header httpx signs
+
+  @unit
   Scenario: a GET refuses a downgrade from https to http
     Given a client whose endpoint answers a https GET with a 301 to the same http URL
     When the SDK sends the GET to the https URL

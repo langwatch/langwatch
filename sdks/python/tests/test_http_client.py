@@ -40,6 +40,9 @@ HTTPS_URL = "https://langwatch.test/api/v1/things?page=2"
 OTHER_PATH = "https://langwatch.test/api/v2/things?page=2"
 OTHER_HOST = "https://other.test/api/v1/things?page=2"
 
+# What httpx.BasicAuth("user", "secret") signs a request with.
+BASIC_AUTH = "Basic dXNlcjpzZWNyZXQ="
+
 CREDENTIALS = {
     "Authorization": "Bearer sk-lw-test",
     "X-Auth-Token": "sk-lw-test",
@@ -381,6 +384,66 @@ def test_get_drops_credentials_on_another_port():
     second = seen[1]
     assert "authorization" not in second.headers
     assert second.headers["host"] == "langwatch.test:8443"
+
+
+# @scenario "a GET drops the client's auth on a cross origin redirect"
+def test_get_drops_the_client_auth_on_another_host():
+    handler, seen = scripted(redirect(302, OTHER_HOST), httpx.Response(200))
+
+    with create_client(
+        transport=httpx.MockTransport(handler), auth=httpx.BasicAuth("user", "secret")
+    ) as client:
+        client.get(HTTPS_URL)
+
+    assert seen[0].headers["authorization"] == BASIC_AUTH
+    assert "authorization" not in seen[1].headers
+
+
+# @scenario "a GET drops the client's auth on a cross origin redirect"
+def test_async_get_drops_the_client_auth_on_another_host():
+    handler, seen = scripted(redirect(302, OTHER_HOST), httpx.Response(200))
+
+    async def run():
+        async with create_async_client(
+            transport=httpx.MockTransport(handler),
+            auth=httpx.BasicAuth("user", "secret"),
+        ) as client:
+            await client.get(HTTPS_URL)
+
+    asyncio.run(run())
+
+    assert seen[0].headers["authorization"] == BASIC_AUTH
+    assert "authorization" not in seen[1].headers
+
+
+# @scenario "a GET keeps the client's auth on an https upgrade"
+def test_get_keeps_the_client_auth_on_an_https_upgrade():
+    handler, seen = scripted(redirect(301, HTTPS_URL), httpx.Response(200))
+
+    with create_client(
+        transport=httpx.MockTransport(handler), auth=httpx.BasicAuth("user", "secret")
+    ) as client:
+        client.get(HTTP_URL)
+
+    assert str(seen[1].url) == HTTPS_URL
+    assert seen[1].headers["authorization"] == BASIC_AUTH
+
+
+# @scenario "a GET keeps the client's auth on an https upgrade"
+def test_async_get_keeps_the_client_auth_on_an_https_upgrade():
+    handler, seen = scripted(redirect(301, HTTPS_URL), httpx.Response(200))
+
+    async def run():
+        async with create_async_client(
+            transport=httpx.MockTransport(handler),
+            auth=httpx.BasicAuth("user", "secret"),
+        ) as client:
+            await client.get(HTTP_URL)
+
+    asyncio.run(run())
+
+    assert str(seen[1].url) == HTTPS_URL
+    assert seen[1].headers["authorization"] == BASIC_AUTH
 
 
 # @scenario "a GET refuses a downgrade from https to http"
