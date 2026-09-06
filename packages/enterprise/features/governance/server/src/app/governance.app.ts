@@ -47,6 +47,7 @@ import {
   type IssuedPersonalVirtualKey,
   type ListPersonalVirtualKeysInput,
   type ListRoutingPoliciesInput,
+  type GovernanceActorWorkspace,
   type PersonalVirtualKey,
   type PersonalUsageQueryInput,
   type PersonalUsageWindow,
@@ -210,14 +211,6 @@ export interface GovernanceActorUser {
 }
 
 /** Where an actor's own workspace lives, for the admin's drill-in link. */
-export interface GovernanceActorWorkspace {
-  userId: string;
-  displayName: string;
-  teamId: string;
-  projectId: string;
-  projectSlug: string;
-}
-
 /** What the process composes this feature's application from. */
 export interface GovernanceAppDependencies {
   governance: GovernanceService;

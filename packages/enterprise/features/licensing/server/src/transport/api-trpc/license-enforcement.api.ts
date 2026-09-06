@@ -18,7 +18,13 @@
  * button and the license that sets it are answered from one object. The
  * operations notification is a second feature's slice on the context.
  */
-import { limitTypeSchema, type LimitType } from "@langwatch/enterprise-licensing-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import {
+  allLimitChecksSchema,
+  limitCheckResultSchema,
+  limitTypeSchema,
+  type LimitType,
+} from "@langwatch/enterprise-licensing-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { LicensingApp, LicensingCaller } from "#app/licensing.app";
@@ -69,7 +75,9 @@ type LicenseEnforcementTrpcProcedures<
    * audit policy for one declared permission, applied AFTER this feature's own
    * input parser so the check reads its organization id from validated input.
    */
-  policy(permission: "organization:view"): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(permission: "organization:view"): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const organizationScopeSchema = z.object({ organizationId: z.string() });
@@ -89,7 +97,7 @@ export class LicenseEnforcementTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: LicenseEnforcementTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
     /**
      * The caller as the enforcement service classifies them: a lite member is
@@ -106,65 +114,80 @@ export class LicenseEnforcementTrpcApi {
       return ctx.session?.user ?? actor;
     };
 
-    return trpc.router({
-      /**
-       * Whether a specific limit allows creating another resource. Ask before
-       * showing a create button or form.
-       */
-      checkLimit: policy("organization:view")(procedure.input(limitScopeSchema)).query(
-        async ({ ctx, input }) => {
-          return ctx.app.licensing.checkLimit({
-            organizationId: input.organizationId,
-            limitType: input.limitType,
-            user: callerOf(ctx),
-          });
-        },
-      ),
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("checkLimit", (p) =>
+        p
+          .withInput(limitScopeSchema)
+          .withOutput(limitCheckResultSchema)
+          .withPermission("organization:view")
+          /**
+           * Whether one limit still allows creating another resource. Asked
+           * before a create button or form is shown.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.licensing.checkLimit({
+              organizationId: input.organizationId,
+              limitType: input.limitType,
+              user: callerOf(ctx),
+            }),
+          ),
+      )
+      .query("checkAllLimits", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(allLimitChecksSchema)
+          .withPermission("organization:view")
+          /**
+           * Every limit at once, for a dashboard or settings page that shows
+           * several.
+           *
+           * WHICH limits "every limit" means is the application's, not this
+           * door's: a list enumerated here would go stale the day a limit is
+           * added, and silently show one fewer.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.licensing.checkAllLimits({
+              organizationId: input.organizationId,
+              user: callerOf(ctx),
+            }),
+          ),
+      )
+      .mutation("reportLimitBlocked", (p) =>
+        p
+          .withInput(limitScopeSchema)
+          .withOutput(z.void())
+          .withPermission("organization:view")
+          /**
+           * Reports that a client pre-check refused somebody.
+           *
+           * Fire-and-forget from the client's side: the upgrade dialog appears
+           * immediately and this raises the operations notification as a side
+           * effect. The server re-checks the limit, so a fabricated request
+           * cannot raise a false alert.
+           */
+          .handle(async ({ ctx, input }) => {
+            const result = await ctx.app.licensing.checkLimit({
+              organizationId: input.organizationId,
+              limitType: input.limitType,
+              user: callerOf(ctx),
+            });
 
-      /**
-       * Every limit at once, for dashboards and settings pages that show
-       * several.
-       *
-       * WHICH limits "every limit" means is the application's, not this
-       * door's: a surface that enumerated them here would go stale the day a
-       * limit is added, and silently show one fewer.
-       */
-      checkAllLimits: policy("organization:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.licensing.checkAllLimits({
-            organizationId: input.organizationId,
-            user: callerOf(ctx),
+            if (!result.allowed) {
+              void ctx.app.usageLimits
+                .notifyResourceLimitReached({
+                  organizationId: input.organizationId,
+                  limitType: input.limitType,
+                  current: result.current,
+                  max: result.max,
+                })
+                .catch((error: unknown) => ctx.app.licensing.reportError(error));
+            }
           }),
-      ),
-
-      /**
-       * Report that a UI pre-check blocked a user from creating a resource.
-       *
-       * Fire-and-forget from the client's perspective: the upgrade modal
-       * appears immediately; this mutation triggers an ops notification as a
-       * side effect. The server re-verifies the limit so a fabricated request
-       * cannot trigger a false alert.
-       */
-      reportLimitBlocked: policy("organization:view")(procedure.input(limitScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          const result = await ctx.app.licensing.checkLimit({
-            organizationId: input.organizationId,
-            limitType: input.limitType,
-            user: callerOf(ctx),
-          });
-
-          if (!result.allowed) {
-            void ctx.app.usageLimits
-              .notifyResourceLimitReached({
-                organizationId: input.organizationId,
-                limitType: input.limitType,
-                current: result.current,
-                max: result.max,
-              })
-              .catch((error: unknown) => ctx.app.licensing.reportError(error));
-          }
-        },
-      ),
-    });
+      )
+      .build();
   }
 }

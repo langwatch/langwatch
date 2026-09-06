@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { LicenseError } from "./license-constants";
+import { planSchema } from "@langwatch/entitlement-contract";
 import type { PlanInfo } from "./license-plan";
 
 /**
@@ -179,3 +180,78 @@ export type RemoveLicenseResult = {
   /** Always true on success. Throws OrganizationNotFoundError if org doesn't exist. */
   removed: true;
 };
+
+const licenseResourceLimitsShape = {
+  currentMembers: z.number(),
+  maxMembers: z.number(),
+  currentMembersLite: z.number(),
+  maxMembersLite: z.number(),
+  currentMessagesPerMonth: z.number(),
+  maxMessagesPerMonth: z.number(),
+} as const;
+
+const licenseMetadataShape = {
+  plan: z.string(),
+  planName: z.string(),
+  expiresAt: z.string(),
+  organizationName: z.string(),
+} as const;
+
+/**
+ * The license an organization is running on, as its settings page reads it.
+ *
+ * Four answers, not one with optional fields: no license at all, a license too
+ * corrupted to read anything out of, one that reads but does not check out,
+ * and a good one. Only the last two carry seat and volume figures, because
+ * only they have a plan to measure against.
+ */
+export const licenseStatusSchema: z.ZodType<LicenseStatus> = z.union([
+  z.object({ hasLicense: z.literal(false), valid: z.literal(false) }).strict(),
+  z
+    .object({ hasLicense: z.literal(true), valid: z.literal(false), corrupted: z.literal(true) })
+    .strict(),
+  z
+    .object({
+      hasLicense: z.literal(true),
+      valid: z.literal(false),
+      corrupted: z.literal(false).optional(),
+      /**
+       * True when LangWatch signed it and the term simply ended, false when the
+       * signature does not check out. Only the first still meters seats.
+       */
+      expired: z.boolean(),
+      ...licenseMetadataShape,
+      ...licenseResourceLimitsShape,
+    })
+    .strict(),
+  z
+    .object({
+      hasLicense: z.literal(true),
+      valid: z.literal(true),
+      ...licenseMetadataShape,
+      ...licenseResourceLimitsShape,
+    })
+    .strict(),
+]);
+
+/** Why a deployment configured for single sign-on is not using it. */
+export const ssoGateStatusSchema = z
+  .object({
+    configuredProvider: z.string().nullable(),
+    licensed: z.boolean(),
+    mounted: z.boolean(),
+  })
+  .strict();
+
+/** A pasted key was accepted, with the plan it resolved to. */
+export const licenseUploadedSchema = z
+  .object({ success: z.literal(true), planInfo: planSchema })
+  .strict();
+
+/** A key was dropped, returning the organization to the free tier. */
+export const licenseRemovedSchema = z
+  .object({ success: z.literal(true), removed: z.literal(true) })
+  .strict();
+
+/** A freshly minted and signed key. The one answer that carries one. */
+export const licenseGeneratedSchema = z.object({ licenseKey: z.string() }).strict();

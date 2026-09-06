@@ -101,7 +101,11 @@ function harness({ apiKeys = {} }: { apiKeys?: Partial<ApiKeyService> } = {}) {
 
   const router = ApiKeyTrpcApi.create(
     trpc,
-    { protected: authenticated, noPermission: () => (procedure) => procedure },
+    {
+      protected: authenticated,
+      validateOutput: true,
+      policy: () => (procedure) => procedure,
+    },
     { recordAudit },
   );
 
@@ -121,7 +125,11 @@ describe("ApiKeyTrpcApi", () => {
       const trpc = initTRPC.context<TestContext>().create();
       const router = ApiKeyTrpcApi.create(
         trpc,
-        { protected: trpc.procedure, noPermission: () => (procedure) => procedure },
+        {
+          protected: trpc.procedure,
+          validateOutput: true,
+          policy: () => (procedure) => procedure,
+        },
         { recordAudit: () => {} },
       );
 

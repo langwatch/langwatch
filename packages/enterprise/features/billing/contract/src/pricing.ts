@@ -1,8 +1,19 @@
+import { z } from "zod";
 import { stripePricesFile } from "./stripe-price-catalog";
 import type { StripePriceMap, StripePriceName } from "./stripe-prices";
 
 export const Currency = { USD: "USD", EUR: "EUR" } as const;
 export type Currency = (typeof Currency)[keyof typeof Currency];
+export const currencySchema = z.enum(Currency);
+
+/**
+ * The currency a reader is quoted in, and the country it was decided from.
+ * Null country means nothing named one and the default was used.
+ */
+export const detectedCurrencySchema = z
+  .object({ currency: currencySchema, country: z.string().nullable() })
+  .strict();
+export type DetectedCurrency = z.infer<typeof detectedCurrencySchema>;
 
 function getUnitAmountCents(name: StripePriceName, prices: StripePriceMap): number {
   const priceId = prices[name];

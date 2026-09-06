@@ -59,22 +59,48 @@ export class EnterpriseGatewayTrpcComposition {
       reason: string;
       permissions: readonly AuthzPermission[];
     }): EnterpriseTrpcPolicy;
+    /**
+     * Check each answer against the output schema its procedure declared. The
+     * process decides; production leaves it off.
+     */
+    validateOutput: boolean;
   }) {
-    const { root, protectedProcedure, policy, resolverAuthorizedPolicy } = options;
+    const { root, protectedProcedure, policy, resolverAuthorizedPolicy, validateOutput } = options;
 
     return {
       routingPolicy: RoutingPolicyTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
       }),
       personalVirtualKeys: PersonalVirtualKeyTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
         resolverAuthorizedPolicy,
+        validateOutput,
       }),
       webhookEndpoints: WebhookEndpointTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        // The one place the webhook entitlement check becomes a decorator. It
+        // reads the webhook application's own gate, and is applied AFTER the
+        // permission check so membership is established when it runs.
+        entitlementGate: <TProcedure>(procedure: TProcedure): TProcedure =>
+          (procedure as unknown as { use: (m: unknown) => TProcedure }).use(
+            async ({
+              ctx,
+              input,
+              next,
+            }: {
+              ctx: WebhookEndpointTrpcContext;
+              input: { organizationId: string };
+              next: () => Promise<unknown>;
+            }) => {
+              await ctx.app.webhooks.assertEntitled(input.organizationId);
+              return next();
+            },
+          ),
+        validateOutput,
       }),
     };
   }

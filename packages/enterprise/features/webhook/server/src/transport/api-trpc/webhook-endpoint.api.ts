@@ -21,10 +21,16 @@
  *
  * Transport only: input parsing, the entitlement gate, and delegation.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   WEBHOOK_EVENT_TYPES,
+  webhookDeliveryPageSchema,
   webhookDestinationKindSchema,
+  webhookEndpointHealthSchema,
+  webhookEndpointViewSchema,
+  webhookEndpointWithSecretSchema,
+  webhookEventTypeSchema,
 } from "@langwatch/enterprise-webhook-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -45,8 +51,6 @@ export type WebhookEndpointTrpcContext = Readonly<{
   actor(): Readonly<{ id: string }>;
 }>;
 
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type WebhookEndpointTrpcProcedures<
   TContext extends WebhookEndpointTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -60,7 +64,15 @@ type WebhookEndpointTrpcProcedures<
    * order they were added, so a check installed before `.input()` would read no
    * organization id at all.
    */
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /**
+   * The Enterprise entitlement gate, already built by the process and applied
+   * AFTER the permission check, so membership is established when it runs —
+   * exactly the order this surface has always had.
+   */
+  entitlementGate: TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const orgInput = z.object({ organizationId: z.string() });
@@ -93,180 +105,182 @@ export class WebhookEndpointTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: WebhookEndpointTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, entitlementGate, validateOutput } = procedures;
 
-    // The plan gate is installed at each procedure AFTER the RBAC check, so
-    // membership is already established when it runs — exactly the order this
-    // surface has always had.
-    //
-    // Nothing translates an error here any more. Every refusal this surface
-    // raises is already a `HandledError` with the status it has always
-    // answered with: the entitlement gate's is a 403, the endpoint's
-    // validation refusal a 400 and its absence a 404, and the process's tRPC
-    // policy maps each to the code the `TRPCError`s built here used to name.
-    return trpc.router({
-      /** The event catalog the drawer renders its checkboxes from. */
-      eventTypes: policy("webhookEndpoints:view")(procedure.input(orgInput))
-        .use(async ({ ctx, input, next }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        })
-        .query(() => WEBHOOK_EVENT_TYPES),
+    // Nothing translates an error here. Every refusal this surface raises is
+    // already a `HandledError` with the status it has always answered with: the
+    // entitlement gate's is a 403, the endpoint's validation refusal a 400 and
+    // its absence a 404, and the process's tRPC policy maps each to the code
+    // the `TRPCError`s built here used to name.
+    const entitled = (permission: AuthzPermission): TrpcPolicyDecorator => {
+      const check = policy(permission);
+      return (built) => entitlementGate(check(built));
+    };
+    const VIEW = "webhookEndpoints:view, then the Enterprise entitlement gate";
+    const MANAGE = "webhookEndpoints:manage, then the Enterprise entitlement gate";
 
-      list: policy("webhookEndpoints:view")(procedure.input(orgInput))
-        .use(async ({ ctx, input, next }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        })
-        .query(({ ctx, input }) =>
-          ctx.app.webhooks.endpoints.getAll({ organizationId: input.organizationId }),
-        ),
-
-      deliveries: policy("webhookEndpoints:view")(
-        procedure.input(
-          endpointInput.extend({
-            limit: z.number().int().min(1).max(200).optional(),
-            cursor: z.object({ firedAt: z.coerce.date(), id: z.string() }).optional(),
-          }),
-        ),
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("eventTypes", (p) =>
+        p
+          .withInput(orgInput)
+          .withOutput(webhookEventTypeSchema.array())
+          .withCustomPermission(entitled("webhookEndpoints:view"), VIEW)
+          /** The event catalog the drawer renders its checkboxes from. */
+          .handle(() => WEBHOOK_EVENT_TYPES),
       )
-        .use(async ({ ctx, input, next }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        })
-        .query(({ ctx, input }) =>
-          ctx.app.webhooks.endpoints.getDeliveries({
-            organizationId: input.organizationId,
-            endpointId: input.endpointId,
-            limit: input.limit,
-            cursor: input.cursor,
-          }),
-        ),
-
-      create: policy("webhookEndpoints:manage")(
-        procedure.input(
-          orgInput.extend({
-            destinationKind: webhookDestinationKindSchema.optional(),
-            url: z.string().optional(),
-            sqs: sqsDestinationInput.optional(),
-            enabledEvents: z.array(z.string()).min(1),
-            maxBatchSize: z.number().int().optional(),
-            maxBatchDelayMs: z.number().int().optional(),
-            maxInFlight: z.number().int().optional(),
-          }),
-        ),
+      .query("list", (p) =>
+        p
+          .withInput(orgInput)
+          .withOutput(webhookEndpointViewSchema.array())
+          .withCustomPermission(entitled("webhookEndpoints:view"), VIEW)
+          .handle(({ ctx, input }) =>
+            ctx.app.webhooks.endpoints.getAll({ organizationId: input.organizationId }),
+          ),
       )
-        .use(async ({ ctx, input, next }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        })
-        .mutation(({ ctx, input }) =>
-          ctx.app.webhooks.endpoints.create({
-            organizationId: input.organizationId,
-            destinationKind: input.destinationKind,
-            url: input.url,
-            sqs: input.sqs,
-            enabledEvents: input.enabledEvents,
-            maxBatchSize: input.maxBatchSize,
-            maxBatchDelayMs: input.maxBatchDelayMs,
-            maxInFlight: input.maxInFlight,
-          }),
-        ),
-
-      health: policy("webhookEndpoints:view")(procedure.input(endpointInput))
-        .use(async ({ ctx, input, next }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        })
-        .query(({ ctx, input }) =>
-          ctx.app.webhooks.health.health({
-            organizationId: input.organizationId,
-            endpointId: input.endpointId,
-          }),
-        ),
-
-      update: policy("webhookEndpoints:manage")(
-        procedure.input(
-          endpointInput.extend({
-            // Accepted only when it repeats the kind the endpoint already has.
-            // Zod strips unknown keys, so leaving it out would silently drop a
-            // caller's attempted kind change and answer success where REST
-            // refuses: two surfaces, two answers to the same request.
-            destinationKind: webhookDestinationKindSchema.optional(),
-            url: z.string().optional(),
-            sqs: sqsDestinationInput.partial().optional(),
-            enabledEvents: z.array(z.string()).min(1).optional(),
-            maxBatchSize: z.number().int().optional(),
-            maxBatchDelayMs: z.number().int().optional(),
-            maxInFlight: z.number().int().optional(),
-          }),
-        ),
+      .query("deliveries", (p) =>
+        p
+          .withInput(
+            endpointInput.extend({
+              limit: z.number().int().min(1).max(200).optional(),
+              cursor: z.object({ firedAt: z.coerce.date(), id: z.string() }).optional(),
+            }),
+          )
+          .withOutput(webhookDeliveryPageSchema)
+          .withCustomPermission(entitled("webhookEndpoints:view"), VIEW)
+          .handle(({ ctx, input }) =>
+            ctx.app.webhooks.endpoints.getDeliveries({
+              organizationId: input.organizationId,
+              endpointId: input.endpointId,
+              limit: input.limit,
+              cursor: input.cursor,
+            }),
+          ),
       )
-        .use(async ({ ctx, input, next }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        })
-        .mutation(({ ctx, input }) =>
-          ctx.app.webhooks.endpoints.update({
-            organizationId: input.organizationId,
-            endpointId: input.endpointId,
-            destinationKind: input.destinationKind,
-            url: input.url,
-            sqs: input.sqs,
-            enabledEvents: input.enabledEvents,
-            maxBatchSize: input.maxBatchSize,
-            maxBatchDelayMs: input.maxBatchDelayMs,
-            maxInFlight: input.maxInFlight,
-          }),
-        ),
-
-      rollSecret: policy("webhookEndpoints:manage")(procedure.input(endpointInput))
-        .use(async ({ ctx, input, next }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        })
-        .mutation(({ ctx, input }) =>
-          ctx.app.webhooks.endpoints.rollSecret({
-            organizationId: input.organizationId,
-            endpointId: input.endpointId,
-          }),
-        ),
-
-      enable: policy("webhookEndpoints:manage")(procedure.input(endpointInput))
-        .use(async ({ ctx, input, next }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        })
-        .mutation(({ ctx, input }) =>
-          ctx.app.webhooks.endpoints.enable({
-            organizationId: input.organizationId,
-            endpointId: input.endpointId,
-          }),
-        ),
-
-      disable: policy("webhookEndpoints:manage")(procedure.input(endpointInput))
-        .use(async ({ ctx, input, next }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        })
-        .mutation(({ ctx, input }) =>
-          ctx.app.webhooks.endpoints.disable({
-            organizationId: input.organizationId,
-            endpointId: input.endpointId,
-          }),
-        ),
-
-      archive: policy("webhookEndpoints:manage")(procedure.input(endpointInput))
-        .use(async ({ ctx, input, next }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        })
-        .mutation(({ ctx, input }) =>
-          ctx.app.webhooks.endpoints.archive({
-            organizationId: input.organizationId,
-            endpointId: input.endpointId,
-          }),
-        ),
-    });
+      .mutation("create", (p) =>
+        p
+          .withInput(
+            orgInput.extend({
+              destinationKind: webhookDestinationKindSchema.optional(),
+              url: z.string().optional(),
+              sqs: sqsDestinationInput.optional(),
+              enabledEvents: z.array(z.string()).min(1),
+              maxBatchSize: z.number().int().optional(),
+              maxBatchDelayMs: z.number().int().optional(),
+              maxInFlight: z.number().int().optional(),
+            }),
+          )
+          .withOutput(webhookEndpointWithSecretSchema)
+          .withCustomPermission(entitled("webhookEndpoints:manage"), MANAGE)
+          .handle(({ ctx, input }) =>
+            ctx.app.webhooks.endpoints.create({
+              organizationId: input.organizationId,
+              destinationKind: input.destinationKind,
+              url: input.url,
+              sqs: input.sqs,
+              enabledEvents: input.enabledEvents,
+              maxBatchSize: input.maxBatchSize,
+              maxBatchDelayMs: input.maxBatchDelayMs,
+              maxInFlight: input.maxInFlight,
+            }),
+          ),
+      )
+      .query("health", (p) =>
+        p
+          .withInput(endpointInput)
+          .withOutput(webhookEndpointHealthSchema)
+          .withCustomPermission(entitled("webhookEndpoints:view"), VIEW)
+          .handle(({ ctx, input }) =>
+            ctx.app.webhooks.health.health({
+              organizationId: input.organizationId,
+              endpointId: input.endpointId,
+            }),
+          ),
+      )
+      .mutation("update", (p) =>
+        p
+          .withInput(
+            endpointInput.extend({
+              // Accepted only when it repeats the kind the endpoint already
+              // has. Zod strips unknown keys, so leaving it out would silently
+              // drop a caller's attempted kind change and answer success where
+              // REST refuses: two surfaces, two answers to the same request.
+              destinationKind: webhookDestinationKindSchema.optional(),
+              url: z.string().optional(),
+              sqs: sqsDestinationInput.partial().optional(),
+              enabledEvents: z.array(z.string()).min(1).optional(),
+              maxBatchSize: z.number().int().optional(),
+              maxBatchDelayMs: z.number().int().optional(),
+              maxInFlight: z.number().int().optional(),
+            }),
+          )
+          .withOutput(webhookEndpointViewSchema)
+          .withCustomPermission(entitled("webhookEndpoints:manage"), MANAGE)
+          .handle(({ ctx, input }) =>
+            ctx.app.webhooks.endpoints.update({
+              organizationId: input.organizationId,
+              endpointId: input.endpointId,
+              destinationKind: input.destinationKind,
+              url: input.url,
+              sqs: input.sqs,
+              enabledEvents: input.enabledEvents,
+              maxBatchSize: input.maxBatchSize,
+              maxBatchDelayMs: input.maxBatchDelayMs,
+              maxInFlight: input.maxInFlight,
+            }),
+          ),
+      )
+      .mutation("rollSecret", (p) =>
+        p
+          .withInput(endpointInput)
+          .withOutput(webhookEndpointWithSecretSchema)
+          .withCustomPermission(entitled("webhookEndpoints:manage"), MANAGE)
+          .handle(({ ctx, input }) =>
+            ctx.app.webhooks.endpoints.rollSecret({
+              organizationId: input.organizationId,
+              endpointId: input.endpointId,
+            }),
+          ),
+      )
+      .mutation("enable", (p) =>
+        p
+          .withInput(endpointInput)
+          .withOutput(webhookEndpointViewSchema)
+          .withCustomPermission(entitled("webhookEndpoints:manage"), MANAGE)
+          .handle(({ ctx, input }) =>
+            ctx.app.webhooks.endpoints.enable({
+              organizationId: input.organizationId,
+              endpointId: input.endpointId,
+            }),
+          ),
+      )
+      .mutation("disable", (p) =>
+        p
+          .withInput(endpointInput)
+          .withOutput(webhookEndpointViewSchema)
+          .withCustomPermission(entitled("webhookEndpoints:manage"), MANAGE)
+          .handle(({ ctx, input }) =>
+            ctx.app.webhooks.endpoints.disable({
+              organizationId: input.organizationId,
+              endpointId: input.endpointId,
+            }),
+          ),
+      )
+      .mutation("archive", (p) =>
+        p
+          .withInput(endpointInput)
+          .withOutput(z.void())
+          .withCustomPermission(entitled("webhookEndpoints:manage"), MANAGE)
+          .handle(({ ctx, input }) =>
+            ctx.app.webhooks.endpoints.archive({
+              organizationId: input.organizationId,
+              endpointId: input.endpointId,
+            }),
+          ),
+      )
+      .build();
   }
 }

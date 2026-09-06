@@ -82,3 +82,35 @@ export const webhookEndpointHealthSchema = z.object({
   p95LatencyMs: z.number().min(0).nullable(),
 });
 export type WebhookEndpointHealth = z.infer<typeof webhookEndpointHealthSchema>;
+
+/**
+ * A newly created or re-secreted endpoint. The signing secret crosses to the
+ * client exactly here and in a roll, once each time; every read answers a view
+ * with no secret material on it.
+ */
+export const webhookEndpointWithSecretSchema = z
+  .object({ endpoint: webhookEndpointViewSchema, secret: z.string() })
+  .strict();
+
+/** One delivery attempt, as the endpoint's activity list renders it. */
+export const webhookDeliveryAttemptSchema = z
+  .object({
+    id: z.string(),
+    dispatchId: z.string(),
+    attempt: z.number().int(),
+    eventCount: z.number().int(),
+    outcome: webhookDeliveryOutcomeSchema,
+    responseStatus: z.number().int().nullable(),
+    latencyMs: z.number().nullable(),
+    error: z.string().nullable(),
+    firedAt: z.date(),
+  })
+  .strict();
+
+/** One page of delivery attempts, newest first, with the cursor for the next. */
+export const webhookDeliveryPageSchema = z
+  .object({
+    deliveries: z.array(webhookDeliveryAttemptSchema),
+    nextCursor: z.object({ firedAt: z.date(), id: z.string() }).strict().nullable(),
+  })
+  .strict();

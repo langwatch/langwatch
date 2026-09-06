@@ -25,6 +25,7 @@ const identityPolicy = <TProcedure>(procedure: TProcedure): TProcedure => proced
 const router = LicenseEnforcementTrpcApi.create(trpc, {
   protected: trpc.procedure,
   policy: () => identityPolicy,
+  validateOutput: true,
 });
 
 /**

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { llmModels } from "./model-catalog";
 import { resolveLatestAlias } from "./latest-aliases";
 import type { LLMModelEntry } from "./model-catalog.types";
@@ -9,12 +10,14 @@ function isModelTier(name: string): name is ModelTier {
   return MODEL_TIERS.includes(name as ModelTier);
 }
 
-export interface TierTargetSuggestion {
-  modelId: string;
-  name: string;
-  provider: string;
-  recommended?: boolean;
-}
+/** One model worth pointing a tier at, as a picker renders it. */
+export const tierTargetSuggestionSchema = z.object({
+  modelId: z.string(),
+  name: z.string(),
+  provider: z.string(),
+  recommended: z.boolean().optional(),
+});
+export type TierTargetSuggestion = z.infer<typeof tierTargetSuggestionSchema>;
 
 export interface SuggestTierTargetsInput {
   tier: ModelTier;

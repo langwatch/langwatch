@@ -2,7 +2,13 @@
  * Personal virtual keys over the process's tRPC transport. Distinct from the organization-wide
  * virtual-key admin surface, which gates on `virtualKeys:manage` / `:rotate` / `:delete`.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import {
+  governanceWriteAcknowledgedSchema,
+  issuedPersonalVirtualKeyAnswerSchema,
+  personalVirtualKeySchema,
+} from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { GovernanceApp } from "#app/governance.app";
@@ -23,8 +29,6 @@ export type PersonalVirtualKeyTrpcContext = Readonly<{
   }> | null;
 }>;
 
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type PersonalVirtualKeyTrpcProcedures<
   TContext extends PersonalVirtualKeyTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -36,7 +40,9 @@ type PersonalVirtualKeyTrpcProcedures<
    * Tracing, logging, error shaping, scope lineage, the check and audit for one
    * declared permission, applied AFTER this feature's input parser.
    */
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
   /**
    * The declaration for a procedure whose reach the resolver decides from data
    * it loads — here, whose keys the caller may see. Records why, and which
@@ -45,7 +51,7 @@ type PersonalVirtualKeyTrpcProcedures<
   resolverAuthorizedPolicy(options: {
     reason: string;
     permissions: readonly AuthzPermission[];
-  }): ProcedureDecorator;
+  }): TrpcPolicyDecorator;
 }>;
 
 const organizationScopeSchema = z.object({ organizationId: z.string() });
@@ -60,7 +66,7 @@ export class PersonalVirtualKeyTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: PersonalVirtualKeyTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy, resolverAuthorizedPolicy } = procedures;
+    const { protected: procedure, policy, resolverAuthorizedPolicy, validateOutput } = procedures;
 
     /** The caller, plus the display identity the lazy workspace backfill names. */
     const callerOf = (ctx: PersonalVirtualKeyTrpcContext) => ({
@@ -69,78 +75,97 @@ export class PersonalVirtualKeyTrpcApi {
       displayEmail: ctx.session?.user.email ?? null,
     });
 
-    return trpc.router({
-      /**
-       * Personal keys in an organization. Never returns the secret. The default surface lists
-       * the caller's OWN keys, and the principal-user match is what authorises it.
-       */
-      list: resolverAuthorizedPolicy({
-        reason:
-          "a personal key belongs to its principal, so the caller's own keys need no permission; the resolver refuses non-members and widens the result past the caller only for a holder of virtualKeys:viewOtherPersonal at this organization",
-        permissions: ["virtualKeys:viewOtherPersonal"],
-      })(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            targetUserId: z.string().optional(),
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              targetUserId: z.string().optional(),
+            }),
+          )
+          .withOutput(personalVirtualKeySchema.array())
+          .withCustomPermission(
+            resolverAuthorizedPolicy({
+              reason:
+                "a personal key belongs to its principal, so the caller's own keys need no permission; the resolver refuses non-members and widens the result past the caller only for a holder of virtualKeys:viewOtherPersonal at this organization",
+              permissions: ["virtualKeys:viewOtherPersonal"],
+            }),
+            "whose keys the caller may see is decided by the resolver from the principal it loads, not from input",
+          )
+          /**
+           * Personal keys in an organization. Never returns the secret. The
+           * default surface lists the caller's OWN keys, and the
+           * principal-user match is what authorises it.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governanceApp.listPersonalVirtualKeys(
+              { organizationId: input.organizationId, targetUserId: input.targetUserId },
+              callerOf(ctx),
+            ),
+          ),
+      )
+      .mutation("issuePersonal", (p) =>
+        p
+          .withInput(
+            organizationScopeSchema.extend({
+              label: z
+                .string()
+                .min(1)
+                .max(64)
+                .regex(/^[a-z0-9][a-z0-9_-]*$/, {
+                  message: "Label must be lowercase alphanumeric, dash, or underscore (no spaces)",
+                }),
+              routingPolicyId: z.string().optional(),
+            }),
+          )
+          .withOutput(issuedPersonalVirtualKeyAnswerSchema)
+          .withPermission("organization:view")
+          /**
+           * Issues a new personal key under the given label. Answers the secret
+           * exactly once — the caller must persist it immediately. Used by the
+           * "Add a new key" drawer, and by the CLI device-flow approval handler
+           * for the first personal key on first login.
+           */
+          .handle(async ({ ctx, input }) => {
+            const issued = await ctx.app.governanceApp.issuePersonalVirtualKey(
+              {
+                organizationId: input.organizationId,
+                label: input.label,
+                routingPolicyId: input.routingPolicyId,
+              },
+              callerOf(ctx),
+            );
+
+            // The one moment the plaintext key exists on the wire.
+            return {
+              id: issued.virtualKey.id,
+              label: issued.virtualKey.name,
+              secret: issued.secret,
+              baseUrl: issued.baseUrl,
+              displayPrefix: issued.virtualKey.displayPrefix,
+              routingPolicyId: issued.routingPolicyId,
+            };
           }),
-        ),
-      ).query(async ({ ctx, input }) =>
-        ctx.app.governanceApp.listPersonalVirtualKeys(
-          { organizationId: input.organizationId, targetUserId: input.targetUserId },
-          callerOf(ctx),
-        ),
-      ),
-
-      /**
-       * Issue a new personal key under the given label. Returns the secret exactly once — the
-       * caller must persist it immediately. Used by the "Add a new key" drawer, and by the CLI
-       * device-flow approval handler for the first personal key on first login.
-       */
-      issuePersonal: policy("organization:view")(
-        procedure.input(
-          organizationScopeSchema.extend({
-            label: z
-              .string()
-              .min(1)
-              .max(64)
-              .regex(/^[a-z0-9][a-z0-9_-]*$/, {
-                message: "Label must be lowercase alphanumeric, dash, or underscore (no spaces)",
-              }),
-            routingPolicyId: z.string().optional(),
+      )
+      .mutation("revokePersonal", (p) =>
+        p
+          .withInput(organizationScopeSchema.extend({ id: z.string() }))
+          .withOutput(governanceWriteAcknowledgedSchema)
+          .withPermission("organization:view")
+          /** Revokes one of the caller's own personal keys. Idempotent. */
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.governanceApp.revokePersonalVirtualKey(
+              { organizationId: input.organizationId, id: input.id },
+              callerOf(ctx),
+            );
+            return { ok: true };
           }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const issued = await ctx.app.governanceApp.issuePersonalVirtualKey(
-          {
-            organizationId: input.organizationId,
-            label: input.label,
-            routingPolicyId: input.routingPolicyId,
-          },
-          callerOf(ctx),
-        );
-
-        // The one moment the plaintext key exists on the wire.
-        return {
-          id: issued.virtualKey.id,
-          label: issued.virtualKey.name,
-          secret: issued.secret,
-          baseUrl: issued.baseUrl,
-          displayPrefix: issued.virtualKey.displayPrefix,
-          routingPolicyId: issued.routingPolicyId,
-        };
-      }),
-
-      /** Revoke one of the caller's own personal keys. Idempotent. */
-      revokePersonal: policy("organization:view")(
-        procedure.input(organizationScopeSchema.extend({ id: z.string() })),
-      ).mutation(async ({ ctx, input }) => {
-        await ctx.app.governanceApp.revokePersonalVirtualKey(
-          { organizationId: input.organizationId, id: input.id },
-          callerOf(ctx),
-        );
-        return { ok: true };
-      }),
-    });
+      )
+      .build();
   }
 }

@@ -45,7 +45,8 @@ function harness() {
 
   const router = CurrencyTrpcApi.create(trpc, {
     protected: authenticated,
-    noPermission,
+    policy: () => noPermission,
+    validateOutput: true,
   });
 
   return {

@@ -17,6 +17,16 @@ export {
   AgentSandboxKeyMintService,
 } from "./services/agent-sandbox-key-mint.service";
 export {
+  AGENT_SANDBOX_KEY_REUSE_MS,
+  AgentSandboxKeySharePort,
+} from "./ports/agent-sandbox-key-share.port";
+export { AbsentAgentSandboxKeyShareAdapter } from "./adapters/absent.agent-sandbox-key-share.adapter";
+export { PostgresAgentSandboxKeyMintAdapter } from "./adapters/postgres.agent-sandbox-key-mint.adapter";
+export {
+  RedisAgentSandboxKeyShareAdapter,
+  type AgentSandboxKeyShareRedis,
+} from "./adapters/redis.agent-sandbox-key-share.adapter";
+export {
   AGENT_SANDBOX_KEY_REAP_INTERVAL_MS,
   AGENT_SANDBOX_KEY_REAP_PROCESS_NAME,
 } from "./processes/agent-sandbox-key-reap.process";

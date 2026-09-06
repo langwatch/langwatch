@@ -60,6 +60,7 @@ export function createEnterpriseGovernanceTrpcRouters<
     root: mount.root,
     protectedProcedure: mount.protectedProcedure,
     policy,
+    validateOutput: mount.validateOutput ?? false,
   });
   const gateway = EnterpriseGatewayTrpcComposition.create({
     root: mount.root,
@@ -68,6 +69,7 @@ export function createEnterpriseGovernanceTrpcRouters<
     // Two of the three authorize in their resolver rather than from the input,
     // and take the same chain under the name their package declares it by.
     resolverAuthorizedPolicy: appTrpcServiceAuthorizedPolicy(mount.middlewares),
+    validateOutput: mount.validateOutput ?? false,
   });
 
   return {

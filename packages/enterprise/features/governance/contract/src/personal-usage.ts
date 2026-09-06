@@ -59,3 +59,12 @@ export const personalUsageBreakdownSchema = z
   })
   .strict();
 export type PersonalUsageBreakdown = z.infer<typeof personalUsageBreakdownSchema>;
+
+/** The three answers one /me usage screen renders, resolved together. */
+export const personalUsageRollupSchema = z
+  .object({
+    summary: personalUsageSummarySchema,
+    dailyBuckets: z.array(personalUsageBucketSchema),
+    breakdownByModel: z.array(personalUsageBreakdownSchema),
+  })
+  .strict();

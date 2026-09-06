@@ -65,6 +65,7 @@ export function createEnterpriseTrpcRouters<
       backOfficePolicyForOrganization: noPermission(BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION),
       // See the module docblock: this process bills nothing and quotes nobody.
       saasBilling: false,
+      validateOutput: mount.validateOutput ?? false,
       ports: mount.ports,
     });
 

@@ -7,5 +7,12 @@ export {
   ScimTokenNotFoundError,
   ScimWriteOutsideConnectionError,
 } from "./scim.errors";
-export type { ScimTokenEntitlement, ScimTokenRecord, ScimTokenSummary } from "./scim-token";
+export {
+  issuedScimTokenSchema,
+  scimTokenRevokedSchema,
+  scimTokenSummarySchema,
+  type ScimTokenEntitlement,
+  type ScimTokenRecord,
+  type ScimTokenSummary,
+} from "./scim-token";
 export { SCIM_ROLES, resolveHighestRole, type ScimRole } from "./scim-role-resolver";

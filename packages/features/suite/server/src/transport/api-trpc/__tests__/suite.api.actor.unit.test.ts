@@ -22,6 +22,7 @@ function harness(run = vi.fn().mockResolvedValue(runResult)) {
   const router = SuiteTrpcApi.create(trpc, {
     protected: trpc.procedure,
     policy: () => (procedure) => procedure,
+    validateOutput: true,
   });
 
   const suites = { run } as unknown as SuiteApp;

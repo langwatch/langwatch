@@ -7,7 +7,11 @@
  *
  * @see specs/suites/test-suites.feature
  */
-import { ScenarioTestSuiteNotFoundError } from "@langwatch/scenario-contract";
+import { createTrpcService } from "@langwatch/api/trpc";
+import {
+  ScenarioTestSuiteNotFoundError,
+  scenarioTestSuiteSchema,
+} from "@langwatch/scenario-contract";
 import { SuiteNotFoundError } from "@langwatch/suite-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -22,51 +26,64 @@ export function createTestSuiteRouter<
   trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
   procedures: SuiteTrpcProcedures<TContext, TOptions, TRoot>,
 ) {
-  const { protected: procedure, policy } = procedures;
+  const { protected: procedure, policy, validateOutput } = procedures;
 
-  return trpc.router({
-    create: policy("scenarios:manage")(
-      procedure.input(projectSchema.extend({ name: z.string().trim().min(1) })),
-    ).mutation(async ({ ctx, input }) => {
-      return ctx.app.suites.createTestSuite(input);
-    }),
-
-    getAll: policy("scenarios:view")(procedure.input(projectSchema)).query(
-      async ({ ctx, input }) => {
+  return createTrpcService({
+    root: trpc,
+    procedures: { protected: procedure, policy },
+    validateOutput,
+  })
+    .mutation("create", (p) =>
+      p
+        .withInput(projectSchema.extend({ name: z.string().trim().min(1) }))
+        .withOutput(scenarioTestSuiteSchema)
+        .withPermission("scenarios:manage")
+        .handle(async ({ ctx, input }) => ctx.app.suites.createTestSuite(input)),
+    )
+    .query("getAll", (p) =>
+      p
+        .withInput(projectSchema)
+        .withOutput(scenarioTestSuiteSchema.array())
+        .withPermission("scenarios:view")
         // scenarioIds is the reconciled member cache, which is what the UI reads.
-        return await ctx.app.suites.listTestSuites(input);
-      },
-    ),
-
-    rename: policy("scenarios:manage")(
-      procedure.input(
-        projectSchema.extend({
-          testSuiteId: z.string(),
-          name: z.string().trim().min(1),
+        .handle(async ({ ctx, input }) => ctx.app.suites.listTestSuites(input)),
+    )
+    .mutation("rename", (p) =>
+      p
+        .withInput(
+          projectSchema.extend({
+            testSuiteId: z.string(),
+            name: z.string().trim().min(1),
+          }),
+        )
+        .withOutput(scenarioTestSuiteSchema)
+        .withPermission("scenarios:manage")
+        .handle(async ({ ctx, input }) => {
+          try {
+            return await ctx.app.suites.renameTestSuite(input);
+          } catch (error) {
+            if (error instanceof ScenarioTestSuiteNotFoundError) {
+              throw new SuiteNotFoundError(input.testSuiteId);
+            }
+            throw error;
+          }
         }),
-      ),
-    ).mutation(async ({ ctx, input }) => {
-      try {
-        return await ctx.app.suites.renameTestSuite(input);
-      } catch (error) {
-        if (error instanceof ScenarioTestSuiteNotFoundError) {
-          throw new SuiteNotFoundError(input.testSuiteId);
-        }
-        throw error;
-      }
-    }),
-
-    archive: policy("scenarios:manage")(
-      procedure.input(projectSchema.extend({ testSuiteId: z.string() })),
-    ).mutation(async ({ ctx, input }) => {
-      try {
-        return await ctx.app.suites.archiveTestSuite(input);
-      } catch (error) {
-        if (error instanceof ScenarioTestSuiteNotFoundError) {
-          throw new SuiteNotFoundError(input.testSuiteId);
-        }
-        throw error;
-      }
-    }),
-  });
+    )
+    .mutation("archive", (p) =>
+      p
+        .withInput(projectSchema.extend({ testSuiteId: z.string() }))
+        .withOutput(scenarioTestSuiteSchema)
+        .withPermission("scenarios:manage")
+        .handle(async ({ ctx, input }) => {
+          try {
+            return await ctx.app.suites.archiveTestSuite(input);
+          } catch (error) {
+            if (error instanceof ScenarioTestSuiteNotFoundError) {
+              throw new SuiteNotFoundError(input.testSuiteId);
+            }
+            throw error;
+          }
+        }),
+    )
+    .build();
 }

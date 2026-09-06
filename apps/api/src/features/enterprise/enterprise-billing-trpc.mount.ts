@@ -46,11 +46,15 @@ export function createEnterpriseBillingTrpcRouters<
   const billing = SubscriptionTrpcApi.create(mount.root, {
     protected: mount.protectedProcedure,
     policy: appTrpcPolicy(mount.middlewares),
+    validateOutput: mount.validateOutput ?? false,
   });
 
   const currencyDetection = CurrencyTrpcApi.create(mount.root, {
     protected: mount.protectedProcedure,
-    noPermission: appTrpcNoPermissionPolicy(mount.middlewares)(CURRENCY_NO_PERMISSION),
+    // The declaration is the process's, already written: the chain asks for a
+    // policy by access, and this surface has exactly one.
+    policy: () => appTrpcNoPermissionPolicy(mount.middlewares)(CURRENCY_NO_PERMISSION),
+    validateOutput: mount.validateOutput ?? false,
   });
 
   // Typed as the served router either way, so the record always carries the

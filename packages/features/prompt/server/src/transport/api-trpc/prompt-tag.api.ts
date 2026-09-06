@@ -1,7 +1,9 @@
 /**
  * Prompt tag definitions over the process's tRPC transport.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
+import { promptDeleteResultSchema, promptTagSchema } from "@langwatch/prompt-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -43,62 +45,72 @@ export class PromptTagTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: PromptTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      /**
-       * Returns all prompt tag definitions for the project's organization.
-       */
-      getAll: policy("prompts:view")(procedure.input(z.object({ projectId: z.string() }))).query(
-        async ({ ctx, input }) =>
-          ctx.app.prompts.listTagsForProject({ projectId: input.projectId }),
-      ),
-
-      /**
-       * Creates a custom tag definition for the project's organization.
-       */
-      create: policy("prompts:manage")(
-        procedure.input(z.object({ projectId: z.string(), name: z.string() })),
-      ).mutation(async ({ ctx, input }) =>
-        ctx.app.prompts.createTagForProject(
-          { projectId: input.projectId, name: input.name },
-          ctx.actor(),
-        ),
-      ),
-
-      /**
-       * Renames a tag definition and updates all corresponding assignments.
-       */
-      rename: policy("prompts:manage")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            oldName: z.string(),
-            newName: z.string(),
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("getAll", (p) =>
+        p
+          .withInput(z.object({ projectId: z.string() }))
+          .withOutput(promptTagSchema.array())
+          .withPermission("prompts:view")
+          /** Every prompt tag definition in the project's organization. */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.prompts.listTagsForProject({ projectId: input.projectId }),
+          ),
+      )
+      .mutation("create", (p) =>
+        p
+          .withInput(z.object({ projectId: z.string(), name: z.string() }))
+          .withOutput(promptTagSchema)
+          .withPermission("prompts:manage")
+          /** A custom tag definition for the project's organization. */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.prompts.createTagForProject(
+              { projectId: input.projectId, name: input.name },
+              ctx.actor(),
+            ),
+          ),
+      )
+      .mutation("rename", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              oldName: z.string(),
+              newName: z.string(),
+            }),
+          )
+          .withOutput(promptTagSchema)
+          .withPermission("prompts:manage")
+          /** Renames a tag definition and every assignment that names it. */
+          .handle(async ({ ctx, input }) => {
+            await assertMayManageEveryProject(ctx, { projectId: input.projectId });
+            return ctx.app.prompts.renameTagForProject({
+              projectId: input.projectId,
+              oldName: input.oldName,
+              newName: input.newName,
+            });
           }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        await assertMayManageEveryProject(ctx, { projectId: input.projectId });
-        return ctx.app.prompts.renameTagForProject({
-          projectId: input.projectId,
-          oldName: input.oldName,
-          newName: input.newName,
-        });
-      }),
-
-      /**
-       * Deletes a tag definition by name and cascades to assignments.
-       */
-      delete: policy("prompts:manage")(
-        procedure.input(z.object({ projectId: z.string(), name: z.string() })),
-      ).mutation(async ({ ctx, input }) => {
-        await assertMayManageEveryProject(ctx, { projectId: input.projectId });
-        await ctx.app.prompts.deleteTagForProject({
-          projectId: input.projectId,
-          name: input.name,
-        });
-        return { success: true };
-      }),
-    });
+      )
+      .mutation("delete", (p) =>
+        p
+          .withInput(z.object({ projectId: z.string(), name: z.string() }))
+          .withOutput(promptDeleteResultSchema)
+          .withPermission("prompts:manage")
+          /** Deletes a tag definition by name and cascades to assignments. */
+          .handle(async ({ ctx, input }) => {
+            await assertMayManageEveryProject(ctx, { projectId: input.projectId });
+            await ctx.app.prompts.deleteTagForProject({
+              projectId: input.projectId,
+              name: input.name,
+            });
+            return { success: true };
+          }),
+      )
+      .build();
   }
 }

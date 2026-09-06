@@ -26,7 +26,15 @@
  * organization's, and the door is the only place a signed-out person meets
  * one.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import {
+  frontDoorAskedSchema,
+  frontDoorSentSchema,
+  inviteLandingSchema,
+  signUpVerificationResultSchema,
+} from "@langwatch/auth-contract";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
+import { routingDecisionSchema } from "@langwatch/identity-contract";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import {
   TRPCError,
@@ -64,7 +72,9 @@ type FrontDoorTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(declaration: AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const ANONYMOUS_ROUTING: AuthzDeclaration = {
@@ -143,192 +153,228 @@ export class FrontDoorTrpcApi {
     procedures: FrontDoorTrpcProcedures<TContext, TOptions, TRoot>,
     app: AuthApp,
   ) {
-    const { protected: procedure, public: publicProcedure, policy } = procedures;
+    const { protected: procedure, public: publicProcedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      /**
-       * Where this address signs in. The decision object IS the contract: the
-       * screen renders `methodSet` and keys its guidance off `reasonCode`.
-       *
-       * A mutation rather than a query on purpose: a query would be cached and
-       * refetched per address, and a per-address cache entry is an
-       * account-existence oracle built out of network timing. The router
-       * itself cannot tell a registered address from an unregistered one
-       * (ADR-117 §2) — this keeps the transport from learning it either.
-       */
-      route: policy(ANONYMOUS_ROUTING)(publicProcedure.input(routeInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const withinBudget = await app.isWithinBudget({
-            key: `frontDoor.route:${app.clientIp(ctx)}`,
-            windowSeconds: 60 * 60,
-            max: 200,
-          });
-          if (!withinBudget) {
-            throw throttled("Too many sign-in attempts. Please try again later.");
-          }
-
-          return app.route({
-            identifier: input.identifier,
-            breakGlass: input.breakGlass ?? false,
-          });
-        },
-      ),
-
-      /**
-       * Sends a sign-up address its confirmation link. Sign-up is
-       * verification-first (ADR-117 §6), so this runs before a method is
-       * chosen and before anything at all exists for the address.
-       *
-       * An address that already has an account is told so: the no-oracle
-       * invariant is scoped to sign-in and reset, and refusing to say it here
-       * is what strands somebody on an account they half-created.
-       */
-      requestSignUpVerification: policy(OWN_SIGN_UP)(
-        publicProcedure.input(emailInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const withinBudget = await app.isWithinBudget({
-          key: `frontDoor.requestSignUpVerification:${app.clientIp(ctx)}`,
-          windowSeconds: 60 * 60,
-          max: 20,
-        });
-        if (!withinBudget) {
-          throw throttled("Too many signup attempts. Please try again later.");
-        }
-
-        if (await app.addressIsRegistered(ctx, { email: input.email })) {
-          throw new EmailAlreadyRegisteredError();
-        }
-
-        await app.requestSignUpVerification(ctx, { email: input.email });
-        return { sent: true as const };
-      }),
-
-      /**
-       * Sends the confirmation link for the CALLER'S OWN address.
-       *
-       * Signing up creates the account and signs the person in; confirming the
-       * address follows them in rather than standing in front of them
-       * (ADR-117 §6, revised). This is what sends it, and what the app's "we
-       * have not confirmed this yet" nudge will resend from.
-       *
-       * Protected, unlike everything else on this router, and that is the
-       * design rather than an inconsistency. A public "send a confirmation to
-       * this address" is a mailer pointed at any address anybody types, and
-       * the guard that keeps `requestSignUpVerification` honest — refusing an
-       * address that already has an account — is exactly the guard this one
-       * cannot have, since by now the account is the whole point. Taking the
-       * address from the session instead of the request closes it completely:
-       * the only address anybody can send to is the one they are already
-       * signed in as.
-       */
-      sendMyAddressConfirmation: policy(OWN_ADDRESS)(procedure.input(emptyInputSchema)).mutation(
-        async ({ ctx }) => {
-          const user = ctx.session?.user;
-          if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
-          const email = user.email;
-          if (!email) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "This account has no email address to confirm.",
+    // Two services, one per procedure kind, merged onto one router: every
+    // door here is signed-out except `sendMyAddressConfirmation`, which takes
+    // the address from the session precisely so nobody can name another.
+    const signedOut = createTrpcService({
+      root: trpc,
+      procedures: { protected: publicProcedure, policy },
+      validateOutput,
+    })
+      .mutation("route", (p) =>
+        p
+          .withInput(routeInputSchema)
+          .withOutput(routingDecisionSchema)
+          .withPermission(ANONYMOUS_ROUTING)
+          /**
+           * Where this address signs in. The decision object IS the contract:
+           * the screen renders `methodSet` and keys its guidance off
+           * `reasonCode`.
+           *
+           * A mutation rather than a query on purpose: a query would be cached
+           * and refetched per address, and a per-address cache entry is an
+           * account-existence oracle built out of network timing. The router
+           * itself cannot tell a registered address from an unregistered one
+           * (ADR-117 §2) — this keeps the transport from learning it either.
+           */
+          .handle(async ({ ctx, input }) => {
+            const withinBudget = await app.isWithinBudget({
+              key: `frontDoor.route:${app.clientIp(ctx)}`,
+              windowSeconds: 60 * 60,
+              max: 200,
             });
-          }
+            if (!withinBudget) {
+              throw throttled("Too many sign-in attempts. Please try again later.");
+            }
 
-          const withinBudget = await app.isWithinBudget({
-            key: `frontDoor.sendMyAddressConfirmation:${user.id}`,
-            windowSeconds: 60 * 60,
-            max: 10,
-          });
-          if (!withinBudget) {
-            throw throttled("Too many attempts. Please try again later.");
-          }
+            return app.route({
+              identifier: input.identifier,
+              breakGlass: input.breakGlass ?? false,
+            });
+          }),
+      )
+      .mutation("requestSignUpVerification", (p) =>
+        p
+          .withInput(emailInputSchema)
+          .withOutput(frontDoorSentSchema)
+          .withPermission(OWN_SIGN_UP)
+          /**
+           * Sends a sign-up address its confirmation link. Sign-up is
+           * verification-first (ADR-117 §6), so this runs before a method is
+           * chosen and before anything at all exists for the address.
+           *
+           * An address that already has an account is told so: the no-oracle
+           * invariant is scoped to sign-in and reset, and refusing to say it
+           * here is what strands somebody on a half-created account.
+           */
+          .handle(async ({ ctx, input }) => {
+            const withinBudget = await app.isWithinBudget({
+              key: `frontDoor.requestSignUpVerification:${app.clientIp(ctx)}`,
+              windowSeconds: 60 * 60,
+              max: 20,
+            });
+            if (!withinBudget) {
+              throw throttled("Too many signup attempts. Please try again later.");
+            }
 
-          await app.requestSignUpVerification(ctx, { email });
-          return { sent: true as const };
-        },
-      ),
+            if (await app.addressIsRegistered(ctx, { email: input.email })) {
+              throw new EmailAlreadyRegisteredError();
+            }
 
-      /**
-       * Spends a confirmation link and answers the address it confirmed, so
-       * the screen can carry on to the method choice. A link that carried a
-       * pending credential also creates the account. Expired, already spent
-       * and never issued are one refusal — the way on is the same for all
-       * three.
-       */
-      completeSignUpVerification: policy(OWN_EMAILED_TOKEN)(
-        publicProcedure.input(tokenInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const withinBudget = await app.isWithinBudget({
-          key: `frontDoor.completeSignUpVerification:${app.clientIp(ctx)}`,
-          windowSeconds: 60 * 60,
-          max: 60,
-        });
-        if (!withinBudget) {
-          throw throttled("Too many attempts. Please try again later.");
-        }
+            await app.requestSignUpVerification(ctx, { email: input.email });
+            return { sent: true as const };
+          }),
+      )
+      .mutation("completeSignUpVerification", (p) =>
+        p
+          .withInput(tokenInputSchema)
+          .withOutput(signUpVerificationResultSchema)
+          .withPermission(OWN_EMAILED_TOKEN)
+          /**
+           * Spends a confirmation link and answers the address it confirmed, so
+           * the screen can carry on to the method choice. A link that carried a
+           * pending credential also creates the account. Expired, already spent
+           * and never issued are one refusal — the way on is the same for all
+           * three.
+           */
+          .handle(async ({ ctx, input }) => {
+            const withinBudget = await app.isWithinBudget({
+              key: `frontDoor.completeSignUpVerification:${app.clientIp(ctx)}`,
+              windowSeconds: 60 * 60,
+              max: 60,
+            });
+            if (!withinBudget) {
+              throw throttled("Too many attempts. Please try again later.");
+            }
 
-        return app.completeSignUpVerification(ctx, { token: input.token });
-      }),
+            return app.completeSignUpVerification(ctx, { token: input.token });
+          }),
+      )
+      .query("inviteLanding", (p) =>
+        p
+          .withInput(inviteCodeInputSchema)
+          .withOutput(inviteLandingSchema)
+          .withPermission(INVITE_CODE_IS_THE_AUTHORIZATION)
+          /**
+           * What an invitation link can say to whoever opens it: which
+           * organization is asking, and who asked. Enough to decide whether to
+           * accept, and nothing that would make a guessed code worth guessing —
+           * no address, no role, no membership.
+           *
+           * A revoked invitation reads exactly like a missing one, the same way
+           * `organization.acceptInvite` answers it: the journey ends quietly.
+           * Expired is different, because it is recoverable in one click by the
+           * inviter (D11). Both refusals are the port's, so the two surfaces
+           * cannot drift into telling a code-holder different things.
+           */
+          .handle(async ({ ctx, input }) => {
+            const withinBudget = await app.isWithinBudget({
+              key: `frontDoor.inviteLanding:${app.clientIp(ctx)}`,
+              windowSeconds: 60 * 60,
+              max: 60,
+            });
+            if (!withinBudget) {
+              throw throttled("Too many attempts. Please try again later.");
+            }
 
-      /**
-       * What an invitation link can say to whoever opens it: which
-       * organization is asking, and who asked. Enough to decide whether to
-       * accept, and nothing that would make a guessed code worth guessing — no
-       * address, no role, no membership.
-       *
-       * A revoked invitation reads exactly like a missing one, the same way
-       * `organization.acceptInvite` answers it: the journey ends quietly.
-       * Expired is different, because it is recoverable in one click by the
-       * inviter (D11). Both refusals are the port's, so the two surfaces
-       * cannot drift into telling a code-holder different things.
-       */
-      inviteLanding: policy(INVITE_CODE_IS_THE_AUTHORIZATION)(
-        publicProcedure.input(inviteCodeInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const withinBudget = await app.isWithinBudget({
-          key: `frontDoor.inviteLanding:${app.clientIp(ctx)}`,
-          windowSeconds: 60 * 60,
-          max: 60,
-        });
-        if (!withinBudget) {
-          throw throttled("Too many attempts. Please try again later.");
-        }
+            return app.readInviteLanding(ctx, { inviteCode: input.inviteCode });
+          }),
+      )
+      .mutation("requestFreshInvite", (p) =>
+        p
+          .withInput(inviteCodeInputSchema)
+          .withOutput(frontDoorAskedSchema)
+          .withPermission(FRESH_INVITE_REQUEST)
+          /**
+           * "My invitation expired, send me another" (D11).
+           *
+           * The person asking is holding a stale code and may have no session at
+           * all, so this mints nothing: it tells the organization's admins that
+           * somebody is waiting, and they resend from the members table. Letting
+           * a stale code refresh itself would make the expiry decorative.
+           *
+           * Two limits, because they stop different things. The per-IP one stops
+           * a script walking codes; the per-invitation one stops any number of
+           * people turning one invitation into a way to mail somebody
+           * repeatedly, and it is the SAME counter the admin's resend spends, so
+           * the two routes to one inbox cannot be used to double up.
+           *
+           * The answer is the same shape whatever happened, and never says how
+           * many admins exist or who they are.
+           */
+          .handle(async ({ ctx, input }) => {
+            const withinBudget = await app.isWithinBudget({
+              key: `frontDoor.requestFreshInvite:${app.clientIp(ctx)}`,
+              windowSeconds: 60 * 60,
+              max: 20,
+            });
+            if (!withinBudget) {
+              throw throttled("Too many attempts. Please try again later.");
+            }
 
-        return app.readInviteLanding(ctx, { inviteCode: input.inviteCode });
-      }),
+            await app.requestFreshInvite(ctx, { inviteCode: input.inviteCode });
 
-      /**
-       * "My invitation expired, send me another" (D11).
-       *
-       * The person asking is holding a stale code and may have no session at
-       * all, so this mints nothing: it tells the organization's admins that
-       * somebody is waiting, and they resend from the members table. Letting a
-       * stale code refresh itself would make the expiry decorative.
-       *
-       * Two limits, because they stop different things. The per-IP one stops a
-       * script walking codes; the per-invitation one stops any number of
-       * people turning one invitation into a way to mail somebody repeatedly,
-       * and it is the SAME counter the admin's resend spends, so the two
-       * routes to one inbox cannot be used to double up.
-       *
-       * The answer is the same shape whatever happened, and never says how
-       * many admins exist or who they are.
-       */
-      requestFreshInvite: policy(FRESH_INVITE_REQUEST)(
-        publicProcedure.input(inviteCodeInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const withinBudget = await app.isWithinBudget({
-          key: `frontDoor.requestFreshInvite:${app.clientIp(ctx)}`,
-          windowSeconds: 60 * 60,
-          max: 20,
-        });
-        if (!withinBudget) {
-          throw throttled("Too many attempts. Please try again later.");
-        }
+            return { asked: true };
+          }),
+      )
+      .build();
 
-        await app.requestFreshInvite(ctx, { inviteCode: input.inviteCode });
+    /**
+     * Protected, unlike everything else on this router, and that is the design
+     * rather than an inconsistency. A public "send a confirmation to this
+     * address" is a mailer pointed at any address anybody types, and the guard
+     * that keeps `requestSignUpVerification` honest — refusing an address that
+     * already has an account — is exactly the guard this one cannot have, since
+     * by now the account is the whole point. Taking the address from the session
+     * instead of the request closes it completely: the only address anybody can
+     * send to is the one they are already signed in as.
+     */
+    const signedIn = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .mutation("sendMyAddressConfirmation", (p) =>
+        p
+          .withInput(emptyInputSchema)
+          .withOutput(frontDoorSentSchema)
+          .withPermission(OWN_ADDRESS)
+          /**
+           * Sends the confirmation link for the CALLER'S OWN address.
+           *
+           * Signing up creates the account and signs the person in; confirming
+           * the address follows them in rather than standing in front of them
+           * (ADR-117 §6, revised). This is what sends it, and what the app's "we
+           * have not confirmed this yet" nudge will resend from.
+           */
+          .handle(async ({ ctx }) => {
+            const user = ctx.session?.user;
+            if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+            const email = user.email;
+            if (!email) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "This account has no email address to confirm.",
+              });
+            }
 
-        return { asked: true };
-      }),
-    });
+            const withinBudget = await app.isWithinBudget({
+              key: `frontDoor.sendMyAddressConfirmation:${user.id}`,
+              windowSeconds: 60 * 60,
+              max: 10,
+            });
+            if (!withinBudget) {
+              throw throttled("Too many attempts. Please try again later.");
+            }
+
+            await app.requestSignUpVerification(ctx, { email });
+            return { sent: true as const };
+          }),
+      )
+      .build();
+
+    return trpc.mergeRouters(signedOut, signedIn);
   }
 }

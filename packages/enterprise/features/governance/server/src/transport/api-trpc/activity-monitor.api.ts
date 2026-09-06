@@ -14,8 +14,20 @@
  *
  * Spec: specs/ai-gateway/governance/activity-monitor.feature
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import {
+  activityEventDetailRowSchema,
+  activityMonitorSummarySchema,
+  ingestionSourceHealthRowSchema,
+  recentAnomalyRowSchema,
+  sourceHealthMetricsSchema,
+  spendByDepartmentRowSchema,
+  spendByTeamRowSchema,
+  spendByUserRowSchema,
+  spendOverTimeResultSchema,
+  type GovernanceService,
+} from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -23,21 +35,21 @@ export type ActivityMonitorTrpcContext = Readonly<{
   app: Readonly<{ governance: GovernanceService }>;
 }>;
 
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type ActivityMonitorTrpcProcedures<
   TContext extends ActivityMonitorTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
   /**
    * Refuses the call when the caller's organization is not on an enterprise
    * plan. Composition supplies one gate per feature identifier — this
    * surface's identifier is `ACTIVITY_MONITOR`.
    */
-  planGate: ProcedureDecorator;
+  planGate: TrpcPolicyDecorator;
 }>;
 
 const organizationScope = z.object({ organizationId: z.string() });
@@ -75,114 +87,167 @@ export class ActivityMonitorTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: ActivityMonitorTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy, planGate } = procedures;
+    const { protected: procedure, policy, planGate, validateOutput } = procedures;
 
-    // Every declaration composes as `policy(planGate(procedure.input(schema)))`.
-    // `.input` first so the plan gate can read `input.organizationId`, then
-    // `planGate`, then `policy` (tracing, logging, error shaping, scope
-    // lineage, authz, audit). One helper because every read shares the shape.
-    const declare = <TSchema extends z.ZodTypeAny>(schema: TSchema) =>
-      policy("activityMonitor:view")(planGate(procedure.input(schema)));
+    // Every declaration composes as `policy(planGate(<parsed procedure>))`. The
+    // chain applies the parser first so the plan gate can read
+    // `input.organizationId`, then the plan gate, then the policy (tracing,
+    // logging, error shaping, scope lineage, authz, audit).
+    const activityMonitorViewer = policy("activityMonitor:view");
+    const declare: TrpcPolicyDecorator = (built) => activityMonitorViewer(planGate(built));
+    const REASON =
+      "activityMonitor:view, then the enterprise plan gate carrying the ACTIVITY_MONITOR refusal copy";
 
-    return trpc.router({
-      /** Summary cards: total spend in window, delta vs previous, users, anomaly breakdown. */
-      summary: declare(summarySchema).query(async ({ ctx, input }) =>
-        ctx.app.governance.activitySummary({
-          organizationId: input.organizationId,
-          windowDays: input.windowDays,
-        }),
-      ),
-
-      /**
-       * Per-user spend breakdown; defaults match the top-N bird's-eye card.
-       * Pagination + sort back the View-all-users listing page.
-       */
-      spendByUser: declare(spendByEntitySchema).query(async ({ ctx, input }) =>
-        ctx.app.governance.activitySpendByUser({
-          organizationId: input.organizationId,
-          windowDays: input.windowDays,
-          limit: input.limit,
-          offset: input.offset,
-          sortBy: input.sortBy,
-          sortDir: input.sortDir,
-        }),
-      ),
-
-      /**
-       * Per-team spend rollup (with an "Org-wide" bucket for null-teamId
-       * sources). Pairs with `spendByUser` for the admin bird's-eye home.
-       */
-      spendByTeam: declare(spendByEntitySchema).query(async ({ ctx, input }) =>
-        ctx.app.governance.activitySpendByTeam({
-          organizationId: input.organizationId,
-          windowDays: input.windowDays,
-          limit: input.limit,
-          offset: input.offset,
-          sortBy: input.sortBy,
-          sortDir: input.sortDir,
-        }),
-      ),
-
-      /**
-       * Spend rolled up by department across every project in the org — the
-       * marketing-versus-engineering comparison, including personal AI use.
-       * Reads the whole org's spend, not just the governance ingestion silo.
-       */
-      spendByDepartment: declare(spendByDepartmentSchema).query(async ({ ctx, input }) =>
-        ctx.app.governance.activitySpendByDepartment({
-          organizationId: input.organizationId,
-          windowDays: input.windowDays,
-        }),
-      ),
-
-      /**
-       * Daily spend-over-time buckets, grouped by team, user or model —
-       * bucket-major envelope so the chart iterates days directly. Empty
-       * days emit `points: []` so the X axis stays dense.
-       */
-      spendOverTime: declare(spendOverTimeSchema).query(async ({ ctx, input }) =>
-        ctx.app.governance.activitySpendOverTime({
-          organizationId: input.organizationId,
-          windowDays: input.windowDays,
-          groupBy: input.groupBy,
-        }),
-      ),
-
-      /** Per-source health for the dashboard's source strip. */
-      ingestionSourcesHealth: declare(organizationScope).query(async ({ ctx, input }) =>
-        ctx.app.governance.activityIngestionSourcesHealth({
-          organizationId: input.organizationId,
-        }),
-      ),
-
-      /**
-       * Recent alerts produced by the anomaly-detection subscriber. Returns
-       * `[]` when no rules have fired or when ClickHouse is disabled (the
-       * subscriber short-circuits without CH).
-       */
-      recentAnomalies: declare(recentAnomaliesSchema).query(async ({ ctx, input }) =>
-        ctx.app.governance.activityRecentAnomalies({
-          organizationId: input.organizationId,
-          limit: input.limit,
-        }),
-      ),
-
-      /**
-       * Recent events for a single IngestionSource — powers the per-source
-       * detail page's "raw vs normalised" preview, cursor-paginated by
-       * `eventTimestamp DESC` via `beforeIso`.
-       */
-      eventsForSource: declare(eventsForSourceSchema).query(async ({ ctx, input }) =>
-        ctx.app.governance.activityEventsForSource(input),
-      ),
-
-      /**
-       * Volume metrics for one source over rolling 24h/7d/30d windows plus
-       * `lastSuccessIso`. Powers the per-source detail page's health header.
-       */
-      sourceHealthMetrics: declare(sourceScopeSchema).query(async ({ ctx, input }) =>
-        ctx.app.governance.activitySourceHealthMetrics(input),
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("summary", (p) =>
+        p
+          .withInput(summarySchema)
+          .withOutput(activityMonitorSummarySchema)
+          .withCustomPermission(declare, REASON)
+          /**
+           * Summary cards: total spend in the window, the delta against the
+           * previous one, users, and the anomaly breakdown.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.activitySummary({
+              organizationId: input.organizationId,
+              windowDays: input.windowDays,
+            }),
+          ),
+      )
+      .query("spendByUser", (p) =>
+        p
+          .withInput(spendByEntitySchema)
+          .withOutput(spendByUserRowSchema.array())
+          .withCustomPermission(declare, REASON)
+          /**
+           * Per-user spend breakdown; the defaults match the top-N bird's-eye
+           * card, and pagination and sort back the view-all listing page.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.activitySpendByUser({
+              organizationId: input.organizationId,
+              windowDays: input.windowDays,
+              limit: input.limit,
+              offset: input.offset,
+              sortBy: input.sortBy,
+              sortDir: input.sortDir,
+            }),
+          ),
+      )
+      .query("spendByTeam", (p) =>
+        p
+          .withInput(spendByEntitySchema)
+          .withOutput(spendByTeamRowSchema.array())
+          .withCustomPermission(declare, REASON)
+          /**
+           * Per-team spend rollup, with an "Org-wide" bucket for sources that
+           * name no team. Pairs with `spendByUser` on the admin bird's-eye home.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.activitySpendByTeam({
+              organizationId: input.organizationId,
+              windowDays: input.windowDays,
+              limit: input.limit,
+              offset: input.offset,
+              sortBy: input.sortBy,
+              sortDir: input.sortDir,
+            }),
+          ),
+      )
+      .query("spendByDepartment", (p) =>
+        p
+          .withInput(spendByDepartmentSchema)
+          .withOutput(spendByDepartmentRowSchema.array())
+          .withCustomPermission(declare, REASON)
+          /**
+           * Spend rolled up by department across every project in the
+           * organization — the marketing-versus-engineering comparison,
+           * including personal AI use. Reads the whole organization's spend,
+           * not only the governance ingestion silo.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.activitySpendByDepartment({
+              organizationId: input.organizationId,
+              windowDays: input.windowDays,
+            }),
+          ),
+      )
+      .query("spendOverTime", (p) =>
+        p
+          .withInput(spendOverTimeSchema)
+          .withOutput(spendOverTimeResultSchema)
+          .withCustomPermission(declare, REASON)
+          /**
+           * Daily spend-over-time buckets grouped by team, user or model —
+           * bucket-major so the chart iterates days directly. An empty day
+           * emits `points: []` so the X axis stays dense.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.activitySpendOverTime({
+              organizationId: input.organizationId,
+              windowDays: input.windowDays,
+              groupBy: input.groupBy,
+            }),
+          ),
+      )
+      .query("ingestionSourcesHealth", (p) =>
+        p
+          .withInput(organizationScope)
+          .withOutput(ingestionSourceHealthRowSchema.array())
+          .withCustomPermission(declare, REASON)
+          /** Per-source health for the dashboard's source strip. */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.activityIngestionSourcesHealth({
+              organizationId: input.organizationId,
+            }),
+          ),
+      )
+      .query("recentAnomalies", (p) =>
+        p
+          .withInput(recentAnomaliesSchema)
+          .withOutput(recentAnomalyRowSchema.array())
+          .withCustomPermission(declare, REASON)
+          /**
+           * Recent alerts produced by the anomaly-detection subscriber. Answers
+           * `[]` when no rule has fired and when ClickHouse is disabled — the
+           * subscriber short-circuits without it.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.activityRecentAnomalies({
+              organizationId: input.organizationId,
+              limit: input.limit,
+            }),
+          ),
+      )
+      .query("eventsForSource", (p) =>
+        p
+          .withInput(eventsForSourceSchema)
+          .withOutput(activityEventDetailRowSchema.array())
+          .withCustomPermission(declare, REASON)
+          /**
+           * Recent events for one IngestionSource — the per-source detail
+           * page's "raw versus normalised" preview, cursor-paginated by
+           * `eventTimestamp DESC` through `beforeIso`.
+           */
+          .handle(async ({ ctx, input }) => ctx.app.governance.activityEventsForSource(input)),
+      )
+      .query("sourceHealthMetrics", (p) =>
+        p
+          .withInput(sourceScopeSchema)
+          .withOutput(sourceHealthMetricsSchema)
+          .withCustomPermission(declare, REASON)
+          /**
+           * Volume metrics for one source over rolling 24-hour, 7-day and
+           * 30-day windows, plus `lastSuccessIso`. The per-source detail page's
+           * health header.
+           */
+          .handle(async ({ ctx, input }) => ctx.app.governance.activitySourceHealthMetrics(input)),
+      )
+      .build();
   }
 }

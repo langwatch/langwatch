@@ -3,9 +3,11 @@
  * `anomalyRules:manage`.
  * Spec: specs/ai-gateway/governance/anomaly-rules.feature
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   ANOMALY_RULE_SCOPES,
+  anomalyRuleSchema,
   ANOMALY_RULE_SEVERITIES,
   type GovernanceService,
   redactDestinationConfig,
@@ -19,17 +21,17 @@ export type AnomalyRulesTrpcContext = Readonly<{
   actor(): Readonly<{ id: string }>;
 }>;
 
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type AnomalyRulesTrpcProcedures<
   TContext extends AnomalyRulesTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
   /** Refuses off-plan callers with the `ANOMALY_RULES` refusal copy. */
-  planGate: ProcedureDecorator;
+  planGate: TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const severitySchema = z.enum(ANOMALY_RULE_SEVERITIES);
@@ -134,77 +136,113 @@ export class AnomalyRulesTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: AnomalyRulesTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy, planGate } = procedures;
+    const { protected: procedure, policy, planGate, validateOutput } = procedures;
 
-    const view = <TSchema extends z.ZodTypeAny>(schema: TSchema) =>
-      policy("anomalyRules:view")(planGate(procedure.input(schema)));
-    const manage = <TSchema extends z.ZodTypeAny>(schema: TSchema) =>
-      policy("anomalyRules:manage")(planGate(procedure.input(schema)));
+    // The permission first, the plan gate second, exactly as the hand-built
+    // chain composed them: a caller who may not read these at all is refused
+    // before the answer names which plan the organization is on.
+    const gated = (permission: AuthzPermission): TrpcPolicyDecorator => {
+      const check = policy(permission);
+      return (built) => check(planGate(built));
+    };
+    const VIEW_THEN_PLAN = "anomalyRules:view, then the plan gate carrying the ANOMALY_RULES copy";
+    const MANAGE_THEN_PLAN =
+      "anomalyRules:manage, then the plan gate carrying the ANOMALY_RULES copy";
 
-    return trpc.router({
-      list: view(organizationScope).query(async ({ ctx, input }) =>
-        (await ctx.app.governance.anomalyRuleList(input.organizationId)).map(toAnomalyRuleDto),
-      ),
-
-      get: view(idAndOrg).query(async ({ ctx, input }) =>
-        toAnomalyRuleDto(
-          await ctx.app.governance.anomalyRuleGetById({
-            id: input.id,
-            organizationId: input.organizationId,
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(organizationScope)
+          .withOutput(anomalyRuleSchema.array())
+          .withCustomPermission(gated("anomalyRules:view"), VIEW_THEN_PLAN)
+          .handle(async ({ ctx, input }) =>
+            (await ctx.app.governance.anomalyRuleList(input.organizationId)).map(toAnomalyRuleDto),
+          ),
+      )
+      .query("get", (p) =>
+        p
+          .withInput(idAndOrg)
+          .withOutput(anomalyRuleSchema)
+          .withCustomPermission(gated("anomalyRules:view"), VIEW_THEN_PLAN)
+          .handle(async ({ ctx, input }) =>
+            toAnomalyRuleDto(
+              await ctx.app.governance.anomalyRuleGetById({
+                id: input.id,
+                organizationId: input.organizationId,
+              }),
+            ),
+          ),
+      )
+      .mutation("create", (p) =>
+        p
+          .withInput(createSchema)
+          .withOutput(anomalyRuleSchema)
+          .withCustomPermission(gated("anomalyRules:manage"), MANAGE_THEN_PLAN)
+          .handle(async ({ ctx, input }) => {
+            try {
+              const created = await ctx.app.governance.anomalyRuleCreate({
+                organizationId: input.organizationId,
+                name: input.name,
+                description: input.description ?? null,
+                severity: input.severity,
+                ruleType: input.ruleType,
+                scope: input.scope,
+                scopeId: input.scopeId,
+                thresholdConfig: input.thresholdConfig,
+                destinationConfig: input.destinationConfig,
+                status: input.status,
+                actorUserId: ctx.actor().id,
+              });
+              return toAnomalyRuleDto(created);
+            } catch (err) {
+              translateConfigValidationError(err, input.ruleType);
+            }
           }),
-        ),
-      ),
-
-      create: manage(createSchema).mutation(async ({ ctx, input }) => {
-        try {
-          const created = await ctx.app.governance.anomalyRuleCreate({
-            organizationId: input.organizationId,
-            name: input.name,
-            description: input.description ?? null,
-            severity: input.severity,
-            ruleType: input.ruleType,
-            scope: input.scope,
-            scopeId: input.scopeId,
-            thresholdConfig: input.thresholdConfig,
-            destinationConfig: input.destinationConfig,
-            status: input.status,
-            actorUserId: ctx.actor().id,
-          });
-          return toAnomalyRuleDto(created);
-        } catch (err) {
-          translateConfigValidationError(err, input.ruleType);
-        }
-      }),
-
-      update: manage(updateSchema).mutation(async ({ ctx, input }) => {
-        try {
-          const updated = await ctx.app.governance.anomalyRuleUpdate({
-            id: input.id,
-            organizationId: input.organizationId,
-            name: input.name,
-            description: input.description,
-            severity: input.severity,
-            ruleType: input.ruleType,
-            scope: input.scope,
-            scopeId: input.scopeId,
-            thresholdConfig: input.thresholdConfig,
-            destinationConfig: input.destinationConfig,
-            status: input.status,
-          });
-          return toAnomalyRuleDto(updated);
-        } catch (err) {
-          translateConfigValidationError(err, input.ruleType);
-        }
-      }),
-
-      archive: manage(idAndOrg).mutation(async ({ ctx, input }) =>
-        toAnomalyRuleDto(
-          await ctx.app.governance.anomalyRuleArchive({
-            id: input.id,
-            organizationId: input.organizationId,
+      )
+      .mutation("update", (p) =>
+        p
+          .withInput(updateSchema)
+          .withOutput(anomalyRuleSchema)
+          .withCustomPermission(gated("anomalyRules:manage"), MANAGE_THEN_PLAN)
+          .handle(async ({ ctx, input }) => {
+            try {
+              const updated = await ctx.app.governance.anomalyRuleUpdate({
+                id: input.id,
+                organizationId: input.organizationId,
+                name: input.name,
+                description: input.description,
+                severity: input.severity,
+                ruleType: input.ruleType,
+                scope: input.scope,
+                scopeId: input.scopeId,
+                thresholdConfig: input.thresholdConfig,
+                destinationConfig: input.destinationConfig,
+                status: input.status,
+              });
+              return toAnomalyRuleDto(updated);
+            } catch (err) {
+              translateConfigValidationError(err, input.ruleType);
+            }
           }),
-        ),
-      ),
-    });
+      )
+      .mutation("archive", (p) =>
+        p
+          .withInput(idAndOrg)
+          .withOutput(anomalyRuleSchema)
+          .withCustomPermission(gated("anomalyRules:manage"), MANAGE_THEN_PLAN)
+          .handle(async ({ ctx, input }) =>
+            toAnomalyRuleDto(
+              await ctx.app.governance.anomalyRuleArchive({
+                id: input.id,
+                organizationId: input.organizationId,
+              }),
+            ),
+          ),
+      )
+      .build();
   }
 }

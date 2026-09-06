@@ -22,6 +22,14 @@
  * rather than a second bag declared here, so the limit surface next door
  * reaches the same ones.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import {
+  licenseGeneratedSchema,
+  licenseRemovedSchema,
+  licenseStatusSchema,
+  licenseUploadedSchema,
+  ssoGateStatusSchema,
+} from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   TRPCError,
@@ -60,16 +68,16 @@ type LicenseTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(
-    permission: "organization:view" | "organization:manage",
-  ): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(permission: "organization:view" | "organization:manage"): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
   /**
    * The same chain carrying an explicit opt-out of the permission check, for
    * `getSsoGateStatus` alone: the answer is deployment-wide, so there is no
    * organization to check it against. It stays behind a session because an
    * anonymous visitor has no business learning that an install is unlicensed.
    */
-  unscopedPolicy<TProcedure>(procedure: TProcedure): TProcedure;
+  unscopedPolicy: TrpcPolicyDecorator;
 }>;
 
 /**
@@ -109,129 +117,149 @@ export class LicenseTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: LicenseTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy, unscopedPolicy } = procedures;
+    const { protected: procedure, policy, unscopedPolicy, validateOutput } = procedures;
 
-    return trpc.router({
-      /** The current license status for an organization. */
-      getStatus: policy("organization:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ ctx, input }) => {
-          // No catch: `OrganizationNotFoundError` is a `HandledError`, so the
-          // shared middleware maps it to NOT_FOUND and keeps it as the cause.
-          // Re-wrapping it here threw away the code and the trace id.
-          return await ctx.app.licensing.getLicenseStatus(input.organizationId);
-        },
-      ),
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("getStatus", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(licenseStatusSchema)
+          .withPermission("organization:view")
+          /** The current license status for an organization. */
+          .handle(async ({ ctx, input }) =>
+            // No catch: `OrganizationNotFoundError` is a `HandledError`, so the
+            // shared middleware maps it to NOT_FOUND and keeps it as the cause.
+            // Re-wrapping it here threw away the code and the trace id.
+            ctx.app.licensing.getLicenseStatus(input.organizationId),
+          ),
+      )
+      .query("getSsoGateStatus", (p) =>
+        p
+          .withInput(z.object({}))
+          .withOutput(ssoGateStatusSchema)
+          .withCustomPermission(
+            unscopedPolicy,
+            "the answer is deployment-wide, so there is no organization to check it against; it stays behind a session because an anonymous visitor has no business learning that an install is unlicensed",
+          )
+          /**
+           * Why a deployment configured for single sign-on is not using it:
+           * either the license gate is refusing to switch it on, or the
+           * provider never mounted.
+           *
+           * The public environment cannot answer it: the resolved provider
+           * reports "email" for an unlicensed deployment, a misconfigured one,
+           * and one that never wanted single sign-on alike. Telling them apart
+           * is the whole point here, because the first two are an operator
+           * watching their company sign in by email with nothing on screen to
+           * say why (ADR-027 decided logs-only telemetry for the gate; this is
+           * a settings page, not telemetry).
+           *
+           * `mounted` is reported separately from `licensed` because the two
+           * are fixed in different places: one by activating a license, the
+           * other by correcting the provider name or its client credentials.
+           * Both land in email mode, which is the no-lockout guarantee working,
+           * but neither is visible on the sign-in page, and an operator who
+           * cannot see them may believe federation is being enforced when it is
+           * not.
+           */
+          .handle(async ({ ctx }) => ctx.app.licensing.getSsoGateStatus()),
+      )
+      .mutation("upload", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string().min(1),
+              licenseKey: z.string().min(1, "License key is required"),
+            }),
+          )
+          .withOutput(licenseUploadedSchema)
+          .withPermission("organization:manage")
+          /** Uploads and validates a new license for an organization. */
+          .handle(async ({ ctx, input }) => {
+            // The refusal for an unacceptable key is the application's: the
+            // service reports a `LICENSE_ERRORS` literal, and mapping that to
+            // the code the presentation registry writes copy against is a
+            // decision about the domain rather than about this transport.
+            const planInfo = await ctx.app.licensing.uploadLicense({
+              organizationId: input.organizationId,
+              licenseKey: input.licenseKey,
+            });
 
-      /**
-       * Why a deployment configured for single sign-on is not using it: either
-       * the license gate is refusing to switch it on, or the provider never
-       * mounted.
-       *
-       * The public environment cannot answer it: the resolved provider reports
-       * "email" for an unlicensed deployment, a misconfigured one, and one that
-       * never wanted single sign-on alike. Telling them apart is the whole
-       * point here, because the first two are an operator watching their
-       * company sign in by email with nothing on screen to say why (ADR-027
-       * decided logs-only telemetry for the gate; this is a settings page, not
-       * telemetry).
-       *
-       * `mounted` is reported separately from `licensed` because the two are
-       * fixed in different places: one by activating a license, the other by
-       * correcting the provider name or its client credentials. Both land in
-       * email mode, which is the no-lockout guarantee working, but neither is
-       * visible on the sign-in page, and an operator who cannot see them may
-       * believe federation is being enforced when it is not.
-       */
-      getSsoGateStatus: unscopedPolicy(procedure.input(z.object({}))).query(async ({ ctx }) =>
-        ctx.app.licensing.getSsoGateStatus(),
-      ),
-
-      /** Uploads and validates a new license for an organization. */
-      upload: policy("organization:manage")(
-        procedure.input(
-          z.object({
-            organizationId: z.string().min(1),
-            licenseKey: z.string().min(1, "License key is required"),
+            return { success: true as const, planInfo };
           }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        // The refusal for an unacceptable key is the application's: the
-        // service reports a `LICENSE_ERRORS` literal, and mapping that to the
-        // code the presentation registry writes copy against is a decision
-        // about the domain rather than about this transport.
-        const planInfo = await ctx.app.licensing.uploadLicense({
-          organizationId: input.organizationId,
-          licenseKey: input.licenseKey,
-        });
+      )
+      .mutation("remove", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(licenseRemovedSchema)
+          .withPermission("organization:manage")
+          /** Removes the license from an organization. */
+          .handle(async ({ ctx, input }) => {
+            const result = await ctx.app.licensing.removeLicense(input.organizationId);
 
-        return { success: true, planInfo };
-      }),
+            return { success: true as const, removed: result.removed };
+          }),
+      )
+      .mutation("generate", (p) =>
+        p
+          .withInput(z.object({ organizationId: z.string().min(1) }).merge(generateLicenseSchema))
+          .withOutput(licenseGeneratedSchema)
+          /**
+           * `organization:manage`, because only an organization's own admins
+           * may mint a key against it.
+           */
+          .withPermission("organization:manage")
+          .handle(async ({ ctx, input }) => {
+            const { privateKey, organizationName, email, expiresAt, planType, plan } = input;
 
-      /** Removes the license from an organization. */
-      remove: policy("organization:manage")(procedure.input(organizationScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          const result = await ctx.app.licensing.removeLicense(input.organizationId);
+            if (expiresAt <= new Date()) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Expiration date must be in the future",
+              });
+            }
 
-          return {
-            success: true,
-            removed: result.removed,
-          };
-        },
-      ),
+            try {
+              // What a minted key CONTAINS — the plan template, the minted plan
+              // and the issue time — is the application's, so a second door
+              // cannot mint a key that means something slightly different.
+              const licenseKey = ctx.app.licensing.mintLicenseKey({
+                organizationId: input.organizationId,
+                privateKey,
+                organizationName,
+                email,
+                expiresAt,
+                planType,
+                plan,
+              });
 
-      /**
-       * Generates a new license key. `organization:manage`, because only an
-       * organization's own admins may mint one against it.
-       */
-      generate: policy("organization:manage")(
-        procedure.input(
-          z.object({ organizationId: z.string().min(1) }).merge(generateLicenseSchema),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const { privateKey, organizationName, email, expiresAt, planType, plan } = input;
-
-        if (expiresAt <= new Date()) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Expiration date must be in the future",
-          });
-        }
-
-        try {
-          // What a minted key CONTAINS — the plan template, the minted plan
-          // and the issue time — is the application's, so a second door
-          // cannot mint a key that means something slightly different.
-          const licenseKey = ctx.app.licensing.mintLicenseKey({
-            organizationId: input.organizationId,
-            privateKey,
-            organizationName,
-            email,
-            expiresAt,
-            planType,
-            plan,
-          });
-
-          return { licenseKey };
-        } catch (error) {
-          // The application has already recorded the diagnostic; what is left
-          // here is the copy an operator reads, which belongs to the door that
-          // answers them.
-          //
-          // A signing-key failure already says which of the three things went
-          // wrong, and the handled-error middleware maps it to a 400 with that
-          // code intact. Re-wrapping would flatten all three into one message
-          // the UI cannot key off.
-          if (HandledError.isHandled(error)) throw error;
-          // Real copy on a 4xx, so the authored-prose channel renders it as-is;
-          // the cause rides along for the logs rather than being discarded, and
-          // is never shown (its message would be a crypto diagnostic).
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Failed to sign license. Please check your private key.",
-            cause: error,
-          });
-        }
-      }),
-    });
+              return { licenseKey };
+            } catch (error) {
+              // The application has already recorded the diagnostic; what is
+              // left here is the copy an operator reads, which belongs to the
+              // door that answers them.
+              //
+              // A signing-key failure already says which of the three things
+              // went wrong, and the handled-error middleware maps it to a 400
+              // with that code intact. Re-wrapping would flatten all three into
+              // one message the UI cannot key off.
+              if (HandledError.isHandled(error)) throw error;
+              // Real copy on a 4xx, so the authored-prose channel renders it
+              // as-is; the cause rides along for the logs rather than being
+              // discarded, and is never shown (its message would be a crypto
+              // diagnostic).
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Failed to sign license. Please check your private key.",
+                cause: error,
+              });
+            }
+          }),
+      )
+      .build();
   }
 }

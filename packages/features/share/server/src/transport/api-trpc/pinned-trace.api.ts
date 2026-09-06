@@ -9,8 +9,9 @@
  *
  * Transport only: gates, input parsing and delegation.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import { pinnedTraceSchema, type DataRetentionService } from "@langwatch/data-retention-contract";
 import { PinnedToActiveShareError, type ShareService } from "@langwatch/share-contract";
 import {
   TRPCError,
@@ -47,7 +48,9 @@ type PinnedTraceTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const traceScopeSchema = z.object({
@@ -71,55 +74,70 @@ export class PinnedTraceTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: PinnedTraceTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      pin: policy("project:update")(procedure.input(pinInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return ctx.app.dataRetention.pin({
-            projectId: input.projectId,
-            traceId: input.traceId,
-            userId: ctx.actor().id,
-            reason: input.reason,
-          });
-        },
-      ),
-
-      unpin: policy("project:update")(procedure.input(traceScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          try {
-            await ctx.app.share.unpinTrace({
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .mutation("pin", (p) =>
+        p
+          .withInput(pinInputSchema)
+          .withOutput(pinnedTraceSchema)
+          .withPermission("project:update")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.dataRetention.pin({
               projectId: input.projectId,
               traceId: input.traceId,
-            });
-          } catch (error) {
-            // Surfaces as a non-toast inline error in the UI (the PinButton also
-            // disables itself when source=share + share active, but we never
-            // trust the client; the route is the authoritative gate).
-            if (error instanceof PinnedToActiveShareError) {
-              throw new TRPCError({ code: "CONFLICT", message: error.message });
+              userId: ctx.actor().id,
+              reason: input.reason,
+            }),
+          ),
+      )
+      .mutation("unpin", (p) =>
+        p
+          .withInput(traceScopeSchema)
+          .withOutput(z.void())
+          .withPermission("project:update")
+          .handle(async ({ ctx, input }) => {
+            try {
+              await ctx.app.share.unpinTrace({
+                projectId: input.projectId,
+                traceId: input.traceId,
+              });
+            } catch (error) {
+              // Surfaces as a non-toast inline error in the UI (the PinButton
+              // also disables itself when source=share and the share is active,
+              // but the client is never trusted; this is the gate).
+              if (error instanceof PinnedToActiveShareError) {
+                throw new TRPCError({ code: "CONFLICT", message: error.message });
+              }
+              throw error;
             }
-            throw error;
-          }
-        },
-      ),
-
-      getPin: policy("traces:view")(procedure.input(traceScopeSchema)).query(
-        async ({ ctx, input }) => {
-          return ctx.app.dataRetention.tryGetPin({
-            projectId: input.projectId,
-            traceId: input.traceId,
-          });
-        },
-      ),
-
-      listByProject: policy("traces:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) => {
-          return ctx.app.dataRetention.listByProject({
-            projectId: input.projectId,
-          });
-        },
-      ),
-    });
+          }),
+      )
+      .query("getPin", (p) =>
+        p
+          .withInput(traceScopeSchema)
+          .withOutput(pinnedTraceSchema.nullable())
+          .withPermission("traces:view")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.dataRetention.tryGetPin({
+              projectId: input.projectId,
+              traceId: input.traceId,
+            }),
+          ),
+      )
+      .query("listByProject", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(pinnedTraceSchema.array())
+          .withPermission("traces:view")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.dataRetention.listByProject({ projectId: input.projectId }),
+          ),
+      )
+      .build();
   }
 }

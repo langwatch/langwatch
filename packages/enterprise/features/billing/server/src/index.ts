@@ -100,11 +100,7 @@ export {
 } from "./services/billing-alert-cooldown.service";
 export { UsageLimitService } from "./services/usage-limit.service";
 export { UsageWarningService } from "./services/usage-warning.service";
-export {
-  BillingSubscriptionService,
-  RECENT_INVOICES_LIMIT,
-  type BillingDisplayInvoice,
-} from "./services/subscription.service";
+export { BillingSubscriptionService, RECENT_INVOICES_LIMIT } from "./services/subscription.service";
 export {
   LicensePurchaseService,
   LicenseGenerator,

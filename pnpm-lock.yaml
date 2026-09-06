@@ -1556,6 +1556,9 @@ importers:
         specifier: workspace:*
         version: link:../task
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../test-harness
       tsx:
         specifier: ^4.22.4
         version: 4.22.4
@@ -1962,6 +1965,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../../../features/authz/contract
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../../clickhouse-client
@@ -2331,6 +2337,9 @@ importers:
 
   packages/enterprise/features/licensing/server:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../../api
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../contract
@@ -2675,6 +2684,9 @@ importers:
 
   packages/enterprise/features/sso/server:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../../api
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
@@ -3325,6 +3337,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -3928,6 +3943,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/monitor-contract':
+        specifier: workspace:*
+        version: link:../../monitor/contract
       croner:
         specifier: ^10.0.1
         version: 10.0.1
@@ -4399,6 +4417,9 @@ importers:
 
   packages/features/data-privacy/server:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -4874,6 +4895,9 @@ importers:
 
   packages/features/evaluation/contract:
     dependencies:
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
@@ -5194,6 +5218,9 @@ importers:
 
   packages/features/experiment/contract:
     dependencies:
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
@@ -5209,6 +5236,9 @@ importers:
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
+      nanoid:
+        specifier: ^6.0.0
+        version: 6.0.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -5313,6 +5343,12 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@clickhouse/client':
+        specifier: ^1.23.0
+        version: 1.23.0
+      '@langwatch/clickhouse-client':
+        specifier: workspace:*
+        version: link:../../../clickhouse-client
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../test-harness
@@ -5540,6 +5576,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../eventing
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../contract
@@ -6410,6 +6449,12 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/clickhouse-client':
+        specifier: workspace:*
+        version: link:../../../clickhouse-client
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -8096,6 +8141,12 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/model-provider-server':
+        specifier: workspace:*
+        version: link:../../model-provider/server
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../redis-client
@@ -8410,6 +8461,9 @@ importers:
       '@langwatch/actor':
         specifier: workspace:*
         version: link:../../../actor
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -8766,6 +8820,9 @@ importers:
 
   packages/features/topic/server:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract

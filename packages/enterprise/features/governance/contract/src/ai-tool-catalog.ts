@@ -270,11 +270,47 @@ export type AiToolCliCatalog = {
   configuredProviderKeys: string[];
 };
 
-export type AiToolProviderOption = {
-  providerKey: string;
-  displayName: string;
-  configured: boolean;
-};
+/** One provider the admin drawer offers, and whether it is set up yet. */
+export const aiToolProviderOptionSchema = z
+  .object({
+    providerKey: z.string(),
+    displayName: z.string(),
+    configured: z.boolean(),
+  })
+  .strict();
+export type AiToolProviderOption = z.infer<typeof aiToolProviderOptionSchema>;
+
+/** Which providers this member's organization has configured. */
+export const aiToolProviderAvailabilitySchema = z
+  .object({ configuredProviders: z.array(z.string()) })
+  .strict();
+
+/**
+ * The OTLP endpoint the Claude Code tile auto-fills, or null when the
+ * organization has published no `claude_code` source yet. Only the URL is
+ * disclosed — no source name, scope or secret — because the bearer token is
+ * what gates the write and the URL resolves publicly per source id anyway.
+ */
+export const aiToolOtlpEndpointSchema = z.object({ endpoint: z.string().nullable() }).strict();
+
+/** One tile of the starter pack, as the admin checklist renders it. */
+export const aiToolStarterTileChoiceSchema = z
+  .object({ slug: z.string(), displayName: z.string(), type: aiToolTypeSchema })
+  .strict();
+
+/** One routing policy the admin drawer offers for a model-provider tile. */
+export const aiToolRoutingPolicyOptionSchema = z
+  .object({ id: z.string(), name: z.string() })
+  .strict();
+
+/** What importing the starter pack did: per-slug, and never destructive. */
+export const aiToolStarterPackImportSchema = z
+  .object({
+    created: z.number().int().nonnegative(),
+    updated: z.number().int().nonnegative(),
+    skipped: z.number().int().nonnegative(),
+  })
+  .strict();
 
 export class AiToolEntryNotFoundError extends Error {
   constructor(

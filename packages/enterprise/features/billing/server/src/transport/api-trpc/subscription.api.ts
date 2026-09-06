@@ -27,15 +27,20 @@
  * re-threw a bare `TRPCError` with no cause, which is what turned every 5xx
  * billing failure into "An unknown error occurred".
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import {
+  billingDisplayInvoiceSchema,
+  type BillingDisplayInvoice,
+  billingPortalSessionSchema,
+  billingRedirectSchema,
   Currency,
   SUBSCRIBABLE_PLANS,
+  subscriptionItemsUpdatedSchema,
   UserEmailRequiredError,
   type PlanTypes as PlanType,
 } from "@langwatch/enterprise-billing-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import type { BillingDisplayInvoice } from "../../services/subscription.service";
 
 /**
  * The two billing collaborators, each narrowed to what this surface calls.
@@ -115,9 +120,9 @@ type SubscriptionTrpcProcedures<
    * audit policy for one declared permission, applied AFTER this feature's own
    * input parser so the check reads its organization id from validated input.
    */
-  policy(
-    permission: "organization:view" | "organization:manage",
-  ): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(permission: "organization:view" | "organization:manage"): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const subscriptionPlanEnum = z.enum(SUBSCRIBABLE_PLANS);
@@ -132,7 +137,7 @@ export class SubscriptionTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: SubscriptionTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
     /**
      * A plain `Error`, not a handled one: an installation reaching a billing
@@ -157,173 +162,220 @@ export class SubscriptionTrpcApi {
       return ctx.session?.user ?? {};
     };
 
-    return trpc.router({
-      addTeamMemberOrEvents: policy("organization:manage")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            plan: subscriptionPlanEnum,
-            upgradeMembers: z.boolean(),
-            upgradeTraces: z.boolean(),
-            totalMembers: z.number(),
-            totalTraces: z.number(),
-            // Echoed back from `previewProration` so the charge prices the same
-            // instant the customer was quoted. Optional: callers that never
-            // showed a quote are priced at the moment they run.
-            quotedAt: z.number().int().positive().optional(),
+    /**
+     * Three of these answer the provider's own object, unchanged. Naming its
+     * shape here would be this package describing Stripe's, and it would drift
+     * the first time Stripe adds a field.
+     */
+    const PROVIDER_OWNED = "answers the billing provider's own object, unchanged";
+
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .mutation("addTeamMemberOrEvents", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              plan: subscriptionPlanEnum,
+              upgradeMembers: z.boolean(),
+              upgradeTraces: z.boolean(),
+              totalMembers: z.number(),
+              totalTraces: z.number(),
+              // Echoed back from `previewProration` so the charge prices the
+              // same instant the customer was quoted. Optional: a caller that
+              // never showed a quote is priced at the moment they run.
+              quotedAt: z.number().int().positive().optional(),
+            }),
+          )
+          .withOutput(subscriptionItemsUpdatedSchema)
+          .withPermission("organization:manage")
+          /**
+           * Raises the seat and volume lines on a live subscription, priced at
+           * the instant the customer was quoted.
+           */
+          .handle(async ({ input, ctx }) => {
+            const { subscriptionService } = requireSaasBilling(ctx.app);
+            return subscriptionService.updateSubscriptionItems({
+              organizationId: input.organizationId,
+              plan: input.plan as PlanType,
+              upgradeMembers: input.upgradeMembers,
+              upgradeTraces: input.upgradeTraces,
+              totalMembers: input.totalMembers,
+              totalTraces: input.totalTraces,
+              quotedAt: input.quotedAt,
+            });
           }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
-        const { subscriptionService } = requireSaasBilling(ctx.app);
-        return await subscriptionService.updateSubscriptionItems({
-          organizationId: input.organizationId,
-          plan: input.plan as PlanType,
-          upgradeMembers: input.upgradeMembers,
-          upgradeTraces: input.upgradeTraces,
-          totalMembers: input.totalMembers,
-          totalTraces: input.totalTraces,
-          quotedAt: input.quotedAt,
-        });
-      }),
+      )
+      .mutation("create", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              baseUrl: z.string(),
+              plan: subscriptionPlanEnum,
+              membersToAdd: z.number().optional(),
+              tracesToAdd: z.number().optional(),
+              currency: z.nativeEnum(Currency).optional(),
+              billingInterval: z.enum(["monthly", "annual"]).optional(),
+            }),
+          )
+          .withOutput(billingRedirectSchema)
+          .withPermission("organization:manage")
+          /** Starts a checkout for an organization that has no subscription. */
+          .handle(async ({ input, ctx }) => {
+            const { customerService, subscriptionService } = requireSaasBilling(ctx.app);
+            const customerId = await customerService.getOrCreateCustomerId({
+              user: callerOf(ctx),
+              organizationId: input.organizationId,
+            });
 
-      create: policy("organization:manage")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            baseUrl: z.string(),
-            plan: subscriptionPlanEnum,
-            membersToAdd: z.number().optional(),
-            tracesToAdd: z.number().optional(),
-            currency: z.nativeEnum(Currency).optional(),
-            billingInterval: z.enum(["monthly", "annual"]).optional(),
+            return subscriptionService.createOrUpdateSubscription({
+              organizationId: input.organizationId,
+              baseUrl: input.baseUrl,
+              plan: input.plan as PlanType,
+              membersToAdd: input.membersToAdd,
+              tracesToAdd: input.tracesToAdd,
+              customerId,
+              currency: input.currency,
+              billingInterval: input.billingInterval,
+            });
           }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
-        const { customerService, subscriptionService } = requireSaasBilling(ctx.app);
-        const customerId = await customerService.getOrCreateCustomerId({
-          user: callerOf(ctx),
-          organizationId: input.organizationId,
-        });
+      )
+      .mutation("manage", (p) =>
+        p
+          .withInput(z.object({ organizationId: z.string(), baseUrl: z.string() }))
+          .withOutput(billingPortalSessionSchema)
+          .withPermission("organization:manage")
+          /** A billing-portal session for card, address and cancellation. */
+          .handle(async ({ input, ctx }) => {
+            const { customerService, subscriptionService } = requireSaasBilling(ctx.app);
+            const customerId = await customerService.getOrCreateCustomerId({
+              user: callerOf(ctx),
+              organizationId: input.organizationId,
+            });
 
-        return await subscriptionService.createOrUpdateSubscription({
-          organizationId: input.organizationId,
-          baseUrl: input.baseUrl,
-          plan: input.plan as PlanType,
-          membersToAdd: input.membersToAdd,
-          tracesToAdd: input.tracesToAdd,
-          customerId,
-          currency: input.currency,
-          billingInterval: input.billingInterval,
-        });
-      }),
-
-      manage: policy("organization:manage")(
-        procedure.input(z.object({ organizationId: z.string(), baseUrl: z.string() })),
-      ).mutation(async ({ input, ctx }) => {
-        const { customerService, subscriptionService } = requireSaasBilling(ctx.app);
-        const customerId = await customerService.getOrCreateCustomerId({
-          user: callerOf(ctx),
-          organizationId: input.organizationId,
-        });
-
-        return await subscriptionService.createBillingPortalSession({
-          customerId,
-          baseUrl: input.baseUrl,
-          organizationId: input.organizationId,
-        });
-      }),
-
-      previewProration: policy("organization:manage")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            newTotalSeats: z.number().min(1),
+            return subscriptionService.createBillingPortalSession({
+              customerId,
+              baseUrl: input.baseUrl,
+              organizationId: input.organizationId,
+            });
           }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const { subscriptionService } = requireSaasBilling(ctx.app);
-        return await subscriptionService.previewProration({
-          organizationId: input.organizationId,
-          newTotalSeats: input.newTotalSeats,
-        });
-      }),
-
-      getLastSubscription: policy("organization:view")(
-        procedure.input(z.object({ organizationId: z.string() })),
-      ).query(async ({ input, ctx }) => {
-        const { subscriptionService } = requireSaasBilling(ctx.app);
-        return await subscriptionService.tryGetLastNonCancelledSubscription(input.organizationId);
-      }),
-
-      upgradeWithInvites: policy("organization:manage")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            baseUrl: z.string(),
-            currency: z.nativeEnum(Currency).optional(),
-            billingInterval: z.enum(["monthly", "annual"]).optional(),
-            totalSeats: z.number().min(1),
-            invites: z.array(
-              z.object({
-                email: z.string().email(),
-                role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
-              }),
-            ),
+      )
+      .query("previewProration", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              newTotalSeats: z.number().min(1),
+            }),
+          )
+          .withoutOutput(PROVIDER_OWNED)
+          .withPermission("organization:manage")
+          /** What a seat change costs, before it is confirmed. */
+          .handle(async ({ input, ctx }) => {
+            const { subscriptionService } = requireSaasBilling(ctx.app);
+            return subscriptionService.previewProration({
+              organizationId: input.organizationId,
+              newTotalSeats: input.newTotalSeats,
+            });
           }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
-        const { customerService, subscriptionService } = requireSaasBilling(ctx.app);
-        const customerId = await customerService.getOrCreateCustomerId({
-          user: callerOf(ctx),
-          organizationId: input.organizationId,
-        });
-
-        return await subscriptionService.createSubscriptionWithInvites({
-          organizationId: input.organizationId,
-          baseUrl: input.baseUrl,
-          membersToAdd: input.totalSeats,
-          customerId,
-          currency: input.currency,
-          billingInterval: input.billingInterval,
-          invites: input.invites,
-        });
-      }),
-
-      prospective: policy("organization:manage")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            plan: subscriptionPlanEnum,
-            customerName: z.string().optional(),
-            customerEmail: z.string().email().optional(),
-            note: z.string().optional(),
+      )
+      .query("getLastSubscription", (p) =>
+        p
+          .withInput(z.object({ organizationId: z.string() }))
+          .withoutOutput(PROVIDER_OWNED)
+          .withPermission("organization:view")
+          /** The most recent subscription that has not been cancelled. */
+          .handle(async ({ input, ctx }) => {
+            const { subscriptionService } = requireSaasBilling(ctx.app);
+            return subscriptionService.tryGetLastNonCancelledSubscription(input.organizationId);
           }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
-        const { subscriptionService } = requireSaasBilling(ctx.app);
-        const actorEmail = callerOf(ctx).email;
-        if (!actorEmail) {
-          throw new UserEmailRequiredError();
-        }
+      )
+      .mutation("upgradeWithInvites", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              baseUrl: z.string(),
+              currency: z.nativeEnum(Currency).optional(),
+              billingInterval: z.enum(["monthly", "annual"]).optional(),
+              totalSeats: z.number().min(1),
+              invites: z.array(
+                z.object({
+                  email: z.string().email(),
+                  role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+                }),
+              ),
+            }),
+          )
+          .withOutput(billingRedirectSchema)
+          .withPermission("organization:manage")
+          /** Checkout and the invitations that motivated it, as one act. */
+          .handle(async ({ input, ctx }) => {
+            const { customerService, subscriptionService } = requireSaasBilling(ctx.app);
+            const customerId = await customerService.getOrCreateCustomerId({
+              user: callerOf(ctx),
+              organizationId: input.organizationId,
+            });
 
-        return await subscriptionService.notifyProspective({
-          organizationId: input.organizationId,
-          plan: input.plan as PlanType,
-          customerName: input.customerName,
-          customerEmail: input.customerEmail,
-          note: input.note,
-          actorEmail,
-        });
-      }),
+            return subscriptionService.createSubscriptionWithInvites({
+              organizationId: input.organizationId,
+              baseUrl: input.baseUrl,
+              membersToAdd: input.totalSeats,
+              customerId,
+              currency: input.currency,
+              billingInterval: input.billingInterval,
+              invites: input.invites,
+            });
+          }),
+      )
+      .mutation("prospective", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              plan: subscriptionPlanEnum,
+              customerName: z.string().optional(),
+              customerEmail: z.string().email().optional(),
+              note: z.string().optional(),
+            }),
+          )
+          .withoutOutput(
+            "the notification channel's own acknowledgement; nothing on this surface reads it",
+          )
+          .withPermission("organization:manage")
+          /** Tells sales an organization asked about a plan that is not self-serve. */
+          .handle(async ({ input, ctx }) => {
+            const { subscriptionService } = requireSaasBilling(ctx.app);
+            const actorEmail = callerOf(ctx).email;
+            if (!actorEmail) {
+              throw new UserEmailRequiredError();
+            }
 
-      listInvoices: policy("organization:view")(
-        procedure.input(z.object({ organizationId: z.string() })),
-      ).query(async ({ input, ctx }) => {
-        const { subscriptionService } = requireSaasBilling(ctx.app);
-        return await subscriptionService.listInvoices({
-          organizationId: input.organizationId,
-        });
-      }),
-    });
+            return subscriptionService.notifyProspective({
+              organizationId: input.organizationId,
+              plan: input.plan as PlanType,
+              customerName: input.customerName,
+              customerEmail: input.customerEmail,
+              note: input.note,
+              actorEmail,
+            });
+          }),
+      )
+      .query("listInvoices", (p) =>
+        p
+          .withInput(z.object({ organizationId: z.string() }))
+          .withOutput(billingDisplayInvoiceSchema.array())
+          .withPermission("organization:view")
+          /** The organization's invoices, for the billing page. */
+          .handle(async ({ input, ctx }) => {
+            const { subscriptionService } = requireSaasBilling(ctx.app);
+            return subscriptionService.listInvoices({ organizationId: input.organizationId });
+          }),
+      )
+      .build();
   }
 }

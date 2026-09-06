@@ -26,6 +26,14 @@ export const roleSchema = z
   .strict();
 export type Role = z.infer<typeof roleSchema>;
 
+/**
+ * What a write to the role surface answers when there is nothing to hand back:
+ * the write happened. Same shape for a definition removed and for a role given
+ * or taken away, so no caller learns anything from the difference.
+ */
+export const roleWriteAcknowledgedSchema = z.object({ success: z.literal(true) }).strict();
+export type RoleWriteAcknowledged = z.infer<typeof roleWriteAcknowledgedSchema>;
+
 export const roleUpdateSchema = z
   .object({
     name: z.string().min(1).max(100).optional(),

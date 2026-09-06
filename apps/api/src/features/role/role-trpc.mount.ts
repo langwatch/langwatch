@@ -24,8 +24,6 @@ import { declareAuthzMiddleware, type AuthzPermission } from "@langwatch/authz-c
 import {
   RoleBindingTrpcApi,
   RoleTrpcApi,
-  roleBindingTrpcInputSchemas,
-  roleTrpcInputSchemas,
   type RoleBindingTrpcContext,
   type RoleTrpcContext,
 } from "@langwatch/role-server";
@@ -138,42 +136,40 @@ export function createRoleTrpcRouter<
   TRoot extends AnyTRPCRootTypes,
 >(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<RoleTrpcPorts>) {
   const service = createTrpcApiService(mount);
-  const inputs = roleTrpcInputSchemas({ customRolePermission: mount.ports.customRolePermission });
   const custom = (options: {
     permission: "organization:view" | "organization:manage";
     plan?: boolean;
   }) => service.custom(roleOrganizationCheck(mount.ports, options));
-
-  return RoleTrpcApi.create(mount.root, {
-    // Tightened from organization:view to manage: role definitions are an
-    // admin-surface read, and every screen that lists them already requires
-    // manage. The bump closes a member-session direct-call path and is
-    // invisible to the product.
-    getAll: service.policy("organization:manage")(service.protected.input(inputs.getAll)),
-    getById: custom({ permission: "organization:view" })(service.protected.input(inputs.getById)),
-    create: withMiddleware(
-      service.policy("organization:manage")(service.protected.input(inputs.create)),
-      planGateMiddleware(mount.ports),
-    ),
-    update: custom({ permission: "organization:manage", plan: true })(
-      service.protected.input(inputs.update),
-    ),
-    delete: custom({ permission: "organization:manage" })(service.protected.input(inputs.delete)),
-    // The declared form of the check the assignment used to hand-roll: resolve
-    // the team's organization from its id, require manage there, and only then
-    // consult the plan.
-    assignToUser: withMiddleware(
-      service.policy({ kind: "permission", permission: "organization:manage", via: "teamId" })(
-        service.protected.input(inputs.assignToUser),
-      ),
-      assignmentPlanGate(mount.ports),
-    ),
-    removeFromUser: service.policy({
-      kind: "permission",
-      permission: "organization:manage",
-      via: "teamId",
-    })(service.protected.input(inputs.removeFromUser)),
+  const manage = service.policy("organization:manage");
+  const manageViaTeam = service.policy({
+    kind: "permission",
+    permission: "organization:manage",
+    via: "teamId",
   });
+
+  return RoleTrpcApi.create(
+    mount.root,
+    {
+      protected: service.protected,
+      policy: service.policy,
+      validateOutput: service.validateOutput,
+      access: {
+        viewRoleOrganization: custom({ permission: "organization:view" }),
+        manageRoleOrganization: custom({ permission: "organization:manage" }),
+        manageRoleOrganizationThenPlan: custom({ permission: "organization:manage", plan: true }),
+        // The permission first, the plan second: a denial must never reveal
+        // which plan the organization is on.
+        manageOrganizationThenPlan: (procedure) =>
+          withMiddleware(manage(procedure), planGateMiddleware(mount.ports)),
+        // The declared form of the check the assignment used to hand-roll:
+        // resolve the team's organization from its id, require manage there,
+        // and only then consult the plan.
+        manageAssignmentTeamThenPlan: (procedure) =>
+          withMiddleware(manageViaTeam(procedure), assignmentPlanGate(mount.ports)),
+      },
+    },
+    { customRolePermission: mount.ports.customRolePermission },
+  );
 }
 
 /**
@@ -202,20 +198,10 @@ export function createRoleBindingTrpcRouter<
   TRoot extends AnyTRPCRootTypes,
 >(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
   const service = createTrpcApiService(mount);
-  const inputs = roleBindingTrpcInputSchemas();
-  const manage = service.policy("organization:manage");
 
   return RoleBindingTrpcApi.create(mount.root, {
-    // Audit-grade RBAC data — every binding's users, groups, scopes and role
-    // assignments — so it stays at organization:manage rather than view.
-    listForOrg: manage(service.protected.input(inputs.listForOrg)),
-    listForUser: manage(service.protected.input(inputs.listForUser)),
-    getMyAccessBreakdown: service.policy("organization:view")(
-      service.protected.input(inputs.getMyAccessBreakdown),
-    ),
-    create: manage(service.protected.input(inputs.create)),
-    update: manage(service.protected.input(inputs.update)),
-    delete: manage(service.protected.input(inputs.delete)),
-    applyMemberBindings: manage(service.protected.input(inputs.applyMemberBindings)),
+    protected: service.protected,
+    policy: service.policy,
+    validateOutput: service.validateOutput,
   });
 }

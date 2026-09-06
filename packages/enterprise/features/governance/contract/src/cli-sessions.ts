@@ -35,6 +35,20 @@ export const cliSessionSchema = z
   .strict();
 export type CliSession = z.infer<typeof cliSessionSchema>;
 
+/**
+ * One session as the Devices dashboard renders it: everything on the record
+ * except the token keys, which identify live credentials and belong to the
+ * revocation path rather than to a card on a screen.
+ */
+export const cliSessionCardSchema = cliSessionSchema.omit({ tokenKeys: true });
+export type CliSessionCard = z.infer<typeof cliSessionCardSchema>;
+
+/** What a revocation answers: that it happened, and how many tokens it took. */
+export const cliSessionRevocationSchema = z
+  .object({ ok: z.boolean(), revokedTokens: z.number().int().nonnegative() })
+  .strict();
+export type CliSessionRevocation = z.infer<typeof cliSessionRevocationSchema>;
+
 export const cliUserInputSchema = z.object({ userId: z.string().min(1) }).strict();
 export type CliUserInput = z.infer<typeof cliUserInputSchema>;
 

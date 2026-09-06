@@ -8,7 +8,12 @@
  *
  * Spec: specs/ai-governance/sessions/personal-sessions.feature
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import {
+  organizationSessionPolicySchema,
+  governanceWriteAcknowledgedSchema,
+} from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { OrganizationSessionPolicyService } from "#services/organization-session-policy.service";
@@ -21,15 +26,15 @@ export type SessionPolicyTrpcContext = Readonly<{
   }>;
 }>;
 
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type SessionPolicyTrpcProcedures<
   TContext extends SessionPolicyTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const organizationScopeSchema = z.object({ organizationId: z.string() });
@@ -48,24 +53,35 @@ export class SessionPolicyTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: SessionPolicyTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      /** Current policy for the organization. */
-      get: policy("organization:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ ctx, input }) => ctx.app.sessionPolicy.get(input.organizationId),
-      ),
-
-      /** Set `maxSessionDurationDays`; 0 = unbounded, capped at 365. */
-      setMaxDuration: policy("organization:manage")(procedure.input(setMaxDurationSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.sessionPolicy.setMaxDurationDays(
-            input.organizationId,
-            input.maxSessionDurationDays,
-          );
-          return { ok: true };
-        },
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("get", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(organizationSessionPolicySchema)
+          .withPermission("organization:view")
+          /** Current policy for the organization. */
+          .handle(async ({ ctx, input }) => ctx.app.sessionPolicy.get(input.organizationId)),
+      )
+      .mutation("setMaxDuration", (p) =>
+        p
+          .withInput(setMaxDurationSchema)
+          .withOutput(governanceWriteAcknowledgedSchema)
+          .withPermission("organization:manage")
+          /** Set `maxSessionDurationDays`; 0 is unbounded, capped at 365. */
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.sessionPolicy.setMaxDurationDays(
+              input.organizationId,
+              input.maxSessionDurationDays,
+            );
+            return { ok: true };
+          }),
+      )
+      .build();
   }
 }

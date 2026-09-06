@@ -11,7 +11,8 @@
  * with it — is decided there, because it is a decision about the domain rather
  * than about this transport.
  */
-import type { AuthzDeclaration } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import { authzOwnStandingSchema, type AuthzDeclaration } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { AuthzApp } from "#app/authz.app";
@@ -44,7 +45,9 @@ type AuthzTrpcProcedures<
    * input: tRPC runs middlewares in the order they were added, so a check
    * installed before `.input()` would see no input at all.
    */
-  policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(declaration: AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -74,12 +77,22 @@ export class AuthzTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: AuthzTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      effectivePermissions: policy(RESOLVES_OWN_STANDING)(procedure.input(scopeInputSchema)).query(
-        async ({ ctx, input }) => ctx.app.authzApp.effectivePermissionsFor(input, ctx.actor()),
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("effectivePermissions", (p) =>
+        p
+          .withInput(scopeInputSchema)
+          .withOutput(authzOwnStandingSchema)
+          .withPermission(RESOLVES_OWN_STANDING)
+          .handle(async ({ ctx, input }) =>
+            ctx.app.authzApp.effectivePermissionsFor(input, ctx.actor()),
+          ),
+      )
+      .build();
   }
 }

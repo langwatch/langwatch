@@ -17,8 +17,13 @@
  * Transport only: input parsing, delegation, wire shape. The persistence and
  * the rotation invariant belong to {@link GovernanceService}.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import {
+  issuedIngestionKeySchema,
+  personalIngestionKeySchema,
+  type GovernanceService,
+} from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -27,15 +32,15 @@ export type IngestionKeyTrpcContext = Readonly<{
   actor(): Readonly<{ id: string }>;
 }>;
 
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type IngestionKeyTrpcProcedures<
   TContext extends IngestionKeyTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const organizationScopeSchema = z.object({ organizationId: z.string() });
@@ -55,51 +60,68 @@ export class IngestionKeyTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: IngestionKeyTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      /**
-       * The caller's live ingestion keys within the active org — powers the
-       * "Trace Ingest" grid's "is this source connected" tile state so a green
-       * check survives a reload.
-       */
-      list: policy("organization:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.governance.ingestionKeyListForPersonalProject({
-            userId: ctx.actor().id,
-            organizationId: input.organizationId,
-          }),
-      ),
-
-      /**
-       * Mint (rotating in place) an ingestion key for the caller's personal
-       * project + sourceType. Returns the plaintext token once; subsequent
-       * reads only see the source list.
-       */
-      install: policy("organization:view")(procedure.input(mintSchema)).mutation(
-        async ({ ctx, input }) =>
-          ctx.app.governance.ingestionKeyEnsureForPersonalProject({
-            userId: ctx.actor().id,
-            organizationId: input.organizationId,
-            sourceType: input.sourceType,
-            ingestionTemplateId: input.templateId ?? null,
-          }),
-      ),
-
-      /**
-       * Hard-cut rotation: re-mint the key for (personal project, sourceType).
-       * The previous token is revoked immediately, so any tool still using it
-       * starts failing auth on its next request.
-       */
-      rotate: policy("organization:view")(procedure.input(mintSchema)).mutation(
-        async ({ ctx, input }) =>
-          ctx.app.governance.ingestionKeyEnsureForPersonalProject({
-            userId: ctx.actor().id,
-            organizationId: input.organizationId,
-            sourceType: input.sourceType,
-            ingestionTemplateId: input.templateId ?? null,
-          }),
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(personalIngestionKeySchema.array())
+          .withPermission("organization:view")
+          /**
+           * The caller's live ingestion keys within the active organization —
+           * what the "Trace Ingest" grid reads to decide whether a source is
+           * connected, so a green check survives a reload.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.ingestionKeyListForPersonalProject({
+              userId: ctx.actor().id,
+              organizationId: input.organizationId,
+            }),
+          ),
+      )
+      .mutation("install", (p) =>
+        p
+          .withInput(mintSchema)
+          .withOutput(issuedIngestionKeySchema)
+          .withPermission("organization:view")
+          /**
+           * Mints — rotating in place — an ingestion key for the caller's
+           * personal project and source type. Answers the plaintext token once;
+           * every later read sees the source list and nothing more.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.ingestionKeyEnsureForPersonalProject({
+              userId: ctx.actor().id,
+              organizationId: input.organizationId,
+              sourceType: input.sourceType,
+              ingestionTemplateId: input.templateId ?? null,
+            }),
+          ),
+      )
+      .mutation("rotate", (p) =>
+        p
+          .withInput(mintSchema)
+          .withOutput(issuedIngestionKeySchema)
+          .withPermission("organization:view")
+          /**
+           * Hard-cut rotation: re-mints the key for this personal project and
+           * source type. The previous token is revoked immediately, so a tool
+           * still holding it starts failing on its next request.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.ingestionKeyEnsureForPersonalProject({
+              userId: ctx.actor().id,
+              organizationId: input.organizationId,
+              sourceType: input.sourceType,
+              ingestionTemplateId: input.templateId ?? null,
+            }),
+          ),
+      )
+      .build();
   }
 }

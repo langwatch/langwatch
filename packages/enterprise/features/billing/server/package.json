@@ -25,6 +25,7 @@
   "dependencies": {
     "@clickhouse/client": "^1.23.0",
     "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",

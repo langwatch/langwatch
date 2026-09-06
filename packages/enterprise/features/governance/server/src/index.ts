@@ -37,7 +37,6 @@ export {
   RoutingPolicyScopeRequiredError,
   type GovernanceActorDirectory,
   type GovernanceActorUser,
-  type GovernanceActorWorkspace,
   type GovernanceAppDependencies,
   type GovernanceCaller,
   type GovernancePersonalVirtualKeyPorts,

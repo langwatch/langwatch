@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { identifierDomain, normalizeIdentifierValue } from "./identifier";
 
 /**
@@ -140,6 +141,24 @@ export interface RoutingDecision {
   methodSet: readonly SignInMethod[];
   reasonCode: SignInRoutingReasonCode;
 }
+
+/** One offered method, as a transport states it. @see SignInMethod */
+export const signInMethodSchema = z.object({
+  id: z.string(),
+  kind: z.enum(SIGNIN_METHOD_KINDS),
+  connectionId: z.string().nullable(),
+});
+
+/**
+ * The decision the front door answers with. The object IS the contract: a
+ * screen renders `methodSet` and keys its guidance off `reasonCode`.
+ */
+export const routingDecisionSchema = z.object({
+  outcome: z.enum(SIGNIN_ROUTING_OUTCOMES),
+  connectionId: z.string().optional(),
+  methodSet: z.array(signInMethodSchema).readonly(),
+  reasonCode: z.enum(SIGNIN_ROUTING_REASON_CODES),
+});
 
 export interface RoutingInput {
   /** Null when the sign-in surface is requested before any address is typed. */

@@ -26,6 +26,7 @@
  * Transport only: the gate, the input shapes, the audit rows and delegation.
  * The reports themselves arrive through {@link BugReportTrpcPorts}.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import { type AdminIdentity } from "@langwatch/ops-contract";
 import {
   TRPCError,
@@ -67,9 +68,6 @@ export type BugReportTrpcContext = Readonly<{
   }> | null;
 }>;
 
-/** One procedure, wrapped in the process's policy chain. */
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type BugReportTrpcProcedures<
   TContext extends BugReportTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -82,7 +80,9 @@ type BugReportTrpcProcedures<
    * and audit, applied AFTER this feature's input parser. The process composes
    * the chain and owns the written reason the declaration carries.
    */
-  staffPolicy: ProcedureDecorator;
+  staffPolicy: TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The process capabilities this transport needs that are not the inbox's own. */
@@ -133,7 +133,7 @@ export class BugReportTrpcApi {
     procedures: BugReportTrpcProcedures<TContext, TOptions, TRoot>,
     ports: BugReportTrpcPorts<TListing, TReport>,
   ) {
-    const { protected: procedure, staffPolicy } = procedures;
+    const { protected: procedure, staffPolicy, validateOutput } = procedures;
 
     /**
      * The operator, or a refusal.
@@ -155,38 +155,69 @@ export class BugReportTrpcApi {
       return staff;
     };
 
-    return trpc.router({
-      getAll: staffPolicy(procedure.input(getAllInputSchema)).query(async ({ ctx, input }) => {
-        const staff = requireStaff(ctx);
-        await ports.recordAudit({
-          userId: staff.id,
-          action: "bugReports.getAll",
-          // Never the raw search text: contact searches are email addresses,
-          // and audit rows outlive the inbox.
-          args: {
-            page: input.page,
-            pageSize: input.pageSize,
-            hasSearch: Boolean(input.search),
-          },
-          targetKind: TARGET_KIND,
-        });
-        return ports.getAll(input);
-      }),
+    const STAFF_ONLY =
+      "a bug report carries no tenant — the table has no organization, team or project column — so there is no scope an id in the input could be checked at and no organization role that could grant the read; what decides it is the LangWatch staff list, checked in the handler, and an impersonating operator is read as the operator";
 
-      getById: staffPolicy(procedure.input(getByIdInputSchema)).query(async ({ ctx, input }) => {
-        const staff = requireStaff(ctx);
-        await ports.recordAudit({
-          userId: staff.id,
-          action: "bugReports.getById",
-          targetKind: TARGET_KIND,
-          targetId: input.id,
-        });
-        const report = await ports.getById(input);
-        if (!report) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Report not found" });
-        }
-        return report;
-      }),
-    });
+    /**
+     * The listing and the report are the PROCESS's shapes, generic here. A
+     * schema written in this file would be this package describing a type it
+     * does not own, and it would drift the first time a column is added.
+     */
+    const PROCESS_OWNED_SHAPE =
+      "the inbox rows are the process's own reader shape, forwarded untouched; this package does not describe them";
+
+    return createTrpcService({
+      root: trpc,
+      procedures: {
+        protected: procedure,
+        // Both procedures declare their access with the already-built staff
+        // chain, so no declaration reaches this factory.
+        policy: () => (built) => built,
+      },
+      validateOutput,
+    })
+      .query("getAll", (p) =>
+        p
+          .withInput(getAllInputSchema)
+          .withoutOutput(PROCESS_OWNED_SHAPE)
+          .withCustomPermission(staffPolicy, STAFF_ONLY)
+          .handle(async ({ ctx, input }) => {
+            const staff = requireStaff(ctx);
+            await ports.recordAudit({
+              userId: staff.id,
+              action: "bugReports.getAll",
+              // Never the raw search text: contact searches are email
+              // addresses, and audit rows outlive the inbox.
+              args: {
+                page: input.page,
+                pageSize: input.pageSize,
+                hasSearch: Boolean(input.search),
+              },
+              targetKind: TARGET_KIND,
+            });
+            return ports.getAll(input);
+          }),
+      )
+      .query("getById", (p) =>
+        p
+          .withInput(getByIdInputSchema)
+          .withoutOutput(PROCESS_OWNED_SHAPE)
+          .withCustomPermission(staffPolicy, STAFF_ONLY)
+          .handle(async ({ ctx, input }) => {
+            const staff = requireStaff(ctx);
+            await ports.recordAudit({
+              userId: staff.id,
+              action: "bugReports.getById",
+              targetKind: TARGET_KIND,
+              targetId: input.id,
+            });
+            const report = await ports.getById(input);
+            if (!report) {
+              throw new TRPCError({ code: "NOT_FOUND", message: "Report not found" });
+            }
+            return report;
+          }),
+      )
+      .build();
   }
 }

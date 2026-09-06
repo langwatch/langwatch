@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { PlanTypes } from "./plan-types";
 
@@ -171,3 +172,30 @@ export interface BillingUsageCounter {
 export interface BillingPlanResolver {
   getActivePlan(input: { organizationId: string }): Promise<{ name?: string | null }>;
 }
+
+/** One invoice, as the billing page lists it. */
+export const billingDisplayInvoiceSchema = z
+  .object({
+    id: z.string(),
+    number: z.string().nullable(),
+    date: z.number(),
+    amountDue: z.number(),
+    currency: z.string(),
+    status: z.string(),
+    pdfUrl: z.string().nullable(),
+    hostedUrl: z.string().nullable(),
+  })
+  .strict();
+export type BillingDisplayInvoice = z.infer<typeof billingDisplayInvoiceSchema>;
+
+/**
+ * A hosted page to send the customer to. Null where the provider had nothing
+ * to redirect to — a change that took effect without one.
+ */
+export const billingRedirectSchema = z.object({ url: z.string().nullable() }).strict();
+
+/** The billing portal always answers a URL: it is the whole point of the call. */
+export const billingPortalSessionSchema = z.object({ url: z.string() }).strict();
+
+/** A live subscription's lines were changed. */
+export const subscriptionItemsUpdatedSchema = z.object({ success: z.boolean() }).strict();

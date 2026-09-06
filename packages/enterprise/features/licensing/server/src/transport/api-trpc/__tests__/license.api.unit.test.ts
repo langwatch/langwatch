@@ -17,6 +17,7 @@ const router = LicenseTrpcApi.create(trpc, {
   protected: trpc.procedure,
   policy: () => identityPolicy,
   unscopedPolicy: identityPolicy,
+  validateOutput: true,
 });
 
 const refuses = (name: string) => () => {

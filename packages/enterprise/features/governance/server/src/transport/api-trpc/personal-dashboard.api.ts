@@ -21,7 +21,13 @@
  * Transport only: input parsing, the membership refusal, and delegation to
  * {@link GovernanceApp}.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import {
+  cliBootstrapResultSchema,
+  governanceBudgetOverviewForUserSchema,
+  personalUsageRollupSchema,
+} from "@langwatch/enterprise-governance-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -43,8 +49,6 @@ export type PersonalDashboardTrpcContext = Readonly<{
   actor(): Readonly<{ id: string }>;
 }>;
 
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type PersonalDashboardTrpcProcedures<
   TContext extends PersonalDashboardTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -56,7 +60,9 @@ type PersonalDashboardTrpcProcedures<
    * Tracing, logging, error shaping, scope lineage, the check and audit for
    * one declared permission, applied AFTER this feature's input parser.
    */
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const personalUsageSchema = z.object({
@@ -83,76 +89,96 @@ export class PersonalDashboardTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: PersonalDashboardTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      /**
-       * Per-user usage rollup powering the /me dashboard cards, charts and
-       * recent activity. Scoped to the caller's personal project (which by
-       * definition has only their traces) unioned with the ingestion rows
-       * recorded against them in the organization's governance tenant.
-       *
-       * Returns empty-state safe values (zeros, empty arrays, null model) when
-       * no traces exist yet, so the page can render before the member's first
-       * CLI request lands.
-       */
-      personalUsage: policy("organization:view")(procedure.input(personalUsageSchema)).query(
-        async ({ ctx, input }) => {
-          const caller = ctx.actor();
-          await assertMember(ctx, caller.id, input.organizationId);
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("personalUsage", (p) =>
+        p
+          .withInput(personalUsageSchema)
+          .withOutput(personalUsageRollupSchema)
+          .withPermission("organization:view")
+          /**
+           * Per-user usage rollup powering the /me dashboard cards, charts and
+           * recent activity. Scoped to the caller's personal project (which by
+           * definition has only their traces) unioned with the ingestion rows
+           * recorded against them in the organization's governance tenant.
+           *
+           * Answers empty-state safe values (zeros, empty arrays, null model)
+           * when no traces exist yet, so the page can render before the
+           * member's first CLI request lands.
+           */
+          .handle(async ({ ctx, input }) => {
+            const caller = ctx.actor();
+            await assertMember(ctx, caller.id, input.organizationId);
 
-          return ctx.app.governanceApp.personalUsageDashboard(
-            {
-              organizationId: input.organizationId,
-              window:
-                input.windowStartMs && input.windowEndMs
-                  ? { startMs: input.windowStartMs, endMs: input.windowEndMs }
-                  : undefined,
-            },
-            caller,
-          );
-        },
-      ),
-
-      /**
-       * Every budget that binds the caller's own keys in this organization,
-       * each labelled with its scope ("whole organization budget", "team
-       * budget (Core)", "personal budget"), most binding first. One source:
-       * the same overview the CLI's budget-overview endpoint serves, so /me
-       * and the login epilogue can never report different numbers for the same
-       * budget.
-       *
-       * A caller with no gateway access gets an answer whose consumer renders
-       * nothing budget-related.
-       *
-       * Authorization: members read their OWN overview only — the user id is
-       * always the session's. `organization:view` is the entry gate; the
-       * application re-checks membership itself, fail closed.
-       */
-      budgetOverview: policy("organization:view")(procedure.input(budgetOverviewSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.governanceApp.personalBudgetOverview(
-            {
-              organizationId: input.organizationId,
-              includeTopModels: input.includeTopModels,
-            },
-            ctx.actor(),
+            return ctx.app.governanceApp.personalUsageDashboard(
+              {
+                organizationId: input.organizationId,
+                window:
+                  input.windowStartMs && input.windowEndMs
+                    ? { startMs: input.windowStartMs, endMs: input.windowEndMs }
+                    : undefined,
+              },
+              caller,
+            );
+          }),
+      )
+      .query("budgetOverview", (p) =>
+        p
+          .withInput(budgetOverviewSchema)
+          .withOutput(governanceBudgetOverviewForUserSchema)
+          /**
+           * Members read their OWN overview only — the user id is always the
+           * session's. `organization:view` is the entry gate; the application
+           * re-checks membership itself, fail closed.
+           */
+          .withPermission("organization:view")
+          /**
+           * Every budget that binds the caller's own keys in this organization,
+           * each labelled with its scope ("whole organization budget", "team
+           * budget (Core)", "personal budget"), most binding first. One source:
+           * the same overview the CLI's budget-overview endpoint serves, so /me
+           * and the login epilogue can never report different numbers for the
+           * same budget.
+           *
+           * A caller with no gateway access gets an answer whose consumer
+           * renders nothing budget-related.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governanceApp.personalBudgetOverview(
+              {
+                organizationId: input.organizationId,
+                includeTopModels: input.includeTopModels,
+              },
+              ctx.actor(),
+            ),
           ),
-      ),
-
-      /**
-       * CLI bootstrap data for the login-completion ceremony: inherited
-       * providers (with display name and model list) plus the monthly budget
-       * (limit and used).
-       *
-       * Empty-state safe: answers no providers and an unset monthly budget when
-       * the member has no personal workspace yet.
-       */
-      cliBootstrap: policy("organization:view")(procedure.input(cliBootstrapSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.governanceApp.cliBootstrap({ organizationId: input.organizationId }, ctx.actor()),
-      ),
-    });
+      )
+      .query("cliBootstrap", (p) =>
+        p
+          .withInput(cliBootstrapSchema)
+          .withOutput(cliBootstrapResultSchema)
+          .withPermission("organization:view")
+          /**
+           * CLI bootstrap data for the login-completion ceremony: inherited
+           * providers (with display name and model list) plus the monthly
+           * budget (limit and used).
+           *
+           * Empty-state safe: answers no providers and an unset monthly budget
+           * when the member has no personal workspace yet.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governanceApp.cliBootstrap(
+              { organizationId: input.organizationId },
+              ctx.actor(),
+            ),
+          ),
+      )
+      .build();
   }
 }
 

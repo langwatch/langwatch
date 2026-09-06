@@ -37,6 +37,23 @@ export const issuedPersonalVirtualKeySchema = z
   .strict();
 export type IssuedPersonalVirtualKey = z.infer<typeof issuedPersonalVirtualKeySchema>;
 
+/**
+ * What issuing a personal key answers: the one moment the plaintext secret
+ * exists on the wire. Nothing stores it and no read returns it again, so a
+ * caller who loses it revokes and issues another.
+ */
+export const issuedPersonalVirtualKeyAnswerSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    secret: z.string().min(1),
+    baseUrl: z.string().url(),
+    displayPrefix: personalVirtualKeySchema.shape.displayPrefix,
+    routingPolicyId: z.string().nullable(),
+  })
+  .strict();
+export type IssuedPersonalVirtualKeyAnswer = z.infer<typeof issuedPersonalVirtualKeyAnswerSchema>;
+
 export const ensureDefaultPersonalVirtualKeyInputSchema = z
   .object({
     userId: z.string().min(1),

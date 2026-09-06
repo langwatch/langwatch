@@ -393,3 +393,29 @@ export type AuthzBindingsForSynthesisOutput = z.infer<typeof authzBindingsForSyn
 
 export const authzCustomRolesOutputSchema = z.array(authzCustomRoleSchema);
 export type AuthzCustomRolesOutput = z.infer<typeof authzCustomRolesOutputSchema>;
+
+/** The scope an own-standing read resolved to, by kind and id. */
+const authzResolvedScopeSchema = z
+  .object({
+    type: z.union([
+      authzScopeRefSchema.options[0].shape.type,
+      authzScopeRefSchema.options[1].shape.type,
+      authzScopeRefSchema.options[2].shape.type,
+      authzScopeRefSchema.options[3].shape.type,
+    ]),
+    id: z.string(),
+  })
+  .strict();
+
+/**
+ * The caller's OWN standing at one scope. A scope they have no standing in —
+ * or one that does not resolve at all — answers a null scope and the empty
+ * set, which is the engine's no-default-access rather than a special case.
+ */
+export const authzOwnStandingSchema = z
+  .object({
+    scope: authzResolvedScopeSchema.nullable(),
+    permissions: z.array(z.string()),
+  })
+  .strict();
+export type AuthzOwnStanding = z.infer<typeof authzOwnStandingSchema>;

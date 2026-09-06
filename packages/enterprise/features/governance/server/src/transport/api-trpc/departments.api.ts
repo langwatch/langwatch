@@ -10,8 +10,14 @@
  *
  * Spec: specs/ai-gateway/governance/departments.feature
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import {
+  departmentAssignmentsSchema,
+  departmentSchema,
+  governanceWriteAcknowledgedSchema,
+  type GovernanceService,
+} from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -19,15 +25,15 @@ export type DepartmentsTrpcContext = Readonly<{
   app: Readonly<{ governance: GovernanceService }>;
 }>;
 
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type DepartmentsTrpcProcedures<
   TContext extends DepartmentsTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const organizationScope = z.object({ organizationId: z.string() });
@@ -59,60 +65,94 @@ export class DepartmentsTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: DepartmentsTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      list: policy("governance:view")(procedure.input(organizationScope)).query(
-        async ({ ctx, input }) => ctx.app.governance.departmentList(input.organizationId),
-      ),
-
-      assignments: policy("governance:view")(procedure.input(organizationScope)).query(
-        async ({ ctx, input }) => ctx.app.governance.departmentAssignments(input.organizationId),
-      ),
-
-      create: policy("governance:manage")(procedure.input(createSchema)).mutation(
-        async ({ ctx, input }) => ctx.app.governance.departmentCreate(input),
-      ),
-
-      rename: policy("governance:manage")(procedure.input(renameSchema)).mutation(
-        async ({ ctx, input }) =>
-          ctx.app.governance.departmentRename({
-            id: input.id,
-            organizationId: input.organizationId,
-            name: input.name,
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(organizationScope)
+          .withOutput(departmentSchema.array())
+          .withPermission("governance:view")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.departmentList(input.organizationId),
+          ),
+      )
+      .query("assignments", (p) =>
+        p
+          .withInput(organizationScope)
+          .withOutput(departmentAssignmentsSchema)
+          .withPermission("governance:view")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.departmentAssignments(input.organizationId),
+          ),
+      )
+      .mutation("create", (p) =>
+        p
+          .withInput(createSchema)
+          .withOutput(departmentSchema)
+          .withPermission("governance:manage")
+          .handle(async ({ ctx, input }) => ctx.app.governance.departmentCreate(input)),
+      )
+      .mutation("rename", (p) =>
+        p
+          .withInput(renameSchema)
+          .withOutput(departmentSchema)
+          .withPermission("governance:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governance.departmentRename({
+              id: input.id,
+              organizationId: input.organizationId,
+              name: input.name,
+            }),
+          ),
+      )
+      .mutation("archive", (p) =>
+        p
+          .withInput(idAndOrg)
+          .withOutput(governanceWriteAcknowledgedSchema)
+          .withPermission("governance:manage")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.governance.departmentArchive({
+              id: input.id,
+              organizationId: input.organizationId,
+            });
+            return { ok: true };
           }),
-      ),
-
-      archive: policy("governance:manage")(procedure.input(idAndOrg)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.governance.departmentArchive({
-            id: input.id,
-            organizationId: input.organizationId,
-          });
-          return { ok: true };
-        },
-      ),
-
-      assignUser: policy("governance:manage")(procedure.input(assignUserSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.governance.departmentAssignUser(input);
-          return { ok: true };
-        },
-      ),
-
-      assignTeam: policy("governance:manage")(procedure.input(assignTeamSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.governance.departmentAssignTeam(input);
-          return { ok: true };
-        },
-      ),
-
-      assignProject: policy("governance:manage")(procedure.input(assignProjectSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.governance.departmentAssignProject(input);
-          return { ok: true };
-        },
-      ),
-    });
+      )
+      .mutation("assignUser", (p) =>
+        p
+          .withInput(assignUserSchema)
+          .withOutput(governanceWriteAcknowledgedSchema)
+          .withPermission("governance:manage")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.governance.departmentAssignUser(input);
+            return { ok: true };
+          }),
+      )
+      .mutation("assignTeam", (p) =>
+        p
+          .withInput(assignTeamSchema)
+          .withOutput(governanceWriteAcknowledgedSchema)
+          .withPermission("governance:manage")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.governance.departmentAssignTeam(input);
+            return { ok: true };
+          }),
+      )
+      .mutation("assignProject", (p) =>
+        p
+          .withInput(assignProjectSchema)
+          .withOutput(governanceWriteAcknowledgedSchema)
+          .withPermission("governance:manage")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.governance.departmentAssignProject(input);
+            return { ok: true };
+          }),
+      )
+      .build();
   }
 }

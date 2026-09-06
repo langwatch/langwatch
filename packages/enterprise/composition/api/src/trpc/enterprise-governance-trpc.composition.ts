@@ -78,8 +78,13 @@ export class EnterpriseGovernanceTrpcComposition {
     protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
     /** The process's full policy chain for one declared permission. */
     policy(permission: AuthzPermission): EnterpriseTrpcPolicy;
+    /**
+     * Check each answer against the output schema its procedure declared. The
+     * process decides; production leaves it off.
+     */
+    validateOutput: boolean;
   }) {
-    const { root, protectedProcedure, policy } = options;
+    const { root, protectedProcedure, policy, validateOutput } = options;
 
     return {
       /**
@@ -91,49 +96,60 @@ export class EnterpriseGovernanceTrpcComposition {
       personalDashboard: PersonalDashboardTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
       }),
       personalSessions: PersonalSessionsTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
       }),
       sessionPolicy: SessionPolicyTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
       }),
       ingestionKey: IngestionKeyTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
       }),
       departments: DepartmentsTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
       }),
       ingestionTemplates: IngestionTemplatesTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
       }),
       activityMonitor: ActivityMonitorTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
         planGate: planGateFor(ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR),
       }),
       anomalyRules: AnomalyRulesTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
         planGate: planGateFor(ENTERPRISE_FEATURE_ERRORS.ANOMALY_RULES),
       }),
       governance: GovernanceTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
         ocsfExportPlanGate: planGateFor(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT),
       }),
       ingestionSources: IngestionSourcesTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
       }),
       aiTools: AiToolsTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
+        validateOutput,
       }),
     };
   }

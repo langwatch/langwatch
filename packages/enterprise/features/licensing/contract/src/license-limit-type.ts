@@ -20,13 +20,19 @@ export type LimitType = (typeof limitTypes)[number];
 export const limitTypeSchema = z.enum(limitTypes);
 
 /** Result of checking a limit */
-export interface LimitCheckResult {
-  /** Whether the organization can create another resource of this type */
-  readonly allowed: boolean;
-  /** Current count of resources */
-  readonly current: number;
-  /** Maximum allowed by current plan */
-  readonly max: number;
-  /** Type of limit being checked */
-  readonly limitType: LimitType;
-}
+export const limitCheckResultSchema = z
+  .object({
+    /** Whether the organization can create another resource of this type */
+    allowed: z.boolean(),
+    /** Current count of resources */
+    current: z.number(),
+    /** Maximum allowed by the current plan */
+    max: z.number(),
+    /** Type of limit being checked */
+    limitType: limitTypeSchema,
+  })
+  .strict();
+export type LimitCheckResult = z.infer<typeof limitCheckResultSchema>;
+
+/** Every limit at once, keyed by type. Which limits exist is the app's answer. */
+export const allLimitChecksSchema = z.record(limitTypeSchema, limitCheckResultSchema);

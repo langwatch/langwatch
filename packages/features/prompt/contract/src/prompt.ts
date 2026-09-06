@@ -259,3 +259,51 @@ export const promptShorthandSchema = z
   })
   .strict();
 export type PromptShorthand = z.infer<typeof promptShorthandSchema>;
+
+/**
+ * One copy a push may target, as the push-selection screen renders it: the
+ * copy's own identity, the path that names where it lives, and whether this
+ * caller may write to that project at all. A copy they cannot write to is
+ * never offered, so the flag is what the list is filtered on.
+ */
+export const promptCopyChoiceSchema = promptCopySummarySchema
+  .extend({
+    /** The copy's handle, or its id when it has none. */
+    handle: z.string(),
+    /** `organization / team / project`, ready to render. */
+    fullPath: z.string(),
+    hasPermission: z.boolean(),
+  })
+  .strict();
+export type PromptCopyChoice = z.infer<typeof promptCopyChoiceSchema>;
+
+/** A prompt that arrived in this project as a copy, with its source named. */
+export const copiedPromptSchema = versionedPromptSchema
+  .extend({ copiedFromPromptId: z.string().min(1) })
+  .strict();
+export type CopiedPrompt = z.infer<typeof copiedPromptSchema>;
+
+/**
+ * What a push to a source prompt's copies answers.
+ *
+ * The three counts are deliberately separate: a caller who may not write to
+ * every copy sees fewer pushed than selected, and fewer selected than exist,
+ * rather than a refusal for the whole push.
+ */
+export const promptPushToCopiesResultSchema = z
+  .object({
+    pushedTo: z.number().int(),
+    totalCopies: z.number().int(),
+    selectedCopies: z.number().int(),
+    results: z.array(
+      z
+        .object({
+          copyId: z.string().min(1),
+          copyName: z.string(),
+          prompt: versionedPromptSchema,
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type PromptPushToCopiesResult = z.infer<typeof promptPushToCopiesResultSchema>;

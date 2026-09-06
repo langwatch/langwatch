@@ -11,8 +11,10 @@
  *
  * Spec: ADR-057.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
+  shareLinkSchema,
   shareResourceTypeSchema,
   shareVisibilitySchema,
   type ShareService,
@@ -44,7 +46,9 @@ type ShareTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const listForResourceInputSchema = z.object({
@@ -82,48 +86,63 @@ export class ShareTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: ShareTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      /**
-       * All links for a resource — backs the management list in the share
-       * drawer. Requires `traces:share` (not `traces:view`): the list
-       * re-displays the secret tokens, so only someone who can mint/revoke
-       * shares may enumerate them.
-       */
-      listForResource: policy("traces:share")(procedure.input(listForResourceInputSchema)).query(
-        async ({ ctx, input }) => {
-          return ctx.app.share.listForResource(input);
-        },
-      ),
-
-      /** Mint a share link. */
-      createShare: policy("traces:share")(procedure.input(createShareInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return ctx.app.share.createShare({
-            projectId: input.projectId,
-            resourceType: input.resourceType,
-            resourceId: input.resourceId,
-            visibility: input.visibility,
-            expiresAt: input.expiresAt ?? null,
-            maxViews: input.maxViews ?? null,
-            userId: ctx.actor().id,
-          });
-        },
-      ),
-
-      /** Revoke a single link by id. */
-      revoke: policy("traces:share")(procedure.input(revokeInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.share.revokeById(input);
-        },
-      ),
-
-      revokeAllTraceShares: policy("project:update")(procedure.input(projectScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.share.revokeAllTraceShares(input.projectId);
-        },
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("listForResource", (p) =>
+        p
+          .withInput(listForResourceInputSchema)
+          .withOutput(shareLinkSchema.array())
+          /**
+           * All links for a resource — backs the management list in the share
+           * drawer. Requires `traces:share` (not `traces:view`): the list
+           * re-displays the secret tokens, so only someone who can mint or
+           * revoke shares may enumerate them.
+           */
+          .withPermission("traces:share")
+          .handle(async ({ ctx, input }) => ctx.app.share.listForResource(input)),
+      )
+      .mutation("createShare", (p) =>
+        p
+          .withInput(createShareInputSchema)
+          .withOutput(shareLinkSchema)
+          .withPermission("traces:share")
+          /** Mint a share link. */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.share.createShare({
+              projectId: input.projectId,
+              resourceType: input.resourceType,
+              resourceId: input.resourceId,
+              visibility: input.visibility,
+              expiresAt: input.expiresAt ?? null,
+              maxViews: input.maxViews ?? null,
+              userId: ctx.actor().id,
+            }),
+          ),
+      )
+      .mutation("revoke", (p) =>
+        p
+          .withInput(revokeInputSchema)
+          .withOutput(z.void())
+          .withPermission("traces:share")
+          /** Revoke a single link by id. A revocation answers nothing. */
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.share.revokeById(input);
+          }),
+      )
+      .mutation("revokeAllTraceShares", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(z.void())
+          .withPermission("project:update")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.share.revokeAllTraceShares(input.projectId);
+          }),
+      )
+      .build();
   }
 }

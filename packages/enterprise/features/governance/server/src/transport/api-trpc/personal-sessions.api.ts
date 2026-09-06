@@ -13,8 +13,13 @@
  *
  * Spec: specs/ai-governance/sessions/sessions-inventory.feature
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import {
+  cliSessionCardSchema,
+  cliSessionRevocationSchema,
+  type GovernanceService,
+} from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -29,8 +34,6 @@ export type PersonalSessionsTrpcContext = Readonly<{
   actor(): Readonly<{ id: string }>;
 }>;
 
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type PersonalSessionsTrpcProcedures<
   TContext extends PersonalSessionsTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -42,7 +45,9 @@ type PersonalSessionsTrpcProcedures<
    * Tracing, logging, error shaping, scope lineage, the check and audit for
    * one declared permission, applied AFTER this feature's input parser.
    */
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const organizationScopeSchema = z.object({ organizationId: z.string() });
@@ -61,57 +66,69 @@ export class PersonalSessionsTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: PersonalSessionsTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      /**
-       * The caller's own active CLI sessions, one card per device.
-       *
-       * `organization:view` is the base membership check the surface shares
-       * with every other governance page. The actual reach is the caller's
-       * userId, from `ctx.actor()`, never from input.
-       */
-      list: policy("organization:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ ctx }) => {
-          const sessions = await ctx.app.governance.cliSessionListForUser({
-            userId: ctx.actor().id,
-          });
-          return sessions.map((session) => ({
-            sessionStartedAtMs: session.sessionStartedAtMs,
-            deviceLabel: session.deviceLabel,
-            hostname: session.hostname,
-            uname: session.uname,
-            platform: session.platform,
-            lastSeenMs: session.lastSeenMs,
-            expiresAtMs: session.expiresAtMs,
-          }));
-        },
-      ),
-
-      /** Revoke one of the caller's own sessions. Idempotent. */
-      revoke: policy("organization:view")(procedure.input(revokeSchema)).mutation(
-        async ({ ctx, input }) => {
-          const result = await ctx.app.governance.cliSessionRevoke({
-            userId: ctx.actor().id,
-            sessionStartedAtMs: input.sessionStartedAtMs,
-          });
-          return { ok: true, revokedTokens: result.revokedTokens };
-        },
-      ),
-
-      /**
-       * Revoke every session for the caller ("log out everywhere"). Reuses
-       * the user-wide token revoke so the per-user token index clears in one
-       * shot.
-       */
-      revokeAll: policy("organization:view")(procedure.input(organizationScopeSchema)).mutation(
-        async ({ ctx }) => {
-          const result = await ctx.app.governance.cliTokenRevokeForUser({
-            userId: ctx.actor().id,
-          });
-          return { ok: true, revokedTokens: result.revokedCount };
-        },
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(cliSessionCardSchema.array())
+          /**
+           * `organization:view` is the base membership check the surface shares
+           * with every other governance page. The actual reach is the caller's
+           * userId, from `ctx.actor()`, never from input.
+           */
+          .withPermission("organization:view")
+          .handle(async ({ ctx }) => {
+            const sessions = await ctx.app.governance.cliSessionListForUser({
+              userId: ctx.actor().id,
+            });
+            return sessions.map((session) => ({
+              sessionStartedAtMs: session.sessionStartedAtMs,
+              deviceLabel: session.deviceLabel,
+              hostname: session.hostname,
+              uname: session.uname,
+              platform: session.platform,
+              lastSeenMs: session.lastSeenMs,
+              expiresAtMs: session.expiresAtMs,
+            }));
+          }),
+      )
+      .mutation("revoke", (p) =>
+        p
+          .withInput(revokeSchema)
+          .withOutput(cliSessionRevocationSchema)
+          .withPermission("organization:view")
+          /** Revokes one of the caller's own sessions. Idempotent. */
+          .handle(async ({ ctx, input }) => {
+            const result = await ctx.app.governance.cliSessionRevoke({
+              userId: ctx.actor().id,
+              sessionStartedAtMs: input.sessionStartedAtMs,
+            });
+            return { ok: true, revokedTokens: result.revokedTokens };
+          }),
+      )
+      .mutation("revokeAll", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(cliSessionRevocationSchema)
+          .withPermission("organization:view")
+          /**
+           * Revokes every session for the caller ("log out everywhere"). Reuses
+           * the user-wide token revoke so the per-user token index clears in one
+           * shot.
+           */
+          .handle(async ({ ctx }) => {
+            const result = await ctx.app.governance.cliTokenRevokeForUser({
+              userId: ctx.actor().id,
+            });
+            return { ok: true, revokedTokens: result.revokedCount };
+          }),
+      )
+      .build();
   }
 }

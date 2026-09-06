@@ -13,6 +13,8 @@ export * from "./governance-signals";
 export * from "./governance.errors";
 export * from "./governance-events";
 export * from "./governance.service";
+export * from "./session-policy";
+export * from "./governance.responses";
 export * from "./ingestion-source";
 export * from "./ingestion-source.commands";
 export * from "./ingestion-template";

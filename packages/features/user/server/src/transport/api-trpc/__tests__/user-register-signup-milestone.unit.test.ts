@@ -57,6 +57,7 @@ function harness({
     },
     trackServerEvent,
     createCredentialUser,
+    ports,
   };
 }
 
@@ -92,6 +93,43 @@ describe("user.register", () => {
 
       expect(h.createCredentialUser).not.toHaveBeenCalled();
       expect(h.trackServerEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the email is typed with capital letters", () => {
+    /** Sign-in lowercases the address on every lookup, so an account stored as
+     *  typed is one sign-in can never find: the customer is locked out with
+     *  "already exists" forever.
+     *  @scenario "A capitalised email creates an account sign-in can find" */
+    it("stores the lowercased address, and looks the account up lowercased too", async () => {
+      const h = harness();
+
+      await h.caller.register({
+        name: "Joel",
+        email: "Joel.During@example.com",
+        password: "supersecret",
+      });
+
+      expect(h.createCredentialUser).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "joel.during@example.com" }),
+      );
+      expect(h.ports.emailIsTaken).toHaveBeenCalledWith(expect.anything(), {
+        email: "joel.during@example.com",
+      });
+    });
+
+    /** @scenario "A capitalised email creates an account sign-in can find" */
+    it("refuses a second signup for the same address typed differently", async () => {
+      const h = harness({ emailIsTaken: true });
+
+      await expect(
+        h.caller.register({
+          name: "Joel",
+          email: "Joel.During@example.com",
+          password: "supersecret",
+        }),
+      ).rejects.toThrow();
+      expect(h.createCredentialUser).not.toHaveBeenCalled();
     });
   });
 });

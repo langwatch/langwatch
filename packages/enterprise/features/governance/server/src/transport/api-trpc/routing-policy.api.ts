@@ -18,10 +18,16 @@
  * application's, raised as handled errors with stable codes that the process's
  * boundary renders — a transport does not construct a transport error.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { routingPolicyScopeTypeSchema } from "@langwatch/enterprise-governance-contract";
+import {
+  governanceWriteAcknowledgedSchema,
+  routingPolicySchema,
+  routingPolicyScopeTypeSchema,
+} from "@langwatch/enterprise-governance-contract";
 import {
   suggestTierTargets,
+  tierTargetSuggestionSchema,
   type SuggestTierTargetsInput,
 } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
@@ -40,8 +46,6 @@ export type RoutingPolicyTrpcContext = Readonly<{
   actor(): Readonly<{ id: string }>;
 }>;
 
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type RoutingPolicyTrpcProcedures<
   TContext extends RoutingPolicyTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -55,7 +59,9 @@ type RoutingPolicyTrpcProcedures<
    * order they were added, and the check reads its scope id from the validated
    * input.
    */
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const scopeTypeSchema = routingPolicyScopeTypeSchema;
@@ -94,137 +100,168 @@ export class RoutingPolicyTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: RoutingPolicyTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      /** List policies in an organization, optionally filtered to those selectable from a scope. */
-      list: policy("routingPolicies:view")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            selectableForScope: z
-              .object({ scopeType: scopeTypeSchema, scopeId: z.string() })
-              .optional(),
-          }),
-        ),
-      ).query(async ({ ctx, input }) =>
-        ctx.app.governanceApp.listRoutingPolicies({
-          organizationId: input.organizationId,
-          selectableForScope: input.selectableForScope,
-        }),
-      ),
-
-      /** Get a single policy by id (includes its scope rows). */
-      get: policy("routingPolicies:view")(procedure.input(policyIdSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.governanceApp.getRoutingPolicy({
-            id: input.id,
-            organizationId: input.organizationId,
-          }),
-      ),
-
-      /**
-       * Models worth pointing a tier at, ranked. Server-side because the model
-       * catalog is far too large to ship to the browser; the tier names and
-       * labels themselves are client-safe.
-       */
-      tierSuggestions: policy("routingPolicies:view")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            tier: tierSchema,
-            boundProviderTypes: z.array(z.string()).default([]),
-          }),
-        ),
-      ).query(({ input }) =>
-        suggestTierTargets({
-          tier: input.tier,
-          boundProviderTypes: input.boundProviderTypes,
-        }),
-      ),
-
-      create: policy("routingPolicies:manage")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            scopes: scopesArraySchema,
-            name: z.string().min(1).max(128),
-            description: z.string().nullable().optional(),
-            modelProviderIds: z
-              .array(z.string())
-              .min(1, "Routing policy must reference at least one provider credential"),
-            isDefault: z.boolean().default(false),
-            modelAliases: aliasesSchema,
-            defaultModel: defaultModelSchema,
-            policyRules: policyRulesSchema,
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) =>
-        ctx.app.governanceApp.createRoutingPolicy(
-          {
-            organizationId: input.organizationId,
-            scopes: input.scopes,
-            name: input.name,
-            description: input.description ?? null,
-            modelProviderIds: input.modelProviderIds,
-            isDefault: input.isDefault,
-            modelAliases: input.modelAliases,
-            defaultModel: input.defaultModel ?? null,
-            policyRules: input.policyRules,
-          },
-          ctx.actor(),
-        ),
-      ),
-
-      update: policy("routingPolicies:manage")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            id: z.string(),
-            name: z.string().min(1).max(128).optional(),
-            description: z.string().nullable().optional(),
-            modelProviderIds: z
-              .array(z.string())
-              .min(1, "Routing policy must reference at least one provider credential")
-              .optional(),
-            modelAliases: aliasesSchema,
-            defaultModel: defaultModelSchema,
-            policyRules: policyRulesSchema,
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) =>
-        ctx.app.governanceApp.updateRoutingPolicy(
-          {
-            id: input.id,
-            organizationId: input.organizationId,
-            name: input.name,
-            description: input.description,
-            modelProviderIds: input.modelProviderIds,
-            modelAliases: input.modelAliases,
-            defaultModel: input.defaultModel,
-            policyRules: input.policyRules,
-          },
-          ctx.actor(),
-        ),
-      ),
-
-      setDefault: policy("routingPolicies:manage")(procedure.input(policyIdSchema)).mutation(
-        async ({ ctx, input }) =>
-          ctx.app.governanceApp.setDefaultRoutingPolicy(
-            { id: input.id, organizationId: input.organizationId },
-            ctx.actor(),
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              selectableForScope: z
+                .object({ scopeType: scopeTypeSchema, scopeId: z.string() })
+                .optional(),
+            }),
+          )
+          .withOutput(routingPolicySchema.array())
+          .withPermission("routingPolicies:view")
+          /**
+           * Policies in an organization, optionally filtered to those
+           * selectable from one scope.
+           */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governanceApp.listRoutingPolicies({
+              organizationId: input.organizationId,
+              selectableForScope: input.selectableForScope,
+            }),
           ),
-      ),
-
-      delete: policy("routingPolicies:manage")(procedure.input(policyIdSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.governanceApp.deleteRoutingPolicy({
-            id: input.id,
-            organizationId: input.organizationId,
-          });
-          return { ok: true };
-        },
-      ),
-    });
+      )
+      .query("get", (p) =>
+        p
+          .withInput(policyIdSchema)
+          .withOutput(routingPolicySchema)
+          .withPermission("routingPolicies:view")
+          /** One policy by id, with its scope rows. */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governanceApp.getRoutingPolicy({
+              id: input.id,
+              organizationId: input.organizationId,
+            }),
+          ),
+      )
+      .query("tierSuggestions", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              tier: tierSchema,
+              boundProviderTypes: z.array(z.string()).default([]),
+            }),
+          )
+          .withOutput(tierTargetSuggestionSchema.array())
+          .withPermission("routingPolicies:view")
+          /**
+           * Models worth pointing a tier at, ranked. Server-side because the
+           * model catalog is far too large to ship to the browser; the tier
+           * names and labels themselves are client-safe.
+           */
+          .handle(({ input }) =>
+            suggestTierTargets({
+              tier: input.tier,
+              boundProviderTypes: input.boundProviderTypes,
+            }),
+          ),
+      )
+      .mutation("create", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              scopes: scopesArraySchema,
+              name: z.string().min(1).max(128),
+              description: z.string().nullable().optional(),
+              modelProviderIds: z
+                .array(z.string())
+                .min(1, "Routing policy must reference at least one provider credential"),
+              isDefault: z.boolean().default(false),
+              modelAliases: aliasesSchema,
+              defaultModel: defaultModelSchema,
+              policyRules: policyRulesSchema,
+            }),
+          )
+          .withOutput(routingPolicySchema)
+          .withPermission("routingPolicies:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governanceApp.createRoutingPolicy(
+              {
+                organizationId: input.organizationId,
+                scopes: input.scopes,
+                name: input.name,
+                description: input.description ?? null,
+                modelProviderIds: input.modelProviderIds,
+                isDefault: input.isDefault,
+                modelAliases: input.modelAliases,
+                defaultModel: input.defaultModel ?? null,
+                policyRules: input.policyRules,
+              },
+              ctx.actor(),
+            ),
+          ),
+      )
+      .mutation("update", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              id: z.string(),
+              name: z.string().min(1).max(128).optional(),
+              description: z.string().nullable().optional(),
+              modelProviderIds: z
+                .array(z.string())
+                .min(1, "Routing policy must reference at least one provider credential")
+                .optional(),
+              modelAliases: aliasesSchema,
+              defaultModel: defaultModelSchema,
+              policyRules: policyRulesSchema,
+            }),
+          )
+          .withOutput(routingPolicySchema)
+          .withPermission("routingPolicies:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governanceApp.updateRoutingPolicy(
+              {
+                id: input.id,
+                organizationId: input.organizationId,
+                name: input.name,
+                description: input.description,
+                modelProviderIds: input.modelProviderIds,
+                modelAliases: input.modelAliases,
+                defaultModel: input.defaultModel,
+                policyRules: input.policyRules,
+              },
+              ctx.actor(),
+            ),
+          ),
+      )
+      .mutation("setDefault", (p) =>
+        p
+          .withInput(policyIdSchema)
+          .withOutput(routingPolicySchema)
+          .withPermission("routingPolicies:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.governanceApp.setDefaultRoutingPolicy(
+              { id: input.id, organizationId: input.organizationId },
+              ctx.actor(),
+            ),
+          ),
+      )
+      .mutation("delete", (p) =>
+        p
+          .withInput(policyIdSchema)
+          .withOutput(governanceWriteAcknowledgedSchema)
+          .withPermission("routingPolicies:manage")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.governanceApp.deleteRoutingPolicy({
+              id: input.id,
+              organizationId: input.organizationId,
+            });
+            return { ok: true };
+          }),
+      )
+      .build();
   }
 }

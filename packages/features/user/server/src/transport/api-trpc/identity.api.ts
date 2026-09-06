@@ -29,7 +29,9 @@
  *
  * Spec: specs/identity/identifier-model.feature.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
+import { identityVerificationCompletedSchema } from "@langwatch/user-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -54,7 +56,9 @@ type IdentityTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(declaration: AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The process capabilities this transport needs that are not the user's own. */
@@ -111,28 +115,36 @@ export class IdentityTrpcApi {
     procedures: IdentityTrpcProcedures<TContext, TOptions, TRoot>,
     ports: IdentityTrpcPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      /**
-       * Complete an email verification ceremony. Carries the two proofs that
-       * must arrive together: the emailed single-use token, and the PKCE
-       * verifier held by the context that STARTED the ceremony. A link opened
-       * on its own — forwarded, or followed by a mail scanner — can never
-       * verify anything, because it carries only the first.
-       */
-      completeVerification: policy(OWN_VERIFICATION_RECORD)(
-        procedure.input(completeVerificationInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ports.completeEmailVerification({
-          userId: ctx.actor().id,
-          identifierId: input.identifierId,
-          verificationId: input.verificationId,
-          token: input.token,
-          codeVerifier: input.codeVerifier,
-        });
-        return { verified: true as const };
-      }),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .mutation("completeVerification", (p) =>
+        p
+          .withInput(completeVerificationInputSchema)
+          .withOutput(identityVerificationCompletedSchema)
+          .withPermission(OWN_VERIFICATION_RECORD)
+          /**
+           * Complete an email verification ceremony. Carries the two proofs
+           * that must arrive together: the emailed single-use token, and the
+           * PKCE verifier held by the context that STARTED the ceremony. A link
+           * opened on its own — forwarded, or followed by a mail scanner — can
+           * never verify anything, because it carries only the first.
+           */
+          .handle(async ({ ctx, input }) => {
+            await ports.completeEmailVerification({
+              userId: ctx.actor().id,
+              identifierId: input.identifierId,
+              verificationId: input.verificationId,
+              token: input.token,
+              codeVerifier: input.codeVerifier,
+            });
+            return { verified: true as const };
+          }),
+      )
+      .build();
   }
 }

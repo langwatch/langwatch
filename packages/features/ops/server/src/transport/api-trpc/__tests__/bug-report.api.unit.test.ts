@@ -58,6 +58,7 @@ function harness({
             return next();
           },
         ),
+      validateOutput: true,
     },
     { getAll, getById, recordAudit },
   );

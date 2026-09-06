@@ -35,6 +35,7 @@ import {
 import {
   ScimTokenTrpcApi,
   type ScimTokenTrpcContext,
+  type ScimPlanProvider,
   type ScimTokenTrpcPorts,
 } from "@langwatch/enterprise-scim-server";
 import {
@@ -124,29 +125,61 @@ export class EnterpriseTrpcComposition {
     backOfficePolicyForOrganization: EnterpriseTrpcPolicy;
     /** Whether this installation bills through Stripe. */
     saasBilling: boolean;
+    /**
+     * Check each answer against the output schema its procedure declared. The
+     * process decides — production leaves it off, because a declared shape
+     * documents the answer rather than gating it.
+     */
+    validateOutput: boolean;
     ports: {
       scimToken: TScimTokenPorts;
       ssoConnections: TSsoConnectionPorts;
     };
   }) {
-    const { root, protectedProcedure, policy, ports } = options;
+    const { root, protectedProcedure, policy, ports, validateOutput } = options;
 
     const license = LicenseTrpcApi.create(root, {
       protected: protectedProcedure,
       policy,
       unscopedPolicy: options.instanceLicensePolicy,
+      validateOutput,
     });
 
     const licenseEnforcement = LicenseEnforcementTrpcApi.create(root, {
       protected: protectedProcedure,
       policy,
+      validateOutput,
     });
 
-    const scimToken = ScimTokenTrpcApi.create(
-      root,
-      { protected: protectedProcedure, policy },
-      ports.scimToken,
-    );
+    // The one place SCIM's plan gate becomes a decorator. The refusal reads
+    // the SCIM application's own plan provider rather than the process-wide
+    // one, which is why it is built here from the port instead of reusing the
+    // shared `requireEnterprisePlan` middleware.
+    const scimPlanGate = <TProcedure>(procedure: TProcedure): TProcedure =>
+      (procedure as unknown as { use: (m: unknown) => TProcedure }).use(
+        async ({
+          ctx,
+          input,
+          next,
+        }: {
+          ctx: { app: { scimApp: { planProvider: ScimPlanProvider } } };
+          input: { organizationId: string };
+          next: () => Promise<unknown>;
+        }) => {
+          await ports.scimToken.requireEnterprisePlan({
+            planProvider: ctx.app.scimApp.planProvider,
+            organizationId: input.organizationId,
+          });
+          return next();
+        },
+      );
+
+    const scimToken = ScimTokenTrpcApi.create(root, {
+      protected: protectedProcedure,
+      policy,
+      planGate: scimPlanGate,
+      validateOutput,
+    });
 
     const ssoConnections = SsoConnectionTrpcApi.create(
       root,
@@ -154,6 +187,7 @@ export class EnterpriseTrpcComposition {
         protected: protectedProcedure,
         staffPolicy: options.backOfficePolicy,
         staffPolicyForOrganization: options.backOfficePolicyForOrganization,
+        validateOutput,
       },
       ports.ssoConnections,
     );
@@ -161,6 +195,7 @@ export class EnterpriseTrpcComposition {
     const billing = SubscriptionTrpcApi.create(root, {
       protected: protectedProcedure,
       policy,
+      validateOutput,
     });
 
     // SaaS-only: subscription management requires Stripe. Typed as the served
@@ -172,7 +207,10 @@ export class EnterpriseTrpcComposition {
 
     const currencyDetection = CurrencyTrpcApi.create(root, {
       protected: protectedProcedure,
-      noPermission: options.currencyPolicy,
+      // The declaration is the process's, already written: the chain asks for
+      // a policy by access, and this surface has exactly one.
+      policy: () => options.currencyPolicy,
+      validateOutput,
     });
 
     // SaaS-only for the same reason and by the same construction: geo-IP

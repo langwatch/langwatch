@@ -14,8 +14,16 @@ import type { PromptTrpcContext } from "../../../rules/prompt-trpc-context.rules
 const ORGANIZATION_PROJECTS = ["project_a", "project_b"];
 
 function buildCaller(options: { manageable: readonly string[]; app?: Partial<PromptApp> }) {
-  const renameTagForProject = vi.fn(async () => ({ id: "tag_1", name: "release" }));
-  const deleteTagForProject = vi.fn(async () => ({ id: "tag_1", name: "production" }));
+  const renameTagForProject = vi.fn(async () => ({
+    id: "tag_1",
+    organizationId: "organization_1",
+    name: "release",
+  }));
+  const deleteTagForProject = vi.fn(async () => ({
+    id: "tag_1",
+    organizationId: "organization_1",
+    name: "production",
+  }));
   const projectsSharingTagCatalog = vi.fn(async () => ORGANIZATION_PROJECTS);
 
   const prompts = {
@@ -39,6 +47,7 @@ function buildCaller(options: { manageable: readonly string[]; app?: Partial<Pro
   const router = PromptTagTrpcApi.create(trpc, {
     protected: trpc.procedure,
     policy: () => (procedure) => procedure,
+    validateOutput: true,
   });
 
   return {

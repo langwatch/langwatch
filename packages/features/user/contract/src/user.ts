@@ -148,3 +148,13 @@ export type RemoveUserAvatarInput = z.infer<typeof removeUserAvatarInputSchema>;
 
 export const userAvatarResultSchema = z.object({ image: z.string() }).strict();
 export type UserAvatarResult = z.infer<typeof userAvatarResultSchema>;
+
+/**
+ * What a completed email-verification ceremony answers.
+ *
+ * Deliberately one flag and nothing else: the caller already knows which
+ * identifier they were verifying, and the ceremony has no other fact to hand
+ * back that is not already theirs.
+ */
+export const identityVerificationCompletedSchema = z.object({ verified: z.literal(true) }).strict();
+export type IdentityVerificationCompleted = z.infer<typeof identityVerificationCompletedSchema>;

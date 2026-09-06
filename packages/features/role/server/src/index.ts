@@ -9,8 +9,9 @@ export {
 export {
   RoleTrpcApi,
   roleTrpcInputSchemas,
-  type DeclaredProcedure,
+  type RoleTrpcAccess,
   type RoleTrpcContext,
+  type RoleTrpcPorts,
   type RoleTrpcProcedures,
 } from "./transport/api-trpc/role.api";
 export {

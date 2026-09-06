@@ -13,8 +13,15 @@
  * what the organization has not bought.
  *
  * Transport only: gates, input shapes and delegation to `ScimService`. The plan
- * gate is a port, because the plan is the process's answer and not SCIM's.
+ * gate arrives already built, because the plan is the process's answer and not
+ * SCIM's.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import {
+  issuedScimTokenSchema,
+  scimTokenRevokedSchema,
+  scimTokenSummarySchema,
+} from "@langwatch/enterprise-scim-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { ScimApp, ScimPlanProvider } from "#app/scim.app";
@@ -43,7 +50,16 @@ type ScimTokenTrpcProcedures<
    * audit policy for one declared permission, applied AFTER this feature's own
    * input parser so the check reads its organization id from validated input.
    */
-  policy(permission: "organization:manage"): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(permission: "organization:manage"): TrpcPolicyDecorator;
+  /**
+   * Refuses the call unless the organization is on an Enterprise plan, using
+   * this feature's own plan provider. The process builds it from
+   * {@link ScimTokenTrpcPorts.requireEnterprisePlan}; installing a middleware
+   * is not something this package names tRPC's builder internals to do.
+   */
+  planGate: TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The process capabilities this transport needs that are not SCIM's own. */
@@ -70,56 +86,75 @@ export class ScimTokenTrpcApi {
     TContext extends ScimTokenTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends ScimTokenTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: ScimTokenTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, planGate, validateOutput } = procedures;
+    const manage = policy("organization:manage");
 
-    const enterpriseScimProcedure = policy("organization:manage")(
-      procedure.input(organizationScopeSchema),
-    ).use(async ({ ctx, input, next }) => {
-      await ports.requireEnterprisePlan({
-        planProvider: ctx.app.scimApp.planProvider,
-        organizationId: input.organizationId,
-      });
-      return next();
-    });
+    /**
+     * `organization:manage`, and only then the Enterprise plan gate. Composed
+     * in that order on purpose: "you don't have access to this organization"
+     * is a clearer answer than "your organization has not bought this" for
+     * somebody who has neither.
+     */
+    const enterpriseScimAccess: TrpcPolicyDecorator = (built) => planGate(manage(built));
 
-    return trpc.router({
-      list: enterpriseScimProcedure.query(async ({ ctx, input }) => {
-        return ctx.app.scimApp.listTokens({ organizationId: input.organizationId });
-      }),
+    const ENTERPRISE_SCIM =
+      "organization:manage — minting a SCIM token is the same authority as inviting anybody — and then the Enterprise plan gate";
 
-      generate: enterpriseScimProcedure
-        .input(
-          z.object({
-            description: z.string().optional(),
-            // D08: which connection this token is for. Optional on the wire and
-            // required by the service, so a client that has not been updated
-            // gets the named `scim_connection_required` refusal rather than a
-            // schema error the customer cannot read.
-            connectionId: z.string().optional(),
-          }),
-        )
-        .mutation(async ({ ctx, input }) => {
-          return ctx.app.scimApp.generateToken({
-            organizationId: input.organizationId,
-            connectionId: input.connectionId,
-            description: input.description,
-          });
-        }),
-
-      revoke: enterpriseScimProcedure
-        .input(z.object({ tokenId: z.string() }))
-        .mutation(async ({ ctx, input }) => {
-          return ctx.app.scimApp.revokeToken({
-            organizationId: input.organizationId,
-            tokenId: input.tokenId,
-          });
-        }),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(scimTokenSummarySchema.array())
+          .withCustomPermission(enterpriseScimAccess, ENTERPRISE_SCIM)
+          /** The organization's tokens, as the settings page shows them. */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.scimApp.listTokens({ organizationId: input.organizationId }),
+          ),
+      )
+      .mutation("generate", (p) =>
+        p
+          .withInput(
+            organizationScopeSchema.extend({
+              description: z.string().optional(),
+              // D08: which connection this token is for. Optional on the wire
+              // and required by the service, so a client that has not been
+              // updated gets the named `scim_connection_required` refusal
+              // rather than a schema error the customer cannot read.
+              connectionId: z.string().optional(),
+            }),
+          )
+          .withOutput(issuedScimTokenSchema)
+          .withCustomPermission(enterpriseScimAccess, ENTERPRISE_SCIM)
+          /** Mints one for a directory connection; the secret is answered once. */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.scimApp.generateToken({
+              organizationId: input.organizationId,
+              connectionId: input.connectionId,
+              description: input.description,
+            }),
+          ),
+      )
+      .mutation("revoke", (p) =>
+        p
+          .withInput(organizationScopeSchema.extend({ tokenId: z.string() }))
+          .withOutput(scimTokenRevokedSchema)
+          .withCustomPermission(enterpriseScimAccess, ENTERPRISE_SCIM)
+          /** Retires one, so the directory it belonged to stops provisioning. */
+          .handle(async ({ ctx, input }) =>
+            ctx.app.scimApp.revokeToken({
+              organizationId: input.organizationId,
+              tokenId: input.tokenId,
+            }),
+          ),
+      )
+      .build();
   }
 }

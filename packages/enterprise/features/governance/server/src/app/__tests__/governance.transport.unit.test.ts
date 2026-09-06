@@ -160,7 +160,7 @@ function buildApi(
   });
 
   const built = spine(options.grants ?? ["aiTools:view", "aiTools:manage"]);
-  const { hono } = createGovernanceRestApp({ security: built.security, app: () => app });
+  const hono = createGovernanceRestApp({ security: built.security, app: () => app });
 
   const requestWith =
     (token: string, header: string) =>

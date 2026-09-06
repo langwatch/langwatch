@@ -16,7 +16,24 @@ import type { SuiteTrpcContext } from "../../../rules/suite-trpc-context.rules";
 import { SuiteTrpcApi } from "../suite.api";
 
 const PROJECT_ID = "project_1";
-const TEST_SUITE = { id: "test_suite_1", projectId: PROJECT_ID, name: "Refunds" };
+const TEST_SUITE = {
+  id: "test_suite_1",
+  projectId: PROJECT_ID,
+  name: "Refunds",
+  slug: "refunds",
+  description: null,
+  scenarioIds: [],
+  targets: [],
+  repeatCount: 1,
+  labels: [],
+  simulatorModel: null,
+  judgeModel: null,
+  kind: "test_suite" as const,
+  scope: null,
+  archivedAt: null,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+};
 
 function callerAs(role: BuiltinRoleKey) {
   const trpc = initTRPC.context<SuiteTrpcContext>().create();
@@ -39,6 +56,7 @@ function callerAs(role: BuiltinRoleKey) {
           }
           return next();
         }),
+    validateOutput: true,
   });
 
   const suites = {

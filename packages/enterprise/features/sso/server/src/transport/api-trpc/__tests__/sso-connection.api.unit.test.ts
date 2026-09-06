@@ -114,6 +114,7 @@ const router = SsoConnectionTrpcApi.create(
     protected: trpc.procedure,
     staffPolicy: identityPolicy,
     staffPolicyForOrganization: identityPolicy,
+    validateOutput: true,
   },
   { backoffice: () => backoffice, recordAudit },
 );

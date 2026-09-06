@@ -31,6 +31,11 @@
  *
  * Spec: specs/identity/sso-onboarding-tiers.feature.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import {
+  backofficeSsoConnectionPageSchema,
+  backofficeSsoConnectionSchema,
+} from "@langwatch/enterprise-sso-contract";
 import { AdminSurfaceHiddenError, type AdminIdentity } from "@langwatch/ops-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -39,40 +44,11 @@ import { z } from "zod";
 type OperatorActor = Readonly<{ userId: string }>;
 
 /**
- * One connection as the back office reads it.
- *
- * Structural rather than imported, for the same reason the port below is: the
- * service is the process's. Named fields, not `unknown` — a tRPC procedure
- * publishes what its handler returns, so an `unknown` here is what the browser
- * gets, and the back-office list was reading `total`, `connections` and every
- * row field off `{}`.
+ * One connection as the back office reads it. The shape is the SSO contract's
+ * `backofficeSsoConnectionSchema`; naming it again here would be a second
+ * description of one wire shape.
  */
-export type BackofficeSsoConnection = Readonly<{
-  connectionId: string;
-  organizationId: string;
-  /** Null when the organization no longer exists. */
-  organizationName: string | null;
-  type: string;
-  state: string;
-  claimedDomains: string[];
-  approvedDomains: string[];
-  verifiedDomains: string[];
-  domainVerifications: {
-    domain: string;
-    method: string;
-    actorId: string | null;
-    verifiedAtMs: number;
-  }[];
-  providerId: string;
-  issuer: string | null;
-  allowsJit: boolean;
-  source: string;
-  testLoginAccountId: string | null;
-  rejection: { domain: string; note: string } | null;
-  pendingVerificationDomain: string | null;
-  createdAtMs: number;
-  updatedAtMs: number;
-}>;
+export type BackofficeSsoConnection = z.infer<typeof backofficeSsoConnectionSchema>;
 
 /**
  * What the back office reads and commands. Structural rather than imported:
@@ -185,7 +161,7 @@ type SsoConnectionTrpcProcedures<
    * surface is gated on the staff list and is cross-tenant by design. Applied
    * AFTER this feature's own input parser, as every declared check is.
    */
-  staffPolicy<TProcedure>(procedure: TProcedure): TProcedure;
+  staffPolicy: TrpcPolicyDecorator;
   /**
    * The same opt-out for the verbs whose input names an organization, allowing
    * `organizationId` with its own written reason: the id is NOT what decides
@@ -194,7 +170,9 @@ type SsoConnectionTrpcProcedures<
    * routing, saying which tenant's history the command is appended to, and it
    * is never read as a scope the caller was granted.
    */
-  staffPolicyForOrganization<TProcedure>(procedure: TProcedure): TProcedure;
+  staffPolicyForOrganization: TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The process capabilities this transport needs that are not SSO's own. */
@@ -242,7 +220,12 @@ export class SsoConnectionTrpcApi {
     procedures: SsoConnectionTrpcProcedures<TContext, TOptions, TRoot>,
     ports: TPorts,
   ) {
-    const { protected: procedure, staffPolicy, staffPolicyForOrganization } = procedures;
+    const {
+      protected: procedure,
+      staffPolicy,
+      staffPolicyForOrganization,
+      validateOutput,
+    } = procedures;
 
     /** The operator, or a 404 that says nothing about why. */
     // The CONSTRAINT, not the type parameter: tRPC hands a resolver a
@@ -289,151 +272,184 @@ export class SsoConnectionTrpcApi {
       return operator;
     };
 
-    return trpc.router({
-      getAll: staffPolicy(
-        procedure.input(
-          z.object({
-            page: z.number().int().min(0).default(0),
-            pageSize: z.number().int().min(1).max(100).default(25),
-            search: z.string().max(253).optional(),
+    const STAFF_ONLY =
+      "gated on the back office's ADMIN_EMAILS staff list plus an in-handler isAdmin, deliberately not ops:*; the surface is cross-tenant by design and denial is a 404 that says nothing about why";
+    const STAFF_ONLY_FOR_ORGANIZATION = `${STAFF_ONLY}. organizationId is routing — which tenant's history the command is appended to — and is never read as a scope the caller was granted`;
+
+    return createTrpcService({
+      root: trpc,
+      procedures: {
+        protected: procedure,
+        // Every procedure here declares its access with one of the two
+        // already-built staff chains, so no declaration reaches this factory.
+        policy: () => (built) => built,
+      },
+      validateOutput,
+    })
+      .query("getAll", (p) =>
+        p
+          .withInput(
+            z.object({
+              page: z.number().int().min(0).default(0),
+              pageSize: z.number().int().min(1).max(100).default(25),
+              search: z.string().max(253).optional(),
+            }),
+          )
+          .withOutput(backofficeSsoConnectionPageSchema)
+          .withCustomPermission(staffPolicy, STAFF_ONLY)
+          .handle(async ({ ctx, input }) => {
+            const operator = requireOperator(ctx);
+            await ports.recordAudit({
+              userId: operator.userId,
+              action: "ssoConnections.getAll",
+              args: {
+                page: input.page,
+                pageSize: input.pageSize,
+                hasSearch: Boolean(input.search),
+              },
+              targetKind: "ssoConnection",
+            });
+            return ports.backoffice().list(input);
           }),
-        ),
-      ).query(async ({ ctx, input }) => {
-        const operator = requireOperator(ctx);
-        await ports.recordAudit({
-          userId: operator.userId,
-          action: "ssoConnections.getAll",
-          args: {
-            page: input.page,
-            pageSize: input.pageSize,
-            hasSearch: Boolean(input.search),
-          },
-          targetKind: "ssoConnection",
-        });
-        return ports.backoffice().list(input);
-      }),
-
-      getById: staffPolicy(procedure.input(z.object({ connectionId: z.string().min(1) }))).query(
-        async ({ ctx, input }) => {
-          const operator = requireOperator(ctx);
-          await ports.recordAudit({
-            userId: operator.userId,
-            action: "ssoConnections.getById",
-            args: { connectionId: input.connectionId },
-            targetKind: "ssoConnection",
-            targetId: input.connectionId,
-          });
-          return ports.backoffice().getById(input);
-        },
-      ),
-
-      register: staffPolicyForOrganization(
-        procedure.input(
-          z.object({
-            organizationId: z.string().min(1),
-            // The union the aggregate speaks, so a SAML request reaches the
-            // service and is refused BY NAME. Narrowing it to `"oidc"` here
-            // would answer a validation error instead, which tells the operator
-            // the field is wrong rather than that the protocol is not
-            // self-serve yet.
-            type: z.enum(["oidc", "saml"]),
-            providerId: z.string().min(1).max(100),
-            issuer: z.string().max(2048).nullable().default(null),
-            allowsJit: z.boolean().default(false),
+      )
+      .query("getById", (p) =>
+        p
+          .withInput(z.object({ connectionId: z.string().min(1) }))
+          .withOutput(backofficeSsoConnectionSchema.nullable())
+          .withCustomPermission(staffPolicy, STAFF_ONLY)
+          .handle(async ({ ctx, input }) => {
+            const operator = requireOperator(ctx);
+            await ports.recordAudit({
+              userId: operator.userId,
+              action: "ssoConnections.getById",
+              args: { connectionId: input.connectionId },
+              targetKind: "ssoConnection",
+              targetId: input.connectionId,
+            });
+            return ports.backoffice().getById(input);
           }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const operator = await audited({ ctx, action: "register", args: input });
-        return ports.backoffice().registerConnection({ ...input, operator });
-      }),
-
-      claimDomain: staffPolicyForOrganization(procedure.input(domainTarget)).mutation(
-        async ({ ctx, input }) => {
-          const operator = await audited({
-            ctx,
-            action: "claimDomain",
-            args: input,
-          });
-          await ports.backoffice().claimDomain({ ...input, operator });
-        },
-      ),
-
-      approveDomainClaim: staffPolicyForOrganization(procedure.input(domainTarget)).mutation(
-        async ({ ctx, input }) => {
-          const operator = await audited({
-            ctx,
-            action: "approveDomainClaim",
-            args: input,
-          });
-          await ports.backoffice().approveDomainClaim({ ...input, operator });
-        },
-      ),
-
-      rejectDomainClaim: staffPolicyForOrganization(
-        procedure.input(domainTarget.extend({ note: z.string().min(1).max(1000) })),
-      ).mutation(async ({ ctx, input }) => {
-        const operator = await audited({
-          ctx,
-          action: "rejectDomainClaim",
-          args: { ...input, note: undefined },
-        });
-        await ports.backoffice().rejectDomainClaim({ ...input, operator });
-      }),
-
-      attestDomain: staffPolicyForOrganization(procedure.input(domainTarget)).mutation(
-        async ({ ctx, input }) => {
-          const operator = await audited({
-            ctx,
-            action: "attestDomain",
-            args: input,
-          });
-          await ports.backoffice().attestDomain({ ...input, operator });
-        },
-      ),
-
-      activate: staffPolicyForOrganization(
-        procedure.input(connectionTarget.extend({ testLoginAccountId: z.string().min(1) })),
-      ).mutation(async ({ ctx, input }) => {
-        const operator = await audited({ ctx, action: "activate", args: input });
-        await ports.backoffice().activateConnection({ ...input, operator });
-      }),
-
-      suspend: staffPolicyForOrganization(
-        procedure.input(
-          connectionTarget.extend({
-            reason: z.string().min(1).max(1000).nullable().default(null),
+      )
+      .mutation("register", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string().min(1),
+              // The union the aggregate speaks, so a SAML request reaches the
+              // service and is refused BY NAME. Narrowing it to `"oidc"` here
+              // would answer a validation error instead, which tells the
+              // operator the field is wrong rather than that the protocol is
+              // not self-serve yet.
+              type: z.enum(["oidc", "saml"]),
+              providerId: z.string().min(1).max(100),
+              issuer: z.string().max(2048).nullable().default(null),
+              allowsJit: z.boolean().default(false),
+            }),
+          )
+          .withoutOutput(
+            "answers the process's back-office command result, which is the identity aggregate's and not this surface's to describe",
+          )
+          .withCustomPermission(staffPolicyForOrganization, STAFF_ONLY_FOR_ORGANIZATION)
+          .handle(async ({ ctx, input }) => {
+            const operator = await audited({ ctx, action: "register", args: input });
+            return ports.backoffice().registerConnection({ ...input, operator });
           }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const operator = await audited({ ctx, action: "suspend", args: input });
-        await ports.backoffice().suspendConnection({ ...input, operator });
-      }),
-
-      resume: staffPolicyForOrganization(procedure.input(connectionTarget)).mutation(
-        async ({ ctx, input }) => {
-          const operator = await audited({ ctx, action: "resume", args: input });
-          await ports.backoffice().resumeConnection({ ...input, operator });
-        },
-      ),
-
-      requestTeardown: staffPolicyForOrganization(
-        procedure.input(
-          connectionTarget.extend({
-            reason: z.string().min(1).max(1000).nullable().default(null),
+      )
+      .mutation("claimDomain", (p) =>
+        p
+          .withInput(domainTarget)
+          .withOutput(z.void())
+          .withCustomPermission(staffPolicyForOrganization, STAFF_ONLY_FOR_ORGANIZATION)
+          .handle(async ({ ctx, input }) => {
+            const operator = await audited({ ctx, action: "claimDomain", args: input });
+            await ports.backoffice().claimDomain({ ...input, operator });
           }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const operator = await audited({
-          ctx,
-          action: "requestTeardown",
-          args: input,
-        });
-        await ports.backoffice().requestTeardown({
-          ...input,
-          operator,
-          graceMs: TEARDOWN_GRACE_MS,
-        });
-      }),
-    });
+      )
+      .mutation("approveDomainClaim", (p) =>
+        p
+          .withInput(domainTarget)
+          .withOutput(z.void())
+          .withCustomPermission(staffPolicyForOrganization, STAFF_ONLY_FOR_ORGANIZATION)
+          .handle(async ({ ctx, input }) => {
+            const operator = await audited({ ctx, action: "approveDomainClaim", args: input });
+            await ports.backoffice().approveDomainClaim({ ...input, operator });
+          }),
+      )
+      .mutation("rejectDomainClaim", (p) =>
+        p
+          .withInput(domainTarget.extend({ note: z.string().min(1).max(1000) }))
+          .withOutput(z.void())
+          .withCustomPermission(staffPolicyForOrganization, STAFF_ONLY_FOR_ORGANIZATION)
+          .handle(async ({ ctx, input }) => {
+            const operator = await audited({
+              ctx,
+              action: "rejectDomainClaim",
+              args: { ...input, note: undefined },
+            });
+            await ports.backoffice().rejectDomainClaim({ ...input, operator });
+          }),
+      )
+      .mutation("attestDomain", (p) =>
+        p
+          .withInput(domainTarget)
+          .withOutput(z.void())
+          .withCustomPermission(staffPolicyForOrganization, STAFF_ONLY_FOR_ORGANIZATION)
+          .handle(async ({ ctx, input }) => {
+            const operator = await audited({ ctx, action: "attestDomain", args: input });
+            await ports.backoffice().attestDomain({ ...input, operator });
+          }),
+      )
+      .mutation("activate", (p) =>
+        p
+          .withInput(connectionTarget.extend({ testLoginAccountId: z.string().min(1) }))
+          .withOutput(z.void())
+          .withCustomPermission(staffPolicyForOrganization, STAFF_ONLY_FOR_ORGANIZATION)
+          .handle(async ({ ctx, input }) => {
+            const operator = await audited({ ctx, action: "activate", args: input });
+            await ports.backoffice().activateConnection({ ...input, operator });
+          }),
+      )
+      .mutation("suspend", (p) =>
+        p
+          .withInput(
+            connectionTarget.extend({
+              reason: z.string().min(1).max(1000).nullable().default(null),
+            }),
+          )
+          .withOutput(z.void())
+          .withCustomPermission(staffPolicyForOrganization, STAFF_ONLY_FOR_ORGANIZATION)
+          .handle(async ({ ctx, input }) => {
+            const operator = await audited({ ctx, action: "suspend", args: input });
+            await ports.backoffice().suspendConnection({ ...input, operator });
+          }),
+      )
+      .mutation("resume", (p) =>
+        p
+          .withInput(connectionTarget)
+          .withOutput(z.void())
+          .withCustomPermission(staffPolicyForOrganization, STAFF_ONLY_FOR_ORGANIZATION)
+          .handle(async ({ ctx, input }) => {
+            const operator = await audited({ ctx, action: "resume", args: input });
+            await ports.backoffice().resumeConnection({ ...input, operator });
+          }),
+      )
+      .mutation("requestTeardown", (p) =>
+        p
+          .withInput(
+            connectionTarget.extend({
+              reason: z.string().min(1).max(1000).nullable().default(null),
+            }),
+          )
+          .withOutput(z.void())
+          .withCustomPermission(staffPolicyForOrganization, STAFF_ONLY_FOR_ORGANIZATION)
+          .handle(async ({ ctx, input }) => {
+            const operator = await audited({ ctx, action: "requestTeardown", args: input });
+            await ports.backoffice().requestTeardown({
+              ...input,
+              operator,
+              graceMs: TEARDOWN_GRACE_MS,
+            });
+          }),
+      )
+      .build();
   }
 }
