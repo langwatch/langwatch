@@ -559,6 +559,13 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the period counts as resolved only once an answer arrives
 
     @unit
+    Scenario: a confirmation taken before the boundary does not count as reading past it
+      Given a cached key whose config was confirmed unchanged inside its budget period
+      When that period ends and the next request arrives
+      Then the boundary still forces an unconditional re-read
+      And the new period's spend replaces the old
+
+    @unit
     Scenario: a bundle with no budgets keeps the ordinary staleness clock
       Given a cached key with no budgets
       When its config passes the staleness TTL

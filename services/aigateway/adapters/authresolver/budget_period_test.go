@@ -237,6 +237,48 @@ func TestResolve_BudgetRollFetchFails_StaysUnconditional(t *testing.T) {
 		"once the control plane answers, the new period's spend replaces the old")
 }
 
+/** @scenario "a confirmation taken before the boundary does not count as reading past it" */
+func TestResolve_BudgetPeriodRolled_AfterEarlier304_StillRefreshes(t *testing.T) {
+	// The ordinary staleness refresh runs many times inside a period and is
+	// answered 304 every time — a daily budget on a 60s clock sees hundreds
+	// before its boundary. None of them may count as having read past that
+	// boundary: they carry no spend, and were taken while the period was still
+	// running. If one did, the roll would never fire for the entry that had it,
+	// which is nearly every entry.
+	boundary := time.Now().Add(300 * time.Millisecond)
+	fetcher := &budgetConfigFetcher{etag: "42", spent: 0, validUntil: time.Now().Add(24 * time.Hour)}
+	svc := newBudgetService(t, fetcher)
+
+	rawKey := "vk-lw-budget-304-then-roll"
+	seedBudgetEntry(t, svc, rawKey, boundary, "42")
+
+	// A staleness refresh inside the period: the token goes out and is
+	// confirmed, so nothing is swapped in.
+	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
+	_, err := svc.Resolve(context.Background(), rawKey)
+	require.NoError(t, err)
+	awaitConfigRefresh(t, e)
+	require.Equal(t, []string{"42"}, fetcher.conditionals(),
+		"inside its period the entry revalidates normally")
+
+	// Now the period ends underneath it.
+	time.Sleep(400 * time.Millisecond)
+
+	live, ok := svc.l1.Peek(hashKey(rawKey))
+	require.True(t, ok)
+	_, err = svc.Resolve(context.Background(), rawKey)
+	require.NoError(t, err)
+	awaitConfigRefresh(t, live)
+
+	assert.Equal(t, []string{"42", ""}, fetcher.conditionals(),
+		"the boundary still has to force an unconditional re-read; the earlier 304 was taken inside the period and says nothing about the spend after it")
+
+	live, ok = svc.l1.Peek(hashKey(rawKey))
+	require.True(t, ok)
+	assert.Equal(t, int64(0), live.bundle.Config.Budget.Scopes[0].SpentMicroUSD,
+		"and the new period's spend replaces the old")
+}
+
 /** @scenario "a bundle with no budgets keeps the ordinary staleness clock" */
 func TestResolve_NoBudgetBoundary_KeepsConditionalRefresh(t *testing.T) {
 	fetcher := &budgetConfigFetcher{etag: "42", spent: 0}
