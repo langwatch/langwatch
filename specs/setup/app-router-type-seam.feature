@@ -32,3 +32,12 @@ Feature: Naming the API router type does not compile the API application
     When the modules that program loads are counted
     Then the count stays under the recorded ceiling
     And a change that widens the graph fails with the new count, not silently
+
+  @unit
+  Scenario: The browser program compiles no API application source
+    Given the browser application's every source file
+    When the modules the compiler loads for them are walked, following
+      type-only imports as well as value ones
+    Then not one of them belongs to the API application
+    And a browser package that names the router type again fails with the
+      files it pulled back in

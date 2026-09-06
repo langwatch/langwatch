@@ -23,6 +23,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { walkFiles } from "../src/files";
 import { createWorkspaceModuleResolver, moduleImports } from "../src/module-graph";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -46,15 +47,15 @@ const CEILING = 3_850;
 let walked: ReadonlySet<string> | undefined;
 
 function appRouterModules(): ReadonlySet<string> {
-  walked ??= reachableWorkspaceModules({ root: APP_ROUTER_TYPES });
+  walked ??= reachableWorkspaceModules({ roots: [APP_ROUTER_TYPES] });
   return walked;
 }
 
-/** Everything the compiler loads to answer what the type at `root` is. */
-function reachableWorkspaceModules({ root }: { root: string }): ReadonlySet<string> {
+/** Everything the compiler loads to answer what the types at `roots` are. */
+function reachableWorkspaceModules({ roots }: { roots: readonly string[] }): ReadonlySet<string> {
   const resolver = createWorkspaceModuleResolver({ root: REPO_ROOT });
-  const seen = new Set<string>([root]);
-  const queue = [root];
+  const seen = new Set<string>(roots);
+  const queue = [...roots];
   while (queue.length > 0) {
     const file = queue.pop()!;
     for (const entry of moduleImports({ file })) {
@@ -97,6 +98,28 @@ describe("given a program names the API router type", () => {
       );
 
       expect(rejoined.map((file) => file.slice(REPO_ROOT.length + 1))).toEqual([]);
+    });
+  });
+});
+
+describe("given the browser application is compiled", () => {
+  describe("when the modules its own program loads are walked", () => {
+    /** @scenario "The browser program compiles no API application source" */
+    it("loads no file out of the API application", { timeout: 240_000 }, () => {
+      const uiSource = join(REPO_ROOT, "apps", "ui", "src");
+      const reached = reachableWorkspaceModules({
+        roots: walkFiles(uiSource, (path) => /\.tsx?$/.test(path)),
+      });
+
+      const apiFiles = [...reached].filter((file) =>
+        file.startsWith(join(REPO_ROOT, "apps", "api", "src") + sep),
+      );
+
+      expect(
+        apiFiles.map((file) => file.slice(REPO_ROOT.length + 1)).sort(),
+        "The browser application reached the API application's source. Its typecheck now " +
+          "compiles the API process. See ADR-130.",
+      ).toEqual([]);
     });
   });
 });

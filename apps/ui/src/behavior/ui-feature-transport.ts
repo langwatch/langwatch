@@ -9,7 +9,6 @@ import {
   type FeatureApiMap,
   type RouterFromMap,
 } from "@langwatch/platform-api-client/feature-api";
-import type { AppRouter } from "@langwatch/platform-api/app-trpc/types";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createTRPCClient,
@@ -17,7 +16,6 @@ import {
   httpBatchLink,
   httpLink,
   splitLink,
-  type TRPCClient,
 } from "@trpc/client";
 import type { ComponentType, ReactNode } from "react";
 import superjson from "superjson";
@@ -62,7 +60,7 @@ export type UiFeatureApiClientOptions = {
 };
 
 /**
- * The three lanes, built once and shared by both clients below.
+ * The three lanes the browser's one client is built from.
  */
 function uiFeatureApiLinks({
   url = UI_TRPC_ENDPOINT,
@@ -105,15 +103,6 @@ export function createUiFeatureApiClient(
   return getUntypedClient(
     createTRPCClient<RouterFromMap<FeatureApiMap>>({ links: uiFeatureApiLinks(options) }),
   );
-}
-
-/**
- * The same three lanes, typed by the router the API process actually mounts.
- */
-export function createUiAppApiClient(
-  options: UiFeatureApiClientOptions = {},
-): TRPCClient<AppRouter> {
-  return createTRPCClient<AppRouter>({ links: uiFeatureApiLinks(options) });
 }
 
 /** A feature's Provider, with the types its own procedure map gave it erased. */

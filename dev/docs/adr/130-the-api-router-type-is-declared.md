@@ -80,6 +80,24 @@ Measured on the same probe, before and after, cold and uncapped:
 
 Wall-clock is not quoted: the machine was between load 20 and load 64 throughout, and ADR-100 already records that timings under that are contention. `Files`, `Symbols`, `Types`, `Instantiations` and `Memory used` are load-independent.
 
+**Stage 1b — the browser stops naming the type at all (landed).** Stage 2 is what makes `AppRouter` cheap for everyone. It is not what the browser application was waiting for: only two first-party modules in `apps/ui`'s program named the type, and neither needed a router type that the machinery in `feature-api.ts` could not already give it.
+
+`packages/features/secret/web` was the only package importing `@langwatch/platform-api-client`'s root barrel, whose one export was `trpcReact = createTRPCReact<AppRouter>()`. It now declares `SecretApiMap` and calls `createFeatureApi<SecretApiMap>()`, exactly as its thirty-seven siblings do — four procedures, whose inputs and outputs are the secret contract's own schemas. `app-router-client.ts` and the barrel it was the only member of are deleted; the package's remaining three subpath exports (`./feature-api`, `./query-key`, `./invalidate`) are what every other package already imported, and it no longer depends on `@langwatch/platform-api`.
+
+`apps/ui/src/behavior/ui-feature-transport.ts` exported `createUiAppApiClient`, a `TRPCClient<AppRouter>` over the same three links `createUiFeatureApiClient` builds. Nothing in the application called it; one unit test did. It is deleted with its test, and `apps/ui` no longer depends on `@langwatch/platform-api` in any form. The addressing behaviour that test also covered — a query reaching `/api/trpc/<procedure>` — is asserted on the surviving client by `apps/ui/tests/ui-feature-transport.unit.test.ts`.
+
+Measured on `apps/ui` itself, cold and uncapped, one run at a time:
+
+| `apps/ui` | Files | Lines | Identifiers | Symbols | Types | Instantiations | Memory used | Check time |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| before stage 1b | 19,011 | 2,569,715 | 3,085,366 | 11,420,847 | 4,807,123 | 19,583,709 | 7.63 GB | 294.1 s |
+| after stage 1b | 10,101 | 1,314,208 | 1,532,599 | 5,534,379 | 1,824,181 | 8,015,665 | 4.05 GB | 18.4 s |
+| **saved** | **−8,910 (−47%)** | **−49%** | **−50%** | **−5.89M (−52%)** | **−2.98M (−62%)** | **−11.57M (−59%)** | **−3.58 GB (−47%)** | **−94%** |
+
+`tsc --listFiles` on the browser project now reports **0** files under `apps/api/src` and **0** under `@elevenlabs/elevenlabs-js`, down from 118 and 2,606. This lands almost exactly on the `AnyTRPCRouter`-stub bound measured before stage 1 (10,126 files / 4.00 GB) — because the browser now names no router type at all, rather than a cheap one. Check time is quoted here despite ADR-100 only because the change is a factor of sixteen; the file and memory counts are the evidence.
+
+Stage 2 is still the fix. It is now the fix for `apps/api`'s own consumers and for anything that names `AppRouter` in future, not for the browser.
+
 **Stages 2-4 — declare the type.** Move the maps to the contracts, declare `AppApiMap`, annotate `ApiApplication.trpc`, give the factories return types, add the conformance test.
 
 ## Rationale / Trade-offs
@@ -98,9 +116,9 @@ The cost of the decision is a second place the wire contract is written: the map
 
 `AppRouter` gains a ceiling it cannot quietly exceed. `packages/architecture-lint/tests/app-router-type-seam.unit.test.ts` walks the real import graph from `app-trpc.types.ts` — following type-only imports, because the compiler does — and fails if the reachable workspace source count passes 3,850 (3,746 today), or if any feature that has a `*.composition.types.ts` sibling is reached through its composition again. `specs/setup/app-router-type-seam.feature` carries both scenarios.
 
-Until stage 2 lands, the two consumers still pay: `packages/platform-api-client/src/app-router-client.ts` (`trpcReact`, used only by `packages/features/secret/web`) and `apps/ui/src/behavior/ui-feature-transport.ts` (`createUiAppApiClient`). Every other web package reaches the client through `createFeatureApi` and its own map, and narrowing the barrel so those thirty-seven stop paying for `trpcReact` is a separate, mechanical change.
+Both of the consumers that used to pay are gone (stage 1b), so no browser package names `AppRouter` any more. A third scenario on the same spec — "The browser program compiles no API application source" — walks every module `apps/ui/src` loads, following type-only imports as well as value ones, and fails with the list of `apps/api/src` files a change pulled back in. It was confirmed to bite: a scratch module in `apps/ui/src` importing `AppRouter` fails it with 118 files named.
 
-`@langwatch/scenario` re-exporting ElevenLabs conversation types from its package root stops mattering to the browser once stage 2 lands. It is still worth fixing upstream, because nothing first-party names `@elevenlabs/elevenlabs-js` anywhere in this repository.
+`@langwatch/scenario` re-exporting ElevenLabs conversation types from its package root no longer reaches the browser. It is still worth fixing upstream, because nothing first-party names `@elevenlabs/elevenlabs-js` anywhere in this repository.
 
 ## References
 
