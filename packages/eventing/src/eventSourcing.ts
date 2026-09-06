@@ -26,6 +26,7 @@ import { ConfigurationError, QueueError } from "./services/errorHandling";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
 import { resolveCoalesceMaxBatch } from "./services/queues/queueManager";
 import type { EventStore } from "./stores/eventStore.types";
+import type { KillSwitchPort } from "./kill-switch";
 
 const logger = createLogger("langwatch:event-sourcing");
 
@@ -43,6 +44,11 @@ export interface EventSourcingOptions {
   executionTarget?: ExecutionTarget;
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /**
+   * Per-tenant operator stop for every component the registered pipelines
+   * mount. Absent means no switch is readable, so every component runs.
+   */
+  killSwitch?: KillSwitchPort;
   /** Enables warnings when projections run inline because no shared queue exists. */
   warnWhenProjectionsRunInline?: boolean;
   configureGlobalProjections?: (registry: ProjectionRegistry<Event>) => void;
@@ -122,6 +128,7 @@ export class EventSourcing {
   private readonly _executionTarget?: ExecutionTarget;
   private readonly _replayMarkerChecker?: ReplayMarkerChecker;
   private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
+  private readonly _killSwitch?: KillSwitchPort;
   private readonly _warnWhenProjectionsRunInline: boolean;
   private readonly _processStore?: ProcessStore;
   private readonly _processManagerMode: "run" | "producer-only";
@@ -138,6 +145,7 @@ export class EventSourcing {
     this._executionTarget = options.executionTarget;
     this._replayMarkerChecker = options.replayMarkerChecker;
     this._retentionPolicyResolver = options.retentionPolicyResolver;
+    this._killSwitch = options.killSwitch;
     this._warnWhenProjectionsRunInline = options.warnWhenProjectionsRunInline ?? false;
     this._processStore = options.processStore;
     this._processManagerMode = options.processManagerMode ?? "run";
@@ -331,6 +339,7 @@ export class EventSourcing {
           executionTarget: this._executionTarget,
           replayMarkerChecker: this._replayMarkerChecker,
           retentionPolicyResolver: this._retentionPolicyResolver,
+          killSwitch: this._killSwitch,
           warnWhenProjectionsRunInline: this._warnWhenProjectionsRunInline,
           prepareEventForProjection: definition.prepareEventForProjection,
         });

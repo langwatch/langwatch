@@ -2,6 +2,7 @@ import {
   createEventingGroupQueueFactory,
   EventSourcing,
   EventStoreProducerOnly,
+  type KillSwitchPort,
 } from "@langwatch/eventing";
 import type { GroupQueueDependencies } from "@langwatch/group-queue";
 import type { ResourceScope } from "@langwatch/runtime-composition";
@@ -29,6 +30,12 @@ export type ApiEventingInfrastructureOptions = {
   queue: ApiEventingQueue;
   /** Names this process in a producer-only store's refusals. */
   processName: string;
+  /**
+   * Per-tenant operator stop for the commands this producer sends. Absent
+   * leaves every command running, which is what a process with no flag store
+   * can honestly answer.
+   */
+  killSwitch?: KillSwitchPort;
 };
 
 /**
@@ -98,6 +105,7 @@ export class ApiEventingInfrastructure {
       }),
       consumersEnabled: false,
       executionTarget: "api",
+      ...(options.killSwitch ? { killSwitch: options.killSwitch } : {}),
       warnWhenProjectionsRunInline: false,
     });
 

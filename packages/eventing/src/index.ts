@@ -44,6 +44,21 @@ export { createTenantId, TenantIdSchema } from "./domain/tenantId";
 export type { Event, Projection } from "./domain/types";
 export { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "./domain/types";
 export type { ExecutionTarget, RetentionPolicy, RetentionPolicyResolver } from "./runtime.types";
+export type {
+  EsKillSwitchKey,
+  KillSwitchComponent,
+  KillSwitchComponentSource,
+  KillSwitchComponentType,
+  KillSwitchDescriptor,
+  KillSwitchOptions,
+  KillSwitchQuery,
+} from "./kill-switch";
+export {
+  generateKillSwitchKey,
+  isComponentKilled,
+  killSwitchDescriptorsFor,
+  KillSwitchPort,
+} from "./kill-switch";
 export type { EventSourcingOptions } from "./eventSourcing";
 // Runtime
 export { EventSourcing } from "./eventSourcing";

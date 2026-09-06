@@ -55,6 +55,7 @@ export class EventSourcingPipeline<
       executionTarget: definition.executionTarget,
       replayMarkerChecker: definition.replayMarkerChecker,
       retentionPolicyResolver: definition.retentionPolicyResolver,
+      killSwitch: definition.killSwitch,
       prepareEventForProjection: definition.prepareEventForProjection,
       warnWhenProjectionsRunInline: definition.warnWhenProjectionsRunInline,
     });

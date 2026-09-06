@@ -6,6 +6,7 @@
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
+import { KillSwitchPort, type KillSwitchQuery } from "../../kill-switch";
 import type { Event } from "../../domain/types";
 import { ProjectionRouter } from "../../projections/projectionRouter";
 import {
@@ -98,6 +99,113 @@ async function expectDispatchFailure(
 }
 
 describe("subscriber enqueue-time contract", () => {
+  describe("given a subscriber whose kill switch is thrown for one tenant", () => {
+    describe("when events for that tenant and another are dispatched", () => {
+      /** @scenario a subscriber can be stopped for one tenant without a deploy */
+      it("stops only the killed tenant, and resolves the switch against it", async () => {
+        const received: Event[] = [];
+        let filterRan = false;
+        const before = {
+          filtered: await enqueueOutcomeCount("filtered"),
+          staged: await enqueueOutcomeCount("staged"),
+          killed: await enqueueOutcomeCount("killed"),
+        };
+
+        // Recorded rather than blanket-true: a stub that ignores its arguments
+        // passes even if the router asked for the wrong component type, the
+        // wrong subscriber, or a hardcoded tenant — and per-tenant targeting is
+        // this switch's entire distinguishing claim.
+        const asked: KillSwitchQuery[] = [];
+        const killedTenant = createTestTenantId(`${tenantId}-killed`);
+        const router = new ProjectionRouter<Event>(
+          aggregateType,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          makeQueueManager(),
+          {
+            killSwitch: new (class extends KillSwitchPort {
+              async isKilled(query: KillSwitchQuery): Promise<boolean> {
+                asked.push(query);
+                return query.tenantId === killedTenant;
+              }
+            })(),
+          },
+        );
+        router.registerEventSubscriber({
+          name: "seamSubscriber",
+          eventTypes: [],
+          handle: async (event) => {
+            received.push(event);
+          },
+          options: {
+            enqueue: {
+              filter: () => {
+                filterRan = true;
+                return true;
+              },
+            },
+          },
+        });
+
+        const live = makeEvent("evt-live");
+        const killed = { ...makeEvent("evt-killed"), tenantId: killedTenant };
+        await router.dispatch([killed, live], readContext);
+
+        // The live tenant is untouched; only the killed one loses its job, and
+        // the seam never asked it to judge the event either.
+        expect(received.map((event) => event.tenantId)).toEqual([tenantId]);
+        expect(filterRan).toBe(true);
+
+        expect(asked.map((ask) => ask.tenantId).sort()).toEqual([killedTenant, tenantId].sort());
+        for (const ask of asked) {
+          expect(ask.componentType).toBe("subscriber");
+          expect(ask.componentName).toBe("seamSubscriber");
+          expect(ask.aggregateType).toBe(aggregateType);
+        }
+
+        // A kill is permanent loss, so it is counted — and counted as its own
+        // outcome, never folded into `filtered`, which would disguise an
+        // operator's stop as the subscriber judging the event irrelevant.
+        expect(await enqueueOutcomeCount("killed")).toBe(before.killed + 1);
+        expect(await enqueueOutcomeCount("filtered")).toBe(before.filtered);
+        expect(await enqueueOutcomeCount("staged")).toBe(before.staged + 1);
+      });
+    });
+
+    describe("when a second event arrives for the same tenant", () => {
+      it("resolves the switch once per tenant, not once per event", async () => {
+        // The hottest subscribers match every event; a lookup per event puts a
+        // cache read on the busiest path in the product to answer a question
+        // that cannot change within one batch.
+        let lookups = 0;
+        const router = new ProjectionRouter<Event>(
+          aggregateType,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          makeQueueManager(),
+          {
+            killSwitch: new (class extends KillSwitchPort {
+              async isKilled(): Promise<boolean> {
+                lookups += 1;
+                return false;
+              }
+            })(),
+          },
+        );
+        router.registerEventSubscriber({
+          name: "seamSubscriber",
+          eventTypes: [],
+          handle: async () => {},
+        });
+
+        await router.dispatch(
+          [makeEvent("evt-1"), makeEvent("evt-2"), makeEvent("evt-3")],
+          readContext,
+        );
+
+        expect(lookups).toBe(1);
+      });
+    });
+  });
+
   describe("given a subscriber with an enqueue filter", () => {
     describe("when the filter rejects the event", () => {
       /** @scenario a non-matching event never mints a job */

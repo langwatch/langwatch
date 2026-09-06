@@ -17,6 +17,7 @@ import {
   type OpsTrpcPorts,
 } from "../../transport/api-trpc/ops.api";
 import { OpsApp, type OpsCapability } from "../ops.app";
+import { OpsEventingIntrospectionPort } from "../../ports/eventing-introspection.port";
 
 /**
  * Every mock is typed from the port itself. The port's own comment explains
@@ -95,6 +96,20 @@ function buildApp(): OpsApp {
     ops: {} as OpsCapability,
     featureFlags: {} as FeatureFlagService,
     projects: { searchByQuery: async () => [] },
+    eventingIntrospection: new (class extends OpsEventingIntrospectionPort {
+      projections() {
+        return [];
+      }
+      killSwitches() {
+        return [];
+      }
+      processManagers() {
+        return [];
+      }
+      dejaViewProjections() {
+        return [];
+      }
+    })(),
   });
 }
 

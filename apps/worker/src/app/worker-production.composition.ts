@@ -192,6 +192,7 @@ import {
   createWorkerDatasetNormalization,
   createWorkerDatasetWrites,
 } from "./worker-dataset-normalization.composition";
+import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
 import { createWorkerFeatureFlags } from "./worker-feature-flags.composition";
 import { createWorkerGovernanceRollups } from "./worker-governance-rollups.composition";
 import { createWorkerObjectStorage } from "./worker-object-storage.composition";
@@ -456,9 +457,21 @@ export class WorkerProductionComposition {
         })
       : undefined;
 
+    // Built before the Eventing runtime because the runtime reads it: every
+    // projection, command and subscriber the pipelines mount consults its own
+    // kill switch per tenant, and ONE service per process is what keeps the
+    // cache tier shared and two callers from disagreeing for a TTL about
+    // whether a switch is thrown.
+    const featureFlags = createWorkerFeatureFlags({
+      database: options.database,
+      config: options.config,
+      redis: eventingOptions.groupQueue.redis,
+    });
+
     const eventing = WorkerEventingRuntime.createProduction({
       persistence: eventingOptions,
       warnWhenProjectionsRunInline: options.config.nodeEnvironment === "production",
+      killSwitch: EventingKillSwitchAdapter.create(featureFlags),
       ...(saasMeter ? { configureGlobalProjections: saasMeter } : {}),
       ...(options.eventing.consumers ? { consumers: options.eventing.consumers } : {}),
     });
@@ -700,11 +713,6 @@ export class WorkerProductionComposition {
       ...(options.resources ? { resources: options.resources } : {}),
     });
     const traceServices = createWorkerTraceCapabilityServices({ database: traceDatabase });
-    const traceFeatureFlags = createWorkerFeatureFlags({
-      database: traceDatabase,
-      config: options.config,
-      redis: eventingOptions.groupQueue.redis,
-    });
     // ONE publisher, three producers. Trace, Langy and Scenario all advance
     // projections a tenant's tabs are watching, and all three publish the same
     // object onto the same channel — so the process composes the publisher once
@@ -872,7 +880,7 @@ export class WorkerProductionComposition {
       config: options.config,
       database: options.database,
       redis: processRedis,
-      featureFlags: traceFeatureFlags,
+      featureFlags,
       resolveOrganizationClient: options.eventing.resolveClickHouseOrganizationClient as never,
       resolveClickHouseInstances: options.eventing.resolveClickHouseInstances as never,
       ...(WorkerProductionComposition.opsAbsence(options)
@@ -1125,7 +1133,7 @@ export class WorkerProductionComposition {
         pipeline: WorkerTraceProcessingPipeline.create({
           config: options.config,
           services: traceServices,
-          featureFlags: traceFeatureFlags,
+          featureFlags,
           traceCanonicalisation,
           stores: {
             spanAppendStore: createWorkerSpanStorage({
@@ -1231,7 +1239,7 @@ export class WorkerProductionComposition {
           database: options.database as never,
           teams: PrismaGovernanceOldestTeamAdapter.create(options.database),
         }).build(),
-        featureFlags: traceFeatureFlags,
+        featureFlags,
         aws: objectStorage.aws,
         encryption: resolveWorkerStoredSecretCipher(options.config),
         ...(options.observability ? { logger: options.observability.logger } : {}),

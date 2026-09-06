@@ -15,6 +15,7 @@ import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.t
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
 import type { ProcessManagerDefinition } from "./processManagerDefinition";
 import type { PipelineMetadata } from "./types";
+import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys";
 
 /**
  * Queue serialization and append-coalescing options (ADR-066 pillar 2), shared
@@ -59,6 +60,12 @@ export interface CommandSerializationOptions<Payload = any> {
  * Options for configuring a command handler in a static pipeline definition.
  */
 export interface CommandHandlerOptions<Payload = any> extends CommandSerializationOptions<Payload> {
+  /**
+   * Operator stop for this component, resolved per tenant at dispatch time.
+   * Absent means the generated key; a `customKey` must also be what the
+   * descriptors advertise or the switch cannot be set.
+   */
+  killSwitch?: KillSwitchOptions;
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;

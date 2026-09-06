@@ -2,6 +2,7 @@ import type { AggregateType } from "../domain/aggregateType";
 import type { TenantId } from "../domain/tenantId";
 import type { Event, EventMetadataBase } from "../domain/types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
+import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys";
 
 /**
  * A staged queue payload (ADR-069): a plain versioned job DTO a `stage` hook
@@ -91,6 +92,12 @@ export interface EnqueueDispatchOptions<E extends Event = Event> {
 }
 
 export interface EventSubscriberOptions<E extends Event = Event> {
+  /**
+   * Operator stop for this component, resolved per tenant at dispatch time.
+   * Absent means the generated key; a `customKey` must also be what the
+   * descriptors advertise or the switch cannot be set.
+   */
+  killSwitch?: KillSwitchOptions;
   /** Compile-time off switch. */
   disabled?: boolean;
   delay?: number;

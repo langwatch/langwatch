@@ -14,6 +14,7 @@ import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.typ
 import type { CommandHandlerOptions } from "./commands/commandDispatcher";
 import type { JobRegistryEntry } from "./queues/queueManager";
 import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types";
+import type { KillSwitchPort } from "../kill-switch";
 
 /**
  * Options for configuring event sourcing behavior.
@@ -127,6 +128,8 @@ export interface EventSourcingServiceOptions<
    */
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /** Per-tenant operator stop for this pipeline's components. */
+  killSwitch?: KillSwitchPort;
   /**
    * Process composition enables this for production workers and API processes.
    * It keeps an accidentally inline projection visible without Eventing reading

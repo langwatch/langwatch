@@ -203,6 +203,9 @@ function composeOps(options: OpsFeatureCollaborators, logger: Logger): OpsApp {
     }) as OpsCapability,
     featureFlags: options.featureFlags,
     projects: options.projects,
+    eventingIntrospection: EventingOpsIntrospectionAdapter.create(
+      () => options.eventing?.definitions ?? [],
+    ),
   });
 }
 

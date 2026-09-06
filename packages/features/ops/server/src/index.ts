@@ -24,7 +24,6 @@ export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-repo
 export { BugReportInboxService, type BugReportListing } from "./services/bug-report-inbox.service";
 export {
   OpsTrpcApi,
-  type OpsScope,
   type OpsTrpcContext,
   type OpsTrpcPorts,
 } from "./transport/api-trpc/ops.api";

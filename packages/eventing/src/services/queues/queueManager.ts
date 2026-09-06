@@ -12,6 +12,7 @@ import type {
   EventSourcedQueueProcessor,
   QueueSendOptions,
 } from "../../queues";
+import { type KillSwitchPort } from "../../kill-switch";
 import { resolveDeduplicationStrategy } from "../../queues";
 import type { JobDelivery } from "../../queues/queue.types";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
@@ -132,6 +133,7 @@ export class QueueManager<EventType extends Event = Event> {
   private readonly logger = createLogger("langwatch:event-sourcing:queue-manager");
   private readonly globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly globalJobRegistry?: Map<string, JobRegistryEntry>;
+  private readonly killSwitch?: KillSwitchPort;
   private readonly queues = new Map<string, EventSourcedQueueProcessor<any>>();
   private handlerCount = 0;
   private subscriberCount = 0;
@@ -144,16 +146,19 @@ export class QueueManager<EventType extends Event = Event> {
     pipelineName,
     globalQueue,
     globalJobRegistry,
+    killSwitch,
   }: {
     aggregateType: AggregateType;
     pipelineName: string;
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
     globalJobRegistry?: Map<string, JobRegistryEntry>;
+    killSwitch?: KillSwitchPort;
   }) {
     this.aggregateType = aggregateType;
     this.pipelineName = pipelineName;
     this.globalQueue = globalQueue;
     this.globalJobRegistry = globalJobRegistry;
+    this.killSwitch = killSwitch;
   }
 
   private createDefaultDeduplicationId(event: EventType): string {
@@ -623,6 +628,8 @@ export class QueueManager<EventType extends Event = Event> {
         aggregateType: this.aggregateType,
         commandName: cmdEntry.commandName,
         pipelineName: this.pipelineName,
+        killSwitch: this.killSwitch,
+        killSwitchOptions: cmdEntry.options.killSwitch,
         logger,
       };
 

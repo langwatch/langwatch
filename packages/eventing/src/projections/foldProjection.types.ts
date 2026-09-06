@@ -1,5 +1,6 @@
 import type { Event } from "../domain/types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
+import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys";
 
 /**
  * A stateful projection that folds events into accumulated state.
@@ -126,6 +127,12 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
  * Options for configuring fold projection processing behavior.
  */
 export interface FoldProjectionOptions {
+  /**
+   * Operator stop for this component, resolved per tenant at dispatch time.
+   * Absent means the generated key; a `customKey` must also be what the
+   * descriptors advertise or the switch cannot be set.
+   */
+  killSwitch?: KillSwitchOptions;
   /** Disable this projection in the assembled runtime. */
   disabled?: boolean;
   /**

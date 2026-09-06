@@ -1,8 +1,9 @@
-import type { StaticPipelineDefinition } from "@langwatch/eventing";
+import { killSwitchDescriptorsFor, type StaticPipelineDefinition } from "@langwatch/eventing";
 import {
   OpsEventingIntrospectionPort,
   type OpsDejaViewProjection,
   type OpsProcessManagerMetadata,
+  type OpsKillSwitchDescriptor,
   type OpsProjectionMetadata,
 } from "../ports/eventing-introspection.port";
 
@@ -57,6 +58,10 @@ export class EventingOpsIntrospectionAdapter extends OpsEventingIntrospectionPor
       }));
       return [...folds, ...maps, ...states];
     });
+  }
+
+  killSwitches(): OpsKillSwitchDescriptor[] {
+    return this.definitions().flatMap((def) => killSwitchDescriptorsFor(def));
   }
 
   processManagers(): OpsProcessManagerMetadata[] {

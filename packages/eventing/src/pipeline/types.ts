@@ -14,6 +14,7 @@ import type { EventStore } from "../stores/eventStore.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
 import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types";
+import type { KillSwitchPort } from "../kill-switch";
 
 /**
  * Static metadata about a pipeline for tooling and introspection.
@@ -77,6 +78,7 @@ export interface EventSourcingPipelineDefinition<
   executionTarget?: ExecutionTarget;
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  killSwitch?: KillSwitchPort;
   prepareEventForProjection?: (event: EventType) => EventType;
   warnWhenProjectionsRunInline?: boolean;
 }

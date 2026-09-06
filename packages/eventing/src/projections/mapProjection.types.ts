@@ -3,6 +3,7 @@ import type { Event } from "../domain/types";
 import type { RetentionPolicy } from "../runtime.types";
 import type { EnqueueDispatchOptions } from "../subscribers/eventSubscriber.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
+import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys";
 
 /**
  * A stateless projection that transforms individual events into records.
@@ -98,6 +99,12 @@ export type MapEnqueueDispatchOptions<E extends Event = Event> = Pick<
  * supply a filter that widened its own type back out.
  */
 export interface MapProjectionOptions<E extends Event = Event> {
+  /**
+   * Operator stop for this component, resolved per tenant at dispatch time.
+   * Absent means the generated key; a `customKey` must also be what the
+   * descriptors advertise or the switch cannot be set.
+   */
+  killSwitch?: KillSwitchOptions;
   /** Concurrency limit for processing jobs. */
   concurrency?: number;
 

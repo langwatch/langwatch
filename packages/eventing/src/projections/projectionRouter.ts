@@ -27,6 +27,7 @@ import type { EventStoreReadContext } from "../stores/eventStore.types";
 import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
+import { isComponentKilled, type KillSwitchPort } from "../kill-switch";
 import { EventUtils } from "../utils/event.utils";
 import { toError } from "../utils/errors";
 import {
@@ -106,6 +107,7 @@ export class ProjectionRouter<
   private readonly executionTarget?: ExecutionTarget;
   private readonly replayMarkerChecker?: ReplayMarkerChecker;
   private readonly retentionPolicyResolver?: RetentionPolicyResolver;
+  private readonly killSwitch?: KillSwitchPort;
   private readonly tracer = getLangWatchTracer("langwatch.event-sourcing.projection-router");
   private readonly logger = createLogger("langwatch:event-sourcing:projection-router");
   private readonly foldExecutor = new FoldProjectionExecutor();
@@ -130,11 +132,13 @@ export class ProjectionRouter<
       executionTarget?: ExecutionTarget;
       replayMarkerChecker?: ReplayMarkerChecker;
       retentionPolicyResolver?: RetentionPolicyResolver;
+      killSwitch?: KillSwitchPort;
     } = {},
   ) {
     this.executionTarget = options.executionTarget;
     this.replayMarkerChecker = options.replayMarkerChecker;
     this.retentionPolicyResolver = options.retentionPolicyResolver;
+    this.killSwitch = options.killSwitch;
   }
 
   registerFoldProjection(projection: FoldProjectionDefinition<any, EventType>): void {
@@ -1008,6 +1012,20 @@ export class ProjectionRouter<
         const filteredEvents = [];
         let declined = 0;
         for (const event of events) {
+          if (
+            await isComponentKilled({
+              killSwitch: this.killSwitch,
+              aggregateType: this.aggregateType,
+              componentType: "mapProjection",
+              componentName: name,
+              tenantId: event.tenantId,
+              customKey: mapProj.options?.killSwitch?.customKey,
+              logger: this.logger,
+            })
+          ) {
+            continue;
+          }
+
           // Filter by event type
           if (mapProj.eventTypes.length > 0 && !mapProj.eventTypes.includes(event.type)) {
             continue;
@@ -1057,6 +1075,20 @@ export class ProjectionRouter<
       for (const event of events) {
         for (const [name, mapProj] of this.mapProjections) {
           if (mapProj.options?.disabled) continue;
+
+          if (
+            await isComponentKilled({
+              killSwitch: this.killSwitch,
+              aggregateType: this.aggregateType,
+              componentType: "mapProjection",
+              componentName: name,
+              tenantId: event.tenantId,
+              customKey: mapProj.options?.killSwitch?.customKey,
+              logger: this.logger,
+            })
+          ) {
+            continue;
+          }
 
           if (mapProj.eventTypes.length > 0 && !mapProj.eventTypes.includes(event.type)) {
             continue;
@@ -1200,8 +1232,42 @@ export class ProjectionRouter<
 
       const enqueue = subscriber.options?.enqueue;
 
+      // The seam that DISCARDS events irreversibly needs an off switch as much
+      // as any dispatch path: subscriber fan-out is never replayed, so a bad
+      // filter loses those events for good. Resolved once per distinct tenant
+      // because the answer cannot change within one batch, and the busiest
+      // subscribers match every event.
+      const killedByTenant = new Map<string, boolean>();
+      const isKilledFor = async (tenantId: string): Promise<boolean> => {
+        const cached = killedByTenant.get(tenantId);
+        if (cached !== undefined) return cached;
+        const killed = await isComponentKilled({
+          killSwitch: this.killSwitch,
+          aggregateType: this.aggregateType,
+          componentType: "subscriber",
+          componentName: name,
+          tenantId,
+          customKey: subscriber.options?.killSwitch?.customKey,
+          logger: this.logger,
+        });
+        killedByTenant.set(tenantId, killed);
+        return killed;
+      };
+
       for (const event of matching) {
         try {
+          if (await isKilledFor(event.tenantId)) {
+            // Counted, not skipped silently. A kill is permanent loss for this
+            // subscriber, and an operator has to be able to tell it apart from
+            // a quiet subscriber — precisely when they are looking.
+            incrementEsSubscriberEnqueueTotal({
+              pipelineName: this.pipelineName,
+              subscriberName: name,
+              outcome: "killed",
+            });
+            continue;
+          }
+
           // Enqueue-time filter (ADR-069 invariant 4): a declined event never
           // mints a job. A throw here is deliberately NOT caught as `false` —
           // it falls through to the catch below, so the failure is reported
@@ -1387,6 +1453,20 @@ export class ProjectionRouter<
         };
         EventUtils.validateTenantId(readContext, "processStateProjectionEvents");
 
+        if (
+          await isComponentKilled({
+            killSwitch: this.killSwitch,
+            aggregateType: this.aggregateType,
+            componentType: "projection",
+            componentName: projectionName,
+            tenantId: first.tenantId,
+            customKey: projection.options?.killSwitch?.customKey,
+            logger: this.logger,
+          })
+        ) {
+          return;
+        }
+
         let toApply = events;
         if (this.replayMarkerChecker) {
           const kept: EventType[] = [];
@@ -1491,6 +1571,20 @@ export class ProjectionRouter<
       },
       async () => {
         EventUtils.validateTenantId(context, "processFoldProjectionEvent");
+
+        if (
+          await isComponentKilled({
+            killSwitch: this.killSwitch,
+            aggregateType: this.aggregateType,
+            componentType: "projection",
+            componentName: projectionName,
+            tenantId: event.tenantId,
+            customKey: fold.options?.killSwitch?.customKey,
+            logger: this.logger,
+          })
+        ) {
+          return;
+        }
 
         // Defer or skip if projection-replay is active for this aggregate
         if (this.replayMarkerChecker) {
@@ -1650,6 +1744,21 @@ export class ProjectionRouter<
       },
       async () => {
         EventUtils.validateTenantId(context, "processFoldProjectionBatch");
+
+        // All events in a batch share the tenant.
+        if (
+          await isComponentKilled({
+            killSwitch: this.killSwitch,
+            aggregateType: this.aggregateType,
+            componentType: "projection",
+            componentName: projectionName,
+            tenantId: events[0]!.tenantId,
+            customKey: fold.options?.killSwitch?.customKey,
+            logger: this.logger,
+          })
+        ) {
+          return;
+        }
 
         // Defer or skip events for which projection-replay is active.
         let toApply = events;

@@ -62,6 +62,7 @@ export class EventSourcingService<
     executionTarget,
     replayMarkerChecker,
     retentionPolicyResolver,
+    killSwitch,
     warnWhenProjectionsRunInline = false,
   }: EventSourcingServiceOptions<EventType, ProjectionTypes>) {
     this.pipelineName = pipelineName;
@@ -97,6 +98,7 @@ export class EventSourcingService<
       pipelineName: this.pipelineName,
       globalQueue,
       globalJobRegistry,
+      killSwitch,
     });
 
     // Create ProjectionRouter (no event store needed — incremental only)
@@ -104,7 +106,7 @@ export class EventSourcingService<
       aggregateType,
       pipelineName,
       this.queueManager,
-      { executionTarget, replayMarkerChecker, retentionPolicyResolver },
+      { executionTarget, replayMarkerChecker, retentionPolicyResolver, killSwitch },
     );
 
     // Register fold projections and auto-wire event loaders for out-of-order re-fold

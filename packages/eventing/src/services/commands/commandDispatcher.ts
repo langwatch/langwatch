@@ -14,6 +14,7 @@ import { EventSchema } from "../../domain/types";
 import type { CommandSerializationOptions } from "../../pipeline/staticBuilder.types";
 import type { DeduplicationStrategy } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
+import { isComponentKilled, type KillSwitchOptions, type KillSwitchPort } from "../../kill-switch";
 import { EventUtils } from "../../utils/event.utils";
 import { ValidationError } from "../errorHandling";
 
@@ -36,6 +37,8 @@ export interface ProcessCommandParams<EventType extends Event> {
   aggregateType: AggregateType;
   commandName: string;
   pipelineName: string;
+  killSwitch?: KillSwitchPort;
+  killSwitchOptions?: KillSwitchOptions;
   logger?: ReturnType<typeof createLogger>;
 }
 
@@ -119,6 +122,8 @@ export async function processCommand<EventType extends Event>(
     aggregateType,
     commandName,
     pipelineName,
+    killSwitch,
+    killSwitchOptions,
     logger: log,
   } = params;
 
@@ -138,6 +143,20 @@ export async function processCommand<EventType extends Event>(
   const validated = validation.data;
   const tenantId = createTenantId(String(validated.tenantId));
   const aggregateId = getAggregateId(validated);
+
+  if (
+    await isComponentKilled({
+      killSwitch,
+      aggregateType,
+      componentType: "command",
+      componentName: commandName,
+      tenantId,
+      customKey: killSwitchOptions?.customKey,
+      logger: log,
+    })
+  ) {
+    return;
+  }
 
   const command = createCommand(tenantId, aggregateId, commandType, validated);
 
@@ -271,6 +290,22 @@ async function handleBatchCommands<EventType extends Event>(args: {
   for (const validated of validatedPayloads) {
     const payloadTenantId = createTenantId(String(validated.tenantId));
     const aggregateId = getAggregateId(validated);
+
+    // Mirrors the single path's silent return: no events, no metrics — but
+    // the rest of the batch still runs.
+    if (
+      await isComponentKilled({
+        killSwitch: params.killSwitch,
+        aggregateType,
+        componentType: "command",
+        componentName: params.commandName,
+        tenantId: payloadTenantId,
+        customKey: params.killSwitchOptions?.customKey,
+        logger: params.logger,
+      })
+    ) {
+      continue;
+    }
 
     progress.attempted++;
     const command = createCommand(payloadTenantId, aggregateId, commandType, validated);
@@ -421,6 +456,8 @@ export async function processCommandBatch<EventType extends Event>(
  * Options for configuring a command handler.
  */
 export interface CommandHandlerOptions<Payload> extends CommandSerializationOptions<Payload> {
+  /** Operator stop for this command, resolved per tenant at dispatch time. */
+  killSwitch?: KillSwitchOptions;
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   delay?: number;

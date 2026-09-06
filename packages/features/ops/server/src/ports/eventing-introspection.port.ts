@@ -44,9 +44,25 @@ export interface OpsDejaViewProjection {
   apply: (state: unknown, event: { type: string }) => unknown;
 }
 
+/**
+ * One togglable kill switch the live pipeline graph will read at runtime.
+ * Advertised before any row exists, because a write refuses a key that is
+ * neither a registry entry nor a live descriptor.
+ */
+export interface OpsKillSwitchDescriptor {
+  key: string;
+  aggregateType: string;
+  componentType: "projection" | "mapProjection" | "command" | "subscriber";
+  componentName: string;
+  pipelineName: string;
+}
+
 export abstract class OpsEventingIntrospectionPort {
   /** Every fold, map and state projection mounted across the pipelines. */
   abstract projections(): OpsProjectionMetadata[];
+
+  /** Every kill-switch key the mounted components will consult at runtime. */
+  abstract killSwitches(): OpsKillSwitchDescriptor[];
 
   /** The process-manager state machines mounted across the pipelines. */
   abstract processManagers(): OpsProcessManagerMetadata[];

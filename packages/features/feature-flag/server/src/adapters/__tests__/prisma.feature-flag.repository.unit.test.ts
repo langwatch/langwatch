@@ -84,6 +84,7 @@ beforeEach(() => {
 
 describe("given no operator row exists for the trace blob offload flag", () => {
   describe("when the ingestion edge resolves the flag for a project", () => {
+    /** @scenario "Oversized span content survives ingestion wherever storage is available" */
     it("resolves to the registry default of on", async () => {
       const service = buildService();
 
@@ -113,6 +114,7 @@ describe("given an operator switched the trace blob offload flag off fleet-wide"
 
 describe("given an operator wrote a single per-project opt-out rule and no row existed before", () => {
   describe("when the ingestion edge resolves the flag for the targeted project", () => {
+    /** @scenario "Oversized span content survives ingestion wherever storage is available" */
     it("returns false for that project", async () => {
       const service = buildService();
       await writeOptOutRule(service);
@@ -127,6 +129,7 @@ describe("given an operator wrote a single per-project opt-out rule and no row e
   });
 
   describe("when the ingestion edge resolves the flag for a project the rule does not name", () => {
+    /** @scenario "Oversized span content survives ingestion wherever storage is available" */
     it("stays enabled, so one project's opt-out never turns the fleet off", async () => {
       const service = buildService();
       await writeOptOutRule(service);

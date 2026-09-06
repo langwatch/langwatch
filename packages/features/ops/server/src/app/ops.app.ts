@@ -59,6 +59,8 @@ import type {
   ReplayStatus,
 } from "@langwatch/ops-contract";
 import type { ProjectService } from "@langwatch/project-contract";
+import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port";
+import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules";
 
 /** One process ref, the triple every process-manager read is keyed by. */
 export type OpsProcessRef = {
@@ -217,6 +219,11 @@ export interface OpsAppDependencies {
   ops: OpsCapability;
   featureFlags: FeatureFlagService;
   projects: Pick<ProjectService, "searchByQuery">;
+  /**
+   * The live pipeline graph, read for the kill-switch keys an operator may
+   * set. Without it every generated key is unsettable.
+   */
+  eventingIntrospection: OpsEventingIntrospectionPort;
 }
 
 /** The badge's two integers, and when they were computed. */
@@ -451,9 +458,16 @@ export class OpsApp {
 
   // -- feature flags ---------------------------------------------------------
 
-  /** Every operator-visible flag, including orphan stored rows. */
-  featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue> {
-    return this.dependencies.featureFlags.listOperatorCatalogue();
+  /**
+   * Every operator-visible flag: the registry, orphan stored rows, and every
+   * kill switch the live pipeline graph will read even before anyone has
+   * flipped it.
+   */
+  async featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue> {
+    return withKillSwitchDescriptors({
+      catalogue: await this.dependencies.featureFlags.listOperatorCatalogue(),
+      descriptors: this.dependencies.eventingIntrospection.killSwitches(),
+    });
   }
 
   /** Turns one registered flag on or off. */
@@ -488,9 +502,14 @@ export class OpsApp {
     return this.dependencies.featureFlags.clearStoredFlag(input);
   }
 
+  /**
+   * Writes reach explicit registry entries and the kill-switch keys the live
+   * pipeline graph advertises, and nothing else: family-prefix matching alone
+   * would let a typo store an orphan row that never affects anything.
+   */
   private requireRegisteredFlag(key: string): void {
-    if (!listFeatureFlags().some((flag) => flag.key === key)) {
-      throw new OpsUnknownFeatureFlagError(key);
-    }
+    if (listFeatureFlags().some((flag) => flag.key === key)) return;
+    if (this.dependencies.eventingIntrospection.killSwitches().some((d) => d.key === key)) return;
+    throw new OpsUnknownFeatureFlagError(key);
   }
 }

@@ -363,7 +363,12 @@ export const incrementEsSubscriberEnqueueTotal = ({
 }: {
   pipelineName: string;
   subscriberName: string;
-  outcome: "filtered" | "staged" | "referenced" | "failed";
+  /**
+   * `killed` is its own outcome, never folded into `filtered`: a kill is
+   * permanent loss for that subscriber, and an operator has to tell it apart
+   * from the subscriber judging the event irrelevant.
+   */
+  outcome: "filtered" | "staged" | "referenced" | "failed" | "killed";
 }) => subscriberEnqueueTotal.labels(pipelineName, subscriberName, outcome).inc();
 
 /**
