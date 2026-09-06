@@ -113,22 +113,11 @@ export function mountTracesRest(options: {
               }),
           }
         : {}),
-      // The coding-agent transcript join is NOT supplied, and the ONE
-      // collaborator missing is the CANONICAL LOG READ —
-      // `LogService.getLogsByTraceId` over `log_records`, which
-      // `composeApiTraceReadStack` refuses by name. Both legs of the join read
-      // a trace's logs (the span enrichment and the transcript's own log
-      // pass), and the legacy table left underneath has taken no write since
-      // the canonical cutover, so the derivation would answer an empty
-      // transcript — "this agent did nothing" — for every trace ingested
-      // since. The route is left unregistered and answers 404 instead.
-      //
-      // NOT the coding-agent session store, which this process DOES compose
-      // (the org group's `CodingAgentApp`, over its own ClickHouse). The
-      // transcript never reads a session: it calls only the contract's own
-      // pure derivation — `buildTranscript`, `logContentKeys`,
-      // `contentAttrKeys` — so the store was never what this door was waiting
-      // for.
+      // Named absence: the coding-agent transcript join is not supplied
+      // because `composeApiTraceReadStack` refuses `LogService.getLogsByTraceId`
+      // by name, and deriving a transcript without it would answer an empty
+      // one for every trace. Not a missing session store (this process does
+      // compose `CodingAgentApp`) — the transcript never reads a session.
     },
   });
 }

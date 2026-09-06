@@ -124,10 +124,10 @@ const databaseMocks = vi.hoisted(() => {
   const client = new Proxy(
     {
       projectSecret: { findMany },
-      // The raw-query surface, as FUNCTIONS rather than the empty delegate the trap below answers every other
-      // key with. The durable process store the webhook replay appends an envelope through refuses a client that
-      // does not carry it — a client without `$transaction` cannot commit a buffer and its outbox rows together,
-      // which is the whole guarantee — so a double missing it fails the composition rather than the read.
+      // The raw-query surface, as FUNCTIONS rather than the empty delegate the
+      // trap below answers every other key with: the webhook replay store
+      // refuses a client without `$transaction` (can't commit a buffer and
+      // its outbox rows together), so a double missing it fails composition.
       $executeRaw: async (): Promise<number> => 0,
       $queryRaw: async (): Promise<unknown[]> => [],
       $transaction: async (run: unknown): Promise<unknown> =>
@@ -209,10 +209,10 @@ const secret: Secret = {
 };
 
 describe("ApiProductionComposition", () => {
-  // `installConnectedAgentRedis` composes a process-wide singleton (`@langwatch/agent-server`'s
-  // `getConnectedAgentRuntime`) that refuses a second install once built — correct for one live process, but this
-  // file composes many `ApiProductionComposition`s in one test process. Closing after each test is what makes
-  // every composition resolve its own runtime once, rather than colliding with the previous test's.
+  // `installConnectedAgentRedis` composes a process-wide singleton
+  // (`getConnectedAgentRuntime`) that refuses a second install once built.
+  // This file composes many compositions in one test process, so closing
+  // after each test lets every composition resolve its own runtime once.
   afterEach(async () => {
     await ConnectedAgentRuntimeAdapter.close();
   });
@@ -1263,13 +1263,9 @@ function secretService() {
 }
 
 /**
- * The optional collaborators nothing supplies.
- *
- * `api.main.ts` composes with no options at all, so every one of these was declared optional
- * and then never handed in: the redaction resolver, the reviewer's trace content, the setup
- * checklist's simulation evidence, the person-shaped messages and the seat allowances behind
- * `licenseEnforcement.*`. Each has a fallback off this process's own graph now, and this is
- * what says so.
+ * The optional collaborators nothing supplies: `api.main.ts` composes with no
+ * options, so each of these falls back on its own default rather than a
+ * caller-provided value.
  */
 describe("given the optional collaborators no host supplies", () => {
   afterEach(async () => {

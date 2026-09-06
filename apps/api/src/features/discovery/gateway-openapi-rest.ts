@@ -1,18 +1,6 @@
 /**
- * Serves the generated OpenAPI description of the LangWatch REST API at
- * GET /api/gateway/v1/openapi.json, the location published in
- * specs/ai-gateway/_shared/contract.md section 12.
- *
- * This is the location the gateway contract pins, and it is not the one a
- * caller who has not read that contract will try. `./api-discovery-rest` and
- * `./root-discovery-rest` serve the same document at `/api/openapi.json` and
- * `/.well-known/openapi` for those, from the same bytes — three URLs, one
- * document, by construction.
- *
- * ORDERING: this unauthenticated spec document shares the `/api/gateway/v1`
- * namespace with the credentialed gateway resource routes, so it mounts FIRST
- * and cannot be shadowed by a sibling that later grows a parameterised segment
- * at the root of that namespace.
+ * Serves the OpenAPI description at GET /api/gateway/v1/openapi.json. Mounts
+ * FIRST in `/api/gateway/v1` so a later parameterised sibling cannot shadow it.
  */
 import { publicEndpoint } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";

@@ -1,10 +1,5 @@
 /**
- * An address under /settings that names no page: it keeps the settings shell.
- *
- * `platform/app` framed its 404 in `DashboardLayout`, so a mistyped settings address still
- * carried the sidebar and the top bar and the reader could get back. Mounted on the table's own
- * top-level catch-all instead, the same address rendered a bare full-viewport 404 with no menu.
- *
+ * An address under /settings that names no page keeps the settings shell.
  * Spec: specs/settings/settings-page-chrome.feature
  * @vitest-environment jsdom
  */

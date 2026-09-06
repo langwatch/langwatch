@@ -1,35 +1,7 @@
 /**
- * The webhook feature's application: what both of its doors call.
- *
- * It holds every capability the feature's api files reach — the endpoint
- * store, the delivery health report, the emitted-events log, the entitlement
- * check, the last delivery hop a test fire uses, and the `Idempotency-Key`
- * ledger a create dispatches through — and it is the one typed thing a
- * transport is given. Before it, the tRPC door declared
- * `Readonly<{ gateway: { webhookEndpoints; webhookHealth } }>` and a separate
- * `assertEntitled` port, while the REST family declared its own
- * `WebhookRestServices` bag: two descriptions of one composition, neither
- * reachable from the other, and the tRPC one reaching through a `gateway` key
- * that belongs to a different feature entirely.
- *
- * What lives here as a decision is what both doors were making for themselves:
- *
- *   - **the entitlement gate.** One `assertEntitled` for the whole surface,
- *     called at the same point in both chains — after authentication and after
- *     the RBAC check, so "you don't have access" still beats "your plan
- *     doesn't include this".
- *   - **whether the events log exists at all.** A deployment without
- *     ClickHouse has no store for it, and both doors had to remember that the
- *     capability is optional.
- *
- * ## Why this application is a holder rather than a set of operations
- *
- * The endpoint store's own methods ARE the feature's operations — create,
- * update, enable, disable, archive, roll the secret, read the deliveries — and
- * both doors call them with the same arguments. Restating each one here would
- * add a layer without adding a decision. What was worth lifting is above; the
- * rest is reached through {@link endpoints} and {@link health}, which is what
- * lets the REST family move into this package as a move rather than a rewrite.
+ * The webhook feature's application: what both doors (tRPC and REST) call.
+ * Lifts only the shared decisions — one `assertEntitled` gate, one optional
+ * events log — and reaches the rest through {@link endpoints}/{@link health}.
  */
 import type { WebhookEndpointRuntime } from "../adapters/webhook-endpoint.webhook-endpoint.adapter";
 import type { WebhookDispatchResult } from "../services/webhook-delivery.service";
@@ -64,11 +36,8 @@ export interface WebhookAppDependencies {
   /** The one shared entitlement check for the whole surface. */
   assertEndpointsEntitled(organizationId: string): Promise<void>;
   /**
-   * One endpoint's last hop, for the test fire.
-   *
-   * The test has to reach exactly what real delivery reaches, including the
-   * transport, so this is the same dispatch the delivery worker performs
-   * rather than a second HTTP client that only knows about URLs.
+   * One endpoint's last hop, for the test fire: the same dispatch the
+   * delivery worker performs, not a second HTTP client that only knows URLs.
    */
   dispatch: WebhookTestDispatch;
 }
@@ -92,35 +61,26 @@ export class WebhookApp {
 
   /**
    * Refuses the whole surface unless the organization's plan carries webhook
-   * endpoints.
-   *
-   * Entitlement is process state, so the check itself arrives as a dependency;
-   * what is decided here is that there is ONE of it, called the same way from
-   * both doors. It raises `WebhookEndpointsNotEntitledError`, which is already
-   * a handled 403, so neither door has to translate it.
+   * endpoints: one check, called the same way from both doors, raising the
+   * already-handled `WebhookEndpointsNotEntitledError`.
    */
   assertEntitled(organizationId: string): Promise<void> {
     return this.dependencies.assertEndpointsEntitled(organizationId);
   }
 
   /**
-   * The emitted-events log as this application was composed with it, absent
-   * included. {@link requireEvents} is what a door reads; this is what a
-   * process recomposing the application over a different entitlement gate
-   * passes on, so the log is not silently dropped on the way through.
+   * The emitted-events log as composed, absent included, so recomposing over
+   * a different entitlement gate doesn't silently drop it. {@link requireEvents}
+   * is what a door reads.
    */
   get events(): WebhookEventsService | undefined {
     return this.dependencies.events;
   }
 
   /**
-   * The emitted-events log, or a plain failure when this deployment has no
-   * ClickHouse to keep it in.
-   *
-   * Deliberately NOT a `HandledError`: a missing datastore is a deployment
-   * fault with no action for the caller, so it degrades to "unknown" plus a
-   * trace id at the boundary (ADR-045) rather than promising a remedy that
-   * does not exist.
+   * The emitted-events log, or a plain failure with no ClickHouse to keep it
+   * in — not a `HandledError`, since a missing datastore has no caller
+   * remedy and degrades to "unknown" at the boundary (ADR-045).
    */
   requireEvents(): WebhookEventsService {
     const service = this.dependencies.events;

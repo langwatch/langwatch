@@ -514,9 +514,10 @@ describe("given an API process composed with the object store, retention and mon
 
     describe("and this deployment keeps its bytes in Azure Blob", () => {
       /**
-       * The registry registers the Azure driver as a FACTORY, so nothing is constructed until an `azure-blob://` URI is actually read. What this pins is
-       * that reading one reaches AZURE — the request goes to the configured account endpoint under a shared-key signature — rather than being refused by
-       * scheme or answered by the S3 driver, which would report a file gone that is not.
+       * The registry registers the Azure driver as a factory, so nothing is
+       * constructed until an `azure-blob://` URI is read. This pins that
+       * reading one reaches Azure, rather than being refused by scheme or
+       * answered by the S3 driver (which would report a file gone that isn't).
        */
       it("probes the bytes through the Azure driver, at the configured account", async () => {
         const requests: Array<{ url: string; method: string; authorization: string }> = [];
@@ -557,9 +558,9 @@ describe("given an API process composed with the object store, retention and mon
 
     describe("and the object is on Azure but this deployment configured no account", () => {
       /**
-       * The credential resolver refuses BY NAME rather than the read reporting the object gone. A deployment
-       * that lost its Azure configuration has files it cannot reach, not files that were deleted, and the two
-       * answers lead an operator to opposite actions.
+       * The credential resolver refuses by name rather than the read
+       * reporting the object gone: a deployment missing its Azure config has
+       * files it cannot reach, not files that were deleted.
        */
       it("refuses rather than reporting the file missing", async () => {
         const { application } = composeApplication();
@@ -732,9 +733,8 @@ describe("given an API process composed with the object store, retention and mon
 
   describe("when the object store did not compose", () => {
     /**
-     * Before these three separated they were one half, and a process holding no byte backend composed NONE of the
-     * record — the retention settings and the monitors page went with the object store, and the seal named the
-     * half rather than the surface.
+     * A process holding no byte backend composed none of the record: the
+     * retention settings and the monitors page went with the object store.
      */
     it("refuses the object probe by name", async () => {
       const { application } = composeApplication({ withoutStoredObject: true });

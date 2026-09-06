@@ -360,9 +360,10 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when the grant ledger and the role service are composed", () => {
     /**
-     * The absence above is closed by this process building the service itself rather than by a host injecting one. What that has to prove is that the read
-     * reaches the ROW — a port that answered `[]` would pass a test which only checked the call stopped refusing, and an empty invitation list is the one
-     * answer an administrator acts on by inviting the same person twice.
+     * The read must reach the row, not just stop refusing: a port that
+     * answered `[]` would pass a test checking only that, and an empty
+     * invitation list is the one answer that leads an administrator to
+     * invite the same person twice.
      */
     it("answers the pending-invite read from the invitation rows", async () => {
       const { application, invites } = composeApplication({ withInvitations: true });
@@ -380,9 +381,9 @@ describe("given an API process composed with the five tenant features", () => {
     });
 
     /**
-     * The acceptance link is the thing an administrator hands somebody when no mail gateway is composed, and it
-     * is minted from the deployment's public origin. A link built against a default host would look right in the
-     * listing and open nothing.
+     * The acceptance link an administrator hands somebody with no mail
+     * gateway composed is minted from the deployment's own public origin —
+     * a default host would look right in the listing and open nothing.
      */
     it("carries an acceptance link on this deployment's own origin", async () => {
       const { application } = composeApplication({ withInvitations: true });
@@ -409,9 +410,10 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when no clustering scheduler runs in this process", () => {
     /**
-     * The composition raises `service_unavailable` naming the scheduler, and the project transport re-raises it untouched: the cause is known — this process composes no clustering wake path — and the caller
-     * can act on it, so the name reaches the wire instead of a trace id for a condition we could have named. The transport's deliberate degradation is still there underneath it, and still covers the
-     * event-store internals a caller cannot act on; it just no longer swallows the refusal above them.
+     * The composition raises `service_unavailable` naming the scheduler, and
+     * the project transport re-raises it untouched rather than swallowing a
+     * knowable cause into a trace id. It still degrades event-store
+     * internals a caller cannot act on — just not this refusal.
      */
     it("refuses the request by name rather than accepting a run nobody starts", async () => {
       const { application } = composeApplication();

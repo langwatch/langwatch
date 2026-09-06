@@ -21,29 +21,17 @@ const isNodeRuntime = typeof process !== "undefined" && typeof process.versions?
 let logContextProvider: LogContextProvider | undefined;
 
 /**
- * Registers the server context provider used by every logger mixin.
- *
- * The provider is injected rather than imported so this module stays safe to
- * load in a browser: no OpenTelemetry or Node-only context module is part of
- * the root package's module graph.
+ * Registers the server context provider used by every logger mixin. Injected
+ * rather than imported so this module stays safe to load in a browser.
  */
 export function registerLogContextProvider(provider: LogContextProvider): void {
   logContextProvider = provider;
 }
 
 /**
- * The request and tenant context, with the fields that have no value left off.
- *
- * The provider answers with every field on every call, null for the ones it
- * cannot fill, and outside a request that is all of them. Stamped literally,
- * every boot line carried fifty columns of
- * `traceId=null spanId=null organizationId=null projectId=null userId=null`
- * ahead of its message, on the console and in the exported record both.
- *
- * A field that is absent says exactly what a field that is null says, in no
- * columns — and says it better downstream, where a `traceId != ""` filter
- * matches the four characters "null" but never matches a field that is not
- * there.
+ * The request and tenant context, with the fields that have no value left off:
+ * a present field lets a `traceId != ""` filter work downstream, where a
+ * stamped `null` string would match it by accident.
  */
 function presentLogContext(): Record<string, string> {
   const context = logContextProvider?.();
@@ -57,12 +45,9 @@ function presentLogContext(): Record<string, string> {
 }
 
 /**
- * The JSON-safe form of one logged value.
- *
- * A log record is JSON on the wire, and two of the things we log are not:
- * a `bigint`, which `JSON.stringify` throws on rather than skips, and a
- * nested `Error`, whose message and stack are non-enumerable and so serialise
- * to `{}`. Both are rendered here instead.
+ * The JSON-safe form of one logged value: renders a `bigint` (which
+ * `JSON.stringify` throws on) and a nested `Error` (whose message/stack are
+ * non-enumerable, so it would otherwise serialise to `{}`).
  */
 function jsonSafe(value: unknown, seen: WeakSet<object>): unknown {
   if (typeof value === "bigint") return value.toString();
@@ -77,12 +62,9 @@ function jsonSafe(value: unknown, seen: WeakSet<object>): unknown {
 }
 
 /**
- * Custom Error serializer.
- *
- * pino's own serializer carries the message, stack, type and cause chain. The
- * error's own enumerable properties are walked separately, so a `bigint` or a
- * nested `Error` hung off a custom error class survives as something readable
- * rather than throwing the whole record away.
+ * Custom Error serializer: keeps pino's message/stack/cause handling and also
+ * walks the error's own enumerable properties, so a `bigint` or nested
+ * `Error` on a custom error class survives instead of being dropped.
  */
 const errorSerializer = (error: unknown) => {
   if (!(error instanceof Error)) {
@@ -95,16 +77,9 @@ const errorSerializer = (error: unknown) => {
 };
 
 /**
- * Every key a cause may be logged under, mapped to the same serializer.
- *
- * pino matches serializers by exact property name and nothing warns when a key
- * has none: the value is passed to `JSON.stringify`, and an `Error` has no
- * enumerable own properties, so it lands as `{}` with the message and stack -
- * the only reasons it was logged - gone. Keeping the map in one exported
- * constant is what lets a test drive the real thing rather than a copy of it.
- *
- * `error` for records that ARE failures; {@link REQUEST_CAUSE_FIELD} for the
- * cause on records deliberately logged below error level.
+ * Every key a cause may be logged under, mapped to the same serializer: pino
+ * matches serializers by exact property name, and an unregistered key
+ * serialises an `Error` to `{}` (no message, no stack).
  */
 export const NODE_LOG_SERIALIZERS = {
   error: errorSerializer,
@@ -120,36 +95,10 @@ export interface CreateLoggerOptions {
 }
 
 /**
- * Creates a Pino logger with one API for Node.js and browser consumers.
- *
- * Node.js loggers use the shared console/OTel transport and inject registered
- * async request context. Browser loggers use Pino's browser mode and never load
- * the package's OpenTelemetry or Node-only context modules.
+ * Creates a Pino logger, cached per (name, disableContext) pair: a fresh
+ * `pino()` per call measured at 2.3% of production wall time. Safe to share
+ * since per-request fields arrive fresh on every call via the mixin.
  */
-// One logger per (name, disableContext) pair, kept for the life of the process.
-//
-// `createLogger` has 400+ call sites, many of them per-instance class fields
-// and a few inline in catch blocks, so a fresh `pino()` per call was measured
-// at 2.3% of the app's wall time in production — nearly a quarter of that
-// inside `pino/lib/caller.js:getCallers`, which captures a stack trace on
-// every construction to work out who called it. None of that work varies
-// between calls that pass the same name.
-//
-// Sharing an instance is safe because nothing request-scoped is baked in at
-// construction. `name`, `service` and `service.version` are process-wide, and
-// the per-request fields — traceId, spanId, organizationId, projectId, userId
-// — arrive through the `mixin` in createNodeLogger, which pino invokes on
-// every log call and which reads the async-local context at that moment. Two
-// requests sharing a logger still get their own context on their own lines.
-// The transport above is shared for the same reason.
-//
-// The cache is bounded by the number of distinct logger names in the source.
-// The handful of call sites that build a name rather than writing a literal
-// derive it from module or route identity, never from tenant or request data;
-// a name derived per project would make this grow without limit.
-//
-// `disableContext` is part of the key because it is the one option that
-// changes the logger that gets constructed.
 export interface LoggerFactory {
   createLogger(name: string, options?: CreateLoggerOptions): PinoLogger;
   reset(): void;
@@ -216,12 +165,7 @@ export function createLoggerFactory(configuration: LoggerConfiguration = {}): Lo
   return { createLogger: create, reset: () => loggerCache.clear() };
 }
 
-/**
- * Drops the memoised loggers.
- *
- * Only tests need this. They replace the injected configuration between cases,
- * and a process-lifetime cache would otherwise pin a logger to the first one.
- */
+/** Drops the memoised loggers; only tests need this, between cases. */
 export function resetLoggerCache(): void {
   loggerFactory.reset();
 }
@@ -270,28 +214,16 @@ function createNodeLogger(
     timestamp: pino.stdTimeFunctions.isoTime,
     serializers: NODE_LOG_SERIALIZERS,
     formatters: {
-      // Adds process identity alongside pino's own pid/hostname bindings,
-      // distinct from `name` (the per-module label like "langwatch:api:hono").
-      // Prod ships stdout through fluent-bit, which promotes this field to the
-      // Loki `service_name` label — it is how the Go services land under
-      // `langwatch-service-aigateway` / `-nlp` (pkg/clog stamps the same
-      // field). Without it every line from this app arrives as
-      // `service_name="fluent-bit"`, unfilterable by service. Done here rather
-      // than via `base` so pino keeps supplying pid/hostname and this module
-      // stays free of a node:os import (it must remain browser-safe).
+      // Adds process identity (distinct from `name`, the per-module label):
+      // fluent-bit promotes this to the Loki `service_name` label, so prod
+      // logs stay filterable by service. Set here rather than via `base` so
+      // this module stays free of a node:os import (must remain browser-safe).
       bindings: (bindings) => ({
         ...bindings,
         service: configuration.serviceName,
-        // Which build produced the line.
-        //
-        // The configuration root derives this from the same OTel resource
-        // identity used for traces, but that resource only reaches telemetry we
-        // export.
-        // These logs go to stdout and are picked up from the pod's log file, a
-        // path the resource never touches, so no log line has ever carried a
-        // version: measured 2026-08-07, `service_version` appeared on no record
-        // in the fleet. Injecting the same semantic value keeps one source of
-        // truth rather than introducing a second way to say it.
+        // Which build produced the line: stdout logs bypass the OTel resource
+        // (measured 2026-08-07, `service_version` appeared on no fleet
+        // record), so this injects the same semantic value directly instead.
         ...serviceVersionField(configuration),
       }),
       level: (label) => ({ level: label.toUpperCase() }),
@@ -336,21 +268,9 @@ export function consoleIgnoreFields(isOtelExportEnabled: boolean): string {
 }
 
 /**
- * One line, in the shape every lane of a `pnpm dev` terminal prints:
- *
- *   [13:44:08.251] INFO (langwatch:api:rest): request handled {"method":"GET"}
- *
- * No date, because a development terminal is always today, and no process
- * identity, because `concurrently` has already spent the first columns saying
- * which of the five lanes a line came from.
- *
- * Every option here has to survive `structuredClone`: a transport target's
- * options cross a worker-thread boundary, so a function — a custom prettifier
- * for the time or the level — cannot be passed. Building the pretty stream on
- * this thread instead, to get around that, is what the console used to do for
- * about an hour: it works, and it silently kills the OTel log transport, whose
- * worker only survives while it is pino's own destination rather than one leg
- * of a multistream. The formatting is not worth the export.
+ * Pretty-console options for a `pnpm dev` line: no date or process identity
+ * (concurrently prefixes the lane). Must survive `structuredClone` — no
+ * formatter functions, since options cross a worker-thread boundary.
  */
 export function prettyConsoleOptions({
   level,

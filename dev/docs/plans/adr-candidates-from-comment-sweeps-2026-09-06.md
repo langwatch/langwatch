@@ -27,3 +27,14 @@ Remaining sweep scope not yet started: the rest of `trace/server` (spool service
 eventing stores, six transport files) and roughly 35 other feature server
 packages. Repo-wide `comment-block-size` stood at 1891 after sweep A and 726
 inside the feature-server scope after sweep B.
+
+## Sweep G (2026-09-06): apps/api, apps/server, apps/ui e2e/tests, enterprise webhook/governance/billing, observability, test-harness, sdks/typescript/agent
+
+| File | Narrative to record | Home |
+| --- | --- | --- |
+| `packages/observability/src/logger.ts` | Logger factory cache keyed by (name, disableContext): 400+ call sites, fresh `pino()` measured at 2.3% of prod wall time; safe to share since per-request fields arrive fresh via the mixin, never baked in at construction | New ADR: observability logger factory caching |
+| `packages/observability/src/logger.ts` | Pretty-console transport options must survive `structuredClone` (cross a worker-thread boundary, so no formatter functions); building the pretty stream on this thread instead silently kills the OTel log transport | Appendix to the same ADR: pretty console transport constraints |
+| `apps/api/src/features/enterprise/enterprise-webhook.composition.ts` | The webhook surface's entitlement gate is a plan read, not an Enterprise capability, so a deployment with no governance app still answers a customer-actionable 403 instead of an unknown-error 503 | Best practice: composition roots (webhook plan-gate independence) |
+| `packages/enterprise/features/webhook/server/src/app/webhook.app.ts` | Why `WebhookApp` is a holder (lifts only the entitlement gate and optional-events-log decisions both doors used to duplicate) rather than restating endpoint-store operations | Best practice: service-repository-adapter-port (application-as-holder) |
+| `apps/api/src/features/trace/trace-rest.mount.ts` | Named absence: the coding-agent transcript join is not supplied because `composeApiTraceReadStack` refuses `LogService.getLogsByTraceId` by name (legacy table has taken no write since the canonical cutover) | Best practice: composition roots (named absences) |
+| `apps/ui/e2e/langy/local-control-fixture.ts` | CLI API key mint is read back before use: `apiKey.create` answering 200 has been seen to leave the binding unwritten under load, surfacing two minutes later as a CLI that never printed its prompt | ADR-129 appendix |

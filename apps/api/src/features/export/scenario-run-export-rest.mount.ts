@@ -1,18 +1,7 @@
 /**
- * This process's composition of the packaged scenario run export REST family
- * (`@langwatch/scenario-server`).
- *
- * The family — the route, the streaming, the gzip pipe and the progress
- * broadcast — lives in the feature package (ADR-128). What lives here is
- * everything it dispatches through that is this process's: the browser
- * session, the permission probe, the audit sink, the export id and the fan-out
- * a watching browser subscribes to.
- *
- * The SESSION is what decides whether this family is mounted at all. A bulk
- * export lifts a project's whole run history — full mode includes every
- * conversation transcript — so it is attributable to a person by design, and a
- * process with no browser-session transport cannot name one. Such a process
- * leaves the family off rather than mounting a door that refuses every caller.
+ * This process's composition of the scenario run export REST family (ADR-128).
+ * A bulk export must be attributable to a person, so a process with no
+ * browser-session transport leaves the family unmounted.
  */
 import type { AppRestBroadcast, AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { generate } from "@langwatch/ksuid";
@@ -35,11 +24,8 @@ import type {
 } from "../../app/api-handler-managed-session";
 
 /**
- * The ksuid resource prefix an export id carries.
- *
- * STATED rather than imported: the resource catalogue that names it lives in
- * a browser package, and this is a persisted wire constant rather than a
- * decision — the browser subscribes to progress under exactly this id.
+ * The ksuid resource prefix an export id carries, stated rather than
+ * imported: the catalogue naming it lives in a browser package.
  */
 const EXPORT_KSUID_RESOURCE = "export";
 

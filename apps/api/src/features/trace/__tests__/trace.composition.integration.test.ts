@@ -202,9 +202,10 @@ function testAuthz(): AuthzService {
 }
 
 /**
- * The trace feature, faked at its PORTS: the application slice it publishes, the plan reading beside it and the
- * five port groups. The routers are the REAL mounts over those ports, which is what makes the calls below go
- * through the process's own root rather than through a stub.
+ * The trace feature, faked at its ports: the published application slice,
+ * the plan reading beside it, and the five port groups. The routers are the
+ * real mounts over those ports, so calls below go through the process's own
+ * root rather than a stub.
  */
 function testTraceGroupHalf(broadcast: PresenceEmitterPort): ComposedTraceFeature {
   const ports = testTraceGroupPorts();

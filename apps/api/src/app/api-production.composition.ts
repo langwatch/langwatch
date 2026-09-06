@@ -2417,15 +2417,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * The one-click unsubscribe door's collaborators, or none. `undefined` where this process
-   * composed no automation application.
-   */
-  /**
-   * The internal cron family's collaborators, or none.
-   *
-   * None when the deployment configured no `CRON_API_KEY`: the sweep behind
-   * this door deletes Lambda functions, so a door that cannot authenticate its
-   * caller must not be mounted at all rather than mounted and refusing.
+   * The internal cron family's collaborators, or `undefined` with no
+   * `CRON_API_KEY`: the sweep behind this door deletes Lambda functions, so
+   * an unauthenticated caller must not be mounted rather than refused.
    */
   private composeCron(): CronRestPorts | undefined {
     const secret = this.composedCronApiKey;
@@ -2444,6 +2438,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     };
   }
 
+  /**
+   * The one-click unsubscribe door's collaborators, or `undefined` where this
+   * process composed no automation application.
+   */
   private composeUnsubscribe(): UnsubscribeRestPorts | undefined {
     const automation = this.composedAutomation.service;
     if (!automation) return undefined;

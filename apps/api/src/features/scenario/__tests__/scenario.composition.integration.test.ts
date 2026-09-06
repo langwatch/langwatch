@@ -532,10 +532,10 @@ describe("given the API process composed the scenario feature from its own graph
     it("opens the turn stream, passes its watch gate, and completes with no live buffer", async () => {
       const { application } = composeApplication();
 
-      // The whole point of driving this one on a Redis-less process: the gate is the part that must work — a
-      // caller who cannot see the conversation is refused — and the transport's own documented answer to "no
-      // Redis" is to yield nothing so the browser falls back to the Postgres read. A stream that completes
-      // cleanly is that answer; a stream that errored would mean the gate or the mount was wrong.
+      // On a Redis-less process the gate is what must work (a caller who
+      // cannot see the conversation is refused); "no Redis" yields nothing so
+      // the browser falls back to the Postgres read. A clean completion is
+      // that answer — an error would mean the gate or the mount was wrong.
       const watched = await watchSse({
         application,
         path: "langy.onTurnStream",
@@ -551,8 +551,9 @@ describe("given the API process composed the scenario feature from its own graph
 
   describe("when the agent-side pipelines are registered producer-only", () => {
     /**
-     * The write path end to end: the real `/api/trpc` handler, this process's policy chain, the composed scenario
-     * application, the packaged `simulation_processing` definition registered PRODUCER-only, and the command's
+     * The write path end to end: the real `/api/trpc` handler, this
+     * process's policy chain, the composed scenario application, the
+     * producer-only `simulation_processing` definition, and the command's
      * own handler appending onto the event store.
      */
     it("lands a scenario run command on the event store through the real handler", async () => {
@@ -675,10 +676,10 @@ describe("given the API process composed the scenario feature from its own graph
         "mutation",
       );
 
-      // Not this composition's `service_unavailable` but Langy's OWN `langy_agent_unavailable`, and that is the
-      // better answer: a web process composes no agent manager, the feature already has a typed refusal for
-      // exactly that shape, and the client renders words for it. The composed graph reaching the feature's
-      // refusal rather than a generic one is what this pins.
+      // Not this composition's `service_unavailable` but Langy's own
+      // `langy_agent_unavailable`: a web process composes no agent manager,
+      // and the feature already has a typed refusal the client renders words
+      // for. This pins the composed graph reaching that refusal, not a generic one.
       expect(status).toBeGreaterThanOrEqual(400);
       expect(JSON.stringify(body)).toContain("langy_agent_unavailable");
     });

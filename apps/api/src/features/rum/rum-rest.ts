@@ -1,17 +1,7 @@
 /**
- * Ingest for browser telemetry: `POST /api/rum/v1/traces`.
- *
- * The browser exports OTLP here rather than to the collector directly. That is
- * deliberate — production keeps OTLP off the internet, and the collector's
- * bearer filter guards only its traces pipeline, so exposing it would also
- * expose an unauthenticated log sink. Proxying through the app's own origin
- * means no CORS and no new internet-facing infrastructure.
- *
- * The route stays thin: read the body under a cap, name the caller, hand both
- * to the service. Everything the payload is allowed to cost or claim is decided
- * in `rum-ingest.service.ts`.
- *
- * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
+ * Ingest for browser telemetry: `POST /api/rum/v1/traces`, proxied through
+ * the app's own origin so production keeps OTLP off the internet. Route
+ * stays thin; `rum-ingest.service.ts` decides cost and claims. See ADR-058.
  */
 
 import { HandledError } from "@langwatch/handled-error";
@@ -23,13 +13,9 @@ import type { Context } from "hono";
 import { ingestBrowserTraces, readCappedBody, type RumRateLimiter } from "./rum-ingest.service";
 
 /**
- * Names the caller for the per-caller rate-limit bucket.
- *
- * Both inputs are self-asserted — the session header is whatever the browser
- * chose, and `x-forwarded-for` is only trustworthy from the hop nearest us
- * (which is why this reads the *last* entry: earlier ones are supplied by the
- * client and appended to by each proxy). Neither can be relied on to identify
- * an abuser, which is why the service also enforces a global cap.
+ * Names the caller for the per-caller rate-limit bucket. Both inputs are
+ * self-asserted, so `x-forwarded-for` reads only the *last* hop (nearest us);
+ * neither is reliable enough alone, hence the service's global cap too.
  */
 export const rateLimitKey = (c: Context): string => {
   const session = c.req.header(RUM_SESSION_HEADER);

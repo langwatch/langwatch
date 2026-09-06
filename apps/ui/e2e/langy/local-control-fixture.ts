@@ -1,23 +1,8 @@
 /**
- * The harness for the local control scenarios (ADR-129).
- *
- * It builds the world the feature needs and nothing more:
- *
- *  1. a demo application copied into a temporary git repository, with the
- *     LangWatch SDK dependency pointed at this checkout so the copy resolves
- *     outside the monorepo,
- *  2. the REAL command line, `langwatch langy --share-control`, in a tmux
- *     session, driven with `send-keys` the way a developer drives it,
- *  3. a watcher on the conversation that answers the permission cards and the
- *     question cards through tRPC, as the user, on a policy the test sets.
- *
- * Nothing here mocks the product. The scenario asks Langy in the panel's own
- * tRPC surface, Langy's tools reach the machine over the control socket, and
- * the facts the tests assert come from the repository, the terminal and the
- * conversation record.
- *
- * @see specs/langy/langy-dogfood-scenarios.feature
- * @see dev/docs/adr/129-langy-local-control.md
+ * The harness for the local control scenarios (ADR-129): a demo app in a
+ * temp git repo, the real CLI in a tmux session, and a watcher answering
+ * permission/question cards through tRPC. Nothing here mocks the product.
+ * @see specs/langy/langy-dogfood-scenarios.feature dev/docs/adr/129-langy-local-control.md
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
@@ -140,24 +125,9 @@ function organizationHoldsProject(organization: {
 }
 
 /**
- * A user-scoped API key for the test's own user, bound to the test project.
- *
- * The command line signs in with a device session, and a control request
- * belongs to a person: a plain project key has no user behind it and lists no
- * requests. Rather than clicking through the device-code screens, the fixture
- * mints the same class of credential the login mints, through the product's
- * own `apiKey.create` mutation, as the signed-in user. `LANGWATCH_API_KEY` in
- * the command line's environment is then the credential it resolves, which is
- * the documented environment path of `resolveCredentials`.
- *
- * The key carries one PROJECT-scoped binding, so the platform resolves the
- * project from the key alone and the command line never has to name one.
- *
- * The mint is read back before it is used. A `apiKey.create` that answers 200
- * has been seen to leave the binding unwritten under load, and the key that
- * comes back then reaches every route with "does not grant langy:view". That
- * failure surfaces two minutes later as a command line that never printed its
- * prompt, which says nothing about the cause, so it is caught here instead.
+ * A user-scoped API key for the test's own user, minted through
+ * `apiKey.create` and read back before use: a 200 has been seen to leave the
+ * binding unwritten under load. See ADR-129 appendix.
  */
 export function getCliApiKey(): Promise<string> {
   cliApiKeyPromise ??= (async () => {
@@ -267,13 +237,9 @@ async function copyTree(from: string, to: string): Promise<void> {
 }
 
 /**
- * Point the demo's LangWatch SDK dependency at this checkout by absolute path.
- *
- * Both applications depend on the SDK through a relative path that only
- * resolves inside the monorepo (`../../../../sdks/python`,
- * `file:../../../../sdks/typescript`). A copy outside it must name the same
- * SDK by its absolute path, or the install fails and the scenario measures the
- * fixture rather than the product.
+ * Points the demo's LangWatch SDK dependency at this checkout by absolute
+ * path: the relative path it ships with only resolves inside the monorepo,
+ * and a copy outside it needs the absolute one or the install fails.
  */
 async function pointSdkAtThisCheckout({
   root,
@@ -507,13 +473,9 @@ export interface CliTerminal {
 }
 
 /**
- * Cancels every control request still open for this project.
- *
- * A request a run never answered stays open for its whole window, and the next
- * `langwatch langy --share-control` then opens the picker instead of waiting.
- * Every scenario shares one project, so one run's leftovers change what the
- * next run's command line does. Clearing them first is what a developer with
- * one live conversation sees.
+ * Cancels every control request still open for this project: every scenario
+ * shares one project, so a previous run's unanswered request would otherwise
+ * open the picker instead of waiting for the next run's command line.
  */
 export async function cancelOpenControlRequests(): Promise<void> {
   const apiKey = await getCliApiKey();
@@ -752,16 +714,10 @@ export interface ConversationWatcher {
   permissions: PermissionAsk[];
   questions: QuestionAsk[];
   /**
-   * The answers the developer has given on cards since the last drain, one
-   * line each, and empties the list.
-   *
-   * The fixture answers a card through the panel's own mutation, which is
-   * exactly what the developer does and exactly why the judge cannot see it:
-   * the conversation it grades holds Langy's messages and tool results, and
-   * the answer never appears in either. A criterion about what Langy did AFTER
-   * a grant or a denial then has nothing to read. Feed these lines into the
-   * scenario after each turn to put the developer's side of the card in the
-   * record.
+   * The developer's card answers since the last drain, one line each,
+   * emptying the list. The judge's conversation never sees these (the panel
+   * mutation answers a card the same way a developer does), so feed these
+   * lines in after each turn to put the developer's side in the record.
    */
   drainAnswerNotes: () => string[];
   /**
@@ -798,17 +754,10 @@ export interface ConversationWatcher {
    */
   lastAssistantText: (input?: { turnId?: string; timeoutMs?: number }) => Promise<string>;
   /**
-   * One turn's answer as a judge reads it: the tool calls it made and what
-   * they answered, then its reply.
-   *
-   * A turn the panel starts on its own never passes through the scenario
-   * adapter, so nothing else puts its work in front of the judge. Feeding only
-   * the reply leaves every claim in it looking ungrounded, which is a fact
-   * about the harness and not about the answer.
-   *
-   * Name the turn with `turnId`. Without it the read takes whatever answer is
-   * last right now, which after a turn that just ended can still be the answer
-   * before it.
+   * One turn's answer as a judge reads it: its tool calls and their answers,
+   * then its reply — needed because a panel-started turn never passes
+   * through the scenario adapter otherwise. Name the turn with `turnId`, or
+   * the read may return the previous turn's answer instead of this one's.
    */
   lastTurnMessages: (input?: { turnId?: string; timeoutMs?: number }) => Promise<JudgeMessage[]>;
   stop: () => void;
@@ -1392,21 +1341,11 @@ export interface DemoApp {
 }
 
 /**
- * Start the demo application from the shared folder, connected to the platform.
- *
- * It runs in its own terminal rather than as a child of the test, because
- * Langy restarts it through the folder and the test must not own the process
- * it is asserting about.
- *
- * The credentials go in the folder's own `.env`, which is where a developer
- * keeps them and where the demo reads them from. Exporting them only in this
- * launcher would leave them out of the shell Langy restarts the application
- * in, so the new process would come up with no way to reach the platform and
- * the agent would never register the change.
- *
- * The model key is one of them. Without it the demo's own tests cannot pass in
- * the shared folder whatever Langy writes, so a scenario that asks Langy to
- * run the checks would only ever prove that it tried.
+ * Starts the demo application from the shared folder, connected to the
+ * platform, in its own terminal (not a child of the test) since Langy
+ * restarts it through the folder. Credentials go in the folder's own `.env`
+ * — the shell Langy restarts in — including the model key, without which the
+ * demo's own tests can't pass whatever Langy writes.
  */
 export async function startDemoApp({
   repo,

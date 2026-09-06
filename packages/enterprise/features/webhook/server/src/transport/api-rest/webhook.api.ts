@@ -66,15 +66,8 @@ const sqsDestinationSchema = z.object({
 });
 
 /**
- * Each kind requires its own address and refuses the other kind's, and a 400
- * has to say WHICH field is wrong rather than that the body is wrong
- * somewhere. A superRefine puts the message on the path of the offending
- * field, which is what turns the refusal into an instruction.
- *
- * The second half matters as much as the first. An endpoint stores one
- * address, so a body carrying both would have half of it dropped on the way
- * to the row, and a 201 would tell the caller their queue configuration was
- * saved when it was discarded.
+ * Each kind requires its own address and refuses both at once (an endpoint
+ * stores one); a superRefine puts the 400's message on the offending field.
  */
 function refineDestinationShape(
   body: {
@@ -237,13 +230,9 @@ const endpointCommonDtoFields = {
 };
 
 /**
- * The destination is a union on `destination_kind`, not two independent
- * nullable fields.
- *
- * Described as two nullable fields, the document permitted `destination_kind:
- * "http"` beside a populated `sqs`, and a generated client had to null-check
- * both and hope. As a union each branch states exactly one address, and the
- * kind narrows to it.
+ * A union on `destination_kind`, not two nullable fields: those permitted
+ * `destination_kind: "http"` beside a populated `sqs`, forcing a client to
+ * null-check both and hope.
  */
 const httpEndpointDtoSchema = z.object({
   destination_kind: z.literal("http"),
@@ -313,10 +302,8 @@ const eventTypeDtoSchema = z.object({
 });
 
 /**
- * One emitted event, the SAME envelope the signed deliveries carry, so a
- * pull and a receiver parse with one reader. `data` is the per-type business
- * payload and stays an open object: every family carries its own cut, and a
- * closed shape here would describe only one of them.
+ * One emitted event, the same envelope signed deliveries carry. `data` stays
+ * an open object since every family carries its own cut of the payload.
  */
 const webhookEventEnvelopeSchema = z.object({
   id: z.string(),
@@ -356,6 +343,8 @@ const notFoundResponse = {
 
 const logger = createLogger("langwatch:webhooks:rest");
 
+type WebhookContext = OrganizationScopedContext<EndpointVariables>;
+
 /** The queue fields, wire spelling to service spelling. */
 function sqsFromBody(sqs: {
   queue_url?: string;
@@ -374,13 +363,9 @@ function sqsFromBody(sqs: {
 }
 
 /**
- * The destination half of a create body, wire spelling to service spelling.
- *
- * The schema already refused a kind without its own address, so the queue URL
- * is present here. That is stated by narrowing the parameter rather than by
- * casting the result: a cast would go on asserting it after a future
- * loosening of the refinement, and the row written would carry an empty
- * queue URL instead of failing the compile.
+ * The destination half of a create body, wire to service spelling, stated by
+ * narrowing the parameter rather than casting — the schema already refused
+ * a kind with no address.
  */
 function destinationFromBody(body: {
   destination_kind?: "http" | "sqs";
@@ -445,13 +430,140 @@ async function recordTestFire(
 }
 
 /**
- * The webhook platform's public REST surface, `/api/webhooks/v1`.
- *
- * Live since 2026-08, so every path, body, header, status code and enum
- * spelling below is a published contract rather than an implementation
- * detail. The capabilities arrive as one per-request provider rather than
- * being read off the request, so this family can be mounted into any process
- * that has them — including the spec generator, which never resolves it.
+ * PATCH `/endpoints/:id`: applies any field update, then any requested
+ * status transition on the possibly just-updated row. Pulled out of the
+ * route table as the bulk of its cognitive complexity.
+ */
+async function updateEndpointHandler(
+  webhooks: () => WebhookApp,
+  input: { id: string } & z.infer<typeof updateEndpointSchema>,
+  organization: { id: string },
+) {
+  const endpointId = input.id;
+  const body = input;
+  const endpoints = webhooks().endpoints;
+
+  const hasFieldUpdate =
+    body.destination_kind !== undefined ||
+    body.url !== undefined ||
+    body.sqs !== undefined ||
+    body.enabled_events !== undefined ||
+    body.max_batch_size !== undefined ||
+    body.max_batch_delay_ms !== undefined ||
+    body.max_in_flight !== undefined;
+  let endpoint = hasFieldUpdate
+    ? await endpoints.update({
+        organizationId: organization.id,
+        endpointId,
+        destinationKind: body.destination_kind,
+        url: body.url,
+        ...(body.sqs !== undefined ? { sqs: sqsFromBody(body.sqs) } : {}),
+        enabledEvents: body.enabled_events,
+        maxBatchSize: body.max_batch_size,
+        maxBatchDelayMs: body.max_batch_delay_ms,
+        maxInFlight: body.max_in_flight,
+      })
+    : await endpoints.getById({
+        organizationId: organization.id,
+        endpointId,
+      });
+  const requestedStatus = body.status && toStoredEnum(body.status);
+  if (requestedStatus === "DISABLED" && endpoint.status === "ACTIVE") {
+    endpoint = await endpoints.disable({
+      organizationId: organization.id,
+      endpointId,
+    });
+  } else if (requestedStatus === "ACTIVE" && endpoint.status === "DISABLED") {
+    endpoint = await endpoints.enable({
+      organizationId: organization.id,
+      endpointId,
+    });
+  }
+  return { data: endpointResponse(endpoint) };
+}
+
+/**
+ * POST `/endpoints/:id/test`: dispatches a signed test event and reports its
+ * outcome, logging (never throwing) on a delivery-log write failure. Pulled
+ * out of the route table as the other large share of its complexity.
+ */
+async function testEndpointHandler(
+  webhooks: () => WebhookApp,
+  input: { id: string },
+  organization: { id: string },
+) {
+  const endpointId = input.id;
+  const services = webhooks();
+  const [secrets, destination] = await Promise.all([
+    services.endpoints.getSigningSecrets({
+      organizationId: organization.id,
+      endpointId,
+    }),
+    services.endpoints.getDestinationConfig({
+      organizationId: organization.id,
+      endpointId,
+    }),
+  ]);
+  const dispatchId = `test:${randomUUID()}`;
+  try {
+    // The test has to reach exactly what real delivery reaches, including
+    // the transport: a queue endpoint's test must land on the queue, not
+    // on a URL it does not have.
+    const result = await services.dispatch({
+      destination,
+      organizationId: organization.id,
+      endpointId,
+      body: testFireBody(new Date()),
+      batchId: dispatchId,
+      attempt: 1,
+      signingSecrets: secrets,
+      isTestFire: true,
+    });
+    const delivered = result.verdict === "success";
+    await recordTestFire(services.endpoints, {
+      organizationId: organization.id,
+      endpointId,
+      dispatchId,
+      outcome: delivered ? "success" : "terminal",
+      ...(result.status !== null ? { responseStatus: result.status } : {}),
+    });
+    return {
+      data: {
+        delivered,
+        // Null on a transport with no status of its own: a queue accepted
+        // the message or it did not, and there is no code to report.
+        response_status: result.status,
+        // `body` is `unknown` on the dispatch result — a queue transport
+        // answers with whatever its client returned — so it is rendered
+        // rather than sliced directly, which would throw on a non-string.
+        response_body: String(delivered ? (result.body ?? "") : (result.error ?? "")).slice(0, 500),
+      },
+    };
+  } catch (error) {
+    // The full message goes to the delivery log for the operator; the
+    // response carries a sanitized summary so internal dispatch wording
+    // and transport details never reach the caller verbatim.
+    await recordTestFire(services.endpoints, {
+      organizationId: organization.id,
+      endpointId,
+      dispatchId,
+      outcome: "terminal",
+      error: error instanceof Error ? error.message.slice(0, 500) : String(error),
+    });
+    return {
+      data: {
+        delivered: false,
+        response_status: null,
+        error:
+          "The test delivery could not reach the receiver; see the endpoint's delivery log for details.",
+      },
+    };
+  }
+}
+
+/**
+ * The webhook platform's public REST surface, `/api/webhooks/v1`. Live since
+ * 2026-08, so every path/body/header/status/enum below is a published contract.
  */
 export function createWebhookRestApp(options: {
   security: AppRestSecurity;
@@ -511,8 +623,6 @@ export function createWebhookRestApp(options: {
       }),
     routeMiddleware: [requireWebhookPlan],
   });
-
-  type WebhookContext = OrganizationScopedContext<EndpointVariables>;
 
   const endpointIdParams = z.object({ id: z.string().min(1) });
 
@@ -613,50 +723,8 @@ export function createWebhookRestApp(options: {
       "patch",
       "/endpoints/:id",
       MANAGEMENT_API_VERSION,
-      async (c: WebhookContext, input: { id: string } & z.infer<typeof updateEndpointSchema>) => {
-        const organization = organizationOf(c);
-        const endpointId = input.id;
-        const body = input;
-        const endpoints = webhooks().endpoints;
-
-        const hasFieldUpdate =
-          body.destination_kind !== undefined ||
-          body.url !== undefined ||
-          body.sqs !== undefined ||
-          body.enabled_events !== undefined ||
-          body.max_batch_size !== undefined ||
-          body.max_batch_delay_ms !== undefined ||
-          body.max_in_flight !== undefined;
-        let endpoint = hasFieldUpdate
-          ? await endpoints.update({
-              organizationId: organization.id,
-              endpointId,
-              destinationKind: body.destination_kind,
-              url: body.url,
-              ...(body.sqs !== undefined ? { sqs: sqsFromBody(body.sqs) } : {}),
-              enabledEvents: body.enabled_events,
-              maxBatchSize: body.max_batch_size,
-              maxBatchDelayMs: body.max_batch_delay_ms,
-              maxInFlight: body.max_in_flight,
-            })
-          : await endpoints.getById({
-              organizationId: organization.id,
-              endpointId,
-            });
-        const requestedStatus = body.status && toStoredEnum(body.status);
-        if (requestedStatus === "DISABLED" && endpoint.status === "ACTIVE") {
-          endpoint = await endpoints.disable({
-            organizationId: organization.id,
-            endpointId,
-          });
-        } else if (requestedStatus === "ACTIVE" && endpoint.status === "DISABLED") {
-          endpoint = await endpoints.enable({
-            organizationId: organization.id,
-            endpointId,
-          });
-        }
-        return { data: endpointResponse(endpoint) };
-      },
+      async (c: WebhookContext, input: { id: string } & z.infer<typeof updateEndpointSchema>) =>
+        updateEndpointHandler(webhooks, input, organizationOf(c)),
       (b) =>
         policy(requires("webhookEndpoints:manage"))(b)
           .withParams(endpointIdParams)
@@ -721,79 +789,8 @@ export function createWebhookRestApp(options: {
       "post",
       "/endpoints/:id/test",
       MANAGEMENT_API_VERSION,
-      async (c: WebhookContext, input: { id: string }) => {
-        const organization = organizationOf(c);
-        const endpointId = input.id;
-        const services = webhooks();
-        const [secrets, destination] = await Promise.all([
-          services.endpoints.getSigningSecrets({
-            organizationId: organization.id,
-            endpointId,
-          }),
-          services.endpoints.getDestinationConfig({
-            organizationId: organization.id,
-            endpointId,
-          }),
-        ]);
-        const dispatchId = `test:${randomUUID()}`;
-        try {
-          // The test has to reach exactly what real delivery reaches, including
-          // the transport: a queue endpoint's test must land on the queue, not
-          // on a URL it does not have.
-          const result = await services.dispatch({
-            destination,
-            organizationId: organization.id,
-            endpointId,
-            body: testFireBody(new Date()),
-            batchId: dispatchId,
-            attempt: 1,
-            signingSecrets: secrets,
-            isTestFire: true,
-          });
-          const delivered = result.verdict === "success";
-          await recordTestFire(services.endpoints, {
-            organizationId: organization.id,
-            endpointId,
-            dispatchId,
-            outcome: delivered ? "success" : "terminal",
-            ...(result.status !== null ? { responseStatus: result.status } : {}),
-          });
-          return {
-            data: {
-              delivered,
-              // Null on a transport with no status of its own: a queue accepted
-              // the message or it did not, and there is no code to report.
-              response_status: result.status,
-              // `body` is `unknown` on the dispatch result — a queue transport
-              // answers with whatever its client returned — so it is rendered
-              // rather than sliced directly, which would throw on a non-string.
-              response_body: String(delivered ? (result.body ?? "") : (result.error ?? "")).slice(
-                0,
-                500,
-              ),
-            },
-          };
-        } catch (error) {
-          // The full message goes to the delivery log for the operator; the
-          // response carries a sanitized summary so internal dispatch wording
-          // and transport details never reach the caller verbatim.
-          await recordTestFire(services.endpoints, {
-            organizationId: organization.id,
-            endpointId,
-            dispatchId,
-            outcome: "terminal",
-            error: error instanceof Error ? error.message.slice(0, 500) : String(error),
-          });
-          return {
-            data: {
-              delivered: false,
-              response_status: null,
-              error:
-                "The test delivery could not reach the receiver; see the endpoint's delivery log for details.",
-            },
-          };
-        }
-      },
+      async (c: WebhookContext, input: { id: string }) =>
+        testEndpointHandler(webhooks, input, organizationOf(c)),
       (b) =>
         policy(requires("webhookEndpoints:manage"))(b)
           .withParams(endpointIdParams)

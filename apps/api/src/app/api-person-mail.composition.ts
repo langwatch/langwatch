@@ -1,12 +1,7 @@
 /**
- * Every message a person-shaped surface sends, over the ONE outbound mail graph this process
- * composed.
- *
- * The twin of {@link ApiComposedPasswordResetMail}: a whole send that `@langwatch/mail` owns
- * end to end, and the deployment's public host arrives with the message rather than being read
- * out of the template package. Without it the sign-up confirmation link, the budget-increase
- * request and all six join-request notifications were composed by nobody, so a deployment with
- * a configured mail gateway still sent none of them.
+ * Every message a person-shaped surface sends, over this process's one
+ * outbound mail graph. Twin of {@link ApiComposedPasswordResetMail}: the
+ * public host arrives with the message rather than being read from the template.
  */
 import {
   sendBudgetIncreaseRequestEmail,

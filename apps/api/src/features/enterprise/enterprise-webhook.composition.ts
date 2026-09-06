@@ -1,17 +1,8 @@
 /**
- * The webhook application `/api/webhooks/v1` reads, with the entitlement gate
- * this process can always answer.
- *
- * The surface's gate is a PLAN READ, not an Enterprise capability: a
- * deployment that composed no Enterprise governance application still knows
- * whether an organization's plan carries webhook endpoints, and the 403 that
- * names the plan is a refusal the customer can act on. Taken off the
- * governance slice instead, the whole family answered a platform 503 whose
- * body says only that an unknown error occurred — a knowable refusal reported
- * as our outage.
- *
- * Everything behind the gate is left exactly as the slice composed it. This
- * decides which plan the surface is judged against, and nothing else.
+ * The webhook application `/api/webhooks/v1` reads, gated on a plan read (not
+ * an Enterprise capability) so a deployment with no governance application
+ * still answers a customer-actionable 403 instead of an unknown-error 503.
+ * See ADR candidate: webhook plan-gate independence, comment-sweep plan.
  */
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { WebhookAccessService, WebhookApp } from "@langwatch/enterprise-api/webhooks";

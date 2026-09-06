@@ -399,9 +399,9 @@ describe("given an API process composed with the gateway feature", () => {
 
   describe("when no ClickHouse is composed", () => {
     /**
-     * The distinction the whole spend source exists for: a process that cannot price a budget says so, which a client renders differently from a budget
-     * that has genuinely spent nothing. The application carries the answer, so this asserts it on the composition rather than on a list whose emptiness
-     * would make it vacuously true.
+     * A process that cannot price a budget says so — distinct from a budget
+     * that has genuinely spent nothing — so this asserts it on the
+     * composition rather than on a list whose emptiness would be vacuous.
      */
     it("composes the gateway application with its spend source switched off by name", () => {
       const { gateway } = composeApplication();

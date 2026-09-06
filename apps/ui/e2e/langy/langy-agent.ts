@@ -1,6 +1,6 @@
-// AgentAdapter that drives Langy through the REAL product surface: the same `langy.createConversation` /
-// `langy.continueConversation` tRPC mutations and `langy.onTurnStream` SSE subscription the browser panel uses
-// (see src/features/langy/logic/langyChatTransport.ts).
+// AgentAdapter that drives Langy through the real product surface: the same
+// tRPC mutations and SSE subscription the browser panel uses (see
+// src/features/langy/logic/langyChatTransport.ts).
 
 import type { AgentAdapter, AgentInput, AgentReturnTypes } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
@@ -57,13 +57,9 @@ export interface LangySessionState {
    */
   toolNames: string[];
   /**
-   * Every settled tool card's OUTPUT, in order.
-   *
-   * The CLI prints the platform's own bytes unchanged, so a dispatched UI
-   * action's `"executedVia":"browser"` or `"backend"` marker reaches the test
-   * process here and nowhere else: it is on no durable turn record and on no
-   * field of this state. This is the product-truth handle for which leg
-   * carried an action.
+   * Every settled tool card's OUTPUT, in order: the only place a dispatched
+   * UI action's `"executedVia":"browser"`/`"backend"` marker reaches the
+   * test process, since it is on no durable turn record.
    */
   toolOutputs: string[];
 }
@@ -126,9 +122,9 @@ async function trpcMutate<T>({
 }
 
 /**
- * `langy_turn_in_progress` fires from two different checks in langy-turn.service.ts: the authoritative Postgres admission claim
- * (`admission.kind === "busy"`), and a conversation-status PROJECTION read that its own comment calls "only a rollout/back-compat hint...
- * the Postgres admission claim above is the concurrency authority" — i.e. it can go stale.
+ * `langy_turn_in_progress` fires from two checks in langy-turn.service.ts:
+ * the authoritative Postgres admission claim, and a conversation-status
+ * projection read that can go stale (a back-compat hint, per its own comment).
  */
 async function trpcMutateWithTurnLockRetry<T>({
   cookie,
@@ -204,9 +200,9 @@ function parseHandledStreamError(entry: {
 }
 
 /**
- * The judge grades from these frames while the AGENT read the full payload, so any cut between the two must be stated or the judge reads a
- * missing item as a nonexistent one and fails a genuinely grounded reply as fabrication (it did, twice: real seeded trace ids cited from an
- * elided array tail, and a result count that sat past this adapter's own byte cap).
+ * The judge grades from these frames while the agent read the full payload,
+ * so any cut between the two must be stated or the judge reads a missing
+ * item as fabrication (it has, twice: elided trace ids, an elided count).
  */
 function boundOutputForJudge(output: string): string {
   const capped = output.slice(0, 8192);
