@@ -77,6 +77,9 @@ const UNDOCUMENTED_CALLER_IDENTITY =
 const UNDOCUMENTED_MODEL_DEFAULTS =
   "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
 
+const UNDOCUMENTED_LANGY_LOCAL_CONTROL =
+  "Not yet documented in the API reference: the Langy local control routes are called by the langwatch CLI (langwatch langy --share-control), and the CLI documentation covers that flow.";
+
 const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
   "Not yet documented in the API reference: the saved workbench chart routes require the analytics:view permission and have no reference pages yet.";
 
@@ -103,6 +106,14 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
+  "/api/v1/langy/control/connect/frames": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/control/connect/poll": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/control/connect/register": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/control/requests": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/control/requests/{id}/approve":
+    UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/control/requests/{id}/cancel":
+    UNDOCUMENTED_LANGY_LOCAL_CONTROL,
   "/api/v1/projects/{projectId}/analytics/charts":
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}":

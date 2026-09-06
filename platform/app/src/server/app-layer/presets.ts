@@ -27,7 +27,6 @@ import {
   mintLangySessionApiKey,
   revokeLangySessionApiKey,
 } from "~/server/app-layer/langy/langyApiKey";
-import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
@@ -830,7 +829,7 @@ export function initializeDefaultApp(options?: {
     prisma,
   );
   const langyMessageRepository = new PrismaLangyMessageRepository(prisma);
-  const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
+  const langyAgentUrl = process.env.LANGY_AGENT_URL;
   const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
   const langyWorker = createLangyWorkerPort({
     agentUrl: langyAgentUrl ?? "",
@@ -1446,9 +1445,6 @@ export function initializeDefaultApp(options?: {
     // Check-only cap view for the panel-open warm: signature parity with the
     // turn's token strip, without spending a PR permit on a panel open.
     checkPermit: getLangyGithubPrUsage,
-    // The harness flag (`release_langy_pi_harness`), evaluated once per turn
-    // and riding `credentials.harness` into probe, stash and dispatch.
-    resolveHarness: resolveLangyHarness,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
@@ -2287,6 +2283,12 @@ export function createTestApp(overrides?: TestAppOverrides): App {
           recordTurnHandoff: noop,
           consumeTurnHandoff: noop,
           generateConversationTitle: noop,
+          requestLocalControl: noop,
+          connectLocalWorkspace: noop,
+          disconnectLocalWorkspace: noop,
+          changeLocalPolicy: noop,
+          startUserWait: noop,
+          endUserWait: noop,
         },
         new NullLangyConversationRepository(),
       ),
@@ -2427,6 +2429,12 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         recordTurnHandoff: noop,
         consumeTurnHandoff: noop,
         generateConversationTitle: noop,
+        requestLocalControl: noop,
+        connectLocalWorkspace: noop,
+        disconnectLocalWorkspace: noop,
+        changeLocalPolicy: noop,
+        startUserWait: noop,
+        endUserWait: noop,
       } as AppCommands["langy"],
       topicClustering: {
         requestClustering: noop,

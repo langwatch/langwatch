@@ -221,26 +221,6 @@ describe("LangyTurnService.warmConversationWorker", () => {
     });
   });
 
-  describe("given the harness flag resolves to pi", () => {
-    it("rides the harness on the probe and inside the warm credentials", async () => {
-      const { deps, mocks } = makeDeps({
-        resolveHarness: vi.fn(async () => "pi" as const),
-      });
-      const service = LangyTurnService.create(deps);
-
-      await service.warmConversationWorker(warmInput());
-
-      const probeArgs = mocks.probe.mock.calls[0]![0] as unknown as {
-        harness?: string;
-      };
-      expect(probeArgs.harness).toBe("pi");
-      const warmArgs = mocks.warm.mock.calls[0]![0] as {
-        credentials: { harness?: string };
-      };
-      expect(warmArgs.credentials.harness).toBe("pi");
-    });
-  });
-
   describe("given minting refuses because no Langy scope applies", () => {
     /** @scenario A user whose role cannot carry Langy scope sees nothing */
     it("swallows the scope refusal and reports it warmed nothing", async () => {

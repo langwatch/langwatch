@@ -580,7 +580,7 @@ test_langy_disabled() {
   # below would pass against it. These are what stop this suite reporting a
   # clean opt-out for a chart that rendered nothing at all.
   assert_contains "langy: agent Deployment present when enabled"  "$on" "name: ${RELEASE}-langyagent"
-  assert_contains "langy: agent URL wired when enabled"           "$on" "OPENCODE_AGENT_URL"
+  assert_contains "langy: agent URL wired when enabled"           "$on" "LANGY_AGENT_URL"
   assert_contains "langy: rollout flag forced when enabled"       "$on" "release_langy_enabled"
   assert_contains "langy: shared secret key present when enabled" "$on" "LANGY_INTERNAL_SECRET"
 
@@ -589,7 +589,7 @@ test_langy_disabled() {
   assert_not_contains "langy: no agent resources when disabled" "$off" "${RELEASE}-langyagent"
 
   # The umbrella chart's own references, each behind its own guard.
-  assert_not_contains "langy: agent URL not wired when disabled"      "$off" "OPENCODE_AGENT_URL"
+  assert_not_contains "langy: agent URL not wired when disabled"      "$off" "LANGY_AGENT_URL"
   assert_not_contains "langy: rollout flag not forced when disabled"  "$off" "release_langy_enabled"
   assert_not_contains "langy: shared secret key absent when disabled" "$off" "LANGY_INTERNAL_SECRET"
 
