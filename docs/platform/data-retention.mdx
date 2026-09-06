@@ -83,7 +83,7 @@ Shortening a period without **Apply this change to existing data** leaves stored
 
 ## Self-hosted deployments
 
-Retention works the same way on your own ClickHouse. Files that traces reference in object storage, for example images, are not deleted by retention.
+Retention works the same way on your own ClickHouse. Files that traces reference in object storage, for example images, are not deleted by retention. Each file is stored under its content hash and shared by every trace in the project that references the same bytes, so deleting a trace never deletes its files. LangWatch removes them when the project is deleted. To remove them earlier, delete them from your bucket yourself, and check that no other trace still references them.
 
 Without a license the deployment keeps the platform default of 49 days and cannot add a policy. An Enterprise license opens the same presets and custom period as the Enterprise plan.
 

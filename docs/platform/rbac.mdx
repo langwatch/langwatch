@@ -21,7 +21,7 @@ LangWatch has three scopes:
 | **Team** | A set of projects and the people who work on them |
 | **Project** | Traces, evaluations, prompts, datasets, API keys and everything else you send data to |
 
-Every member of the organization has an organization role. Access to a team or a project comes from a team role, given per team or per project through a role binding.
+Every member of the organization has an organization role. A role binding at the organization scope applies to every team and project in it, which is how an organization Admin reaches everything. Below that, access to a team or a project comes from a binding on that team or that project.
 
 ## Organization roles
 
@@ -30,7 +30,7 @@ Set the organization role per member at **Settings > Members**. The role decides
 | Role | What it grants |
 |------|----------------|
 | **Admin** | Every permission on every team and project in the organization, plus the organization settings: members, teams, roles, groups, billing, the audit log, AI Governance, webhook endpoints and spend data |
-| **Member** | `organization:view` and `aiTools:view`. Access to a team or a project comes only from a team role |
+| **Member** | `organization:view` and `aiTools:view`. Access to a team or a project comes from a binding on that team or that project |
 | **Lite Member** | `organization:view` and `aiTools:view`. On a team or a project a Lite Member is capped at the Viewer permissions below, plus `annotations:create` and `annotations:update`, and never sees costs, the AI Gateway pages or the audit log |
 
 A Lite Member uses a Lite seat, which is counted separately from full seats. In the settings pages a Lite Member can only be given the Viewer role on a team or a project. A group binding above Viewer applies as Viewer for a Lite Member.

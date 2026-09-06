@@ -85,7 +85,7 @@ Created without a user association (`userId: null`). Scoped to specific projects
 ```
 
 <Info>
-Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific projects when possible.
+Service keys with neither `projectIds` nor `bindings` get org-wide ADMIN access. Always scope to specific projects when possible.
 </Info>
 
 `projectIds` is shorthand rather than a separate mechanism: each id becomes one ADMIN binding on that project, added to any `bindings` you sent rather than replacing them. Reach for `bindings` directly when you want a role other than ADMIN, or a team or organization scope. Service keys only, and a personal key that sends it is refused.
