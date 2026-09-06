@@ -22,6 +22,7 @@ import {
   assertPathCompletedAfterSkill,
   attachKickoffConversation,
   conversationMessages,
+  createGuidedCheckout,
   GUIDED_LINES,
   GUIDED_OPTIONS,
   GUIDED_TONE_CRITERIA,
@@ -40,7 +41,6 @@ import {
   assertToolsPresent,
   type CliTerminal,
   type ConversationWatcher,
-  createDemoRepo,
   type DemoRepo,
   setCodeAccessPreference,
   startShareControl,
@@ -74,7 +74,7 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
       tour: "completed",
     });
     await setCodeAccessPreference(null);
-    repo = await createDemoRepo({ language: "langgraph", name: "guided-chat" });
+    repo = await createGuidedCheckout({ name: "guided-chat" });
   }, 1_200_000);
 
   afterAll(async () => {

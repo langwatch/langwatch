@@ -12,6 +12,8 @@
  * @see specs/langy/langy-guided-onboarding.feature
  */
 
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { expect } from "vitest";
 import {
   buildGuidedKickoffParts,
@@ -27,7 +29,12 @@ import {
   useProject,
 } from "./config";
 import type { LangyAdapter, LangyToolEvent } from "./langy-agent";
-import { getCliApiKey, openaiKey } from "./local-control-fixture";
+import {
+  createDemoRepo,
+  type DemoRepo,
+  getCliApiKey,
+  openaiKey,
+} from "./local-control-fixture";
 import {
   getSessionCookie,
   resetSessionCookie,
@@ -593,6 +600,27 @@ export function expectSnippetOnThisGateway({
   const escaped = gatewayUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   expect(text).toMatch(new RegExp(`OPENAI_BASE_URL=["']?${escaped}/v1`));
   expect(text).not.toMatch(/gateway\.langwatch\.ai/);
+}
+
+/**
+ * The developer's checkout as they share it: the demo repo with its own model
+ * key in `.env`, the way a checkout that runs has one. Langy starts the app
+ * itself on the llmops path and adds the LangWatch lines to the same file;
+ * without the model key the first scenario run fails on the agent's side,
+ * on credentials, before anything the path is about.
+ */
+export async function createGuidedCheckout({
+  name,
+}: {
+  name: string;
+}): Promise<DemoRepo> {
+  const repo = await createDemoRepo({ language: "langgraph", name });
+  await fs.writeFile(
+    path.join(repo.root, ".env"),
+    `OPENAI_API_KEY=${openaiKey()}\n`,
+    "utf8",
+  );
+  return repo;
 }
 
 /** Wait until the organization lists the path as done, or give up. */

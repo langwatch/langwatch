@@ -22,6 +22,7 @@ import {
   assertPathCompletedAfterSkill,
   attachKickoffConversation,
   conversationMessages,
+  createGuidedCheckout,
   GUIDED_LINES,
   GUIDED_OPTIONS,
   GUIDED_TONE_CRITERIA,
@@ -40,7 +41,6 @@ import {
   assertToolsPresent,
   type CliTerminal,
   type ConversationWatcher,
-  createDemoRepo,
   type DemoRepo,
   setCodeAccessPreference,
   startShareControl,
@@ -74,10 +74,7 @@ describe("Langy sets up the llmops path through the shared folder", () => {
     // "GitHub" from another suite would silence the very card this file is
     // about.
     await setCodeAccessPreference(null);
-    repo = await createDemoRepo({
-      language: "langgraph",
-      name: "guided-llmops",
-    });
+    repo = await createGuidedCheckout({ name: "guided-llmops" });
   }, 1_200_000);
 
   afterAll(async () => {
