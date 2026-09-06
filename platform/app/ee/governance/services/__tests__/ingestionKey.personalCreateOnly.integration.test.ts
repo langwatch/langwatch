@@ -20,6 +20,7 @@ import {
 import { registerGovernanceMcpTools } from "~/mcp/governance-tools";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
@@ -35,7 +36,7 @@ const PROJECT_ID = `prj-ikc-${suffix}`;
 const PROJECT_API_KEY = `sk-lw-ikc-${suffix}`;
 
 /** The one MCP surface under test, invoked the way the server would. */
-async function mintThroughMcp(sourceType: string): Promise<void> {
+async function mintThroughMcp(sourceType: string): Promise<string> {
   const tools = new Map<string, (args: any) => Promise<unknown>>();
   const server = {
     tool: (
@@ -56,7 +57,22 @@ async function mintThroughMcp(sourceType: string): Promise<void> {
   const mint = tools.get("governance_ingestion_keys_mint");
   if (!mint)
     throw new Error("governance_ingestion_keys_mint is not registered");
-  await mint({ source_type: sourceType });
+  const result = (await mint({ source_type: sourceType })) as {
+    content: Array<{ text: string }>;
+  };
+  const issued = JSON.parse(
+    result.content.map((part) => part.text).join(""),
+  ) as { token: string };
+  return issued.token;
+}
+
+/**
+ * Whether a token still gets through the resolver every trace-write endpoint
+ * authorizes with. A revoked key resolves to nothing, which is the 401.
+ */
+async function authorizesTraceWrites(token: string): Promise<boolean> {
+  const resolved = await TokenResolver.create(prisma).resolve({ token });
+  return resolved !== null;
 }
 
 function caller() {
@@ -82,6 +98,8 @@ async function liveKeyIds(): Promise<string[]> {
 
 describe("personal ingest keys minted outside the CLI", () => {
   const service = IngestionKeyService.create(prisma);
+  /** Every token handed out before the rotation, in the order it was minted. */
+  const priorTokens: string[] = [];
 
   beforeAll(async () => {
     await prisma.organization.create({
@@ -152,21 +170,24 @@ describe("personal ingest keys minted outside the CLI", () => {
 
   describe("when a device already holds a key and the tile connects the source", () => {
     /** @scenario "Connecting a source from the personal tile keeps the devices' keys" */
-    it("adds a key and revokes none", async () => {
+    it("adds a key and leaves the device's own authorizing", async () => {
       const laptop = await service.issueForPersonalProject({
         userId: USER_ID,
         organizationId: ORG_ID,
         sourceType: "claude_code",
       });
+      priorTokens.push(laptop.token);
 
-      await caller().ingestionKey.install({
+      const installed = await caller().ingestionKey.install({
         organizationId: ORG_ID,
         sourceType: "claude_code",
       });
+      priorTokens.push(installed.token);
 
       const live = await liveKeyIds();
       expect(live).toContain(laptop.apiKeyId);
       expect(live).toHaveLength(2);
+      expect(await authorizesTraceWrites(laptop.token)).toBe(true);
     });
   });
 
@@ -175,7 +196,7 @@ describe("personal ingest keys minted outside the CLI", () => {
     it("adds a key and revokes none", async () => {
       const before = await liveKeyIds();
 
-      await mintThroughMcp("claude_code");
+      priorTokens.push(await mintThroughMcp("claude_code"));
 
       const live = await liveKeyIds();
       // Every key that was live before an agent asked for one is still live:
@@ -187,17 +208,27 @@ describe("personal ingest keys minted outside the CLI", () => {
 
   describe("when the tile rotates the source", () => {
     /** @scenario "An explicit rotation from the personal tile revokes every prior key" */
-    it("leaves exactly the rotated key live", async () => {
-      expect((await liveKeyIds()).length).toBeGreaterThan(1);
+    it("leaves one new key authorizing and every prior token refused", async () => {
+      const before = await liveKeyIds();
+      expect(before.length).toBeGreaterThan(1);
+      expect(priorTokens).toHaveLength(before.length);
 
-      await caller().ingestionKey.rotate({
+      const rotated = await caller().ingestionKey.rotate({
         organizationId: ORG_ID,
         sourceType: "claude_code",
       });
 
       // Rotation is the verb that kills the other machines' keys, and it is
-      // the only one that still does.
-      expect(await liveKeyIds()).toHaveLength(1);
+      // the only one that still does. A row read is not the claim being
+      // made, so each prior token goes back through the resolver the
+      // trace-write endpoints authorize with.
+      const live = await liveKeyIds();
+      expect(live).toHaveLength(1);
+      expect(before).not.toContain(live[0]);
+      expect(await authorizesTraceWrites(rotated.token)).toBe(true);
+      for (const token of priorTokens) {
+        expect(await authorizesTraceWrites(token)).toBe(false);
+      }
     });
   });
 });

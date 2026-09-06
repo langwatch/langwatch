@@ -176,6 +176,13 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   # that stops at the first leaves the rest writing under a page that says the
   # key was rotated.
 
+  @unit @ingest-api-key @rotate
+  Scenario: A rotation that cannot kill every prior key mints nothing
+    Given a rotation over several live keys
+    When one of them cannot be revoked
+    Then every other prior key is still attempted
+    And no new key is minted
+
   @integration @ingest-api-key @rotate @personal
   Scenario: An explicit rotation from the personal tile revokes every prior key
     Given jane's personal workspace holds several live "claude_code" keys
@@ -186,6 +193,13 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   # The cap is per source type, so the set of source types must be finite or
   # a device session holds the cap again under every value it invents. The
   # personal mint accepts the tools the CLI wraps and nothing else.
+
+  @unit @ingest-api-key @issue @personal @create-only
+  Scenario: A source type outside the wrapped tools needs its template
+    Given a personal mint from the tile or the MCP tool
+    When it names a source type no wrapped tool stamps
+    Then it mints only if a published template names that source type
+    And no key is created for a source type nothing names
 
   @integration @ingest-api-key @issue @personal @create-only
   Scenario: A personal key is minted only for a tool the CLI wraps

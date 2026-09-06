@@ -18,12 +18,20 @@ const apiKeyRepo = vi.hoisted(() => ({
 const workspace = vi.hoisted(() => ({
   findExisting: vi.fn(),
 }));
+const templates = vi.hoisted(() => ({
+  findByIdForOrg: vi.fn(),
+}));
 
 vi.mock("~/server/api-key/api-key.service", () => ({
   ApiKeyService: { create: () => apiKeys },
 }));
 vi.mock("~/server/api-key/api-key.repository", () => ({
   ApiKeyRepository: { create: () => apiKeyRepo },
+}));
+vi.mock("../../repositories/ingestionTemplate.repository", () => ({
+  IngestionTemplateRepository: class {
+    findByIdForOrg = templates.findByIdForOrg;
+  },
 }));
 vi.mock("../personalWorkspace.service", () => ({
   PersonalWorkspaceService: class {
@@ -71,6 +79,7 @@ describe("IngestionKeyService.issueForPersonalProject", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = IngestionKeyService.create({} as never);
+    templates.findByIdForOrg.mockResolvedValue(null);
     workspace.findExisting.mockResolvedValue({ project: { id: "project_1" } });
     apiKeys.create.mockResolvedValue({
       token: "ik-lw-fresh-token",
@@ -91,19 +100,41 @@ describe("IngestionKeyService.issueForPersonalProject", () => {
   });
 
   describe("when the source type is one the product knows but no CLI wraps", () => {
-    it("mints through the create-only path the tile and MCP use", async () => {
+    /** @scenario "A source type outside the wrapped tools needs its template" */
+    it("mints when a published template names it", async () => {
       apiKeyRepo.findIngestKeysForProject.mockResolvedValue([]);
+      templates.findByIdForOrg.mockResolvedValue({
+        id: "tmpl_cowork",
+        sourceType: "claude_cowork",
+      });
 
       const issued = await service.createForPersonalProject({
         ...PARAMS,
         sourceType: "claude_cowork",
+        ingestionTemplateId: "tmpl_cowork",
       });
 
-      // The wrapped-tool list bounds what a device session may mint. The
-      // tile and the MCP tool name source types from the product's own
-      // catalog, so they reach the same create-only mint without it.
       expect(issued.apiKeyId).toBe("ak_new");
       expect(apiKeys.revoke).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A source type outside the wrapped tools needs its template" */
+    it("refuses a source type no template names", async () => {
+      // The cap counts one source type at a time, so a caller free to invent
+      // them is a caller with an unbounded number of 32-key buckets.
+      await expect(
+        service.createForPersonalProject({
+          ...PARAMS,
+          sourceType: "made_up",
+          ingestionTemplateId: "tmpl_other",
+        }),
+      ).rejects.toThrow(/made_up/);
+
+      await expect(
+        service.createForPersonalProject({ ...PARAMS, sourceType: "made_up" }),
+      ).rejects.toThrow(/made_up/);
+
+      expect(apiKeys.create).not.toHaveBeenCalled();
     });
   });
 

@@ -107,6 +107,34 @@ describe("IngestionKeyService.ensureForProject", () => {
     });
   });
 
+  describe("when one of the prior keys cannot be revoked", () => {
+    /** @scenario "A rotation that cannot kill every prior key mints nothing" */
+    it("still tries the rest, then fails without minting", async () => {
+      apiKeyRepo.findIngestKeysForProject.mockResolvedValue([
+        priorKey("ak_laptop"),
+        priorKey("ak_desktop"),
+        priorKey("ak_vm"),
+      ]);
+      apiKeys.revoke.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "ak_desktop") throw new Error("postgres is down");
+      });
+
+      await expect(service.ensureForProject(MINT_PARAMS)).rejects.toThrow(
+        /prior ingestion key/,
+      );
+
+      // Handing back a fresh token while a machine keeps writing with an old
+      // one is the outcome rotation exists to prevent. Every key still gets
+      // its attempt, so the retry has less left to do.
+      expect(apiKeys.revoke.mock.calls.map(([args]) => args.id)).toEqual([
+        "ak_laptop",
+        "ak_desktop",
+        "ak_vm",
+      ]);
+      expect(apiKeys.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when no prior key exists", () => {
     it("mints without revoking anything", async () => {
       apiKeyRepo.findIngestKeysForProject.mockResolvedValue([]);
