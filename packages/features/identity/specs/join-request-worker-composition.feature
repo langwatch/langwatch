@@ -99,3 +99,23 @@ Feature: Composing the join-request ledger in a background worker
     When the lapse notice is rendered
     Then it is byte-for-byte the message the application renders
     And it names nobody and gives no reason
+
+  @unit
+  Scenario: The arrival notifier counts prior approvals from the domain
+    Given a domain with two requests already approved
+    When a third request arrives
+    Then the approved-from-domain count reaches the arrival mail
+
+  @unit
+  Scenario: The expiry notifier finds the requester's own personal project
+    Given a requester who already holds a personal project
+    When their request lapses
+    Then the personal project link reaches the expiry mail
+    And a requester with no personal project gets no link
+
+  @unit
+  Scenario: The auto-join notifier reads the same seat census as invitations
+    Given an organization on a self-serve plan below its seat ceiling
+    When a domain match joins somebody automatically
+    Then the seats used and the seats the plan covers reach the notice
+    And an organization on a negotiated plan gets no seat count

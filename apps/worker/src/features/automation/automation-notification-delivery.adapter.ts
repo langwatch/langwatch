@@ -16,7 +16,7 @@ import {
   type WebhookSendResult,
 } from "@langwatch/automation-server";
 import { toDispatchError } from "@langwatch/eventing";
-import type { MailRenderPort } from "@langwatch/mail";
+import type { MailRenderPort, TriggerDigestEntry } from "@langwatch/mail";
 import type { TraceRecord } from "@langwatch/trace-contract";
 import type { EmailDeliveryPort } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -30,6 +30,29 @@ type SettlementDigestEntry = {
   projectId: string;
   fullTrace: TraceRecord;
 };
+
+/** How much of a trace's input the digest shows before it stops being a preview. */
+const DIGEST_PREVIEW_MAX_CHARS = 140;
+
+/**
+ * A settled match, as the digest template asks for one.
+ *
+ * `occurredAt` and `preview` come from what settlement already hydrated onto
+ * this candidate — the trace's own start time and its computed input — so no
+ * new read is needed to fill them. `value`/`unit` stay unset: nothing in the
+ * settlement pipeline threads a matched metric alongside the trace id, so
+ * naming one here would be a guess rather than a fact.
+ */
+function toDigestEntry(entry: SettlementDigestEntry): TriggerDigestEntry {
+  const preview = entry.input.trim();
+  const startedAt = entry.fullTrace.timestamps?.started_at;
+
+  return {
+    traceId: entry.traceId,
+    ...(typeof startedAt === "number" ? { occurredAt: new Date(startedAt).toISOString() } : {}),
+    ...(preview ? { preview: preview.slice(0, DIGEST_PREVIEW_MAX_CHARS) } : {}),
+  };
+}
 
 /**
  * Everything an automation alert can leave this process through.
@@ -146,7 +169,7 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
         triggerMessage: input.triggerMessage,
         projectSlug: input.projectSlug,
         baseHost: this.baseHost,
-        entries: input.triggerData,
+        entries: input.triggerData.map(toDigestEntry),
       });
     } catch (error) {
       throw toDispatchError(error, {

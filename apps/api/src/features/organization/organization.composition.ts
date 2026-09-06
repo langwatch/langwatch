@@ -212,6 +212,7 @@ export function composeOrganizationFeature(options: {
         peers: options.peers.membership,
         rateLimit: (input) => options.rateLimit(input),
         logger,
+        baseHost: options.baseHost,
       })
     : undefined;
 
@@ -653,8 +654,10 @@ function composeMembershipHalf(options: {
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<Readonly<{ allowed: boolean; resetAt: number }>>;
   logger: Logger;
+  /** This deployment's public origin, for a lapsed requester's personal project link. */
+  baseHost: string;
 }): OrganizationMembership {
-  const { prisma, plans, peers, logger } = options;
+  const { prisma, plans, peers, logger, baseHost } = options;
   const { organizations, projects, grants, auth, users, eventing, mail, processName } = peers;
   const unavailable = (capability: string) => new ApiOrganizationUnavailableError(capability);
 
@@ -706,7 +709,13 @@ function composeMembershipHalf(options: {
     candidates: new PrismaJoinCandidateRepository(prisma),
     membership: PrismaJoinMembershipAdapter.create(prisma, grants),
     notifier: mail
-      ? EmailJoinRequestNotifierAdapter.create(prisma, mail)
+      ? EmailJoinRequestNotifierAdapter.create({
+          prisma,
+          mail,
+          baseHost,
+          plans,
+          memberships: PrismaUsageMembershipRepository.create(prisma),
+        })
       : {
           // Fire-and-forget by construction: a request that could not be
           // announced is still recorded, and the admin finds it on the members

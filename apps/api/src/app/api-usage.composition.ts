@@ -8,12 +8,17 @@ import {
   NotificationService as BillingNotificationService,
   UsageLimitEmailAdapter,
   UsageWarningService,
+  type BillingNextStepResolver,
   type BillingSubscriptionRepository,
   type UsageLimitEmailData,
 } from "@langwatch/enterprise-billing-server";
-import type {
-  BillingUsageCounter,
-  BillingUsageLimitOrganization,
+import {
+  PLAN_LIMITS,
+  GROWTH_SEAT_PLAN_TYPES,
+  PlanTypes,
+  type BillingUsageCounter,
+  type BillingUsageLimitOrganization,
+  type BillingPricingModel,
 } from "@langwatch/enterprise-billing-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
@@ -21,7 +26,11 @@ import {
   NodeLicenseCryptographyAdapter,
   type OrganizationLicensePort,
 } from "@langwatch/enterprise-licensing-server";
-import type { PlanProvider, UsageUnit } from "@langwatch/entitlement-contract";
+import type {
+  PlanProvider,
+  PricingModel as EntitlementPricingModel,
+  UsageUnit,
+} from "@langwatch/entitlement-contract";
 import {
   EntitlementService,
   InProcessUsageCache,
@@ -33,6 +42,9 @@ import {
   UsageService,
   UsageStatsService,
   UsageVolumeCounterPort,
+  PlanCataloguePort,
+  PlanNextStepService,
+  type CataloguePlan,
   type LimitsTrpcPorts,
   type ProjectUsageCounts,
   type UsageCount,
@@ -267,7 +279,116 @@ function composeApiUsageWarnings(
       usageLimitEmail: ApiUsageLimitEmailAdapter.create(mail),
     }),
     baseHost: mail.baseHost,
+    nextStep: ApiUsageNextStepResolver.create({
+      plans: options.plans,
+      nextStep: PlanNextStepService.create({ catalogue: ApiPlanCatalogueAdapter.create() }),
+      baseHost: mail.baseHost,
+    }),
+    usageUnit: (input) => counter.getResolvedUsageUnit(input),
   });
+}
+
+/**
+ * The self-serve ladder `PlanNextStepService` ranks, read off `PLAN_LIMITS` — the same
+ * static table every plan in this deployment is priced from. Annual variants are
+ * collapsed onto their monthly rung here, since that grouping is this catalogue's own
+ * fact and not a policy the next-step service should have to know.
+ *
+ * The seat-priced ladder (`SEAT_EVENT`) has one rung: an organization already on it has
+ * nowhere self-serve to move to, so its next step correctly resolves to "none".
+ */
+const TIERED_LADDER: readonly CataloguePlan[] = [
+  catalogueRung(PlanTypes.PRO, [PlanTypes.PRO]),
+  catalogueRung(PlanTypes.LAUNCH, [PlanTypes.LAUNCH, PlanTypes.LAUNCH_ANNUAL]),
+  catalogueRung(PlanTypes.ACCELERATE, [PlanTypes.ACCELERATE, PlanTypes.ACCELERATE_ANNUAL]),
+  catalogueRung(PlanTypes.GROWTH, [PlanTypes.GROWTH]),
+];
+
+const SEAT_EVENT_LADDER: readonly CataloguePlan[] = [
+  catalogueRung(GROWTH_SEAT_PLAN_TYPES[0], GROWTH_SEAT_PLAN_TYPES),
+];
+
+function catalogueRung(representative: PlanTypes, types: readonly PlanTypes[]): CataloguePlan {
+  const plan = PLAN_LIMITS[representative];
+  const pricedPerSeat = plan.userPrice !== undefined;
+
+  return {
+    tier: representative,
+    types,
+    name: plan.name,
+    monthlyPrice: pricedPerSeat ? plan.userPrice! : plan.prices,
+    pricedPerSeat,
+    maxMessagesPerMonth: plan.maxMessagesPerMonth,
+    maxMembers: plan.maxMembers,
+  };
+}
+
+/** The self-serve ladder, as `PLAN_LIMITS` already defines it. No price is invented here. */
+class ApiPlanCatalogueAdapter extends PlanCataloguePort {
+  static create(): ApiPlanCatalogueAdapter {
+    return new ApiPlanCatalogueAdapter();
+  }
+
+  private constructor() {
+    super();
+  }
+
+  listSelfServePlans(input: {
+    pricingModel: EntitlementPricingModel | null;
+  }): Promise<readonly CataloguePlan[]> {
+    return Promise.resolve(input.pricingModel === "SEAT_EVENT" ? SEAT_EVENT_LADDER : TIERED_LADDER);
+  }
+}
+
+/**
+ * Where a usage-limit mail can point an organization next, mapped from
+ * `PlanNextStepService`'s ladder-rung answer onto the shape `@langwatch/mail`'s
+ * template asks for — the checkout link and the billing period are this
+ * composition's own facts, not the entitlement package's.
+ */
+class ApiUsageNextStepResolver implements BillingNextStepResolver {
+  static create(options: {
+    plans: Pick<PlanProvider, "getActivePlan">;
+    nextStep: PlanNextStepService;
+    baseHost: string;
+  }): ApiUsageNextStepResolver {
+    return new ApiUsageNextStepResolver(options.plans, options.nextStep, options.baseHost);
+  }
+
+  private constructor(
+    private readonly plans: Pick<PlanProvider, "getActivePlan">,
+    private readonly nextStep: PlanNextStepService,
+    private readonly baseHost: string,
+  ) {}
+
+  async resolve(input: {
+    organizationId: string;
+    pricingModel: BillingPricingModel | null;
+    currency: "USD" | "EUR";
+  }): Promise<NonNullable<UsageLimitEmailData["nextStep"]> | undefined> {
+    const plan = await this.plans.getActivePlan({ organizationId: input.organizationId });
+    const resolved = await this.nextStep.resolve({
+      plan,
+      pricingModel: input.pricingModel,
+      currency: input.currency,
+    });
+
+    if (resolved.kind === "none") return undefined;
+    if (resolved.kind === "account_team") {
+      return { kind: "account_team", contactUrl: "https://langwatch.ai/contact" };
+    }
+
+    return {
+      kind: "self_serve",
+      name: resolved.name,
+      url: `${this.baseHost}/settings/subscription/checkout/${resolved.tier.toLowerCase()}`,
+      price: resolved.monthlyPrice,
+      currency: resolved.currency,
+      billingPeriod: "monthly",
+      pricedPerSeat: resolved.pricedPerSeat,
+      raisesLimitTo: resolved.maxMessagesPerMonth,
+    };
+  }
 }
 
 class ApiComposedUsageStats extends ApiUsageStatsPort {
@@ -349,6 +470,8 @@ class ApiUsageWarningDirectory implements BillingUsageLimitOrganization {
     name: string;
     sentPlanLimitAlert: Date | null;
     members: Array<{ user: { id: string; name: string | null; email: string | null } }>;
+    pricingModel: BillingPricingModel | null;
+    currency: "USD" | "EUR";
   } | null> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
@@ -356,13 +479,20 @@ class ApiUsageWarningDirectory implements BillingUsageLimitOrganization {
         id: true,
         name: true,
         sentPlanLimitAlert: true,
+        pricingModel: true,
+        currency: true,
         members: {
           where: { role: "ADMIN" },
           select: { user: { select: { id: true, name: true, email: true } } },
         },
       },
     });
-    return organization ?? null;
+    if (!organization) return null;
+
+    return {
+      ...organization,
+      pricingModel: (organization.pricingModel ?? null) as BillingPricingModel | null,
+    };
   }
 
   async updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void> {

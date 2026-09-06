@@ -6,6 +6,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   NOTIFICATION_TYPES,
   USAGE_UNKNOWN,
+  type BillingPricingModel,
   type BillingUsageCounter,
   type BillingUsageLimitOrganization,
   type UsageLimitData,
@@ -17,6 +18,26 @@ import type {
 import type { NotificationService, UsageLimitEmailData } from "./billing-usage-notice.service";
 
 const logger = createLogger("langwatch:notifications:usageWarning");
+
+/** What an organization's usage is metered in, resolved by the deployment's own meter policy. */
+export type BillingUsageUnit = "traces" | "events";
+
+/**
+ * Where this organization can go next, as `UsageLimitEmailData["nextStep"]` shapes it.
+ *
+ * A plain structural type rather than an import of `PlanNextStepService`: this package
+ * does not depend on `@langwatch/entitlement-server`. Reading the organization's own
+ * plan is this collaborator's job too — folding it in here, rather than taking a
+ * separate `plans` port, keeps the FULL `Plan` shape `PlanNextStepService.resolve`
+ * needs out of this package, which only ever sees the result.
+ */
+export type BillingNextStepResolver = {
+  resolve(input: {
+    organizationId: string;
+    pricingModel: BillingPricingModel | null;
+    currency: "USD" | "EUR";
+  }): Promise<NonNullable<UsageLimitEmailData["nextStep"]> | undefined>;
+};
 
 /** Ascending, so the last one passed is the highest one crossed. */
 const USAGE_WARNING_THRESHOLDS = [50, 70, 90, 95, 100] as const;
@@ -33,6 +54,10 @@ export type UsageWarningServiceOptions = {
   usageCounts: BillingUsageCounter;
   emails: NotificationService;
   baseHost: string;
+  /** Resolves where the organization can go next. Absent skips the hook. */
+  nextStep?: BillingNextStepResolver;
+  /** What the organization is metered in, from the deployment's own meter policy. */
+  usageUnit?: (input: { organizationId: string }) => Promise<BillingUsageUnit | undefined>;
 };
 
 export class UsageWarningService {
@@ -41,6 +66,10 @@ export class UsageWarningService {
   private readonly usageCounts: BillingUsageCounter;
   private readonly emails: NotificationService;
   private readonly baseHost: string;
+  private readonly nextStep: BillingNextStepResolver | undefined;
+  private readonly resolveUsageUnit:
+    | ((input: { organizationId: string }) => Promise<BillingUsageUnit | undefined>)
+    | undefined;
 
   static create(options: UsageWarningServiceOptions): UsageWarningService {
     return new UsageWarningService(options);
@@ -52,6 +81,8 @@ export class UsageWarningService {
     this.usageCounts = options.usageCounts;
     this.emails = options.emails;
     this.baseHost = options.baseHost;
+    this.nextStep = options.nextStep;
+    this.resolveUsageUnit = options.usageUnit;
   }
 
   /**
@@ -116,8 +147,11 @@ export class UsageWarningService {
       organizationId,
       organizationName: organization.name,
       deliverableAdmins,
-      emailContext: this.buildEmailContext({
+      emailContext: await this.buildEmailContext({
+        organizationId,
         organizationName: organization.name,
+        pricingModel: organization.pricingModel,
+        currency: organization.currency,
         usagePercentage,
         currentMonthMessagesCount,
         maxMonthlyUsageLimit,
@@ -315,22 +349,33 @@ export class UsageWarningService {
   /**
    * Builds the email data object with severity, formatting, and presentation constants.
    */
-  private buildEmailContext({
+  private async buildEmailContext({
+    organizationId,
     organizationName,
+    pricingModel,
+    currency,
     usagePercentage,
     currentMonthMessagesCount,
     maxMonthlyUsageLimit,
     crossedThreshold,
     projectUsageData,
   }: {
+    organizationId: string;
     organizationName: string;
+    pricingModel: BillingPricingModel | null;
+    currency: "USD" | "EUR";
     usagePercentage: number;
     currentMonthMessagesCount: number;
     maxMonthlyUsageLimit: number;
     crossedThreshold: number;
     projectUsageData: Array<{ id: string; name: string; messageCount: number }>;
-  }): UsageLimitEmailData {
+  }): Promise<UsageLimitEmailData> {
     const actionUrl = `${this.baseHost}/settings/usage`;
+
+    const [usageUnit, nextStep] = await Promise.all([
+      this.tryResolveUsageUnit({ organizationId }),
+      this.tryResolveNextStep({ organizationId, pricingModel, currency }),
+    ]);
 
     const logoUrl =
       "https://hs-143534269.f.hubspotstarter-eu1.net/hub/143534269/hubfs/header-3.png?width=1116&upscale=true&name=header-3.png";
@@ -360,7 +405,49 @@ export class UsageWarningService {
       actionUrl,
       logoUrl,
       severity,
+      ...(usageUnit !== undefined && { usageUnit }),
+      ...(nextStep !== undefined && { nextStep }),
     };
+  }
+
+  /** What this organization is metered in, or nothing when the deployment composed no meter. */
+  private async tryResolveUsageUnit(input: {
+    organizationId: string;
+  }): Promise<BillingUsageUnit | undefined> {
+    if (!this.resolveUsageUnit) return undefined;
+    try {
+      return await this.resolveUsageUnit(input);
+    } catch (error) {
+      logger.warn(
+        { organizationId: input.organizationId, error },
+        "Could not resolve the usage unit for a usage-limit email; the mail keeps its default word",
+      );
+
+      return undefined;
+    }
+  }
+
+  /**
+   * Where this organization can go next, or nothing when the deployment composed no
+   * catalogue, or the plan could not be read. A hook that cannot be resolved truthfully
+   * is omitted rather than guessed — the service message it rides on still goes out.
+   */
+  private async tryResolveNextStep(input: {
+    organizationId: string;
+    pricingModel: BillingPricingModel | null;
+    currency: "USD" | "EUR";
+  }): Promise<UsageLimitEmailData["nextStep"] | undefined> {
+    if (!this.nextStep) return undefined;
+    try {
+      return await this.nextStep.resolve(input);
+    } catch (error) {
+      logger.warn(
+        { organizationId: input.organizationId, error },
+        "Could not resolve the next-step plan for a usage-limit email; the mail omits it",
+      );
+
+      return undefined;
+    }
   }
 
   /**

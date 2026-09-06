@@ -70,6 +70,7 @@ export class ApiComposedPersonMail extends ApiPersonMailPort {
     organizationName: string;
     requesterName: string;
     domain: string;
+    approvedFromDomainCount?: number;
   }): Promise<unknown> {
     return sendJoinRequestArrivedEmail({
       mailer: this.mail.delivery,
@@ -116,6 +117,7 @@ export class ApiComposedPersonMail extends ApiPersonMailPort {
   async sendRequestExpired(input: {
     requesterEmail: string;
     organizationName: string;
+    personalProjectUrl?: string;
   }): Promise<unknown> {
     return sendJoinRequestExpiredEmail({ mailer: this.mail.delivery, ...input });
   }
@@ -125,6 +127,7 @@ export class ApiComposedPersonMail extends ApiPersonMailPort {
     organizationName: string;
     memberName: string;
     domain: string;
+    seats?: { used: number; ceiling: number };
   }): Promise<unknown> {
     return sendDomainAutoJoinedEmail({
       mailer: this.mail.delivery,

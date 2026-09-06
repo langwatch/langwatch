@@ -99,7 +99,11 @@ export {
   type BillingCooldownCache,
 } from "./services/billing-alert-cooldown.service";
 export { UsageLimitService } from "./services/usage-limit.service";
-export { UsageWarningService } from "./services/usage-warning.service";
+export {
+  UsageWarningService,
+  type BillingNextStepResolver,
+  type BillingUsageUnit,
+} from "./services/usage-warning.service";
 export { BillingSubscriptionService, RECENT_INVOICES_LIMIT } from "./services/subscription.service";
 export {
   LicensePurchaseService,
@@ -107,7 +111,9 @@ export {
   LicensePurchaseDelivery,
   type GeneratedLicense,
   type LicenseEmailDelivery,
+  type LicenseFeaturesResolver,
   type LicensePurchaseNotification,
+  type LicenseUnlockedFeatures,
 } from "./services/license-purchase.service";
 export {
   NotificationService,

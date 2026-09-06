@@ -50,3 +50,21 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Given a subscription carrying seat and usage prices
     When Stripe reports the subscription as updated
     Then each item's quantity matches what the calculator derives for its price
+
+  @unit
+  Scenario: A licence checkout links what the issued tier unlocks
+    Given a licence checkout for a tier sold on the self-serve ladder
+    When the licence purchase is handled
+    Then the licence mail carries a self-serve unlocked-features link
+
+  @unit
+  Scenario: A licence checkout for a negotiated tier names the account team
+    Given a licence checkout for a tier resolved as account-managed
+    When the licence purchase is handled
+    Then the licence mail names the account team and links no plan page
+
+  @unit
+  Scenario: A licence checkout with no catalogue composed sends without the link
+    Given a licence checkout on a deployment that composed no catalogue resolver
+    When the licence purchase is handled
+    Then the licence mail sends without unlocked features

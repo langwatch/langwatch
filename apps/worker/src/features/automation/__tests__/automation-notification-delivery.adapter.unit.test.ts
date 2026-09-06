@@ -229,6 +229,38 @@ describe("WorkerAutomationNotificationDeliveryAdapter", () => {
       expect(sent.headers?.["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
     });
 
+    /** @scenario "The default digest row carries when it happened and what matched" */
+    it("carries the trace's start time and computed input into the digest row", async () => {
+      const { adapter, mailer } = composeDelivery();
+      const claimed = new Set<string>();
+      const startedAt = Date.UTC(2026, 5, 15, 12, 0, 0);
+
+      await adapter.sendLegacyEmail({
+        recipients: ["ada@example.com"],
+        triggerData: [
+          {
+            traceId: "trace-1",
+            input: "why did the refund fail",
+            output: "world",
+            projectId: "project-1",
+            fullTrace: { timestamps: { started_at: startedAt } } as never,
+          },
+        ],
+        triggerName: "Error rate",
+        triggerId: "trigger-1",
+        projectId: "project-1",
+        projectSlug: "acme",
+        triggerType: null,
+        triggerMessage: "over budget",
+        isRecipientSent: async (hash) => claimed.has(hash),
+        recordRecipientSent: async (hash) => void claimed.add(hash),
+      });
+
+      const sent = mailer.sent[0]!;
+      expect(sent.html).toContain("why did the refund fail");
+      expect(sent.html).toContain(new Date(startedAt).toISOString().slice(0, 10));
+    });
+
     /** @scenario "The settlement digest renders and sends from this process" */
     it("sends the same digest to Slack through the packaged renderer", async () => {
       const posted: unknown[] = [];

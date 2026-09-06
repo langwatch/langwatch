@@ -141,22 +141,48 @@ export class PrismaJoinSettingsAdapter implements JoinSettingPort {
   }
 }
 
+/** The organization's plan, read only for the fields the seat census needs. */
+export type JoinRequestNotifierPlans = {
+  getActivePlan(input: {
+    organizationId: string;
+  }): Promise<{ maxMembers: number; planSource?: string; overrideAddingLimitations?: boolean }>;
+};
+
+/** How many full members an organization holds, for the same seat census the plan is checked against. */
+export type JoinRequestNotifierMemberships = {
+  getMemberCount(organizationId: string): Promise<number>;
+};
+
 /**
  * Who is told, and how. Every fan-out is `Promise.allSettled`, for the reason D11's re-request mail
  * gives: one bouncing admin address must not silence the rest. A mail that cannot be sent is logged
  * and the request stands — the durable fact is the request, not the notification.
  */
 export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
-  static create(
-    prisma: PrismaClient,
-    mail: JoinRequestNotificationMailPort,
-  ): EmailJoinRequestNotifierAdapter {
-    return new EmailJoinRequestNotifierAdapter(prisma, mail);
+  static create(options: {
+    prisma: PrismaClient;
+    mail: JoinRequestNotificationMailPort;
+    /** This deployment's public origin, for a lapsed requester's personal project link. */
+    baseHost: string;
+    /** Read for the seat census a domain-auto-join notice carries. Absent omits it. */
+    plans?: JoinRequestNotifierPlans;
+    memberships?: JoinRequestNotifierMemberships;
+  }): EmailJoinRequestNotifierAdapter {
+    return new EmailJoinRequestNotifierAdapter(
+      options.prisma,
+      options.mail,
+      options.baseHost,
+      options.plans,
+      options.memberships,
+    );
   }
 
   private constructor(
     private readonly prisma: PrismaClient,
     private readonly mail: JoinRequestNotificationMailPort,
+    private readonly baseHost: string,
+    private readonly plans: JoinRequestNotifierPlans | undefined,
+    private readonly memberships: JoinRequestNotifierMemberships | undefined,
   ) {}
 
   async requestArrived({
@@ -170,10 +196,11 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     requesterUserId: string;
     domain: string;
   }): Promise<void> {
-    const [organizationName, requesterName, admins] = await Promise.all([
+    const [organizationName, requesterName, admins, approvedFromDomainCount] = await Promise.all([
       this.organizationName({ organizationId }),
       this.displayName({ userId: requesterUserId }),
       this.adminEmails({ organizationId }),
+      this.approvedFromDomainCount({ organizationId, domain }),
     ]);
     await this.fanOut({
       joinRequestId,
@@ -184,6 +211,7 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
           organizationName,
           requesterName,
           domain,
+          approvedFromDomainCount,
         }),
       ),
     });
@@ -267,15 +295,22 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     organizationId: string;
     requesterUserId: string;
   }): Promise<void> {
-    const [organizationName, requesterEmail] = await Promise.all([
+    const [organizationName, requesterEmail, personalProjectUrl] = await Promise.all([
       this.organizationName({ organizationId }),
       this.emailOf({ userId: requesterUserId }),
+      this.tryPersonalProjectUrl({ userId: requesterUserId }),
     ]);
     if (!requesterEmail) return;
     await this.fanOut({
       joinRequestId,
       what: "requestExpired",
-      sends: [this.mail.sendRequestExpired({ requesterEmail, organizationName })],
+      sends: [
+        this.mail.sendRequestExpired({
+          requesterEmail,
+          organizationName,
+          ...(personalProjectUrl ? { personalProjectUrl } : {}),
+        }),
+      ],
     });
   }
 
@@ -290,16 +325,23 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     requesterUserId: string;
     domain: string;
   }): Promise<void> {
-    const [organizationName, memberName, admins] = await Promise.all([
+    const [organizationName, memberName, admins, seats] = await Promise.all([
       this.organizationName({ organizationId }),
       this.displayName({ userId: requesterUserId }),
       this.adminEmails({ organizationId }),
+      this.trySeats({ organizationId }),
     ]);
     await this.fanOut({
       joinRequestId,
       what: "joinedAutomatically",
       sends: admins.map((adminEmail) =>
-        this.mail.sendJoinedAutomatically({ adminEmail, organizationName, memberName, domain }),
+        this.mail.sendJoinedAutomatically({
+          adminEmail,
+          organizationName,
+          memberName,
+          domain,
+          ...(seats ? { seats } : {}),
+        }),
       ),
     });
   }
@@ -383,6 +425,72 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
       select: { email: true },
     });
     return user?.email ?? null;
+  }
+
+  /**
+   * How many join requests from this domain have already been approved.
+   *
+   * Read here directly rather than through a repository method: this adapter
+   * already reads `JoinRequest` rows for `requestStillWaiting`, and a count
+   * on the same table is not a new collaborator, only a new query.
+   */
+  private async approvedFromDomainCount({
+    organizationId,
+    domain,
+  }: {
+    organizationId: string;
+    domain: string;
+  }): Promise<number> {
+    return this.prisma.joinRequest.count({
+      where: { organizationId, domain, state: "APPROVED" },
+    });
+  }
+
+  /**
+   * A personal project of the requester's own, in any organization they already hold one
+   * in — not necessarily the one whose request just lapsed, since a request that never
+   * resolved never gave them a personal workspace THERE. `undefined` when they have none
+   * yet, which is the ordinary case for somebody who has never signed in before.
+   */
+  private async tryPersonalProjectUrl({ userId }: { userId: string }): Promise<string | undefined> {
+    const team = await this.prisma.team.findFirst({
+      where: { ownerUserId: userId, isPersonal: true },
+      select: { slug: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return team ? `${this.baseHost}/${team.slug}` : undefined;
+  }
+
+  /**
+   * Seats held against what the plan covers, or nothing for an organization on
+   * enterprise or negotiated terms — the same gate the invitation re-request
+   * mail's seat census uses, since a public seat ceiling is not that
+   * organization's number either.
+   */
+  private async trySeats({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ used: number; ceiling: number } | undefined> {
+    if (!this.plans || !this.memberships) return undefined;
+    try {
+      const plan = await this.plans.getActivePlan({ organizationId });
+      const accountManaged =
+        plan.planSource === "license" || plan.overrideAddingLimitations === true;
+      if (accountManaged || plan.maxMembers <= 0) return undefined;
+
+      return {
+        used: await this.memberships.getMemberCount(organizationId),
+        ceiling: plan.maxMembers,
+      };
+    } catch (error) {
+      logger.warn(
+        { organizationId, error },
+        "Could not read the seat census for a domain-auto-join notice",
+      );
+
+      return undefined;
+    }
   }
 }
 

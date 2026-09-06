@@ -18,6 +18,14 @@ export abstract class JoinRequestNotificationMailPort {
     organizationName: string;
     requesterName: string;
     domain: string;
+    /**
+     * How many requests from this domain have already been approved.
+     *
+     * An admin approving a third colleague from one domain is doing by hand
+     * what one setting does for them. Absent, or below the habit floor, the
+     * mail says nothing about it.
+     */
+    approvedFromDomainCount?: number;
   }): Promise<unknown>;
 
   /** The one nudge, on the seventh day. Sent to one organization admin. */
@@ -51,6 +59,13 @@ export abstract class JoinRequestNotificationMailPort {
   abstract sendRequestExpired(input: {
     requesterEmail: string;
     organizationName: string;
+    /**
+     * A personal project of their own to work in meanwhile, when they have one.
+     *
+     * A second line and never the button: the thing this reader came for is the
+     * organization, and asking again is what they do next.
+     */
+    personalProjectUrl?: string;
   }): Promise<unknown>;
 
   /** The domain policy admitted somebody. Sent to one organization admin. */
@@ -59,5 +74,12 @@ export abstract class JoinRequestNotificationMailPort {
     organizationName: string;
     memberName: string;
     domain: string;
+    /**
+     * Seats held after this join, against what the plan covers.
+     *
+     * Absent for an organization on enterprise or negotiated terms, whose
+     * ceiling is its own rather than the public ladder's.
+     */
+    seats?: { used: number; ceiling: number };
   }): Promise<unknown>;
 }

@@ -261,8 +261,6 @@ const LEGACY_INERT: string[] = [
   // would bind them (packages/architecture-lint's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
   // first real binding.
-  "packages/enterprise/features/billing/specs/stripe-webhook.feature",
-  "packages/enterprise/features/billing/specs/usage-limits.feature",
   "packages/features/authz/specs/offboarding.feature",
   "packages/features/organization/specs/invitations.feature",
   "packages/features/scenario/specs/simulation-run.feature",

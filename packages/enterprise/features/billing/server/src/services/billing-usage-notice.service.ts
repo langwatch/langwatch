@@ -33,6 +33,25 @@ export interface UsageLimitEmailData {
   actionUrl: string;
   logoUrl: string;
   severity: string;
+  /** What this organization is metered in, as its own meter reports it. */
+  usageUnit?: "traces" | "events";
+  /**
+   * Where this organization can go next, resolved for THIS organization by
+   * `PlanNextStepService`. Shaped to match `@langwatch/mail`'s
+   * `usageLimitEmailProps.nextStep` without this package depending on it.
+   */
+  nextStep?:
+    | {
+        kind: "self_serve";
+        name: string;
+        url: string;
+        price: number;
+        currency: string;
+        billingPeriod: "monthly" | "annual";
+        pricedPerSeat?: boolean;
+        raisesLimitTo: number;
+      }
+    | { kind: "account_team"; contactUrl: string };
 }
 
 // ---------------------------------------------------------------------------

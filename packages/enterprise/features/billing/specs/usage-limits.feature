@@ -37,3 +37,15 @@ Feature: Plan-limit and usage-warning notifications fire correctly
     Given an organization at its project limit
     When the limit check runs
     Then the notification names projects and what to do about it
+
+  @unit
+  Scenario: The usage warning carries the organization's own next step and meter
+    Given an organization above a warning threshold on the public ladder
+    When the usage-limit warning is built
+    Then the mail carries the plan it can move to and the unit it is metered in
+
+  @unit
+  Scenario: A usage warning omits the next step it cannot resolve
+    Given an organization above a warning threshold whose catalogue read fails
+    When the usage-limit warning is built
+    Then the mail still sends without a next step

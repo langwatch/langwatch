@@ -151,12 +151,22 @@ export interface UsageLimitData {
   maxMonthlyUsageLimit: number;
 }
 
+/**
+ * How an organization is billed, restated as a literal type rather than
+ * imported: this contract does not depend on `@langwatch/entitlement-contract`.
+ */
+export type BillingPricingModel = "TIERED" | "SEAT_EVENT";
+
 export interface BillingUsageLimitOrganization {
   findWithAdmins(organizationId: string): Promise<{
     id: string;
     name: string;
     sentPlanLimitAlert: Date | null;
     members: Array<{ user: { id: string; name: string | null; email: string | null } }>;
+    /** Which self-serve ladder this organization buys from, for the next-step hook. */
+    pricingModel: BillingPricingModel | null;
+    /** What the next-step plan is quoted in for this organization. */
+    currency: "USD" | "EUR";
   } | null>;
   updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void>;
   findProjectsWithName(organizationId: string): Promise<Array<{ id: string; name: string }>>;

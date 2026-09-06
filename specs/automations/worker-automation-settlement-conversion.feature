@@ -38,6 +38,12 @@ Feature: The background worker owns automation settlement
     And the unsubscribe footer offers both the automation and the whole project
 
   @unit
+  Scenario: The default digest row carries when it happened and what matched
+    Given a settled match whose trace carries a start time and a computed input
+    When the digest is delivered
+    Then the row names when it happened and shows the input as its preview
+
+  @unit
   Scenario: A settlement half that cannot deliver says so
     Given a deployment that named no host for its links
     When the composition root builds the automations pipeline
