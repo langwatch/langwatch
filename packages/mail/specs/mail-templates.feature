@@ -77,3 +77,21 @@ Feature: The transactional messages LangWatch sends
     When each template is rendered from each of its fixtures
     Then the page around the card carries a dark rule of its own
     And the frame and the card read as one dark surface
+
+  @unit
+  Scenario: The studio shows every message at once
+    When the gallery is asked to render every registered template
+    Then it returns one entry for every registered fixture
+    And every entry carries a non-empty subject line and a non-empty rendered body
+
+  @unit
+  Scenario: The studio's shareable link survives a copy-paste
+    Given a person has edited a template's props in the studio
+    When those props are encoded into the link's fragment
+    Then decoding that fragment returns the same edited props
+
+  @unit
+  Scenario: A malformed shareable link falls back to the fixture
+    Given a fragment that is not valid encoded props
+    When the studio decodes it
+    Then it falls back to the fixture's own props

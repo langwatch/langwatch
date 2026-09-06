@@ -38,7 +38,9 @@
     "dev": "pnpm -s run start:prepare:db && node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/api.entrypoint.ts",
     "task": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/tasks/tasks.entrypoint.ts",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "pretest": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test": "vitest run",
+    "pretest:unit": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test:unit": "vitest run",
     "test:stress": "vitest run --exclude '**/node_modules/**' src/__tests__/collector.stress.test.ts",
     "check:gateway-control-plane": "node --experimental-transform-types scripts/check-gateway-control-plane.ts"

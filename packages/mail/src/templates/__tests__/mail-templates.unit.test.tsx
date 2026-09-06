@@ -59,9 +59,7 @@ describe("given the mail template registry", () => {
         .filter((entry) => entry.endsWith(".tsx"))
         .filter((entry) => entry !== "email-layout.tsx");
 
-      const unreached = componentFiles.filter(
-        (file) => !barrel.includes(`"./${file.replace(/\.tsx$/, "")}"`),
-      );
+      const unreached = componentFiles.filter((file) => !barrel.includes(`"./${file}"`));
 
       expect(unreached).toEqual([]);
     });

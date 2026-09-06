@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // pnpm orders `build` topologically but has no graph for `dev`, so a lane that
 // resolves a workspace package's `dist` can start before that package was ever
-// built. Only two packages resolve `dist`; every other workspace package
-// exports its own `src`. The SDK cannot join them until its 727 `@/*` aliases
-// and 2,240 extensionless relative imports are rewritten.
+// built. Only three packages resolve `dist`; every other workspace package
+// exports its own `src`. `@langwatch/mail` joined them because Node cannot load
+// a `.tsx` file: its templates are the only JSX on a server boot graph, so the
+// package compiles and the three processes import the compiled entry.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -13,6 +14,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const targets = [
   { name: "langwatch", dir: "sdks/typescript", entry: "dist/index.mjs" },
   { name: "@langwatch/mcp-server", dir: "mcp/typescript", entry: "dist/index.js" },
+  { name: "@langwatch/mail", dir: "packages/mail", entry: "dist/index.js" },
 ];
 
 const mtime = (path) => {
@@ -34,7 +36,20 @@ const newestUnder = (dir) => {
 
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
-for (const target of targets) {
+// A named argument narrows the run to one package. `predev` wants all of them;
+// a test hook wants only `@langwatch/mail`, and building the SDK to run a unit
+// suite would cost a minute for nothing.
+const requested = process.argv.slice(2);
+const selected = requested.length
+  ? targets.filter((target) => requested.includes(target.name))
+  : targets;
+const unknown = requested.filter((name) => !targets.some((target) => target.name === name));
+if (unknown.length) {
+  console.error(`ensure-built: no such target: ${unknown.join(", ")}`);
+  process.exit(1);
+}
+
+for (const target of selected) {
   const dir = join(root, target.dir);
   const isFresh = () =>
     mtime(join(dir, target.entry)) >

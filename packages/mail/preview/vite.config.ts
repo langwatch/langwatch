@@ -2,7 +2,7 @@ import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
-import { buildGalleryEntries } from "./gallery-render";
+import { buildGalleryEntries } from "./gallery-render.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(here, "..");
@@ -20,7 +20,7 @@ const registryModule = resolve(packageRoot, "src/templates/index.ts");
  */
 const templateRenderer = (): Plugin => {
   const load = (server: ViteDevServer) =>
-    server.ssrLoadModule(registryModule) as Promise<typeof import("../src/templates/index")>;
+    server.ssrLoadModule(registryModule) as Promise<typeof import("../src/templates/index.ts")>;
 
   return {
     name: "langwatch-mail-preview",

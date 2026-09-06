@@ -1,0 +1,26 @@
+{
+  // The emitting half of the package. Node cannot load `.tsx`, so the three
+  // server processes import `dist` while the studio and the tests read `src`.
+  // tsc is the whole build: `rewriteRelativeImportExtensions` turns the `.ts`
+  // and `.tsx` specifiers into `.js`, so no bundler has to learn the shape of
+  // the package and `dist` mirrors `src` file for file.
+  //
+  // No declarations: TypeScript 7 rewrites those specifiers in the JavaScript
+  // but NOT in declaration output, so an emitted `dist/index.d.ts` would still
+  // say `./providers/types.ts` and resolve to nothing. `types` stays on `src`,
+  // which is also what every other workspace package publishes.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": false,
+    "sourceMap": true,
+    "types": ["node"],
+    // Inside `dist` on purpose: the build clears `dist` first, and an
+    // incremental tsc with its build info elsewhere sees an up-to-date project
+    // and emits nothing into the directory that was just deleted.
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.test.tsx"]
+}

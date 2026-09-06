@@ -36,10 +36,14 @@
     "predev": "node ../../dev/scripts/ensure-built.mjs",
     "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/worker.entrypoint.ts",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "prebuild": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "build": "node scripts/build-server.mjs",
     "build:server": "node scripts/build-server.mjs",
+    "pretest": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test": "vitest run",
+    "pretest:unit": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test:unit": "vitest run",
+    "pretest:integration": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {

@@ -60,6 +60,30 @@ by somebody usually not signed in, and the link lands them on the front door.
 Every message is declared twice — inline for the clients that read nothing else,
 and once more under `prefers-color-scheme: dark`. A test asserts both are present.
 
+## The build
+
+```bash
+pnpm --filter @langwatch/mail build   # tsc -> dist/, ESM + source maps
+```
+
+This is the one workspace feature package that ships compiled JavaScript rather
+than its own source, and the reason is the templates: they are `.tsx`, and the
+three Node processes run TypeScript through `node --experimental-transform-types`,
+which cannot load a `.tsx` file at all. So `exports` points a runtime at
+`dist/index.js` while `types` still points at `src/index.ts` — a consumer
+typechecks against the source it can read, and nothing goes stale between them.
+
+tsc is the whole build. `rewriteRelativeImportExtensions` rewrites the `.ts` and
+`.tsx` specifiers to `.js` on the way out, so no bundler has to be taught the
+package's shape, and `dist` mirrors `src` file for file.
+
+`dev/scripts/ensure-built.mjs` rebuilds it when `src` is newer than `dist`. The
+`predev` hook of the api and the worker runs it, as do their `pretest` hooks, and
+the image builds it the way pnpm builds any workspace dependency. Running one of
+those is what keeps a rebuild out of your hands.
+
+The studio and the tests read `src` directly, so neither needs a build.
+
 ## Sending in development
 
 Nothing here reads an environment variable. A gateway takes its

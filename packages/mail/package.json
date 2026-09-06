@@ -4,18 +4,21 @@
   "private": true,
   "description": "The outbound mail gateways LangWatch sends through, and the transactional messages the identity and organization surfaces send.",
   "files": [
+    "dist",
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "dev": "vite --config preview/vite.config.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p preview/tsconfig.json",
     "test": "vitest run",

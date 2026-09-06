@@ -39,32 +39,32 @@ export {
   type EmailProviderName,
   type EmailProviderPort,
   type MailerConfiguration,
-} from "./providers/types";
-export { hasEmailProvider, resolveEmailProviderName } from "./providers";
+} from "./providers/types.ts";
+export { hasEmailProvider, resolveEmailProviderName } from "./providers/index.ts";
 export {
   buildSesClientConfig,
   SesEmailProvider,
   type SesAwsClientConfiguration,
-} from "./providers/ses";
-export { SendgridEmailProvider } from "./providers/sendgrid";
-export { buildSmtpTransportOptions, isSmtpConfigured, SmtpEmailProvider } from "./providers/smtp";
-export { ResendEmailProvider } from "./providers/resend";
-export { computeDefaultFrom, sendEmail } from "./email-sender";
-export { MailRenderPort } from "./ports/mail-render.port";
-export { mailTemplates } from "./templates/index";
-export { propsFormSchema, renderMailTemplate } from "./templates/registry";
-export type { MailFixture, MailTemplate } from "./templates/registry";
-export { expressive } from "./templates/email-layout";
-export { ReactEmailMailRenderer } from "./adapters/react-email.render.adapter";
+} from "./providers/ses.ts";
+export { SendgridEmailProvider } from "./providers/sendgrid.ts";
+export { buildSmtpTransportOptions, isSmtpConfigured, SmtpEmailProvider } from "./providers/smtp.ts";
+export { ResendEmailProvider } from "./providers/resend.ts";
+export { computeDefaultFrom, sendEmail } from "./email-sender.ts";
+export { MailRenderPort } from "./ports/mail-render.port.ts";
+export { mailTemplates } from "./templates/index.ts";
+export { propsFormSchema, renderMailTemplate } from "./templates/registry.ts";
+export type { MailFixture, MailTemplate } from "./templates/registry.ts";
+export { expressive } from "./templates/email-layout.tsx";
+export { ReactEmailMailRenderer } from "./adapters/react-email.render.adapter.ts";
 export {
   renderTriggerDigestEmail,
   type TriggerDigestEntry,
   type TriggerDigestMail,
-} from "./templates/trigger-digest-email";
-export { sendBudgetIncreaseRequestEmail } from "./templates/budget-increase-request-email";
-export type { SendBudgetIncreaseRequestEmailInput } from "./templates/budget-increase-request-email";
-export { sendInviteEmail } from "./templates/invite-email";
-export { sendInviteReRequestEmail } from "./templates/invite-re-request-email";
+} from "./templates/trigger-digest-email.tsx";
+export { sendBudgetIncreaseRequestEmail } from "./templates/budget-increase-request-email.tsx";
+export type { SendBudgetIncreaseRequestEmailInput } from "./templates/budget-increase-request-email.tsx";
+export { sendInviteEmail } from "./templates/invite-email.tsx";
+export { sendInviteReRequestEmail } from "./templates/invite-re-request-email.tsx";
 export {
   joinRequestExpiredSubject,
   joinRequestReminderSubject,
@@ -76,14 +76,14 @@ export {
   sendJoinRequestExpiredEmail,
   sendJoinRequestReminderEmail,
   sendJoinRequestRejectedEmail,
-} from "./templates/join-request-emails";
+} from "./templates/join-request-emails.tsx";
 export {
   automationLimitEmailSubject,
   renderAutomationLimitEmail,
   sendAutomationLimitEmail,
   type AutomationLimitKind,
-} from "./templates/automation-limit-email";
-export { sendLicenseEmail } from "./templates/license-email";
-export { sendResetPasswordEmail } from "./templates/reset-password-email";
-export { sendSignUpVerificationEmail } from "./templates/sign-up-verification-email";
-export { sendUsageLimitEmail } from "./templates/usage-limit-email";
+} from "./templates/automation-limit-email.tsx";
+export { sendLicenseEmail } from "./templates/license-email.tsx";
+export { sendResetPasswordEmail } from "./templates/reset-password-email.tsx";
+export { sendSignUpVerificationEmail } from "./templates/sign-up-verification-email.tsx";
+export { sendUsageLimitEmail } from "./templates/usage-limit-email.tsx";

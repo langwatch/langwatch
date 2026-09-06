@@ -444,9 +444,20 @@ describe("browser-only UI never reaches backend code", () => {
         "@langwatch/mail",
       );
 
-      const resolved = resolver.resolve({ specifier: "@langwatch/mail", file: composition });
-      expect(resolved).toBeDefined();
-      expect(isMailTerminal({ file: resolved! })).toBe(true);
+      // The package COMPILES now — Node cannot load a `.tsx` file, and its
+      // templates are the only JSX a server process boots through — so the
+      // entry a backend root reaches is `dist/`, which this walk never reads
+      // (`dist` is not source, and it may not even be built when this runs).
+      // The terminal has to cover both halves: the compiled entry the
+      // processes import, and the `src` a test or the studio still imports
+      // directly. A terminal that covered only one would report the other.
+      const manifest: { exports: { ".": { import: string } } } = JSON.parse(
+        readFileSync(join(REPO_ROOT, "packages/mail/package.json"), "utf8"),
+      );
+      const entry = join(REPO_ROOT, "packages/mail", manifest.exports["."].import);
+      expect(entry.startsWith(join(REPO_ROOT, "packages", "mail", "dist") + sep)).toBe(true);
+      expect(isMailTerminal({ file: entry })).toBe(true);
+      expect(isMailTerminal({ file: template })).toBe(true);
 
       // And the walk stops there: the composition reaches the package, the
       // package renders React, and no chain is reported for either.
