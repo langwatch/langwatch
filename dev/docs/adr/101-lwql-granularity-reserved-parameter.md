@@ -156,7 +156,7 @@ The budget has to sit where the query is bound, before ClickHouse executes it.
 
 - Issue [#6713](https://github.com/langwatch/langwatch/issues/6713) — saved-chart granularity, slice 3 of the saved-charts epic ([#6582](https://github.com/langwatch/langwatch/issues/6582))
 - Issue [#7502](https://github.com/langwatch/langwatch/issues/7502) — tRPC run forwards client `onBudgetOverflow` instead of fixing it per surface
-- PR [#7426](https://github.com/langwatch/langwatch/pull/7426) — ships the contract this ADR describes
+- PR [#7474](https://github.com/langwatch/langwatch/pull/7474) — workbench epic that ships the contract this ADR describes
 - `platform/app/src/server/analytics/lwql/timeWindow.ts` — the reserved-parameter vocabulary, `LWQL_GRANULARITY_STEPS`
 - `platform/app/src/server/analytics/lwql/resolveTimeWindow.ts` — `resolveLangWatchQLGranularity`, `assertLangWatchQLGranularityDeclaration`, the budget
 - `specs/analytics/lwql-workbench.feature` — the behavioural contract
