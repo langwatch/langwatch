@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { Evaluator, PersistEvaluatorInput } from "@langwatch/evaluator-contract";
+import type { Evaluator } from "@langwatch/evaluator-contract";
 import { EvaluatorService } from "../evaluator.service";
-import type { EvaluatorRepository } from "../../repositories/evaluator.repository";
+import type {
+  EvaluatorRepository,
+  PersistEvaluatorInput,
+} from "../../repositories/evaluator.repository";
 import type { EvaluatorCodeExecutionPort } from "../../ports/evaluator.port";
 
 function buildService() {
