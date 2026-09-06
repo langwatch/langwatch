@@ -10,6 +10,10 @@ import {
   type AuthService,
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
+import {
+  DroppedBetterAuthSecondaryStorageAdapter,
+  RedisBetterAuthSecondaryStorageAdapter,
+} from "../../adapters/better-auth-secondary-storage.adapter";
 import type { SignInMethodPolicy } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UserService } from "@langwatch/user-contract";
@@ -83,41 +87,16 @@ export const isEmailPasswordEnabled = (deployment: {
  * Wires Better Auth's secondary storage to the process's Redis connection.
  * Used by rate limiting (below) so limits are enforced across pods. The
  * presence of the connection decides the session strategy (ADR-093).
+ *
+ * A process with no connection still gets a store rather than nothing: reads
+ * degrade to a miss the database answers, and every dropped write is reported.
  */
-function createSecondaryStorage(
+export function createSecondaryStorage(
   redis: RedisConnection | null,
-): BetterAuthOptions["secondaryStorage"] {
-  if (!redis) return undefined;
-  return {
-    get: async (key) => {
-      return await redis.get(`better-auth:${key}`);
-    },
-    // Read-and-clear in one round trip, so two callers racing for a
-    // single-use value cannot both be handed it. `GETDEL` is what the
-    // rest of the app already uses for exactly this (the scenario tab
-    // registry, the GitHub install nonce).
-    getAndDelete: async (key) => {
-      return await redis.getdel(`better-auth:${key}`);
-    },
-    // The counter behind distributed rate limiting. Required by better-auth 1.7 — before it,
-    // the limiter read and wrote a serialized record, which two pods could interleave.
-    increment: async (key, ttl) => {
-      const namespaced = `better-auth:${key}`;
-      const count = await redis.incr(namespaced);
-      if (count === 1) await redis.expire(namespaced, ttl);
-      return count;
-    },
-    set: async (key, value, ttl) => {
-      if (ttl) {
-        await redis.set(`better-auth:${key}`, value, "EX", ttl);
-      } else {
-        await redis.set(`better-auth:${key}`, value);
-      }
-    },
-    delete: async (key) => {
-      await redis.del(`better-auth:${key}`);
-    },
-  };
+): NonNullable<BetterAuthOptions["secondaryStorage"]> {
+  return redis
+    ? RedisBetterAuthSecondaryStorageAdapter.create(redis)
+    : DroppedBetterAuthSecondaryStorageAdapter.create();
 }
 
 /**
@@ -609,7 +588,7 @@ export const createBetterAuthTransport = ({
     secondaryStorage,
     rateLimit: {
       ...authOptions.rateLimit,
-      storage: secondaryStorage ? "secondary-storage" : "memory",
+      storage: redis ? "secondary-storage" : "memory",
     },
     emailAndPassword: {
       ...authOptions.emailAndPassword,

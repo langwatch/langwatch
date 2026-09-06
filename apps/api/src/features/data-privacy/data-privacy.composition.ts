@@ -11,6 +11,7 @@ import type {
   DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
 import {
+  ContentDropPolicyService,
   DataPrivacyPermissionsPort,
   DataPrivacyScopeAuthorizationService,
   DataPrivacySnapshotService,
@@ -38,6 +39,12 @@ export type DataPrivacyPeers = Readonly<{
 /** The one namespace, built over the composed rules. */
 export type ComposedDataPrivacyFeature = Readonly<{
   router(mount: ApiTrpcFeatureMount): ReturnType<typeof createDataPrivacyTrpcRouter>;
+  // The interlock the ingest edge asks before it externalizes inline media:
+  // storing bytes for a project whose policy is about to discard them keeps
+  // exactly what the customer asked us not to.
+
+  /** True when this project's resolved policy drops any span content at all. */
+  dropsAnyContent(projectId: string): Promise<boolean>;
 }>;
 
 /** The three answers the privacy surface needs from this deployment. */
@@ -107,8 +114,12 @@ export function composeDataPrivacyFeature(options: {
     },
   };
 
+  const contentDrop = ContentDropPolicyService.create();
+
   return {
     router: (mount) => createDataPrivacyTrpcRouter({ ...mount, ports, checks: scopeChecks(mount) }),
+    dropsAnyContent: async (projectId) =>
+      contentDrop.dropsAnyContent(await policies.getResolvedForProject({ projectId })),
   };
 }
 
@@ -123,6 +134,10 @@ export function refusingDataPrivacyFeature(): ComposedDataPrivacyFeature {
 
   return {
     router: (mount) => createDataPrivacyTrpcRouter({ ...mount, ports, checks: scopeChecks(mount) }),
+    // No rules can be read, so none can be shown to drop anything. The
+    // interlock fails CLOSED: without a policy to consult, the edge stores no
+    // content it might have been told to discard.
+    dropsAnyContent: async () => true,
   };
 }
 

@@ -15,6 +15,7 @@ import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import type { UsageLimitResult } from "@langwatch/entitlement-server";
 import { DEFAULT_PII_REDACTION_LEVEL, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
+  TraceEdgeMediaPayloadService,
   TraceIngestionService,
   TraceIngressCommandPort,
   TraceSpanCollectionService,
@@ -26,7 +27,9 @@ import {
   type CollectorUsageLimitPort,
   type OtlpIngestCredential,
   type OtlpIngestRestPorts,
+  type EdgeMediaExtractionDeps,
   type SpanDedupRef,
+  type TraceIngressPayloadPort,
 } from "@langwatch/trace-server";
 
 import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
@@ -50,7 +53,9 @@ export type ApiTraceIngestAllowance = Readonly<{
 
 /** Reports the composition decisions an absent collaborator would hide. */
 export abstract class ApiTraceIngestAbsenceReport {
-  abstract absent(capability: "command-queue" | "dedup" | "plan-allowance"): void;
+  abstract absent(
+    capability: "command-queue" | "dedup" | "plan-allowance" | "edge-media-extraction",
+  ): void;
 }
 
 export class LoggedApiTraceIngestAbsence extends ApiTraceIngestAbsenceReport {
@@ -62,7 +67,7 @@ export class LoggedApiTraceIngestAbsence extends ApiTraceIngestAbsenceReport {
     super();
   }
 
-  absent(capability: "command-queue" | "dedup" | "plan-allowance"): void {
+  absent(capability: "command-queue" | "dedup" | "plan-allowance" | "edge-media-extraction"): void {
     this.logger.warn(
       { capability },
       capability === "command-queue"
@@ -87,6 +92,20 @@ export type ApiTraceIngestOptions = Readonly<{
   allowance?: ApiTraceIngestAllowance | undefined;
   /** Names this process in the producer registration's own refusals. */
   processName: string;
+  /**
+   * What the edge media extraction needs to run: the content-addressed store to
+   * externalize into, the per-project opt-in, and the privacy interlock. Absent
+   * where this process composed no object store, and the receiver says so.
+   */
+  media?: Pick<
+    EdgeMediaExtractionDeps,
+    "featureFlags" | "hasContentDropRules" | "service" | "telemetry"
+  >;
+  /**
+   * The ADR-022 whole-payload spool, when this process composed one. Media
+   * extraction runs before it, which is what usually keeps it from firing.
+   */
+  payloads?: TraceIngressPayloadPort;
   report?: ApiTraceIngestAbsenceReport;
 }>;
 
@@ -136,11 +155,18 @@ export function composeApiTraceIngest(
   );
   const dedup = composeApiTraceSpanDedup({ redis: options.redis, logger, report });
 
+  const payloads = composeApiTraceIngestPayloads({
+    media: options.media,
+    payloads: options.payloads,
+    report,
+  });
+
   const ingestion = TraceIngestionService.create({
     codingAgents: new ApiSpanFilterOnlyCodingAgents(),
     codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
     dedup,
     commands,
+    ...(payloads ? { payloads } : {}),
   });
 
   const usageLimit = composeApiTraceIngestUsageLimit({
@@ -478,4 +504,29 @@ class ApiSpanFilterOnlyCodingAgents extends CodingAgentService {
   getForPersonalProject(): Promise<never> {
     return this.unavailable();
   }
+}
+
+// Media extraction goes in FRONT of the ADR-022 spool: externalizing the heavy
+// part of a span usually brings the command back under the inline threshold,
+// so the transient whole-payload spool behind it rarely writes anything at all.
+// A process with neither prepares nothing, and an oversized attribute takes the
+// truncation the pipeline already applies.
+
+/** The ingest path's payload preparation, in the one order that matters. */
+function composeApiTraceIngestPayloads(options: {
+  media: ApiTraceIngestOptions["media"];
+  payloads: TraceIngressPayloadPort | undefined;
+  report: ApiTraceIngestAbsenceReport | undefined;
+}): TraceIngressPayloadPort | undefined {
+  const { media } = options;
+  if (!media?.service) {
+    options.report?.absent("edge-media-extraction");
+    return options.payloads;
+  }
+
+  return TraceEdgeMediaPayloadService.create({
+    deps: media,
+    logger: createLogger("langwatch:api:trace-ingest:edge-media-extraction"),
+    ...(options.payloads ? { next: options.payloads } : {}),
+  });
 }

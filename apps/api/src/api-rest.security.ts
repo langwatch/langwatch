@@ -6,6 +6,7 @@ import {
   type ApiErrorEnvelope,
   type AppRestSecurity,
   type AppRestSecurityPorts,
+  type IdempotentRunner,
   type RequestActor,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
@@ -190,6 +191,13 @@ export class ApiRestSecurity {
     observability: ApiRestSecurityObservability;
     audit?: ApiAuditPort;
     logger?: Pick<Logger, "error">;
+    /**
+     * The `Idempotency-Key` receipt ledger this process composed, backing
+     * every family that declares `withIdempotency(...)`. Absent on a process
+     * with no database or no cipher, and then such a family fails to build
+     * rather than accepting a key it cannot honour.
+     */
+    idempotency?: IdempotentRunner;
   }): AppRestSecurity {
     const security = new ApiRestSecurity(
       options.apiKeys,
@@ -198,7 +206,10 @@ export class ApiRestSecurity {
       options.audit,
       options.logger ?? createLogger("langwatch:api:rest-security"),
     );
-    return createAppRestSecurity(security.ports(options.observability));
+    return createAppRestSecurity({
+      ...security.ports(options.observability),
+      ...(options.idempotency ? { idempotency: options.idempotency } : {}),
+    });
   }
 
   /**
@@ -353,7 +364,7 @@ export class ApiRestSecurity {
           { error, method: context.req.method, path: context.req.path },
           "Organization credential resolution failed",
         );
-        return this.refuse(context, new ApiOrganizationAuthenticationUnavailableError(), envelope);
+        return this.unavailable(context, error, envelope);
       }
 
       if (!resolution.ok) {
@@ -385,13 +396,10 @@ export class ApiRestSecurity {
             "Organization lookup failed while authenticating an organization credential",
           );
         }
-        return this.refuse(
-          context,
-          organizationMissing
-            ? new ApiOrganizationNotFoundForCredentialError()
-            : new ApiOrganizationAuthenticationUnavailableError(),
-          envelope,
-        );
+        if (organizationMissing) {
+          return this.refuse(context, new ApiOrganizationNotFoundForCredentialError(), envelope);
+        }
+        return this.unavailable(context, error, envelope);
       }
 
       installOrganizationVariables(context, resolved);
@@ -524,6 +532,22 @@ export class ApiRestSecurity {
         "REST request audit failed after a successful response",
       );
     }
+  }
+
+  /**
+   * A failure of the credential lookup itself, which is infrastructure rather
+   * than a refusal.
+   */
+  // Where the family's own error handler owns the response, the original is
+  // re-raised as it arrived: ADR-045 keeps an unanticipated failure a plain
+  // error rather than dressing it up as customer-actionable. Where this
+  // middleware owns the response it answers the family's server error, whose
+  // body carries none of the cause.
+  private unavailable(context: Context, error: unknown, envelope: Envelope): Response {
+    if (envelope === "throw") {
+      throw error;
+    }
+    return this.refuse(context, new ApiOrganizationAuthenticationUnavailableError(), envelope);
   }
 
   /**

@@ -110,6 +110,21 @@ export class ContentDropPolicyService {
     );
   }
 
+  /** Whether this policy drops any content at all. */
+  // The one question an interlock upstream of the drop asks: work that stores
+  // span content — externalizing media at the ingest edge — must not run for a
+  // project whose policy is about to discard it, or the platform writes bytes
+  // the customer asked it not to keep.
+  dropsAnyContent(policy: ResolvedDataPrivacy): boolean {
+    const { roles, stripToolCalls } = this.rolesDroppedFromChatArrays(policy);
+    return (
+      this.droppedKeys(policy).size > 0 ||
+      this.dropMatchers(policy).length > 0 ||
+      roles.size > 0 ||
+      stripToolCalls
+    );
+  }
+
   /** The categories currently set to `drop`, for the span marker / observability. */
   droppedCategories(policy: ResolvedDataPrivacy): ContentCategory[] {
     return CONTENT_CATEGORIES.filter((c) => policy.categories[c].disposition === "drop");

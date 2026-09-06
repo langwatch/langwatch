@@ -13,8 +13,9 @@ const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 // those as dropped writes. The name is spelled inline because a `vi.mock`
 // factory is hoisted above any const it might reference.
 vi.mock("@langwatch/observability", async () => {
-  const actual =
-    await vi.importActual<typeof import("@langwatch/observability")>("@langwatch/observability");
+  const actual = await vi.importActual<typeof import("@langwatch/observability")>(
+    "@langwatch/observability",
+  );
   return {
     ...actual,
     createLogger: (name: string) => ({

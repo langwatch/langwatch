@@ -2,7 +2,13 @@
  * The workbench run loop, composed for this process.
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
-import { AgentSandboxKeyMintService } from "@langwatch/api-key-server";
+import {
+  AbsentAgentSandboxKeyShareAdapter,
+  AgentSandboxKeyMintService,
+  PostgresAgentSandboxKeyMintAdapter,
+  RedisAgentSandboxKeyShareAdapter,
+  type AgentSandboxKeyShareRedis,
+} from "@langwatch/api-key-server";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
@@ -201,6 +207,11 @@ export type ApiExperimentRunOptions = Readonly<{
   evaluators: EvaluatorService;
   /** The credential a run lends the code it executes. Absent means it lends none. */
   apiKeys: ApiKeyService | undefined;
+  /**
+   * The 32-byte hex key this deployment seals stored secrets with, which the shared sandbox
+   * token is held under too. Absent means the runs of a project share no key.
+   */
+  storedSecretEncryptionKey: string | undefined;
   report?: ApiExperimentRunAbsenceReport;
 }>;
 
@@ -340,6 +351,8 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
     sandboxCredentials: ApiExperimentSandboxCredentialAdapter.create({
       prisma: options.prisma,
       apiKeys: options.apiKeys,
+      redis: redis,
+      storedSecretEncryptionKey: options.storedSecretEncryptionKey,
     }),
     connectedDispatch: ApiExperimentConnectedDispatchAdapter.create(),
     connectedAgentOwnership: ApiExperimentConnectedAgentOwnershipAdapter.create(),
@@ -551,23 +564,41 @@ class ApiExperimentEvaluationReportingAdapter extends ExperimentEvaluationReport
  * organization, and the mint.
  */
 class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialPort {
+  /**
+   * The share is Redis when the queue composed one and in-process otherwise, and none at all
+   * when this deployment has no key to seal a token with: the plaintext is the whole value of a
+   * share, so a process that cannot seal it mints per run instead.
+   */
   static create(options: {
     prisma: PrismaClient;
     apiKeys: ApiKeyService | undefined;
+    redis: AgentSandboxKeyShareRedis | null;
+    storedSecretEncryptionKey: string | undefined;
   }): ApiExperimentSandboxCredentialAdapter {
-    return new ApiExperimentSandboxCredentialAdapter(options.prisma, options.apiKeys);
+    const secret = options.storedSecretEncryptionKey?.trim();
+    const share = secret
+      ? RedisAgentSandboxKeyShareAdapter.create({ redis: options.redis, secret })
+      : AbsentAgentSandboxKeyShareAdapter.create();
+    const mint = options.apiKeys
+      ? PostgresAgentSandboxKeyMintAdapter.create({
+          database: options.prisma,
+          apiKeys: options.apiKeys,
+          share,
+        }).build()
+      : undefined;
+    return new ApiExperimentSandboxCredentialAdapter(options.prisma, mint);
   }
 
   private constructor(
     private readonly prisma: PrismaClient,
-    private readonly apiKeys: ApiKeyService | undefined,
+    private readonly mint: AgentSandboxKeyMintService | undefined,
   ) {
     super();
   }
 
   async tryMintRunKey(input: { projectId: string }): Promise<string | undefined> {
-    const apiKeys = this.apiKeys;
-    if (!apiKeys) return undefined;
+    const mint = this.mint;
+    if (!mint) return undefined;
 
     const project = await this.prisma.project.findUnique({
       where: { id: input.projectId },
@@ -576,11 +607,7 @@ class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialP
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return undefined;
 
-    return await AgentSandboxKeyMintService.tryMint({
-      apiKeys,
-      projectId: input.projectId,
-      organizationId,
-    });
+    return await mint.tryGetOrMint({ projectId: input.projectId, organizationId });
   }
 }
 

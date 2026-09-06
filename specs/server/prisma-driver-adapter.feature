@@ -46,7 +46,14 @@ Feature: Postgres access through the Prisma driver adapter
     Then creation does not throw
     And only an actual query attempt surfaces the connection failure
 
-  @deprecated @unit
+  # `~/server/db` went with platform/app: there is no global client module to
+  # import, and the composition root owns the one connection (the scenario
+  # below). What survives of this scenario is bound by "Importing the Prisma
+  # client package has no process side effects" in
+  # packages/prisma-client/src/import-side-effects.test.ts. Parked rather than
+  # deleted because retiring a scenario needs a ruling
+  # (dev/docs/plans/restore-or-retire-2026-09-05.md).
+  @deprecated @unimplemented
   Scenario: Importing the db module does not construct a client
     Given a module that imports "~/server/db"
     When the module is imported

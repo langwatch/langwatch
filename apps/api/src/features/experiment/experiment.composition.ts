@@ -117,6 +117,8 @@ export function composeExperimentFeature(options: {
   redis?: RedisConnection | null;
   /** The credential a run lends the code it executes. */
   apiKeys?: ApiKeyService;
+  /** The key this deployment seals stored secrets with; the shared sandbox token rides on it. */
+  storedSecretEncryptionKey?: string;
   /** The live-update channel a workbench cell is broadcast on. */
   broadcast?: ExperimentBroadcast;
   /** The canonicaliser for a monitor's stored mappings, from the trace registry. */
@@ -205,6 +207,7 @@ export function composeExperimentFeature(options: {
     agents: options.peers.agents,
     evaluators: options.peers.evaluators,
     apiKeys: options.apiKeys,
+    storedSecretEncryptionKey: options.storedSecretEncryptionKey,
     ...(options.runReport ? { report: options.runReport } : {}),
   });
 

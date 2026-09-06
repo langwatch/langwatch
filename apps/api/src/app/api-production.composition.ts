@@ -392,6 +392,7 @@ import { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
 import { apiClientAddress } from "./api-client-address";
 import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
 import { composeApiTraceIngest, LoggedApiTraceIngestAbsence } from "./api-trace-ingest.composition";
+import { ApiTraceMediaStore } from "./api-packaged-rest.composition";
 import {
   AdminAccessService,
   PrismaBugReportRepository,
@@ -1492,6 +1493,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // where this process opened no ClickHouse, and the receiver says so.
       ...(this.composedUsageEnforcement ? { allowance: this.composedUsageEnforcement } : {}),
       processName: serviceName,
+      // Edge media externalization, over the SAME content-addressed store the
+      // scenario-event door writes through and the SAME privacy rules the
+      // worker's content drop reads: a picture stored here is one object, and
+      // it is not stored at all for a project whose policy discards it.
+      media: {
+        featureFlags: this.composedFeatureFlag.service,
+        hasContentDropRules: (projectId) => this.composedDataPrivacy.dropsAnyContent(projectId),
+        ...(this.composedStoredObject.bytes
+          ? { service: ApiTraceMediaStore.create(this.composedStoredObject.bytes) }
+          : {}),
+      },
       report: LoggedApiTraceIngestAbsence.create(createLogger(serviceName)),
     });
     // The gateway's public family, over the SAME application the six gateway

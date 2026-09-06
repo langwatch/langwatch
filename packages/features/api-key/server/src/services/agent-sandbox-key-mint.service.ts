@@ -4,6 +4,9 @@
 import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 
+import type { AgentSandboxKeySharePort } from "../ports/agent-sandbox-key-share.port";
+import type { ApiKeyRepository } from "../repositories/api-key.repository";
+
 const logger = createLogger("langwatch:api-key:agent-sandbox");
 
 /**
@@ -21,37 +24,45 @@ export const AGENT_SANDBOX_KEY_TTL_MS = 12 * 60 * 60 * 1000;
 export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = ["agentCache:manage"];
 
 export class AgentSandboxKeyMintService {
-  private constructor() {}
-
-  static create(): AgentSandboxKeyMintService {
-    return new AgentSandboxKeyMintService();
+  static create(options: {
+    apiKeys: ApiKeyService;
+    /** Resolves whose credential a personal workspace's key has to be. */
+    repository: Pick<ApiKeyRepository, "tryFindPersonalWorkspaceOwner">;
+    share: AgentSandboxKeySharePort;
+  }): AgentSandboxKeyMintService {
+    return new AgentSandboxKeyMintService(options.apiKeys, options.repository, options.share);
   }
 
+  private constructor(
+    private readonly apiKeys: ApiKeyService,
+    private readonly repository: Pick<ApiKeyRepository, "tryFindPersonalWorkspaceOwner">,
+    private readonly share: AgentSandboxKeySharePort,
+  ) {}
+
   /**
-   * Mint the credential a code agent's sandbox authenticates with. The key belongs to no user,
-   * is bound to one project, and holds the agent cache grains only, so it is strictly narrower
-   * than the project key that authorized the run.
+   * Mint the credential a code agent's sandbox authenticates with. The key is bound to one
+   * project and holds the agent cache grains only, so it is strictly narrower than the project
+   * key that authorized the run.
    */
-  static async mint({
-    apiKeys,
+  async mint({
     projectId,
     organizationId,
   }: {
-    apiKeys: ApiKeyService;
     projectId: string;
     organizationId: string;
   }): Promise<string> {
-    const { token } = await apiKeys.create({
+    const ownerUserId = await this.ownerOf({ projectId, organizationId });
+    const { token } = await this.apiKeys.create({
       isSystemManaged: true,
       name: AGENT_SANDBOX_API_KEY_NAME,
       description:
-        "Short-lived key for one code agent run. Reaches the project's agent " +
-        "cache and nothing else, and expires by itself.",
-      // No owner and no creator: there is no person behind a run's sandbox, and
-      // a key with no owner has no user ceiling to clamp. The grains below are
-      // the whole ceiling instead.
-      userId: null,
-      createdByUserId: null,
+        "Short-lived key shared by the code agent runs of one project. Reaches the " +
+        "project's agent cache and nothing else, and expires by itself.",
+      // In a shared project there is no person behind a run's sandbox, and a key with no owner
+      // has no user ceiling to clamp, so the grains below are the whole ceiling. A personal
+      // workspace admits no principal but its owner, so there the key is the owner's own.
+      userId: ownerUserId,
+      createdByUserId: ownerUserId,
       organizationId,
       permissionMode: "restricted",
       permissions: [...AGENT_SANDBOX_PERMISSIONS],
@@ -63,32 +74,58 @@ export class AgentSandboxKeyMintService {
   }
 
   /**
-   * Mint a sandbox key, or report that the run goes without one. A run that cannot get a key
+   * The key a run of this project puts in its sandbox: the one the project's runs currently
+   * share, or a freshly minted one when there is none. Two runs that start together on an empty
+   * share may both mint; both keys are valid and the later one is shared from then on.
+   */
+  async getOrMint(input: { projectId: string; organizationId: string }): Promise<string> {
+    const held = await this.share.tryGet({ projectId: input.projectId });
+    if (held !== undefined) return held;
+
+    const token = await this.mint(input);
+    await this.share.hold({ projectId: input.projectId, token });
+    return token;
+  }
+
+  /**
+   * Get a sandbox key, or report that the run goes without one. A run that cannot get a key
    * must still run: its rows each do their own work and the cache simply never answers. So a
    * failure here is a warning and an `undefined`, never a thrown error that would stop the run.
    */
-  static async tryMint({
-    apiKeys,
-    projectId,
-    organizationId,
-  }: {
-    apiKeys: ApiKeyService;
+  async tryGetOrMint(input: {
     projectId: string;
     organizationId: string;
   }): Promise<string | undefined> {
     try {
-      return await AgentSandboxKeyMintService.mint({
-        apiKeys,
-        projectId,
-        organizationId,
-      });
+      return await this.getOrMint(input);
     } catch (error) {
       logger.warn(
-        { projectId, error },
-        "could not mint an agent sandbox key; the run continues without the agent cache",
+        { projectId: input.projectId, error },
+        "could not get an agent sandbox key; the run continues without the agent cache",
       );
 
       return undefined;
     }
+  }
+
+  // A personal workspace admits no principal but its owner, so the grant policy
+  // refuses an ownerless key there; the one it accepts is the owner's own, and
+  // the owner's ceiling then caps it. No recorded owner answers null and the
+  // mint is refused — the guard's own rule for incomplete provisioning.
+
+  /**
+   * Whose credential the sandbox key is: the workspace owner's in a personal
+   * workspace, nobody's in a shared project.
+   */
+  private async ownerOf(input: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<string | null> {
+    const personal = await this.repository.tryFindPersonalWorkspaceOwner({
+      organizationId: input.organizationId,
+      scopeId: input.projectId,
+    });
+
+    return personal?.ownerUserId ?? null;
   }
 }
