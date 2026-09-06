@@ -226,7 +226,7 @@ export const projectRouter = createTRPCRouter({
     }),
   getResolvedDefaultModel: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input }) => {
       const resolvedModel = await getApp().projects.resolveDefaultModel(
         input.projectId,
