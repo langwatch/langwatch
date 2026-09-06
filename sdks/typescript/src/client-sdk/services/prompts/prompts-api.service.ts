@@ -233,15 +233,13 @@ export class PromptsApiService {
     const { data, error, response } = await this.apiClient.POST("/api/v1/prompts/tags", {
       body: { name },
     });
-    // The operation describes both a schema-less 200 and the 201 that carries
-    // the tag, so the client widens `data` to `unknown`. The tag is the 201.
     return unwrapApiResult({
       operation: "create tag",
       data,
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as CreatedTag;
+    });
   }
 
   /**

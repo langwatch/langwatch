@@ -118,3 +118,53 @@ Feature: The published OpenAPI document tracks the surface the API process serve
       Given a bare family whose v1 twin is another family's declared base
       When the description is generated
       Then the run fails naming the path both families claim
+
+  Rule: a body the routes leave unschema'd is described as unstated, not as a shape
+
+    # A family that reads its body raw, or writes its answer raw, states a media
+    # type and no shape. The description used to publish that as a media object
+    # with nothing in it, which every client generator reads as `unknown`: a
+    # required request body no caller can fill, and a success status that widens
+    # the response of every other status beside it. None of that is what the
+    # route said. Nothing here invents a schema — the document just stops
+    # claiming more than the route declared.
+
+    @unit
+    Scenario: A status with no schema is described without a body
+      Given a route that writes its answer raw and describes another status by hand
+      When the description is generated
+      Then the status with no schema keeps its description and describes no body
+      And the status that names a schema keeps it
+
+    @unit
+    Scenario: A body of unstated shape is not required
+      Given a route that reads its body raw and describes no shape for it
+      When the description is generated
+      Then the request body still names the media type the route reads
+      And the request body is not required
+
+    @unit
+    Scenario: No published response describes a body it cannot name
+      Given the description of every mounted family
+      When the description is generated
+      Then no response media object in it is published without a schema
+
+    @unit
+    Scenario: A declared schema is left alone
+      Given a request body and a response that each name a schema
+      When the description is generated
+      Then both are published exactly as declared
+
+    @unit
+    Scenario: A body with one described media type stays required
+      Given a required request body naming one media type with a schema and one without
+      When the description is generated
+      Then the request body stays required
+      And both media types are kept
+
+    @unit
+    Scenario: A status keeps the media types it did describe
+      Given a status naming one media type with a schema and one without
+      When the description is generated
+      Then only the media type with no schema is dropped
+      And the status keeps its description

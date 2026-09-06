@@ -1559,7 +1559,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }
@@ -6448,10 +6448,7 @@
         "operationId": "postApiPromptsTags",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           },
           "201": {
             "description": "Tag created",
@@ -6746,10 +6743,7 @@
         "operationId": "deleteApiPromptsTagsByTag",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           },
           "204": {
             "description": "Tag deleted"
@@ -15098,7 +15092,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }
@@ -17455,7 +17449,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }
@@ -19812,7 +19806,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }
@@ -22165,7 +22159,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }
@@ -39977,7 +39971,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }
@@ -40213,7 +40207,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }
@@ -50527,10 +50521,7 @@
         "operationId": "getApiDataset",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "List all non-archived datasets for the project (paginated)",
@@ -50566,10 +50557,7 @@
         "operationId": "postApiDataset",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Create a new dataset",
@@ -50637,10 +50625,7 @@
         "operationId": "postApiDatasetUpload",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
@@ -50656,10 +50641,7 @@
         "operationId": "postApiDatasetDirectUpload",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
@@ -50675,10 +50657,7 @@
         "operationId": "putApiDatasetDirectUploadStagingByUploadId",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Stream a heavy upload into staging when there is no browser-reachable S3",
@@ -50704,10 +50683,7 @@
         "operationId": "postApiDatasetDirectUploadByDatasetIdFinalize",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Finalize a direct upload: size-check and start processing",
@@ -50733,10 +50709,7 @@
         "operationId": "postApiDatasetDirectUploadByDatasetIdRetry",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Retry normalization of a failed or stuck dataset",
@@ -50762,10 +50735,7 @@
         "operationId": "deleteApiDatasetDirectUploadByDatasetId",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Abort a still-pending direct upload and clean up its row",
@@ -50791,10 +50761,7 @@
         "operationId": "postApiDatasetBySlugOrIdUpload",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Upload a file (CSV, JSON, JSONL) to an existing dataset",
@@ -50820,10 +50787,7 @@
         "operationId": "postApiDatasetBySlugOrIdRecords",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Create records in a dataset in batch",
@@ -50874,10 +50838,7 @@
         "operationId": "getApiDatasetBySlugOrIdRecords",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "List records for a dataset (paginated)",
@@ -50921,10 +50882,7 @@
         "operationId": "deleteApiDatasetBySlugOrIdRecords",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Delete records from a dataset by IDs",
@@ -50973,10 +50931,7 @@
         "operationId": "postApiDatasetBySlugEntries",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Add entries to a dataset",
@@ -51218,10 +51173,7 @@
         "operationId": "patchApiDatasetBySlugOrId",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Update a dataset by its slug or id",
@@ -51293,10 +51245,7 @@
         "operationId": "deleteApiDatasetBySlugOrId",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Archive a dataset (soft-delete)",
@@ -51322,10 +51271,7 @@
         "operationId": "patchApiDatasetBySlugOrIdRecordsByRecordId",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {}
-            }
+            "description": "Success"
           }
         },
         "description": "Update or create a record in a dataset",
@@ -102735,6 +102681,12 @@
                           "name"
                         ]
                       }
+                    },
+                    "planName": {
+                      "type": "string"
+                    },
+                    "created": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -105695,6 +105647,12 @@
                           "name"
                         ]
                       }
+                    },
+                    "planName": {
+                      "type": "string"
+                    },
+                    "created": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -108655,6 +108613,12 @@
                           "name"
                         ]
                       }
+                    },
+                    "planName": {
+                      "type": "string"
+                    },
+                    "created": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -115179,7 +115143,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }
@@ -115301,7 +115265,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }
@@ -115423,7 +115387,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }
@@ -127548,7 +127512,7 @@
           }
         },
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {}
           }

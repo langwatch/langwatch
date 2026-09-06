@@ -16,6 +16,7 @@ import {
 import {
   atCanonicalPaths,
   generateOpenApiDocument,
+  withUnstatedBodiesLeftUnstated,
   type GeneratedOpenApiDocument,
   type OpenApiDocument,
 } from "../openapi-document.generator";
@@ -333,6 +334,134 @@ describe("given the frozen document and the served surface", () => {
       // deleted from the list rather than left to make the guard weaker than
       // it reads.
       expect([...report.baselined].sort()).toEqual([...UNSERVED_AT_BASELINE].sort());
+    });
+  });
+});
+
+describe("given routes that declare a media type and no schema", () => {
+  describe("when the description is generated", () => {
+    /** @scenario "A status with no schema is described without a body" */
+    it("keeps the status and drops the media object that describes nothing", () => {
+      const tags = generated.document.paths?.["/api/v1/prompts/tags"]?.post as {
+        responses: Record<string, { description?: string; content?: Record<string, unknown> }>;
+      };
+
+      expect(tags.responses["200"]?.description).toBe("Success");
+      expect(tags.responses["200"]?.content).toBeUndefined();
+      expect(tags.responses["201"]?.content?.["application/json"]).toHaveProperty("schema");
+    });
+
+    /** @scenario "A body of unstated shape is not required" */
+    it("keeps the media type a raw body names and stops calling it required", () => {
+      const run = generated.document.paths?.["/api/v1/experiments/{slug}/run"]?.post as {
+        requestBody: { required?: boolean; content: Record<string, unknown> };
+      };
+
+      expect(Object.keys(run.requestBody.content)).toEqual(["application/json"]);
+      expect(run.requestBody.required).toBe(false);
+    });
+
+    /** @scenario "No published response describes a body it cannot name" */
+    it("publishes no response media object without a schema", () => {
+      const unnamed: string[] = [];
+      for (const [path, item] of Object.entries(generated.document.paths ?? {})) {
+        for (const [method, operation] of Object.entries(item)) {
+          const responses = (
+            operation as {
+              responses?: Record<string, { content?: Record<string, { schema?: unknown }> }>;
+            }
+          ).responses;
+          for (const [status, response] of Object.entries(responses ?? {})) {
+            for (const [mediaType, media] of Object.entries(response?.content ?? {})) {
+              if (media?.schema === undefined) {
+                unnamed.push(`${method.toUpperCase()} ${path} ${status} ${mediaType}`);
+              }
+            }
+          }
+        }
+      }
+
+      expect(unnamed).toEqual([]);
+    });
+  });
+
+  describe("when a schema is declared", () => {
+    /** @scenario "A declared schema is left alone" */
+    it("leaves a described body and a described status untouched", () => {
+      const document: OpenApiDocument = {
+        paths: {
+          "/thing": {
+            post: {
+              requestBody: {
+                required: true,
+                content: { "application/json": { schema: { type: "object" } } },
+              },
+              responses: {
+                "200": { description: "ok", content: { "application/json": { schema: {} } } },
+              },
+            },
+          },
+        },
+      };
+
+      expect(withUnstatedBodiesLeftUnstated(document)).toEqual(document);
+    });
+
+    /** @scenario "A body with one described media type stays required" */
+    it("leaves a required body alone when any of its media types names a schema", () => {
+      const document: OpenApiDocument = {
+        paths: {
+          "/thing": {
+            post: {
+              requestBody: {
+                required: true,
+                content: {
+                  "application/json": { schema: { type: "object" } },
+                  "text/csv": {},
+                },
+              },
+              responses: { "200": { description: "ok" } },
+            },
+          },
+        },
+      };
+
+      const stated = withUnstatedBodiesLeftUnstated(document).paths?.["/thing"]?.post as {
+        requestBody: { required?: boolean; content: Record<string, unknown> };
+      };
+
+      expect(stated.requestBody.required).toBe(true);
+      expect(Object.keys(stated.requestBody.content)).toEqual(["application/json", "text/csv"]);
+    });
+
+    /** @scenario "A status keeps the media types it did describe" */
+    it("drops only the media types of one status that name no schema", () => {
+      const document: OpenApiDocument = {
+        paths: {
+          "/thing": {
+            get: {
+              responses: {
+                "200": {
+                  description: "ok",
+                  content: {
+                    "application/json": { schema: { type: "string" } },
+                    "text/event-stream": {},
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const responses = (
+        withUnstatedBodiesLeftUnstated(document).paths?.["/thing"]?.get as {
+          responses: Record<string, { content?: Record<string, unknown>; description?: string }>;
+        }
+      ).responses;
+
+      expect(Object.keys(responses["200"]?.content ?? {})).toEqual(["application/json"]);
+      expect(responses["200"]?.description).toBe("ok");
     });
   });
 });

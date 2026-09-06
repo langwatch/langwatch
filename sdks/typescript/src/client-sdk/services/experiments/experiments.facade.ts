@@ -226,9 +226,6 @@ export class ExperimentsFacade {
         params: {
           path: { slug },
         },
-        // The served description gives this operation a required body with no
-        // schema; `undefined` sends no body, exactly as omitting the key did.
-        body: undefined,
       });
     } catch (error) {
       if (isLangWatchHandledError(error)) {

@@ -221,7 +221,7 @@ export async function generateOpenApiDocument({
     hoistEmbeddedJsonSchemaDefinitions(withoutEmptyPaths(generated)),
   );
   const unpublishable = stampSecurityFromRegistry(stamped);
-  const document = atCanonicalPaths(withoutEmptyPaths(stamped));
+  const document = withUnstatedBodiesLeftUnstated(atCanonicalPaths(withoutEmptyPaths(stamped)));
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
@@ -525,4 +525,59 @@ function withoutEmbeddedJsonSchemaDefinitions<T>(value: T): T {
       .filter(([key]) => key !== "$defs")
       .map(([key, item]) => [key, withoutEmbeddedJsonSchemaDefinitions(item)]),
   ) as T;
+}
+
+/** A media object as far as this pass reads it: the schema is what it looks for. */
+type MediaObject = { schema?: unknown };
+
+/** Whether a `content` map states a schema for at least one media type. */
+function statesASchema(content: Record<string, MediaObject> | undefined): boolean {
+  return Object.values(content ?? {}).some(
+    (media) => !!media && typeof media === "object" && media.schema !== undefined,
+  );
+}
+
+/**
+ * A media object naming a media type and no schema says nothing about the
+ * payload, and every client generator reads it as `unknown`: a required request
+ * body no caller can fill, and a success status that widens the response union
+ * of every other status beside it. It is what `withRawBody` and
+ * `withRawResponse` leave behind when a family describes no shape — never
+ * something a route stated.
+ *
+ * A response therefore loses the schema-less media entry and keeps its
+ * description: the status is real, the body is undescribed, and the document
+ * now says exactly that. A request body KEEPS its media type, which is the one
+ * thing the route did state, and stops claiming to be required — `required:
+ * true` is the blanket default the middleware writes for every raw body, not a
+ * declaration, and a required body of unstated shape is a demand no reader of
+ * the document can satisfy. Nothing here invents a schema.
+ */
+export function withUnstatedBodiesLeftUnstated(document: OpenApiDocument): OpenApiDocument {
+  for (const [, item] of Object.entries(document.paths ?? {})) {
+    for (const [, operation] of operationsOf(item)) {
+      const op = operation as {
+        requestBody?: { required?: boolean; content?: Record<string, MediaObject> };
+        responses?: Record<string, { content?: Record<string, MediaObject> }>;
+      };
+
+      if (op.requestBody?.content && !statesASchema(op.requestBody.content)) {
+        op.requestBody.required = false;
+      }
+
+      for (const response of Object.values(op.responses ?? {})) {
+        if (!response?.content) continue;
+        const described = Object.fromEntries(
+          Object.entries(response.content).filter(
+            ([, media]) => !!media && typeof media === "object" && media.schema !== undefined,
+          ),
+        );
+        if (Object.keys(described).length === Object.keys(response.content).length) continue;
+        if (Object.keys(described).length === 0) delete response.content;
+        else response.content = described;
+      }
+    }
+  }
+
+  return document;
 }
