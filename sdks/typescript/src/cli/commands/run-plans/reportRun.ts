@@ -22,6 +22,7 @@ import {
   waitForBatchRun,
   type BatchRunOutcome,
 } from "../../utils/waitForBatchRun";
+import type { WaitOptions } from "./scopeFlags";
 
 /** How the run ended, in the final document a machine caller reads. */
 export type RunCommandOutcome = "scheduled" | BatchRunOutcome;
@@ -70,8 +71,10 @@ export interface EmitRunResultParams {
   result: RunPlanRunResult;
   /** The note the run was filed under, for the human block. */
   note?: string;
-  /** The command line, for `--wait` and for the output format. */
-  options: RawOutputFlags & { wait?: boolean };
+  /** The command line, for the output format. */
+  options: RawOutputFlags;
+  /** What `--wait` asked for; absent when the caller did not ask to wait. */
+  wait?: WaitOptions;
   /** What is being waited on, for the progress line: "test suite run". */
   subject: string;
 }
@@ -89,6 +92,7 @@ export async function emitRunResult({
   result,
   note,
   options,
+  wait,
   subject,
 }: EmitRunResultParams): Promise<void> {
   const machine = resolveOutputOptions(options).format !== "table";
@@ -100,15 +104,15 @@ export async function emitRunResult({
   // A run that scheduled nothing can never see a completion arrive. Polling
   // would run out the full timeout and report a timeout for a run that is
   // already over.
-  const nothingToWaitFor = options.wait === true && result.jobCount === 0;
+  const hasNothingToWaitFor = wait !== undefined && result.jobCount === 0;
 
-  if (!options.wait || nothingToWaitFor) {
+  if (!wait || hasNothingToWaitFor) {
     await printResult(
       { ...result, outcome: "scheduled" satisfies RunCommandOutcome },
       {
         ...options,
         table: () => {
-          if (nothingToWaitFor) {
+          if (hasNothingToWaitFor) {
             console.log();
             console.log(
               chalk.yellow("  No jobs were scheduled: nothing to wait for."),
@@ -127,6 +131,7 @@ export async function emitRunResult({
     jobCount: result.jobCount,
     subject,
     machine,
+    timeoutMs: wait.timeoutMs,
   });
 
   await printResult(

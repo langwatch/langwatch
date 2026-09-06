@@ -2131,7 +2131,7 @@ gateway:
     authExistingSecretName: ""
     authSecretKey: token
 
-## The Langy agent is the OpenCode "manager" pod that backs the in-product
+## The Langy agent is the worker manager pod that backs the in-product
 ## assistant. Internal-only (no ingress); the control plane reaches it over
 ## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
 ## SecurityContext, single-replica) live in charts/langyagent/values.yaml.
@@ -2146,9 +2146,9 @@ gateway:
 ## ISOLATION. The agent runs shell written by a language model, and the workers
 ## hold the requesting user's credentials, so the controls that bound that are
 ## on by DEFAULT and cost nothing: each conversation's worker runs under its own
-## UID with its own credentials, workers cannot read each other's, the per-worker
-## opencode password separates them, and the NetworkPolicy denies egress to the
-## internet unless you turn it on.
+## UID with its own credentials, workers cannot read each other's, a worker
+## binds no listener a sibling could dial, and the NetworkPolicy denies egress
+## to the internet unless you turn it on.
 ##
 ## Those are the controls that stop the attack that actually happens: a worker
 ## reached by prompt injection through ingested data, using its own legitimate

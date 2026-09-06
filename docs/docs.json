@@ -136,6 +136,17 @@
                   "agent-testing/run-from-ci"
                 ]
               },
+              {
+                "group": "Improve your agent",
+                "pages": [
+                  "improve-your-agent/overview",
+                  "improve-your-agent/reduce-turns",
+                  "improve-your-agent/fix-tool-calls",
+                  "improve-your-agent/reduce-cost-and-latency",
+                  "improve-your-agent/optimize-with-dspy",
+                  "improve-your-agent/algorithms"
+                ]
+              },
               "agent-testing/voice-agents",
               "agent-testing/red-teaming"
             ]
@@ -950,6 +961,7 @@
               "langy/prompt-optimization",
               "langy/scenario-tests-and-evals",
               "langy/pull-requests",
+              "langy/local-development",
               "langy/insights"
             ]
           },
@@ -1692,7 +1704,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1788525926",
+      "source": "/ci/cache/busted/1788674350",
       "destination": "/introduction"
     },
     {

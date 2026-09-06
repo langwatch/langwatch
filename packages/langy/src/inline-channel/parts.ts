@@ -20,9 +20,9 @@ import * as z from "zod/v4";
 
 import { langyChoiceSelectionSchema } from "./choices";
 import {
-  DERIVED_SAFE_CARD_KINDS,
   langyDerivedCardSchema,
   langyCardHintSchema,
+  RENDERED_CARD_KINDS,
 } from "../cards/derived-safe.js";
 
 export const LANGY_CARD_PART_TYPE = "langy-card";
@@ -33,7 +33,7 @@ export const langyCardPartSchema = z
   .object({
     type: z.literal(LANGY_CARD_PART_TYPE),
     blockId: z.string().min(1),
-    kind: z.enum(DERIVED_SAFE_CARD_KINDS),
+    kind: z.enum(RENDERED_CARD_KINDS),
     /** Always "derived" — the provenance chrome keys off this, never off kind. */
     provenance: z.literal("derived"),
     card: langyDerivedCardSchema,
