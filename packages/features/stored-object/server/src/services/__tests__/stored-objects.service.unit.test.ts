@@ -567,3 +567,48 @@ describe("headById", () => {
     });
   });
 });
+
+describe("the service surface a caller composes against", () => {
+  let repo: StoredObjectsRepository;
+  let registry: StoredObjectStoragePort;
+  let service: StoredObjectsService;
+
+  beforeEach(() => {
+    repo = makeRepository();
+    registry = makeRegistry();
+    service = makeService({ repository: repo, registry });
+  });
+
+  describe("when one object is stored, read, probed and then deleted", () => {
+    /** @scenario StoredObjectsService exposes storeFromBytes, tryGetById, headById, deleteOwnedBy */
+    it("serves the whole lifecycle through the repository and the storage registry alone", async () => {
+      const stored = await service.storeFromBytes(STORE_PARAMS);
+      const row = makeRow({ id: stored.id });
+
+      vi.mocked(repo.tryFindById).mockResolvedValue(row);
+      const readStream = Readable.from(["hello"]);
+      vi.mocked(registry.get).mockResolvedValue(readStream);
+      const read = await service.tryGetById({ projectId: PROJECT_ID, id: stored.id });
+
+      vi.mocked(registry.exists).mockResolvedValue(true);
+      const head = await service.headById({ projectId: PROJECT_ID, id: stored.id });
+
+      vi.mocked(repo.findAllByProject).mockResolvedValue([row]);
+      await service.deleteOwnedBy({ projectId: PROJECT_ID });
+
+      expect(stored.isDuplicate).toBe(false);
+      expect(read).toMatchObject({ row });
+      expect(head).toEqual({ status: "available", mediaType: row.media_type });
+      expect(repo.deleteByIds).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        ids: [stored.id],
+      });
+      // Every call above went through the two collaborators the service was
+      // constructed from, so nothing else is reachable from this surface.
+      expect(registry.put).toHaveBeenCalledOnce();
+      expect(registry.get).toHaveBeenCalledOnce();
+      expect(registry.exists).toHaveBeenCalledOnce();
+      expect(registry.delete).toHaveBeenCalledOnce();
+    });
+  });
+});
