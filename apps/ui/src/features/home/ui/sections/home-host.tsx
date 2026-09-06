@@ -15,6 +15,12 @@ import {
 } from "@langwatch/project-web/screens/home";
 import { useMemo, type ReactNode } from "react";
 
+import {
+  AnalyticsHostProvider,
+  type AnalyticsHostPort,
+} from "@langwatch/analytics-web/surfaces/analytics-host";
+
+import { resolveAnalyticsProject } from "../../../../behavior/analytics-project";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
@@ -60,7 +66,7 @@ function readDeployment(): ProjectHomeDeployment {
 }
 
 export function ProjectHomeHostSection({ children }: { children: ReactNode }) {
-  const { session, navigation } = useUiCapabilities();
+  const { session, navigation, route, feedback } = useUiCapabilities();
   const scope = session.activeScope();
   const reducedMotion = useUiPrefersReducedMotion();
 
@@ -144,8 +150,44 @@ export function ProjectHomeHostSection({ children }: { children: ReactNode }) {
     ],
   );
 
+  // The home draws the traces overview and the briefing's vanity strip out of
+  // the analytics surfaces, and those read the analytics host. Built HERE off
+  // the graph this host already read, rather than by nesting the analytics
+  // shell: that would ask the same question a second time.
+  const reading = route.reading();
+  const analyticsHost = useMemo<AnalyticsHostPort>(
+    () => ({
+      project: () =>
+        resolveAnalyticsProject({
+          organizations: (organizations.data ?? []) as OrganizationsRead,
+          projectId: scope.projectId ?? void 0,
+        }),
+      organizationId: () => scope.organizationId ?? void 0,
+      hasPermission: (permission) => session.hasPermission(permission),
+      route: () => reading,
+      setQuery: (next, options) => route.setQuery(next, options),
+      navigate: (to) => navigation.navigate(to),
+      succeeded: (notice) => feedback.succeeded(notice),
+      failed: (notice) => feedback.failed(notice),
+    }),
+    [
+      organizations.data,
+      scope.projectId,
+      scope.organizationId,
+      session,
+      reading,
+      route,
+      navigation,
+      feedback,
+    ],
+  );
+
   if (failure.departing) return <UiPageLoading />;
   if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
-  return <ProjectHomeHostProvider value={host}>{children}</ProjectHomeHostProvider>;
+  return (
+    <ProjectHomeHostProvider value={host}>
+      <AnalyticsHostProvider value={analyticsHost}>{children}</AnalyticsHostProvider>
+    </ProjectHomeHostProvider>
+  );
 }

@@ -243,6 +243,18 @@ export const apiConfigDefinition = RuntimeConfig.define({
     }),
   },
   /**
+   * Facts about the install itself, read at the App's own spellings so this
+   * process and the background one cannot disagree about them.
+   */
+  deployment: {
+    /**
+     * `ADMIN_EMAILS`; unset means nobody is a platform operator. The back
+     * office matches a signed-in person against this list, and a process that
+     * never read it hides `/api/admin/*` from everyone.
+     */
+    adminEmails: Config.value(optionalEnvironmentString, { env: "ADMIN_EMAILS" }),
+  },
+  /**
    * Same env vars as the worker's mail config, so sender domains agree on
    * SPF. `BASE_HOST` is read from `publicBaseUrl`, not re-bound here.
    */

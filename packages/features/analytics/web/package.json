@@ -43,6 +43,10 @@
       "types": "./src/screens/analytics/index.ts",
       "default": "./src/screens/analytics/index.ts"
     },
+    "./surfaces/analytics-host": {
+      "types": "./src/model/analytics-host.ts",
+      "default": "./src/model/analytics-host.ts"
+    },
     "./surfaces/precondition-matchers": {
       "types": "./src/model/filters/precondition-matchers.ts",
       "default": "./src/model/filters/precondition-matchers.ts"

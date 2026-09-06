@@ -90,6 +90,7 @@ import {
 import {
   composeAuthFeature,
   refusingAuthFeature,
+  resolvePersonDeploymentFacts,
   type ApiPersonDeploymentFacts,
 } from "../features/auth/auth.composition";
 import { composeUserFeature, refusingUserFeature } from "../features/user/user.composition";
@@ -2862,7 +2863,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The SAME counter the public REST surface meters through, so a budget
       // cannot be spent twice by asking on two paths.
       rateLimit: (request) => this.rateLimiter.consume(request),
-      deployment: this.options.identity ?? {},
+      deployment: this.personDeployment(options),
       ...(this.options.mail ? { mail: this.options.mail } : {}),
       processName,
     });
@@ -2880,7 +2881,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       },
       eventing: identityEventing,
       rateLimit: (request) => this.rateLimiter.consume(request),
-      deployment: this.options.identity ?? {},
+      deployment: this.personDeployment(options),
       ...(this.options.mail ? { mail: this.options.mail } : {}),
       processName,
     });
@@ -3737,6 +3738,20 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     return this.composedOrganizationInvites;
   }
 
+  /**
+   * The deployment facts the person-shaped surfaces read. A host that composed
+   * this process may state them; where it named no operator list, the install's
+   * own `ADMIN_EMAILS` answers. Nothing supplies `identity` in production, so
+   * without this the back office and the operator menu saw an empty list and
+   * hid `/api/admin/*` from every operator.
+   */
+  private personDeployment(options: ApiRuntimeCompositionOptions): ApiPersonDeploymentFacts {
+    return resolvePersonDeploymentFacts({
+      supplied: this.options.identity,
+      adminEmails: options.config.deployment.adminEmails,
+    });
+  }
+
   private resolvePlanProvider(options: ApiRuntimeCompositionOptions): PlanProvider {
     if (this.composedPlanProvider) return this.composedPlanProvider;
     const database = this.composedDatabase?.connection;
@@ -3758,9 +3773,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ...(options.config.infrastructure.licensing.publicKey
         ? { licensePublicKey: options.config.infrastructure.licensing.publicKey }
         : {}),
-      adminEmails: this.options.identity?.adminEmails
-        ? AdminAccessService.parseEmails(this.options.identity.adminEmails)
-        : [],
+      adminEmails: AdminAccessService.parseEmails(this.personDeployment(options).adminEmails ?? []),
       report: this.entitlementAbsence(options),
     });
     return this.composedPlanProvider;

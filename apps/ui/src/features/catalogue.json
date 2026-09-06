@@ -206,7 +206,7 @@
       "root": "home",
       "uses": {
         "screens": ["@langwatch/project-web/screens/home"],
-        "surfaces": []
+        "surfaces": ["@langwatch/analytics-web/surfaces/analytics-host"]
       }
     },
     {

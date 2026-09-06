@@ -89,3 +89,13 @@ Feature: Adaptive home views
     When I use the view switcher next to the greeting
     Then I can pin the page to any view, or return it to automatic resolution
     And the switcher is never rendered in production builds
+
+  # The home draws the traces overview and the briefing's vanity strip out of
+  # the analytics surfaces, and those read the analytics host. Mounting only the
+  # home's own host left them with nothing to read and the page threw before it
+  # rendered anything — both at `/<project>` and at `/`, which lands there.
+  @integration
+  Scenario: The project home renders the analytics surfaces it draws
+    Given I open the project home
+    When the page renders its analytics surfaces
+    Then the home renders rather than failing on a missing analytics host

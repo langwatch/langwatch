@@ -80,6 +80,8 @@ describe("API process configuration", () => {
       validateTrpcOutput: true,
       cronApiKey: undefined,
       opsApiKey: undefined,
+      // `ADMIN_EMAILS`, unset here: nobody is instance staff on this deployment.
+      deployment: { adminEmails: undefined },
       nlpLambdaFleet: undefined,
       platformDefaultRetentionDays: 49,
       authz: {

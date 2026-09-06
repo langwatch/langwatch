@@ -57,6 +57,21 @@ export type ApiPersonDeploymentFacts = Readonly<{
 
 import type { ComposedAuthFeature } from "./auth.composition.types";
 
+/**
+ * The deployment facts as this process resolves them: a host that composed the
+ * process may state them, and where it named no operator list the install's own
+ * `ADMIN_EMAILS` answers. Nothing states them in production, so an unresolved
+ * list made `ops.isAdmin` false for everybody and hid the whole back office.
+ */
+export function resolvePersonDeploymentFacts(options: {
+  supplied: ApiPersonDeploymentFacts | undefined;
+  adminEmails: string | undefined;
+}): ApiPersonDeploymentFacts {
+  const supplied = options.supplied ?? {};
+  if (supplied.adminEmails !== undefined) return supplied;
+  return options.adminEmails ? { ...supplied, adminEmails: options.adminEmails } : supplied;
+}
+
 /** Composes the two signed-out doors over this process's own graph. */
 export function composeAuthFeature(options: {
   /** The one guarded connection every row read below runs on. */
