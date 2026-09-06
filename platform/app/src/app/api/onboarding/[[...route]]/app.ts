@@ -3,9 +3,10 @@
  * reaches when Langy, working inside its sandbox with the conversation's key,
  * reports a path as done. The state belongs to the project's organization.
  *
- * Guarded by the langy permissions rather than the project family: a Langy
- * session key never carries `project:*` (the family is withheld as auth
- * scope), and this state is exactly what Langy is driving.
+ * Guarded by `project:view` on both routes because Langy's own session key
+ * is the intended caller: the `langy` family is never delegated to that key
+ * and the project family delegates its reads, while completing a path is
+ * idempotent product state that changes no credential and no role.
  *
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
@@ -46,7 +47,7 @@ function registerGuidedEndpoints(v: OnboardingVersion): void {
   v.get(
     "/guided",
     {
-      ...guard("langy:view"),
+      ...guard("project:view"),
       output: stateOutputSchema,
       description:
         "Read the guided onboarding state of this project's organization: the paths picked in order, the one being set up, the ones done, the provider connected, and where the tour stands.",
@@ -64,7 +65,7 @@ function registerGuidedEndpoints(v: OnboardingVersion): void {
   v.post(
     "/guided/paths/:path/complete",
     {
-      ...guard("langy:create"),
+      ...guard("project:view"),
       params: pathParamsSchema,
       output: stateOutputSchema,
       description:

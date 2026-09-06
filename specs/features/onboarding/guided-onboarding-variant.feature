@@ -215,6 +215,12 @@ Feature: Guided onboarding variant
     Then the organization's done paths list llmops
 
   @unit
+  Scenario: the REST routes are guarded by a permission Langy's own key can hold
+    Given Langy reports a path as done from inside its own session, with the conversation's key
+    When the guided state route and the completion route declare their guards
+    Then each guard is a permission the platform delegates to a Langy session key
+
+  @unit
   Scenario: the CLI prints the guided state as JSON
     When "langwatch onboarding state" runs
     Then it resolves credentials first and prints the state the platform answered
