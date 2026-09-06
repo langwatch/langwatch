@@ -15,14 +15,16 @@ import { LANGWATCH_SDK_VERSION } from "../../internal/constants";
 import type { Logger } from "../../logger";
 import {
   overrideSharedClientForTests,
-  reconnectDelayMs,
   refusalAdvice,
   resetSharedClient,
   sharedClientForTests,
   shutdownForTests,
+} from "../client";
+import {
+  reconnectDelayMs,
   RECONNECT_BASE_MS,
   RECONNECT_MAX_MS,
-} from "../client";
+} from "../reconnect";
 import { connectAgent, type AgentCall, type AgentHandler } from "../define";
 import { PROTOCOL_VERSION, type AgentParameterValue, type RegisterFrame } from "../protocol";
 import { NoWebSocketError } from "../transport";

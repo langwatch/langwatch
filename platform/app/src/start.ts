@@ -92,6 +92,11 @@ import {
   getConnectedAgentRuntime,
 } from "./server/connected-agents/runtime";
 import { prisma } from "./server/db";
+import { LocalControlGateway } from "./server/langy-local-control/control.gateway";
+import {
+  closeLocalControlRuntime,
+  getLocalControlSessionCore,
+} from "./server/langy-local-control/runtime";
 import {
   getWorkerMetricsPort,
   isMetricsAuthorized,
@@ -395,6 +400,15 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   });
   connectGateway.mount(upgradeRouter);
 
+  // Langy local control (ADR-129): the outbound socket of
+  // `langwatch langy --share-control` lands here. Bearer session key, no
+  // Origin check, so the dev proxy and the ingress carry it with no per-path
+  // entry of their own.
+  const localControlGateway = new LocalControlGateway({
+    core: getLocalControlSessionCore(),
+  });
+  localControlGateway.mount(upgradeRouter);
+
   server.once("error", (err) => {
     // Write synchronously to stderr BEFORE the structured log: pino's
     // transports are async worker threads that never flush past the
@@ -480,6 +494,10 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
           await connectGateway.close();
           await closeLongPollTransport();
           await closeConnectedAgentRuntime();
+          // The shared folders close the same way and for the same reason: a
+          // local command in flight outlives any drain budget.
+          await localControlGateway.close();
+          await closeLocalControlRuntime();
         },
       },
       // Drain in-process workers (if any) before closing the shared App below,
