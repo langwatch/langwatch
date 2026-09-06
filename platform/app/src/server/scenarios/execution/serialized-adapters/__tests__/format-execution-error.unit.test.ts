@@ -15,7 +15,7 @@ import {
 } from "../format-execution-error";
 
 /** Build the herr envelope the Go engine writes (`pkg/herr/http.go`). */
-const herrBody = (type: string, message: string) =>
+const herrBody = ({ type, message }: { type: string; message: string }) =>
   JSON.stringify({ error: { type, message } });
 
 describe("format-execution-error helpers (lw#3439)", () => {
@@ -100,19 +100,21 @@ describe("format-execution-error helpers (lw#3439)", () => {
     });
   });
 
-  describe("parseErrorEnvelope", () => {
+  describe("when parsing error envelopes", () => {
     it("reads the herr envelope the Go engine writes", () => {
-      const out = parseErrorEnvelope(herrBody("bad_request", "engine blew up"));
+      const out = parseErrorEnvelope(
+        herrBody({ type: "bad_request", message: "engine blew up" }),
+      );
       expect(out.code).toBe("bad_request");
       expect(out.detail).toBe("engine blew up");
-      expect(out.legacyDetail).toBe(false);
+      expect(out.isLegacyDetail).toBe(false);
     });
 
     it("reads the legacy detail envelope as a fallback", () => {
       const out = parseErrorEnvelope(JSON.stringify({ detail: "boom" }));
       expect(out.code).toBeUndefined();
       expect(out.detail).toBe("boom");
-      expect(out.legacyDetail).toBe(true);
+      expect(out.isLegacyDetail).toBe(true);
     });
 
     it("stringifies a non-string detail rather than passing it through", () => {
@@ -133,18 +135,18 @@ describe("format-execution-error helpers (lw#3439)", () => {
       const out = parseErrorEnvelope(body);
       expect(out.code).toBeUndefined();
       expect(out.detail).toBeUndefined();
-      expect(out.legacyDetail).toBe(false);
+      expect(out.isLegacyDetail).toBe(false);
     });
 
     it("treats an unparseable body as opaque", () => {
       const out = parseErrorEnvelope("<html>500</html>");
       expect(out.code).toBeUndefined();
       expect(out.detail).toBeUndefined();
-      expect(out.legacyDetail).toBe(false);
+      expect(out.isLegacyDetail).toBe(false);
     });
   });
 
-  describe("classifyEngineFailure", () => {
+  describe("when classifying engine failures", () => {
     it("classifies a Python exception class as user_code", () => {
       expect(classifyEngineFailure({ errorType: "AttributeError" })).toBe(
         "user_code",
@@ -175,12 +177,14 @@ describe("format-execution-error helpers (lw#3439)", () => {
     });
   });
 
-  describe("classifyHttpFailure", () => {
+  describe("when classifying HTTP failures", () => {
     it("classifies a customer-fault herr code as user_code", () => {
       expect(
         classifyHttpFailure({
           status: 400,
-          envelope: parseErrorEnvelope(herrBody("bad_request", "x")),
+          envelope: parseErrorEnvelope(
+            herrBody({ type: "bad_request", message: "x" }),
+          ),
         }),
       ).toBe("user_code");
     });
@@ -195,7 +199,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(
         classifyHttpFailure({
           status: 400,
-          envelope: parseErrorEnvelope(herrBody(code, "x")),
+          envelope: parseErrorEnvelope(herrBody({ type: code, message: "x" })),
         }),
       ).toBe("user_code");
     });
@@ -213,7 +217,9 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(
         classifyHttpFailure({
           status: 500,
-          envelope: parseErrorEnvelope(herrBody("internal_error", "x")),
+          envelope: parseErrorEnvelope(
+            herrBody({ type: "internal_error", message: "x" }),
+          ),
         }),
       ).toBe("nlp_service");
     });
@@ -224,7 +230,9 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(
         classifyHttpFailure({
           status: 401,
-          envelope: parseErrorEnvelope(herrBody("unauthorized", "bad key")),
+          envelope: parseErrorEnvelope(
+            herrBody({ type: "unauthorized", message: "bad key" }),
+          ),
         }),
       ).toBe("nlp_service");
     });
@@ -245,7 +253,9 @@ describe("format-execution-error helpers (lw#3439)", () => {
       // a non-2xx herr envelope. Same cause must not get opposite blame.
       const viaHerr = classifyHttpFailure({
         status: 400,
-        envelope: parseErrorEnvelope(herrBody("invalid_workflow", "bad dsl")),
+        envelope: parseErrorEnvelope(
+          herrBody({ type: "invalid_workflow", message: "bad dsl" }),
+        ),
       });
       const viaEngine = classifyEngineFailure({
         errorType: "invalid_workflow",
@@ -298,13 +308,24 @@ describe("format-execution-error helpers (lw#3439)", () => {
       );
       expect(out.message).not.toMatch(/user code raised/);
     });
+
+    it("treats a completely missing error object as an nlp_service failure, not user code", () => {
+      // status: "error" with no `error` at all breaks the engine's own
+      // 200-failure contract. Defaulting this to `{}` and running it through
+      // the same path as a present-but-unrecognized type would blame the
+      // customer for an empty message that is entirely the engine's fault.
+      const out = formatEngineError({ engineError: undefined });
+      expect(out.source).toBe("nlp_service");
+      expect(out.message).not.toMatch(/user code raised/);
+      expect(out.message).toMatch(/without an error body/);
+    });
   });
 
   describe("formatHttpError", () => {
     it("formats a customer-fault herr envelope as a user-code failure", () => {
       const out = formatHttpError({
         status: 400,
-        rawBody: herrBody("bad_request", "ValueError: x"),
+        rawBody: herrBody({ type: "bad_request", message: "ValueError: x" }),
       });
       expect(out.source).toBe("user_code");
       expect(out.message).toMatch(/user code raised an error/);
@@ -315,7 +336,10 @@ describe("format-execution-error helpers (lw#3439)", () => {
     it("formats a 503 as an infra failure", () => {
       const out = formatHttpError({
         status: 503,
-        rawBody: herrBody("child_unavailable", "service down"),
+        rawBody: herrBody({
+          type: "child_unavailable",
+          message: "service down",
+        }),
       });
       expect(out.source).toBe("nlp_service");
       expect(out.message).toMatch(/NLP service returned HTTP 503/);
@@ -362,10 +386,11 @@ describe("format-execution-error helpers (lw#3439)", () => {
     it("strips the internal endpoint a herr infra message names", () => {
       const out = formatHttpError({
         status: 503,
-        rawBody: herrBody(
-          "child_unavailable",
-          "dial tcp http://nlp-internal:5561/go/studio/execute_sync: connection refused",
-        ),
+        rawBody: herrBody({
+          type: "child_unavailable",
+          message:
+            "dial tcp http://nlp-internal:5561/go/studio/execute_sync: connection refused",
+        }),
       });
       expect(out.source).toBe("nlp_service");
       expect(out.message).not.toMatch(/nlp-internal/);
@@ -389,7 +414,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
     it("returns a source that always agrees with the message wording", () => {
       const userCode = formatHttpError({
         status: 400,
-        rawBody: herrBody("bad_request", "ValueError: x"),
+        rawBody: herrBody({ type: "bad_request", message: "ValueError: x" }),
       });
       expect(userCode.source).toBe("user_code");
       expect(userCode.message).toMatch(/user code raised an error/);
@@ -400,7 +425,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
 
       const infra503 = formatHttpError({
         status: 503,
-        rawBody: herrBody("child_unavailable", "down"),
+        rawBody: herrBody({ type: "child_unavailable", message: "down" }),
       });
       expect(infra503.source).toBe("nlp_service");
       expect(infra503.message).toMatch(/NLP service returned HTTP 503/);

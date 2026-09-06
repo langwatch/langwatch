@@ -690,6 +690,30 @@ describe("resolveScenarioError", () => {
       expect(result.message).not.toMatch(/Couldn't reach the endpoint/);
     });
 
+    /** @scenario A user-code failure with no readable detail still never leaks internals */
+    it("falls back to the generic unreadable-failure sentence rather than the raw blob when every candidate exposes internals", () => {
+      // No line here matches the exception-class regex, and there is no
+      // `type: X` header, so every extractUserCodeDetail candidate collapses
+      // to this one stack-frame line — which exposesInternals vetoes. Before
+      // this fix the function fell through to `raw.trim()`, returning this
+      // frame (container path and all) verbatim in the customer-facing
+      // message; it must now render the same safe sentence every other
+      // unreadable failure does instead.
+      const result = classifyScenarioInfraError(
+        [
+          "SerializedCodeAgentAdapter: user code raised an error during execution.",
+          "  user code error:",
+          "    at async wrappedHandler (/app/dist/index.cjs:42:9)",
+        ].join("\n"),
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.UserCodeError);
+      expectNoInternals(result.message);
+      expect(result.message).toBe(
+        "The agent's code raised an error: The simulation failed, but it didn't report a reason we can show.",
+      );
+    });
+
     /** @scenario An adapter that never got a response is an execution timeout, not a generic failure */
     it("still classifies a genuine infra timeout as an execution timeout", () => {
       // The guard must not swallow the real thing it sits in front of.

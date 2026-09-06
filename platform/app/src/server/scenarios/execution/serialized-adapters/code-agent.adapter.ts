@@ -572,7 +572,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
           // silently resolves to an empty agent reply (lw#3439).
           if (result.status === "error") {
             const { message, source, rawDetail } = formatEngineError({
-              engineError: result.error ?? {},
+              engineError: result.error,
             });
             span.setAttribute(
               "error.kind",

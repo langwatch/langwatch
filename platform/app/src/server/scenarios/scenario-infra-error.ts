@@ -280,8 +280,13 @@ function extractUserCodeDetail(raw: string): string {
 
   // Prefer the exception line, then the declared type, then the remaining
   // body. `summarize` returns undefined when a candidate is nothing but
-  // noise, so fall through to the next candidate and, last, the raw blob —
-  // a user-code failure must always render SOME detail, never an empty string.
+  // noise OR when it exposes our internals, so fall through to the next
+  // candidate and, last, to the same safe generic sentence every other
+  // unreadable failure gets. Returning the raw blob here would bypass both
+  // `summarize`'s truncation and its INTERNALS_PATTERNS check — the exact
+  // leak this file exists to stop — the moment a customer's own code
+  // happens to mention something like a stack frame or a "/app/" path in
+  // its own message and every candidate above gets vetoed for it.
   for (const candidate of [
     exceptionLine,
     declaredType,
@@ -291,7 +296,7 @@ function extractUserCodeDetail(raw: string): string {
     const summary = summarize(candidate);
     if (summary) return summary;
   }
-  return raw.trim();
+  return UNREADABLE_FAILURE_MESSAGE;
 }
 
 /**

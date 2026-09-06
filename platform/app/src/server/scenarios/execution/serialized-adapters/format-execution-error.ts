@@ -156,7 +156,7 @@ export interface ParsedErrorEnvelope {
   /** Human-readable detail: herr `error.message`, or a legacy `detail`. */
   detail?: string;
   /** True when the body parsed as the legacy FastAPI `{ detail }` shape. */
-  legacyDetail: boolean;
+  isLegacyDetail: boolean;
 }
 
 /** Coerce an unknown JSON value into a renderable string, or undefined. */
@@ -179,7 +179,7 @@ export function parseErrorEnvelope(rawBody: string): ParsedErrorEnvelope {
   try {
     parsed = JSON.parse(rawBody);
   } catch {
-    return { legacyDetail: false };
+    return { isLegacyDetail: false };
   }
 
   // The herr envelope is parsed with the SAME schema every other nlpgo reader
@@ -190,20 +190,20 @@ export function parseErrorEnvelope(rawBody: string): ParsedErrorEnvelope {
     return {
       code: herr.data.error.type,
       detail: asDetailString(herr.data.error.message),
-      legacyDetail: false,
+      isLegacyDetail: false,
     };
   }
 
   if (typeof parsed !== "object" || parsed === null) {
-    return { legacyDetail: false };
+    return { isLegacyDetail: false };
   }
   // Legacy FastAPI `{ detail }` — the only shape the shared schema does not
   // model, because nlpgo never emits it.
   const body = parsed as { detail?: unknown };
   if ("detail" in body) {
-    return { detail: asDetailString(body.detail), legacyDetail: true };
+    return { detail: asDetailString(body.detail), isLegacyDetail: true };
   }
-  return { legacyDetail: false };
+  return { isLegacyDetail: false };
 }
 
 /**
@@ -238,7 +238,7 @@ export function classifyHttpFailure(args: {
       ? "user_code"
       : "nlp_service";
   }
-  if (envelope.legacyDetail && status === 500 && Boolean(envelope.detail)) {
+  if (envelope.isLegacyDetail && status === 500 && Boolean(envelope.detail)) {
     return "user_code";
   }
   return "nlp_service";
@@ -312,12 +312,32 @@ function renderServiceFailure(args: {
  * is preferred over its one-line message because it is what a customer
  * debugs from.
  */
-export function formatEngineError(args: { engineError: NlpEngineError }): {
+export function formatEngineError(args: {
+  engineError: NlpEngineError | undefined;
+}): {
   message: string;
   source: HttpFailureSource;
   rawDetail: string;
 } {
   const { engineError } = args;
+  // `status: "error"` with no `error` object at all is not a customer's
+  // Python raising nothing — the 200-failure contract promises `error:
+  // { node_id, type, message, traceback }` whenever the run failed, so an
+  // absent object is the engine breaking its own protocol. Defaulting this
+  // to `{}` and classifying it through the same path as a present-but-
+  // unrecognized exception type would blame the customer for an empty
+  // message that is entirely our fault to explain.
+  if (!engineError) {
+    return {
+      source: "nlp_service",
+      rawDetail: "",
+      message: renderServiceFailure({
+        headline:
+          "SerializedCodeAgentAdapter: NLP service reported a failed run without an error body.",
+        detail: "",
+      }),
+    };
+  }
   const source = classifyEngineFailure({ errorType: engineError.type });
   const rawDetail =
     engineError.traceback ?? engineError.message ?? engineError.type ?? "";
