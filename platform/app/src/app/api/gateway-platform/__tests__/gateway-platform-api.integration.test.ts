@@ -40,6 +40,7 @@ import {
   withIdempotency,
 } from "~/server/api/idempotency";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { mintLangySessionApiKeyForUser } from "~/server/app-layer/langy/langyApiKey";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
 import {
@@ -71,6 +72,7 @@ const ADMIN_USER_ID = `usr-gwrest-admin-${suffix}`;
 const MEMBER_USER_ID = `usr-gwrest-member-${suffix}`;
 const VIEWER_USER_ID = `usr-gwrest-viewer-${suffix}`;
 const OUTSIDE_USER_ID = `usr-gwrest-outside-${suffix}`;
+const LANGY_USER_ID = `usr-gwrest-langy-${suffix}`;
 
 // An org with NO governance project, exclusively for the
 // trace_project_required refusal — its absence must be a property of the
@@ -95,6 +97,7 @@ const ALL_USER_IDS = [
   MEMBER_USER_ID,
   VIEWER_USER_ID,
   OUTSIDE_USER_ID,
+  LANGY_USER_ID,
 ];
 const ALL_PROJECT_IDS = [
   PROJECT_ID,
@@ -107,6 +110,8 @@ const ALL_PROJECT_IDS = [
 let adminToken = "";
 let memberToken = "";
 let viewerToken = "";
+/** A Langy session key, minted the way the Langy turn processor mints one. */
+let langyToken = "";
 let nogovAdminToken = "";
 
 function ch(): ClickHouseClient {
@@ -438,6 +443,26 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       bindingScope: { type: RoleBindingScopeType.PROJECT, id: PROJECT_ID },
       bindingRole: TeamUserRole.MEMBER,
     });
+    // A project member, then the key Langy holds on their behalf: the real
+    // mint, so the test sees exactly the permission subset the policy grants
+    // (create yes, manage and rotate withheld).
+    await seedUserWithRole({
+      userId: LANGY_USER_ID,
+      orgId: ORG_ID,
+      teamId: TEAM_ID,
+      orgRole: OrganizationUserRole.MEMBER,
+      teamRole: TeamUserRole.MEMBER,
+      bindingScope: { type: RoleBindingScopeType.PROJECT, id: PROJECT_ID },
+      bindingRole: TeamUserRole.MEMBER,
+    });
+    langyToken = (
+      await mintLangySessionApiKeyForUser({
+        prisma,
+        userId: LANGY_USER_ID,
+        projectId: PROJECT_ID,
+        organizationId: ORG_ID,
+      })
+    ).token;
     viewerToken = await seedUserWithRole({
       userId: VIEWER_USER_ID,
       orgId: ORG_ID,
@@ -532,6 +557,11 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       where: { organizationId: { in: ALL_ORG_IDS } },
     });
     await prisma.user.deleteMany({ where: { id: { in: ALL_USER_IDS } } });
+    // The Langy session key binds a system custom role that holds its
+    // permission subset; the organization cannot go while that row remains.
+    await prisma.customRole.deleteMany({
+      where: { organizationId: { in: ALL_ORG_IDS } },
+    });
     await prisma.organization.deleteMany({
       where: { id: { in: ALL_ORG_IDS } },
     });
@@ -686,18 +716,74 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       ]);
     });
 
-    /** @scenario A member API key passes the route gate but not per-scope manage */
-    it("refuses creation when the key can create but not manage the scope", async () => {
-      // MEMBER holds virtualKeys:create (route ceiling passes) but not
-      // virtualKeys:manage — the per-scope gate the tRPC create enforces.
-      // If REST ever stops running the shared per-scope assert, this
-      // returns 201 and fails.
+    /** @scenario A key that can create but not manage mints a key for its own project */
+    it("mints a key for the caller's own project when the key can create but not manage", async () => {
+      // MEMBER holds virtualKeys:create but not virtualKeys:manage. The
+      // default scope is the caller's own project, where create is enough.
       const { status, body } = await createVk(
-        { name: `member-denied-${suffix}` },
+        { name: `member-own-${suffix}` },
+        apiKeyAuth(memberToken),
+      );
+      expect(status).toBe(201);
+      expect(body.virtual_key.scopes).toEqual([
+        { scope_type: "project", scope_id: PROJECT_ID },
+      ]);
+    });
+
+    /** @scenario A key that can create but not manage cannot mint above its project */
+    it("refuses a team-scoped key when the key can create but not manage", async () => {
+      // The per-scope manage gate the tRPC create enforces still stands
+      // beyond the caller's own project. If REST ever stops running the
+      // shared per-scope assert, this returns 201 and fails.
+      const { status, body } = await createVk(
+        {
+          name: `member-denied-${suffix}`,
+          scopes: [{ scope_type: "team", scope_id: TEAM_ID }],
+        },
         apiKeyAuth(memberToken),
       );
       expect(status).toBe(403);
       expect(body.error.message).toContain("virtualKeys:manage");
+    });
+
+    /** @scenario Langy's session key mints a key for the project it speaks for */
+    it("lets a Langy session key mint a key for its own project and nothing beyond it", async () => {
+      const minted = await createVk(
+        { name: `langy-own-${suffix}` },
+        apiKeyAuth(langyToken),
+      );
+      expect(minted.status).toBe(201);
+      expect(minted.body.virtual_key.scopes).toEqual([
+        { scope_type: "project", scope_id: PROJECT_ID },
+      ]);
+
+      const teamScoped = await createVk(
+        {
+          name: `langy-team-${suffix}`,
+          scopes: [{ scope_type: "team", scope_id: TEAM_ID }],
+        },
+        apiKeyAuth(langyToken),
+      );
+      expect(teamScoped.status).toBe(403);
+      expect(teamScoped.body.error.message).toContain("virtualKeys:manage");
+
+      const foreignTraces = await createVk(
+        {
+          name: `langy-traces-${suffix}`,
+          trace_project_id: SIBLING_PROJECT_ID,
+        },
+        apiKeyAuth(langyToken),
+      );
+      expect(foreignTraces.status).toBe(403);
+      expect(foreignTraces.body.error.message).toContain("virtualKeys:manage");
+
+      // Rotation is what the policy withholds manage to protect.
+      const rotated = await post(
+        `/api/gateway/v1/virtual-keys/${minted.body.virtual_key.id}/rotate`,
+        {},
+        apiKeyAuth(langyToken),
+      );
+      expect(rotated.status).toBe(403);
     });
 
     /** @scenario Org-scoped key creation without a governance project is refused */

@@ -51,6 +51,7 @@ import {
 } from "~/server/gateway/resourceMetadata";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
 import {
+  assertActorCanCreateScopes,
   assertActorCanManageAllScopes,
   assertActorCanOperateOnAnyScope,
   assertGuardrailAttachmentsAllowed,
@@ -969,7 +970,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
   describeRoute({
     summary: "Create virtual key",
     description:
-      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project, where `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
     tags: ["Virtual Keys"],
     parameters: [idempotencyKeyParameter],
     responses: {
@@ -996,7 +997,8 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
         },
       },
       403: {
-        description: "Caller lacks virtualKeys:manage at a requested scope",
+        description:
+          "Caller lacks virtualKeys:create on its own project, or virtualKeys:manage at a scope beyond it",
         content: {
           "application/json": { schema: resolver(apiErrorSchema) },
         },
@@ -1016,9 +1018,13 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
     const service = VirtualKeyService.create(prisma);
     try {
       // The SAME pre-flight sequence the tRPC create runs, with the actor
-      // swapped for the API credential: manage at every requested scope,
-      // scopes inside the caller's org, guardrail refs project-local.
-      await assertActorCanManageAllScopes({ prisma, actor }, scopes);
+      // swapped for the API credential: the scope gate (create on the
+      // caller's own project, manage at every scope beyond it), scopes
+      // inside the caller's org, guardrail refs project-local.
+      await assertActorCanCreateScopes(
+        { prisma, actor },
+        { scopes, callerProjectId: project.id },
+      );
       await assertScopesBelongToOrg(prisma, organizationId, scopes);
       await assertTraceProjectBelongsToOrg(
         prisma,
