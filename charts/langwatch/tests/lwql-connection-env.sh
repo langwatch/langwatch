@@ -91,12 +91,16 @@ $(cat "$err")"
     return
   fi
 
+  # Chart-managed ClickHouse + chart-managed PostgreSQL (the default): the app
+  # owns the reader role, so it gets the explicit LWQL_MANAGE_POSTGRES_READER
+  # flag AND the reader password. Never the flag on any external-PostgreSQL path.
   local required=(
     LWQL_CLICKHOUSE_URL
     LWQL_CLICKHOUSE_USER
     LWQL_DATABASE
     LWQL_TENANT_SETTING
     LWQL_CLICKHOUSE_PASSWORD
+    LWQL_MANAGE_POSTGRES_READER
     LWQL_POSTGRES_READER_PASSWORD
   )
 
@@ -223,6 +227,21 @@ $(cat "$err")"
     fail "extpg-no-host-env-emitted" \
       "render emitted CLICKHOUSE_LWQL_PG_HOST although the bridge host was cancelled to \"\" for an external PostgreSQL — this would silently target the non-existent in-cluster PostgreSQL Service."
   fi
+
+  # External PostgreSQL owns lwql_ro out of band: the app must NOT be told to
+  # manage the reader role (LWQL_MANAGE_POSTGRES_READER) or handed a reader
+  # password it must not use. Running CREATE/ALTER ROLE against an operator's
+  # PostgreSQL as the DATABASE_URL user would crashloop the pod or rotate the
+  # operator's reader password.
+  local names
+  names="$(env_names_in "$out" "app/deployment.yaml")"
+  local var
+  for var in LWQL_MANAGE_POSTGRES_READER LWQL_POSTGRES_READER_PASSWORD; do
+    if has_env "$names" "$var"; then
+      fail "extpg-no-host-$var" \
+        "external PostgreSQL emitted $var on the app. The reader role is owned out of band here; the app must neither manage it nor hold its credential."
+    fi
+  done
 }
 
 # Verifies: a PARTIAL external-PostgreSQL bridge override (some other
@@ -259,4 +278,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: chart-managed ClickHouse wires the full LangWatchQL connection on app and workers; external ClickHouse self-provisions and omits the chart-managed vars"
+echo "PASS: all 4 LangWatchQL connection postures pinned — (1) chart-managed ClickHouse + chart-managed PostgreSQL wires the full connection plus the reader-management flag on app and workers; (2) external ClickHouse self-provisions and omits the chart-managed vars; (3) external PostgreSQL with the bridge host cancelled renders the bridge disabled and hands the app neither the manage flag nor the reader password; (4) a partial external-PostgreSQL override fails closed"

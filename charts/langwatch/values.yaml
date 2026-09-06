@@ -1907,12 +1907,15 @@ clickhouse:
     # authenticate (its password lives under `postgres-password`, not this key)
     # and discard that reader isolation.
     #
-    # CHART-MANAGED PostgreSQL (postgresql.chartManaged: true, the default): the
-    # subchart auto-derives `host` to the chart's own Service (<release>-postgresql)
-    # — the one place the release name is in scope — so the collection renders and
-    # works out of the box; `database` must equal postgresql.auth.database (the
-    # render fails if they diverge, since Helm cannot derive one subchart value
-    # from a parent one), and `user` stays `lwql_ro`.
+    # CHART-MANAGED PostgreSQL (postgresql.chartManaged: true, the default):
+    # `host` below defaults to the chart's own PostgreSQL Service. THIS parent
+    # chart composes '<release>-postgresql' as its own default (a tpl string the
+    # subchart only evaluates — the subchart never guesses a host), so the
+    # collection renders and works out of the box. `database` must equal
+    # postgresql.auth.database, and `user` must stay `lwql_ro` — the render fails
+    # if either drifts while the bridge dials this Service, since Helm cannot
+    # derive one subchart value from a parent one and the app converges exactly
+    # that reader.
     #
     # EXTERNAL PostgreSQL (postgresql.chartManaged: false): the chart cannot know
     # your PostgreSQL address, so you MUST set `host` (the render fails otherwise);

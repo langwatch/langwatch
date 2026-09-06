@@ -41,6 +41,7 @@ import {
   type LwqlSelfProvisionEnv,
   lwqlKeyMapTableQualifiedName,
   lwqlPostgresEndpointFromDatabaseUrl,
+  lwqlPostgresReaderModeFromEnv,
   lwqlPostgresSchemaFromDatabaseUrl,
   lwqlSelfProvisionFromEnv,
   planLwqlKeyMapBackfill,
@@ -341,24 +342,30 @@ export default async function execute() {
       productionPostgresApprovedViewStatements({ schema: postgresSchema }),
     );
     // The reader role the named collection dials PostgreSQL as. Two ownership
-    // models on the non-self-provision path, told apart by whether the deploy
-    // handed us the reader password:
-    //   - chart-managed ClickHouse (Helm, issue #6635): the clickhouse-serverless
-    //     subchart renders the ClickHouse access model and the lwql_postgres
-    //     named collection, but nothing on that path creates the PostgreSQL
-    //     reader role — so the app converges lwql_ro here, from
-    //     LWQL_POSTGRES_READER_PASSWORD (the same Secret key the subchart mounts
-    //     the collection's password from), before ClickHouse dials it. Shares
-    //     selfProvisioning's builder so the role's isolation (read-only,
-    //     statement timeout, connection budget, approved-view-only grants) is
-    //     identical to the self-provisioned server's.
-    //   - SaaS/terraform: the reader role is owned out of band and the app holds
-    //     no credential for it, so it only re-issues the view grants against
+    // models on the non-self-provision path, told apart by the EXPLICIT
+    // LWQL_MANAGE_POSTGRES_READER flag (see lwqlPostgresReaderModeFromEnv) —
+    // never by "a password arrived", which the mode selection at the top of this
+    // task forbids and which SaaS/terraform (it may set the reader password for
+    // its own uses) would otherwise trip:
+    //   - "manage-role" — chart-managed ClickHouse PAIRED WITH chart-managed
+    //     PostgreSQL (Helm, issue #6635): nothing else creates the reader, so
+    //     the chart hands us LWQL_MANAGE_POSTGRES_READER=true plus the reader
+    //     password and the app converges lwql_ro here (the same Secret key the
+    //     subchart mounts the collection's password from) before ClickHouse
+    //     dials it. Shares selfProvisioning's builder so the role's isolation
+    //     (read-only, statement timeout, connection budget, approved-view-only
+    //     grants) is identical to the self-provisioned server's.
+    //   - "grants-only" — SaaS/terraform, or an operator-owned external
+    //     PostgreSQL: the reader role is owned out of band and the app holds no
+    //     mandate to touch it, so it only re-issues the view grants against
     //     whatever views exist now (a view added by this deploy would otherwise
     //     have no grant until someone re-ran the out-of-band job). A no-op where
-    //     the role is absent.
+    //     the role is absent. Running CREATE/ALTER ROLE here would either
+    //     crashloop a default-on feature (a non-superuser DATABASE_URL) or
+    //     silently rotate the operator's own reader password.
+    const readerMode = lwqlPostgresReaderModeFromEnv();
     const readerPassword = process.env.LWQL_POSTGRES_READER_PASSWORD;
-    if (readerPassword) {
+    if (readerMode === "manage-role" && readerPassword) {
       await runPostgresStatements(
         selfHostedPostgresReaderStatements({
           schema: postgresSchema,
@@ -366,6 +373,11 @@ export default async function execute() {
         }),
       );
     } else {
+      if (readerMode === "manage-role") {
+        logger.warn(
+          "LWQL_MANAGE_POSTGRES_READER is true but LWQL_POSTGRES_READER_PASSWORD is not set — cannot converge the reader role this boot; re-granting the approved views only",
+        );
+      }
       await runPostgresStatements(
         productionPostgresReaderGrantStatements({
           schema: postgresSchema,

@@ -512,10 +512,30 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       {{- end }}
     {{- end }}
   {{- else }}
-    {{- $bridgeDb := $bridge.database | default "langwatch" }}
-    {{- $pgDb := (.Values.postgresql.auth | default dict).database | default "langwatch" }}
-    {{- if ne $bridgeDb $pgDb }}
-      {{- $errors = append $errors (printf "clickhouse.lwqlAccessModel.postgres.database (%q) must equal postgresql.auth.database (%q) for chart-managed PostgreSQL: the lwql_postgres bridge reads the app's own database, and Helm cannot derive one subchart value from a parent one. Set both to the same name." $bridgeDb $pgDb) }}
+    {{- /* These two guards protect the case where the bridge dials the chart's
+           OWN managed PostgreSQL: its database and reader user must match what
+           the app provisions, since Helm cannot derive one subchart value from a
+           parent one. They fire ONLY when the bridge host resolves to the
+           release-derived default Service (the chart's own primary). An operator
+           who points the bridge at an EXPLICIT other host — a read replica, a
+           separate instance — owns that instance's database and reader, so the
+           guards do not apply there. NB: postgres.host is NOT empty on the
+           chart-managed default path; it defaults to the release-derived tpl
+           string, so the discriminator is "resolves to the chart's own Service",
+           not "empty" (an empty host disables the bridge, leaving nothing to
+           drift against). */}}
+    {{- $resolvedHost := tpl ($bridge.host | default "") . }}
+    {{- $ownHost := printf "%s-postgresql" .Release.Name }}
+    {{- if eq $resolvedHost $ownHost }}
+      {{- $bridgeDb := $bridge.database | default "langwatch" }}
+      {{- $pgDb := (.Values.postgresql.auth | default dict).database | default "langwatch" }}
+      {{- if ne $bridgeDb $pgDb }}
+        {{- $errors = append $errors (printf "clickhouse.lwqlAccessModel.postgres.database (%q) must equal postgresql.auth.database (%q) for chart-managed PostgreSQL: the lwql_postgres bridge reads the app's own database, and Helm cannot derive one subchart value from a parent one. Set both to the same name." $bridgeDb $pgDb) }}
+      {{- end }}
+      {{- $bridgeUser := $bridge.user | default "lwql_ro" }}
+      {{- if ne $bridgeUser "lwql_ro" }}
+        {{- $errors = append $errors (printf "clickhouse.lwqlAccessModel.postgres.user (%q) must be \"lwql_ro\" for the chart-managed PostgreSQL bridge: the app converges exactly that dedicated read-only reader from LWQL_POSTGRES_READER_PASSWORD and grants it the approved views, so a different user is never provisioned and the bridge fails to authenticate. Keep user=lwql_ro, or point the bridge at an external host if you provision your own reader." $bridgeUser) }}
+      {{- end }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -1055,12 +1075,29 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       name: {{ include "langwatch.clickhouse.lwqlSecretName" . }}
       key: {{ $lwql.passwordSecretKey | default "lwql_password" }}
       optional: true
+{{- /* The PostgreSQL reader role (lwql_ro) is owned by whoever owns the
+       PostgreSQL the bridge dials. The app CREATEs/ALTERs it ONLY for
+       chart-managed ClickHouse PAIRED WITH chart-managed PostgreSQL — the one
+       deployment where nothing else provisions it. That ownership is stated
+       EXPLICITLY (LWQL_MANAGE_POSTGRES_READER), never inferred by the app from
+       "a reader password arrived": an external PostgreSQL owns lwql_ro out of
+       band, and the app running CREATE/ALTER ROLE against it as the DATABASE_URL
+       user would either crashloop a default-on feature (a non-superuser
+       connection) or rotate the operator's own reader password. So the manage
+       flag AND the reader password are handed over together, and only here;
+       anywhere else the app re-grants the approved views only (a no-op where the
+       role is absent). Emitting the password only in this condition also avoids
+       handing the app a credential it must not use. */}}
+{{- if .Values.postgresql.chartManaged }}
+- name: LWQL_MANAGE_POSTGRES_READER
+  value: "true"
 - name: LWQL_POSTGRES_READER_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ include "langwatch.clickhouse.lwqlSecretName" . }}
       key: {{ ($lwql.postgres | default dict).passwordSecretKey | default "lwql_pg_password" }}
       optional: true
+{{- end }}
 {{- else }}
 {{- $lwqlSecretName := .Values.secrets.existingSecret | default (include "langwatch.appSecretName" .) }}
 - name: LWQL_CLICKHOUSE_PASSWORD

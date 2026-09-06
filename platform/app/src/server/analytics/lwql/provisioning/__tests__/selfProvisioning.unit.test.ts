@@ -32,6 +32,7 @@ import { productionLangWatchQLNames } from "../productionProvisioning";
 import {
   LWQL_SELF_PROVISION_DEFAULTS,
   lwqlPostgresEndpointFromDatabaseUrl,
+  lwqlPostgresReaderModeFromEnv,
   lwqlSelfProvisionFromEnv,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
@@ -396,5 +397,50 @@ describe("selfHostedPostgresReaderStatements", () => {
       statement.startsWith("GRANT SELECT ON"),
     );
     expect(grants.length).toBe(lwqlPostgresViews(LWQL_VIEW_CATALOG).length);
+  });
+});
+
+describe("lwqlPostgresReaderModeFromEnv", () => {
+  describe("when LWQL_MANAGE_POSTGRES_READER is exactly 'true'", () => {
+    it("manages the reader role", () => {
+      expect(
+        lwqlPostgresReaderModeFromEnv({ LWQL_MANAGE_POSTGRES_READER: "true" }),
+      ).toBe("manage-role");
+    });
+  });
+
+  describe("when the flag is unset", () => {
+    it("re-grants only, never touching the role", () => {
+      expect(lwqlPostgresReaderModeFromEnv({})).toBe("grants-only");
+    });
+  });
+
+  describe("when a reader password is present without the flag", () => {
+    // The whole point of the explicit flag: SaaS/terraform sets the reader
+    // password for its own uses and the app must NOT create/rotate the role it
+    // owns out of band.
+    it("re-grants only, never inferring management from the password", () => {
+      expect(
+        lwqlPostgresReaderModeFromEnv({
+          LWQL_POSTGRES_READER_PASSWORD: "reader-secret",
+        }),
+      ).toBe("grants-only");
+    });
+  });
+
+  describe("when the flag is set to a truthy-looking non-'true' value", () => {
+    it.each([
+      "1",
+      "false",
+      "TRUE",
+      "yes",
+      " true",
+    ])("treats %j as grants-only — only the exact string enables management", (value) => {
+      expect(
+        lwqlPostgresReaderModeFromEnv({
+          LWQL_MANAGE_POSTGRES_READER: value,
+        }),
+      ).toBe("grants-only");
+    });
   });
 });

@@ -94,6 +94,26 @@ helm upgrade lw . -f examples/overlays/size-dev.yaml -f examples/overlays/access
 helm uninstall lw
 ```
 
+#### ClickHouse credentials Secret rename (release names longer than 36 characters)
+
+The chart-managed ClickHouse credentials Secret is now named
+`langwatch.clickhouse.serviceName` — the release name **truncated to 36
+characters** — so it agrees with the subchart's own `-clickhouse` fullname on a
+release name of any length. Earlier chart versions used the **untruncated**
+`<release>-clickhouse`. For a release name of 36 characters or fewer the two are
+identical and upgrades are unaffected.
+
+For a release name **longer than 36 characters**, this is a rename. The old
+Secret is retained (`helm.sh/resource-policy: keep`) and still holds the live
+password and Keeper `clusterSecret` the running pods authenticate with. On
+`autogen.enabled=true` the chart detects this on upgrade: when the new
+(truncated) name has no Secret yet but the old untruncated one does, it **adopts
+the old values into the new Secret** so the password and `clusterSecret` are not
+regenerated underneath the pods. The old Secret is then orphaned but harmless;
+delete it once the upgrade is confirmed healthy. Operators who set an explicit
+`clickhouse.auth.existingSecret` are unaffected — the chart honours that name
+verbatim.
+
 #### Upgrades with local-filesystem stored objects
 
 This is the default mode, where the app and the workers mount one

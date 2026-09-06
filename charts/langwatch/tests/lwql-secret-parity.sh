@@ -212,20 +212,38 @@ app_env_value() {
   ' "$1"
 }
 
-# Verifies: The chart's LangWatchQL identity + tenant setting match the app's
-# LWQL_CONNECTION_DEFAULTS, so the two never drift out of a rendered install.
+# The value emitted for a plain `- name: <var>` env var ANYWHERE in the render.
+# The bridge env (CLICKHOUSE_LWQL_PG_USER) lives on the subchart StatefulSet, not
+# the app Deployment, so it is not app-scoped.
+render_env_value() {
+  awk -v want="$2" '
+    $0 ~ ("- name: " want "$") {
+      getline; sub(/^[[:space:]]*value:[[:space:]]*/, ""); gsub(/"/, ""); print; exit
+    }
+  ' "$1"
+}
+
+# Verifies: The chart's LangWatchQL identity, tenant setting AND bridge reader
+# user match the app's constants, so the three copies never drift out of a
+# rendered install.
 #
 # langwatch_lwql and custom_api_key_hash are access-model constants baked into the
 # clickhouse-serverless image AND carried by the app as LWQL_CONNECTION_DEFAULTS
-# (connection.ts) AND emitted by the chart helpers. Three copies, one meaning: if
-# the chart emits a user or tenant setting the app does not expect, every query
-# authenticates or filters against the wrong thing. Pin the chart's rendered
-# values to the app source directly — no build, just the literals.
+# (connection.ts) AND emitted by the chart helpers; lwql_ro is the reader role
+# baked into the same image AND carried by the app as
+# LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole (selfProvisioning.ts, via
+# LWQL_POSTGRES_READER_ROLE in productionProvisioning.ts) AND rendered as the
+# subchart's CLICKHOUSE_LWQL_PG_USER. If the chart emits a user, tenant setting
+# or bridge reader the app does not expect, every query authenticates, filters,
+# or bridges against the wrong thing. Pin the chart's rendered values to the app
+# source directly — no build, just the literals.
 test_lwql_connection_defaults_parity() {
   local conn_ts="../../platform/app/src/server/analytics/lwql/connection.ts"
-  if [[ ! -f "$conn_ts" ]]; then
+  local self_prov_ts="../../platform/app/src/server/analytics/lwql/provisioning/selfProvisioning.ts"
+  local prod_prov_ts="../../platform/app/src/server/analytics/lwql/provisioning/productionProvisioning.ts"
+  if [[ ! -f "$conn_ts" || ! -f "$self_prov_ts" || ! -f "$prod_prov_ts" ]]; then
     fail "defaults-parity-source" \
-      "cannot find $conn_ts (LWQL_CONNECTION_DEFAULTS) relative to charts/langwatch — the parity check needs the app source."
+      "cannot find the app source (connection.ts / selfProvisioning.ts / productionProvisioning.ts) relative to charts/langwatch — the parity check needs it."
     return
   fi
   local app_user app_tenant
@@ -237,6 +255,22 @@ test_lwql_connection_defaults_parity() {
     return
   fi
 
+  # The reader role: selfProvisioning.ts binds it to LWQL_POSTGRES_READER_ROLE,
+  # whose literal lives in productionProvisioning.ts. Assert the binding, then
+  # read the literal — so a rename in either file is caught here.
+  if ! grep -q 'postgresReaderRole:[[:space:]]*LWQL_POSTGRES_READER_ROLE' "$self_prov_ts"; then
+    fail "defaults-parity-reader-binding" \
+      "selfProvisioning.ts no longer binds LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole to LWQL_POSTGRES_READER_ROLE — the bridge reader parity check can no longer follow the constant."
+    return
+  fi
+  local app_reader
+  app_reader="$(sed -n 's/.*LWQL_POSTGRES_READER_ROLE[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$prod_prov_ts" | head -1)"
+  if [[ -z "$app_reader" ]]; then
+    fail "defaults-parity-reader-extract" \
+      "could not read LWQL_POSTGRES_READER_ROLE from productionProvisioning.ts (got '$app_reader'). Did the constant's shape change?"
+    return
+  fi
+
   local out="${TMPDIR:-/tmp}/lwql-defaults-parity.yaml"
   local err="${TMPDIR:-/tmp}/lwql-defaults-parity.err"
   if ! render_to "$out" "$err" lw --set autogen.enabled=true; then
@@ -245,9 +279,10 @@ $(cat "$err")"
     return
   fi
 
-  local ch_user ch_tenant
+  local ch_user ch_tenant ch_reader
   ch_user="$(app_env_value "$out" "LWQL_CLICKHOUSE_USER")"
   ch_tenant="$(app_env_value "$out" "LWQL_TENANT_SETTING")"
+  ch_reader="$(render_env_value "$out" "CLICKHOUSE_LWQL_PG_USER")"
   if [[ "$ch_user" != "$app_user" ]]; then
     fail "defaults-parity-user" \
       "the chart emits LWQL_CLICKHOUSE_USER='$ch_user' but the app's LWQL_CONNECTION_DEFAULTS.restrictedUser is '$app_user'. langwatch.lwql.restrictedUser (helper), the subchart image, and connection.ts must all name the same identity."
@@ -255,6 +290,10 @@ $(cat "$err")"
   if [[ "$ch_tenant" != "$app_tenant" ]]; then
     fail "defaults-parity-tenant" \
       "the chart emits LWQL_TENANT_SETTING='$ch_tenant' but the app's LWQL_CONNECTION_DEFAULTS.tenantSetting is '$app_tenant'. langwatch.lwql.tenantSetting (helper), the subchart image, and connection.ts must all name the same setting."
+  fi
+  if [[ "$ch_reader" != "$app_reader" ]]; then
+    fail "defaults-parity-reader" \
+      "the subchart renders CLICKHOUSE_LWQL_PG_USER='$ch_reader' but the app's LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole is '$app_reader'. clickhouse.lwqlAccessModel.postgres.user (default), the subchart image, and selfProvisioning.ts must all name the same reader role the app converges and grants."
   fi
 }
 

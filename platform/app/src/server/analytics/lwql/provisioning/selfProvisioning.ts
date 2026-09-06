@@ -103,6 +103,38 @@ export function lwqlSelfProvisionFromEnv(
   return { connection, postgresReaderPassword };
 }
 
+/**
+ * On the NON-self-provision path (chart-managed ClickHouse, or SaaS/terraform),
+ * whether THIS deployment owns the PostgreSQL reader role (`lwql_ro`) — creating
+ * it, setting its password, and locking down its grants — or only re-grants an
+ * externally-owned role SELECT on the approved views.
+ *
+ *  - `"manage-role"`: chart-managed ClickHouse PAIRED WITH chart-managed
+ *    PostgreSQL — the one deployment where nothing else provisions the reader,
+ *    so the chart signals it with `LWQL_MANAGE_POSTGRES_READER=true` (see
+ *    `charts/langwatch/templates/_helpers.tpl`, `langwatch.sharedEnv`) and the
+ *    app converges `lwql_ro` from `LWQL_POSTGRES_READER_PASSWORD`.
+ *  - `"grants-only"`: everything else — SaaS/terraform, or an operator-owned
+ *    external PostgreSQL — owns the role out of band. The app must NEVER run
+ *    `CREATE ROLE` / `ALTER ROLE … PASSWORD` against it as the `DATABASE_URL`
+ *    user: that either throws (a non-superuser connection) and crashloops a
+ *    default-on feature, or silently rotates the operator's reader password.
+ *
+ * Keyed on an EXPLICIT flag, never on "a reader password happens to be present":
+ * SaaS/terraform may also set `LWQL_POSTGRES_READER_PASSWORD`, and implicit-mode
+ * detection is exactly what `provisionLwql`'s mode selection forbids. A password
+ * present without the flag stays `"grants-only"`.
+ */
+export type LwqlPostgresReaderMode = "manage-role" | "grants-only";
+
+export function lwqlPostgresReaderModeFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): LwqlPostgresReaderMode {
+  return env.LWQL_MANAGE_POSTGRES_READER === "true"
+    ? "manage-role"
+    : "grants-only";
+}
+
 /** The PostgreSQL endpoint the named collection dials, from `DATABASE_URL`. */
 export interface LwqlPostgresEndpoint {
   host: string;

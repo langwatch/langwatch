@@ -36,8 +36,10 @@ export {
   withTenancyOptOut,
 } from "./productionProvisioning";
 export {
+  type LwqlPostgresReaderMode,
   type LwqlSelfProvisionEnv,
   lwqlPostgresEndpointFromDatabaseUrl,
+  lwqlPostgresReaderModeFromEnv,
   lwqlSelfProvisionFromEnv,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
