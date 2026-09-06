@@ -43,7 +43,7 @@ describe("given the hosted MCP endpoint being composed for the API process", () 
   });
 
   describe("when the process composed no authorization service", () => {
-    // @scenario "A process without authorization serves no hosted MCP"
+    /** @scenario "A process without authorization serves no hosted MCP" */
     it("serves no MCP, because no bearer's minting grant could be re-proved", () => {
       expect(
         tryCreateHostedMcpSurface({

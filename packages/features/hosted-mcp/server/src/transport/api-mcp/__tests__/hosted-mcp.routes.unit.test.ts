@@ -65,7 +65,7 @@ const DISPATCHED_PATHS = [
 
 describe("given the hosted MCP route policy declarations", () => {
   describe("when they are compared with the paths the dispatcher claims", () => {
-    // @scenario "Every path the dispatcher claims carries a declared policy"
+    /** @scenario "Every path the dispatcher claims carries a declared policy" */
     it("declares each claimed path and claims each declared path", () => {
       const declared = new Set(hostedMcpRoutePolicies().map((route) => route.path));
       const claims = handler();
@@ -78,7 +78,7 @@ describe("given the hosted MCP route policy declarations", () => {
   });
 
   describe("when the declared credential is read", () => {
-    // @scenario "The transport routes declare the credential they accept"
+    /** @scenario "The transport routes declare the credential they accept" */
     it("puts the transport behind an API key and leaves the handshake public", () => {
       const byVerb = new Map(
         hostedMcpRoutePolicies().map((route) => [`${route.method} ${route.path}`, route]),
@@ -97,7 +97,7 @@ describe("given the hosted MCP route policy declarations", () => {
   });
 
   describe("when the endpoint is composed", () => {
-    // @scenario "Composing the endpoint puts its routes in the registry"
+    /** @scenario "Composing the endpoint puts its routes in the registry" */
     it("records every verb it serves in the process-wide route registry", () => {
       handler();
 

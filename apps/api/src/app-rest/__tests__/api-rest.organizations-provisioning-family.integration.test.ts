@@ -29,7 +29,7 @@ type CreatedOrganization = {
 
 describe("given a self-hosted deployment with the instance credential configured", () => {
   describe("when an instance administrator provisions an organization", () => {
-    // @scenario "An instance administrator creates an organization with a bootstrap key"
+    /** @scenario "An instance administrator creates an organization with a bootstrap key" */
     it("returns the organization and an admin key bound ADMIN over it", async () => {
       const { api, keys } = mountProvisioning();
 
@@ -64,7 +64,7 @@ describe("given a self-hosted deployment with the instance credential configured
   });
 
   describe("when the slug is not lowercase letters, digits and hyphens", () => {
-    // @scenario "A slug outside the documented shape is refused"
+    /** @scenario "A slug outside the documented shape is refused" */
     it("answers 422 and writes no organization", async () => {
       const { api, directory } = mountProvisioning();
 
@@ -80,7 +80,7 @@ describe("given a self-hosted deployment with the instance credential configured
   });
 
   describe("when the slug is already claimed on the instance", () => {
-    // @scenario "A duplicate organization slug is refused"
+    /** @scenario "A duplicate organization slug is refused" */
     it("answers organization_slug_taken with 409 and creates no second organization", async () => {
       const { api, directory } = mountProvisioning();
       const first = await api.post(
@@ -103,7 +103,7 @@ describe("given a self-hosted deployment with the instance credential configured
   });
 
   describe("when the bootstrap key cannot be minted", () => {
-    // @scenario "A failed bootstrap key leaves no organization behind"
+    /** @scenario "A failed bootstrap key leaves no organization behind" */
     it("compensates the committed organization so the slug provisions on the retry", async () => {
       const { api, directory } = mountProvisioning();
 
@@ -135,7 +135,7 @@ describe("given a self-hosted deployment with the instance credential configured
   });
 
   describe("when the roster is read with and without the instance credential", () => {
-    // @scenario "Listing organizations requires the instance key"
+    /** @scenario "Listing organizations requires the instance key" */
     it("names missing_credentials and invalid_credentials apart, and lists both to the key", async () => {
       const { api } = mountProvisioning();
       const first = (await (
@@ -168,7 +168,7 @@ describe("given a self-hosted deployment with the instance credential configured
   });
 
   describe("when a provisioned organization is fetched by the id creation returned", () => {
-    // @scenario "Fetching a provisioned organization returns what creation reported"
+    /** @scenario "Fetching a provisioned organization returns what creation reported" */
     it("reads back the same id, name and slug", async () => {
       const { api } = mountProvisioning();
       const created = (await (
@@ -195,7 +195,7 @@ describe("given a self-hosted deployment with the instance credential configured
   });
 
   describe("when an id that names no organization is fetched", () => {
-    // @scenario "Fetching an unknown organization id is not found"
+    /** @scenario "Fetching an unknown organization id is not found" */
     it("answers 404", async () => {
       const { api } = mountProvisioning();
 
@@ -221,7 +221,7 @@ describe("given a self-hosted deployment with the instance credential configured
 
 describe("given no instance administrator credential is configured", () => {
   describe("when an organization is provisioned", () => {
-    // @scenario "Organization provisioning is absent without an instance key"
+    /** @scenario "Organization provisioning is absent without an instance key" */
     it("answers 404 from a family that is mounted but does not exist for this deployment", async () => {
       const absence = absenceRecorder();
       const { api, directory } = mountProvisioning({
@@ -247,7 +247,7 @@ describe("given no instance administrator credential is configured", () => {
 
 describe("given a cloud deployment with an instance administrator credential configured", () => {
   describe("when an organization is provisioned", () => {
-    // @scenario "Organization provisioning is absent on cloud deployments"
+    /** @scenario "Organization provisioning is absent on cloud deployments" */
     it("answers 404 even though the credential is set", async () => {
       const { api, directory } = mountProvisioning({ packagedPorts: { isSaas: () => true } });
 

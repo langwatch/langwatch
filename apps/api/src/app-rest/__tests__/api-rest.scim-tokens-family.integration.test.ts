@@ -15,7 +15,7 @@ const CONNECTION_ID = "ssoconn_acme";
 
 describe("given the organization's SCIM tokens over REST", () => {
   describe("when a token is minted and the organization's tokens are listed", () => {
-    // @scenario "Listing SCIM tokens never returns secrets"
+    /** @scenario "Listing SCIM tokens never returns secrets" */
     it("describes the token without ever carrying its value or its digest", async () => {
       const api = mountScimFamilies();
 
@@ -47,7 +47,7 @@ describe("given the organization's SCIM tokens over REST", () => {
   });
 
   describe("when a token is minted", () => {
-    // @scenario "Creating a SCIM token returns the secret exactly once"
+    /** @scenario "Creating a SCIM token returns the secret exactly once" */
     it("returns the value once, and that value authenticates a SCIM request", async () => {
       const api = mountScimFamilies();
 
@@ -72,7 +72,7 @@ describe("given the organization's SCIM tokens over REST", () => {
   });
 
   describe("when a minted token is revoked", () => {
-    // @scenario "Revoking a SCIM token stops it verifying"
+    /** @scenario "Revoking a SCIM token stops it verifying" */
     it("refuses provisioning with it, and answers a second revoke with scim_token_not_found", async () => {
       const api = mountScimFamilies();
       const created = (await (

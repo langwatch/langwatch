@@ -117,7 +117,7 @@ function projectSecurity(): AppRestSecurity {
 
 describe("given the REST automation edit", () => {
   describe("when the edit carries delivery settings", () => {
-    // @scenario "A REST edit cannot rewrite an automation's delivery settings"
+    /** @scenario "A REST edit cannot rewrite an automation's delivery settings" */
     it("refuses the edit with the invalid-action-params code and writes nothing", async () => {
       const api = mount();
 
@@ -130,7 +130,7 @@ describe("given the REST automation edit", () => {
       expect(api.app.update).not.toHaveBeenCalled();
     });
 
-    // @scenario "A REST edit cannot re-attribute an automation to another user"
+    /** @scenario "A REST edit cannot re-attribute an automation to another user" */
     it("refuses an edit that renames the annotation queue's creator", async () => {
       const api = mount();
 
@@ -145,7 +145,7 @@ describe("given the REST automation edit", () => {
   });
 
   describe("when the edit carries only the fields the endpoint documents", () => {
-    // @scenario "A REST edit still changes an automation's name and state"
+    /** @scenario "A REST edit still changes an automation's name and state" */
     it("applies the edit and forwards no delivery settings", async () => {
       const api = mount();
 

@@ -129,7 +129,7 @@ describe("given the hosted MCP approval step", () => {
   });
 
   describe("when the approving person may only view the project", () => {
-    // @scenario "A project viewer cannot mint an MCP authorization code"
+    /** @scenario "A project viewer cannot mint an MCP authorization code" */
     it("refuses the approval and stores no authorization code", async () => {
       const app = mount(["project:view"]);
 
@@ -144,7 +144,7 @@ describe("given the hosted MCP approval step", () => {
   });
 
   describe("when the approval is evaluated", () => {
-    // @scenario "The approval step names the update grain, not the view grain"
+    /** @scenario "The approval step names the update grain, not the view grain" */
     it("probes the permission that reveals the project's API key", async () => {
       const app = mount(["project:update"]);
 
@@ -156,7 +156,7 @@ describe("given the hosted MCP approval step", () => {
   });
 
   describe("when the approving person may update the project", () => {
-    // @scenario "A person who may update the project mints a code"
+    /** @scenario "A person who may update the project mints a code" */
     it("stores a code bound to the client and redirect URI it approved", async () => {
       const app = mount(["project:update"]);
 

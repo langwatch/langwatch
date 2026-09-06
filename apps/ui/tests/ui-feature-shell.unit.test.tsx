@@ -218,7 +218,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
   });
 
   describe("when a screen from any feature reads the shared organization, team and project hook", () => {
-    // @scenario "The application session publishes the scope every feature reads"
+    /** @scenario "The application session publishes the scope every feature reads" */
     it("sees the project, the organization and the grants the session resolved", () => {
       const shell = createUiFeatureShell({
         apis: [],
@@ -242,7 +242,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
       expect(view.getByTestId("scope").textContent).toBe("ada-project|org_1|true|false");
     });
 
-    // @scenario "A session with no resolved scope leaves the shared hook unresolved rather than throwing"
+    /** @scenario "A session with no resolved scope leaves the shared hook unresolved rather than throwing" */
     it("reads unresolved with no project and no grants when the session publishes no scope", () => {
       const shell = createUiFeatureShell({
         apis: [],

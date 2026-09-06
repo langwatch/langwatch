@@ -95,7 +95,7 @@ const TRACKED = trackedFiles();
 
 describe("given TypeScript 7 is the compiler", () => {
   describe("when source reaches for the compiler API", () => {
-    // @scenario "The compiler API is only reached through its unstable export"
+    /** @scenario "The compiler API is only reached through its unstable export" */
     it("finds no value import of the typescript root export", () => {
       const offenders = TRACKED.filter(
         (file) =>
@@ -113,7 +113,7 @@ describe("given TypeScript 7 is the compiler", () => {
   describe("when a workspace package declares its compiler", () => {
     const manifests = TRACKED.filter((file) => MANIFEST_PATTERN.test(file));
 
-    // @scenario "Every workspace package builds against one compiler major"
+    /** @scenario "Every workspace package builds against one compiler major" */
     it("declares TypeScript 7 everywhere except the packages held on 6", () => {
       const declared = new Map<string, string>();
       for (const manifest of manifests) {
@@ -142,7 +142,7 @@ describe("given TypeScript 7 is the compiler", () => {
       expect(wrong).toEqual([]);
     });
 
-    // @scenario "The superseded preview compiler is gone"
+    /** @scenario "The superseded preview compiler is gone" */
     it("declares the native-preview package nowhere", () => {
       const offenders = manifests.filter((manifest) =>
         readFileSync(resolve(REPO_ROOT, manifest), "utf8").includes("@typescript/native-preview"),

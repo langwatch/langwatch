@@ -5,6 +5,12 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
+import {
+  applyOverlayToTrace,
+  mapTraceToDatasetEntry,
+  type Trace,
+  type TraceEditOverlayPatch,
+} from "@langwatch/trace-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -46,10 +52,64 @@ function testPrisma() {
     },
   };
 
+  // The one correction row the suggestion writes, kept as the store would keep
+  // it: the overlay service reads it back and merges into it.
+  const overlays = new Map<
+    string,
+    { id: string; projectId: string; traceId: string; patch: unknown }
+  >();
+  const overlayKey = (projectId: string, traceId: string) => `${projectId}/${traceId}`;
+
   const client = {
     $transaction: vi.fn(async (run: (tx: typeof transaction) => Promise<unknown>) =>
       typeof run === "function" ? await run(transaction) : undefined,
     ),
+    annotation: {
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        ...data,
+        userId: data.userId ?? null,
+        email: data.email ?? null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    },
+    traceEditOverlay: {
+      findUnique: vi.fn(
+        async ({
+          where,
+        }: {
+          where: { projectId_traceId: { projectId: string; traceId: string } };
+        }) =>
+          overlays.get(
+            overlayKey(where.projectId_traceId.projectId, where.projectId_traceId.traceId),
+          ) ?? null,
+      ),
+      upsert: vi.fn(
+        async ({
+          where,
+          create,
+          update,
+        }: {
+          where: { projectId_traceId: { projectId: string; traceId: string } };
+          create: Record<string, unknown>;
+          update: Record<string, unknown>;
+        }) => {
+          const key = overlayKey(
+            where.projectId_traceId.projectId,
+            where.projectId_traceId.traceId,
+          );
+          const existing = overlays.get(key);
+          const row = { ...(existing ?? create), ...update } as {
+            id: string;
+            projectId: string;
+            traceId: string;
+            patch: unknown;
+          };
+          overlays.set(key, row);
+          return row;
+        },
+      ),
+    },
     project: {
       findUnique: vi.fn(async () => ({
         id: PROJECT_ID,
@@ -62,7 +122,7 @@ function testPrisma() {
     annotationQueueItem: { findMany: vi.fn(async () => []) },
   } as unknown as PrismaClient;
 
-  return { client, queueItemWrites, transaction };
+  return { client, queueItemWrites, transaction, overlays, overlayKey };
 }
 
 function testAuthz(): AuthzService {
@@ -216,6 +276,64 @@ describe("given an API process composed with the annotation feature", () => {
           },
         ],
       ]);
+    });
+  });
+
+  describe("when a reviewer suggests what a span should have answered", () => {
+    /** @scenario "A field suggested through a comment reaches the dataset" */
+    it("carries the suggested output into the dataset row for that span", async () => {
+      const { application, prisma } = composeApplication();
+      const traceId = "trace-span-suggestion-dataset";
+
+      const { status } = await callTrpc(application, "annotation.create", {
+        projectId: PROJECT_ID,
+        traceId,
+        comment: "this search should have found Amsterdam",
+        scoreOptions: {},
+        anchorKind: "field",
+        anchorId: "span-search",
+        anchorPath: "output",
+        expectedOutput: "Amsterdam",
+      });
+      expect(status).toBe(200);
+
+      const capturedTrace = {
+        trace_id: traceId,
+        project_id: PROJECT_ID,
+        metadata: {},
+        timestamps: { started_at: 1_000, inserted_at: 1_000, updated_at: 1_000 },
+        input: { value: "what is the capital of the Netherlands?" },
+        output: { value: "Rotterdam" },
+        spans: [
+          {
+            span_id: "span-search",
+            trace_id: traceId,
+            project_id: PROJECT_ID,
+            type: "tool",
+            name: "search",
+            input: { type: "text", value: "capital of the Netherlands" },
+            output: { type: "text", value: "Rotterdam" },
+            timestamps: { started_at: 1_000, finished_at: 1_100 },
+          },
+        ],
+      } as unknown as Trace;
+
+      const stored = prisma.overlays.get(prisma.overlayKey(PROJECT_ID, traceId));
+      const corrected = applyOverlayToTrace({
+        trace: capturedTrace,
+        patch: stored?.patch as TraceEditOverlayPatch,
+      });
+
+      const [row] = mapTraceToDatasetEntry(
+        corrected as never,
+        { answer: { source: "spans", key: "search", subkey: "output" } },
+        new Set(),
+      );
+
+      expect(JSON.stringify(row?.answer)).toContain("Amsterdam");
+      expect(JSON.stringify(row?.answer)).not.toContain("Rotterdam");
+      // The captured trace is never rewritten: the correction is an overlay.
+      expect(capturedTrace.spans?.[0]?.output).toEqual({ type: "text", value: "Rotterdam" });
     });
   });
 

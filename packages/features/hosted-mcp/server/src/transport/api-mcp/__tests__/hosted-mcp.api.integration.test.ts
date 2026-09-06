@@ -996,7 +996,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     }
 
     describe("when that person no longer holds the permission on the project", () => {
-      // @scenario "A bearer whose approver lost the permission is refused"
+      /** @scenario "A bearer whose approver lost the permission is refused" */
       it("refuses the call with the code mcp_grant_revoked", async () => {
         const accessToken = await mintBearer();
         sessionGrant.granted = false;
@@ -1013,7 +1013,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
 
     describe("when that person still holds the permission on the project", () => {
-      // @scenario "A bearer whose approver still holds the permission is served"
+      /** @scenario "A bearer whose approver still holds the permission is served" */
       it("serves the call, having re-proved the grant rather than assumed it", async () => {
         const accessToken = await mintBearer();
 
@@ -1033,7 +1033,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("given a caller presenting a project API key as the bearer", () => {
-    // @scenario "A direct project API key carries no grant to re-prove"
+    /** @scenario "A direct project API key carries no grant to re-prove" */
     it("serves the call without probing any person's grant", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 

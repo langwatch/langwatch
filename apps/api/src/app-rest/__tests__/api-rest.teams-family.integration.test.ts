@@ -50,7 +50,7 @@ const asViewer = { authorization: `Bearer ${VIEWER_TOKEN}` };
 
 describe("given the organization's teams over REST", () => {
   describe("when a request carries no usable organization credential", () => {
-    // @scenario "Rejects unauthenticated requests"
+    /** @scenario "Rejects unauthenticated requests" */
     it("refuses a listing sent with no authorization header", async () => {
       const { api } = mountTeams();
 
@@ -59,7 +59,7 @@ describe("given the organization's teams over REST", () => {
       expect(response.status).toBe(401);
     });
 
-    // @scenario "Rejects invalid API key"
+    /** @scenario "Rejects invalid API key" */
     it("refuses a listing sent with a bearer token that resolves to nothing", async () => {
       const { api } = mountTeams();
 
@@ -72,7 +72,7 @@ describe("given the organization's teams over REST", () => {
   });
 
   describe("when a team is created", () => {
-    // @scenario "Creates a team"
+    /** @scenario "Creates a team" */
     it("answers 201 with the team's id, name, slug, organization and timestamps", async () => {
       const { api } = mountTeams();
 
@@ -88,7 +88,7 @@ describe("given the organization's teams over REST", () => {
       expect(body.updatedAt).toBeDefined();
     });
 
-    // @scenario "Rejects create when name is missing"
+    /** @scenario "Rejects create when name is missing" */
     it("refuses a body with no name at all", async () => {
       const { api } = mountTeams();
 
@@ -98,7 +98,7 @@ describe("given the organization's teams over REST", () => {
       await expect(errorCodeOf(response)).resolves.toBe("validation_error");
     });
 
-    // @scenario "Rejects create when name is empty"
+    /** @scenario "Rejects create when name is empty" */
     it("refuses an empty name", async () => {
       const { api } = mountTeams();
 
@@ -107,7 +107,7 @@ describe("given the organization's teams over REST", () => {
       expect(response.status).toBe(422);
     });
 
-    // @scenario "Rejects create when name exceeds 255 characters"
+    /** @scenario "Rejects create when name exceeds 255 characters" */
     it("refuses a name longer than 255 characters", async () => {
       const { api } = mountTeams();
 
@@ -118,7 +118,7 @@ describe("given the organization's teams over REST", () => {
   });
 
   describe("when teams are listed", () => {
-    // @scenario "Lists non-archived teams for the organization"
+    /** @scenario "Lists non-archived teams for the organization" */
     it("answers a paginated data array", async () => {
       const { api } = mountTeams();
       await api.post("/api/v1/teams", { name: "Listed" }, asAdmin);
@@ -135,7 +135,7 @@ describe("given the organization's teams over REST", () => {
       expect(body.pagination.page).toBe(1);
     });
 
-    // @scenario "Paginates team list"
+    /** @scenario "Paginates team list" */
     it("honours the page and limit the caller asked for", async () => {
       const { api } = mountTeams();
       for (const name of ["One", "Two", "Three"]) {
@@ -154,7 +154,7 @@ describe("given the organization's teams over REST", () => {
       expect(body.pagination.total).toBe(4);
     });
 
-    // @scenario "Excludes teams from other organizations"
+    /** @scenario "Excludes teams from other organizations" */
     it("answers only teams belonging to the credential's organization", async () => {
       const { api } = mountTeams();
 
@@ -170,7 +170,7 @@ describe("given the organization's teams over REST", () => {
   });
 
   describe("when one team is read by id", () => {
-    // @scenario "Returns a team by id"
+    /** @scenario "Returns a team by id" */
     it("answers the team the create returned", async () => {
       const { api } = mountTeams();
       const created = (await (
@@ -185,7 +185,7 @@ describe("given the organization's teams over REST", () => {
       expect(body.name).toBe(created.name);
     });
 
-    // @scenario "Returns 404 for non-existent team"
+    /** @scenario "Returns 404 for non-existent team" */
     it("refuses an id no team carries", async () => {
       const { api } = mountTeams();
 
@@ -194,7 +194,7 @@ describe("given the organization's teams over REST", () => {
       expect(response.status).toBe(404);
     });
 
-    // @scenario "Returns 404 for team in another organization"
+    /** @scenario "Returns 404 for team in another organization" */
     it("refuses a team that belongs to a different organization", async () => {
       const { api } = mountTeams();
 
@@ -205,7 +205,7 @@ describe("given the organization's teams over REST", () => {
   });
 
   describe("when a team is renamed", () => {
-    // @scenario "Updates team name"
+    /** @scenario "Updates team name" */
     it("answers the team under its new name", async () => {
       const { api } = mountTeams();
       const created = (await (
@@ -224,7 +224,7 @@ describe("given the organization's teams over REST", () => {
       expect(body.name).toBe("Updated Name");
     });
 
-    // @scenario "Returns 404 when updating non-existent team"
+    /** @scenario "Returns 404 when updating non-existent team" */
     it("refuses a rename of a team that does not exist", async () => {
       const { api } = mountTeams();
 
@@ -235,7 +235,7 @@ describe("given the organization's teams over REST", () => {
   });
 
   describe("when a team is archived", () => {
-    // @scenario "Archives a team"
+    /** @scenario "Archives a team" */
     it("answers the archived team with the moment it was archived", async () => {
       const { api } = mountTeams();
       const created = (await (
@@ -250,7 +250,7 @@ describe("given the organization's teams over REST", () => {
       expect(body.archivedAt).toBeTruthy();
     });
 
-    // @scenario "Archived team is inaccessible via GET"
+    /** @scenario "Archived team is inaccessible via GET" */
     it("refuses a read of the team afterwards", async () => {
       const { api } = mountTeams();
       const created = (await (
@@ -263,7 +263,7 @@ describe("given the organization's teams over REST", () => {
       expect(response.status).toBe(404);
     });
 
-    // @scenario "Archived team is excluded from list"
+    /** @scenario "Archived team is excluded from list" */
     it("leaves the team out of the listing afterwards", async () => {
       const { api } = mountTeams();
       const created = (await (
@@ -277,7 +277,7 @@ describe("given the organization's teams over REST", () => {
       expect(body.data.map(({ id }) => id)).not.toContain(created.id);
     });
 
-    // @scenario "Returns 404 when deleting non-existent team"
+    /** @scenario "Returns 404 when deleting non-existent team" */
     it("refuses an archive of a team that does not exist", async () => {
       const { api } = mountTeams();
 
@@ -286,7 +286,7 @@ describe("given the organization's teams over REST", () => {
       expect(response.status).toBe(404);
     });
 
-    // @scenario "Returns 404 when deleting already-archived team"
+    /** @scenario "Returns 404 when deleting already-archived team" */
     it("refuses a second archive of the same team", async () => {
       const { api } = mountTeams();
       const created = (await (
@@ -301,7 +301,7 @@ describe("given the organization's teams over REST", () => {
   });
 
   describe("when the team is somebody's personal workspace", () => {
-    // @scenario "Refuses to archive a personal team"
+    /** @scenario "Refuses to archive a personal team" */
     it("names personal_workspace_not_managed_here and leaves the workspace unarchived", async () => {
       const { api } = mountTeams();
 
@@ -312,7 +312,7 @@ describe("given the organization's teams over REST", () => {
       expect((await api.get(`/api/v1/teams/${PERSONAL_TEAM_ID}`, asAdmin)).status).toBe(200);
     });
 
-    // @scenario "Refuses to add a member to a personal team"
+    /** @scenario "Refuses to add a member to a personal team" */
     it("names personal_workspace_not_managed_here and leaves the owner alone on it", async () => {
       const { api } = mountTeams();
 
@@ -327,7 +327,7 @@ describe("given the organization's teams over REST", () => {
       await expect(memberUserIds(api, PERSONAL_TEAM_ID)).resolves.toEqual([OWNER_USER_ID]);
     });
 
-    // @scenario "Refuses to remove a member from a personal team"
+    /** @scenario "Refuses to remove a member from a personal team" */
     it("names personal_workspace_not_managed_here and leaves the owner's binding in place", async () => {
       const { api } = mountTeams();
 
@@ -343,7 +343,7 @@ describe("given the organization's teams over REST", () => {
   });
 
   describe("when a member holds more than one role on the same team", () => {
-    // @scenario "Removing a member takes every role they hold on the team"
+    /** @scenario "Removing a member takes every role they hold on the team" */
     it("takes every role they hold there rather than the first one found", async () => {
       const { api } = mountTeams();
       const team = (await (
@@ -367,7 +367,7 @@ describe("given the organization's teams over REST", () => {
   });
 
   describe("when a management call is refused", () => {
-    // @scenario "An unknown team names the code"
+    /** @scenario "An unknown team names the code" */
     it("names team_not_found for a team that does not exist", async () => {
       const { api } = mountTeams();
 
@@ -377,7 +377,7 @@ describe("given the organization's teams over REST", () => {
       await expect(errorCodeOf(response)).resolves.toBe("team_not_found");
     });
 
-    // @scenario "Adding somebody who is not in the organization names the code"
+    /** @scenario "Adding somebody who is not in the organization names the code" */
     it("names user_not_in_organization for somebody outside the organization", async () => {
       const { api } = mountTeams();
       const team = (await (
@@ -394,7 +394,7 @@ describe("given the organization's teams over REST", () => {
       await expect(errorCodeOf(response)).resolves.toBe("user_not_in_organization");
     });
 
-    // @scenario "Granting a role a member already holds names the code"
+    /** @scenario "Granting a role a member already holds names the code" */
     it("names team_member_already_added for a role they already hold", async () => {
       const { api } = mountTeams();
       const team = (await (
@@ -414,7 +414,7 @@ describe("given the organization's teams over REST", () => {
       await expect(errorCodeOf(response)).resolves.toBe("team_member_already_added");
     });
 
-    // @scenario "Removing somebody who holds no role on the team names the code"
+    /** @scenario "Removing somebody who holds no role on the team names the code" */
     it("names team_membership_not_found for somebody who is not on the team", async () => {
       const { api } = mountTeams();
       const team = (await (await api.post("/api/v1/teams", { name: "Empty" }, asAdmin)).json()) as {
@@ -432,14 +432,14 @@ describe("given the organization's teams over REST", () => {
   });
 
   describe("when the credential holds no team permission", () => {
-    // @scenario "Viewer cannot list teams"
+    /** @scenario "Viewer cannot list teams" */
     it("refuses the listing", async () => {
       const { api } = mountTeams();
 
       expect((await api.get("/api/v1/teams", asViewer)).status).toBe(403);
     });
 
-    // @scenario "Viewer cannot create a team"
+    /** @scenario "Viewer cannot create a team" */
     it("refuses the create", async () => {
       const { api } = mountTeams();
 
@@ -448,7 +448,7 @@ describe("given the organization's teams over REST", () => {
       );
     });
 
-    // @scenario "Viewer cannot update a team"
+    /** @scenario "Viewer cannot update a team" */
     it("refuses the rename", async () => {
       const { api } = mountTeams();
       const created = (await (
@@ -460,7 +460,7 @@ describe("given the organization's teams over REST", () => {
       expect(response.status).toBe(403);
     });
 
-    // @scenario "Viewer cannot delete a team"
+    /** @scenario "Viewer cannot delete a team" */
     it("refuses the archive", async () => {
       const { api } = mountTeams();
       const created = (await (

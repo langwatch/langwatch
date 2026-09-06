@@ -9,7 +9,7 @@ import { errorCodeOf, mountSuiteFamilies } from "./support/suite-family.harness"
 const BASE = "/api/v1/test-suites";
 
 describe("given the project holds one test suite and one run plan", () => {
-  // @scenario "Listing test suites returns the test suites only"
+  /** @scenario "Listing test suites returns the test suites only" */
   it("returns the test suite alone", async () => {
     const { api, world } = mountSuiteFamilies();
     const testSuite = world.addTestSuite({ name: "Refunds" });
@@ -30,7 +30,7 @@ describe("given the project holds one test suite and one run plan", () => {
 });
 
 describe("given a name for a new test suite", () => {
-  // @scenario "Creating a test suite creates it empty"
+  /** @scenario "Creating a test suite creates it empty" */
   it("creates it with no scenario", async () => {
     const { api } = mountSuiteFamilies();
 
@@ -47,8 +47,8 @@ describe("given a name for a new test suite", () => {
 });
 
 describe("given a test suite holds two scenarios", () => {
-  // @scenario "Reading a test suite names the scenarios filed in it"
-  // @scenario "A test suite reads back with the scenarios filed in it"
+  /** @scenario "Reading a test suite names the scenarios filed in it" */
+  /** @scenario "A test suite reads back with the scenarios filed in it" */
   it("names both scenarios in the response", async () => {
     const { api, world } = mountSuiteFamilies();
     const { testSuite, cases } = world.addTestSuiteWithCases("Refunds", 2);
@@ -61,7 +61,7 @@ describe("given a test suite holds two scenarios", () => {
     expect(body.scenarios.map((one) => one.name)).toEqual(cases.map((one) => one.name));
   });
 
-  // @scenario "Archiving a test suite archives the scenarios filed in it"
+  /** @scenario "Archiving a test suite archives the scenarios filed in it" */
   it("archives the suite and the scenarios filed in it", async () => {
     const { api, world } = mountSuiteFamilies();
     const { testSuite, cases } = world.addTestSuiteWithCases("Refunds", 2);
@@ -76,7 +76,7 @@ describe("given a test suite holds two scenarios", () => {
 });
 
 describe("given the project holds a test suite named Refunds", () => {
-  // @scenario "Renaming a test suite keeps its slug"
+  /** @scenario "Renaming a test suite keeps its slug" */
   it("carries the new name and the slug it was created with", async () => {
     const { api, world } = mountSuiteFamilies();
     const testSuite = world.addTestSuite({ name: "Refunds" });
@@ -92,7 +92,7 @@ describe("given the project holds a test suite named Refunds", () => {
 });
 
 describe("given a test suite holds one scenario and the project holds one agent", () => {
-  // @scenario "Running a test suite names the plan after the suite and its targets"
+  /** @scenario "Running a test suite names the plan after the suite and its targets" */
   it("creates a run plan named after the suite and the target", async () => {
     const { api, world, commands } = mountSuiteFamilies();
     const { testSuite } = world.addTestSuiteWithCases("Refunds", 1);
@@ -114,8 +114,8 @@ describe("given a test suite holds one scenario and the project holds one agent"
     expect(commands.queued).toHaveLength(1);
   });
 
-  // @scenario "The target chosen for a test suite run is offered again from the last run plan of that suite"
-  // @scenario "Running a test suite twice joins the run plan the first run resolved"
+  /** @scenario "The target chosen for a test suite run is offered again from the last run plan of that suite" */
+  /** @scenario "Running a test suite twice joins the run plan the first run resolved" */
   it("reports the plan as not created the second time", async () => {
     const { api, world } = mountSuiteFamilies();
     const { testSuite } = world.addTestSuiteWithCases("Refunds", 1);
@@ -138,7 +138,7 @@ describe("given a test suite holds one scenario and the project holds one agent"
 });
 
 describe("given a test suite holds active and archived scenarios", () => {
-  // @scenario "Running a test suite schedules its active scenarios against the chosen targets"
+  /** @scenario "Running a test suite schedules its active scenarios against the chosen targets" */
   it("schedules active scenarios against every target and leaves archived ones out", async () => {
     const { api, world, commands } = mountSuiteFamilies();
     const active = [world.addScenario({ name: "One" }), world.addScenario({ name: "Two" })];
@@ -165,7 +165,7 @@ describe("given a test suite holds active and archived scenarios", () => {
 });
 
 describe("given a test suite whose only scenario is archived", () => {
-  // @scenario "Running a test suite whose scenarios are all archived is refused with suite_scope_empty"
+  /** @scenario "Running a test suite whose scenarios are all archived is refused with suite_scope_empty" */
   it("refuses the run with suite_scope_empty and schedules nothing", async () => {
     const { api, world, commands } = mountSuiteFamilies();
     const archived = world.addScenario({ name: "Old", archivedAt: new Date() });
@@ -183,7 +183,7 @@ describe("given a test suite whose only scenario is archived", () => {
 });
 
 describe("given the id names a run plan", () => {
-  // @scenario "Reading a run plan through the test suite route answers suite_not_found"
+  /** @scenario "Reading a run plan through the test suite route answers suite_not_found" */
   it("answers 404 naming the code", async () => {
     const { api, world } = mountSuiteFamilies();
     const plan = world.addPlan({ name: "Nightly" });
@@ -196,7 +196,7 @@ describe("given the id names a run plan", () => {
 });
 
 describe("given an id the project does not hold", () => {
-  // @scenario "Running a test suite that does not exist answers suite_not_found"
+  /** @scenario "Running a test suite that does not exist answers suite_not_found" */
   it("answers 404 naming the code", async () => {
     const { api, world } = mountSuiteFamilies();
     const agent = world.addAgent();
@@ -228,7 +228,7 @@ describe("given the family's addresses", () => {
     expect((await api.get(`${BASE}/2026-08-27/`)).status).toBe(404);
   });
 
-  // @scenario "An unknown test suites version segment answers 404"
+  /** @scenario "An unknown test suites version segment answers 404" */
   it("answers 404 for a version segment the family never served", async () => {
     const { api } = mountSuiteFamilies();
 

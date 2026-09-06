@@ -24,7 +24,7 @@ const teamAssignment = { teamId: "team-1", role: "MEMBER" };
 
 describe("given an organization with several members", () => {
   describe("when the members are listed", () => {
-    // @scenario "Listing members returns roles and status"
+    /** @scenario "Listing members returns roles and status" */
     it("lists active members with role and status, and disabled ones only on request", async () => {
       const world = organizationWorld({
         members: [
@@ -66,7 +66,7 @@ describe("given an organization with several members", () => {
   });
 
   describe("when a member belonging to two teams is fetched", () => {
-    // @scenario "Fetching a member includes their team bindings"
+    /** @scenario "Fetching a member includes their team bindings" */
     it("lists both teams with the role held on each", async () => {
       const world = organizationWorld({
         members: [
@@ -99,7 +99,7 @@ describe("given an organization with several members", () => {
   });
 
   describe("when a member holding the member role is promoted", () => {
-    // @scenario "Changing a member's organization role takes effect"
+    /** @scenario "Changing a member's organization role takes effect" */
     it("changes the organization role and reads it back", async () => {
       const world = organizationWorld({
         members: [acting, { userId: "user-promote", role: "MEMBER" }],
@@ -123,7 +123,7 @@ describe("given an organization with several members", () => {
   });
 
   describe("when an active member is disabled", () => {
-    // @scenario "Disabling a member blocks their access"
+    /** @scenario "Disabling a member blocks their access" */
     it("reports them as disabled and drops them from the organization's members", async () => {
       const world = organizationWorld({
         members: [acting, { userId: "user-disable" }],
@@ -145,7 +145,7 @@ describe("given an organization with several members", () => {
   });
 
   describe("when a disabled member is re-enabled with no seats left on the plan", () => {
-    // @scenario "Re-enabling a member checks the seat limit"
+    /** @scenario "Re-enabling a member checks the seat limit" */
     it("refuses with member_seat_limit_reached and keeps the member disabled", async () => {
       const world = organizationWorld({
         members: [acting, { userId: "user-reenable", disabled: true }],
@@ -165,7 +165,7 @@ describe("given an organization with several members", () => {
   });
 
   describe("when the credential's own member is disabled", () => {
-    // @scenario "A member cannot disable themselves"
+    /** @scenario "A member cannot disable themselves" */
     it("refuses with cannot_disable_self and leaves that member active", async () => {
       const world = organizationWorld({ members: [acting] });
 
@@ -182,7 +182,7 @@ describe("given an organization with several members", () => {
   });
 
   describe("when a member is removed", () => {
-    // @scenario "Removing a member deletes the membership"
+    /** @scenario "Removing a member deletes the membership" */
     it("deletes the membership, after which the member reads as not found", async () => {
       const world = organizationWorld({
         members: [acting, { userId: "user-remove" }],
@@ -206,7 +206,7 @@ describe("given an organization with several members", () => {
   });
 
   describe("when the credential's own member is removed", () => {
-    // @scenario "A member cannot remove themselves"
+    /** @scenario "A member cannot remove themselves" */
     it("refuses with cannot_remove_self and keeps that member in the organization", async () => {
       const world = organizationWorld({
         members: [acting, { userId: "user-other", role: "ADMIN" }],
@@ -224,7 +224,7 @@ describe("given an organization with several members", () => {
   });
 
   describe("when the organization's one active admin is removed", () => {
-    // @scenario "Removing the last active admin is refused"
+    /** @scenario "Removing the last active admin is refused" */
     it("refuses with cannot_remove_last_admin and keeps somebody who can sign in", async () => {
       // A service credential acts as nobody, so the self guard cannot be what
       // refuses here — only the last-admin guard can.
@@ -245,7 +245,7 @@ describe("given an organization with several members", () => {
   });
 
   describe("when two offboardings remove both admins at the same time", () => {
-    // @scenario "Two admins removed at the same time cannot both succeed"
+    /** @scenario "Two admins removed at the same time cannot both succeed" */
     it("refuses one of them and leaves the organization with an active admin", async () => {
       const world = organizationWorld({
         actingUserId: null,
@@ -271,7 +271,7 @@ describe("given an organization with several members", () => {
   });
 
   describe("when a member's access breakdown is fetched", () => {
-    // @scenario "A member's access breakdown spans teams and projects"
+    /** @scenario "A member's access breakdown spans teams and projects" */
     it("reports the organization, team and project access with the scope each comes from", async () => {
       const world = organizationWorld({
         members: [
@@ -311,7 +311,7 @@ describe("given an organization with several members", () => {
 
 describe("given invites managed over REST", () => {
   describe("when the organization has a pending invite and they are listed", () => {
-    // @scenario "Listing invites includes the invite link"
+    /** @scenario "Listing invites includes the invite link" */
     it("carries the email, role, invite code and invite link", async () => {
       const world = organizationWorld({
         members: [acting],
@@ -333,7 +333,7 @@ describe("given invites managed over REST", () => {
   });
 
   describe("when two people are invited onto a team carrying a custom role", () => {
-    // @scenario "Creating invites assigns teams including a custom role"
+    /** @scenario "Creating invites assigns teams including a custom role" */
     it("creates both with that team assignment and reports email delivery", async () => {
       const world = organizationWorld({ members: [acting] });
       const emails = ["custom-1@acme.test", "custom-2@acme.test"];
@@ -370,7 +370,7 @@ describe("given invites managed over REST", () => {
   });
 
   describe("when the address invited already belongs to a member", () => {
-    // @scenario "Inviting an existing member is refused"
+    /** @scenario "Inviting an existing member is refused" */
     it("refuses with already_organization_member and creates no invite", async () => {
       const world = organizationWorld({ members: [acting] });
 
@@ -387,7 +387,7 @@ describe("given invites managed over REST", () => {
   });
 
   describe("when an address with a pending invite is invited again", () => {
-    // @scenario "A duplicate pending invite is refused"
+    /** @scenario "A duplicate pending invite is refused" */
     it("refuses with duplicate_invite and leaves one invite for that address", async () => {
       const world = organizationWorld({
         members: [acting],
@@ -407,7 +407,7 @@ describe("given invites managed over REST", () => {
   });
 
   describe("when three people are invited onto a plan with one seat left", () => {
-    // @scenario "Invites beyond the seat limit are refused"
+    /** @scenario "Invites beyond the seat limit are refused" */
     it("refuses with member_seat_limit_reached and creates none of the batch", async () => {
       const world = organizationWorld({ members: [acting], seats: 2 });
 
@@ -430,7 +430,7 @@ describe("given invites managed over REST", () => {
   });
 
   describe("when the team assignment names somebody's personal workspace", () => {
-    // @scenario "An invite cannot assign a personal workspace team"
+    /** @scenario "An invite cannot assign a personal workspace team" */
     it("refuses with personal_workspace_not_managed_here and creates no invite", async () => {
       const world = organizationWorld({ members: [acting], personalTeamIds: ["team-personal"] });
 
@@ -455,7 +455,7 @@ describe("given invites managed over REST", () => {
   });
 
   describe("when a pending invite is revoked", () => {
-    // @scenario "Revoking a pending invite marks it REVOKED"
+    /** @scenario "Revoking a pending invite marks it REVOKED" */
     it("keeps it listed as REVOKED and refuses a second revoke with invite_not_found", async () => {
       const world = organizationWorld({
         members: [acting],

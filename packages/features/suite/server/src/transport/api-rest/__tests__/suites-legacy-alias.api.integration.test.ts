@@ -25,7 +25,7 @@ describe("given both addresses the alias answers on", () => {
 });
 
 describe("given the project holds one run plan", () => {
-  // @scenario "Every suites response carries the deprecation headers"
+  /** @scenario "Every suites response carries the deprecation headers" */
   it("names its successor on every endpoint of the family", async () => {
     const { api, world } = mountSuiteFamilies();
     const plan = world.addPlan({ name: "Nightly" });
@@ -37,7 +37,7 @@ describe("given the project holds one run plan", () => {
     }
   });
 
-  // @scenario "Running a run plan through the alias with targets answers validation_error"
+  /** @scenario "Running a run plan through the alias with targets answers validation_error" */
   it("refuses a run body naming targets", async () => {
     const { api, world, commands } = mountSuiteFamilies();
     const plan = world.addPlan({ name: "Nightly" });
@@ -53,7 +53,7 @@ describe("given the project holds one run plan", () => {
 });
 
 describe("given a suite id the project does not hold", () => {
-  // @scenario "A refused suites request still carries the deprecation headers"
+  /** @scenario "A refused suites request still carries the deprecation headers" */
   it("names its successor on the refusal too", async () => {
     const { api } = mountSuiteFamilies();
 
@@ -65,7 +65,7 @@ describe("given a suite id the project does not hold", () => {
 });
 
 describe("given the project holds a test suite with one scenario", () => {
-  // @scenario "Running a test suite through the alias takes its targets from the body"
+  /** @scenario "Running a test suite through the alias takes its targets from the body" */
   it("schedules the runs and creates the run plan the suite and target name", async () => {
     const { api, world, commands } = mountSuiteFamilies();
     const { testSuite } = world.addTestSuiteWithCases("Refunds", 1);
@@ -87,7 +87,7 @@ describe("given the project holds a test suite with one scenario", () => {
     expect(commands.queued).toHaveLength(1);
   });
 
-  // @scenario "Running a test suite through the alias with no target answers suite_targets_required"
+  /** @scenario "Running a test suite through the alias with no target answers suite_targets_required" */
   it("refuses a run that names no target", async () => {
     const { api, world, commands } = mountSuiteFamilies();
     const { testSuite } = world.addTestSuiteWithCases("Refunds", 1);
@@ -102,7 +102,7 @@ describe("given the project holds a test suite with one scenario", () => {
 });
 
 describe("given the project holds one test suite", () => {
-  // @scenario "Updating a test suite through the alias with targets answers validation_error"
+  /** @scenario "Updating a test suite through the alias with targets answers validation_error" */
   it("refuses an update body naming targets", async () => {
     const { api, world } = mountSuiteFamilies();
     const testSuite = world.addTestSuite({ name: "Refunds" });

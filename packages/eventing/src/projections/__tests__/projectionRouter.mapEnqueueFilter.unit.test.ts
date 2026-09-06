@@ -220,7 +220,7 @@ describe("map projection enqueue-time contract", () => {
 
   describe("given a map projection with no enqueue filter", () => {
     describe("when declared event types are dispatched", () => {
-      // @scenario "Parallel processing"
+      /** @scenario "Parallel processing" */
       it("queues every event of its declared types, unchanged", async () => {
         const appended: SeamRecord[] = [];
         const { router, queued } = makeQueuedRouter(makeProjection({ appended }));

@@ -35,7 +35,7 @@ describe("LangyTurnOverrideService", () => {
   });
 
   describe("given a project holding Langy's versioned prompts", () => {
-    // @scenario "A read failure after a successful read keeps the text already in use"
+    /** @scenario "A read failure after a successful read keeps the text already in use" */
     it("reuses the last text it read when a later read fails, not the constant", async () => {
       let readCount = 0;
       const tryGetPromptByIdOrHandle = vi.fn(async () => {
@@ -66,7 +66,7 @@ describe("LangyTurnOverrideService", () => {
       expect(result.text).not.toBe(LANGY_TURN_OVERRIDE_FALLBACK);
     });
 
-    // @scenario "Withdrawing a promoted version is not undone by a later read failure"
+    /** @scenario "Withdrawing a promoted version is not undone by a later read failure" */
     it("does not resurrect a demoted row when a later read fails", async () => {
       // Read 1 hits a promoted row; read 2 is a GENUINE miss (the operator
       // demoted or deleted it); read 3 is a transient failure. The blip must

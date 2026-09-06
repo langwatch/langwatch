@@ -115,7 +115,7 @@ function passThroughSecurity(): AppRestSecurity {
 
 describe("given the Auth0 SCIM webhook intake", () => {
   describe("when the delivery is signed and carries a directory token", () => {
-    // @scenario "A signed SCIM webhook delivery provisions the token's own organization"
+    /** @scenario "A signed SCIM webhook delivery provisions the token's own organization" */
     it("provisions the organization the credential names, not the one the payload implies", async () => {
       const api = mount();
       const body = createEvent;
@@ -137,7 +137,7 @@ describe("given the Auth0 SCIM webhook intake", () => {
   });
 
   describe("when the delivery presents no directory token", () => {
-    // @scenario "A SCIM webhook delivery without a directory token provisions nothing"
+    /** @scenario "A SCIM webhook delivery without a directory token provisions nothing" */
     it("refuses the delivery and provisions nothing", async () => {
       const api = mount();
       const body = createEvent;
@@ -153,7 +153,7 @@ describe("given the Auth0 SCIM webhook intake", () => {
   });
 
   describe("when the presented secret is not the configured one", () => {
-    // @scenario "A SCIM webhook delivery signed with the wrong secret is refused"
+    /** @scenario "A SCIM webhook delivery signed with the wrong secret is refused" */
     it("refuses a delivery signed with another secret", async () => {
       const api = mount();
       const body = createEvent;
@@ -172,7 +172,7 @@ describe("given the Auth0 SCIM webhook intake", () => {
   });
 
   describe("when a captured delivery is sent twice", () => {
-    // @scenario "A replayed SCIM webhook delivery is refused"
+    /** @scenario "A replayed SCIM webhook delivery is refused" */
     it("refuses the replay", async () => {
       const api = mount();
       const body = createEvent;
@@ -191,7 +191,7 @@ describe("given the Auth0 SCIM webhook intake", () => {
   });
 
   describe("when the delivery is older than the freshness window", () => {
-    // @scenario "A SCIM webhook delivery outside the freshness window is refused"
+    /** @scenario "A SCIM webhook delivery outside the freshness window is refused" */
     it("refuses a stale timestamp", async () => {
       const api = mount();
       const body = createEvent;
@@ -212,7 +212,7 @@ describe("given the Auth0 SCIM webhook intake", () => {
   });
 
   describe("when the deployment configured no webhook secret", () => {
-    // @scenario "A deployment without directory sync does not serve the SCIM webhook"
+    /** @scenario "A deployment without directory sync does not serve the SCIM webhook" */
     it("answers as though the path does not exist", async () => {
       const api = mount({ secret: undefined });
 

@@ -15,7 +15,7 @@ import { errorCodeOf, TEST_ORGANIZATION_ID } from "./support/rest-family.harness
 
 describe("given an organization-scoped credential on an Enterprise plan", () => {
   describe("when the organization is fetched", () => {
-    // @scenario "Fetching the organization returns the caller's organization"
+    /** @scenario "Fetching the organization returns the caller's organization" */
     it("returns the credential's own organization with its profile settings", async () => {
       const world = organizationWorld();
 
@@ -35,7 +35,7 @@ describe("given an organization-scoped credential on an Enterprise plan", () => 
   });
 
   describe("when the organization is renamed", () => {
-    // @scenario "Renaming the organization takes effect"
+    /** @scenario "Renaming the organization takes effect" */
     it("applies the new name and reads it back", async () => {
       const world = organizationWorld();
 
@@ -54,7 +54,7 @@ describe("given an organization-scoped credential on an Enterprise plan", () => 
   });
 
   describe("when the rename carries an empty name", () => {
-    // @scenario "An empty organization name is refused"
+    /** @scenario "An empty organization name is refused" */
     it("refuses with validation_error and leaves the name unchanged", async () => {
       const world = organizationWorld();
 
@@ -71,7 +71,7 @@ describe("given an organization-scoped credential on an Enterprise plan", () => 
   });
 
   describe("when the organization has a single sign-on domain and provider configured", () => {
-    // @scenario "Single sign-on fields are not exposed"
+    /** @scenario "Single sign-on fields are not exposed" */
     it("reports neither field, and an update naming them changes neither", async () => {
       const world = organizationWorld({
         sso: { ssoDomain: "sso.acme.test", ssoProvider: "okta" },
@@ -103,7 +103,7 @@ describe("given an organization-scoped credential on an Enterprise plan", () => 
 
 describe("given no credential at all", () => {
   describe("when the organization is fetched", () => {
-    // @scenario "Fetching the organization without credentials is refused"
+    /** @scenario "Fetching the organization without credentials is refused" */
     it("refuses with missing_credentials before reading anything", async () => {
       const world = organizationWorld({ credentialed: false });
 
@@ -117,7 +117,7 @@ describe("given no credential at all", () => {
 
 describe("given the same endpoint addressed through its version namespaces", () => {
   describe("when each namespace is asked for the organization", () => {
-    // @scenario "The organization endpoint answers on its dated and latest paths"
+    /** @scenario "The organization endpoint answers on its dated and latest paths" */
     it("serves the dated and latest paths and 404s a namespace that does not exist", async () => {
       const world = organizationWorld();
 

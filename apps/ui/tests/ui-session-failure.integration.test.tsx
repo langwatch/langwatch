@@ -144,7 +144,7 @@ function SessionProbe() {
 
 describe("given a session endpoint that refuses the read", () => {
   describe("when a screen asks who is here", () => {
-    // @scenario "A refused session read reads as signed out"
+    /** @scenario "A refused session read reads as signed out" */
     it("answers nobody, and settles rather than holding the screen on nothing", async () => {
       const feedback = new RecordingFeedback();
 
@@ -159,7 +159,7 @@ describe("given a session endpoint that refuses the read", () => {
       expect(view.getByTestId("user").textContent).toBe("nobody");
     });
 
-    // @scenario "A refused session read is reported through the handled-error path"
+    /** @scenario "A refused session read is reported through the handled-error path" */
     it("tells the reader once, in the words registered for the code", async () => {
       const feedback = new RecordingFeedback();
 
@@ -179,7 +179,7 @@ describe("given a session endpoint that refuses the read", () => {
       expect(copy.description).not.toBe(UNKNOWN_ERROR_PRESENTATION.description);
     });
 
-    // @scenario "A signed-out visitor is not sent to onboarding"
+    /** @scenario "A signed-out visitor is not sent to onboarding" */
     it("sends the visitor on the root to sign in, never to onboarding", async () => {
       const feedback = new RecordingFeedback();
 
@@ -192,7 +192,7 @@ describe("given a session endpoint that refuses the read", () => {
   });
 
   describe("when the browser is offline", () => {
-    // @scenario "An offline visitor is not sent to sign in"
+    /** @scenario "An offline visitor is not sent to sign in" */
     it("leaves the visitor where they are, since sign-in cannot load either", async () => {
       vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
       const feedback = new RecordingFeedback();
@@ -213,7 +213,7 @@ describe("given a session endpoint that refuses the read", () => {
 
 describe("given a session endpoint that answers that nobody is signed in", () => {
   describe("when the visitor is on a route that needs a session", () => {
-    // @scenario "A session answering that nobody is signed in reports nothing"
+    /** @scenario "A session answering that nobody is signed in reports nothing" */
     it("reports no failure, because nothing failed", async () => {
       const feedback = new RecordingFeedback();
 
@@ -229,7 +229,7 @@ describe("given a session endpoint that answers that nobody is signed in", () =>
       expect(feedback.failures).toEqual([]);
     });
 
-    // @scenario "A signed-out visitor on an authenticated route goes to sign in"
+    /** @scenario "A signed-out visitor on an authenticated route goes to sign in" */
     it("sends them to sign in, carrying the address they asked for", async () => {
       const feedback = new RecordingFeedback();
 
@@ -248,7 +248,7 @@ describe("given a session endpoint that answers that nobody is signed in", () =>
   });
 
   describe("when the visitor is already on a public route", () => {
-    // @scenario "A signed-out visitor on a public route stays where they are"
+    /** @scenario "A signed-out visitor on a public route stays where they are" */
     it("leaves them on the sign-in screen rather than sending them to it again", async () => {
       const feedback = new RecordingFeedback();
 
@@ -267,7 +267,7 @@ describe("given a session endpoint that answers that nobody is signed in", () =>
 
 describe("given a session endpoint that answers with a signed-in reader", () => {
   describe("when the visitor is on a route that needs a session", () => {
-    // @scenario "A signed-in reader is left where they are"
+    /** @scenario "A signed-in reader is left where they are" */
     it("sends them nowhere and reports nothing", async () => {
       const feedback = new RecordingFeedback();
 

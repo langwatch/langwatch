@@ -11,7 +11,7 @@ describe("given a process deciding whether to profile itself", () => {
     // The cost argument for the whole gate rests on this: no address means the
     // native profiler bindings are never required, so a self-hosted install
     // that has never heard of Pyroscope pays nothing at boot.
-    // @scenario "A process with no profiling endpoint does not profile"
+    /** @scenario "A process with no profiling endpoint does not profile" */
     it("starts nothing", () => {
       expect(
         startProfiling({
@@ -23,7 +23,7 @@ describe("given a process deciding whether to profile itself", () => {
       ).toBeUndefined();
     });
 
-    // @scenario "A process with no profiling endpoint does not profile"
+    /** @scenario "A process with no profiling endpoint does not profile" */
     it("treats a blank address as no address", () => {
       expect(
         startProfiling({
@@ -44,7 +44,7 @@ describe("given a process deciding whether to profile itself", () => {
     // already-imported module `require`s depends on the runner's interception
     // timing, and if it ever stopped intercepting, the real profiler would load,
     // start cleanly, and this test would go green while exercising nothing.
-    // @scenario "A profiler that cannot start does not stop the process"
+    /** @scenario "A profiler that cannot start does not stop the process" */
     it("warns and returns without throwing", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const loadProfiler = vi.fn(() => {
@@ -77,7 +77,7 @@ describe("given telemetry identity carried on OTEL_RESOURCE_ATTRIBUTES", () => {
     // Pyroscope label names follow the Prometheus grammar and reject a dot.
     // A verbatim copy does not error — the push succeeds and the label is
     // simply gone — which is the worst of both worlds.
-    // @scenario "Profiles carry the worktree label in local development"
+    /** @scenario "Profiles carry the worktree label in local development" */
     it("rewrites them to names Pyroscope accepts", () => {
       const tags = tagsFromResourceAttributes(
         "langwatch.worktree=portless,deployment.environment.name=development",
@@ -89,27 +89,27 @@ describe("given telemetry identity carried on OTEL_RESOURCE_ATTRIBUTES", () => {
       });
     });
 
-    // @scenario "Profiles carry the worktree label in local development"
+    /** @scenario "Profiles carry the worktree label in local development" */
     it("keeps the spelling Loki uses for the same attribute", () => {
       expect(normaliseTagKey("langwatch.worktree")).toBe("langwatch_worktree");
     });
 
     // A leading digit is as invalid a label name as a dot is.
-    // @scenario "Profiles carry the worktree label in local development"
+    /** @scenario "Profiles carry the worktree label in local development" */
     it("rewrites a leading digit rather than dropping it", () => {
       expect(normaliseTagKey("9lives")).toBe("_lives");
     });
   });
 
   describe("when the attributes are malformed", () => {
-    // @scenario "Profiles carry the worktree label in local development"
+    /** @scenario "Profiles carry the worktree label in local development" */
     it("yields no tags rather than throwing", () => {
       for (const input of [undefined, "", "   ", "novalue", "=orphan", ",,,"]) {
         expect(tagsFromResourceAttributes(input)).toEqual({});
       }
     });
 
-    // @scenario "Profiles carry the worktree label in local development"
+    /** @scenario "Profiles carry the worktree label in local development" */
     it("keeps the well-formed pairs alongside the junk", () => {
       expect(tagsFromResourceAttributes("novalue,langwatch.worktree=portless,=orphan")).toEqual({
         langwatch_worktree: "portless",
@@ -118,7 +118,7 @@ describe("given telemetry identity carried on OTEL_RESOURCE_ATTRIBUTES", () => {
 
     // A value containing '=' is legal and must survive intact — a URL or a
     // base64 fragment in a resource attribute is not unusual.
-    // @scenario "Profiles carry the worktree label in local development"
+    /** @scenario "Profiles carry the worktree label in local development" */
     it("splits on the first separator only", () => {
       expect(tagsFromResourceAttributes("service.name=a=b")).toEqual({
         service_name: "a=b",

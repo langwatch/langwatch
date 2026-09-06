@@ -31,7 +31,7 @@ function calledNames({ node }: { node: Node }): string[] {
 
 describe("given source text that is not on disk", () => {
   describe("when it is parsed", () => {
-    // @scenario "Source text with no file behind it still parses"
+    /** @scenario "Source text with no file behind it still parses" */
     it("walks the syntax tree of the text it was given", () => {
       const source = parseSourceText({
         fileName: "nowhere/onlyInMemory.ts",
@@ -43,7 +43,7 @@ describe("given source text that is not on disk", () => {
   });
 
   describe("when a second snippet reuses the first one's name", () => {
-    // @scenario "A name reused with new text parses the new text"
+    /** @scenario "A name reused with new text parses the new text" */
     it("parses the second text rather than answering from the cache", () => {
       const fileName = "nowhere/reused.ts";
       parseSourceText({ fileName, sourceText: "first();" });

@@ -62,7 +62,7 @@ const composerWith = (parserConfig: Record<string, string>): ComposerState => ({
 
 describe("Anthropic composer controls", () => {
   describe("the report field", () => {
-    // @scenario "The report offers the two reports that exist and nothing else"
+    /** @scenario "The report offers the two reports that exist and nothing else" */
     it("offers exactly the reports the adapter schema declares", () => {
       const offered = selectOptionsFor("report", {})
         .map((o) => o.value)
@@ -71,7 +71,7 @@ describe("Anthropic composer controls", () => {
       expect(offered).toEqual([...anthropicAdminPullConfigSchema.shape.report.options]);
     });
 
-    // @scenario "A required choice does not answer itself"
+    /** @scenario "A required choice does not answer itself" */
     it("offers an unselected entry so a native select cannot preselect for the admin", () => {
       const options = selectOptionsFor("report", {});
 
@@ -84,7 +84,7 @@ describe("Anthropic composer controls", () => {
   });
 
   describe("the bucket width field", () => {
-    // @scenario "The bucket widths offered are the ones the adapter declares"
+    /** @scenario "The bucket widths offered are the ones the adapter declares" */
     it("offers the widths the adapter schema accepts, and no others", () => {
       const offered = selectOptionsFor("bucketWidth", { report: "usage" })
         .map((o) => o.value)
@@ -95,7 +95,7 @@ describe("Anthropic composer controls", () => {
       ]);
     });
 
-    // @scenario "The cost report offers no width to choose between"
+    /** @scenario "The cost report offers no width to choose between" */
     it("collapses to the default entry on a cost source", () => {
       const options = selectOptionsFor("bucketWidth", { report: "cost" });
 
@@ -108,7 +108,7 @@ describe("Anthropic composer controls", () => {
       ).toMatchObject({ hint: expect.stringContaining("always daily") });
     });
 
-    // @scenario "Switching to the cost report drops a width already chosen"
+    /** @scenario "Switching to the cost report drops a width already chosen" */
     it("clears a width the cost report would refuse", () => {
       const reconciled = reconcileParserValues({
         sourceType: "anthropic_admin",
@@ -119,7 +119,7 @@ describe("Anthropic composer controls", () => {
       expect(buildAnthropicAdminPullConfig(composerWith(reconciled))).not.toBeNull();
     });
 
-    // @scenario "Leaving the bucket width alone still means the adapter default"
+    /** @scenario "Leaving the bucket width alone still means the adapter default" */
     it("submits no bucket width when the default entry is left in place", () => {
       const built = buildAnthropicAdminPullConfig(
         composerWith({ report: "usage", bucketWidth: "" }),
@@ -131,12 +131,12 @@ describe("Anthropic composer controls", () => {
   });
 
   describe("the backfill start field", () => {
-    // @scenario "The backfill start is a date control"
+    /** @scenario "The backfill start is a date control" */
     it("is a date control rather than free text", () => {
       expect(fieldControl({ field: fieldFor("startingAt"), values: {} }).kind).toBe("date");
     });
 
-    // @scenario "A stored instant is shown as its calendar date"
+    /** @scenario "A stored instant is shown as its calendar date" */
     it("shows a seeded instant as the date a date input can display", () => {
       const seeded = seedComposerParserConfig({
         sourceType: "anthropic_admin",
@@ -149,7 +149,7 @@ describe("Anthropic composer controls", () => {
       expect(dateInputValue(seeded.startingAt ?? "")).toBe("2026-08-01");
     });
 
-    // @scenario "Showing an instant on a date control does not rewrite it"
+    /** @scenario "Showing an instant on a date control does not rewrite it" */
     it("keeps an untouched instant intact through a save", () => {
       const built = buildAnthropicAdminPullConfig(
         composerWith({
@@ -163,7 +163,7 @@ describe("Anthropic composer controls", () => {
       expect(built).toMatchObject({ startingAt: "2026-08-01T13:45:00.000Z" });
     });
 
-    // @scenario "A picked date is still normalized to an instant before saving"
+    /** @scenario "A picked date is still normalized to an instant before saving" */
     it("normalizes a freshly picked date to an instant", () => {
       const built = buildAnthropicAdminPullConfig(
         composerWith({ report: "usage", startingAt: "2026-08-01" }),
