@@ -17,7 +17,7 @@ const SRC_ROOT = resolve(__dirname, "..", "..", "..");
  * added call fails even here.
  */
 const NOT_LANGWATCH = new Map([
-  ["cli/commands/agents/dev.ts", 1],
+  ["cli/commands/agents/tunnel.ts", 1],
   ["cli/commands/agents/run.ts", 1],
 ]);
 
