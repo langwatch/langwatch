@@ -228,6 +228,8 @@ func TestDispatch_Azure_DeploymentDoesNotLeakAcrossCredentials(t *testing.T) {
 // The other side of the same leak, and the worse one: the non-Azure guard
 // returns before the deployment comparison, so an in-place rewrite would hand
 // a plain OpenAI provider an Azure deployment name as its model.
+//
+// @scenario "An Azure deployment does not leak into a non-Azure fallback"
 func TestDispatch_Azure_DeploymentDoesNotLeakIntoANonAzureFallback(t *testing.T) {
 	upstream := newAzureUpstream(t)
 	router := azureRouter(t)

@@ -58,6 +58,12 @@ Feature: Azure OpenAI provider routing through in-app dispatch paths
     named differently from the model must not have that name dropped on the way
     out: Azure has no such deployment and refuses the call.
 
+    A deployment belongs to the credential that named it. Dispatch retries walk
+    a chain of credentials over one request, so a deployment resolved for one
+    attempt must not decide what a later attempt sends: the next resource, or a
+    provider that is not Azure at all, would be asked for a deployment it does
+    not have.
+
     Background:
       Given an Azure provider credential with a correct endpoint and API key reaches dispatch
 
@@ -86,3 +92,18 @@ Feature: Azure OpenAI provider routing through in-app dispatch paths
       Given the provider names a deployment that differs from the model id
       When a streaming chat completion for that model is dispatched
       Then the upstream request targets that deployment name
+
+    @integration
+    Scenario: A deployment resolved for one credential does not leak into the next attempt
+      Given the provider maps the model to a deployment name that differs from the model id
+      And a second Azure credential that names no deployment of its own follows it in the chain
+      When the request fails over to that second credential
+      Then the second resource is asked for the deployment named by the model id
+      And the request the customer sent is left unaltered for the next attempt
+
+    @integration
+    Scenario: An Azure deployment does not leak into a non-Azure fallback
+      Given the provider maps the model to a deployment name that differs from the model id
+      And a credential for a provider that is not Azure follows it in the chain
+      When the request fails over to that credential
+      Then that provider is asked for the model id and not the Azure deployment name
