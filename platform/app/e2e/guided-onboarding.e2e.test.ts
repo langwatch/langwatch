@@ -193,6 +193,20 @@ async function trpcQuery<T>({
 }
 
 test.describe("guided onboarding", () => {
+  // The browser's own errors and warnings, in the run's output: a tour that
+  // never starts or a panel that stays shut leaves its reason here and
+  // nowhere the screenshot can show.
+  test.beforeEach(({ page }) => {
+    page.on("pageerror", (error) => {
+      console.log(`[browser] pageerror: ${error.message}`);
+    });
+    page.on("console", (message) => {
+      if (message.type() === "error" || message.type() === "warning") {
+        console.log(`[browser] ${message.type()}: ${message.text()}`);
+      }
+    });
+  });
+
   test.afterEach(async ({ page }, testInfo) => {
     const video = page.video();
     await page.close();
@@ -241,7 +255,26 @@ test.describe("guided onboarding", () => {
 
     // The tour: four steps over the real navigation, Next on each.
     const caption = page.getByTestId("tour-caption");
-    await expect(caption).toBeVisible({ timeout: 60_000 });
+    try {
+      await expect(caption).toBeVisible({ timeout: 60_000 });
+    } catch (error) {
+      // A tour that never starts is a host race: what the organization holds
+      // and what the browser persisted for the panel say which side stalled.
+      const state = await readGuidedState({ page, organizationName }).catch(
+        (reason) => ({ unreadable: String(reason) }),
+      );
+      const persisted = await page.evaluate(() =>
+        Object.fromEntries(
+          Object.keys(localStorage)
+            .filter((key) => /langy|guided|tour/i.test(key))
+            .map((key) => [key, localStorage.getItem(key)]),
+        ),
+      );
+      console.log("[diagnostic] guided state:", JSON.stringify(state));
+      console.log("[diagnostic] browser storage:", JSON.stringify(persisted));
+      console.log("[diagnostic] url:", page.url());
+      throw error;
+    }
     await expect(caption).toContainText("This is the menu");
     await expect(caption).toContainText("1 of 4");
     for (let step = 1; step <= 4; step += 1) {
