@@ -19,10 +19,22 @@ import {
   type GuidedKickoffTourStatus,
 } from "~/features/guided-onboarding/kickoff";
 import type { GuidedPath } from "~/features/guided-onboarding/paths";
-import { ADMIN_EMAIL, APP_BASE, PROJECT_ID, useProject } from "./config";
+import {
+  ADMIN_EMAIL,
+  APP_BASE,
+  PROJECT_ID,
+  useAccount,
+  useProject,
+} from "./config";
 import type { LangyAdapter, LangyToolEvent } from "./langy-agent";
 import { getCliApiKey, openaiKey } from "./local-control-fixture";
-import { getSessionCookie, trpcMutate, trpcQuery } from "./trpc";
+import {
+  getSessionCookie,
+  resetSessionCookie,
+  signUpAccount,
+  trpcMutate,
+  trpcQuery,
+} from "./trpc";
 
 // ---------------------------------------------------------------------------
 // The lines the skill says verbatim (skills/guided-onboarding/SKILL.mdx)
@@ -124,6 +136,8 @@ const MODEL = "gpt-5";
  * The signed-in test user owns it, so every tRPC call this suite makes as
  * that user reaches it.
  */
+const FRESH_ACCOUNT_PASSWORD = "GuidedRun!2026";
+
 export async function seedGuidedOrganization({
   label,
   paths,
@@ -139,8 +153,22 @@ export async function seedGuidedOrganization({
   tour: GuidedKickoffTourStatus;
   withProvider?: boolean;
 }): Promise<GuidedOrganization> {
-  const cookie = await getSessionCookie();
   const stamp = Date.now().toString(36).slice(-5);
+  // A person of their own: the organization has exactly one member, this
+  // process, so no other session signed in on a shared account can land on
+  // it and send the kickoff first.
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  await signUpAccount({
+    name: `Riley ${label}`,
+    email: `riley+guided-${slug}-${stamp}@acme.test`,
+    password: FRESH_ACCOUNT_PASSWORD,
+  });
+  useAccount({
+    email: `riley+guided-${slug}-${stamp}@acme.test`,
+    password: FRESH_ACCOUNT_PASSWORD,
+  });
+  resetSessionCookie();
+  const cookie = await getSessionCookie();
   const orgName = `ACME ${label} ${stamp}`;
   const now = new Date().toISOString();
   const org = await trpcMutate<{
@@ -356,7 +384,32 @@ export async function queueGuidedKickoff({
       Record<string, unknown>
     >,
   });
+  if (!continuing) {
+    // The panel records the conversation the moment the transport names it,
+    // and the fixture does the same: between the seed and that record the
+    // organization owes a kickoff, and any other tab signed in on the account
+    // would send one of its own.
+    adapter.onConversationCreated = async (conversationId) => {
+      adapter.onConversationCreated = undefined;
+      await recordKickoffConversation({ org, conversationId });
+    };
+  }
   return input;
+}
+
+async function recordKickoffConversation({
+  org,
+  conversationId,
+}: {
+  org: GuidedOrganization;
+  conversationId: string;
+}): Promise<void> {
+  const cookie = await getSessionCookie();
+  await trpcMutate({
+    cookie,
+    path: "onboarding.attachConversation",
+    input: { organizationId: org.organizationId, conversationId },
+  });
 }
 
 /**
@@ -372,12 +425,7 @@ export async function attachKickoffConversation({
 }): Promise<string> {
   const conversationId = adapter.state.conversationId;
   if (!conversationId) throw new Error("the kickoff opened no conversation");
-  const cookie = await getSessionCookie();
-  await trpcMutate({
-    cookie,
-    path: "onboarding.attachConversation",
-    input: { organizationId: org.organizationId, conversationId },
-  });
+  await recordKickoffConversation({ org, conversationId });
   return conversationId;
 }
 

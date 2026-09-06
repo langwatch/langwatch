@@ -643,6 +643,13 @@ export type LangyAdapter = AgentAdapter & {
    */
   onUiAction?: (entry: UiActionEntry) => void;
   /**
+   * Called with the id of a conversation this adapter opens, before its first
+   * turn is streamed. The guided fixtures record the id on the organization
+   * here, the way the panel does as soon as the transport names it, so no
+   * other tab on the account sees an organization still owing its kickoff.
+   */
+  onConversationCreated?: (conversationId: string) => Promise<void> | void;
+  /**
    * Forget the conversation, so the next turn opens a new one.
    *
    * A replayed scenario has to start a NEW conversation. Carrying the old id
@@ -723,8 +730,11 @@ export function makeLangyAdapter(
         conversationId: string;
         turnId: string;
       }>({ cookie, path, input: body });
+      const opened = state.conversationId !== conversationId;
       state.conversationId = conversationId;
       state.currentTurnId = turnId;
+      if (opened)
+        await adapterWithState.onConversationCreated?.(conversationId);
 
       const segments: TurnSegment[] = [];
       const settledTools: SettledToolCall[] = [];
