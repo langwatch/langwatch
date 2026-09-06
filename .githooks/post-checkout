@@ -18,8 +18,8 @@ main_checkout="$(cd "$git_common_dir/.." && pwd)"
 worktree_root="$(git rev-parse --show-toplevel)"
 
 # Directories that may contain .env files. "." is the workspace root, where the
-# applications in apps/ resolve .env and .env.portless from — there is no
-# per-application .env any more.
+# applications in apps/ resolve .env from — there is no per-application .env
+# any more.
 env_dirs=("." "services/langevals" "sdks/python" "sdks/typescript" "mcp/typescript")
 
 copied=0

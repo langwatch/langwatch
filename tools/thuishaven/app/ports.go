@@ -24,8 +24,13 @@ type Proxy interface {
 	// on first run, so `haven up` self-bootstraps with no setup command at all.
 	// Idempotent; the CA trust is guarded so it does not re-prompt on every launch.
 	EnsureReady() error
-	// Install installs portless itself — `up`'s bootstrap when Installed() is
-	// false, so a fresh machine needs nothing but `haven up`.
+	// Version reports what the resolved binary says it is ("" when nothing is
+	// resolvable, or it will not answer), so `up` can tell the pinned version
+	// from another one without running an install to find out.
+	Version() string
+	// Install installs the pinned portless (domain.PortlessVersion) — `up`'s
+	// bootstrap when nothing is installed and its upgrade when the machine has a
+	// different version, so a fresh machine needs nothing but `haven up`.
 	Install() error
 	// Endpoint reports how the proxy is reachable (scheme, port) so URLs are
 	// correct on the default 443 or an unprivileged port.
@@ -39,8 +44,8 @@ type Proxy interface {
 	CACertPath() string
 }
 
-// Store persists everything under the thuishaven home dir plus the two
-// worktree-local files (the slug cache and the .env.portless overlay).
+// Store persists everything under the thuishaven home dir plus the worktree-local
+// files (the slug cache, the sticky selection and the HMR gate marker).
 type Store interface {
 	SaveStack(domain.Stack) error
 	RemoveStack(slug string)
@@ -52,7 +57,6 @@ type Store interface {
 	// runs here, surviving terminals and reboots. ok=false means never written.
 	ReadSelection(worktreeDir string) (domain.Selection, bool)
 	WriteSelection(worktreeDir string, sel domain.Selection) error
-	WriteOverlay(lwDir string, st domain.Stack) error
 	// HMR gate marker (worktree-local): expiry in unix-ms; 0/absent means no gate.
 	WriteHMRGate(lwDir string, expiryUnixMs int64) error
 	ReadHMRGate(lwDir string) (int64, bool)

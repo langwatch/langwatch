@@ -242,9 +242,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	}
 	o.linkObservability(ctx, &st)
 	st.UpdatedAt = o.sys.Now()
-	if err := o.store.WriteOverlay(p.WorktreeDir, st); err != nil {
-		return domain.Stack{}, nil, err
-	}
+	o.retireOverlayFiles(p.WorktreeDir)
 	if err := o.store.SaveStack(st); err != nil {
 		return domain.Stack{}, nil, err
 	}
@@ -303,17 +301,40 @@ func (o *Orchestrator) ensurePortlessProxy() error {
 	if o.cfg.PortlessDisabled {
 		return nil
 	}
-	if !o.proxy.Installed() {
-		fmt.Println("portless is not installed — installing it (one time)…")
-		if err := o.proxy.Install(); err != nil {
-			return fmt.Errorf("could not install portless automatically (%w) — install it by hand (npm install -g portless) and re-run `haven up`", err)
-		}
+	if err := o.ensurePortlessInstalled(); err != nil {
+		return err
 	}
 	if err := preflightPortlessCA(); err != nil {
 		return err
 	}
 	if err := o.proxy.EnsureReady(); err != nil {
 		return fmt.Errorf("could not start the portless proxy: %w", err)
+	}
+	return nil
+}
+
+// ensurePortlessInstalled brings the machine to the one pinned portless
+// version, saying in a single line what it did. Nothing to do is silent, so an
+// ordinary `up` stays quiet; an install or an upgrade that fails refuses the up
+// with the hand command that would fix it. Idempotent: the pinned version
+// already being present is the common path and runs npm not at all.
+func (o *Orchestrator) ensurePortlessInstalled() error {
+	switch domain.PlanPortless(o.proxy.Installed(), o.proxy.Version()) {
+	case domain.PortlessInstall:
+		fmt.Printf("portless is not installed — installing %s (one time)…\n", domain.PortlessPackage())
+	case domain.PortlessUpgrade:
+		fmt.Printf("portless %s is installed and haven pins %s — upgrading…\n",
+			o.proxy.Version(), domain.PortlessPackage())
+	case domain.PortlessUnknownVersion:
+		fmt.Printf("portless is installed but would not report its version — haven pins %s; leaving it alone\n",
+			domain.PortlessPackage())
+		return nil
+	case domain.PortlessReady:
+		return nil
+	}
+	if err := o.proxy.Install(); err != nil {
+		return fmt.Errorf("could not install %s automatically (%w) — install it by hand (npm install -g %s) and re-run `haven up`",
+			domain.PortlessPackage(), err, domain.PortlessPackage())
 	}
 	return nil
 }
@@ -892,7 +913,7 @@ func shellSingleQuoted(s string) string {
 // overlay would inherit, resolved at the child's real precedence (process env
 // over the merged dotenv layers).
 func (o *Orchestrator) guardInheritedSeedEnv(lwDir string) error {
-	return domain.GuardSeedTargets(domain.LoadDotenv(lwDir), os.Getenv)
+	return domain.GuardSeedTargets(nil, domain.LoadDotenv(lwDir), os.Getenv)
 }
 
 // hasEnvKey reports whether a KEY=VALUE slice already sets key.

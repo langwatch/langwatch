@@ -27,13 +27,14 @@ const here = import.meta.dirname;
 // runs in Node and needs access to flags like `LANGWATCH_DEV_HTTP2`.
 // The API process loads its own copy the same way; doing it here keeps both
 // processes reading from one source of truth.
+//
+// Under haven there is no second file to load: haven hands this process the
+// resolved app port and API hostname in its environment directly, and dotenv
+// does not override a variable the process already has, so `.env` fills the
+// gaps without ever clobbering the stack haven actually started.
 const rootEnvPath = path.resolve(here, "../../.env");
-const rootOverlayPath = path.resolve(here, "../../.env.portless");
 
 dotenv.config({ path: rootEnvPath, quiet: true });
-// Portless (haven) overlay wins: loaded after .env with override so the
-// resolved app port + api hostname take effect. Absent in non-portless runs.
-dotenv.config({ path: rootOverlayPath, override: true, quiet: true });
 
 const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;

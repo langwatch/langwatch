@@ -13,8 +13,9 @@ Read the "Local dev by hostname" section of the root `CLAUDE.md` first: it has
 `--agent` flag. `dev/haven.mk` and `tools/thuishaven/README.md` are the reference.
 Everything below is a failure mode that is not documented there.
 
-Run every command from the **workspace root**. `.env` and `.env.portless` are root-level;
-`.env.portless` is loaded last with `override: true`, so it beats `.env`.
+Run every command from the **workspace root**, where `.env` lives. haven's own
+resolved values are never written to a file: it injects them into every process
+it starts, and `eval "$(haven env)"` loads the same set into your shell.
 
 ## Before starting: is a stack already up?
 
@@ -134,7 +135,7 @@ stdout does not.
 
 The local-dev seed identity is documented in
 `packages/prisma-client/prisma/seed.ts`'s own header — not a secret. Sign-in only works
-against the origin the app is configured with (`.env.portless` sets `NEXTAUTH_URL` to the
+against the origin the app is configured with (haven sets `NEXTAUTH_URL` to the
 real `https://app.<slug>.langwatch.localhost:<port>`; auth is better-auth, but that
 variable is still what names the trusted origin, bound in
 `apps/api/src/platform/config/api.config.ts`). Hitting the app on raw `127.0.0.1:<port>`

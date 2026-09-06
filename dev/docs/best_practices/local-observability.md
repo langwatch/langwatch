@@ -27,8 +27,8 @@ local-dev orchestrator) owns its lifecycle. That buys three things a raw
   **2h**) plus a Prometheus size cap and a Loki ingestion-rate cap. Deriving from
   the image rather than vendoring means an image bump keeps upstream's defaults.
 - **Every worktree wires itself up automatically.** Once the stack is up, each
-  `pnpm dev` (i.e. `haven up`) writes the OTLP endpoint into that stack's
-  `.env.portless` overlay and tags its telemetry `langwatch.worktree=<slug>`. No
+  `pnpm dev` (i.e. `haven up`) hands the OTLP endpoint to every process in that
+  stack and tags its telemetry `langwatch.worktree=<slug>`. No
   `.env` surgery, and one shared collector serves every worktree — filter Grafana
   to `langwatch.worktree="<your-slug>"` to see only your own logs, traces and
   metrics. `make observability-connect` remains for the Grafana token wiring
@@ -82,8 +82,8 @@ performance investigation used to be a guess or a laptop reproduction that never
 quite matched. Pyroscope closes that gap: every process samples itself on a timer
 and pushes the samples, so a flame graph for any window is a query.
 
-It is on whenever the stack is. haven writes `PYROSCOPE_SERVER_ADDRESS` into
-`.env.portless` while Pyroscope is listening and omits it when it is not —
+It is on whenever the stack is. haven sets `PYROSCOPE_SERVER_ADDRESS` in every
+process it starts while Pyroscope is listening and omits it when it is not —
 absence is the off switch, and it is a real one: with nowhere to push to, no
 profiler starts, and in the TS app the native `@datadog/pprof` binding never even
 enters the boot graph. Override the port with `LW_OBS_PYROSCOPE_PORT`.

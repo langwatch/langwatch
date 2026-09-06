@@ -221,39 +221,12 @@ describe("plan-langy-lane.sh", () => {
     });
   });
 
-  describe("given the haven overlay also pins one", () => {
+  describe("given the env file clears the agent address", () => {
     describe("when the lane is planned", () => {
-      /** @scenario "The haven overlay wins over the plain env file for the agent address" */
-      it("resolves the overlay's address, the one the app loads last", () => {
+      /** @scenario "An env file that clears the agent address drops one exported for a single run" */
+      it("derives the port when the env file clears an exported address", () => {
         const appDir = appDirWith({
-          ".env": `LANGY_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
-          ".env.portless": 'LANGY_AGENT_URL="http://127.0.0.1:41234"\n',
-        });
-
-        const r = plan({ appDir });
-
-        expect(r.agentUrl).toBe("http://127.0.0.1:41234");
-        expect(r.port).toBe("41234");
-      });
-
-      /** @scenario "An overlay that clears the agent address is not read past" */
-      it("derives the port when the overlay clears the address", () => {
-        const appDir = appDirWith({
-          ".env": `LANGY_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
-          ".env.portless": "LANGY_AGENT_URL=\n",
-        });
-
-        const r = plan({ appDir, appPort: "5570" });
-
-        expect(r.port).toBe("5574");
-        expect(r.agentUrl).toBe("http://localhost:5574");
-      });
-
-      /** @scenario "An overlay that clears the agent address drops one exported for a single run" */
-      it("derives the port when the overlay clears an exported address", () => {
-        const appDir = appDirWith({
-          ".env": FULL_ENV,
-          ".env.portless": "LANGY_AGENT_URL=\n",
+          ".env": `LANGY_AGENT_URL=\n${FULL_ENV}`,
         });
 
         const r = plan({
@@ -334,17 +307,15 @@ describe("plan-langy-lane.sh", () => {
         expect(r.decision).toBe("start");
       });
 
-      /** @scenario "A setting only the haven overlay carries does not count as present" */
-      it("does not count a secret that only the haven overlay carries", () => {
+      /** @scenario "A setting the shell alone carries counts as present" */
+      it("counts a secret the shell exported, which the manager inherits", () => {
         const appDir = appDirWith({
           ".env": 'SESSIONS_ROOT="/tmp/s"\nLANGY_WORKSPACE_ROOT="/tmp/w"\n',
-          ".env.portless": 'LANGY_INTERNAL_SECRET="from-overlay"\n',
         });
 
-        const r = plan({ appDir });
+        const r = plan({ appDir, env: { LANGY_INTERNAL_SECRET: "from-shell" } });
 
-        expect(r.decision).toBe("skip");
-        expect(r.reason).toMatch(/LANGY_INTERNAL_SECRET/);
+        expect(r.decision).toBe("start");
       });
 
       /** @scenario "No Go toolchain skips the lane with the manual command" */

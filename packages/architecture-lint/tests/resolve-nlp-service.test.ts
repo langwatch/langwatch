@@ -4,9 +4,9 @@
  * Tests for dev/scripts/lib/resolve-nlp-service.sh, sourced the way
  * dev/scripts/dev-stack.sh sources it: before the launcher decides which
  * port to start the Go NLP engine on. The launcher runs ahead of every Node
- * entry point and sees only the calling shell, while the app loads .env (then
- * the .env.portless haven overlay) with override, so the helper has to read
- * those files to predict the address the app will actually dial.
+ * entry point and sees only the calling shell, while the app loads .env, so the
+ * helper has to read that file to predict the address the app will actually
+ * dial.
  *
  * See specs/setup/dev-nlp-engine-port.feature.
  *
@@ -147,36 +147,12 @@ describe("resolve-nlp-service.sh", () => {
     });
   });
 
-  describe("given a haven overlay alongside the env file", () => {
+  describe("given an env file that clears the address", () => {
     describe("when the launcher resolves the address", () => {
-      /** @scenario "The haven overlay wins over the plain env file" */
-      it("resolves the overlay's address, the one the app loads last", () => {
-        const appDir = appDirWith({
-          ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
-          ".env.portless": 'LANGWATCH_NLP_SERVICE="http://nlp.plum.langwatch.localhost"\n',
-        });
-
-        const r = runHelper({ appDir });
-
-        expect(r.nlpService).toBe("http://nlp.plum.langwatch.localhost");
-      });
-
-      /** @scenario "An overlay that clears the address is not read past" */
-      it("treats an empty overlay assignment as the answer, not as a gap", () => {
-        const appDir = appDirWith({
-          ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
-          ".env.portless": "LANGWATCH_NLP_SERVICE=\n",
-        });
-
-        const r = runHelper({ appDir });
-
-        expect(r.nlpService).toBe("");
-      });
-
-      /** @scenario "An overlay that clears the address drops one exported for a single run" */
+      /** @scenario "An env file that clears the address drops one exported for a single run" */
       it("clears an address the shell exported", () => {
         const appDir = appDirWith({
-          ".env.portless": "LANGWATCH_NLP_SERVICE=\n",
+          ".env": "LANGWATCH_NLP_SERVICE=\n",
         });
 
         const r = runHelper({

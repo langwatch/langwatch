@@ -49,6 +49,7 @@ func (stubProxy) Endpoint() (string, int)            { return "https", 443 }
 func (stubProxy) CACertPath() string                 { return "" }
 func (stubProxy) Shutdown() error                    { return nil }
 func (stubProxy) Install() error                     { return nil }
+func (stubProxy) Version() string                    { return domain.PortlessVersion }
 
 // The three Node lanes are the whole application, so all three are planned
 // unconditionally and each runs its own package's `dev` script from the

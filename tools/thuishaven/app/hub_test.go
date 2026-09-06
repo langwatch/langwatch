@@ -48,11 +48,10 @@ func (f *fakeStore) ReadSlugCache(dir string) (string, bool) {
 	s, ok := f.slugCache[dir]
 	return s, ok
 }
-func (f *fakeStore) WriteSlugCache(string, string) error     { return nil }
-func (f *fakeStore) WriteOverlay(string, domain.Stack) error { return nil }
-func (f *fakeStore) WriteHMRGate(string, int64) error        { return nil }
-func (f *fakeStore) ReadHMRGate(string) (int64, bool)        { return 0, false }
-func (f *fakeStore) ClearHMRGate(string)                     {}
+func (f *fakeStore) WriteSlugCache(string, string) error { return nil }
+func (f *fakeStore) WriteHMRGate(string, int64) error    { return nil }
+func (f *fakeStore) ReadHMRGate(string) (int64, bool)    { return 0, false }
+func (f *fakeStore) ClearHMRGate(string)                 {}
 func (f *fakeStore) TouchDBActivity(slug string) error {
 	f.touched = append(f.touched, slug)
 	if f.dbActivity == nil {
@@ -193,6 +192,7 @@ func (f *fakeProxy) Endpoint() (string, int)            { return "https", 443 }
 func (f *fakeProxy) CACertPath() string                 { return "" }
 func (f *fakeProxy) Shutdown() error                    { return nil }
 func (f *fakeProxy) Install() error                     { return nil }
+func (f *fakeProxy) Version() string                    { return domain.PortlessVersion }
 
 type fakeDBServer struct {
 	databases []string

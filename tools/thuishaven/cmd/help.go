@@ -68,7 +68,7 @@ UI and hit app.<slug>.langwatch.localhost/api for the API — one URL, not two.
 
 Postgres has no routed hostname: unlike ClickHouse (HTTP), it speaks its own
 wire protocol, which the HTTP proxy can't carry — "haven db url postgres" (or
-DATABASE_URL in .env.portless) is the real, loopback connection string.
+DATABASE_URL from "haven env") is the real, loopback connection string.
 
 Shared, machine-wide (one daemon, all worktrees):
 
@@ -81,8 +81,8 @@ Shared, machine-wide (one daemon, all worktrees):
 
 var envHelpText = `Environment variables.
 
-    Most of the knobs below also resolve from .env (then
-    .env.portless), so a lasting preference like "this machine runs native
+    Most of the knobs below also resolve from .env, so a lasting
+    preference like "this machine runs native
     ClickHouse, never provision one" lives next to the URL it belongs with and
     travels into every new worktree. An exported variable still wins, for
     overriding a single run.

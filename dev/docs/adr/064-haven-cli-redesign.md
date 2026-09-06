@@ -111,7 +111,7 @@ haven clean [--yes]   one interactive cleanup: worktrees, artifacts, idle DBs, o
 **Data retention.** A dev stack keeps only **7 days** by default so ClickHouse
 stays small and whole weekly partitions drop cleanly (the partition key is
 `toYearWeek`, so retention is always a whole number of weeks). haven pins it
-through `LANGWATCH_DEFAULT_RETENTION_DAYS=7` in `.env.portless`; the control
+through `LANGWATCH_DEFAULT_RETENTION_DAYS=7` in every process it starts; the control
 plane reads that override only outside production and **fails loud at start-up if
 it is ever set in prod**, where the platform default is fixed — lowering it there
 would silently expire customer data. Because a 7-day window would immediately

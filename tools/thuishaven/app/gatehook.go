@@ -47,7 +47,7 @@ func (o *Orchestrator) InstallFeature(name string) (bool, error) {
 // so this configures the developer's checkout without committing a hook into
 // everyone else's. The root comes from git's own toplevel, which in a worktree
 // resolves to that worktree — so each gets its own, matching the fact that
-// each already gets its own stack, slug and .env.portless.
+// each already gets its own stack and slug.
 func (o *Orchestrator) installGateHook() (bool, error) {
 	if o.cfg.RepoRoot == "" {
 		return false, fmt.Errorf("no repository root: run this from inside a checkout")

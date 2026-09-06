@@ -43,12 +43,10 @@ _langy_port_listening() { lsof -i ":$1" -sTCP:LISTEN >/dev/null 2>&1; }
 
 # True when the manager will have a value for the setting.
 #
-# This reads fewer files than the address does, and the difference is the point.
 # The address is resolved the way the APP reads it, because the app decides
-# where to dial, and the app loads the haven overlay. These settings are read by
-# the MANAGER, and `make service` sources .env alone. A value that lives only in
-# .env.portless would count as present here, start the lane, and the manager
-# would still exit for a missing setting, on every restart.
+# where to dial. These settings are read by the MANAGER, and `make service`
+# sources .env alone — which is the same file, so the two now agree by
+# construction rather than by this function reading one layer fewer.
 _langy_setting_present() {
   local var="$1" repo_root="$2"
   [ -n "${!var:-}" ] && return 0

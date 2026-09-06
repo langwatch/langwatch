@@ -149,7 +149,10 @@ want it says `haven up -idp` once. `haven idp` runs the simulator alone —
 no app, API or databases — routed machine-wide at `idp.langwatch.localhost`.
 
 **Automatic preparation.** `up` owns the whole path from a fresh machine to a
-running stack: portless install + CA trust, `pnpm install` when the lockfile
+running stack: portless install (pinned to one version, `domain.PortlessVersion`
+— haven installs it when it is missing, upgrades a machine that has another
+version, and does nothing when the pin is already there) + CA trust (once per
+machine, guarded by a marker so it never re-prompts), `pnpm install` when the lockfile
 changed, database create + migrate + seed, recovery of a wedged ClickHouse
 container (data kept), and content-addressed langy images — rebuilt only when
 the Dockerfile or a COPY source actually changed, pulled from CI when
@@ -296,11 +299,23 @@ like an auth or routing bug rather than a dead stack. haven does not restart
 what it did not start; `haven up` is the recovery, and it deregisters the dead
 entry's routes before it provisions.
 
-The resolved config lands in `.env.portless` **at the workspace root**, beside
-`.env` — where every application in `apps/` resolves both from. It is loaded
-**last, with `override: true`**, so it beats anything pinned in `.env`. Each
-supervised lane is also handed the same variables directly, so a lane never
-depends on the file having been read.
+The resolved config — hostnames, ports, database URLs, the seeded local
+identity — is never written to a file. Every process haven starts is handed it
+directly in its environment, which beats anything pinned in `.env` because a
+dotenv loader does not override a variable the process already has. For a
+person's own shell, and for a tool haven does not spawn:
+
+```bash
+eval "$(haven env)"     # this worktree's stack, in this terminal
+haven env --json        # the same set, machine-readable
+haven status            # shows what the stack resolved to, no eval needed
+```
+
+Keeping it in memory is deliberate: a dotenv file was a copy of state haven
+already holds, sitting in the checkout with the stack's database URLs and local
+access tokens in it, going stale the moment the stack came down. `haven up`
+deletes `.env.portless` and `.env.haven` if it finds either, and says so once;
+both stay in `.gitignore` so a stray file can never be committed.
 
 ### Why native processes, not kind/k8s (yet)
 

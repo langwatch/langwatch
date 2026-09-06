@@ -86,7 +86,8 @@ observability{,-connect,-down}` still work; they now front haven.
 
 Because haven already knows when the stack is up, it stops making the developer
 hand-tune `.env` and wires the console/Grafana split itself. When the collector
-is running, the overlay (`.env.portless`) additionally carries:
+is running, the environment haven injects into each process additionally
+carries:
 
 - `LOG_CONSOLE_LEVEL=warn` — the console shows only warnings/errors while
   `info`/`debug` flow to Loki (`LOG_OTEL_LEVEL=debug`, unchanged). This reverses

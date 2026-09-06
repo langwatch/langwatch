@@ -1,6 +1,6 @@
 // Package fileregistry implements app.Store on the filesystem: the cross-worktree
 // registry + daemon record under the thuishaven home dir, plus the two
-// worktree-local files (the slug cache and the .env.portless overlay).
+// worktree-local files (the slug cache, the sticky selection and the HMR gate).
 package fileregistry
 
 import (
@@ -188,15 +188,6 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 // renames it into place, so a reader never observes a partial file.
 func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return atomicfile.Write(path, data, perm)
-}
-
-// WriteOverlay writes .env.portless at the WORKSPACE ROOT — the directory every
-// application in apps/ resolves it from (apps/ui's Vite config loads
-// ../../.env.portless, and the api/worker start scripts pass the same path to
-// --env-file-if-exists). Mode 0o600: it carries LANGWATCH_API_KEY, so it must
-// not be world-readable.
-func (s *Store) WriteOverlay(repoDir string, st domain.Stack) error {
-	return os.WriteFile(filepath.Join(repoDir, ".env.portless"), []byte(st.OverlayFile()), 0o600)
 }
 
 // hmrGatePath is the marker the Vite HMR-gate plugin reads. The plugin resolves

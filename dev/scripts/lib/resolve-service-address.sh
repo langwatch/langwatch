@@ -10,11 +10,13 @@
 # port.
 #
 # Precedence mirrors the applications' own load order, because the goal is to
-# predict what they will resolve: .env.portless (the haven overlay, loaded last)
-# beats .env, and both beat the calling shell. Leaving the variable untouched
-# means nothing pinned an address, which is the caller's cue to derive its own.
+# predict what they will resolve: `.env` at the workspace root beats the calling
+# shell. Leaving the variable untouched means nothing pinned an address, which is
+# the caller's cue to derive its own.
 #
-# Both env layers live beside each other at the workspace root.
+# There is one file to read. Under haven the resolved address is injected into
+# each lane's environment rather than written to an overlay file, and this script
+# is the plain `pnpm dev` path, which haven does not run.
 #
 # Usage:
 #
@@ -39,7 +41,7 @@ resolve_service_address() {
   local label="${3:-$1}"
   local file value status
 
-  for file in "$repo_root/.env.portless" "$repo_root/.env"; do
+  for file in "$repo_root/.env"; do
     # `|| status=$?` keeps this out of `set -e`'s reach: a bare assignment from
     # a failing command substitution ends the caller's script.
     status=0

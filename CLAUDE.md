@@ -21,7 +21,7 @@ If no feature file exists for your task, create one before writing code.
 
 The product is four Node applications — `apps/ui` (the browser application, Vite), `apps/api` (tRPC + REST + SSE), `apps/worker` (queues, schedulers, projections) and `apps/tasks` (one-shot migrations and backfills, run before the API serves and on demand) — plus two Go services, `services/aigateway` and `services/nlpgo`. The three long-running ones always run: a stack missing one serves pages and quietly processes no jobs, which looks identical to a healthy one until a job was expected to have run.
 
-`.env` and haven's `.env.portless` overlay live at the **workspace root**. Every application resolves them from there (`apps/ui`'s Vite config loads `../../.env`; the api and worker start scripts pass the same path to `--env-file-if-exists`), so there is no per-application dotenv any more.
+`.env` lives at the **workspace root**. Every application resolves it from there (`apps/ui`'s Vite config loads `../../.env`; the api and worker start scripts pass the same path to `--env-file-if-exists`), so there is no per-application dotenv any more. haven's own resolved values — hostnames, ports, database URLs — are **not** a second file: it injects them into every process it starts, and `eval "$(haven env)"` puts the same set in your shell (`haven env --json` for a machine reader, `haven status` to just look at them).
 
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `.env` is the source of truth for everything else.
 
@@ -44,9 +44,8 @@ on `up`. `LANGY_UNSAFE_HOST_ACCESS=0` refuses that and keeps the sandboxed tier
 (langy then does not start without a runtime); `=1` still forces the host tier on
 a machine that does have one.
 
-haven resolves its own knobs from `.env` (then `.env.portless`) as
-well as the shell, so these travel with the worktree; an exported variable still
-wins for a single run. Postgres and Redis stay haven-managed either way: it
+haven resolves its own knobs from `.env` as well as the shell, so these travel
+with the worktree; an exported variable still wins for a single run. Postgres and Redis stay haven-managed either way: it
 starts them through brew, not a container.
 
 Tests follow the same rule. `pnpm test:unit` never needed a container, and
@@ -95,8 +94,9 @@ haven logs nlp -t       # tail one service's logs from any terminal
 Open `https://langwatch.localhost` for the cross-worktree dashboard;
 `observability.langwatch.localhost` proxies the local Grafana LGTM stack;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. haven's
-resolved config lands in `.env.portless` (loaded last with
-`override: true` so it beats `.env`). Agent-driving haven? Add `--agent` (or
+resolved config never touches disk — `eval "$(haven env)"` loads it into a
+shell, and `haven up` deletes a `.env.portless` or `.env.haven` an older haven
+left behind. Agent-driving haven? Add `--agent` (or
 `HAVEN_AGENT=1`) for plain, token-free output; `haven status --json` is
 machine-readable. See `tools/thuishaven/README.md`.
 

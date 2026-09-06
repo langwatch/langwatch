@@ -40,6 +40,9 @@ const sessionGroup = "session"
 type sessionActions struct {
 	Snapshot func() app.SessionReport
 	Restart  func(name string) (string, error)
+	// Down stops the whole stack. Nil on a viewer with no stop contract (the
+	// play sandbox, where quitting already destroys everything).
+	Down func() error
 }
 
 // runUpViewer opens the viewer on a stack's log files until quit or ctx
@@ -69,6 +72,7 @@ func (d deps) sessionActions(slug string) sessionActions {
 	return sessionActions{
 		Snapshot: func() app.SessionReport { return d.orch.SessionSnapshot(slug) },
 		Restart:  func(name string) (string, error) { return d.orch.RestartStackQuiet(slug, name) },
+		Down:     func() error { return d.orch.DownStack(context.Background(), slug) },
 	}
 }
 
@@ -82,6 +86,11 @@ func runViewer(ctx context.Context, m *viewerModel) error {
 }
 
 type viewerTickMsg struct{}
+
+// stopDoneMsg carries the outcome of stopping the stack back to the UI thread.
+// A failure keeps the viewer open with the reason on screen: quitting on a stop
+// that did not happen would leave the stack running with nothing watching it.
+type stopDoneMsg struct{ err error }
 
 // restartDoneMsg carries a bounce's outcome back to the UI thread so the toast
 // updates without the action blocking Update.
@@ -114,7 +123,10 @@ type viewerModel struct {
 	destroyOnQuit bool   // play's contract, for the dashboard footer copy
 	toast         string // transient action feedback
 	toastTTL      int    // refresh ticks the toast still shows for
-	tickN         int    // refresh counter, so the snapshot polls on a slow beat
+	// confirmStop is set by the first X and cleared by anything else, so the
+	// key that stops the stack always takes two deliberate presses.
+	confirmStop bool
+	tickN       int // refresh counter, so the snapshot polls on a slow beat
 
 	width, height int
 }
@@ -127,7 +139,7 @@ func newViewerModel(slug, combined, capDir string) *viewerModel {
 		groups:   []string{viewerAllGroup},
 		lines:    map[string][]string{},
 		offsets:  map[string]int64{},
-		banner:   fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · haven down stops\x1b[0m\n", slug),
+		banner:   fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · X stops it\x1b[0m\n", slug),
 	}
 }
 
@@ -157,6 +169,12 @@ func (m *viewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ingest()
 		m.refreshDashboard()
 		return m, viewerTick()
+	case stopDoneMsg:
+		if msg.err != nil {
+			m.setToast("stop failed: " + msg.err.Error())
+			return m, nil
+		}
+		return m, tea.Quit
 	case restartDoneMsg:
 		if msg.err != nil {
 			m.setToast("restart failed: " + msg.err.Error())
@@ -197,7 +215,12 @@ func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
 			return m, m.restartAll()
 		}
 	}
+	if s != "X" {
+		m.confirmStop = false
+	}
 	switch s {
+	case "X":
+		return m.handleStopKey()
 	case "esc":
 		// esc is the universal "back out of this screen" key, and on the play
 		// viewer quitting irreversibly destroys the sandbox — databases,
@@ -224,6 +247,26 @@ func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// handleStopKey is the two-press stop. `haven up` runs the stack in the
+// background and q only detaches, so without this the only way to stop what you
+// are looking at is to leave and type `haven down`. X is uppercase and asks
+// twice because it terminates every lane; it is inert on the play viewer, where
+// q already destroys the sandbox and a second stop key would only be ambiguous.
+func (m *viewerModel) handleStopKey() (tea.Model, tea.Cmd) {
+	if m.destroyOnQuit || m.session == nil || m.session.Down == nil {
+		return m, nil
+	}
+	if !m.confirmStop {
+		m.confirmStop = true
+		m.setToast("press X again to stop this stack (databases are kept)")
+		return m, nil
+	}
+	m.confirmStop = false
+	m.setToast("stopping…")
+	down := m.session.Down
+	return m, func() tea.Msg { return stopDoneMsg{err: down()} }
 }
 
 func (m *viewerModel) onDashboard() bool {
@@ -594,7 +637,7 @@ func (m *viewerModel) serversLine() string {
 }
 
 func (m *viewerModel) footerHint() string {
-	quit := "q detaches (stack keeps running)"
+	quit := "q detaches (stack keeps running) · X stops it"
 	if m.destroyOnQuit {
 		quit = "\x1b[31mq quits and DESTROYS the sandbox\x1b[0m"
 	}

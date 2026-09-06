@@ -308,6 +308,16 @@ var table = []commandSpec{
 		},
 	},
 	{
+		name:    "env",
+		summary: "print this stack's resolved environment: eval \"$(haven env)\" to load it in a shell",
+		flags: []flagSpec{
+			{long: "--json", summary: "machine-readable"},
+		},
+		run: func(_ context.Context, d deps, inv invocation) error {
+			return d.orch.Env(d.params, inv.has("--json"))
+		},
+	},
+	{
 		name:    "db",
 		summary: "this stack's data: reset [preset] (drop + migrate + seed) | seed [preset] (drops nothing) | url",
 		args:    "<reset|seed|url> [preset|engine]",

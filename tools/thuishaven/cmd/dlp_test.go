@@ -40,45 +40,38 @@ func TestShouldDisableGoogleDLPMatchesTheAppsBooleanRule(t *testing.T) {
 	})
 }
 
-// The opt-out is the one knob haven both reads and writes: it injects
-// LANGWATCH_DISABLE_GOOGLE_DLP=true into .env.portless, which LoadDotenv then
-// merges *after* .env. Resolving the operator's preference from the merged
-// layers therefore reads back haven's own previous answer, and a developer who
-// sets `false` in .env to exercise DLP locally can never win — the second
-// `haven up` sees the "true" it wrote itself and rewrites it forever.
+// The opt-out is the one knob haven both reads and writes, and the reason it
+// can be read from .env at all is that haven's overlay never reaches a file.
+// While it did, the second `haven up` read back the "true" it had written
+// itself, concluded the operator had asked for it, and rewrote it forever — so
+// a developer who set `false` in .env to exercise DLP locally could never win.
 //
 // @scenario "Local dev opts out of Google DLP by default"
-func TestOptingBackIntoDLPIsNotOverriddenByHavensOwnOverlay(t *testing.T) {
+func TestOptingBackIntoDLPWinsBecauseTheOverlayIsNotAFile(t *testing.T) {
 	const key = "LANGWATCH_DISABLE_GOOGLE_DLP"
 
 	repoRoot := t.TempDir()
 	writeFile(t, filepath.Join(repoRoot, ".env"), key+"=false\n")
+	// What an older haven left behind, and what a checkout hook could copy in.
+	// It must not be read: it is haven's own last answer, not the operator's.
 	writeFile(t, filepath.Join(repoRoot, ".env.portless"), key+"=true\n")
+	writeFile(t, filepath.Join(repoRoot, ".env.haven"), key+"=true\n")
 
-	t.Run("given the merged layers, haven reads back its own overlay", func(t *testing.T) {
-		merged := domain.LoadDotenv(repoRoot)
+	t.Run("given a retired overlay file sitting beside .env", func(t *testing.T) {
+		t.Run("when haven resolves its own knobs", func(t *testing.T) {
+			resolved := domain.LoadDotenv(repoRoot)
 
-		if got := merged[key]; got != "true" {
-			t.Fatalf("precondition failed: merged layers gave %q, want %q — "+
-				"if the overlay no longer wins, this test no longer guards anything", got, "true")
-		}
-		if !shouldDisableGoogleDLP(merged[key], true) {
-			t.Fatal("precondition failed: the overlay value should force DLP off")
-		}
-	})
-
-	// operatorEnvIn is the reader operatorEnvKnobs actually uses, so swapping it
-	// back to the merged layers fails here rather than passing quietly.
-	t.Run("when the operator env reader is consulted", func(t *testing.T) {
-		operator := operatorEnvIn(repoRoot)
-
-		value, isSet := operator[key]
-		if !isSet {
-			t.Fatalf("%s should have been read from .env", key)
-		}
-		if shouldDisableGoogleDLP(value, isSet) {
-			t.Error("an operator who set false in .env must be able to exercise DLP locally")
-		}
+			value, isSet := resolved[key]
+			if !isSet {
+				t.Fatalf("%s should have been read from .env", key)
+			}
+			if value != "false" {
+				t.Fatalf("resolved %q from the dotenv layers, want %q — a retired overlay must never be read back", value, "false")
+			}
+			if shouldDisableGoogleDLP(value, isSet) {
+				t.Error("an operator who set false in .env must be able to exercise DLP locally")
+			}
+		})
 	})
 }
 

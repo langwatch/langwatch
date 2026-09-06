@@ -130,9 +130,8 @@ type deps struct {
 func wire(logger *zap.Logger, isAgent bool) deps {
 	cwd, _ := os.Getwd()
 	// The workspace root is the whole of the "where does haven run things"
-	// answer now: every lane is `pnpm --filter <package>` from here, the
-	// .env/.env.portless layers live here, and there is no single application
-	// directory left to point at.
+	// answer now: every lane is `pnpm --filter <package>` from here, .env lives
+	// here, and there is no single application directory left to point at.
 	worktree := gitTopLevel(cwd)
 
 	naming := domain.DefaultNaming(devEnv("LANGWATCH_LOCAL_TLD"))
@@ -179,18 +178,14 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		obsConsoleLevel = ""
 	}
 
-	// Resolved through the operator's own .env, not the full dotenv layering: the
-	// overlay haven writes is loaded last with override:true, so a knob read only
-	// from the shell would let haven's default beat a .env line that
-	// says otherwise — and the opt-in would silently not work.
-	//
-	// It must exclude .env.portless specifically, because this is the one knob
-	// haven itself writes there (domain.Stack.OverlayEnv). Reading the merged
-	// layers means that from the second `haven up` onward haven is reading back
-	// its own output: it sees the "true" it wrote last time, concludes the
-	// operator asked for it, and rewrites it — so a `.env` opt-in can never win
-	// no matter how many times you set it. An overlay is output, not input.
-	disableDLP, disableDLPSet := operatorEnvLookup("LANGWATCH_DISABLE_GOOGLE_DLP")
+	// Resolved through the operator's own .env as well as the shell, because a
+	// knob read only from the shell would let haven's default beat a .env line
+	// that says otherwise — and the opt-in would silently not work. This is the
+	// one knob haven both reads and writes, and it can be read from .env safely
+	// only because haven's overlay is never written to a file: there is no
+	// output of haven's for this to read back as if it were the operator's
+	// preference.
+	disableDLP, disableDLPSet := dotenvLookup("LANGWATCH_DISABLE_GOOGLE_DLP")
 
 	cfg := app.Config{
 		Naming:  naming,
@@ -778,7 +773,7 @@ func runUpgrade(ctx context.Context, d deps, _ invocation) error {
 }
 
 // devEnv reads one of haven's own knobs: the process environment first, then
-// the merged dotenv layers (.env, then .env.portless).
+// the operator's .env at the workspace root.
 //
 // The same precedence Prisma and tsx give the app's settings, and for the same
 // reason: a preference like "never manage ClickHouse, this machine runs a
@@ -843,38 +838,9 @@ func dotenvKnobs() map[string]string {
 	return dotenvVars
 }
 
-// operatorEnvLookup is dotenvLookup restricted to files a human wrote: the
-// process environment and .env, never the .env.portless overlay haven
-// generates. Use it for any knob haven also *writes*, so that reading a
-// preference cannot pick up haven's own last answer instead of the operator's.
-func operatorEnvLookup(key string) (string, bool) {
-	return resolveKnob(key, os.LookupEnv, operatorEnvKnobs)
-}
-
-// operatorEnvKnobs loads only .env — deliberately not the overlay.
-func operatorEnvKnobs() map[string]string {
-	operatorEnvOnce.Do(func() {
-		cwd, _ := os.Getwd()
-		operatorEnvVars = operatorEnvIn(gitTopLevel(cwd))
-	})
-	return operatorEnvVars
-}
-
-// operatorEnvIn reads the operator-authored .env in lwDir and nothing else.
-// Split out from operatorEnvKnobs so the "and nothing else" half is reachable
-// from a test: pointed at a directory holding both files, it must still not see
-// .env.portless.
-func operatorEnvIn(lwDir string) map[string]string {
-	env := map[string]string{}
-	domain.ReadEnvFile(filepath.Join(lwDir, ".env"), env)
-	return env
-}
-
 var (
-	dotenvOnce      sync.Once
-	dotenvVars      map[string]string
-	operatorEnvOnce sync.Once
-	operatorEnvVars map[string]string
+	dotenvOnce sync.Once
+	dotenvVars map[string]string
 )
 
 // envTruthy reports whether an env var is set to a common "on" value. Accepts the

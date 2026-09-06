@@ -66,13 +66,20 @@ func GuardLocalDatabaseURL(rawURL, wantUser string) error {
 type EnvLookup func(string) string
 
 // GuardSeedTargets refuses to seed when either database URL the seed child will
-// actually connect to points anywhere but local dev. dotenv holds the merged
-// .env + .env.portless values; getenv resolves the process environment, which
-// wins — exactly the precedence the seed child sees (Prisma/tsx read the process
-// environment over the dotenv file), so the env this guard validates and the env
-// the seed connects to are provably the same.
-func GuardSeedTargets(dotenv map[string]string, getenv EnvLookup) error {
+// actually connect to points anywhere but local dev.
+//
+// The three layers are resolved in the seed child's own precedence, which is
+// what makes the environment this guard validates provably the same one the
+// seed connects to: overlay first (haven hands the child these explicitly, so
+// they win over anything it inherits), then the process environment, then .env.
+// overlay is nil when no stack is registered, which is exactly when the child
+// would inherit its URLs instead.
+func GuardSeedTargets(overlay []string, dotenv map[string]string, getenv EnvLookup) error {
+	injected := EnvMap(overlay)
 	resolve := func(key string) string {
+		if v := injected[key]; v != "" {
+			return v
+		}
 		if getenv != nil {
 			if v := getenv(key); v != "" {
 				return v
@@ -89,15 +96,14 @@ func GuardSeedTargets(dotenv map[string]string, getenv EnvLookup) error {
 	return nil
 }
 
-// LoadDotenv merges .env then .env.portless from repoDir into a single map (later
-// files override earlier ones, matching the app's own load order). It is the
-// shared entry point both cmd (the `haven seed` guard) and app (the always-seed
-// on `haven up`) use so they validate one, identical view of the dotenv layers.
+// LoadDotenv reads the operator-authored .env at repoDir. It is the one dotenv
+// layer there is: haven's own overlay is never written to disk, so a caller
+// that needs it asks the registered stack for it (Stack.OverlayEnv) rather than
+// reading a file back. Shared by cmd (the `haven db` guard) and app (the
+// always-seed on `haven up`) so both validate one identical view.
 func LoadDotenv(repoDir string) map[string]string {
 	env := map[string]string{}
-	for _, name := range []string{".env", ".env.portless"} {
-		ReadEnvFile(filepath.Join(repoDir, name), env)
-	}
+	ReadEnvFile(filepath.Join(repoDir, ".env"), env)
 	return env
 }
 

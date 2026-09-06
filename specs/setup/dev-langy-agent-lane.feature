@@ -30,8 +30,7 @@ Feature: `pnpm dev` starts the Langy agent manager
   Rule: The manager starts on the address the app dials
 
     # The launcher runs before every Node entry point and sees only the
-    # calling shell, while the applications load .env and then the
-    # .env.portless haven overlay with override. A pinned agent URL is
+    # calling shell, while the applications load .env. A pinned agent URL is
     # therefore invisible to the launcher and authoritative for the app, the
     # same split the NLP engine had.
 
@@ -42,13 +41,6 @@ Feature: `pnpm dev` starts the Langy agent manager
       When the launcher resolves the agent address
       Then it resolves to the pinned port 8080
       And it says which file that came from
-
-    @unit
-    Scenario: The haven overlay wins over the plain env file for the agent address
-      Given .env pins one agent URL
-      And the haven overlay pins another
-      When the launcher resolves the agent address
-      Then it resolves to the overlay's address, the one the app loads last
 
     @unit
     Scenario: An agent address pinned in a file beats one exported for a single run
@@ -64,17 +56,9 @@ Feature: `pnpm dev` starts the Langy agent manager
       Then it leaves the address unset for the launcher to derive from the port
 
     @unit
-    Scenario: An overlay that clears the agent address is not read past
-      Given .env pins the agent URL
-      And the haven overlay assigns it an empty value
-      When the launcher resolves the agent address
-      Then it derives the port slot, because the app reads the empty overlay too
-      And it does not fall back to the address in the plain env file
-
-    @unit
-    Scenario: An overlay that clears the agent address drops one exported for a single run
+    Scenario: An env file that clears the agent address drops one exported for a single run
       Given an agent URL exported into the shell
-      And the haven overlay assigns the agent URL an empty value
+      And .env assigns the agent URL an empty value
       When the launcher resolves the agent address
       Then it derives the port slot, because the file beats the exported value
 
@@ -128,15 +112,14 @@ Feature: `pnpm dev` starts the Langy agent manager
       And the reason names the missing setting
 
     @unit
-    Scenario: A setting only the haven overlay carries does not count as present
-      Given the Langy secret is only in the haven overlay, not in the app's env file
+    Scenario: A setting the shell alone carries counts as present
+      Given the Langy secret is exported into the shell, not in the app's env file
       When the launcher plans the langy lane
-      Then the lane is skipped
-      And the reason names the missing setting
-      # The manager reads its settings from the app's env file alone, so a value
-      # that lives only in the overlay would start a lane that cannot boot. The
-      # agent address is resolved from the overlay on purpose, because the app
-      # reads the overlay to decide where to dial.
+      Then the lane starts
+      # `make service` inherits the calling shell, so an exported secret is one
+      # the manager will actually have. There is no third place for a setting to
+      # hide any more: haven injects its own values into the processes it starts
+      # rather than writing them to a file this launcher could read.
 
     @unit
     Scenario: No Go toolchain skips the lane with the manual command

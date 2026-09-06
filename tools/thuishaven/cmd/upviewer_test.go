@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -361,3 +362,104 @@ func TestEscDoesNotDestroyAPlaySandbox(t *testing.T) {
 		})
 	})
 }
+
+// `haven up` leaves the stack running in the background and q only detaches, so
+// the viewer needs a way to stop what it is showing. It takes two presses of an
+// uppercase key, because it terminates every lane.
+func TestStopKeyStopsTheStack(t *testing.T) {
+	newStopViewer := func(t *testing.T, stops *int, err error) *viewerModel {
+		t.Helper()
+		m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+		m.enableDashboard(sessionActions{
+			Snapshot: func() app.SessionReport { return app.SessionReport{} },
+			Down:     func() error { *stops++; return err },
+		}, false)
+		return m
+	}
+
+	t.Run("given the up viewer is open", func(t *testing.T) {
+		t.Run("when X is pressed once", func(t *testing.T) {
+			stops := 0
+			m := newStopViewer(t, &stops, nil)
+
+			_, cmd := m.handleKey("X")
+
+			if cmd != nil {
+				t.Fatal("one press must not stop the stack")
+			}
+			if stops != 0 {
+				t.Fatalf("stopped %d times on the first press", stops)
+			}
+			if m.toast == "" {
+				t.Error("the first press must say what the second one will do")
+			}
+		})
+
+		t.Run("when X is pressed twice", func(t *testing.T) {
+			stops := 0
+			m := newStopViewer(t, &stops, nil)
+
+			m.handleKey("X")
+			_, cmd := m.handleKey("X")
+			if cmd == nil {
+				t.Fatal("the second press must stop the stack")
+			}
+			msg := cmd()
+			if stops != 1 {
+				t.Fatalf("stopped %d times, want 1", stops)
+			}
+			if done, ok := msg.(stopDoneMsg); !ok || done.err != nil {
+				t.Fatalf("expected a clean stopDoneMsg, got %#v", msg)
+			}
+		})
+
+		t.Run("when another key comes between the two presses", func(t *testing.T) {
+			stops := 0
+			m := newStopViewer(t, &stops, nil)
+
+			m.handleKey("X")
+			m.handleKey("tab")
+			_, cmd := m.handleKey("X")
+
+			if cmd != nil {
+				t.Fatal("an intervening key must cancel the confirmation, not arm it")
+			}
+			if stops != 0 {
+				t.Fatalf("stopped %d times without a confirmed second press", stops)
+			}
+		})
+	})
+
+	t.Run("given the play viewer, where q already destroys the sandbox", func(t *testing.T) {
+		t.Run("when X is pressed", func(t *testing.T) {
+			stops := 0
+			m := newViewerModel("play-1", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+			m.enableDashboard(sessionActions{
+				Snapshot: func() app.SessionReport { return app.SessionReport{} },
+				Down:     func() error { stops++; return nil },
+			}, true)
+
+			m.handleKey("X")
+			m.handleKey("X")
+
+			if stops != 0 {
+				t.Fatalf("the play viewer has one quit contract; X stopped it %d times", stops)
+			}
+		})
+	})
+}
+
+// A stop that failed must keep the viewer open with the reason on screen:
+// quitting anyway would leave the stack running with nothing watching it.
+func TestFailedStopKeepsTheViewerOpen(t *testing.T) {
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	_, cmd := m.Update(stopDoneMsg{err: errStopFailed})
+	if cmd != nil {
+		t.Fatal("a failed stop must not quit the viewer")
+	}
+	if !strings.Contains(m.toast, "stop failed") {
+		t.Errorf("toast = %q, want the failure named", m.toast)
+	}
+}
+
+var errStopFailed = errors.New("no registered stack \"feat-x\"")

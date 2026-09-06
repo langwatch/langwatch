@@ -288,10 +288,11 @@ unconditionally — there is no mode in which one of them is unbound.
 - One more local process than the 2026-07 default, and it is the honest one:
   a dev stack that boots and processes no jobs is no longer reachable by
   configuration.
-- The contributor source of truth is the **workspace-root `.env`**, with
-  haven's `.env.portless` overlay beside it. Every application resolves both
-  from there. A checkout upgrading across this change moves its own file:
-  `mv platform/app/.env .env`.
+- The contributor source of truth is the **workspace-root `.env`**. Every
+  application resolves it from there. haven's own resolved values are not a
+  second file: it injects them into each process it starts, and `haven env`
+  prints them for a shell. A checkout upgrading across this change moves its own
+  file: `mv platform/app/.env .env`.
 - The migration lane the compose stack runs moved to the api service, which
   owns the schema: Prisma deploy then the ClickHouse task, once, before the
   process starts. The ui lane waits on it, so a browser never loads the SPA

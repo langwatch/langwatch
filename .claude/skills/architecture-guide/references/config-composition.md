@@ -2,7 +2,8 @@
 
 ## Config
 
-One `.env` at the workspace root (plus haven's `.env.portless` overlay). Each process
+One `.env` at the workspace root (haven injects its own resolved values straight
+into the processes it starts; `haven env` prints them for a shell). Each process
 loads it through its own start script (`--env-file-if-exists=../../.env`) and validates
 its own definition at boot. Feature code never reads `process.env`; it receives values
 from the composition root.

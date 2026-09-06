@@ -154,11 +154,10 @@ fi
 # engine without a second terminal. It binds the port the api lane dials via
 # LANGWATCH_NLP_SERVICE: that port when it points at loopback, otherwise PORT+1.
 #
-# The address has to come out of the env files, not just the shell: the Node
-# entry points load `.env` (then the `.env.portless` overlay) AFTER this script
-# runs, so a pinned LANGWATCH_NLP_SERVICE is what the api lane dials while this
-# shell sees nothing at all. Reading it here is what keeps engine and caller on
-# one port.
+# The address has to come out of `.env`, not just the shell: the Node entry
+# points load it AFTER this script runs, so a pinned LANGWATCH_NLP_SERVICE is
+# what the api lane dials while this shell sees nothing at all. Reading it here
+# is what keeps engine and caller on one port.
 START_NLP_COMMAND=""
 if [ "${LANGWATCH_SKIP_NLP:-}" != "1" ]; then
   # shellcheck source=./lib/resolve-nlp-service.sh

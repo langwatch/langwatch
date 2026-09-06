@@ -12,7 +12,7 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 
 3. **Origin mismatch kills auth** — the trusted origin comes from `NEXTAUTH_URL`
    (bound in `apps/api/src/platform/config/api.config.ts`; auth itself is better-auth).
-   It must match the origin you are browsing. Under haven, `.env.portless` sets it to the
+   It must match the origin you are browsing. Under haven it is set to the
    real `https://app.<slug>.langwatch.localhost:<port>`, so browsing the app on
    `127.0.0.1` will 403 the sign-in. Under a plain `pnpm dev`, `PORT` must match.
 

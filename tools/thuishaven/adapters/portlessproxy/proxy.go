@@ -4,6 +4,7 @@
 package portlessproxy
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -150,17 +151,35 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-// Install installs portless globally via npm — the bootstrap `haven up` runs
-// on a machine that has never had it. Output is inherited so the (possibly
-// slow) install is visible rather than a silent hang.
+// Version reports what the resolved portless binary says it is, or "" when
+// nothing is resolvable or it will not answer. Never runs the `npx` fallback:
+// that would download a package just to ask its version.
+func (p *Proxy) Version() string {
+	bin, ok := p.resolveBinary()
+	if !ok {
+		return ""
+	}
+	out, err := exec.CommandContext(context.Background(), bin, "--version").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// Install installs the pinned portless globally via npm — the bootstrap `haven
+// up` runs on a machine that has never had it, and the upgrade it runs when the
+// machine has a different one. The version comes from domain.PortlessVersion,
+// the single place it is recorded. Output is inherited so the (possibly slow)
+// install is visible rather than a silent hang.
 func (p *Proxy) Install() error {
 	if _, err := exec.LookPath("npm"); err != nil {
 		return fmt.Errorf("npm is not on PATH — install Node first (brew install node)")
 	}
-	cmd := exec.Command("npm", "install", "-g", "portless")
+	pkg := domain.PortlessPackage()
+	cmd := exec.CommandContext(context.Background(), "npm", "install", "-g", pkg)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("npm install -g portless: %w", err)
+		return fmt.Errorf("npm install -g %s: %w", pkg, err)
 	}
 	return nil
 }

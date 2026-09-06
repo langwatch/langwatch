@@ -869,7 +869,7 @@ func EnsurePlayCheckout(ctx context.Context, repoRoot string, number int, checko
 
 // playEnvDirs mirrors the directories .githooks/post-checkout copies .env files
 // into. The workspace root is the first of them: it is where the applications
-// in apps/ resolve .env and .env.portless from.
+// in apps/ resolve .env from.
 var playEnvDirs = []string{".", "services/langevals", "sdks/python", "sdks/typescript", "mcp/typescript"}
 
 // StripInheritedEnvFiles removes every untracked .env* file from a play checkout.
@@ -1029,11 +1029,8 @@ func newPlayPorts(free []int) playPorts {
 // proxy that serves its hostnames and the container runtime that holds its
 // dedicated databases. It returns the DOCKER_HOST addressing that runtime.
 func (o *Orchestrator) ensurePlayRuntime(ctx context.Context) (string, error) {
-	if !o.proxy.Installed() {
-		fmt.Println("portless is not installed: installing it (one time)…")
-		if err := o.proxy.Install(); err != nil {
-			return "", fmt.Errorf("could not install portless automatically (%w)", err)
-		}
+	if err := o.ensurePortlessInstalled(); err != nil {
+		return "", err
 	}
 	if err := o.proxy.EnsureReady(); err != nil {
 		return "", fmt.Errorf("could not start the portless proxy: %w", err)
@@ -1113,9 +1110,7 @@ func (o *Orchestrator) registerPlayStack(pl PlaySandbox, ports playPorts) (domai
 		o.log.Warn("play clickhouse alias registration failed")
 	}
 	st.UpdatedAt = o.sys.Now()
-	if err := o.store.WriteOverlay(pl.Checkout, st); err != nil {
-		return st, err
-	}
+	o.retireOverlayFiles(pl.Checkout)
 	if err := o.store.SaveStack(st); err != nil {
 		return st, err
 	}
