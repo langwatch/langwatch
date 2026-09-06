@@ -173,6 +173,11 @@ type CanonicalProvider = {
    * scope says which organization, team or project a provider belongs to, never anything about its credentials.
    */
   scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+  /**
+   * The operator's own skip-permissions list, or null when the provider's registry default applies (ADR-129). The drawer seeds its field from
+   * the listed row, so narrowing it away made a saved list read back as the default on reopen.
+   */
+  langySkipPermissionsModels?: string[] | null;
 };
 
 /**
@@ -202,6 +207,7 @@ function toLegacyProvider(provider: CanonicalProvider): ModelProviderListEntry {
       displayName: model.label,
       mode: "embedding" as const,
     })),
+    langySkipPermissionsModels: provider.langySkipPermissionsModels ?? null,
   };
 }
 
@@ -365,6 +371,7 @@ export class ModelProviderTrpcApi {
                     | Record<string, unknown>
                     | null
                     | undefined,
+                  langySkipPermissionsModels: input.langySkipPermissionsModels,
                 },
                 ctx.actor(),
               );

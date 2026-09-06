@@ -329,6 +329,7 @@ export class ModelProviderCommandService {
         parsed.providerConfig === undefined
           ? (existing?.providerConfig ?? null)
           : parsed.providerConfig,
+      langySkipPermissionsModels: skipPermissionsForWrite(parsed, existing),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });
@@ -459,4 +460,23 @@ export class ModelProviderCommandService {
 
 function humanize(provider: string): string {
   return provider.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+/**
+ * The skip-permissions list this write stores. Omitting the field leaves the
+ * stored list alone; an empty list is a cleared field, and a cleared field
+ * means the provider's registry default applies, so it is stored as null
+ * rather than as an empty array that would read as "trust nothing".
+ */
+function skipPermissionsForWrite(
+  parsed: ModelProviderWriteInput,
+  existing: ModelProvider | null,
+): string[] | null {
+  if (parsed.langySkipPermissionsModels === undefined) {
+    return existing?.langySkipPermissionsModels ?? null;
+  }
+
+  return (parsed.langySkipPermissionsModels?.length ?? 0) > 0
+    ? (parsed.langySkipPermissionsModels ?? null)
+    : null;
 }

@@ -282,6 +282,9 @@ describe("ModelProviderTrpcApi", () => {
         embeddingsModels: null,
         customModels: [{ modelId: "my-model", displayName: "My Model", mode: "chat" }],
         customEmbeddingsModels: [],
+        // A row with no operator list travels as null, which is what tells the
+        // drawer the provider's registry default applies.
+        langySkipPermissionsModels: null,
       });
     });
   });

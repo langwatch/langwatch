@@ -19,6 +19,7 @@ function serviceWith(
   } = {},
 ) {
   const created: unknown[] = [];
+  const updated: unknown[] = [];
   const found: unknown[] = [];
   const repository = {
     tryFindById: async (input: unknown) => {
@@ -27,6 +28,10 @@ function serviceWith(
     },
     create: async (input: unknown) => {
       created.push(input);
+      return input;
+    },
+    update: async (input: unknown) => {
+      updated.push(input);
       return input;
     },
   };
@@ -48,6 +53,7 @@ function serviceWith(
 
   return {
     created,
+    updated,
     found,
     service: ModelProviderCommandService.create({
       repository,
@@ -116,6 +122,92 @@ describe("ModelProviderCommandService.upsert — skip-permissions patterns", () 
         } as never);
 
         expect(created).toHaveLength(1);
+      });
+    });
+  });
+});
+
+describe("ModelProviderCommandService.upsert — the list that reaches the repository", () => {
+  function storedProvider(langySkipPermissionsModels: string[] | null) {
+    return {
+      id: "provider-1",
+      organizationId: "organization-1",
+      provider: "openai",
+      name: "OpenAI",
+      enabled: true,
+      routingHandle: null,
+      scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+      customKeys: null,
+      customModels: [],
+      customEmbeddingsModels: [],
+      extraHeaders: [],
+      rateLimitRpm: null,
+      rateLimitTpm: null,
+      rateLimitRpd: null,
+      fallbackPriorityGlobal: null,
+      providerConfig: null,
+      langySkipPermissionsModels,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  describe("given a create naming two patterns", () => {
+    describe("when the provider is saved", () => {
+      /** @scenario "A stored list replaces the provider default" */
+      it("writes both patterns onto the row", async () => {
+        const { service, created } = serviceWith();
+
+        await service.upsert({
+          projectId: "project-1",
+          provider: "openai",
+          enabled: true,
+          scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+          langySkipPermissionsModels: ["^gpt-9$", "^gpt-10$"],
+        } as never);
+
+        expect(
+          (created[0] as { langySkipPermissionsModels: unknown }).langySkipPermissionsModels,
+        ).toEqual(["^gpt-9$", "^gpt-10$"]);
+      });
+    });
+  });
+
+  describe("given a provider that already holds a list", () => {
+    describe("when the write names an empty list", () => {
+      /** @scenario "Clearing the list returns the provider to its default" */
+      it("clears the row, so the registry default applies again", async () => {
+        const { service, updated } = serviceWith({ existing: storedProvider(["^gpt-9$"]) });
+
+        await service.upsert({
+          id: "provider-1",
+          projectId: "project-1",
+          provider: "openai",
+          enabled: true,
+          langySkipPermissionsModels: [],
+        } as never);
+
+        expect(
+          (updated[0] as { langySkipPermissionsModels: unknown }).langySkipPermissionsModels,
+        ).toBeNull();
+      });
+    });
+
+    describe("when the write does not name the list", () => {
+      /** @scenario "A stored list replaces the provider default" */
+      it("leaves the stored patterns alone", async () => {
+        const { service, updated } = serviceWith({ existing: storedProvider(["^gpt-9$"]) });
+
+        await service.upsert({
+          id: "provider-1",
+          projectId: "project-1",
+          provider: "openai",
+          enabled: false,
+        } as never);
+
+        expect(
+          (updated[0] as { langySkipPermissionsModels: unknown }).langySkipPermissionsModels,
+        ).toEqual(["^gpt-9$"]);
       });
     });
   });

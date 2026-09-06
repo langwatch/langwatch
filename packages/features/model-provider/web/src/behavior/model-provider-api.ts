@@ -132,6 +132,8 @@ export type ModelProviderApiMap = {
           rateLimitRpd?: number | null;
           fallbackPriorityGlobal?: number | null;
           providerConfig?: Record<string, unknown> | null;
+          /** The models allowed to skip Langy's permission checks, as regular expression sources (ADR-129). */
+          langySkipPermissionsModels?: string[] | null;
         };
         output: ModelProviderListEntry;
       };

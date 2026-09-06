@@ -51,6 +51,16 @@ export const modelProviderListEntrySchema = z
     embeddingsModels: z.array(z.string()).nullable(),
     customModels: z.array(customModelEntrySchema),
     customEmbeddingsModels: z.array(customModelEntrySchema),
+    /**
+     * The operator's own list of models allowed to skip Langy's permission
+     * checks, as regular expression sources, or null when the provider's
+     * registry default applies (ADR-129). Carried because the drawer seeds its
+     * field from the listed row — narrowing it away left the field empty on
+     * reopen, so a saved list read back as the default. Optional as well as
+     * nullable because an absent field and a null one say the same thing, and
+     * every test fixture that predates the column means the default.
+     */
+    langySkipPermissionsModels: z.array(z.string()).nullable().optional(),
     /** See the docblock: carried by the domain, dropped by the projection. */
     isSystem: z.boolean().optional(),
   })
