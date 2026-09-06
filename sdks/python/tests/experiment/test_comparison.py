@@ -131,8 +131,8 @@ def judge(monkeypatch) -> _Judge:
         def get_span_context(self) -> _FakeSpanContext:
             return _FakeSpanContext()
 
-    monkeypatch.setattr(langwatch.evaluation.httpx, "Client", _FakeClient)
-    monkeypatch.setattr(langwatch.evaluation.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(langwatch.evaluation, "create_client", _FakeClient)
+    monkeypatch.setattr(langwatch.evaluation, "create_async_client", _FakeAsyncClient)
     monkeypatch.setattr(
         langwatch.evaluation, "get_endpoint", lambda: "https://app.langwatch.test"
     )

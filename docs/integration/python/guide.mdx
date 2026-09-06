@@ -206,7 +206,10 @@ langwatch.setup(
 
 <ParamField path="endpoint_url" type="str | None">
   The LangWatch endpoint URL. Defaults to the `LANGWATCH_ENDPOINT` environment
-  variable or `https://app.langwatch.ai`.
+  variable or `https://app.langwatch.ai`. An `http://` endpoint that answers
+  with a redirect to the same `https://` URL is upgraded automatically, with one
+  warning per process. Any other redirect raises
+  `langwatch.http_client.RedirectRefusedError`: set the endpoint to the final URL.
 </ParamField>
 
 <ParamField path="base_attributes" type="dict[str, Any] | None">
