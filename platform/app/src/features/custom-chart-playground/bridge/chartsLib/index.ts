@@ -85,19 +85,26 @@ type MetricFormat = "number" | "currency" | "percent" | "duration";
 
 /** True when a value is missing or not a usable number (null/undefined/NaN). */
 function isMissingNumber(value: unknown): boolean {
-  return value === null || value === undefined || (typeof value === "number" && isNaN(value));
+  return (
+    value === null ||
+    value === undefined ||
+    (typeof value === "number" && isNaN(value))
+  );
 }
 
 function formatNumber(value: number | null | undefined): string {
   if (isMissingNumber(value)) return "–";
-  return (value as number).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return (value as number).toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatDuration(ms: number | null | undefined): string {
   if (isMissingNumber(ms)) return "–";
   if (!isFinite(ms as number)) return String(ms);
   if (Math.abs(ms as number) < 1000) return `${Math.round(ms as number)}ms`;
-  if (Math.abs(ms as number) < 60000) return `${((ms as number) / 1000).toFixed(1)}s`;
+  if (Math.abs(ms as number) < 60000)
+    return `${((ms as number) / 1000).toFixed(1)}s`;
   return `${((ms as number) / 60000).toFixed(1)}m`;
 }
 
@@ -145,7 +152,10 @@ function isTimeLikeColumn(data: Row[], key: string): boolean {
  * "MM-DD" when the series spans more than one calendar day, else "HH:mm";
  * everything else (and unparsable values) falls back to the raw string.
  */
-function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string {
+function axisTickFormatter(
+  key: string,
+  data: Row[],
+): (value: unknown) => string {
   const timeLike = isTimeLikeColumn(data, key);
   let spansMultipleDays = false;
   if (timeLike) {
@@ -153,7 +163,8 @@ function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string
       .map((row) => Date.parse(String(row[key])))
       .filter((t) => !isNaN(t));
     if (times.length > 0) {
-      spansMultipleDays = Math.max(...times) - Math.min(...times) > 24 * 60 * 60 * 1000;
+      spansMultipleDays =
+        Math.max(...times) - Math.min(...times) > 24 * 60 * 60 * 1000;
     }
   }
   return (value: unknown): string => {
@@ -232,7 +243,11 @@ function h(type: any, props: any, ...children: any[]) {
  * A wrapping legend row rendered above a chart in place of Recharts' own
  * `<Legend>`. Only meaningful with 2+ keys — callers gate on `keys.length > 1`.
  */
-function legendBar(keys: string[], palette: string[], c: ReturnType<typeof chrome>) {
+function legendBar(
+  keys: string[],
+  palette: string[],
+  c: ReturnType<typeof chrome>,
+) {
   return h(
     "div",
     {
@@ -276,7 +291,10 @@ export interface SparklineProps {
   height?: number;
 }
 
-function sparklinePoints(data: Row[] | number[], y?: string): { value: number }[] {
+function sparklinePoints(
+  data: Row[] | number[],
+  y?: string,
+): { value: number }[] {
   if (data.length === 0) return [];
   if (typeof data[0] === "number") {
     return (data as number[]).map((value) => ({ value }));
@@ -482,7 +500,10 @@ export function AreaTimeseries({
             tickFormatter: compactNumber,
           }),
           h(R.Tooltip, {
-            contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
+            contentStyle: {
+              background: c.tooltipBg,
+              border: `1px solid ${c.tooltipBorder}`,
+            },
             labelStyle: { color: c.text },
           }),
           ...areas,
@@ -497,14 +518,17 @@ export function AreaTimeseries({
 // ---------------------------------------------------------------------------
 
 /** A single series' <Bar>, with per-cell opacity for the projected region. */
-function projectedBar(R: any, opts: {
-  key: string;
-  dataKey: string;
-  color: string;
-  stackId?: string;
-  rowCount: number;
-  splitAt: number;
-}) {
+function projectedBar(
+  R: any,
+  opts: {
+    key: string;
+    dataKey: string;
+    color: string;
+    stackId?: string;
+    rowCount: number;
+    splitAt: number;
+  },
+) {
   const { key, dataKey, color, stackId, rowCount, splitAt } = opts;
   const cells = Array.from({ length: rowCount }, (_unused, index) =>
     h(recharts().Cell, {
@@ -577,7 +601,10 @@ export function StackedBars({
             tickFormatter: compactNumber,
           }),
           h(R.Tooltip, {
-            contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
+            contentStyle: {
+              background: c.tooltipBg,
+              border: `1px solid ${c.tooltipBorder}`,
+            },
             labelStyle: { color: c.text },
           }),
           ...series.map((key, index) =>
@@ -645,7 +672,10 @@ export function GroupedBars({
             tickFormatter: compactNumber,
           }),
           h(R.Tooltip, {
-            contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
+            contentStyle: {
+              background: c.tooltipBg,
+              border: `1px solid ${c.tooltipBorder}`,
+            },
             labelStyle: { color: c.text },
           }),
           ...series.map((key, index) =>
@@ -715,7 +745,10 @@ export function ProjectionBars({
             : undefined,
       }),
       h(R.Tooltip, {
-        contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
+        contentStyle: {
+          background: c.tooltipBg,
+          border: `1px solid ${c.tooltipBorder}`,
+        },
         labelStyle: { color: c.text },
       }),
       budget !== undefined &&
@@ -723,7 +756,12 @@ export function ProjectionBars({
           y: budget,
           stroke: "#ef4444",
           strokeDasharray: "4 3",
-          label: { value: "Budget", position: "right", fill: "#ef4444", fontSize: 11 },
+          label: {
+            value: "Budget",
+            position: "right",
+            fill: "#ef4444",
+            fontSize: 11,
+          },
         }),
       projectedBar(R, {
         key: y,
@@ -794,7 +832,10 @@ export function Donut({
             ),
           ),
           h(R.Tooltip, {
-            contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
+            contentStyle: {
+              background: c.tooltipBg,
+              border: `1px solid ${c.tooltipBorder}`,
+            },
             labelStyle: { color: c.text },
           }),
         ),
@@ -846,12 +887,23 @@ export function Leaderboard({
 }: LeaderboardProps) {
   const c = chrome();
   const palette = paletteFor();
-  const ranked = [...data].sort((a, b) => toNumber(b[valueKey]) - toNumber(a[valueKey]));
-  const scaleMax = max ?? Math.max(1, ...ranked.map((row) => toNumber(row[valueKey])));
+  const ranked = [...data].sort(
+    (a, b) => toNumber(b[valueKey]) - toNumber(a[valueKey]),
+  );
+  const scaleMax =
+    max ?? Math.max(1, ...ranked.map((row) => toNumber(row[valueKey])));
 
   return h(
     "div",
-    { style: { height, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 } },
+    {
+      style: {
+        height,
+        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      },
+    },
     ...ranked.map((row, index) => {
       const value = toNumber(row[valueKey]);
       const widthPct = Math.max(2, Math.min(100, (value / scaleMax) * 100));
@@ -861,7 +913,11 @@ export function Leaderboard({
         {
           key: index,
           onClick: clickable
-            ? () => window.LW?.navigate?.(navigateTo!.target, navigateTo!.params(row) as Record<string, unknown>)
+            ? () =>
+                window.LW?.navigate?.(
+                  navigateTo!.target,
+                  navigateTo!.params(row) as Record<string, unknown>,
+                )
             : undefined,
           style: {
             display: "flex",
@@ -872,12 +928,16 @@ export function Leaderboard({
         },
         h(
           "div",
-          { style: { fontSize: 12, color: c.text, minWidth: 96, flexShrink: 0 } },
+          {
+            style: { fontSize: 12, color: c.text, minWidth: 96, flexShrink: 0 },
+          },
           String(row[labelKey] ?? ""),
         ),
         h(
           "div",
-          { style: { flex: 1, background: c.grid, borderRadius: 3, height: 10 } },
+          {
+            style: { flex: 1, background: c.grid, borderRadius: 3, height: 10 },
+          },
           h("div", {
             style: {
               width: `${widthPct}%`,
@@ -889,7 +949,14 @@ export function Leaderboard({
         ),
         h(
           "div",
-          { style: { fontSize: 12, color: c.axis, minWidth: 48, textAlign: "right" } },
+          {
+            style: {
+              fontSize: 12,
+              color: c.axis,
+              minWidth: 48,
+              textAlign: "right",
+            },
+          },
           formatValue(value, format),
         ),
       );
@@ -901,8 +968,18 @@ export function Leaderboard({
 // Heatmap
 // ---------------------------------------------------------------------------
 
-const DEFAULT_HOUR_LABELS = Array.from({ length: 24 }, (_unused, i) => String(i));
-const DEFAULT_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DEFAULT_HOUR_LABELS = Array.from({ length: 24 }, (_unused, i) =>
+  String(i),
+);
+const DEFAULT_WEEKDAY_LABELS = [
+  "Sun",
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+];
 
 export interface HeatmapProps {
   data: Row[];
@@ -922,7 +999,8 @@ function interpolateColor(from: string, to: string, t: number): string {
   };
   const [r1, g1, b1] = parse(from);
   const [r2, g2, b2] = parse(to);
-  const mix = (a: number, b: number) => Math.round((a as number) + ((b as number) - (a as number)) * t);
+  const mix = (a: number, b: number) =>
+    Math.round((a as number) + ((b as number) - (a as number)) * t);
   return `rgb(${mix(r1 as number, r2 as number)}, ${mix(g1 as number, g2 as number)}, ${mix(b1 as number, b2 as number)})`;
 }
 
@@ -937,16 +1015,22 @@ export function Heatmap({
   height = DEFAULT_HEIGHT,
 }: HeatmapProps) {
   const cols = xLabels ?? (xKey === "hour" ? DEFAULT_HOUR_LABELS : undefined);
-  const rows = yLabels ?? (yKey === "weekday" ? DEFAULT_WEEKDAY_LABELS : undefined);
-  const xValues = cols ?? Array.from(new Set(data.map((row) => String(row[xKey]))));
-  const yValues = rows ?? Array.from(new Set(data.map((row) => String(row[yKey]))));
+  const rows =
+    yLabels ?? (yKey === "weekday" ? DEFAULT_WEEKDAY_LABELS : undefined);
+  const xValues =
+    cols ?? Array.from(new Set(data.map((row) => String(row[xKey]))));
+  const yValues =
+    rows ?? Array.from(new Set(data.map((row) => String(row[yKey]))));
   const scale = colorScale ?? ["#eef2ff", "#4338ca"];
   const values = data.map((row) => toNumber(row[valueKey]));
   const maxValue = Math.max(1, ...values);
 
   const lookup = new Map<string, number>();
   data.forEach((row) => {
-    lookup.set(`${String(row[xKey])} ${String(row[yKey])}`, toNumber(row[valueKey]));
+    lookup.set(
+      `${String(row[xKey])} ${String(row[yKey])}`,
+      toNumber(row[valueKey]),
+    );
   });
 
   return h(
@@ -1067,7 +1151,11 @@ interface InferredShape {
   y: string[];
 }
 
-function inferShape(data: Row[], x?: string, y?: string | string[]): InferredShape {
+function inferShape(
+  data: Row[],
+  x?: string,
+  y?: string | string[],
+): InferredShape {
   const cols = columnsOf(data);
   const explicitX = x ?? cols[0];
   const explicitY = y

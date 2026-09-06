@@ -131,7 +131,11 @@ describe("the dashboard's card read", () => {
     });
 
     expect(kindClauseOf(findMany)).toEqual({
-      in: [BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND, PLAYGROUND_SRCDOC_CHART_KIND],
+      in: [
+        BUILDER_CHART_KIND,
+        WORKBENCH_SQL_CHART_KIND,
+        PLAYGROUND_SRCDOC_CHART_KIND,
+      ],
     });
   });
 

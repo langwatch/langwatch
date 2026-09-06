@@ -231,15 +231,28 @@ function resolveDeclaredParam(
       },
     };
   }
-  if (typeof value !== declaration.type) {
-    return {
-      ok: false,
-      error: {
-        code: "playground_query_mistyped_param",
-        title: "Wrong query parameter type",
-        message: `"${declaration.name}" must be a ${declaration.type}, got ${typeof value}.`,
-      },
-    };
+  // A switch on the literal union, rather than `typeof value !==
+  // declaration.type`, so each case narrows `value` for real: TS cannot
+  // narrow against a dynamic (non-literal) right-hand side, but it can
+  // narrow `typeof value === "string"` once `declaration.type` itself has
+  // been switched down to the literal `"string"`.
+  switch (declaration.type) {
+    case "string":
+      if (typeof value === "string") return { ok: true, value };
+      break;
+    case "number":
+      if (typeof value === "number") return { ok: true, value };
+      break;
+    case "boolean":
+      if (typeof value === "boolean") return { ok: true, value };
+      break;
   }
-  return { ok: true, value };
+  return {
+    ok: false,
+    error: {
+      code: "playground_query_mistyped_param",
+      title: "Wrong query parameter type",
+      message: `"${declaration.name}" must be a ${declaration.type}, got ${typeof value}.`,
+    },
+  };
 }

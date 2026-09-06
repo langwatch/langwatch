@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/** @param {string} name */
 function requireEnv(name) {
   const value = process.env[name];
   if (!value) {
@@ -67,9 +68,12 @@ async function listExistingNames() {
     );
   }
   const body = await res.json();
-  return new Set((body.data ?? []).map((w) => w.name));
+  return new Set(
+    (body.data ?? []).map((/** @type {{ name: string }} */ w) => w.name),
+  );
 }
 
+/** @param {{ name: string, code: string, queries: unknown }} definition */
 async function createWidget(definition) {
   const res = await fetch(widgetsUrl, {
     method: "POST",

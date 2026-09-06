@@ -32,17 +32,20 @@ const endpoint = (process.env.LW_ENDPOINT ?? "http://localhost:5560").replace(
   /\/+$/,
   "",
 );
-const apiKey = process.env.LW_API_KEY;
-if (!apiKey) {
+const rawApiKey = process.env.LW_API_KEY;
+if (!rawApiKey) {
   console.error("Missing required env var LW_API_KEY");
   process.exit(1);
 }
+/** @type {string} */
+const apiKey = rawApiKey;
 const DAYS = Number(process.env.DAYS ?? 30);
 const PER_DAY = Number(process.env.PER_DAY ?? 40);
 
 // Locality guard: this script POSTs an ingestion key to LW_ENDPOINT. Refuse
 // anything but a local host so a stray env var can't leak the key or spam a
 // real project. Mirrors seed-sample-traces.ts.
+/** @param {string} url */
 function assertLocalEndpoint(url) {
   let hostname;
   try {
@@ -68,6 +71,7 @@ function assertLocalEndpoint(url) {
 assertLocalEndpoint(endpoint);
 
 // --- seeded PRNG (mulberry32) for reproducible runs when SEED is set ------
+/** @param {number} seed */
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
@@ -82,12 +86,18 @@ const rand = process.env.SEED
   ? mulberry32(Number(process.env.SEED))
   : Math.random;
 
+/**
+ * @param {number} min
+ * @param {number} max
+ */
 function randInt(min, max) {
   return Math.floor(rand() * (max - min + 1)) + min;
 }
+/** @param {readonly any[]} arr */
 function pick(arr) {
   return arr[randInt(0, arr.length - 1)];
 }
+/** @param {readonly { value: any, weight: number }[]} entries */
 function weightedPick(entries) {
   // entries: [{ value, weight }]
   const total = entries.reduce((s, e) => s + e.weight, 0);
@@ -96,9 +106,17 @@ function weightedPick(entries) {
     r -= e.weight;
     if (r <= 0) return e.value;
   }
-  return entries[entries.length - 1].value;
+  const last = entries[entries.length - 1];
+  if (!last) {
+    throw new Error("weightedPick called with an empty entries array");
+  }
+  return last.value;
 }
 // log-normal-ish sample: exp(mean + stdev * gaussian)
+/**
+ * @param {number} mean
+ * @param {number} stdev
+ */
 function lognormal(mean, stdev) {
   // Box-Muller
   const u1 = Math.max(rand(), 1e-9);
@@ -160,7 +178,10 @@ const LABEL_SETS = [
 ];
 
 const USERS = Array.from({ length: 18 }, (_, i) => `demo-user-${i + 1}`);
-const CUSTOMERS = Array.from({ length: 10 }, (_, i) => `demo-customer-${i + 1}`);
+const CUSTOMERS = Array.from(
+  { length: 10 },
+  (_, i) => `demo-customer-${i + 1}`,
+);
 
 // pre-build a pool of threads (some multi-trace) to feed avg-traces/thread
 const THREAD_POOL = Array.from({ length: 120 }, (_, i) => ({
@@ -190,6 +211,10 @@ function nextThread() {
   return t;
 }
 
+/**
+ * @param {string} spanId
+ * @param {boolean} isError
+ */
 function buildLlmSpan(spanId, isError) {
   const model = weightedPick(MODELS);
   const promptTokens = Math.round(lognormal(5.2, 0.6)); // ~ 100-400 typical
@@ -203,6 +228,10 @@ function buildLlmSpan(spanId, isError) {
     type: "llm",
     span_id: spanId,
     name: "chat-completion",
+    timestamps:
+      /** @type {{ started_at: number, finished_at: number } | undefined} */ (
+        undefined
+      ),
     model: model.value,
     input: {
       type: "chat_messages",
@@ -237,6 +266,7 @@ function buildLlmSpan(spanId, isError) {
   };
 }
 
+/** @param {string} spanId */
 function buildRagSpan(spanId) {
   return {
     type: "rag",
@@ -247,9 +277,14 @@ function buildRagSpan(spanId) {
       type: "text",
       value: `${pick(RAG_SNIPPETS)} ${pick(RAG_SNIPPETS)}`,
     },
+    timestamps:
+      /** @type {{ started_at: number, finished_at: number } | undefined} */ (
+        undefined
+      ),
   };
 }
 
+/** @param {string} spanId */
 function buildToolSpan(spanId) {
   return {
     type: "tool",
@@ -257,10 +292,15 @@ function buildToolSpan(spanId) {
     name: "lookup-account",
     input: { type: "text", value: "account_lookup" },
     output: { type: "text", value: "found: true" },
+    timestamps:
+      /** @type {{ started_at: number, finished_at: number } | undefined} */ (
+        undefined
+      ),
   };
 }
 
 // business-hours + weekday weighting: returns a fraction 0..1 of "activity"
+/** @param {Date} date */
 function activityWeight(date) {
   const day = date.getUTCDay(); // 0 Sun .. 6 Sat
   const hour = date.getUTCHours();
@@ -274,6 +314,7 @@ function activityWeight(date) {
   return weekdayFactor * hourFactor;
 }
 
+/** @param {number} dayStartMs */
 function randomTimestampOnDay(dayStartMs) {
   // pick an hour weighted by business-hours activity via rejection sampling
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -289,6 +330,7 @@ function randomTimestampOnDay(dayStartMs) {
   return t.getTime();
 }
 
+/** @param {number} finishedAtMs */
 function buildTrace(finishedAtMs) {
   const traceId = `demo-traffic-${crypto.randomUUID()}`;
   const thread = nextThread();
@@ -328,6 +370,7 @@ function buildTrace(finishedAtMs) {
   };
 }
 
+/** @param {unknown} trace */
 async function post(trace) {
   const response = await fetch(`${endpoint}/api/collector`, {
     method: "POST",
@@ -343,7 +386,17 @@ async function post(trace) {
   }
 }
 
+/** @param {unknown} err */
+function errorMessage(err) {
+  return err instanceof Error ? err.message : String(err);
+}
+
 // small concurrency pool
+/**
+ * @param {readonly unknown[]} items
+ * @param {(item: unknown) => Promise<void>} worker
+ * @param {number} concurrency
+ */
 async function runPool(items, worker, concurrency) {
   let index = 0;
   let succeeded = 0;
@@ -356,7 +409,7 @@ async function runPool(items, worker, concurrency) {
         succeeded++;
       } catch (err) {
         failed++;
-        console.error(`  failed: ${err.message ?? err}`);
+        console.error(`  failed: ${errorMessage(err)}`);
       }
       if (succeeded + failed > 0 && (succeeded + failed) % 100 === 0) {
         console.log(`  progress: ${succeeded + failed}/${items.length}`);

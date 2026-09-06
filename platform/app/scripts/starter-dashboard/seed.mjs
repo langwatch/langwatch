@@ -47,6 +47,7 @@ const MANIFEST = [
   { pack: "legacy-parity-widgets", file: "legacy-latency-percentiles.json" },
 ];
 
+/** @param {string} name */
 function requireEnv(name) {
   const value = process.env[name];
   if (!value) {
@@ -63,6 +64,7 @@ const projectId = requireEnv("PROJECT_ID");
 const dashboardsUrl = `${endpoint}/api/dashboards`;
 const widgetsUrl = `${endpoint}/api/v1/projects/${projectId}/analytics/playground-widgets`;
 
+/** @param {string} url */
 async function getJson(url) {
   const res = await fetch(url, {
     method: "GET",
@@ -74,6 +76,10 @@ async function getJson(url) {
   return res.json();
 }
 
+/**
+ * @param {string} url
+ * @param {unknown} body
+ */
 async function postJson(url, body) {
   const res = await fetch(url, {
     method: "POST",
@@ -105,7 +111,9 @@ function loadManifestDefinitions() {
 
 async function ensureDashboard() {
   const { data } = await getJson(dashboardsUrl);
-  const existing = data.find((d) => d.name === DASHBOARD_NAME);
+  const existing = data.find(
+    (/** @type {{ name: string }} */ d) => d.name === DASHBOARD_NAME,
+  );
   if (existing) {
     console.log(`skip   dashboard — "${DASHBOARD_NAME}" already exists`);
     return existing;
@@ -115,15 +123,20 @@ async function ensureDashboard() {
   return created;
 }
 
+/** @param {{ pack: string, file: string, definition: { name: string, code: string, queries: unknown } }[]} items */
 async function ensureWidgets(items) {
   const { data } = await getJson(widgetsUrl);
-  const existingByName = new Map(data.map((w) => [w.name, w]));
+  const existingByName = new Map(
+    data.map((/** @type {{ name: string, id: string }} */ w) => [w.name, w]),
+  );
 
   const results = [];
   for (const { pack, file, definition } of items) {
     const existing = existingByName.get(definition.name);
     if (existing) {
-      console.log(`skip   ${pack}/${file} — "${definition.name}" already exists`);
+      console.log(
+        `skip   ${pack}/${file} — "${definition.name}" already exists`,
+      );
       results.push(existing);
       continue;
     }
@@ -132,12 +145,18 @@ async function ensureWidgets(items) {
       code: definition.code,
       queries: definition.queries,
     });
-    console.log(`create ${pack}/${file} — "${definition.name}" -> ${created.id}`);
+    console.log(
+      `create ${pack}/${file} — "${definition.name}" -> ${created.id}`,
+    );
     results.push(created);
   }
   return results;
 }
 
+/**
+ * @param {{ id: string, name: string, dashboardId?: string | null }[]} widgets
+ * @param {{ id: string }} dashboard
+ */
 async function pinWidgets(widgets, dashboard) {
   for (const widget of widgets) {
     if (widget.dashboardId === dashboard.id) {

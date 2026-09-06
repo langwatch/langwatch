@@ -49,13 +49,13 @@
  */
 
 import { useCallback } from "react";
+import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
+import { escapeValue } from "~/server/app-layer/traces/query-language/mutations";
+import { useRouter } from "~/utils/compat/next-router";
 import {
   NAVIGABLE_TARGETS,
   type NavigableTarget,
 } from "./bridge/bridgeProtocol";
-import { useRouter } from "~/utils/compat/next-router";
-import { escapeValue } from "~/server/app-layer/traces/query-language/mutations";
-import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
 
 /** The Explorer's default lens — the one an unfiltered explorer opens on. */
 const TRACE_EXPLORER_LENS = "all-traces";
@@ -158,7 +158,9 @@ function readEpochMs(value: unknown): number | undefined {
  * Builds the traces-v2 fragment (`<lensId>?q=&from=&to=`) for the given
  * author params — mirrors `traceExplorerLink.ts`'s `explorerFragment`.
  */
-function buildTracesFragment(params: Readonly<Record<string, unknown>>): string {
+function buildTracesFragment(
+  params: Readonly<Record<string, unknown>>,
+): string {
   const fragmentParams = new URLSearchParams();
 
   const q = buildLiqeQuery(params);
@@ -170,7 +172,8 @@ function buildTracesFragment(params: Readonly<Record<string, unknown>>): string 
     fragmentParams.set("from", String(from));
     fragmentParams.set("to", String(to));
   } else if (
-    (params.startDate !== undefined) !== (params.endDate !== undefined)
+    (params.startDate !== undefined) !==
+    (params.endDate !== undefined)
   ) {
     // Only one bound named — carrying it alone would misrepresent the
     // window (see `traceExplorerLink.ts`'s identical reasoning), so drop it

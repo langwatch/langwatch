@@ -11,7 +11,8 @@ import type { FilterField } from "~/server/filters/types";
 import { GraphCardMenu, type SizeOption } from "./GraphCardMenu";
 import { GraphFilterIndicator } from "./GraphFilterIndicator";
 
-const stripPackPrefix = (n: string) => n.replace(/^(North-star|Legacy):\s*/, "");
+const stripPackPrefix = (n: string) =>
+  n.replace(/^(North-star|Legacy):\s*/, "");
 
 interface GraphCardHeaderProps {
   graphId: string;

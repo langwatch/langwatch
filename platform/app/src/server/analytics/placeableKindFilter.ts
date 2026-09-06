@@ -63,5 +63,7 @@ export async function placeableKindFilter({
   if (await customChartPlaygroundEnabled({ prisma, projectId })) {
     kinds.push(PLAYGROUND_SRCDOC_CHART_KIND);
   }
-  return kinds.length > 1 ? { kind: { in: kinds } } : { kind: BUILDER_CHART_KIND };
+  return kinds.length > 1
+    ? { kind: { in: kinds } }
+    : { kind: BUILDER_CHART_KIND };
 }

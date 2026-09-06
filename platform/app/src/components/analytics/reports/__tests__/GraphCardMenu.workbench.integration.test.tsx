@@ -45,6 +45,7 @@ function mount(overrides: Partial<Parameters<typeof GraphCardMenu>[0]> = {}) {
   withChakra(
     <GraphCardMenu
       graphId="chart-1"
+      projectId="project_1"
       projectSlug="my-project"
       dashboardId="dashboard-1"
       colSpan={1}

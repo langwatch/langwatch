@@ -27,6 +27,7 @@ import { explainAnyError, readHandledError } from "~/features/errors";
 import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import {
   type PlaygroundQuery,
+  type PlaygroundQueryParamValue,
   validatePlaygroundQueryParams,
 } from "~/server/analytics/playgroundWidgetDefinition";
 import { api } from "~/utils/api";
@@ -80,7 +81,8 @@ export function usePlaygroundWidgetExecutor(
     return { start: end - 24 * 60 * 60 * 1000, end };
   });
   const pageWindow = overrides?.timeWindow ?? mountWindow;
-  const granularitySeconds = overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
+  const granularitySeconds =
+    overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
   const execute = useMemo(
     () => createLangWatchQLExecute({ utils, projectId }),
     [utils, projectId],
@@ -94,9 +96,13 @@ export function usePlaygroundWidgetExecutor(
   const runValidated = useCallback(
     async (
       query: Pick<PlaygroundQuery, "sql">,
-      params: Readonly<Record<string, unknown>>,
+      params: Readonly<Record<string, PlaygroundQueryParamValue>>,
       signal?: AbortSignal,
     ): Promise<ChartQueryResult> => {
+      // `LangWatchQLExecute` requires a signal (mirrors the live request
+      // controller, which always has one from its own AbortController); the
+      // standalone "Run" path has no request to cancel, so it gets a signal
+      // that's simply never aborted rather than widening the shared type.
       const result = await execute(
         {
           sql: query.sql,
@@ -104,7 +110,7 @@ export function usePlaygroundWidgetExecutor(
           timeWindow: pageWindow,
           granularitySeconds,
         },
-        { signal },
+        { signal: signal ?? new AbortController().signal },
       );
       return toChartQueryResult(result);
     },

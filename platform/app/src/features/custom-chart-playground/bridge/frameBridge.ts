@@ -80,8 +80,14 @@ export interface FrameBridge {
 export function createFrameBridge(
   options: CreateFrameBridgeOptions,
 ): FrameBridge {
-  const { iframe, executeQuery, onLog, onHeightChange, onNavigate, onTeardown } =
-    options;
+  const {
+    iframe,
+    executeQuery,
+    onLog,
+    onHeightChange,
+    onNavigate,
+    onTeardown,
+  } = options;
 
   let port: MessagePort | null = null;
   let initialized = false;

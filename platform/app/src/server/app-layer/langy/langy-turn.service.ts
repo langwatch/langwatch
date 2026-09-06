@@ -60,6 +60,7 @@ import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/la
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { featureFlagService } from "~/server/featureFlag";
+import type { FeatureFlagKey } from "~/server/featureFlag/registry";
 import { cancelLocalWorkForTurn } from "~/server/langy-local-control/runtime";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "~/server/prompt-config/prompt.service";
@@ -268,8 +269,18 @@ async function resolveDisabledSkillIds({
   await Promise.all(
     flagsToCheck.map(async (flag) => {
       try {
+        // `flag` comes from LANGY_SKILLS' `featureFlag`/`excludedByFlag`,
+        // both plain `string` at the skill-catalog level — nothing there
+        // proves membership in the registry, and `FeatureFlagKey` also
+        // admits the open-ended `es-*-*-*-killswitch` pattern, so no closed
+        // type guard could fully vouch for it either. Same cast, same
+        // reasoning as `input.flag as FeatureFlagKey` in
+        // `src/server/api/routers/featureFlag.ts`: `isEnabled` treats an
+        // unregistered key as a safe no-op (falls through to the legacy
+        // resolver and returns false) rather than throwing, so the cast
+        // stays sound at runtime even for a flag the registry doesn't know.
         if (
-          await featureFlagService.isEnabled(flag, {
+          await featureFlagService.isEnabled(flag as FeatureFlagKey, {
             distinctId: userId,
             projectId,
             organizationId,

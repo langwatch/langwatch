@@ -79,24 +79,21 @@ vi.mock(
   }),
 );
 
-vi.mock(
-  "~/features/custom-chart-playground/PlaygroundDashboardWidget",
-  () => ({
-    PlaygroundDashboardWidget: ({
-      id,
-      graph,
-    }: {
-      id: string;
-      graph: unknown;
-    }) => (
-      <div
-        data-testid="playground-widget"
-        data-id={id}
-        data-graph={JSON.stringify(graph)}
-      />
-    ),
-  }),
-);
+vi.mock("~/features/custom-chart-playground/PlaygroundDashboardWidget", () => ({
+  PlaygroundDashboardWidget: ({
+    id,
+    graph,
+  }: {
+    id: string;
+    graph: unknown;
+  }) => (
+    <div
+      data-testid="playground-widget"
+      data-id={id}
+      data-graph={JSON.stringify(graph)}
+    />
+  ),
+}));
 
 import {
   PLAYGROUND_SRCDOC_CHART_KIND,
@@ -263,9 +260,7 @@ describe("a dashboard grid card", () => {
         PLAYGROUND_PAYLOAD,
       );
       expect(screen.queryByTestId("builder-graph")).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("workbench-widget"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("workbench-widget")).not.toBeInTheDocument();
     });
 
     /** @scenario "A playground card is not offered an alert it cannot evaluate" */

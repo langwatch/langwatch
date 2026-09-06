@@ -44,7 +44,13 @@ async function main() {
     minify: true,
   });
 
-  const script = result.outputFiles[0].text;
+  const outputFile = result.outputFiles?.[0];
+  if (!outputFile) {
+    throw new Error(
+      "esbuild produced no output file for the charts lib bundle (write: false with no entry emitted).",
+    );
+  }
+  const script = outputFile.text;
 
   const source = `/**
  * GENERATED — do not hand-edit. Produced by \`node scripts/build-charts-lib.mjs\`
@@ -64,7 +70,9 @@ export function buildChartsLibScript(): string {
 `;
 
   writeFileSync(OUT_FILE, source);
-  console.log(`Wrote ${path.relative(APP, OUT_FILE)} (${script.length} bytes bundled)`);
+  console.log(
+    `Wrote ${path.relative(APP, OUT_FILE)} (${script.length} bytes bundled)`,
+  );
 }
 
 main().catch((error) => {
