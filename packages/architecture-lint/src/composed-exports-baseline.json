@@ -1,0 +1,305 @@
+{
+  "version": 0,
+  "entries": [
+    {
+      "key": "packages/enterprise/features/audit-log/server|AuditLogAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|NullBillingOrganizationAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|NullBillingWebhookSubscriptionAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|NurturingActivityTrackingService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|NurturingFeatureAdoptionService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|NurturingProductInterestService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|NurturingPromptCreationService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|NurturingService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|NurturingSignupIdentificationService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|NurturingSsoAutoAddService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|NurturingUserSyncService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|PostgresNurturingProfileAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/billing/server|UsageLimitService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/governance/server|PostgresGovernanceInstallationAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/governance/server|PostgresSessionPolicyAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/licensing/server|LicenseService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/licensing/server|PlanProviderService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/scim/server|ScimApi",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/sso/server|BetterAuthSsoAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/sso/server|LicensingSsoAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/webhook/server|PrismaWebhookRetentionRepository",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/enterprise/features/webhook/server|WebhookHealthService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/eventing|ReplayService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/agent/server|PrismaAgentAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/analytics/server|LoggingAnalyticsTripwireService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/analytics/server|LwqlKeyMapService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/auth/server|Auth0PasswordService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/coding-agent/server|OtelCodingAgentReadMetricsAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/evaluation/server|EvaluationInputsOffloadService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/evaluation/server|PrismaEvaluationCostRecorderAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/experiment/server|ExperimentRunStateStoreAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/gateway/server|BudgetOverviewService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/identity/server|IdentityBirthService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/identity/server|IdentitySsoConnectionGrandfatherMigrationAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/identity/server|IdentityWriteGateService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/identity/server|JoinRequestLifecycleDispatcherAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/identity/server|ShadowComparingDomainRoutingAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/identity/server|SignInCallbackLinkingService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/identity/server|SsoConnectionBackofficeService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/identity/server|SsoConnectionGrandfatherService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/identity/server|SsoConnectionTeardownDispatcherAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/langy/server|NullLangyAnalyticsEventSinkAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/langy/server|OtelLangyBlockMetricsAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/log/server|LogRequestCollectionService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/log/server|LogRuntimeAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/metric/server|MetricRequestCollectionService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/metric/server|MetricRuntimeAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/model-provider/server|UnavailableModelProviderCredentialProbeAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/model-provider/server|UnmanagedModelProviderGatewayAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/ops/server|NullEventExplorerAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/ops/server|NullProcessOpsAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/ops/server|NullReplayAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/ops/server|RedisSchedulerWakeAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/ops/server|ReplayService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/ops/server|SlackBugReportNotifierAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/ops/server|SystemMigrationsService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/scenario/server|ChildEgressPolicyAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/scenario/server|ChildLoggerAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/scenario/server|ChildProcessSpawnAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/scenario/server|ChildTlsEnvAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/scenario/server|ComputeRunMetricsAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/scenario/server|HttpAuthAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/scenario/server|LitellmModelAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/scenario/server|RemoteTraceRunAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/scenario/server|ScenarioChildExecutionAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/scenario/server|ScenarioRoleModelAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/stored-object/server|PostgresStoredObjectAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/stored-object/server|StoredObjectsPublicApi",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/topic/server|LangevalsStagedPayloadAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/topic/server|TopicClusteringProcessingProducerAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/trace/server|ClickHouseSpanAttributeKeysFacetAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/trace/server|TraceProjectionLeanEventingAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/trace/server|TraceTtlCacheService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/workflow/server|LambdaWebAdapterStreamService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/workflow/server|NlpLambdaRuntimeService",
+      "measured": "2026-09-07"
+    }
+  ]
+}
