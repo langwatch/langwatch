@@ -9,6 +9,7 @@ import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { runtimePresence } from "~/server/connected-agents/presence.read";
 import { resolveConnectedTarget } from "~/server/scenarios/connected-target.service";
 import { ScenarioReservedSetIdError } from "~/server/scenarios/errors";
 import {
@@ -311,6 +312,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         projectId: input.projectId,
         target: input.target,
         actor,
+        presence: runtimePresence,
       });
       const { parameters, secretParameters, scenarioVersion } =
         await resolveParametersForRun({

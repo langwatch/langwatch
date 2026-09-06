@@ -114,23 +114,27 @@ function rememberTarget({
  * What the caller learns once a plan run is queued.
  *
  * The run set is the plan's own, so the drawer and the runs rail read the run
- * back under that plan. A run of one scenario also names it and the agent, so
- * the drawer can open on the run before the run has an id.
+ * back under that plan, and the plan's address segment is what the Results
+ * tab opens on. A run of one scenario also names it and the agent, so the
+ * drawer can open on the run before the run has an id.
  */
 function runStartedInfoOf({
   batchRunId,
   suiteId,
+  planSlug,
   soleScenarioId,
   target,
 }: {
   batchRunId: string;
   suiteId: string;
+  planSlug: string;
   soleScenarioId: string | null;
   target: TargetValue;
 }): RunStartedInfo {
   return {
     batchRunId,
     scenarioSetId: getSuiteSetId(suiteId),
+    planSlug,
     ...(soleScenarioId
       ? {
           scenarioId: soleScenarioId,
@@ -151,7 +155,7 @@ function runStartedInfoOf({
 function useQueuePlanRun(input: BatchRunInput) {
   const runPlan = api.suites.runPlan.useMutation();
   const { projectId, target, noteInput, runParameters, suiteTargets } = input;
-  const { runName, scope, scopedScenarioIds } = input;
+  const { runName, scope, scopedScenarioIds, evaluators } = input;
   const { repeatCount, simulatorModel, judgeModel } = input;
   const setLastRunTarget = useAgentTestingStore(
     (state) => state.setLastRunTarget,
@@ -175,6 +179,7 @@ function useQueuePlanRun(input: BatchRunInput) {
           repeatCount,
           simulatorModel,
           judgeModel,
+          evaluators,
         },
         idempotencyKey: attempt.idempotencyKey,
         batchRunId: attempt.batchRunId,
@@ -184,6 +189,7 @@ function useQueuePlanRun(input: BatchRunInput) {
       return runStartedInfoOf({
         batchRunId: result.batchRunId ?? attempt.batchRunId,
         suiteId: result.suiteId,
+        planSlug: result.planSlug,
         soleScenarioId,
         target,
       });
@@ -198,6 +204,7 @@ function useQueuePlanRun(input: BatchRunInput) {
       repeatCount,
       simulatorModel,
       judgeModel,
+      evaluators,
       noteInput,
       runParameters,
       setLastRunTarget,
@@ -231,6 +238,7 @@ export function useBatchRun(input: BatchRunInput) {
     input.judgeModel,
     input.noteInput,
     input.runParameters,
+    input.evaluators,
   ]);
 
   const run = useCallback(async () => {

@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import type { LiveInstance } from "~/server/connected-agents/instance.registry";
 import type { DataPrefetcherDependencies } from "~/server/scenarios/execution/data-prefetcher";
 import { AGENT_TEST_SCENARIO_ID } from "../../scenarios/agent-test-scenario";
 import type { AgentWithFields } from "../agent-fields";
@@ -89,11 +90,36 @@ function prefetchDeps(
   } as DataPrefetcherDependencies;
 }
 
-function depsFor(agent: AgentWithFields | null): AgentTestRunDeps & {
+/** One live instance holding the agent, as the registry lists it. */
+function liveInstance(): LiveInstance {
+  return {
+    instanceId: "inst_1",
+    projectId: "proj_1",
+    hostname: "dev-box",
+    username: "dev",
+    pid: 1,
+    sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+    label: null,
+    podId: "pod_a",
+    connectedAt: now.getTime(),
+    maxConcurrency: 1,
+    inflight: 0,
+    lastSeenAt: now.getTime(),
+  };
+}
+
+function depsFor(
+  agent: AgentWithFields | null,
+  { isOnline = true }: { isOnline?: boolean } = {},
+): AgentTestRunDeps & {
   queueRun: ReturnType<typeof vi.fn>;
+  presence: { listLive: ReturnType<typeof vi.fn> };
 } {
   return {
     readAgent: vi.fn().mockResolvedValue(agent),
+    presence: {
+      listLive: vi.fn().mockResolvedValue(isOnline ? [liveInstance()] : []),
+    },
     users: {
       user: {
         findMany: vi
@@ -225,6 +251,85 @@ describe("scheduleAgentTestRun", () => {
         meta: { ownerName: "Someone Else" },
       });
       expect(deps.queueRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a connected agent with no process connected", () => {
+    describe("when scheduling the test run", () => {
+      /** @scenario "An offline connected agent is refused before a run exists" */
+      it("refuses as offline and queues nothing", async () => {
+        const deps = depsFor(
+          agentRow({
+            id: "agent_connected",
+            type: "connected",
+            environment: "production",
+            config: { name: "support-agent", description: "" },
+          }),
+          { isOnline: false },
+        );
+
+        await expect(
+          scheduleAgentTestRun({
+            projectId: "proj_1",
+            agentId: "agent_connected",
+            actor,
+            deps,
+          }),
+        ).rejects.toMatchObject({
+          code: "agent_offline",
+          meta: { agentName: "ACME Support Agent", environment: "production" },
+        });
+        expect(deps.presence.listLive).toHaveBeenCalledWith({
+          projectId: "proj_1",
+          agentId: "agent_connected",
+        });
+        expect(deps.queueRun).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a connected agent with a process connected", () => {
+    describe("when scheduling the test run", () => {
+      /** @scenario "An online connected agent is scheduled" */
+      it("queues one run against it", async () => {
+        const deps = depsFor(
+          agentRow({
+            id: "agent_connected",
+            type: "connected",
+            environment: "production",
+            config: { name: "support-agent", description: "" },
+          }),
+        );
+
+        await scheduleAgentTestRun({
+          projectId: "proj_1",
+          agentId: "agent_connected",
+          actor,
+          deps,
+        });
+
+        expect(deps.queueRun).toHaveBeenCalledTimes(1);
+        expect(deps.queueRun.mock.calls[0]?.[0]).toMatchObject({
+          target: { type: "connected", referenceId: "agent_connected" },
+        });
+      });
+    });
+  });
+
+  describe("given an http agent that no presence would list", () => {
+    /** @scenario "An HTTP agent is never offline" */
+    it("reads no presence and queues the run", async () => {
+      const deps = depsFor(agentRow(), { isOnline: false });
+
+      await scheduleAgentTestRun({
+        projectId: "proj_1",
+        agentId: "agent_http",
+        actor,
+        deps,
+      });
+
+      expect(deps.presence.listLive).not.toHaveBeenCalled();
+      expect(deps.queueRun).toHaveBeenCalledTimes(1);
     });
   });
 

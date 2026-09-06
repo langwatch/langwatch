@@ -40,13 +40,14 @@ For this walkthrough, assume **per-customer** model. Note that `principal` budge
 
 ## Step 2: Configure the upstream ModelProvider once
 
-Your LangWatch org owns a single ModelProvider row per upstream (OpenAI, Anthropic) at ORGANIZATION scope. End-users never see these. Configure them under **Settings → Model Providers → Add Model Provider** (Scope = Organization), then open each row's **Advanced (Gateway)** tab and set the per-credential gateway caps:
+Your LangWatch org owns a single ModelProvider row per upstream (OpenAI, Anthropic) at ORGANIZATION scope. End-users never see these. Configure them under **Settings → Model Providers → Add Model Provider** (Scope = Organization), then expand each row's **Advanced (Gateway)** section and set the gateway fields:
 
 | Field | Suggested value |
 |---|---|
-| RPM | 100000 (your bulk-purchase cap from the upstream) |
 | Fallback priority | 10 for primary, 20 for backup |
 | Provider config (JSON) | region/deployment overrides as needed |
+
+The same section has RPM, TPM and RPD inputs. The gateway stores them and does not enforce them, so they set no ceiling on this row. Put the ceiling on each tenant's virtual key instead, which is what Step 3 mints. See [Rate limits](/ai-gateway/rate-limits).
 
 No separate "binding" entity to mint. The ModelProvider id is what your code references:
 
@@ -95,7 +96,7 @@ export async function provisionCustomer(customerId: string, planLimitUsd: string
 }
 ```
 
-To also cap each **end user inside** the tenant (their seats, their agents' users), add one attributed-user template on the key; it covers every current and future end user with lazy per-user buckets, nothing to provision per user:
+To also cap each **end user inside** the tenant (their seats, their agents' users), add one attributed-user template on the key; it covers every current and future end user with lazy per-user buckets, and you provision no bucket per user:
 
 ```ts
 await fetch(`${LW}/budgets`, {
@@ -190,7 +191,9 @@ langwatch gateway-budgets list --scope-type virtual-key -f json | \
 
 `spend_available: false` in that output means spend could not be totalled server-side; hold billing until it recovers rather than invoicing a zero.
 
-For **invoicing**, do not poll aggregates: ingest the per-request [spend event stream](/ai-gateway/billing-events) through a signed [webhook endpoint](/features/webhooks) into your own billing ledger, and reconcile against `spend-summaries` checksums at period close. Every event carries exact integer quantities per token class, integer nano-USD cost, the tenant key, the end-user id, and your echoed metadata, which is what a rebilling invoice needs and what an aggregate cannot give you. The full billing loop (receive, verify, dedup, settled supersession, reconcile, period close) is its own cookbook: [Metering and rebilling your customers](/ai-gateway/cookbooks/metering-and-rebilling), with a runnable reference implementation in TypeScript and Python.
+For **invoicing**, do not poll aggregates: ingest the per-request [spend event stream](/ai-gateway/billing-events) through a signed [webhook endpoint](/features/webhooks) into your own billing ledger, and reconcile against `spend-summaries` checksums at period close.
+
+Every event carries exact integer quantities per token class, integer nano-USD cost, the tenant key, the end-user id, and your echoed metadata, which is what a rebilling invoice needs and what an aggregate cannot give you. The full billing loop (receive, verify, dedup, settled supersession, reconcile, period close) is its own cookbook: [Metering and rebilling your customers](/ai-gateway/cookbooks/metering-and-rebilling), with a runnable reference implementation in TypeScript and Python.
 
 Rating stays in your billing system: you define the markup over the gateway-reported cost (or bill passthrough plus a management fee), and events carry `rate_version` so cost is re-derivable.
 
@@ -227,7 +230,23 @@ Because the response is standard OpenAI-compatible, your error handler only need
 
 Every write through your backend credential is audited with action, target, and before/after metadata. Scoped API keys attribute the write to the key's owning user; legacy project keys carry no user, so their writes record the machine principal `svc_<your_project_id>`. Filter the audit log on target `virtual_key` to get a per-customer provisioning history, under **/settings/audit-log** in the LangWatch UI.
 
-If you need SIEM export: query ONLY the gateway-shape `AuditLog` rows with a read-only role scoped to that table, and ship the filtered result set, never a whole-database dump (which would carry unrelated, sensitive application data). For example, a daily job running `COPY (SELECT id, "organizationId", "userId", action, "targetKind", "targetId", "createdAt" FROM "AuditLog" WHERE "organizationId" = '<your-org-id>' AND "targetKind" IN ('virtual_key', 'budget', 'model_provider', 'routing_policy', 'cache_rule') AND "createdAt" >= now() - interval '1 day') TO STDOUT WITH CSV` into your SIEM's ingestion path: an explicit column list pinned to your organization, leaving the before/after payloads out unless your SIEM genuinely needs them. There is no public REST audit-export endpoint in v1, see [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically) for the supported paths (UI CSV download, direct SQL).
+If you need SIEM export: query ONLY the gateway-shape `AuditLog` rows with a read-only role scoped to that table, and ship the filtered result set, never a whole-database dump (which would carry unrelated, sensitive application data).
+
+For example, a daily job piping this into your SIEM's ingestion path:
+
+```sql
+COPY (
+  SELECT id, "organizationId", "userId", action, "targetKind", "targetId", "createdAt"
+  FROM "AuditLog"
+  WHERE "organizationId" = '<your-org-id>'
+    AND "targetKind" IN ('virtual_key', 'budget', 'model_provider', 'routing_policy', 'cache_rule')
+    AND "createdAt" >= now() - interval '1 day'
+) TO STDOUT WITH CSV
+```
+
+That is an explicit column list pinned to your organization, and it leaves the before/after payloads out unless your SIEM genuinely needs them.
+
+There is no public REST audit-export endpoint in v1. See [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically) for the supported paths (UI CSV download, direct SQL).
 
 ## Gotchas
 

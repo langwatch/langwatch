@@ -803,6 +803,11 @@ export const VariableMappingInput = ({
             border="1px solid"
             borderColor="border"
             zIndex={2000}
+            // The list is portaled to the body. A modal dialog under the
+            // drawer turns pointer events off outside itself, which would
+            // leave the list visible but not clickable.
+            pointerEvents="auto"
+            data-testid="mapping-dropdown"
           >
             {allOptions.length === 0 ? (
               <Box padding={3}>

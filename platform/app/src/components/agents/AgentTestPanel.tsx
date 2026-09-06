@@ -11,16 +11,13 @@
 import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState } from "react";
+import { OFFLINE_AGENT_TEST_COPY } from "~/components/agents/offlineAgentCopy";
 import { Tooltip } from "~/components/ui/tooltip";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { api } from "~/utils/api";
 
 /** The message the panel sends when nothing else is typed. */
 export const AGENT_TEST_DEFAULT_MESSAGE = "ping";
-
-/** Why the Test button is disabled, read on hover over it. */
-export const OFFLINE_TEST_HINT =
-  "This agent is offline. Start the process that runs it to test it.";
 
 export type AgentTestPanelProps = {
   agentId: string;
@@ -55,7 +52,7 @@ export function AgentTestPanel({
           placeholder="A message to send"
           data-testid="agent-test-message"
         />
-        <Tooltip content={OFFLINE_TEST_HINT} disabled={!offline}>
+        <Tooltip content={OFFLINE_AGENT_TEST_COPY} disabled={!offline}>
           <Box>
             <Button
               size="sm"

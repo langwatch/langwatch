@@ -3,14 +3,17 @@
  *
  * A connected agent is one of them (ADR-128): it carries an environment, a
  * presence and, in a development environment, an owner. A development agent
- * that belongs to another person can only be run by that person, so the
- * picker draws it disabled and says why on hover.
+ * that belongs to another person can only be run by that person, and a
+ * connected agent no process is holding cannot be run at all, so the picker
+ * draws either disabled and says why on hover.
  *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
 import { useMemo } from "react";
+import { OFFLINE_AGENT_SELECT_COPY } from "~/components/agents/offlineAgentCopy";
 import { explainHandledError } from "~/features/errors";
+import { connectedAgentSelectability } from "~/server/connected-agents/selectable";
 import { targetLabelOf } from "~/server/suites/target-key";
 import type { TargetValue } from "./TargetSelector";
 
@@ -46,9 +49,18 @@ export type ScenarioAgent<T extends AgentLike = AgentLike> = T & {
   label: string;
   /** True when a development agent belongs to another person. */
   isTeammateOwned: boolean;
-  /** False only for a development agent of another person. */
+  /** True when a connected agent has no process holding it. */
+  isOffline: boolean;
+  /** False for a development agent of another person and for an offline agent. */
   isRunnable: boolean;
 };
+
+/** True when this agent is a connected agent that no process is holding. */
+export function isOfflineAgent(
+  agent: Pick<AgentLike, "type" | "status">,
+): boolean {
+  return agent.type === "connected" && agent.status === "offline";
+}
 
 /** The label of one agent: its name, and the environment of a connected one. */
 export function agentTargetLabel(agent: AgentLike): string {
@@ -60,7 +72,12 @@ export function agentTargetLabel(agent: AgentLike): string {
   });
 }
 
-/** True when this agent is a personal development agent of another person. */
+/**
+ * True when this agent is a personal development agent of another person.
+ *
+ * The same rule the listings mark their rows with and the run refuses on, so
+ * the picker never offers a target the run would refuse.
+ */
 export function isTeammateOwned({
   agent,
   viewerUserId,
@@ -68,9 +85,10 @@ export function isTeammateOwned({
   agent: AgentLike;
   viewerUserId?: string | null;
 }): boolean {
-  const ownerId = agent.owner?.userId;
-  if (!ownerId) return false;
-  return ownerId !== viewerUserId;
+  return !connectedAgentSelectability({
+    ownerUserId: agent.owner?.userId ?? null,
+    viewerUserId,
+  }).selectable;
 }
 
 /** The agents of the project as targets, newest first, filtered by the search. */
@@ -89,11 +107,13 @@ export function scenarioAgentsOf<T extends AgentLike>({
     )
     .map((agent): ScenarioAgent<T> => {
       const teammates = isTeammateOwned({ agent, viewerUserId });
+      const offline = isOfflineAgent(agent);
       return {
         ...agent,
         label: agentTargetLabel(agent),
         isTeammateOwned: teammates,
-        isRunnable: !teammates,
+        isOffline: offline,
+        isRunnable: !teammates && !offline,
       };
     });
   const sorted = [...scenarioAgents].sort(
@@ -146,4 +166,21 @@ export function ownerOnlyCopy(ownerName?: string | null): string {
     reasons: [],
   });
   return explanation.description || explanation.title;
+}
+
+/**
+ * Why an agent cannot be picked as a run target.
+ *
+ * A development agent of another person can never be run by the reader, so
+ * that reason comes first even when the agent is offline too.
+ */
+export function notRunnableCopy(agent: {
+  isTeammateOwned?: boolean;
+  owner?: { name: string | null } | null;
+  isOffline?: boolean;
+}): string {
+  if (agent.isOffline && !agent.isTeammateOwned) {
+    return OFFLINE_AGENT_SELECT_COPY;
+  }
+  return ownerOnlyCopy(agent.owner?.name);
 }
