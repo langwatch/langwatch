@@ -19,7 +19,7 @@
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import { apiErrorBody, createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 
 import { WebhookApp, type WebhookAppDependencies } from "../../../app/webhook.app";
@@ -53,16 +53,28 @@ const passThrough: MiddlewareHandler = async (_c, next) => next();
  * `apps/api/src/app/api-canonical-error.ts` carries the full mapping; a
  * feature package test may not depend on the app that wires it.
  */
-function canonicalError(error: unknown): { status: 400 | 404 | 500; body: unknown } {
+function canonicalError(error: unknown): {
+  status: 400 | 404 | 500;
+  body: ReturnType<typeof apiErrorBody>;
+} {
   if (HandledError.isHandled(error)) {
     const status =
       error.code === "validation_error" ? 400 : ((error.httpStatus ?? 500) as 404 | 500);
     return {
       status,
-      body: { error: error.code, message: error.message, meta: error.meta },
+      body: apiErrorBody({
+        status,
+        code: error.code,
+        message: error.message,
+        meta: error.meta,
+        retryable: error.retryable,
+      }),
     };
   }
-  return { status: 500, body: { error: "internal_error", message: String(error) } };
+  return {
+    status: 500,
+    body: apiErrorBody({ status: 500, code: "internal_error", message: String(error) }),
+  };
 }
 
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
@@ -90,6 +102,11 @@ function testSecurity(): AppRestSecurity {
     authorizeRouteProjectPermission: () => passThrough,
     authenticateOrganizationThrowing: installOrganization,
     authorizeOrganizationPermissionThrowing: () => passThrough,
+    // No create is exercised here; the port only has to exist for the family
+    // that declares one to build.
+    idempotency: () => {
+      throw new Error("no create is exercised here");
+    },
   } as never);
 }
 
@@ -214,7 +231,6 @@ function buildApp(rows: WebhookSpendEventRow[]) {
     events,
     assertEndpointsEntitled: async () => undefined,
     dispatch: unreachable("dispatch") as never,
-    runIdempotent: unreachable("runIdempotent") as never,
   };
   return createWebhookRestApp({
     security: testSecurity(),
@@ -235,8 +251,8 @@ describe("the events log serves what it says it serves", () => {
     const res = await app.request("/api/webhooks/v1/events/req_nothing_here:completed");
 
     expect(res.status).toBe(404);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe("webhook_event_not_found");
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("webhook_event_not_found");
   });
 
   /** @scenario A malformed event id is refused the same way as a missing one */
@@ -296,12 +312,11 @@ describe("the events log serves what it says it serves", () => {
       const res = await app.request(`/api/webhooks/v1/events${query}`);
       expect(res.status).toBe(400);
       const body = (await res.json()) as {
-        error: string;
-        meta?: { target?: string; fields?: string[] };
+        error: { code: string; meta?: { target?: string; fields?: string[] } };
       };
-      expect(body.error).toBe("validation_error");
-      expect(body.meta?.target).toBe("query");
-      expect(body.meta?.fields).toEqual(expect.arrayContaining([missing]));
+      expect(body.error.code).toBe("validation_error");
+      expect(body.error.meta?.target).toBe("query");
+      expect(body.error.meta?.fields).toEqual(expect.arrayContaining([missing]));
     }
   });
 
@@ -312,8 +327,8 @@ describe("the events log serves what it says it serves", () => {
     const res = await app.request(`/api/webhooks/v1/events?from=${now}&to=${now - 60_000}`);
 
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string; meta?: { target?: string } };
-    expect(body.error).toBe("validation_error");
-    expect(body.meta?.target).toBe("query");
+    const body = (await res.json()) as { error: { code: string; meta?: { target?: string } } };
+    expect(body.error.code).toBe("validation_error");
+    expect(body.error.meta?.target).toBe("query");
   });
 });

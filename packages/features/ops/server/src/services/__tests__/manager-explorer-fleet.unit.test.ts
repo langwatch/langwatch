@@ -51,6 +51,10 @@ function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = 
   }));
 
   class FakeIntrospection extends OpsEventingIntrospectionPort {
+    killSwitches(): never[] {
+      return [];
+    }
+
     projections(): never[] {
       return [];
     }

@@ -40,6 +40,9 @@ vi.mock("fs", async (importOriginal) => {
 // Mock the logger so we can assert on log calls
 vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn(() => mockLogger),
+  // The package index reaches @langwatch/api/trpc, whose call logging builds
+  // one of these at module load. Mocking the logger has to mock it too.
+  createWarnThrottle: () => ({ claim: () => 0 }),
 }));
 
 import fs from "fs";

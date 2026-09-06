@@ -12,6 +12,10 @@ import {
 const metadataMock = vi.fn<() => OpsProcessManagerMetadata[]>(() => []);
 
 class FakeIntrospection extends OpsEventingIntrospectionPort {
+  killSwitches(): never[] {
+    return [];
+  }
+
   projections(): never[] {
     return [];
   }

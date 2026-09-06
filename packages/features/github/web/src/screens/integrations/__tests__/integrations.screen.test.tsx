@@ -146,6 +146,7 @@ describe("given an instance with the GitHub App configured", () => {
     });
 
     /** @scenario Disconnecting hands the reader to GitHub to finish */
+    /** @scenario Disconnect points the admin at GitHub's uninstall page */
     it("opens GitHub's uninstall page and says the row updates once GitHub confirms", async () => {
       const user = userEvent.setup();
       const { host } = renderWithGithubHost(<IntegrationsScreen />);

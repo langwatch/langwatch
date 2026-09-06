@@ -44,6 +44,12 @@ function testSecurity(): AppRestSecurity {
     authorizeRouteProjectPermission: unreachable,
     authenticateOrganizationThrowing: pass,
     authorizeOrganizationPermissionThrowing: unreachable,
+    // The process's ledger, stubbed: no create under test here retries, so it
+    // only has to run its handler once.
+    idempotency: async ({ handler }: { handler: () => Promise<unknown> }) => ({
+      isReplayed: false,
+      ...((await handler()) as Record<string, unknown>),
+    }),
   } as never);
 }
 

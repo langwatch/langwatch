@@ -42,6 +42,10 @@
       "types": "./src/errors.ts",
       "default": "./src/errors.ts"
     },
+    "./query-retry": {
+      "types": "./src/query-retry.ts",
+      "default": "./src/query-retry.ts"
+    },
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"

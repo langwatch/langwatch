@@ -32,6 +32,7 @@ export function createBugReportTrpcRouter<
     {
       protected: service.protected,
       staffPolicy: service.noPermission(BUG_REPORTS_NO_PERMISSION),
+      validateOutput: service.validateOutput,
     },
     mount.ports,
   );

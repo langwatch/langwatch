@@ -7,9 +7,12 @@ import {
 import { AuthzService, type AuthzPermission } from "@langwatch/authz-contract";
 import type { Logger } from "@langwatch/observability";
 import { OrganizationNotFoundError, OrganizationService } from "@langwatch/organization-contract";
+import { MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security";
 import { ApiAuditPort } from "../api-request.policy";
 import { ApiHandlerManagedCredentials } from "../app/api-handler-managed-credential";
@@ -504,6 +507,54 @@ describe("ApiRestSecurity", () => {
       );
     });
 
+    describe("and the family's own error handler owns the response shape", () => {
+      /** @scenario "A database failure loading the organization is re-raised unchanged" */
+      it("re-raises the original failure, never dressed up as a handled error", async () => {
+        const apiKeys = apiKeyService();
+        apiKeys.resolveOrganizationToken.mockResolvedValue({
+          ok: true,
+          resolved: {
+            type: "apiKey-org",
+            apiKeyId: "key-1",
+            userId: "user-1",
+            organizationId: "org-1",
+          },
+        });
+        const organizations = organizationService();
+        const failure = new Error("organization store unreachable");
+        organizations.getSettings.mockRejectedValue(failure);
+        const family = throwingOrganizationApp({
+          apiKeys,
+          organizations,
+          name: "__org_lookup_outage",
+        });
+
+        await family.request();
+
+        expect(family.caught).toEqual([failure]);
+        // ADR-045: infrastructure is never dressed up as customer-actionable,
+        // so the boundary degrades it to a generic unknown with a trace id
+        // rather than promising the caller an action they do not have.
+        expect(HandledError.isHandled(family.caught[0])).toBe(false);
+      });
+
+      /** @scenario "A database failure loading the organization is re-raised unchanged" */
+      it("re-raises a failure of credential resolution itself the same way", async () => {
+        const apiKeys = apiKeyService();
+        const failure = new Error("credential store unreachable");
+        apiKeys.resolveOrganizationToken.mockRejectedValue(failure);
+        const family = throwingOrganizationApp({
+          apiKeys,
+          name: "__org_credential_outage",
+        });
+
+        await family.request();
+
+        expect(family.caught).toEqual([failure]);
+        expect(HandledError.isHandled(family.caught[0])).toBe(false);
+      });
+    });
+
     it("authorizes the declared permission at the organization's own scope", async () => {
       const apiKeys = apiKeyService();
       apiKeys.resolveOrganizationToken.mockResolvedValue({
@@ -532,6 +583,53 @@ describe("ApiRestSecurity", () => {
     });
   });
 });
+
+/**
+ * The same organization door on the versioned-family framework, where the
+ * family's own error handler owns the response shape and authentication is
+ * mounted in throwing mode. `caught` is what that handler was handed.
+ */
+function throwingOrganizationApp(fakes: {
+  apiKeys: ReturnType<typeof apiKeyService>;
+  organizations?: ReturnType<typeof organizationService>;
+  logger?: ReturnType<typeof testLogger>;
+  name: string;
+}) {
+  const caught: unknown[] = [];
+  const security = ApiRestSecurity.create({
+    apiKeys: fakes.apiKeys.service,
+    authz: authzService().service,
+    organizations: (fakes.organizations ?? organizationService()).service,
+    observability: {
+      ...ApiRestObservabilityComposition.create(),
+      canonicalErrorHandler: (error, context) => {
+        caught.push(error);
+        return context.json({ caught: true }, 500);
+      },
+    },
+    ...(fakes.logger ? { logger: fakes.logger } : {}),
+  });
+  const { service, policy } = security.createVersionedApp({
+    name: fakes.name,
+    basePath: `/api/${fakes.name}`,
+  });
+  const app = service
+    .registerRoute(
+      "get",
+      "/",
+      MANAGEMENT_API_VERSION,
+      async () => ({ ok: true }),
+      (builder) => policy("organization:view")(builder).withOutput(z.object({ ok: z.boolean() })),
+    )
+    .build();
+  return {
+    caught,
+    request: () =>
+      app.request(`/api/${fakes.name}/${MANAGEMENT_API_VERSION}/`, {
+        headers: { authorization: "Bearer pat-lw-token" },
+      }),
+  };
+}
 
 function policyOver(fakes: {
   apiKeys: ReturnType<typeof apiKeyService>;

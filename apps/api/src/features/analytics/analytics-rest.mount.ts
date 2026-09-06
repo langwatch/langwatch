@@ -64,6 +64,6 @@ export function mountAnalyticsRest(options: {
       security: options.security,
       analytics: options.analytics,
       requestSchema,
-    }).hono,
+    }),
   ];
 }

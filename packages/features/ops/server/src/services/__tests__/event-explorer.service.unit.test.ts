@@ -24,6 +24,10 @@ const DEFAULT_DEJA_VIEW: OpsDejaViewProjection[] = [
 class FakeIntrospection extends OpsEventingIntrospectionPort {
   dejaView: OpsDejaViewProjection[] = DEFAULT_DEJA_VIEW;
 
+  killSwitches(): never[] {
+    return [];
+  }
+
   projections(): OpsProjectionMetadata[] {
     return [
       { projectionName: "traceMetrics", aggregateType: "Trace" },

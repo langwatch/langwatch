@@ -5,6 +5,7 @@ import {
   InvalidPlanError,
   isGrowthSeatEventPlan,
   isStripePriceName,
+  type BillingDisplayInvoice,
   OrganizationNotFoundError,
   type PlanTypes as PlanType,
   PlanTypes,
@@ -31,17 +32,6 @@ import {
 const logger = createLogger("langwatch:billing:subscriptionService");
 
 export const RECENT_INVOICES_LIMIT = 4;
-
-export type BillingDisplayInvoice = {
-  id: string;
-  number: string | null;
-  date: number;
-  amountDue: number;
-  currency: string;
-  status: string;
-  pdfUrl: string | null;
-  hostedUrl: string | null;
-};
 
 /**
  * Enterprise Stripe subscription lifecycle. Provider, persistence, and

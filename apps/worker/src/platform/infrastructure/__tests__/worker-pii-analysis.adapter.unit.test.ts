@@ -219,13 +219,19 @@ describe("given a Presidio batch call", () => {
 });
 
 describe("given a Google DLP call", () => {
-  /** @scenario "The DLP fallback refuses by name when it is unavailable" */
-  it("refuses by name when DLP is turned off for the deployment", async () => {
+  /**
+   * @scenario "The DLP fallback refuses by name when it is unavailable"
+   * @scenario Google DLP loads its cloud SDK only when enabled and used
+   */
+  it("refuses by name when DLP is turned off, without reaching the SDK", async () => {
     const { adapter } = adapterFor({ googleDlp: { disabled: true, credentials: undefined } });
 
     await expect(
       adapter.tryClearGoogleDlp({ text: "a", piiRedactionLevel: "ESSENTIAL" }),
     ).rejects.toThrow("LANGWATCH_DISABLE_GOOGLE_DLP");
+    // The refusal happens before the client is built, so the opted-out
+    // deployment never pays for the SDK's module graph.
+    expect(inspectContent).not.toHaveBeenCalled();
   });
 
   /** @scenario "The DLP fallback refuses by name when it is unavailable" */

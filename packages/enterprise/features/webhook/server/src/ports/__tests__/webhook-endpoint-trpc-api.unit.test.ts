@@ -28,7 +28,11 @@ const ORG_ID = "org_1";
 const ENDPOINT_ROW = {
   id: "whep_1",
   organizationId: ORG_ID,
+  destinationKind: "http",
   url: "https://example.com/hook",
+  maxBatchSize: 100,
+  maxBatchDelayMs: 1000,
+  maxInFlight: 4,
   enabledEvents: ["gateway.request.completed"],
   status: "ACTIVE",
   disabledReason: null,
@@ -105,9 +109,6 @@ function buildCaller(prisma: ReturnType<typeof buildMockPrisma>) {
     dispatch: () => {
       throw new Error("The test fire is a REST-only path");
     },
-    runIdempotent: () => {
-      throw new Error("Idempotent replay is a REST-only path");
-    },
   });
 
   const trpc = initTRPC
@@ -124,6 +125,28 @@ function buildCaller(prisma: ReturnType<typeof buildMockPrisma>) {
         }
         return next();
       }) as typeof procedure,
+    // The process builds this from the webhook application's own entitlement
+    // check; this is that same check, so the refusal below is the real one.
+    entitlementGate: (procedure) =>
+      (
+        procedure as {
+          use(m: unknown): typeof procedure;
+        }
+      ).use(
+        async ({
+          ctx,
+          input,
+          next,
+        }: {
+          ctx: { app: { webhooks: WebhookApp } };
+          input: { organizationId: string };
+          next: () => Promise<unknown>;
+        }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
+          return next();
+        },
+      ),
+    validateOutput: true,
   });
 
   return router.createCaller({

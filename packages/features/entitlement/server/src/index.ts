@@ -44,7 +44,7 @@ export {
   UsageLimitMessageService,
   type UsageDeployment,
 } from "./services/usage-limit-message.service";
-export { NoUsageCache, UsageCachePort } from "./ports/usage-cache.port";
+export { InProcessUsageCache, NoUsageCache, UsageCachePort } from "./ports/usage-cache.port";
 export { UsageOrganizationPort, type UsageMeterReading } from "./ports/usage-organization.port";
 export {
   UsageVolumeCounterPort,

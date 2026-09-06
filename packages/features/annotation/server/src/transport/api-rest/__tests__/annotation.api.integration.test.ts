@@ -12,7 +12,7 @@ import { createAnnotationsRestApp, type AnnotationRestCredentialPort } from "../
 describe("given the annotations REST family", () => {
   describe("when a project credential resolves", () => {
     it("wraps every read and write in `data` and stamps the key after answering", async () => {
-      const annotation = { id: "annotation-1", comment: "looks right", isThumbsUp: true };
+      const annotation = annotationRow();
       const app = annotationApp({
         list: vi.fn(async () => [annotation]),
         getById: vi.fn(async () => annotation),
@@ -40,11 +40,11 @@ describe("given the annotations REST family", () => {
       expect([list.status, byId.status, byTrace.status, patch.status, created.status]).toEqual([
         200, 200, 200, 200, 200,
       ]);
-      await expect(list.json()).resolves.toEqual({ data: [annotation] });
-      await expect(byId.json()).resolves.toEqual({ data: annotation });
-      await expect(byTrace.json()).resolves.toEqual({ data: [annotation] });
-      await expect(patch.json()).resolves.toEqual({ data: annotation });
-      await expect(created.json()).resolves.toEqual({ data: annotation });
+      await expect(list.json()).resolves.toEqual({ data: [onTheWire(annotation)] });
+      await expect(byId.json()).resolves.toEqual({ data: onTheWire(annotation) });
+      await expect(byTrace.json()).resolves.toEqual({ data: [onTheWire(annotation)] });
+      await expect(patch.json()).resolves.toEqual({ data: onTheWire(annotation) });
+      await expect(created.json()).resolves.toEqual({ data: onTheWire(annotation) });
       expect(removed.status).toBe(200);
       await expect(removed.json()).resolves.toEqual({
         status: "success",
@@ -168,6 +168,36 @@ describe("given the annotations REST family", () => {
     });
   });
 });
+
+/**
+ * One stored comment, as the store hands it to the door: the whole row, not
+ * the three fields a body happens to mention. The door validates what it
+ * answers with against that row's own shape, so a fixture short of it
+ * describes a response the family never sends.
+ */
+function annotationRow() {
+  return {
+    id: "annotation-1",
+    projectId: "project-1",
+    traceId: "trace-1",
+    comment: "looks right",
+    isThumbsUp: true,
+    userId: null,
+    email: null,
+    scoreOptions: {},
+    expectedOutput: null,
+    anchorKind: null,
+    anchorId: null,
+    anchorPath: null,
+    createdAt: new Date("2026-09-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-09-01T00:00:00.000Z"),
+  };
+}
+
+/** The same row after JSON, which is what a caller actually reads. */
+function onTheWire(row: ReturnType<typeof annotationRow>): unknown {
+  return JSON.parse(JSON.stringify(row));
+}
 
 function annotationApp(methods: Record<string, unknown>): AnnotationApp {
   return new Proxy(AnnotationApp.prototype, {

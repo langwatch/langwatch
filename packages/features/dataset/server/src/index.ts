@@ -22,6 +22,7 @@ export {
   createDatasetRestApp,
   type DatasetDirectUploadAuthorization,
   type DatasetDirectUploadAuthorizer,
+  type DatasetDirectUploadRequestReader,
 } from "./transport/api-rest/dataset.api";
 export { createDatasetErrorHandler } from "./transport/api-rest/dataset-error-handler.api";
 export {

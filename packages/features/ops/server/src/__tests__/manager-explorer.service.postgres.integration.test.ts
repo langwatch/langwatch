@@ -21,6 +21,10 @@ import { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.po
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
 class NoopIntrospection extends OpsEventingIntrospectionPort {
+  killSwitches() {
+    return [];
+  }
+
   projections() {
     return [];
   }

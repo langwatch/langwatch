@@ -40,7 +40,10 @@ const identity = {
 };
 
 let credentialsAreValid = true;
-const handleTraces = vi.fn(async () => ({ rejectedSpans: 0, errorMessage: "" }));
+const handleTraces = vi.fn(async (_input: { tenantId: string; traceRequest: unknown }) => ({
+  rejectedSpans: 0,
+  errorMessage: "",
+}));
 const handleLogs = vi.fn(async () => ({ outcome: "collected" as const, rejectedLogRecords: 0 }));
 
 function testSecurity() {
@@ -64,8 +67,10 @@ function testSecurity() {
   return createAppRestSecurity(ports);
 }
 
+const security = testSecurity();
+
 const canonical = createOtlpIngestRestApp({
-  security: testSecurity(),
+  security,
   ports: {
     credential: async () =>
       credentialsAreValid
@@ -80,7 +85,7 @@ const canonical = createOtlpIngestRestApp({
 // Mount order mirrors the process: the canonical family gets first refusal.
 const served = new Hono();
 served.route("/", canonical);
-served.route("/", createOtlpPathAliasRestApp({ canonical }));
+served.route("/", createOtlpPathAliasRestApp({ security, canonical }));
 
 const tracePayload = {
   resourceSpans: [

@@ -112,7 +112,10 @@ describe("given a process that composed none of the packaged services", () => {
 describe("given the deprecated agents family", () => {
   describe("when a project credential lists them", () => {
     it("answers from the application this process composed, for the credential's project", async () => {
-      const list = vi.fn(async () => ({ data: [], page: 1, limit: 20, total: 0 }));
+      const list = vi.fn(async () => ({
+        data: [],
+        pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+      }));
       const api = mount(collaboratorsWith({ agents: () => ({ list }) as never }));
 
       const response = await api.fetch("/api/agents");

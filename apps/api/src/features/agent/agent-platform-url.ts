@@ -17,16 +17,23 @@ import type { AgentPlatformUrlBuilder } from "@langwatch/agent-server";
 export function createAgentPlatformUrlBuilder(
   platformUrl: PlatformUrlBuilder,
 ): AgentPlatformUrlBuilder {
-  return ({ projectSlug, agentId, agentType }) => {
-    const drawer =
-      agentType === "http"
-        ? "agentHttpEditor"
-        : agentType === "connected"
-          ? "agentConnectedDetail"
-          : "agentCodeEditor";
-    return platformUrl({
-      projectSlug,
-      path: `/agents?drawer.open=${drawer}&drawer.agentId=${encodeURIComponent(agentId)}`,
-    });
-  };
+  return ({ projectSlug, agentId, agentType }) =>
+    platformUrl({ projectSlug, path: agentDrawerPath({ agentId, agentType }) });
+}
+
+/** The project-relative half of that address, for a door that adds the origin itself. */
+export function agentDrawerPath({
+  agentId,
+  agentType,
+}: {
+  agentId: string;
+  agentType: string;
+}): string {
+  const drawer =
+    agentType === "http"
+      ? "agentHttpEditor"
+      : agentType === "connected"
+        ? "agentConnectedDetail"
+        : "agentCodeEditor";
+  return `/agents?drawer.open=${drawer}&drawer.agentId=${encodeURIComponent(agentId)}`;
 }

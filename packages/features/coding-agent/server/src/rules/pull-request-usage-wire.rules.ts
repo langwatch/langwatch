@@ -79,40 +79,15 @@ export const pullRequestUsageResponseSchema = z.object({
 });
 
 export const pullRequestUsageQuerySchema = z.object({
-  /** "owner/name". Case is folded by the mapping store, so either works. */
-  repository: z.string().regex(/^[^/\s]+\/[^/\s]+$/, {
-    message: "repository must be owner/name",
-  }),
-  pullRequest: z.coerce.number().int().positive(),
+  repository: z
+    .string()
+    .regex(/^[^/\s]+\/[^/\s]+$/, { message: "repository must be owner/name" })
+    .describe('The repository as "owner/name". Case is folded by the mapping store.'),
+  pullRequest: z.coerce.number().int().positive().describe("The pull request number."),
   /**
-   * Defaults to the GitHub host this instance is bound to, which is github.com
-   * unless an operator named an Enterprise Server. The published document
-   * states github.com, which is the default every instance has until it names
-   * another host.
+   * Omitted, it is the GitHub host this instance is bound to, which is
+   * github.com unless an operator named an Enterprise Server. Each door
+   * applies that default, because only the door can read it.
    */
-  host: z.string().min(1),
+  host: z.string().min(1).optional().describe("The repository's host, e.g. github.com."),
 });
-
-/** The query parameters both doors publish, in the order they are documented. */
-export const pullRequestUsageParameters = [
-  {
-    name: "repository",
-    in: "query",
-    required: true,
-    schema: { type: "string" },
-    description: 'The repository as "owner/name".',
-  },
-  {
-    name: "pullRequest",
-    in: "query",
-    required: true,
-    schema: { type: "integer" },
-    description: "The pull request number.",
-  },
-  {
-    name: "host",
-    in: "query",
-    required: false,
-    schema: { type: "string", default: "github.com" },
-  },
-] as const;

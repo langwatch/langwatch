@@ -92,6 +92,7 @@ function harness({
 
 describe("DatasetTrpcApi", () => {
   describe("given the mounted router", () => {
+    /** @scenario "The dataset transports move without changing who may call them" */
     it("exposes exactly the procedure names the clients call", () => {
       const { router } = harness();
 
@@ -107,6 +108,7 @@ describe("DatasetTrpcApi", () => {
       ]);
     });
 
+    /** @scenario "The dataset transports move without changing who may call them" */
     it("declares the same permission on each procedure as before the move", () => {
       const { router, declaredPermissions } = harness();
 

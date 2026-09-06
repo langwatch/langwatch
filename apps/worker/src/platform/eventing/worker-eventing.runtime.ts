@@ -5,6 +5,7 @@ import {
   type EventSourcingOptions,
   type EventStore,
   type ExecutionTarget,
+  type KillSwitchPort,
   type ProcessStore,
   type ReplayMarkerChecker,
   type RetentionPolicyResolver,
@@ -48,6 +49,8 @@ export interface WorkerEventingDependencies {
   /** Consumer ownership for this runtime. Absent leaves it producer-only. */
   consumers?: WorkerEventingConsumerOptions;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /** Per-tenant operator stop for every component the pipelines mount. */
+  killSwitch?: KillSwitchPort;
   /**
    * Projections that span pipelines, configured before any of them exist.
    *
@@ -72,6 +75,8 @@ export interface WorkerEventingProductionOptions {
   configureGlobalProjections?: EventSourcingOptions["configureGlobalProjections"];
   /** Consumer ownership for this runtime. Absent leaves it producer-only. */
   consumers?: WorkerEventingConsumerOptions;
+  /** Per-tenant operator stop for every component the pipelines mount. */
+  killSwitch?: KillSwitchPort;
 }
 
 /**
@@ -106,6 +111,7 @@ export class WorkerEventingRuntime {
       ...server.dependencies(),
       executionTarget: "worker",
       consumers,
+      killSwitch: options.killSwitch,
       warnWhenProjectionsRunInline: options.warnWhenProjectionsRunInline,
       ...(options.configureGlobalProjections
         ? { configureGlobalProjections: options.configureGlobalProjections }
@@ -133,6 +139,7 @@ export class WorkerEventingRuntime {
       executionTarget: dependencies.executionTarget,
       processStore: this.processStore,
       retentionPolicyResolver: dependencies.retentionPolicyResolver,
+      killSwitch: dependencies.killSwitch,
       warnWhenProjectionsRunInline: dependencies.warnWhenProjectionsRunInline,
       configureGlobalProjections: dependencies.configureGlobalProjections,
       // Spread rather than assigned, so a producer-only runtime hands Eventing

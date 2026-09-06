@@ -6,9 +6,7 @@ import { z } from "zod";
 import {
   RoleApp,
   RoleBindingTrpcApi,
-  roleBindingTrpcInputSchemas,
   RoleTrpcApi,
-  roleTrpcInputSchemas,
   type RoleBindingTrpcContext,
   type RoleTrpcContext,
 } from "../index";
@@ -61,18 +59,24 @@ function roleCaller({
   customRolePermission?: CustomRolePermissionSchema;
 }) {
   const trpc = initTRPC.context<RoleTrpcContext>().create();
-  const inputs = roleTrpcInputSchemas({ customRolePermission });
-  const procedure = trpc.procedure;
+  const passThrough = <TProcedure>(procedure: TProcedure) => procedure;
 
-  const router = RoleTrpcApi.create(trpc, {
-    getAll: procedure.input(inputs.getAll),
-    getById: procedure.input(inputs.getById),
-    create: procedure.input(inputs.create),
-    update: procedure.input(inputs.update),
-    delete: procedure.input(inputs.delete),
-    assignToUser: procedure.input(inputs.assignToUser),
-    removeFromUser: procedure.input(inputs.removeFromUser),
-  });
+  const router = RoleTrpcApi.create(
+    trpc,
+    {
+      protected: trpc.procedure,
+      policy: () => passThrough,
+      validateOutput: true,
+      access: {
+        viewRoleOrganization: passThrough,
+        manageRoleOrganization: passThrough,
+        manageRoleOrganizationThenPlan: passThrough,
+        manageOrganizationThenPlan: passThrough,
+        manageAssignmentTeamThenPlan: passThrough,
+      },
+    },
+    { customRolePermission },
+  );
 
   return router.createCaller({
     app: {
@@ -219,17 +223,11 @@ describe("Feature: role app tRPC adapter", () => {
 
 function bindingCaller(calls: Call[]) {
   const trpc = initTRPC.context<RoleBindingTrpcContext>().create();
-  const inputs = roleBindingTrpcInputSchemas();
-  const procedure = trpc.procedure;
 
   const router = RoleBindingTrpcApi.create(trpc, {
-    listForOrg: procedure.input(inputs.listForOrg),
-    listForUser: procedure.input(inputs.listForUser),
-    getMyAccessBreakdown: procedure.input(inputs.getMyAccessBreakdown),
-    create: procedure.input(inputs.create),
-    update: procedure.input(inputs.update),
-    delete: procedure.input(inputs.delete),
-    applyMemberBindings: procedure.input(inputs.applyMemberBindings),
+    protected: trpc.procedure,
+    policy: () => (procedure) => procedure,
+    validateOutput: true,
   });
 
   const record = (method: string, result: unknown) => async (input: unknown) => {
@@ -245,7 +243,17 @@ function bindingCaller(calls: Call[]) {
         permissions: {
           listManagedBindingsForOrganization: record("listManagedBindingsForOrganization", []),
           listManagedBindingsForUser: record("listManagedBindingsForUser", []),
-          getAccessBreakdown: record("getAccessBreakdown", { bindings: [] }),
+          getAccessBreakdown: record("getAccessBreakdown", {
+            user: {
+              id: USER_ID,
+              name: "Ada",
+              email: "ada@example.com",
+              orgRole: "MEMBER",
+              orgRolePermissions: [],
+            },
+            groups: [],
+            directBindings: [],
+          }),
         } as unknown as AuthzService,
         authzGrants: {
           createBinding: record("createBinding", { id: "binding_1" }),

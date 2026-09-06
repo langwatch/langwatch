@@ -26,6 +26,9 @@ vi.mock("@langwatch/observability", () => {
   });
   return {
     createLogger: vi.fn(() => make({})),
+    // The package index reaches @langwatch/api/trpc, whose call logging builds
+    // one of these at module load. Mocking the logger has to mock it too.
+    createWarnThrottle: () => ({ claim: () => 0 }),
   };
 });
 

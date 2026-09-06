@@ -234,6 +234,7 @@ describe("validateProviderApiKey", () => {
       expect(codeOf(result)).toBe("provider_refused");
     });
 
+    /** @scenario An unreachable provider is not recorded as our own failure */
     it("raises an unreachable-provider error on network failure", async () => {
       mockFetch.mockRejectedValue(new Error("Network error"));
 

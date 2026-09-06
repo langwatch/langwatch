@@ -18,6 +18,7 @@
  * never read from ambient state, which is what lets one operation serve a
  * browser session and a background caller without knowing which it is serving.
  */
+import type { InviteLanding, SignUpVerificationResult } from "@langwatch/auth-contract";
 import type { RoutingDecision } from "@langwatch/identity-contract";
 
 /**
@@ -39,13 +40,6 @@ export type AuthSession = Readonly<{
  */
 export type AuthRequestContext = Readonly<{
   session: AuthSession | null;
-}>;
-
-/** What an invitation link may say to whoever opens it. */
-export type InviteLanding = Readonly<{
-  organizationName: string;
-  inviterName: string | null;
-  alreadyAccepted: boolean;
 }>;
 
 /**
@@ -79,7 +73,7 @@ export interface AuthAppDependencies {
   completeSignUpVerification(
     ctx: AuthRequestContext,
     input: Readonly<{ token: string }>,
-  ): Promise<Readonly<{ email: string; accountCreated: boolean; accountExists: boolean }>>;
+  ): Promise<SignUpVerificationResult>;
   /**
    * The invitation behind a code, reduced to what its landing page may say.
    *

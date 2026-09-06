@@ -10,7 +10,7 @@ type LimitVariant = {
 };
 
 /** Modal opened to confirm a seat quantity update with proration preview. */
-type SeatsVariant = {
+export type UpgradeModalSeatsVariant = {
   mode: "seats";
   organizationId: string;
   currentSeats: number;
@@ -29,7 +29,10 @@ type LiteMemberRestrictionVariant = {
   resource?: string;
 };
 
-export type UpgradeModalVariant = LimitVariant | SeatsVariant | LiteMemberRestrictionVariant;
+export type UpgradeModalVariant =
+  | LimitVariant
+  | UpgradeModalSeatsVariant
+  | LiteMemberRestrictionVariant;
 
 interface OpenSeatsParams {
   organizationId: string;

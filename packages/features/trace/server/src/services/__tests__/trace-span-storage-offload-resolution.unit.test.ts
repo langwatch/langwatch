@@ -16,7 +16,8 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
