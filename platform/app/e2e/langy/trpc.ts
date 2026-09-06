@@ -42,15 +42,32 @@ export function getSessionCookie(): Promise<string> {
     try {
       let res: Response;
       for (let attempt = 1; ; attempt++) {
-        res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Origin: APP_BASE },
-          body: JSON.stringify({
-            email: ADMIN_EMAIL,
-            password: ADMIN_PASSWORD,
-          }),
-          signal: AbortSignal.timeout(15_000),
-        });
+        try {
+          res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Origin: APP_BASE },
+            body: JSON.stringify({
+              email: ADMIN_EMAIL,
+              password: ADMIN_PASSWORD,
+            }),
+            // A loaded stack answers the sign-in in tens of seconds, and the
+            // whole run is lost if this one call gives up: allow it a minute
+            // and try again twice before failing the seed.
+            signal: AbortSignal.timeout(60_000),
+          });
+        } catch (error) {
+          if (
+            attempt < 3 &&
+            error instanceof Error &&
+            (error.name === "TimeoutError" || error.name === "AbortError")
+          ) {
+            console.log(
+              `[scenario] sign-in timed out, retrying (attempt ${attempt})`,
+            );
+            continue;
+          }
+          throw error;
+        }
         // Every vitest run signs in once, so a burst of runs (a suite driven
         // in chunks) can land on the auth rate limiter. That is the runner
         // being throttled, not a scenario failing: wait out the window.

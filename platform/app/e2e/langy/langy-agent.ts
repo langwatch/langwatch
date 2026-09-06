@@ -700,9 +700,12 @@ export function makeLangyAdapter(
         .filter((m: any) => m.role !== "tool")
         .map((m: any) => toTurnMessage(m))
         .filter((m) => m.parts.length > 0 || m.role === "user");
+      // The queued parts stay queued until a turn carrying them settles: a
+      // stream that closes without a terminal marker makes the framework
+      // retry the call, and that retry has to send the kickoff again rather
+      // than an empty message list.
       const messages: Array<{ role: TurnMessage["role"]; parts: unknown[] }> =
         queuedParts ? [{ role: "user", parts: queuedParts }] : scriptedMessages;
-      queuedParts = null;
       const turnInput = {
         requestId: crypto.randomUUID(),
         messages,
@@ -746,6 +749,7 @@ export function makeLangyAdapter(
         // tab that has closed.
         onUiAction: (entry) => adapterWithState.onUiAction?.(entry),
       });
+      queuedParts = null;
       if (settledTools.length === 0) {
         return { role: "assistant", content: text };
       }
