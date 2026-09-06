@@ -179,19 +179,179 @@ async function waitFor<T>({
 
 let cliApiKeyPromise: Promise<string> | null = null;
 
+/** The organization that holds the test project. */
+async function organizationIdOfProject(cookie: string): Promise<string> {
+  const organizations = await trpcQuery<
+    Array<{
+      id: string;
+      teams?: Array<{ projects?: Array<{ id: string }> }>;
+    }>
+  >({ cookie, path: "organization.getAll", input: {} });
+  const organizationId =
+    organizations.find((organization) =>
+      (organization.teams ?? []).some((team) =>
+        (team.projects ?? []).some((project) => project.id === PROJECT_ID),
+      ),
+    )?.id ?? organizations[0]?.id;
+  if (!organizationId) {
+    throw new Error(
+      `no organization holds project ${PROJECT_ID}; check LANGY_PROJECT_ID`,
+    );
+  }
+  return organizationId;
+}
+
+/** What `POST /api/auth/cli/exchange` answers a device-session login with. */
+interface DeviceSessionExchange {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  user: { id: string; email: string; name?: string | null };
+  organization: { id: string; slug: string; name: string };
+  default_personal_vk?: { id?: string; secret?: string; prefix?: string };
+  personal_project?: {
+    id: string;
+    slug: string;
+    name: string;
+    api_key?: string;
+  };
+  cli_api_key?: string;
+  cli_api_key_scope?: {
+    kind: "organization" | "projects";
+    project_ids?: string[];
+    permissions?: string[];
+  };
+  endpoint?: string;
+}
+
+async function postCliAuth<T>({
+  route,
+  body,
+  cookie,
+}: {
+  route: string;
+  body: Record<string, unknown>;
+  cookie?: string;
+}): Promise<T> {
+  const response = await fetch(`${APP_BASE}/api/auth/cli/${route}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(cookie === undefined ? {} : { Cookie: cookie }),
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `/api/auth/cli/${route} answered ${response.status}: ${(await response.text()).slice(0, 300)}`,
+    );
+  }
+  return (await response.json()) as T;
+}
+
+/**
+ * Sign the command line in the way `langwatch login --device` does, as the
+ * test's own user, and write the config file that login writes.
+ *
+ * The three steps are the product's own device flow: the command line's
+ * `device-code` request, the browser's `approve` (sent here with the user's
+ * session cookie, with no key selection, so the server stamps the default the
+ * authorize screen offers), and the command line's `exchange`. The file
+ * carries what `persistDeviceSession` keeps of the exchange, so
+ * `resolveCredentials` walks the same path a developer's login walks: the
+ * session, the personal project and the login key. No project key reaches the
+ * terminal's environment; a control request belongs to a person, and the
+ * person is who the login names.
+ */
+export async function writeCliLoginConfig({
+  configPath,
+}: {
+  configPath: string;
+}): Promise<void> {
+  const cookie = await getSessionCookie();
+  const organizationId = await organizationIdOfProject(cookie);
+  const code = await postCliAuth<{ device_code: string; user_code: string }>({
+    route: "device-code",
+    body: { credential_type: "device_session" },
+  });
+  await postCliAuth<unknown>({
+    route: "approve",
+    body: { user_code: code.user_code, organization_id: organizationId },
+    cookie,
+  });
+  const result = await postCliAuth<DeviceSessionExchange>({
+    route: "exchange",
+    body: { device_code: code.device_code },
+  });
+  const now = Math.floor(Date.now() / 1000);
+  const config = {
+    gateway_url: process.env.LANGWATCH_GATEWAY_URL ?? "http://localhost:5563",
+    control_plane_url: result.endpoint ?? APP_BASE,
+    access_token: result.access_token,
+    refresh_token: result.refresh_token,
+    expires_at: now + result.expires_in,
+    user: {
+      id: result.user.id,
+      email: result.user.email,
+      name: result.user.name,
+    },
+    organization: {
+      id: result.organization.id,
+      slug: result.organization.slug,
+      name: result.organization.name,
+    },
+    ...(result.default_personal_vk
+      ? { default_personal_vk: result.default_personal_vk }
+      : {}),
+    ...(result.personal_project?.api_key
+      ? {
+          personal_project: {
+            id: result.personal_project.id,
+            slug: result.personal_project.slug,
+            name: result.personal_project.name,
+            api_key: result.personal_project.api_key,
+            validated_at: now,
+          },
+        }
+      : {}),
+    ...(result.cli_api_key
+      ? {
+          cli_api_key: result.cli_api_key,
+          ...(result.cli_api_key_scope
+            ? {
+                cli_api_key_scope: {
+                  kind: result.cli_api_key_scope.kind,
+                  project_ids: result.cli_api_key_scope.project_ids ?? [],
+                  ...(Array.isArray(result.cli_api_key_scope.permissions)
+                    ? { permissions: result.cli_api_key_scope.permissions }
+                    : {}),
+                },
+              }
+            : {}),
+        }
+      : {}),
+  };
+  await fs.mkdir(path.dirname(configPath), { recursive: true, mode: 0o700 });
+  await fs.writeFile(configPath, JSON.stringify(config, null, 2), {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+}
+
 /**
  * A user-scoped API key for the test's own user, bound to the test project.
  *
- * The command line signs in with a device session, and a control request
- * belongs to a person: a plain project key has no user behind it and lists no
- * requests. Rather than clicking through the device-code screens, the fixture
- * mints the same class of credential the login mints, through the product's
- * own `apiKey.create` mutation, as the signed-in user. `LANGWATCH_API_KEY` in
- * the command line's environment is then the credential it resolves, which is
- * the documented environment path of `resolveCredentials`.
+ * The scenario library reports its runs to the platform and the demo
+ * application it shares needs a key of its own, and the platform reads the
+ * test makes (open requests, conversations) authenticate the same way. The
+ * fixture mints the same class of credential the login mints, through the
+ * product's own `apiKey.create` mutation, as the signed-in user. The
+ * share-control terminal never sees it: that one signs in through
+ * `writeCliLoginConfig`.
  *
  * The key carries one PROJECT-scoped binding, so the platform resolves the
- * project from the key alone and the command line never has to name one.
+ * project from the key alone.
  *
  * The mint is read back before it is used. A `apiKey.create` that answers 200
  * has been seen to leave the binding unwritten under load, and the key that
@@ -203,23 +363,7 @@ export function getCliApiKey(): Promise<string> {
   cliApiKeyPromise ??= (async () => {
     try {
       const cookie = await getSessionCookie();
-      const organizations = await trpcQuery<
-        Array<{
-          id: string;
-          teams?: Array<{ projects?: Array<{ id: string }> }>;
-        }>
-      >({ cookie, path: "organization.getAll", input: {} });
-      const organizationId =
-        organizations.find((organization) =>
-          (organization.teams ?? []).some((team) =>
-            (team.projects ?? []).some((project) => project.id === PROJECT_ID),
-          ),
-        )?.id ?? organizations[0]?.id;
-      if (!organizationId) {
-        throw new Error(
-          `no organization holds project ${PROJECT_ID}; check LANGY_PROJECT_ID`,
-        );
-      }
+      const organizationId = await organizationIdOfProject(cookie);
       let refusal = "";
       for (let attempt = 0; attempt < 3; attempt += 1) {
         const created = await trpcMutate<{ token: string }>({
@@ -636,17 +780,20 @@ export async function startShareControl({
 }): Promise<CliTerminal> {
   await buildCli();
   if (clearOpenRequests) await cancelOpenControlRequests();
-  const apiKey = await getCliApiKey();
   const sessionName = `langy-${label}-${Date.now().toString(36)}`;
   const configPath = path.join(repo.root, "..", `${sessionName}-config.json`);
+  await writeCliLoginConfig({ configPath });
   const script = path.join(repo.root, "..", `${sessionName}.sh`);
+  // The terminal signs in through the login config alone: a project key in
+  // its environment would make the command line act as the project, and a
+  // control request is addressed to the person.
   await fs.writeFile(
     script,
     [
       "#!/bin/bash",
       `cd ${JSON.stringify(repo.root)}`,
+      "unset LANGWATCH_API_KEY",
       `export LANGWATCH_ENDPOINT=${JSON.stringify(APP_BASE)}`,
-      `export LANGWATCH_API_KEY=${JSON.stringify(apiKey)}`,
       `export LANGWATCH_CLI_CONFIG=${JSON.stringify(configPath)}`,
       "export FORCE_COLOR=0",
       "unset TRACEPARENT",

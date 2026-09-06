@@ -186,15 +186,17 @@ the permission and question cards through tRPC as the user would.
   `setCodeAccessPreference`, `disconnectLocalWorkspace`, `readAgent` and
   `startDemoApp` are the platform-side reads and writes.
 
-**The command line runs on a user-scoped API key, not on a device login.** A
-control request belongs to a person, and a plain project key has no person
-behind it. `getCliApiKey()` mints the same class of credential the login mints,
-through the product's own `apiKey.create` mutation as the signed-in user, with
-one PROJECT-scoped binding so the platform resolves the project from the key
-alone. It reaches the command line as `LANGWATCH_API_KEY`, which is the
-documented environment path of `resolveCredentials`, and `LANGWATCH_CLI_CONFIG`
-points at a scratch file so the developer's own `~/.langwatch/config.json` is
-never touched.
+**The command line signs in the way a developer does.** A control request is
+addressed to a person, so the share-control terminal runs on a device login,
+not on a project key. `writeCliLoginConfig()` walks the product's own device
+flow as the test's user (`device-code`, `approve` with the session cookie,
+`exchange`) and writes the file `langwatch login --device` writes; the
+terminal's `LANGWATCH_CLI_CONFIG` points at that scratch file, so the
+developer's own `~/.langwatch/config.json` is never touched, and
+`LANGWATCH_API_KEY` is unset in its environment. `getCliApiKey()` still mints a
+user key with one PROJECT-scoped binding for everything else: the scenario
+library's own reporting, the demo application, and the platform reads the test
+makes.
 
 ## The guided onboarding (guided-onboarding-*.scenario.test.ts)
 
