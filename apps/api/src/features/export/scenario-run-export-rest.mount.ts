@@ -82,5 +82,5 @@ export function mountScenarioRunExportRest(options: {
       unauthenticatedError: () => new ScenarioRunExportUnauthenticatedError(),
       forbiddenError: (projectId) => new ScenarioRunExportForbiddenError(projectId),
     },
-  }).hono;
+  }).mountable;
 }

@@ -693,5 +693,5 @@ export function createOtlpIngestRestApp(options: {
       });
   }
 
-  return secured.hono;
+  return secured.mountable;
 }

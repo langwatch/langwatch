@@ -89,5 +89,5 @@ export function mountApiTraceExportRest(options: ApiTraceExportRestOptions): Mou
       unauthenticatedError: () => new TraceExportUnauthenticatedError(),
       exportFailedError: (cause) => new TraceExportFailedError(cause),
     },
-  }).hono;
+  }).mountable;
 }

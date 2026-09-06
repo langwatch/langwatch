@@ -70,5 +70,5 @@ export function createRumRestApp(options: {
       return c.body(null, 202);
     });
 
-  return secured.hono;
+  return secured.mountable;
 }

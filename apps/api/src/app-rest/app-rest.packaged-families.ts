@@ -361,7 +361,7 @@ export function mountApiPackagedRestFamilies(options: {
   const agentCache = services.agentCache;
   mount(
     "agent-cache",
-    agentCache ? () => createAgentCacheRestApp({ security, agentCache }).hono : null,
+    agentCache ? () => createAgentCacheRestApp({ security, agentCache }).mountable : null,
   );
 
   const agents = services.agents;
@@ -487,7 +487,7 @@ export function mountApiPackagedRestFamilies(options: {
             dualAuth,
             requireProjectPermission,
             rateLimit: ports.rateLimit,
-          }).hono
+          }).mountable
       : null,
   );
 
@@ -649,7 +649,10 @@ export function mountApiPackagedRestFamilies(options: {
   );
 
   const secrets = services.secrets;
-  mount("secret", secrets ? () => createSecretLegacyRestApp({ security, secrets }).hono : null);
+  mount(
+    "secret",
+    secrets ? () => createSecretLegacyRestApp({ security, secrets }).mountable : null,
+  );
 
   mount(
     "simulation-runs",
@@ -673,7 +676,7 @@ export function mountApiPackagedRestFamilies(options: {
             dualAuth,
             userAvatarObjects,
             rateLimit: ports.rateLimit,
-          }).hono
+          }).mountable
       : null,
   );
 

@@ -85,6 +85,11 @@ export {
   securityForCredentialClass,
 } from "./security/openapi-security.js";
 export {
+  assertEveryRouteDeclared,
+  type MountedRouteTable,
+  undeclaredRoutes,
+} from "./security/route-declaration.js";
+export {
   allRegisteredRoutes,
   getRoutePolicy,
   type RegisteredRoute,
@@ -98,6 +103,7 @@ export {
   type RestApiServicePorts,
   type RestApiVersionedFamily,
   SecuredApp,
+  type SealedRestApp,
   type SecuredVerbs,
   type VersionedAppOptions,
   type VersionedEndpointMeta,

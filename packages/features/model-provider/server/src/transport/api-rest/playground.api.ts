@@ -136,5 +136,5 @@ export function createPlaygroundRestApp<TSession extends PlaygroundRestSession>(
       }
     });
 
-  return secured.hono;
+  return secured.mountable;
 }

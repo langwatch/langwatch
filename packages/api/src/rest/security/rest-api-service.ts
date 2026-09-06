@@ -18,6 +18,7 @@ import {
   ENDPOINT_ROUTE,
   REQUEST_FAMILY,
   type EndpointVariables,
+  type MountableRestApp,
   type MountedRoute,
 } from "../types.js";
 import { canonicalV1Path, undescribedStack } from "../v1-alias.js";
@@ -163,13 +164,39 @@ export type SecuredVerbs<E extends Env> = Pick<Hono<E>, HttpVerb> & {
 };
 
 /**
+ * A composed Hono app with its route-registration surface removed: everything a
+ * caller does with a family after it is built, and nothing that adds a route
+ * behind the access policy.
+ */
+export type SealedRestApp = Omit<
+  Hono<any, any, any>,
+  HttpVerb | "head" | "all" | "on" | "use" | "route" | "mount" | "basePath"
+>;
+
+/**
  * A Hono application whose routes cannot be registered without first declaring an {@link AccessPolicy}. The bare app deliberately does NOT
  * expose `.get/.post/...` — the only way to register a route is `app.access(policy).get(path, ...handlers)`. Omitting the policy is a
  * compile-time error; bypassing the builder is caught by the router introspection guard test against the route registry.
  */
 export class SecuredApp<E extends Env> {
-  /** The underlying Hono app — mount this in the API router via `api.route("/", app.hono)`. */
-  readonly hono: Hono<E>;
+  /**
+   * The composed app as callers may see it: no route registration on it.
+   * Registering a verb on the raw app used to mount an unguarded route; it no
+   * longer typechecks, and `langwatch/no-raw-hono-mount` refuses the source.
+   */
+  get hono(): SealedRestApp {
+    return this.app;
+  }
+
+  /**
+   * The raw app, for a family factory that must publish a `MountableRestApp`.
+   * Prefer {@link mountInto}: this hands back the registration surface.
+   */
+  get mountable(): MountableRestApp {
+    return this.app;
+  }
+
+  private readonly app: Hono<E>;
 
   private readonly basePath: string;
   /** Whether this family publishes `/api/v1` twins of its routes. */
@@ -206,7 +233,7 @@ export class SecuredApp<E extends Env> {
     this.errorEnvelope = args.errorEnvelope ?? "legacy";
     // No Hono base path: the family registers absolute paths itself, because
     // its routes answer under two prefixes and `basePath()` admits only one.
-    this.hono = new Hono<E>();
+    this.app = new Hono<E>();
     this.scoped(
       args.ports.requestTracer({ name: this.family }),
       args.ports.requestLogger(),
@@ -214,7 +241,7 @@ export class SecuredApp<E extends Env> {
     );
     // One shape per family, whichever layer refuses. A family can still
     // install its own onError to name its domain errors more precisely.
-    this.hono.onError(
+    this.app.onError(
       this.errorEnvelope === "canonical"
         ? args.ports.canonicalErrorHandler
         : args.ports.legacyErrorHandler,
@@ -226,9 +253,9 @@ export class SecuredApp<E extends Env> {
    * `/api` families need no v1 scope: `/api/*` already covers `/api/v1/*`.
    */
   private scoped(...handlers: MiddlewareHandler[]): void {
-    this.hono.use(`${this.basePath}/*`, ...handlers);
+    this.app.use(`${this.basePath}/*`, ...handlers);
     if (this.v1BasePath) {
-      this.hono.use(`${this.v1BasePath}/*`, ...handlers);
+      this.app.use(`${this.v1BasePath}/*`, ...handlers);
     }
   }
 
@@ -278,31 +305,31 @@ export class SecuredApp<E extends Env> {
         // carries no OpenAPI metadata, so the describer publishes the bare
         // path once instead of the same operation twice.
         if (aliasPath) {
-          const on = this.hono.on as unknown as (
+          const on = this.app.on as unknown as (
             method: string,
             path: string,
             ...handlers: MiddlewareHandler[]
           ) => unknown;
           on.call(
-            this.hono,
+            this.app,
             method === "all" ? "ALL" : method.toUpperCase(),
             aliasPath,
             ...undescribedStack(stack),
           );
         }
         if (method === "head") {
-          const on = this.hono.on as unknown as (
+          const on = this.app.on as unknown as (
             method: string,
             path: string,
             ...handlers: MiddlewareHandler[]
           ) => unknown;
-          return on.call(this.hono, "HEAD", registeredPath, ...stack);
+          return on.call(this.app, "HEAD", registeredPath, ...stack);
         }
-        const verb = this.hono[method] as unknown as (
+        const verb = this.app[method] as unknown as (
           path: string,
           ...handlers: MiddlewareHandler[]
         ) => unknown;
-        return verb.call(this.hono, registeredPath, ...stack);
+        return verb.call(this.app, registeredPath, ...stack);
       }) as SecuredVerbs<E>[HttpVerb];
     };
 
@@ -338,7 +365,16 @@ export class SecuredApp<E extends Env> {
    * raw Hono would smuggle in routes with no declared policy, so wrap one in a SecuredApp first if you must.
    */
   route(path: string, app: SecuredApp<Env>): this {
-    this.hono.route(mergePath(this.basePath, path), app.hono);
+    this.app.route(mergePath(this.basePath, path), app.app);
+    return this;
+  }
+
+  /**
+   * Mount this family into a parent app. The legitimate use for the composed
+   * app, and the reason the registration surface need not be public at all.
+   */
+  mountInto(parent: MountableRestApp, path = "/"): this {
+    parent.route(path, this.app);
     return this;
   }
 

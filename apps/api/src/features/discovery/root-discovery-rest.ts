@@ -93,5 +93,5 @@ export function createRootDiscoveryRestApp(options: {
     );
   }
 
-  return secured.hono;
+  return secured.mountable;
 }

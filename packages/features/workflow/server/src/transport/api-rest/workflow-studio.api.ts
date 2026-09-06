@@ -246,5 +246,5 @@ export function createWorkflowStudioRestApp<TSession extends WorkflowStudioRestS
       });
     });
 
-  return secured.hono;
+  return secured.mountable;
 }

@@ -19,6 +19,12 @@ import {
   type TRPCDefaultErrorShape,
 } from "@trpc/server";
 import {
+  allRegisteredRoutes,
+  assertEveryRouteDeclared,
+  type MountableRestApp,
+  type SealedRestApp,
+} from "@langwatch/api/rest";
+import {
   TrpcRootDefinition,
   type AppTrpcPolicyMiddlewares,
   type TrpcAuthorizationDecisions,
@@ -88,7 +94,7 @@ export type ApiErrorFormatter = (options: {
 /**
  * The subscription lane, built against the caller this application resolves.
  */
-export type ApiSubscriptionMount = (ports: SseSubscriptionPorts) => Hono;
+export type ApiSubscriptionMount = (ports: SseSubscriptionPorts) => SealedRestApp;
 
 export type ApiHttpOptions = Readonly<{
   createContext(request: Request): Promise<ApiRequestContext>;
@@ -676,9 +682,15 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
         ),
     });
     if (subscriptions) {
-      hono.route("/", subscriptions);
+      // The lane is a composed secured app, published without its registration
+      // surface. Mounting is the one thing a parent still does with it.
+      hono.route("/", subscriptions as MountableRestApp);
     }
     if (rest) {
+      // Last gate before the process serves anything: a route the composition
+      // mounted around the secured builder has no declared access policy, and
+      // the process refuses to start rather than answer it unguarded.
+      assertEveryRouteDeclared({ app: rest, registry: allRegisteredRoutes() });
       hono.route("/", rest);
     }
     return hono;

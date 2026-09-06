@@ -1,4 +1,6 @@
 import { SpanStatusCode, type Tracer } from "@opentelemetry/api";
+import { handlerManagedAuth, publicEndpoint } from "@langwatch/api";
+import { registerRoutePolicy } from "@langwatch/api/rest";
 import type { Logger } from "@langwatch/observability";
 import { Hono } from "hono";
 
@@ -70,11 +72,35 @@ export class ObservabilityApiRequestFailureCaptureAdapter extends ApiRequestFail
 export class ApiProcessLifecycleRoutes {
   static create(options: { metrics?: ApiMetricsPort; rest?: Hono }): Hono {
     const routes = new Hono();
+    // Process-owned, so they carry no builder chain — but the boot assertion
+    // reads the registry, and a route missing from it is indistinguishable
+    // from one smuggled past the builder. Declared here, where they are made.
+    const health = publicEndpoint("unauthenticated liveness probe: answers 204 and reads nothing");
+    for (const method of ["GET", "HEAD"]) {
+      registerRoutePolicy({
+        method,
+        path: "/api/health",
+        policy: health,
+        family: "process-lifecycle",
+        credentialClass: "none",
+      });
+    }
     routes.get("/api/health", (context) => context.body(null, 204));
     routes.on("HEAD", "/api/health", (context) => context.body(null, 204));
 
     const metrics = options.metrics;
     if (metrics) {
+      registerRoutePolicy({
+        method: "GET",
+        path: "/metrics",
+        policy: handlerManagedAuth({
+          reason: "the metrics transport authenticates the scrape itself",
+          permissions: [],
+          credential: "internal",
+        }),
+        family: "process-lifecycle",
+        credentialClass: "internal",
+      });
       routes.get("/metrics", (context) => metrics.respond(context.req.raw));
     }
 

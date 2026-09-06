@@ -231,6 +231,20 @@ describe("the app tRPC authz declaration sweep", () => {
       expect(unchecked).toEqual([]);
     });
 
+    /** A procedure with no declaration is not a procedure the sweep can
+     *  reason about at all: nothing names the permission it needs, so every
+     *  later check reads it as vacuously covered. It is the hole the sweep
+     *  used to filter away.
+     *  @scenario "A tRPC procedure with no access declaration fails the sweep" */
+    it("refuses a procedure with no access declaration", () => {
+      const undeclared = procedures
+        .filter((procedure) => procedure.declaration === null)
+        .map((procedure) => `${procedure.path} declares no access`)
+        .sort();
+
+      expect(undeclared).toEqual([]);
+    });
+
     /** A claim about a field the input does not carry is rot: the field was
      *  renamed or removed and the declaration kept asserting enforcement of
      *  nothing.

@@ -189,5 +189,5 @@ export function createScenarioGenerateRestApp<
       }
     });
 
-  return secured.hono;
+  return secured.mountable;
 }

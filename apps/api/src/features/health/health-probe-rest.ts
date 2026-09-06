@@ -552,5 +552,5 @@ export function createHealthProbeRestApp(options: {
   secured.access(probe).get("/triggers", (c) => triggersProbe(c, ports));
   secured.access(probe).get("/workflows", (c) => workflowsProbe(c, ports));
 
-  return secured.hono;
+  return secured.mountable;
 }

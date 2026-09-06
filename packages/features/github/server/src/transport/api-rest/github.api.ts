@@ -553,5 +553,5 @@ export function createGithubRestApp(options: {
     .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
     .post("/github-langy/webhook", (c) => handleWebhook(c, ports));
 
-  return secured.hono;
+  return secured.mountable;
 }

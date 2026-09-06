@@ -51,6 +51,31 @@ Feature: Hono API endpoint authorization and tenant isolation
       Then each one is registered through SecuredApp with a declared policy
       And any route that bypassed the builder fails this assertion
 
+    @unit
+    Scenario: A mounted route with no declared policy stops the boot
+      Given the composed REST router of the API process
+      When a route is mounted that the route registry does not carry
+      Then the process refuses to finish booting
+      And the refusal names the method and path of every such route
+      # The CI cross-check only sees the composition the description task can
+      # build. This is the same check on the router the process actually
+      # serves, so a path CI never composed cannot answer unguarded.
+
+    @unit
+    Scenario: A tRPC procedure with no access declaration fails the sweep
+      Given every procedure the process mounts
+      When one carries no access declaration at all
+      Then the declaration sweep fails and names that procedure
+      # The sweep used to skip an undeclared procedure, so the one shape it
+      # could say nothing about was the one it reported as fine.
+
+    @unit
+    Scenario: The raw Hono app cannot be mounted around the policy
+      Given a secured app whose routes are declared through access(policy)
+      When source code registers a verb on the underlying Hono app instead
+      Then the architecture linter refuses that source
+      And the published view of the app carries no verb methods to call
+
     @integration
     Scenario: A public or internal route declares a documented reason
       Given the route registry

@@ -36,5 +36,5 @@ export function createApiDiscoveryRestApp(options: {
     .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
     .get("/openapi.json", respondWithApiDocument);
 
-  return secured.hono;
+  return secured.mountable;
 }

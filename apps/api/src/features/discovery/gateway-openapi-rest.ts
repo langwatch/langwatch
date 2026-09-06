@@ -32,5 +32,5 @@ export function createGatewayOpenApiRestApp(options: {
     )
     .get("/openapi.json", respondWithApiDocument);
 
-  return secured.hono;
+  return secured.mountable;
 }

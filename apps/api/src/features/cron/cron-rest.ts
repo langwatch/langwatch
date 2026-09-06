@@ -85,5 +85,5 @@ export function createCronRestApp(options: {
   secured.access(cronPolicy()).get("/old_lambdas_cleanup", oldLambdasCleanupHandler);
   secured.access(cronPolicy()).post("/old_lambdas_cleanup", oldLambdasCleanupHandler);
 
-  return secured.hono;
+  return secured.mountable;
 }

@@ -133,5 +133,5 @@ export function createDatasetGenerateRestApp<TSession extends DatasetGenerateRes
       });
     });
 
-  return secured.hono;
+  return secured.mountable;
 }

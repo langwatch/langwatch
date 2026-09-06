@@ -66,7 +66,7 @@ function threeFamiliesAtOneBasePath(): Hono {
     app
       .access(publicEndpoint("framework test endpoint"))
       .get(`/${family}`, (c) => c.json({ family }));
-    root.route("/", app.hono);
+    app.mountInto(root);
   }
   return root;
 }
