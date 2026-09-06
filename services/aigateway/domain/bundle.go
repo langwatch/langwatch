@@ -552,10 +552,15 @@ type BudgetConfig struct {
 	// from the key's revision and its provider set, neither of which moves
 	// when a period rolls, so a conditional refresh comes back 304 and the
 	// figures never change. A budget that reached its limit in the old
-	// period would then keep rejecting every request in the new one, and
-	// the change event that would otherwise evict this entry is emitted by
-	// the debit of a request that got through — which, once the block is
-	// in force, no request ever does.
+	// period then keeps rejecting requests in the new one.
+	//
+	// The change feed does not close this. The BUDGET_UPDATED that evicts
+	// this entry is emitted by a debit — by a request that got through — and
+	// a blocked key cannot produce one. Eviction is project-wide, so a
+	// sibling key with traffic clears the block for the whole project; a
+	// project whose only traffic is the blocked key has no sibling, and stays
+	// blocked until an admin edits something or the process restarts. Hence a
+	// boundary the gateway keeps on its own schedule.
 	ValidUntil time.Time
 }
 

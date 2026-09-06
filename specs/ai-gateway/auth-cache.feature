@@ -504,11 +504,20 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     # provider set. Neither of those moves when a period ends, so a conditional
     # revalidation confirms figures that describe a period that is over.
     #
-    # For a budget that reached its limit, that is a block with no way out. The
-    # change event that would evict the entry is emitted by the debit of a
-    # request that got through, and once the block is in force no request gets
-    # through. The key stays rejected on yesterday's money until someone edits
-    # it or the gateway restarts.
+    # For a budget that reached its limit, that leaves the key rejecting on
+    # money it did not spend this period. What clears it is a BUDGET_UPDATED
+    # event, and the only one that arrives without an admin touching something
+    # is emitted by a debit — by a request that got through. The blocked key
+    # cannot produce one itself.
+    #
+    # Eviction on that event is project-wide (org-wide when the event carries
+    # no project), so a sibling key with traffic in the same project clears the
+    # block for everyone within a poll cycle. The keys that stay stuck are the
+    # ones whose project has no other traffic — a CI key, a scheduled job, a
+    # single-key project — and they stay stuck until an admin edits something
+    # or the gateway restarts. That is the case this Rule closes; it is not
+    # closed by the change feed, which is why the boundary has to be a schedule
+    # the gateway keeps on its own.
 
     @unit
     Scenario: a bundle knows when its spend figures stop describing the current period
@@ -528,6 +537,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     @unit
     Scenario: a period still running is revalidated the ordinary way
       Given a cached key whose budget is exhausted inside its own period
+      And a config read within the staleness TTL
       When the next request arrives
       Then no config refresh is triggered
       And the request is judged against the spend the gateway holds
