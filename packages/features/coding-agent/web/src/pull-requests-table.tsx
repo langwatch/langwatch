@@ -83,7 +83,7 @@ const PLACEHOLDER_PERIOD_PRESET = "30d";
 interface LiveStatus {
   status: PullRequestStatus;
   source: "live" | "snapshot";
-  mappedAt: Date | null;
+  mappedAt: string | null;
 }
 
 /** The whole read, as the procedure map defines it. */

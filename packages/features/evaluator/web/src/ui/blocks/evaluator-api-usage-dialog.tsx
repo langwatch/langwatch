@@ -1,3 +1,4 @@
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /**
  * The snippets that call this evaluator from a customer's own code.
  *
@@ -28,7 +29,7 @@ import { CodeSnippet } from "../elements/code-snippet";
 import { Dialog } from "@langwatch/design-system/dialog";
 
 export type EvaluatorApiUsageDialogProps = {
-  evaluator: Evaluator | null;
+  evaluator: WireOf<Evaluator> | null;
   open: boolean;
   onClose: () => void;
 };

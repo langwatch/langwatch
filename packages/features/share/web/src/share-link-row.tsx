@@ -1,6 +1,7 @@
 import { HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { ShareLink, ShareVisibility } from "@langwatch/share-contract";
+import type { ShareVisibility } from "@langwatch/share-contract";
+import type { ShareLinkView } from "./share-link-status";
 import type { IconType } from "react-icons";
 import { LuBuilding2, LuCopy, LuFolderClosed, LuGlobe, LuTrash2 } from "react-icons/lu";
 import { describeShareLink, isShareLinkSpent } from "./share-link-status";
@@ -21,7 +22,7 @@ export function ShareLinkRow({
   onCopy,
   onRevoke,
 }: {
-  link: ShareLink;
+  link: ShareLinkView;
   isFirst: boolean;
   isRevoking: boolean;
   /** The host owns how a copy is reported; this row only asks for one. */

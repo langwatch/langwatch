@@ -17,21 +17,21 @@ describe("groupItemsByType", () => {
           type: "prompt",
           name: "Prompt 1",
           href: "/p/prompts?prompt=1",
-          updatedAt: new Date(),
+          updatedAt: new Date().toISOString(),
         },
         {
           id: "2",
           type: "workflow",
           name: "Workflow 1",
           href: "/p/studio/2",
-          updatedAt: new Date(),
+          updatedAt: new Date().toISOString(),
         },
         {
           id: "3",
           type: "prompt",
           name: "Prompt 2",
           href: "/p/prompts?prompt=3",
-          updatedAt: new Date(),
+          updatedAt: new Date().toISOString(),
         },
       ];
 
@@ -58,14 +58,14 @@ describe("groupItemsByType", () => {
           type: "dataset",
           name: "Dataset 1",
           href: "/p/datasets/1",
-          updatedAt: new Date(),
+          updatedAt: new Date().toISOString(),
         },
         {
           id: "2",
           type: "dataset",
           name: "Dataset 2",
           href: "/p/datasets/2",
-          updatedAt: new Date(),
+          updatedAt: new Date().toISOString(),
         },
       ];
 

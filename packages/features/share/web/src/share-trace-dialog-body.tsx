@@ -1,5 +1,5 @@
 import { Separator, VStack } from "@chakra-ui/react";
-import type { ShareLink } from "@langwatch/share-contract";
+import type { ShareLinkView } from "./share-link-status";
 import { CreateShareLinkForm, type CreateShareLinkDraft } from "./create-share-link-form";
 import { ShareLinksList } from "./share-links-list";
 
@@ -21,7 +21,7 @@ export function ShareTraceDialogBody({
   onCopy,
   onRevoke,
 }: {
-  links: ShareLink[];
+  links: ShareLinkView[];
   isLoading: boolean;
   isError: boolean;
   canCreate: boolean;

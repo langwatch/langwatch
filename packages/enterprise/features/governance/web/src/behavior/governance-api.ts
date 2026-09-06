@@ -27,7 +27,7 @@
  * that name, and nothing checks that promise until the generator exists.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorSummary,
@@ -97,10 +97,10 @@ export type GovernanceIngestionSourceView = {
   status: string;
   traceProjectId: string | null;
   traceProjectArchived: boolean;
-  lastEventAt: Date | null;
-  archivedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  lastEventAt: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
   createdById: string | null;
 };
 
@@ -744,17 +744,11 @@ export const governanceApi = createFeatureApi<GovernanceApiMap>();
  * `AppRouter`, and the screens wrote `RouterOutputs["ingestionSources"]["list"][number]`.
  * Deriving the same shape from the map above keeps those type aliases exactly
  * as they were written, and keeps them honest: an output that changes here
- * changes at every alias, which is what a generated map will do too.
+ * changes at every alias, which is what a generated map will do too. It is
+ * derived through the built router so the wire's own shape shows: dates are
+ * ISO strings here, not `Date`.
  */
-type GovernanceOutputOf<TNode> = TNode extends { query: { output: infer TOutput } }
-  ? TOutput
-  : TNode extends { mutation: { output: infer TOutput } }
-    ? TOutput
-    : { [TSegment in keyof TNode]: GovernanceOutputOf<TNode[TSegment]> };
-
-export type RouterOutputs = {
-  [TSegment in keyof GovernanceApiMap]: GovernanceOutputOf<GovernanceApiMap[TSegment]>;
-};
+export type RouterOutputs = OutputsFromMap<GovernanceApiMap>;
 
 /**
  * The name the screens call it by.

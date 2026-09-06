@@ -1,10 +1,9 @@
-import type { ShareLink } from "@langwatch/share-contract";
 import { describe, expect, it } from "vitest";
-import { describeShareLink, isShareLinkSpent } from "../share-link-status";
+import { describeShareLink, isShareLinkSpent, type ShareLinkView } from "../share-link-status";
 
 const NOW = new Date("2026-08-27T12:00:00.000Z");
 
-function buildLink(overrides: Partial<ShareLink> = {}): ShareLink {
+function buildLink(overrides: Partial<ShareLinkView> = {}): ShareLinkView {
   return {
     id: "share_1",
     token: "tok_1",
@@ -17,8 +16,8 @@ function buildLink(overrides: Partial<ShareLink> = {}): ShareLink {
     expiresAt: null,
     maxViews: null,
     viewCount: 0,
-    createdAt: NOW,
-    updatedAt: NOW,
+    createdAt: NOW.toISOString(),
+    updatedAt: NOW.toISOString(),
     ...overrides,
   };
 }
@@ -36,12 +35,12 @@ describe("share link status", () => {
 
   describe("given a link whose expiry has passed", () => {
     it("is spent", () => {
-      const link = buildLink({ expiresAt: new Date(NOW.getTime() - 1) });
+      const link = buildLink({ expiresAt: new Date(NOW.getTime() - 1).toISOString() });
       expect(isShareLinkSpent({ link, now: NOW })).toBe(true);
     });
 
     it("reads as expired", () => {
-      const link = buildLink({ expiresAt: new Date(NOW.getTime() - 1) });
+      const link = buildLink({ expiresAt: new Date(NOW.getTime() - 1).toISOString() });
       expect(describeShareLink({ link, now: NOW })).toBe("Expired");
     });
   });
@@ -50,7 +49,7 @@ describe("share link status", () => {
     // The service treats `expiresAt <= now` as expired; the row must not read
     // as live while the server refuses it.
     it("is already spent", () => {
-      const link = buildLink({ expiresAt: new Date(NOW.getTime()) });
+      const link = buildLink({ expiresAt: NOW.toISOString() });
       expect(isShareLinkSpent({ link, now: NOW })).toBe(true);
     });
   });

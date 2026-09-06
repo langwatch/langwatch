@@ -1,3 +1,4 @@
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /**
  * `defaultModelOverride`: authoring or editing one ModelDefaultConfig policy.
  *
@@ -65,7 +66,8 @@ import { useModelProviderHost } from "../../model/model-provider-host";
 import { modelSelectorOptions } from "../elements/model-selector";
 import { INHERIT_SENTINEL, ProviderModelSelector } from "../elements/provider-model-selector";
 
-type Payload = ModelDefaultSnapshot;
+/** The snapshot as the browser holds one: its instants are ISO strings. */
+type Payload = WireOf<ModelDefaultSnapshot>;
 
 type FeatureProjection = Payload["features"][number];
 type ScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";

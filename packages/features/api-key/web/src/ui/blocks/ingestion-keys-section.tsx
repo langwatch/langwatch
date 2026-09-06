@@ -1,3 +1,4 @@
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { Badge, Box, Button, Card, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { Radio, Trash2 } from "lucide-react";
 
@@ -6,7 +7,8 @@ import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 
-type IngestionKeyRow = ApiKeyListEntry;
+/** A key as the browser holds one: the wire carries its instants as ISO strings. */
+type IngestionKeyRow = WireOf<ApiKeyListEntry>;
 
 function isExpired(key: IngestionKeyRow): boolean {
   return Boolean(key.expiresAt && new Date(key.expiresAt) < new Date());

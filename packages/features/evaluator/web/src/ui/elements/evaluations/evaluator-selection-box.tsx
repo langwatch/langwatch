@@ -1,10 +1,11 @@
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { CheckCircle, ChevronRight } from "lucide-react";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 
 export type EvaluatorSelectionBoxProps = {
   /** The currently selected evaluator, or null if none selected */
-  selectedEvaluator: Evaluator | null;
+  selectedEvaluator: WireOf<Evaluator> | null;
   /** Called when the user clicks to select an evaluator (no evaluator selected) */
   onSelectClick: () => void;
   /** Called when the user clicks on an already-selected evaluator (to edit it) */

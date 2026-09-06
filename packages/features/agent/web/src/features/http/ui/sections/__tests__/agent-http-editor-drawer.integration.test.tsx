@@ -1,7 +1,11 @@
 /* @vitest-environment jsdom */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { AgentWithFields } from "@langwatch/agent-contract";
+import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** An agent as the drawer holds one: the wire carries its instants as strings. */
+type AgentWithFields = WireOf<StoredAgentWithFields>;
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -41,8 +45,8 @@ function savedAgent(config: Record<string, unknown>): AgentWithFields {
     workflowId: null,
     copiedFromAgentId: null,
     archivedAt: null,
-    createdAt: new Date("2026-01-01T00:00:00.000Z"),
-    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
     config: {
       name: "HTTP",
       description: "HTTP API endpoint",

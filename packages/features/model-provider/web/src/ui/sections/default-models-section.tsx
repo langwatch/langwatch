@@ -1,3 +1,4 @@
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /**
  * Default Models — the table of every policy the caller can see, one row per
  * policy, with scope chips on the left and the role-level models in the
@@ -72,7 +73,8 @@ import { useModelProviderHost } from "../../model/model-provider-host";
 import { filterRowsByScope } from "../../model/provider-scope-filter";
 import { ModelChip } from "../elements/model-chip";
 
-type ConfigRow = ModelDefaultConfigSnapshot;
+/** A saved default as the browser holds one: its instants are ISO strings. */
+type ConfigRow = WireOf<ModelDefaultConfigSnapshot>;
 
 interface DefaultModelsSectionProps {
   /** The page header's filter, which narrows this table and the one above it. */

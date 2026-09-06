@@ -12,18 +12,33 @@ import {
 } from "@chakra-ui/react";
 import type {
   FeatureFlagRules,
-  OperatorFeatureFlag,
+  OperatorFeatureFlag as StoredOperatorFeatureFlag,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
+
+/** One flag as the BROWSER receives it: `updatedAt` arrives as an ISO string. */
+export type OperatorFeatureFlag = Omit<StoredOperatorFeatureFlag, "updatedAt"> & {
+  updatedAt: string | null;
+};
 import { useMemo, useState } from "react";
 import { Switch } from "@langwatch/design-system/switch";
 import { FeatureFlagRulesDialog } from "./feature-flag-rules-dialog";
 import { summarizeTargeting, targetingLabel } from "./model/targeting-summary";
 
+/**
+ * The catalogue as the BROWSER receives it.
+ *
+ * The contract types `updatedAt` as `Date` because that is what the server
+ * builds; nothing transforms the wire, so what arrives is the ISO string.
+ */
+export type OperatorFeatureFlagCatalogueRead = Omit<OperatorFeatureFlagCatalogue, "flags"> & {
+  flags: OperatorFeatureFlag[];
+};
+
 export interface OperatorFeatureFlagCatalogueProps {
   /** True on a shared (multi-tenant) install, where a PRODUCT flag reaches every customer. */
   sharedInstall?: boolean;
-  catalogue: OperatorFeatureFlagCatalogue;
+  catalogue: OperatorFeatureFlagCatalogueRead;
   canManage: boolean;
   pendingKey?: string;
   onSetEnabled: (input: { key: string; enabled: boolean }) => Promise<void>;
@@ -288,7 +303,9 @@ function FlagRow({
           </Text>
         ) : (
           <VStack align="start" gap={0}>
-            <Text fontSize="xs">{row.updatedAt?.toLocaleString() ?? ""}</Text>
+            <Text fontSize="xs">
+              {row.updatedAt ? new Date(row.updatedAt).toLocaleString() : ""}
+            </Text>
             <HStack gap={2}>
               <Text fontSize="xs" color="fg.muted">
                 {row.lastEditedBy ?? "unknown"}

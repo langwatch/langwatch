@@ -84,7 +84,8 @@ export interface PromptStudioSpanResult {
   messages: ChatMessage[];
   llmConfig: {
     model: string | null;
-    systemPrompt: ChatMessage["content"];
+    /** Absent when the span carried no system message: JSON drops the key. */
+    systemPrompt?: ChatMessage["content"];
     temperature: number | null;
     maxTokens: number | null;
     topP: number | null;
@@ -99,9 +100,12 @@ export interface PromptStudioSpanResult {
     litellmParams: Record<string, unknown>;
   };
   vendor: string | null;
-  error: Span["error"] | null;
-  timestamps: SpanTimestamps | undefined;
-  metrics: LLMSpan["metrics"] | null;
+  /** Absent when the span recorded no error: JSON drops a key holding `undefined`. */
+  error?: Span["error"] | null;
+  /** Absent on a span with no timing, for the same reason. */
+  timestamps?: SpanTimestamps;
+  /** Absent when the span carried no metrics: JSON drops a key holding `undefined`. */
+  metrics?: LLMSpan["metrics"] | null;
   /** Prompt handle from span attributes (new combined or old format) */
   promptHandle: string | null;
   /** Prompt version number from span attributes (new combined or old format) */

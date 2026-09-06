@@ -14,7 +14,8 @@ export interface DejaViewProcessManagerInstance {
   revision: number;
   updatedAt: number;
   nextWakeAt: number | null;
-  state: unknown;
+  /** Optional: JSON drops a key holding `undefined`. */
+  state?: unknown;
 }
 
 export interface DejaViewProcessManager {

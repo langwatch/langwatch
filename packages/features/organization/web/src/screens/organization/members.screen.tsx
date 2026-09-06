@@ -39,7 +39,6 @@ import { useDepartmentColumn } from "../../behavior/use-department-column";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { useInviteActions } from "../../behavior/use-invite-actions";
-import type { OrganizationWithMembersAndTheirTeams } from "../../behavior/organization-api";
 import { useOrganizationHost, type OrganizationTeamReading } from "../../model/organization-host";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { usePublicEnv } from "../../behavior/use-public-env";
@@ -48,6 +47,10 @@ import type { RouterOutputs } from "../../behavior/organization-api";
 import { api } from "../../behavior/organization-api";
 import { useOrganizationToaster } from "../../behavior/organization-feedback";
 import { reportUnexpected } from "../../behavior/report-unexpected";
+
+/** The organization graph as the browser receives it: instants are ISO strings. */
+type OrganizationWithMembersAndTheirTeams =
+  RouterOutputs["organization"]["getOrganizationWithMembersAndTheirTeams"];
 
 type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
 
@@ -507,7 +510,8 @@ function MemberRowActions({
   member: {
     userId: string;
     role: OrganizationUserRole;
-    disabledAt: Date | null;
+    /** ISO 8601 or absent: the wire carries the instant as text. */
+    disabledAt: string | null;
     user: { name: string | null; email: string | null };
   };
   canDisable: boolean;

@@ -6,10 +6,15 @@ import type {
   AnnotationScoreDataType,
   ScoreOptions,
 } from "@langwatch/annotation-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
-export type AnnotationScoreList = AnnotationScore[];
-export type TraceAnnotation = Annotation;
+/**
+ * The score list and the annotation as the FORM holds them — off a query, so
+ * their instants are the ISO strings the wire carries.
+ */
+export type AnnotationScoreList = WireOf<AnnotationScore>[];
+export type TraceAnnotation = WireOf<Annotation>;
 
 export interface AnnotationScoreOption {
   label: string;

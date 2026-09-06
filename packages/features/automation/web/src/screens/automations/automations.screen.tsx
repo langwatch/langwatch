@@ -37,7 +37,11 @@ import {
 } from "../../features/overview/ui/elements/automation-table-cells";
 import { RUNAWAY_PAUSE_REASON, type TriggerAction } from "@langwatch/automation-contract";
 import { CLIENT_PROVIDERS } from "../../features/authoring/ui/sections/client-providers";
-import type { Monitor } from "@langwatch/monitor-contract";
+import type { Monitor as StoredMonitor } from "@langwatch/monitor-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** A monitor as the browser holds one: the wire carries its instants as strings. */
+type Monitor = WireOf<StoredMonitor>;
 import { useAutomationHost } from "../../model/automation-host";
 import { useOrganizationTeamProject } from "../../behavior/automation-session";
 import { useAutomationToaster } from "../../behavior/automation-feedback";

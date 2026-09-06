@@ -1,12 +1,12 @@
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { getDisplayHandle, OrganizationBadge } from "../../../surfaces/prompt-reference";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { PublishedPromptActions } from "./published-prompt-actions";
 
 interface PublishedPromptContentProps {
   promptId: string;
   promptHandle: string | null;
-  prompt?: VersionedPrompt | null;
+  prompt?: WireVersionedPrompt | null;
 }
 
 /**

@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "../model/wire-versioned-prompt";
 import { usePromptHost } from "../model/prompt-host";
 import cloneDeep from "lodash-es/cloneDeep";
 import { useCallback } from "react";
@@ -10,7 +11,6 @@ import {
 import { useLatestPromptVersion } from "./use-latest-prompt-version";
 import { usePromptConfigContext } from "../model/prompt-config-context";
 import { formValuesToTriggerSaveVersionParams } from "../model/prompt-node-conversion";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { promptApi } from "./prompt-api";
 import { useTabId } from "../model/prompt-tab-context";
 import type { TabData } from "../model/prompt-tabs-store";
@@ -58,7 +58,7 @@ export function useHandleSavePrompt() {
      * Single Responsibility: Updates form state and displays success message after prompt is saved.
      * @param prompt - The saved prompt with version information
      */
-    const onSuccess = (prompt: VersionedPrompt) => {
+    const onSuccess = (prompt: WireVersionedPrompt) => {
       const newSavedState = versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
       methods.reset(newSavedState);
 
@@ -110,7 +110,7 @@ export function useHandleSavePrompt() {
        * When the handle is changed, we need to save the prompt again to update the handle.
        * @param prompt - The prompt that was changed
        */
-      const onSuccessChangeHandle = (prompt: VersionedPrompt) => {
+      const onSuccessChangeHandle = (prompt: WireVersionedPrompt) => {
         if (prompt.id !== configId) throw new Error("Prompt ID mismatch");
         triggerSaveVersion({
           id: prompt.id,

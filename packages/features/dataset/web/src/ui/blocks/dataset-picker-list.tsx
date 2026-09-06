@@ -11,6 +11,7 @@ import { Database, Search } from "lucide-react";
 
 import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
 import type { Dataset, DatasetColumns } from "@langwatch/dataset-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 
 export type DatasetPickerSelection = {
   datasetId: string;
@@ -25,7 +26,7 @@ export function DatasetPickerList({
   onSelect,
 }: {
   /** Gate the datasets query (e.g. only when the hosting dialog is open). */
-  datasets: Dataset[] | undefined;
+  datasets: WireOf<Dataset>[] | undefined;
   isLoading?: boolean;
   isError?: boolean;
   onSelect: (dataset: DatasetPickerSelection) => void;
@@ -126,7 +127,7 @@ function DatasetCard({
   name: string;
   columnCount: number;
   entryCount: number;
-  updatedAt: Date;
+  updatedAt: string;
   onClick: () => void;
 }) {
   return (

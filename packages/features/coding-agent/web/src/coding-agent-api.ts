@@ -53,7 +53,7 @@ export type PullRequestRef = {
 export type PullRequestLiveStatusView = PullRequestRef & {
   status: PullRequestStatus;
   source: "live" | "snapshot";
-  mappedAt: Date | null;
+  mappedAt: string | null;
 };
 
 /**

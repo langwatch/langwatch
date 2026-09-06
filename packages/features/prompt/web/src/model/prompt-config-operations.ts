@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "./wire-versioned-prompt";
 /**
  * What the three prompt dialogs are asked to do, and what they answer with.
  *
@@ -12,16 +13,12 @@
  * factories), so both halves of the wire now resolve to one declaration.
  */
 
-import type {
-  PromptCreateTrpcInput,
-  PromptUpdateTrpcInput,
-  VersionedPrompt,
-} from "@langwatch/prompt-contract";
+import type { PromptCreateTrpcInput, PromptUpdateTrpcInput } from "@langwatch/prompt-contract";
 
 /** Parameters for creating a new prompt configuration. */
 export type CreatePromptParams = {
   data: Omit<PromptCreateTrpcInput["data"], "handle">;
-  onSuccess?: (prompt: VersionedPrompt) => void;
+  onSuccess?: (prompt: WireVersionedPrompt) => void;
   onError?: (error: Error) => void;
 };
 
@@ -32,7 +29,7 @@ export type CreatePromptParams = {
  */
 export type ChangeHandleParams = {
   id: string;
-  onSuccess?: (prompt: VersionedPrompt) => void;
+  onSuccess?: (prompt: WireVersionedPrompt) => void;
   onError?: (error: Error) => void;
 };
 
@@ -42,7 +39,7 @@ export type SaveVersionParams = {
   data: Omit<PromptUpdateTrpcInput["data"], "commitMessage">;
   /** Next version number to display in the dialog (e.g. "Update to v5"). */
   nextVersion?: number;
-  onSuccess?: (prompt: VersionedPrompt) => void;
+  onSuccess?: (prompt: WireVersionedPrompt) => void;
   onError?: (error: Error) => void;
 };
 

@@ -1,5 +1,6 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { Evaluator } from "@langwatch/evaluator-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   ArrowUp,
@@ -25,7 +26,7 @@ const evaluatorTypeLabels = {
 } as const;
 
 export type EvaluatorCardProps = {
-  evaluator: Evaluator;
+  evaluator: WireOf<Evaluator>;
   updatedAtLabel: string;
   onClick?: () => void;
   onEdit?: () => void;

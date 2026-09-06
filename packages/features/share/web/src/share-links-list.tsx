@@ -1,5 +1,5 @@
 import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { ShareLink } from "@langwatch/share-contract";
+import type { ShareLinkView } from "./share-link-status";
 import { ShareLinkRow } from "./share-link-row";
 
 /** The list of existing links, with loading / error / empty states. */
@@ -11,7 +11,7 @@ export function ShareLinksList({
   onCopy,
   onRevoke,
 }: {
-  links: ShareLink[];
+  links: ShareLinkView[];
   isLoading: boolean;
   isError: boolean;
   revokingId: string | null;

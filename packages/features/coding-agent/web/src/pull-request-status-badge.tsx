@@ -42,7 +42,7 @@ export function PullRequestStatusBadge({
 }: {
   status: PullRequestStatus;
   source: "live" | "snapshot" | "payload";
-  mappedAt?: Date | null;
+  mappedAt?: string | null;
 }) {
   const label = PULL_REQUEST_STATUS_LABELS[status];
 

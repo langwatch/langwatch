@@ -29,7 +29,7 @@
  * raises is a decision rather than a surprise.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 import type {
   LegacyModelProvider,
   ModelDefaultEffective,
@@ -281,3 +281,6 @@ export type PromptApiMap = {
  * shell mounts `promptApi.Provider`.
  */
 export const promptApi = createFeatureApi<PromptApiMap>();
+
+/** Every procedure's output, as the browser receives it. */
+export type RouterOutputs = OutputsFromMap<PromptApiMap>;

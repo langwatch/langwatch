@@ -51,8 +51,10 @@ export const transcriptEntrySchema = z.discriminatedUnion("kind", [
     atMs: z.number(),
     name: z.string(),
     mcpServer: z.string().nullable(),
-    input: z.unknown(),
-    output: z.unknown(),
+    // Optional because JSON drops a key holding `undefined`, so a call with no
+    // input or no output arrives without the key at all.
+    input: z.unknown().optional(),
+    output: z.unknown().optional(),
     durationMs: z.number().nullable(),
     failed: z.boolean(),
     agentId: z.string().nullable(),

@@ -211,9 +211,19 @@ export function getModelMetadataForFrontend(): Record<string, ModelMetadataForFr
   );
 }
 
+/**
+ * The two lists this reads. Narrower than `LegacyModelProvider` on purpose: the
+ * browser holds the same providers with ISO strings where the server holds
+ * `Date`s, and naming only what is read lets both callers pass what they have.
+ */
+type ProviderCustomModels = Pick<
+  LegacyModelProvider,
+  "provider" | "customModels" | "customEmbeddingsModels"
+>;
+
 export function mergeCustomModelMetadata(
   existing: Record<string, ModelMetadataForFrontend>,
-  providers: Record<string, LegacyModelProvider>,
+  providers: Record<string, ProviderCustomModels>,
 ): Record<string, ModelMetadataForFrontend> {
   const merged = { ...existing };
 

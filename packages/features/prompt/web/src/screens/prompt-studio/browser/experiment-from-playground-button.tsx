@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
 import { Button, Spinner, Text } from "@chakra-ui/react";
 import { FlaskConical } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -14,7 +15,6 @@ import {
   areFormValuesEqual,
   computeInitialFormValuesForPrompt,
 } from "../../../surfaces/prompt-form";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { promptApi } from "../../../behavior/prompt-api";
 import { usePromptHost } from "../../../model/prompt-host";
 import { generateHumanReadableId } from "../../../model/human-readable-id";
@@ -79,7 +79,7 @@ const convertToLocalPromptConfig = (tabData: TabData): LocalPromptConfig | undef
  */
 const hasUnsavedChanges = (
   tabData: TabData,
-  savedPrompt: VersionedPrompt | null | undefined,
+  savedPrompt: WireVersionedPrompt | null | undefined,
 ): boolean => {
   const configId = tabData.form.currentValues.configId;
   const currentValues = tabData.form.currentValues;
@@ -115,7 +115,7 @@ const convertTabToTarget = (
   tabData: TabData,
   index: number,
   datasets: DatasetReference[],
-  savedPrompt: VersionedPrompt | null | undefined,
+  savedPrompt: WireVersionedPrompt | null | undefined,
 ): TargetConfig => {
   const configId = tabData.form.currentValues.configId;
   const versionId = tabData.form.currentValues.versionMetadata?.versionId;
@@ -226,7 +226,7 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
 
   // Create a map of configId -> savedPrompt for quick lookup
   const savedPromptsMap = useMemo(() => {
-    const map = new Map<string, VersionedPrompt | null>();
+    const map = new Map<string, WireVersionedPrompt | null>();
     savedPromptIds.forEach((configId, index) => {
       const query = savedPromptsQueries[index];
       // Only set if query has completed (data exists or is explicitly null after fetch)

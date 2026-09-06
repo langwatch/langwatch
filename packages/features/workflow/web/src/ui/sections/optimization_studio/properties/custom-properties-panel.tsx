@@ -93,7 +93,8 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
             ·
           </Text>
           <Text fontSize="12px" flexShrink={0}>
-            {currentVersion?.updatedAt && formatTimeAgo(currentVersion.updatedAt.getTime())}
+            {currentVersion?.updatedAt &&
+              formatTimeAgo(new Date(currentVersion.updatedAt).getTime())}
           </Text>
         </HStack>
       </VStack>

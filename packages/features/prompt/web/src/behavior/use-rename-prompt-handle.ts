@@ -1,14 +1,14 @@
+import type { WireVersionedPrompt } from "../model/wire-versioned-prompt";
 import { useCallback } from "react";
 
 import { usePromptHost } from "../model/prompt-host";
 import { usePromptProject } from "./use-prompt-project";
 import { usePromptConfigContext } from "../model/prompt-config-context";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { promptApi } from "./prompt-api";
 
 type UseRenamePromptHandleOptions = {
   promptId: string;
-  onSuccess?: (prompt: VersionedPrompt) => void;
+  onSuccess?: (prompt: WireVersionedPrompt) => void;
 };
 
 /**
@@ -46,7 +46,7 @@ export const useRenamePromptHandle = ({ promptId, onSuccess }: UseRenamePromptHa
       return;
     }
 
-    const handleSuccess = (prompt: VersionedPrompt) => {
+    const handleSuccess = (prompt: WireVersionedPrompt) => {
       void utils.prompts.getAllPromptsForProject.invalidate();
       host.succeeded({
         title: "Prompt handle changed",

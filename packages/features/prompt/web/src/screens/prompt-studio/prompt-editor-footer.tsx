@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "../../model/wire-versioned-prompt";
 import { Button, HStack, Spacer } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 
@@ -7,7 +8,6 @@ import type { PromptConfigFormValues } from "../../surfaces/prompt-form";
 import { GeneratePromptApiSnippetDialog } from "./dialogs/generate-prompt-api-snippet-dialog";
 import { SavePromptButton } from "./save-prompt-button";
 import { VersionHistoryButton } from "./version-history-button";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 export type PromptEditorFooterProps = {
   /** Callback when save button is clicked */
@@ -19,7 +19,7 @@ export type PromptEditorFooterProps = {
   /** Whether save is in progress */
   isSaving?: boolean;
   /** Callback when a version is restored from history */
-  onVersionRestore?: (prompt: VersionedPrompt) => Promise<void>;
+  onVersionRestore?: (prompt: WireVersionedPrompt) => Promise<void>;
   /** The prompt config ID (needed for version history) */
   configId?: string;
   /** The prompt handle (needed for API snippet) */

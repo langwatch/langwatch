@@ -33,8 +33,9 @@ import type {
   AnnotationQueueRecord,
   AnnotationScore,
 } from "@langwatch/annotation-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import type { AnnotationTrace } from "../model/annotation-row";
 
 /** The project every annotation procedure is scoped to. */
@@ -52,11 +53,11 @@ export type AnnotationQueueItemRead = {
   id: string;
   traceId: string;
   annotationQueueId: string | null;
-  doneAt: Date | null;
-  createdAt: Date | null;
+  doneAt: string | null;
+  createdAt: string | null;
   createdByUser: { id: string; name: string | null; image: string | null } | null;
   trace: AnnotationTrace | null;
-  annotations: AnnotationWithUser[];
+  annotations: WireOf<AnnotationWithUser>[];
 };
 
 /** One entry of the sidebar's queue list, with the work still waiting on it. */
@@ -329,15 +330,5 @@ export const annotationApi = createFeatureApi<AnnotationApiMap>();
  */
 export { annotationApi as api };
 
-/** What each procedure in the map answers, read off the map structurally. */
-export type RouterOutputs = {
-  [K in keyof AnnotationApiMap]: OutputsOf<AnnotationApiMap[K]>;
-};
-
-type OutputsOf<TNode> = TNode extends { query: { output: infer TOut } }
-  ? TOut
-  : TNode extends { mutation: { output: infer TOut } }
-    ? TOut
-    : TNode extends { subscription: { output: infer TOut } }
-      ? TOut
-      : { [K in keyof TNode]: OutputsOf<TNode[K]> };
+/** What each procedure in the map answers, as the browser receives it. */
+export type RouterOutputs = OutputsFromMap<AnnotationApiMap>;

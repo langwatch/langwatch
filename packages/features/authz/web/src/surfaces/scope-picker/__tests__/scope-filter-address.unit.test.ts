@@ -93,7 +93,7 @@ describe("given rows scoped across an organization", () => {
 
   describe("when the filter is the organization", () => {
     const filter = resolveScopeFilter(
-      { kind: "specific", scopeType: "ORGANIZATION", scopeId: "org_1" },
+      { kind: "specific", scopeType: "ORGANIZATION", scopeId: "org_1", name: "Acme" },
       {},
     );
 
@@ -139,7 +139,7 @@ describe("given rows scoped across an organization", () => {
 
   describe("when the filter is a project", () => {
     const filter = resolveScopeFilter(
-      { kind: "specific", scopeType: "PROJECT", scopeId: "project_1" },
+      { kind: "specific", scopeType: "PROJECT", scopeId: "project_1", name: "Checkout" },
       {},
     );
 

@@ -10,6 +10,7 @@ export interface PendingJoinRequest {
   joinRequestId: string;
   name: string;
   domain: string;
-  requestedAt: Date;
-  expiresAt: Date | null;
+  /** ISO 8601: the wire carries these instants as text. */
+  requestedAt: string;
+  expiresAt: string | null;
 }

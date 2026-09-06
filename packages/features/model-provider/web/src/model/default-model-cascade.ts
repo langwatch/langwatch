@@ -21,10 +21,14 @@
  */
 
 import type {
-  ModelDefaultConfigSnapshot,
+  ModelDefaultConfigSnapshot as StoredModelDefaultConfigSnapshot,
   ModelDefaultEffective,
   ModelProviderScopeType,
 } from "@langwatch/model-provider-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** A saved default as the browser holds one: its instants are ISO strings. */
+type ModelDefaultConfigSnapshot = WireOf<StoredModelDefaultConfigSnapshot>;
 import type { ScopeHierarchy } from "./provider-scope-filter";
 import { scopeBreadthRank } from "./scope-breadth";
 

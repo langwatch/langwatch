@@ -18,8 +18,8 @@ const samsRequest: PendingJoinRequest = {
   joinRequestId: "jreq_1",
   name: "Sam Rivera",
   domain: "acme.com",
-  requestedAt: new Date("2026-08-20T09:00:00Z"),
-  expiresAt: new Date("2026-09-03T09:00:00Z"),
+  requestedAt: new Date("2026-08-20T09:00:00Z").toISOString(),
+  expiresAt: new Date("2026-09-03T09:00:00Z").toISOString(),
 };
 
 const renderPanel = (
@@ -65,7 +65,7 @@ describe("given an organization with a pending request", () => {
                   email: "dana@acme.com",
                   role: "MEMBER",
                   displayStatus: "PENDING",
-                  expiresAt: new Date("2026-09-03T09:00:00Z"),
+                  expiresAt: new Date("2026-09-03T09:00:00Z").toISOString(),
                   inviteCode: "code_1",
                   teamIds: "",
                 },

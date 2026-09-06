@@ -17,6 +17,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
@@ -49,7 +50,8 @@ export const API_KEY_SCOPE_QUERY_KEY = "scope";
 /** The grant the legacy project key's rotation control is behind. */
 export const PROJECT_KEY_ROTATE_PERMISSION = "project:manage";
 
-type ApiKeyRow = ApiKeyListEntry;
+/** A key as the browser holds one: the wire carries its instants as ISO strings. */
+type ApiKeyRow = WireOf<ApiKeyListEntry>;
 
 /**
  * Actions for the legacy "Project API Key" row. The row intentionally has no edit/revoke

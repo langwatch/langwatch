@@ -300,8 +300,8 @@ describe("WebhookSecretDialog", () => {
           maxBatchSize: 100,
           maxBatchDelayMs: 250,
           maxInFlight: 4,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
       });
 

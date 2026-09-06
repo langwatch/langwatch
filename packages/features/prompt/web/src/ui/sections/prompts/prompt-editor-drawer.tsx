@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
 import { Box, Button, Circle, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -47,7 +48,6 @@ import {
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../../../surfaces/prompt-form";
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import type { LlmConfigInputType } from "@langwatch/workflow-web/surfaces/component-types";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
@@ -874,7 +874,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   };
 
   // Handle version history restore
-  const handleVersionRestore = async (prompt: VersionedPrompt) => {
+  const handleVersionRestore = async (prompt: WireVersionedPrompt) => {
     // Notify evaluations context about the version change (if in evaluations context)
     // This updates the target's version info before we reset the form
     onVersionChange?.({

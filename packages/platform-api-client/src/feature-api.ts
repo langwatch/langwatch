@@ -2,6 +2,7 @@ import type { TRPCUntypedClient } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import type {
   AnyTRPCRootTypes,
+  inferRouterOutputs,
   TRPCBuiltRouter,
   TRPCMutationProcedure,
   TRPCQueryProcedure,
@@ -64,6 +65,33 @@ type FeatureApiRootTypes = Omit<AnyTRPCRootTypes, "transformer"> & { transformer
 
 /** The router type a feature's map describes. */
 export type RouterFromMap<TMap> = TRPCBuiltRouter<FeatureApiRootTypes, ProceduresFrom<TMap>>;
+
+/**
+ * Every procedure's output, addressed by the same path the map nests it under,
+ * as the BROWSER receives it.
+ *
+ * Read the map directly and you get the shape the server hands the transport,
+ * which is not the shape that arrives: `transformer: false` makes tRPC apply
+ * `Serialize<>`, so a declared `Date` is an ISO string here and a key holding
+ * `undefined` is optional. Deriving from the built router keeps that honest —
+ * reading the map by hand does not, and the difference is invisible until a
+ * `.getTime()` throws in the browser.
+ */
+export type OutputsFromMap<TMap extends FeatureApiMap> = inferRouterOutputs<RouterFromMap<TMap>>;
+
+/**
+ * One value the way the browser receives it, given the type the server states.
+ *
+ * The same `Serialize<>` `OutputsFromMap` applies, reached through a one-entry
+ * map so no tRPC internal has to be named: a `Date` becomes the ISO string, and
+ * a key that can hold `undefined` becomes optional. Name this wherever a
+ * component prop or a helper's parameter takes a value that came off a query
+ * but is declared by a contract type the SERVER also constructs — flipping that
+ * contract to `string` would lie to the server instead.
+ */
+export type WireOf<TValue> = OutputsFromMap<{
+  value: { query: { input: void; output: TValue } };
+}>["value"];
 
 /**
  * The feature's typed tRPC hooks.

@@ -1,8 +1,15 @@
 import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "../../../../model/ops-formatters";
 import { PinnedAwareJsonView } from "../../../../ui/elements/ops-pinned-json-view";
-import type { ProcessInstanceDetail } from "@langwatch/ops-contract";
-import type { ProcessOutboxMessageView } from "@langwatch/ops-contract";
+import type { ProcessInstanceDetail as StoredProcessInstanceDetail } from "@langwatch/ops-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** The detail as the browser receives it: a key holding `undefined` is absent. */
+type ProcessInstanceDetail = WireOf<StoredProcessInstanceDetail>;
+import type { ProcessOutboxMessageView as StoredProcessOutboxMessageView } from "@langwatch/ops-contract";
+
+/** One outbox row as the browser receives it. */
+type ProcessOutboxMessageView = WireOf<StoredProcessOutboxMessageView>;
 import type { GrafanaDeepLinkConfig } from "../../../../model/grafana-links";
 import { describeNextWake } from "../../model/process-presentation";
 import { OutboxMessageCard } from "./outbox-message-card";

@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
 import {
   Box,
   type BoxProps,
@@ -20,7 +21,6 @@ import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 const logger = createLogger("VersionHistoryListPopover");
@@ -369,7 +369,7 @@ export function VersionHistoryListPopover({
   configId: string;
   /** The versionId of the version currently being edited. If not provided, defaults to latest. */
   currentVersionId?: string;
-  onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
+  onRestoreSuccess?: (prompt: WireVersionedPrompt) => Promise<void>;
   hasUnsavedChanges?: boolean;
   label?: string;
   /** When true the popover opens automatically on first render. */

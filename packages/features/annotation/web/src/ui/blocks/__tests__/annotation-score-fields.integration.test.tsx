@@ -14,20 +14,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { ScoreFields } from "../annotation-score-fields";
-import type { AnnotationScore } from "@langwatch/annotation-contract";
 import type { ScoreOptions } from "@langwatch/annotation-contract";
 import type {
   AnnotationFormState,
   AnnotationScoreList,
 } from "../../../model/annotation-form-types";
 
-function score(over: Partial<AnnotationScore>): AnnotationScore {
+function score(over: Partial<AnnotationScoreList[number]>): AnnotationScoreList[number] {
   return {
     id: "score-1",
     projectId: "project-1",
     name: "Helpfulness",
-    createdAt: new Date("2026-08-25T08:00:00.000Z"),
-    updatedAt: new Date("2026-08-25T08:00:00.000Z"),
+    createdAt: "2026-08-25T08:00:00.000Z",
+    updatedAt: "2026-08-25T08:00:00.000Z",
     deletedAt: null,
     description: "How much the answer helped",
     active: true,

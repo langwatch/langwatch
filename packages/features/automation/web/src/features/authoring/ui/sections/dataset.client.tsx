@@ -80,7 +80,7 @@ export function deriveMappingFromColumns(columns: DatasetColumns): DatasetMappin
 
 /** Read a dataset's `columnTypes` JSON column into the typed column list,
  *  tolerating malformed/legacy values (returns []). */
-function columnsOf(dataset: { columnTypes: unknown } | undefined): DatasetColumns {
+function columnsOf(dataset: { columnTypes?: unknown } | undefined): DatasetColumns {
   if (!dataset) return [];
   const parsed = datasetColumnsSchema.safeParse(dataset.columnTypes);
   return parsed.success ? parsed.data : [];

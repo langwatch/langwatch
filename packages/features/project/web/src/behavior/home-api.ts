@@ -37,7 +37,8 @@ export type RecentItem = {
   type: RecentItemType;
   name: string;
   href: string;
-  updatedAt: Date;
+  /** ISO 8601: the wire carries the instant as text. */
+  updatedAt: string;
 };
 
 export type HomeApiMap = {

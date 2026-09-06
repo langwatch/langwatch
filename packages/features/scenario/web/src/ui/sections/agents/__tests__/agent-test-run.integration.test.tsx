@@ -9,7 +9,10 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Agent } from "@langwatch/agent-contract";
+import type { Agent as StoredAgent } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+type Agent = WireOf<StoredAgent>;
 import { AgentCard } from "@langwatch/agent-web/surfaces/connected-agents";
 import { useAgentTestRun } from "../use-agent-test-run";
 
@@ -60,8 +63,8 @@ const httpAgent = {
   name: "ACME Support Agent",
   type: "http",
   config: {},
-  updatedAt: new Date("2026-08-30T09:00:00Z"),
-  createdAt: new Date("2026-08-30T09:00:00Z"),
+  updatedAt: "2026-08-30T09:00:00.000Z",
+  createdAt: "2026-08-30T09:00:00.000Z",
   copiedFromAgentId: null,
 } as unknown as Agent;
 

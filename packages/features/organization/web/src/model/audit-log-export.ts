@@ -13,7 +13,11 @@
  * one filter shape to both.
  */
 
-import type { EnrichedAuditLog } from "@langwatch/organization-contract";
+import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** An audit row as the browser receives it: its instant is an ISO string. */
+type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 
 /**
  * CSV-cell cap for the JSON columns (args / before / after).

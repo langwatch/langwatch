@@ -1,3 +1,4 @@
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { CheckCircle, Code, Workflow } from "lucide-react";
 import type { MouseEvent } from "react";
@@ -11,7 +12,7 @@ import {
 } from "@langwatch/evaluator-contract";
 
 export type EvaluatorListItemProps = {
-  evaluator: Evaluator;
+  evaluator: WireOf<Evaluator>;
   updatedAtLabel: string;
   onClick: () => void;
   onEdit: () => void;

@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt";
 /**
  * @vitest-environment jsdom
  * @see specs/prompts/prompt-version-history-author.feature
@@ -6,7 +7,6 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { VersionHistoryListPopover } from "../version-history-list-popover";
 
 vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
@@ -37,7 +37,7 @@ const versionWithAuthor = (author: Author) =>
       commitMessage: "Initial version",
       author,
     },
-  ] as unknown as VersionedPrompt[];
+  ] as unknown as WireVersionedPrompt[];
 
 const renderWithAuthor = async (author: Author) => {
   mockUseQuery.mockReturnValue({ data: versionWithAuthor(author), isLoading: false });

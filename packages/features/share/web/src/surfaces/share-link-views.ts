@@ -1,3 +1,4 @@
+export type { ShareLinkView } from "../share-link-status";
 export * from "../create-share-link-form";
 export * from "../share-link-row";
 export * from "../share-links-list";

@@ -6,7 +6,7 @@ export {
   SHARE_EXPIRY_OPTIONS,
   type ShareExpiryOption,
 } from "./share-expiry";
-export { describeShareLink, isShareLinkSpent } from "./share-link-status";
+export { describeShareLink, isShareLinkSpent, type ShareLinkView } from "./share-link-status";
 export { ShareLinkRow } from "./share-link-row";
 export { ShareLinksList } from "./share-links-list";
 export { ShareTraceDialogBody } from "./share-trace-dialog-body";

@@ -15,6 +15,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { DatasetColumns, DatasetPage } from "@langwatch/dataset-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { Pagination } from "@langwatch/design-system/pagination";
 import {
@@ -138,7 +139,7 @@ export function DatasetEditorTable({
       // count, which would otherwise bounce navigation back to page 1). Written
       // out rather than imported as React Query's `keepPreviousData`, which a
       // screen closure may not reach for.
-      placeholderData: (previous: DatasetPage | null | undefined) => previous,
+      placeholderData: (previous: WireOf<DatasetPage> | null | undefined) => previous,
       // A background refetch (e.g. on reconnect) would reload the store via
       // setData and drop an unsaved local edit on the current page — page
       // navigation is gated on pending writes, but an automatic refetch is not,

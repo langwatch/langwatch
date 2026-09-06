@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
 import { Box, Button, HStack, useDisclosure } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 
@@ -9,7 +10,6 @@ import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-
 import { SavePromptButton } from "./save-prompt-button";
 import { ModelSelectFieldMini } from "../../elements/prompts/forms/fields/model-select-field-mini";
 import { VersionHistoryButton } from "../../elements/prompts/forms/prompt-config-form/version-history-button";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 export type PromptEditorHeaderProps = {
   /** Callback when save button is clicked */
@@ -21,7 +21,7 @@ export type PromptEditorHeaderProps = {
   /** Whether save is in progress */
   isSaving?: boolean;
   /** Callback when a version is restored from history */
-  onVersionRestore?: (prompt: VersionedPrompt) => Promise<void>;
+  onVersionRestore?: (prompt: WireVersionedPrompt) => Promise<void>;
   /**
    * Controls which elements are rendered.
    * - "full" (default): model selector + history, API, and save buttons

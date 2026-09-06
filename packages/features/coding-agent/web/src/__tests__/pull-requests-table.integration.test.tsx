@@ -359,7 +359,7 @@ describe("the personal Pull Requests table", () => {
           prNumber: 4218,
           status: "open",
           source: "live",
-          mappedAt: new Date("2026-07-01T10:00:00Z"),
+          mappedAt: "2026-07-01T10:00:00Z",
         },
       ]);
 
@@ -384,7 +384,7 @@ describe("the personal Pull Requests table", () => {
           prNumber: 4218,
           status: "merged",
           source: "snapshot",
-          mappedAt: new Date("2026-07-01T10:00:00Z"),
+          mappedAt: "2026-07-01T10:00:00Z",
         },
       ]);
       const user = userEvent.setup();

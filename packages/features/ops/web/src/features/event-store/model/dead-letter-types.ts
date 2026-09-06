@@ -11,7 +11,8 @@ export interface DeadLetterMessage {
   attempts: number;
   updatedAt: number;
   traceId: string | null;
-  payload: unknown;
+  /** Optional: JSON drops a key holding `undefined`. */
+  payload?: unknown;
 }
 
 export interface DeadLetterProcessCount {

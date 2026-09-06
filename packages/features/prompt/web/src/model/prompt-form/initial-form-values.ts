@@ -1,4 +1,4 @@
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
+import type { WireVersionedPrompt } from "../wire-versioned-prompt";
 
 import { buildDefaultFormValues } from "./default-form-values";
 import type { PromptConfigFormValues } from "./prompt-form.schemas";
@@ -13,7 +13,7 @@ import {
  * TODO: This seems redundant with the other methods. Let's consider a refactor
  */
 export function computeInitialFormValuesForPrompt(params: {
-  prompt?: VersionedPrompt | null;
+  prompt?: WireVersionedPrompt | null;
   defaultModel?: string;
   maxTokens?: number;
   useSystemMessage?: boolean;

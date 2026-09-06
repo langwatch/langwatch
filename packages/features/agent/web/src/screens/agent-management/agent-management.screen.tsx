@@ -1,9 +1,5 @@
 import { Spacer } from "@chakra-ui/react";
-import type {
-  AgentWithFields,
-  ConnectedAgentConfig,
-  ConnectedAgentView,
-} from "@langwatch/agent-contract";
+import type { ConnectedAgentConfig, ConnectedAgentView } from "@langwatch/agent-contract";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, type ReactNode } from "react";
@@ -29,6 +25,7 @@ import {
   type AgentCardRenderInput,
   type AgentCopyDialogInput,
   type AgentPushDialogInput,
+  type AgentWithFields,
 } from "../../features/management/ui/sections/agent-management-page";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {
@@ -144,7 +141,7 @@ class ScreenCard extends AgentManagementCardPort {
     return (
       <AgentCard
         agent={agent}
-        updatedAtLabel={formatTimeAgo(agent.updatedAt.getTime()) ?? ""}
+        updatedAtLabel={formatTimeAgo(new Date(agent.updatedAt).getTime()) ?? ""}
         {...callbacks}
       />
     );

@@ -13,7 +13,11 @@ import { keepPreviousData } from "../../../../model/keep-previous-data";
 import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "@langwatch/design-system/drawer";
-import { api, type RouterOutputs } from "../../../../behavior/gateway-api";
+import {
+  api,
+  type RouterOutputs,
+  type WebhookDeliveryCursor,
+} from "../../../../behavior/gateway-api";
 
 const DELIVERIES_PAGE_SIZE = 25;
 
@@ -202,7 +206,7 @@ function DeliveriesTable({
  * polled health summary. A fresh endpoint resets pagination to the first page.
  */
 function useDeliveriesDrawerData(organizationId: string, endpoint: EndpointView | null) {
-  const [cursor, setCursor] = useState<{ firedAt: Date; id: string } | undefined>(undefined);
+  const [cursor, setCursor] = useState<WebhookDeliveryCursor | undefined>(undefined);
   // Loaded pages accumulate in load order, keyed by the cursor that fetched
   // each, so Load more APPENDS below what the reader already scanned and a
   // background refetch of the current page replaces its own slot instead of

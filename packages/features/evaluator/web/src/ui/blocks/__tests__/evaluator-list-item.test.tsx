@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Evaluator } from "@langwatch/evaluator-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { EvaluatorListEmptyState } from "../../elements/evaluator-list-empty-state";
 import { EvaluatorListItem } from "../evaluator-list-item";
 
@@ -10,7 +11,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const evaluator: Evaluator = {
+const evaluator: WireOf<Evaluator> = {
   id: "evaluator-1",
   projectId: "project-1",
   name: "Exact Match",
@@ -20,8 +21,8 @@ const evaluator: Evaluator = {
   workflowId: null,
   copiedFromEvaluatorId: null,
   archivedAt: null,
-  createdAt: new Date("2025-01-01T00:00:00Z"),
-  updatedAt: new Date("2025-01-02T00:00:00Z"),
+  createdAt: "2025-01-01T00:00:00.000Z",
+  updatedAt: "2025-01-02T00:00:00.000Z",
 };
 
 afterEach(cleanup);

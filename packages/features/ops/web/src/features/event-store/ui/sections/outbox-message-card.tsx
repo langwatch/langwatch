@@ -2,7 +2,11 @@ import { Badge, Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react
 import { useState } from "react";
 import { formatTimeAgo } from "../../../../model/ops-formatters";
 import { PinnedAwareJsonView } from "../../../../ui/elements/ops-pinned-json-view";
-import type { ProcessOutboxMessageView } from "@langwatch/ops-contract";
+import type { ProcessOutboxMessageView as StoredProcessOutboxMessageView } from "@langwatch/ops-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** One outbox row as the browser receives it: a key holding `undefined` is absent. */
+type ProcessOutboxMessageView = WireOf<StoredProcessOutboxMessageView>;
 import { type GrafanaDeepLinkConfig, grafanaTraceUrl } from "../../../../model/grafana-links";
 
 const NO_PINNED_KEYS: ReadonlySet<string> = new Set();

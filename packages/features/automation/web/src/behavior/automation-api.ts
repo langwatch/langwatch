@@ -50,7 +50,7 @@ import type {
   WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
 import type { Monitor } from "@langwatch/monitor-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 
 /** The project every automation procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -385,15 +385,7 @@ export const automationApi = createFeatureApi<AutomationApiMap>();
  * `RouterOutputs["automation"]["getTriggers"][number]`. Deriving the same shape
  * from the map above keeps those aliases exactly as they were written.
  */
-type AutomationOutputOf<TNode> = TNode extends { query: { output: infer TOutput } }
-  ? TOutput
-  : TNode extends { mutation: { output: infer TOutput } }
-    ? TOutput
-    : { [TSegment in keyof TNode]: AutomationOutputOf<TNode[TSegment]> };
-
-export type RouterOutputs = {
-  [TSegment in keyof AutomationApiMap]: AutomationOutputOf<AutomationApiMap[TSegment]>;
-};
+export type RouterOutputs = OutputsFromMap<AutomationApiMap>;
 
 /**
  * The name the screen calls it by.

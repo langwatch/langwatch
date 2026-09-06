@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
 /**
  * @vitest-environment jsdom
  * @see specs/prompts/prompt-editor-dirty-state.feature
@@ -5,7 +6,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 vi.mock("@langwatch/model-provider-web/surfaces/model-limits", () => ({
   useModelLimits: () => ({ limits: null }),
@@ -18,14 +18,14 @@ import { usePromptConfigForm } from "../use-prompt-config-form";
  * A prompt as the seeder writes one: a system prompt, one input, one output, and no
  * demonstrations.
  */
-const SEEDED_PROMPT: VersionedPrompt = {
+const SEEDED_PROMPT: WireVersionedPrompt = {
   id: "prompt-seeded",
   name: "Seeded Prompt",
   handle: "seeded-prompt",
   scope: "PROJECT",
   version: 1,
   versionId: "version-seeded",
-  versionCreatedAt: new Date("2026-01-01T00:00:00.000Z"),
+  versionCreatedAt: "2026-01-01T00:00:00.000Z",
   model: "openai/gpt-4o",
   temperature: 0.7,
   maxTokens: 4096,
@@ -37,8 +37,8 @@ const SEEDED_PROMPT: VersionedPrompt = {
   inputs: [{ identifier: "question", type: "str" }],
   outputs: [{ identifier: "answer", type: "str" }],
   demonstrations: { inline: { records: {}, columnTypes: [] } },
-  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  createdAt: "2026-01-01T00:00:00.000Z",
   tags: [],
   parameters: {},
 };

@@ -27,8 +27,9 @@ export type EvaluatorEditorContentProps = {
   workflow?: {
     id: string;
     name: string;
-    icon?: string | null;
-    updatedAt: Date;
+    icon?: string | null | undefined;
+    /** ISO 8601: the wire carries the instant as text. */
+    updatedAt: string;
     projectSlug: string;
   };
   /** react-hook-form instance for name + settings */
@@ -121,7 +122,7 @@ export function EvaluatorEditorContent({
               <WorkflowCardDisplay
                 name={workflow.name}
                 icon={workflow.icon}
-                updatedAtLabel={formatTimeAgo(workflow.updatedAt.getTime())}
+                updatedAtLabel={formatTimeAgo(new Date(workflow.updatedAt).getTime())}
                 action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
                 width="300px"
               />

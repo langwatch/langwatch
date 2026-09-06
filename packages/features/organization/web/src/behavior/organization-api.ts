@@ -30,7 +30,7 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "../model/prisma-types";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 
 /**
  * Every filter the audit table narrows by, in the one shape both the table and
@@ -832,18 +832,11 @@ export const organizationApi = createFeatureApi<OrganizationApiMap>();
  * `platform/app`'s `RouterOutputs` was inferred from the mounted router, which
  * a browser package cannot name. Screens that wrote
  * `RouterOutputs["group"]["listAll"][number]` keep that line by reading the
- * same shape off the declaration below instead — the map IS the statement of
- * what a procedure answers here.
+ * same shape off the map instead — the map IS the statement of what a
+ * procedure answers here, and deriving it through the built router keeps the
+ * wire's own shape: dates arrive as ISO strings.
  */
-type OutputsOf<TMap> = {
-  [K in keyof TMap]: TMap[K] extends { query: { output: infer O } }
-    ? O
-    : TMap[K] extends { mutation: { output: infer O } }
-      ? O
-      : OutputsOf<TMap[K]>;
-};
-
-export type RouterOutputs = OutputsOf<OrganizationApiMap>;
+export type RouterOutputs = OutputsFromMap<OrganizationApiMap>;
 
 /** The alias the screens moved with: `api.organization.…`, unchanged. */
 export const api = organizationApi;

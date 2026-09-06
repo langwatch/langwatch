@@ -3,14 +3,18 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import {
   httpAgentConfigSchema,
   type AgentInputBinding,
-  type AgentWithFields,
+  type AgentWithFields as StoredAgentWithFields,
   type Field as Variable,
   type HttpAgentConfig,
   type HttpAuth,
   type HttpHeader,
   type HttpMethod,
 } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { ArrowLeft } from "lucide-react";
+
+/** An agent as the browser holds one: the wire carries its instants as strings. */
+type AgentWithFields = WireOf<StoredAgentWithFields>;
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentHttpEditorTabs } from "./agent-http-editor-tabs";
 import type { AgentHttpEditorPresentationPort } from "./agent-http-editor.presentation";

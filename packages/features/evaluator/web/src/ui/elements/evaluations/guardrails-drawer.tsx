@@ -1,3 +1,4 @@
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { Box, Button, Heading, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,7 +20,7 @@ export type GuardrailsDrawerProps = {
  */
 // Module-level state to persist across drawer navigation (component unmounts/remounts)
 let guardrailsDrawerState: {
-  selectedEvaluator: Evaluator | null;
+  selectedEvaluator: WireOf<Evaluator> | null;
   activeLanguage: string;
 } | null = null;
 
@@ -35,7 +36,7 @@ export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
 
   // Initialize from persisted state or defaults
-  const [selectedEvaluator, setSelectedEvaluator] = useState<Evaluator | null>(
+  const [selectedEvaluator, setSelectedEvaluator] = useState<WireOf<Evaluator> | null>(
     () => guardrailsDrawerState?.selectedEvaluator ?? null,
   );
   const [activeLanguage, setActiveLanguage] = useState(
@@ -70,7 +71,7 @@ export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
   const handleSelectEvaluator = useCallback(() => {
     // Set flow callback for evaluator selection
     setFlowCallbacks("evaluatorList", {
-      onSelect: (evaluator: Evaluator) => {
+      onSelect: (evaluator: WireOf<Evaluator>) => {
         setSelectedEvaluator(evaluator);
         // Also update persisted state immediately
         guardrailsDrawerState = {

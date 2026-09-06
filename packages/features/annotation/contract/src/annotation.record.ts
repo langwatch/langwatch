@@ -188,7 +188,8 @@ export type AnnotationWithUser = {
   email?: string | null;
   comment: string | null;
   isThumbsUp: boolean | null;
-  scoreOptions: unknown;
+  /** Absent when the annotation carries no scores: JSON drops the key. */
+  scoreOptions?: unknown;
   expectedOutput: string | null;
   anchorKind: string | null;
   anchorId: string | null;

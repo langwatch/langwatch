@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "./wire-versioned-prompt";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
@@ -17,7 +18,6 @@ import {
   versionMetadataToNodeFormat,
 } from "./prompt-form";
 import type { SaveVersionParams } from "./prompt-config-operations";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   type LlmConfigInputType,
   LlmConfigInputTypes,
@@ -367,7 +367,7 @@ export function createNewOptimizationStudioPromptName(
 }
 
 export function versionedPromptToLlmPromptConfigComponentNodeData(
-  prompt: VersionedPrompt,
+  prompt: WireVersionedPrompt,
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
     configId: prompt.id,
@@ -463,7 +463,7 @@ export function formValuesToTriggerSaveVersionParams(
   };
 }
 
-export function versionedPromptToOptimizationStudioNodeData(prompt: VersionedPrompt): Required<
+export function versionedPromptToOptimizationStudioNodeData(prompt: WireVersionedPrompt): Required<
   Omit<
     LlmPromptConfigComponent,
     | "_library_ref"

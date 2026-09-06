@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
 import {
   Avatar,
   Box,
@@ -18,7 +19,6 @@ import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { usePromptHost } from "../../../model/prompt-host";
 import { usePromptProject } from "../../../behavior/use-prompt-project";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { promptApi } from "../../../behavior/prompt-api";
 
 /**
@@ -370,7 +370,7 @@ export function VersionHistoryListPopover({
   configId: string;
   /** The versionId of the version currently being edited. If not provided, defaults to latest. */
   currentVersionId?: string;
-  onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
+  onRestoreSuccess?: (prompt: WireVersionedPrompt) => Promise<void>;
   hasUnsavedChanges?: boolean;
   label?: string;
   /** When true the popover opens automatically on first render. */

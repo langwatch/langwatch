@@ -12,7 +12,11 @@
  * it too). The platform copy dies with that drawer.
  */
 
-import type { ModelCost } from "@langwatch/model-provider-contract";
+import type { ModelCost as StoredModelCost } from "@langwatch/model-provider-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** A cost rule as the browser receives it: its instants are ISO strings. */
+type ModelCost = WireOf<StoredModelCost>;
 
 export type LLMModelCostRow = Omit<
   ModelCost,

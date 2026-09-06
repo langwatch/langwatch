@@ -24,6 +24,7 @@ import {
   type AgentCopyDialogInput,
   AgentPageCompositionPort,
   type AgentPushDialogInput,
+  type AgentWithFields as WireAgentWithFields,
 } from "../agent-management-page";
 
 afterEach(cleanup);
@@ -207,6 +208,29 @@ class TestCard extends AgentManagementCardPort {
   }
 }
 
+/** The same agent as the browser holds it, with the instants the wire carries. */
+const wireAgent: WireAgentWithFields = {
+  id: agent.id,
+  projectId: agent.projectId,
+  name: agent.name,
+  type: "http",
+  workflowId: null,
+  copiedFromAgentId: null,
+  archivedAt: null,
+  createdAt: agent.createdAt.toISOString(),
+  updatedAt: agent.updatedAt.toISOString(),
+  copyCount: 1,
+  config: {
+    name: "HTTP",
+    description: "HTTP API endpoint",
+    url: "https://example.test/run",
+    method: "POST",
+  },
+  inputFields: [],
+  outputFields: [],
+  fieldsResolved: true,
+};
+
 function renderPage(browser: TestAgentBrowser, lifecycle = new TestLifecycle()) {
   render(
     <ChakraProvider value={defaultSystem}>
@@ -214,7 +238,7 @@ function renderPage(browser: TestAgentBrowser, lifecycle = new TestLifecycle()) 
         data={{
           projectId: "project_1",
           agents: browser,
-          items: [agent],
+          items: [wireAgent],
           isLoading: false,
           copyProjects: [{ label: "Project 2", value: "project_2", hasCreatePermission: true }],
         }}

@@ -3,7 +3,7 @@
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 import type {
   AggregateDiscovery,
   AggregateEventView,
@@ -635,15 +635,7 @@ export const opsApi = createFeatureApi<OpsApiMap>();
  * `~/utils/api` exported `RouterOutputs` off the real `AppRouter`; deriving the same shape from
  * the map above keeps those aliases exactly as they were written.
  */
-type OpsOutputOf<TNode> = TNode extends { query: { output: infer TOutput } }
-  ? TOutput
-  : TNode extends { mutation: { output: infer TOutput } }
-    ? TOutput
-    : { [TSegment in keyof TNode]: OpsOutputOf<TNode[TSegment]> };
-
-export type RouterOutputs = {
-  [TSegment in keyof OpsApiMap]: OpsOutputOf<OpsApiMap[TSegment]>;
-};
+export type RouterOutputs = OutputsFromMap<OpsApiMap>;
 
 /**
  * The name the screens call it by. They were written against the application's `api` proxy and

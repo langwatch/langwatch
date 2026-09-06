@@ -1,13 +1,20 @@
 import { Button, Center, EmptyState, Grid, Skeleton, VStack } from "@chakra-ui/react";
 import type {
   AgentCopy,
-  AgentWithFields,
+  AgentWithFields as StoredAgentWithFields,
   ConnectedAgentView,
   RelatedAgentEntities,
 } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { Bot, Plus } from "lucide-react";
 import { Fragment, type ComponentType, type ReactNode, useEffect, useState } from "react";
 import type { AgentBrowserPort } from "../../../../model/agent-browser.port";
+
+/**
+ * An agent the way this page holds one: off a query, so its instants are the
+ * ISO strings the wire carries rather than the `Date`s the server built.
+ */
+export type AgentWithFields = WireOf<StoredAgentWithFields>;
 
 export type AgentCopyProject = {
   label: string;

@@ -46,6 +46,10 @@ import type {
   CheckPreconditionRule,
 } from "../../../model/evaluations/types";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** An evaluator as the drawer holds one: off a query, so its instants are strings. */
+type WireEvaluatorWithFields = WireOf<EvaluatorWithFields>;
 import type { MappingState, TRACE_MAPPINGS } from "@langwatch/trace-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared";
@@ -80,7 +84,7 @@ const AUTO_INFER_MAPPINGS: Record<string, keyof typeof TRACE_MAPPINGS> = {
  * Get all field identifiers from an evaluator.
  * Fields are pre-computed by the API for both built-in and workflow evaluators.
  */
-function getEvaluatorFieldIds(evaluator: EvaluatorWithFields | null | undefined): string[] {
+function getEvaluatorFieldIds(evaluator: WireEvaluatorWithFields | null | undefined): string[] {
   if (!evaluator?.fields) return [];
   return evaluator.fields.map((f) => f.identifier);
 }
@@ -122,7 +126,7 @@ function autoInferMappings(
 let onlineEvaluationDrawerState: {
   level: EvaluationLevel; // Can be null (no selection), "trace", or "thread"
   name: string;
-  selectedEvaluator: EvaluatorWithFields | null;
+  selectedEvaluator: WireEvaluatorWithFields | null;
   sample: number;
   mappings: Record<string, UIFieldMapping>;
   preconditions: CheckPrecondition[];
@@ -203,7 +207,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const threadIdleTimeout = form.watch("threadIdleTimeout");
 
   // These are managed separately due to complex interactions with drawer system
-  const [selectedEvaluator, setSelectedEvaluator] = useState<EvaluatorWithFields | null>(
+  const [selectedEvaluator, setSelectedEvaluator] = useState<WireEvaluatorWithFields | null>(
     () => onlineEvaluationDrawerState?.selectedEvaluator ?? null,
   );
   const [mappings, setMappings] = useState<Record<string, UIFieldMapping>>(
@@ -575,7 +579,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     // Set up the flow callback for if user wants to change evaluator from the list
     // (accessible via "back" button in evaluator editor)
     setFlowCallbacks("evaluatorList", {
-      onSelect: (evaluator: EvaluatorWithFields) => {
+      onSelect: (evaluator: WireEvaluatorWithFields) => {
         const newName = name || evaluator.name;
         setSelectedEvaluator(evaluator);
         setHasUnsavedChanges(true); // User selected a different evaluator
@@ -656,7 +660,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   const handleSelectEvaluator = useCallback(() => {
     // Helper function to handle evaluator selection (used by both existing and new evaluators)
-    const selectEvaluatorAndOpenEditor = (evaluator: EvaluatorWithFields) => {
+    const selectEvaluatorAndOpenEditor = (evaluator: WireEvaluatorWithFields) => {
       const newName = name || evaluator.name;
       setSelectedEvaluator(evaluator);
       setHasUnsavedChanges(true); // User selected an evaluator

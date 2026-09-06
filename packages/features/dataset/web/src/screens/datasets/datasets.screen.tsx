@@ -42,6 +42,7 @@ import {
   datasetDisplayRecordCount,
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -116,7 +117,7 @@ export default function DatasetsScreen() {
    * object or a malformed value. A bad row must be displayable and deletable,
    * never crash the whole datasets page.
    */
-  const columnsOf = (dataset: DatasetSummary): DatasetColumns => {
+  const columnsOf = (dataset: WireOf<DatasetSummary>): DatasetColumns => {
     const parsed = datasetColumnsSchema.safeParse(dataset.columnTypes);
     return parsed.success ? parsed.data : [];
   };

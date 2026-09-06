@@ -19,6 +19,10 @@
  */
 
 import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** A listed provider as the browser holds one: its instants are ISO strings. */
+export type ModelProviderListRow = WireOf<ModelProviderListEntry>;
 import { useModelProviderHost } from "../model/model-provider-host";
 import { modelProviderApi } from "./model-provider-api";
 
@@ -31,7 +35,7 @@ import { modelProviderApi } from "./model-provider-api";
  * stray `push`/`sort` on a "local" copy would corrupt the empty list for
  * everyone.
  */
-const NO_PROVIDERS: readonly ModelProviderListEntry[] = [];
+const NO_PROVIDERS: readonly ModelProviderListRow[] = [];
 
 export function useAllModelProvidersList() {
   const host = useModelProviderHost();

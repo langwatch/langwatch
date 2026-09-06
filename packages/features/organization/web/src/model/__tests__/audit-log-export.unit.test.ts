@@ -11,7 +11,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { EnrichedAuditLog } from "@langwatch/organization-contract";
+import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** An audit row as the browser receives it: its instant is an ISO string. */
+type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 import {
   auditLogCsvRow,
   auditLogCsvTable,
@@ -25,7 +29,7 @@ import {
 function row(overrides: Partial<EnrichedAuditLog> = {}): EnrichedAuditLog {
   return {
     id: "audit-1",
-    createdAt: new Date("2026-03-04T09:30:00.000Z"),
+    createdAt: "2026-03-04T09:30:00.000Z",
     userId: "user-1",
     organizationId: "org-1",
     projectId: "proj-1",

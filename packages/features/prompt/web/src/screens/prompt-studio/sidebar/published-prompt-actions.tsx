@@ -1,3 +1,4 @@
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
 import { Box, Button, Text, useDisclosure } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { ArrowUp, Copy, RefreshCw } from "lucide-react";
@@ -13,14 +14,13 @@ import { usePrompts } from "../../../behavior/use-prompts";
 import { useRenamePromptHandle } from "../../../behavior/use-rename-prompt-handle";
 import { computeInitialFormValuesForPrompt } from "../../../surfaces/prompt-form";
 import { getDisplayHandle } from "../../../surfaces/prompt-reference";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { promptApi } from "../../../behavior/prompt-api";
 import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store";
 
 interface PublishedPromptActionsProps {
   promptId: string;
   promptHandle: string | null;
-  prompt?: VersionedPrompt | null;
+  prompt?: WireVersionedPrompt | null;
 }
 
 /**

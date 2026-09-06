@@ -113,9 +113,9 @@ export type EvaluatorEditorController = {
   workflowCard:
     | {
         workflowId: string;
-        workflowName?: string;
-        workflowIcon?: string;
-        updatedAt: Date;
+        workflowName?: string | undefined;
+        workflowIcon?: string | undefined;
+        updatedAt: string;
       }
     | undefined;
   isWorkflowEvaluator: boolean;
@@ -752,7 +752,7 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
               <WorkflowCardDisplay
                 name={workflowCard.workflowName ?? "Workflow"}
                 icon={workflowCard.workflowIcon}
-                updatedAtLabel={formatTimeAgo(workflowCard.updatedAt.getTime())}
+                updatedAtLabel={formatTimeAgo(new Date(workflowCard.updatedAt).getTime())}
                 action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
                 width="300px"
               />

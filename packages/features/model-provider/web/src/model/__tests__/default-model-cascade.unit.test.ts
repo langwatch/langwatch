@@ -46,8 +46,8 @@ function configRow(params: {
   return {
     id: params.id,
     config: params.config,
-    createdAt: new Date(params.createdAt ?? "2026-05-01T00:00:00Z"),
-    updatedAt: new Date(params.createdAt ?? "2026-05-01T00:00:00Z"),
+    createdAt: new Date(params.createdAt ?? "2026-05-01T00:00:00Z").toISOString(),
+    updatedAt: new Date(params.createdAt ?? "2026-05-01T00:00:00Z").toISOString(),
     authorId: null,
     scopes: params.scopes.map((s) => ({ ...s, name: s.id })),
   } as ConfigRow;

@@ -32,9 +32,13 @@ import type {
 import { getMappingSurfaceInputs, parseStudioWorkflow } from "@langwatch/workflow-contract";
 import {
   type AgentConfig as AgentComponentConfig,
-  type AgentWithFields,
+  type AgentWithFields as StoredAgentWithFields,
   linkedWorkflowId,
 } from "@langwatch/agent-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+
+/** An agent as the browser holds one: the wire carries its instants as strings. */
+type AgentWithFields = WireOf<StoredAgentWithFields>;
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { api } from "../../../behavior/scenario-api";
 import { api as workflowApi } from "@langwatch/workflow-web/surfaces/workflow-api";

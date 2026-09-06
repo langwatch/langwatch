@@ -3,6 +3,7 @@
  */
 
 import type { Evaluator } from "@langwatch/evaluator-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { useState } from "react";
 
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
@@ -12,7 +13,7 @@ import { EvaluatorCard, type EvaluatorCardProps } from "./evaluator-card";
 export type EvaluatorGridCardProps = Omit<
   EvaluatorCardProps,
   "evaluator" | "updatedAtLabel" | "onUseFromApi"
-> & { evaluator: Evaluator };
+> & { evaluator: WireOf<Evaluator> };
 
 export function EvaluatorGridCard({ evaluator, ...props }: EvaluatorGridCardProps) {
   const [showApiDialog, setShowApiDialog] = useState(false);

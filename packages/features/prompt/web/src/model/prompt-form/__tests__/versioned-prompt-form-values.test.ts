@@ -1,21 +1,20 @@
+import type { WireVersionedPrompt } from "../../wire-versioned-prompt";
 import { describe, expect, it } from "vitest";
-
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 import { versionedPromptToPromptConfigFormValues } from "../versioned-prompt-form-values";
 
 describe("versionedPromptToPromptConfigFormValues", () => {
   /**
-   * Creates a mock VersionedPrompt for testing handle extraction
+   * Creates a mock WireVersionedPrompt for testing handle extraction
    */
-  const createMockPrompt = (handle: string | null): VersionedPrompt => ({
+  const createMockPrompt = (handle: string | null): WireVersionedPrompt => ({
     id: "prompt-1",
     name: "test-prompt",
     handle: handle,
     scope: "PROJECT",
     version: 1,
     versionId: "version-1",
-    versionCreatedAt: new Date(),
+    versionCreatedAt: new Date().toISOString(),
     model: "gpt-4",
     temperature: 0.7,
     maxTokens: 4096,
@@ -26,8 +25,8 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     messages: [],
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
-    updatedAt: new Date(),
-    createdAt: new Date(),
+    updatedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
     tags: [],
     parameters: {},
   });
@@ -61,7 +60,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
             records: { input: ["a question"] },
           },
         },
-      } as VersionedPrompt;
+      } as WireVersionedPrompt;
 
       const result = versionedPromptToPromptConfigFormValues(prompt);
 
@@ -86,7 +85,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
       const prompt = {
         ...createMockPrompt("gato"),
         demonstrations,
-      } as VersionedPrompt;
+      } as WireVersionedPrompt;
 
       const result = versionedPromptToPromptConfigFormValues(prompt);
 

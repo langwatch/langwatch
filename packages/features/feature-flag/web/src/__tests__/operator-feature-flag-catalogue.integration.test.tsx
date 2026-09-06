@@ -4,12 +4,14 @@
  * leads.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { OperatorFeatureFlagCatalogue } from "@langwatch/feature-flag-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { OperatorFeatureFlagCatalogueView } from "../operator-feature-flag-catalogue";
+import {
+  OperatorFeatureFlagCatalogueView,
+  type OperatorFeatureFlagCatalogueRead,
+} from "../operator-feature-flag-catalogue";
 
-const CATALOGUE: OperatorFeatureFlagCatalogue = {
+const CATALOGUE: OperatorFeatureFlagCatalogueRead = {
   flags: [
     {
       key: "ops_es_trace_processing_killswitch",

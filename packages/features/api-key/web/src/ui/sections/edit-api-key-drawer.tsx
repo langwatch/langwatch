@@ -1,3 +1,4 @@
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /**
  * "Edit API key": the same ceiling, applied to a key that already exists.
  *
@@ -47,7 +48,8 @@ import {
   type PermissionSelection,
 } from "../blocks/permission-category-list";
 
-type ApiKeyRow = ApiKeyListEntry;
+/** A key as the browser holds one: the wire carries its instants as ISO strings. */
+type ApiKeyRow = WireOf<ApiKeyListEntry>;
 type MyBindings = {
   data: NamedApiKeyBinding[] | undefined;
   isLoading: boolean;

@@ -1,3 +1,4 @@
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /**
  * "Choose Evaluator": the picker every flow opens, a REGISTERED drawer
  * belonging to the family that owns evaluators. KNOWN GAP: "New
@@ -28,7 +29,7 @@ import { EvaluatorListEmptyState } from "../elements/evaluator-list-empty-state"
  * the contract's `Evaluator`, wide enough since the list never reads an
  * evaluator's fields — not the router-inferred type this package can't see.
  */
-export type EvaluatorListRow = Evaluator;
+export type EvaluatorListRow = WireOf<Evaluator>;
 
 export type EvaluatorListDrawerProps = {
   open?: boolean;

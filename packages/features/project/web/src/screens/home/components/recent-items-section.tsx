@@ -58,7 +58,7 @@ const MAX_RECENT_ROWS = 8;
  * grid: twice the items in half the height, with recency visible at a glance.
  */
 function RecentItemRow({ item }: { item: RecentItem }) {
-  const timeAgo = formatTimeAgo(item.updatedAt.getTime());
+  const timeAgo = formatTimeAgo(new Date(item.updatedAt).getTime());
   return (
     <ChakraLink asChild _hover={{ textDecoration: "none" }} width="full" display="block">
       <NextLink href={item.href}>

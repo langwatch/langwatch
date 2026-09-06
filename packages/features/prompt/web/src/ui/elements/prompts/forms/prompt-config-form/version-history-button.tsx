@@ -1,4 +1,4 @@
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
+import type { WireVersionedPrompt } from "../../../../../model/wire-versioned-prompt";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { VersionHistoryListPopover } from "../../version-history-list-popover";
 
@@ -13,7 +13,7 @@ export function VersionHistoryButton({
   configId: string;
   /** The versionId of the version currently being edited. If not provided, defaults to latest. */
   currentVersionId?: string;
-  onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
+  onRestoreSuccess?: (prompt: WireVersionedPrompt) => Promise<void>;
   hasUnsavedChanges?: boolean;
   label?: string;
   /** When true the history panel opens automatically on mount. */

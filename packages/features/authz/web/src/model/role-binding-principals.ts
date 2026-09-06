@@ -24,8 +24,10 @@ import type {
   AuthzManagedOrganizationBinding,
   RoleBindingScopeType,
 } from "@langwatch/authz-contract";
+import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 
-export type RoleBinding = AuthzManagedOrganizationBinding;
+/** A binding as the browser holds one: the wire carries `createdAt` as a string. */
+export type RoleBinding = WireOf<AuthzManagedOrganizationBinding>;
 
 /** Which scope tier the reader is looking at, or all of them. */
 export type BindingScopeFilter = "ALL" | RoleBindingScopeType;

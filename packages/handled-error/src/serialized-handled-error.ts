@@ -58,8 +58,9 @@ export interface SerializedHandledError {
   kind: string;
   retryable: boolean;
   meta: Record<string, unknown>;
-  traceId: string | undefined;
-  spanId: string | undefined;
+  /** Optional: JSON drops a key holding `undefined`, so an untraced error carries neither. */
+  traceId?: string;
+  spanId?: string;
   traceUrl?: string;
   httpStatus: number;
   fault: HandledErrorFault;

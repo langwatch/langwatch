@@ -1,4 +1,5 @@
-import { handleSchema, type VersionedPrompt } from "@langwatch/prompt-contract";
+import type { WireVersionedPrompt } from "../wire-versioned-prompt";
+import { handleSchema } from "@langwatch/prompt-contract";
 
 import { withDerivedDemonstrationColumns } from "./demonstration-columns";
 import { formSchema, type PromptConfigFormValues } from "./prompt-form.schemas";
@@ -43,7 +44,7 @@ const extractShortHandle = (handle: string | null | undefined): string | null =>
  * Converts the versioned prompt to form values without the system message.
  */
 export function versionedPromptToPromptConfigFormValues(
-  prompt: VersionedPrompt,
+  prompt: WireVersionedPrompt,
 ): PromptConfigFormValues {
   /**
    * Extract short handle from full path (e.g., "project_ABC/gato" -> "gato")
@@ -113,7 +114,7 @@ export function versionedPromptToPromptConfigFormValues(
  * The system message is added to the messages array.
  */
 export function versionedPromptToPromptConfigFormValuesWithSystemMessage(
-  prompt: VersionedPrompt,
+  prompt: WireVersionedPrompt,
 ): PromptConfigFormValues {
   const base = versionedPromptToPromptConfigFormValues(prompt);
 

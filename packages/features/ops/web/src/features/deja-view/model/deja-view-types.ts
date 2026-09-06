@@ -10,7 +10,8 @@ export type EventResult = {
   eventId: string;
   eventType: string;
   eventTimestamp: string;
-  payload: unknown;
+  /** Optional: JSON drops a key holding `undefined`. */
+  payload?: unknown;
 };
 
 export const EVENT_TYPE_COLORS = [

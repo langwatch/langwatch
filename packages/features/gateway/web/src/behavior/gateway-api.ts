@@ -3,7 +3,7 @@
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 import type {
   GatewayApplicableBudget,
   GatewayBudgetLedgerStatus,
@@ -373,9 +373,10 @@ export type WebhookDeliveryPage = {
     responseStatus: number | null;
     latencyMs: number | null;
     error: string | null;
-    firedAt: Date;
+    /** ISO 8601: the wire carries the instant as text. */
+    firedAt: string;
   }[];
-  nextCursor: { firedAt: Date; id: string } | null;
+  nextCursor: { firedAt: string; id: string } | null;
 };
 
 export type WebhookSqsInput = {
@@ -971,15 +972,7 @@ export const gatewayApi = createFeatureApi<GatewayApiMap>();
  * `~/utils/api` exported `RouterOutputs` off the real `AppRouter`, and the screens wrote
  * `RouterOutputs["webhookEndpoints"]["list"][number]`.
  */
-type GatewayOutputOf<TNode> = TNode extends { query: { output: infer TOutput } }
-  ? TOutput
-  : TNode extends { mutation: { output: infer TOutput } }
-    ? TOutput
-    : { [TSegment in keyof TNode]: GatewayOutputOf<TNode[TSegment]> };
-
-export type RouterOutputs = {
-  [TSegment in keyof GatewayApiMap]: GatewayOutputOf<GatewayApiMap[TSegment]>;
-};
+export type RouterOutputs = OutputsFromMap<GatewayApiMap>;
 
 /**
  * The name the screens call it by. They were written against the application's `api` proxy and

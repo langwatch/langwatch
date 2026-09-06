@@ -40,7 +40,8 @@ export type AnnotationSuggestionValue = AnnotationAnchorValue & {
 };
 
 export type AnnotationScoreValue = {
-  scoreOptions: unknown;
+  /** Optional because the wire drops the key when the annotation scored nothing. */
+  scoreOptions?: unknown;
 };
 
 /** The part of a trace an annotation was left on, in words. */

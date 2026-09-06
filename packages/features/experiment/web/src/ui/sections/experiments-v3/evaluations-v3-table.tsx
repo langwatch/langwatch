@@ -30,7 +30,10 @@ import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import type { RouterOutputs } from "@langwatch/workflow-web/surfaces/workflow-api";
+
+/** An evaluator as this table holds one: off a query, so its instants are strings. */
+type EvaluatorWithFields = NonNullable<RouterOutputs["evaluators"]["getById"]>;
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { newTargetId } from "@langwatch/experiment-contract";
 import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants";

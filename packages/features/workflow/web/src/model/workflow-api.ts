@@ -71,7 +71,11 @@ import type {
   WorkflowApiRestoreVersionInput,
   WorkflowApiRestoreVersionOutput,
 } from "@langwatch/workflow-contract";
-import { createFeatureApi, type RouterFromMap } from "@langwatch/platform-api-client/feature-api";
+import {
+  createFeatureApi,
+  type OutputsFromMap,
+  type RouterFromMap,
+} from "@langwatch/platform-api-client/feature-api";
 
 /** Where a workflow lives, as the copy lineage tooltip spells it out. */
 export type WorkflowProjectPath = {
@@ -87,7 +91,8 @@ export type WorkflowListRow = {
   name: string;
   icon: string | null;
   description: string | null;
-  updatedAt: Date;
+  /** ISO 8601: nothing transforms the wire, so the instant arrives as text. */
+  updatedAt: string;
   copiedFromWorkflowId: string | null;
   copiedFrom: { id: string; name: string; projectId: string; project: WorkflowProjectPath } | null;
   _count: { copiedWorkflows: number };
@@ -450,10 +455,8 @@ export type RouterInputs = {
   [K in keyof WorkflowApiMap]: InputsOf<WorkflowApiMap[K]>;
 };
 
-/** What each procedure in the map answers. */
-export type RouterOutputs = {
-  [K in keyof WorkflowApiMap]: OutputsOf<WorkflowApiMap[K]>;
-};
+/** What each procedure in the map answers, as the browser receives it. */
+export type RouterOutputs = OutputsFromMap<WorkflowApiMap>;
 
 type InputsOf<TNode> = TNode extends { query: { input: infer TIn } }
   ? TIn
@@ -462,11 +465,3 @@ type InputsOf<TNode> = TNode extends { query: { input: infer TIn } }
     : TNode extends { subscription: { input: infer TIn } }
       ? TIn
       : { [K in keyof TNode]: InputsOf<TNode[K]> };
-
-type OutputsOf<TNode> = TNode extends { query: { output: infer TOut } }
-  ? TOut
-  : TNode extends { mutation: { output: infer TOut } }
-    ? TOut
-    : TNode extends { subscription: { output: infer TOut } }
-      ? TOut
-      : { [K in keyof TNode]: OutputsOf<TNode[K]> };

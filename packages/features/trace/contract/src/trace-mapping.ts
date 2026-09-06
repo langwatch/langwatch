@@ -5,9 +5,17 @@ import {
   describeAnnotationAnchor,
 } from "@langwatch/annotation-contract";
 import type {
-  AnnotationScore,
+  AnnotationScore as StoredAnnotationScore,
   AnnotationWithUser as Annotation,
 } from "@langwatch/annotation-contract";
+
+/**
+ * Only what the mapping reads off a project score: its id, to match a rating
+ * against, and its label, to name the column. Naming the whole row here would
+ * force every caller to hold one — including the browser, which holds the
+ * serialised shape, not the stored one.
+ */
+type AnnotationScore = Pick<StoredAnnotationScore, "id" | "name">;
 import {
   type Trace as BaseTrace,
   type DatasetSpan,

@@ -126,8 +126,8 @@ function JoinRequestRow({
 }
 
 /** Spelled out, never abbreviated: "24 Aug 2026", not "24/08". */
-function formatDay(date: Date): string {
-  return date.toLocaleDateString(undefined, {
+function formatDay(date: string): string {
+  return new Date(date).toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",
     year: "numeric",

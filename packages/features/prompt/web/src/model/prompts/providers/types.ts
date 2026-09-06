@@ -1,4 +1,4 @@
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
+import type { WireVersionedPrompt } from "../../wire-versioned-prompt";
 import type { RouterInputs } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 /**
@@ -6,7 +6,7 @@ import type { RouterInputs } from "@langwatch/workflow-web/surfaces/workflow-api
  */
 export type CreatePromptParams = {
   data: Omit<RouterInputs["prompts"]["create"]["data"], "handle">;
-  onSuccess?: (prompt: VersionedPrompt) => void;
+  onSuccess?: (prompt: WireVersionedPrompt) => void;
   onError?: (error: Error) => void;
 };
 
@@ -16,7 +16,7 @@ export type CreatePromptParams = {
  */
 export type ChangeHandleParams = {
   id: string;
-  onSuccess?: (prompt: VersionedPrompt) => void;
+  onSuccess?: (prompt: WireVersionedPrompt) => void;
   onError?: (error: Error) => void;
 };
 
@@ -28,7 +28,7 @@ export type SaveVersionParams = {
   data: Omit<RouterInputs["prompts"]["update"]["data"], "commitMessage">;
   /** Next version number to display in dialog (e.g., "Update to v5") */
   nextVersion?: number;
-  onSuccess?: (prompt: VersionedPrompt) => void;
+  onSuccess?: (prompt: WireVersionedPrompt) => void;
   onError?: (error: Error) => void;
 };
 
