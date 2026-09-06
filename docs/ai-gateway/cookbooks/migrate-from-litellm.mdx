@@ -91,3 +91,5 @@ Send one request and check the response for `X-LangWatch-Gateway-Request-Id`. Op
 ## Keep a LiteLLM proxy behind the gateway
 
 To move in stages, add the LiteLLM proxy as a [custom OpenAI-compatible provider](/ai-gateway/providers/custom-openai-compatible) with its URL as the base URL and a LiteLLM key as the API key. Keys created in LangWatch then reach it as `custom/<model_name>`, with LangWatch budgets, traces and spend events in front of it. Move providers to their own rows one at a time.
+
+On LangWatch Cloud that base URL must use `https` and must not resolve to a private address. A self-hosted gateway accepts `http` while `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` stays `false`.

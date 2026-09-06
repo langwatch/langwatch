@@ -40,6 +40,8 @@ The form then opens the dashboard with a message that names the caps it created.
 
 Each signed-in customer creates agents (name, system prompt, model) and chats with them. The chat streams through the gateway over Server-Sent Events, on that customer's virtual key, with the seat's email in the OpenAI `user` field. A usage meter at the bottom of the page shows live spend against the caps. Switching workspace swaps agents, transcripts, meter and event feed together.
 
+The demo sends the email so the identity is readable while you watch the events arrive. In your own application send a stable pseudonymous id instead: the gateway stores the value as sent, and keeps spend events for 13 months.
+
 ### The app receives its own billing events
 
 The app hosts its receiver at `POST /webhooks/langwatch`. It verifies the `X-LangWatch-Signature` HMAC over the raw request bytes, dedups by envelope id, and answers `2xx` once the batch is stored. Ingested events drive the meters and stream to the browser over Server-Sent Events, so a delivered event moves the meter without a page refresh.

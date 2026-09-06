@@ -3356,7 +3356,7 @@ The same endpoints receive `gateway.budget.threshold_crossed`, `gateway.budget.b
 
 ## Read events over REST
 
-Both routes take `from` and `to` as epoch milliseconds, required, and a `cursor` from the previous page.
+The two list routes take `from` and `to` as epoch milliseconds, required, and a `cursor` from the previous page.
 
 ```bash
 # One row per virtual key over July, for a checksum against your ledger
@@ -3487,12 +3487,12 @@ Per-end-user budgets are created over the API. See [Per end user](#per-end-user)
 | `project` | Every request whose traces land in the project. |
 | `virtual_key` | Every request on this key. |
 | `principal` | Every request by this person, on any key with them as principal. **Member** in the drawer. |
-| `group` | Each member of the group, individually. One budget, one allowance per member. |
-| `attributed_user` | Each end user of your product, individually, on one key or one project. |
+| `group` | Each member of the group, individually. One budget, one allowance per member. Needs the ClickHouse spend ledger. |
+| `attributed_user` | Each end user of your product, individually, on one key or one project. Needs the ClickHouse spend ledger. |
 
 One request is checked against all of them. For example, a request on key `acme-support-agent` in project `support` of team `platform` counts against the key's, the project's, the team's and the organization's budgets, and against the principal and group budgets when the key has a principal.
 
-A `group` budget gives each member their own allowance: a $10 per day budget on group `engineering` caps each engineer at $10, and one member's spend never counts against another. It applies only to keys with a principal.
+A `group` budget gives each member their own allowance: a $10 per day budget on group `engineering` caps each engineer at $10, and one member's spend never counts against another. It applies only to keys with a principal. Telling members apart needs the ClickHouse spend ledger, so a deployment that reads budget spend from Postgres only refuses the create with `group_budget_requires_clickhouse`. An `attributed_user` budget is refused the same way.
 
 ### Per end user
 
@@ -6239,6 +6239,8 @@ Send one request and check the response for `X-LangWatch-Gateway-Request-Id`. Op
 
 To move in stages, add the LiteLLM proxy as a [custom OpenAI-compatible provider](/ai-gateway/providers/custom-openai-compatible) with its URL as the base URL and a LiteLLM key as the API key. Keys created in LangWatch then reach it as `custom/<model_name>`, with LangWatch budgets, traces and spend events in front of it. Move providers to their own rows one at a time.
 
+On LangWatch Cloud that base URL must use `https` and must not resolve to a private address. A self-hosted gateway accepts `http` while `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` stays `false`.
+
 ---
 
 # FILE: ./ai-gateway/cookbooks/migrate-from-portkey.mdx
@@ -7262,6 +7264,8 @@ The form then opens the dashboard with a message that names the caps it created.
 ### The dashboard
 
 Each signed-in customer creates agents (name, system prompt, model) and chats with them. The chat streams through the gateway over Server-Sent Events, on that customer's virtual key, with the seat's email in the OpenAI `user` field. A usage meter at the bottom of the page shows live spend against the caps. Switching workspace swaps agents, transcripts, meter and event feed together.
+
+The demo sends the email so the identity is readable while you watch the events arrive. In your own application send a stable pseudonymous id instead: the gateway stores the value as sent, and keeps spend events for 13 months.
 
 ### The app receives its own billing events
 
@@ -9678,7 +9682,7 @@ Every application, team or person gets a **virtual key** instead of a provider k
 
 Your code points the OpenAI SDK or the Anthropic SDK at `https://gateway.langwatch.ai` and sends the virtual key as the API key. The request body stays the same.
 
-The gateway then gives you, on every request:
+The gateway then gives you, on every request it authenticates:
 
 - **Spend per key, person, team and project**, in the Usage page and as a spend event you can pull or receive by webhook.
 - **Budgets** on any of those scopes, and per end user of your product, that block the request or add a warning header.
@@ -9738,7 +9742,7 @@ The gateway translates between wire formats where the provider differs. For exam
     Requests per minute and per day on a key.
   </Card>
   <Card title="Billing and spend events" icon="file-invoice-dollar" href="/ai-gateway/billing-events">
-    One spend event per request, by webhook or by REST, for rebilling your customers.
+    One spend event per authenticated request, by webhook or by REST, for rebilling your customers.
   </Card>
 </CardGroup>
 
@@ -10961,7 +10965,7 @@ A provider credential is a row under **Settings > Model Providers**. The row bel
   <img src="/images/ai-gateway/model-providers-add-menu.png" alt="The Model Providers page with the Add Model Provider menu open, listing every provider" />
 </Frame>
 
-Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority and a provider config JSON.
+Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority, a provider config JSON, and requests per minute, tokens per minute and requests per day fields. The gateway does not enforce those three; they are recorded on the row only. Cap traffic with the requests per minute and requests per day settings on a virtual key. See [Rate limits](/ai-gateway/rate-limits).
 
 <Frame caption="Advanced (Gateway) on a Bedrock row: fallback priority and provider config.">
   <img src="/images/ai-gateway/model-provider-advanced-gateway.png" alt="The Bedrock provider drawer with the Advanced (Gateway) section expanded" />
@@ -11180,7 +11184,7 @@ You need:
 
 - A LangWatch account with a project.
 - One provider credential under **Settings > Model Providers**, for example your OpenAI API key. The gateway uses the credentials already configured there. See [Providers](/ai-gateway/providers/overview).
-- The `virtualKeys:create` permission in the project. Project admins and members have it by default. See [RBAC](/ai-gateway/rbac).
+- The `virtualKeys:create` permission in the project. Team Member and Team Admin hold it by default. See [RBAC](/ai-gateway/rbac).
 
 ## 1. Create a virtual key
 

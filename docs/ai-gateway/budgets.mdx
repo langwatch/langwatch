@@ -43,12 +43,12 @@ Per-end-user budgets are created over the API. See [Per end user](#per-end-user)
 | `project` | Every request whose traces land in the project. |
 | `virtual_key` | Every request on this key. |
 | `principal` | Every request by this person, on any key with them as principal. **Member** in the drawer. |
-| `group` | Each member of the group, individually. One budget, one allowance per member. |
-| `attributed_user` | Each end user of your product, individually, on one key or one project. |
+| `group` | Each member of the group, individually. One budget, one allowance per member. Needs the ClickHouse spend ledger. |
+| `attributed_user` | Each end user of your product, individually, on one key or one project. Needs the ClickHouse spend ledger. |
 
 One request is checked against all of them. For example, a request on key `acme-support-agent` in project `support` of team `platform` counts against the key's, the project's, the team's and the organization's budgets, and against the principal and group budgets when the key has a principal.
 
-A `group` budget gives each member their own allowance: a $10 per day budget on group `engineering` caps each engineer at $10, and one member's spend never counts against another. It applies only to keys with a principal.
+A `group` budget gives each member their own allowance: a $10 per day budget on group `engineering` caps each engineer at $10, and one member's spend never counts against another. It applies only to keys with a principal. Telling members apart needs the ClickHouse spend ledger, so a deployment that reads budget spend from Postgres only refuses the create with `group_budget_requires_clickhouse`. An `attributed_user` budget is refused the same way.
 
 ### Per end user
 

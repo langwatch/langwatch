@@ -12,7 +12,7 @@ A provider credential is a row under **Settings > Model Providers**. The row bel
   <img src="/images/ai-gateway/model-providers-add-menu.png" alt="The Model Providers page with the Add Model Provider menu open, listing every provider" />
 </Frame>
 
-Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority and a provider config JSON.
+Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority, a provider config JSON, and requests per minute, tokens per minute and requests per day fields. The gateway does not enforce those three; they are recorded on the row only. Cap traffic with the requests per minute and requests per day settings on a virtual key. See [Rate limits](/ai-gateway/rate-limits).
 
 <Frame caption="Advanced (Gateway) on a Bedrock row: fallback priority and provider config.">
   <img src="/images/ai-gateway/model-provider-advanced-gateway.png" alt="The Bedrock provider drawer with the Advanced (Gateway) section expanded" />

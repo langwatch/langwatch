@@ -17,7 +17,7 @@ Every application, team or person gets a **virtual key** instead of a provider k
 
 Your code points the OpenAI SDK or the Anthropic SDK at `https://gateway.langwatch.ai` and sends the virtual key as the API key. The request body stays the same.
 
-The gateway then gives you, on every request:
+The gateway then gives you, on every request it authenticates:
 
 - **Spend per key, person, team and project**, in the Usage page and as a spend event you can pull or receive by webhook.
 - **Budgets** on any of those scopes, and per end user of your product, that block the request or add a warning header.
@@ -77,7 +77,7 @@ The gateway translates between wire formats where the provider differs. For exam
     Requests per minute and per day on a key.
   </Card>
   <Card title="Billing and spend events" icon="file-invoice-dollar" href="/ai-gateway/billing-events">
-    One spend event per request, by webhook or by REST, for rebilling your customers.
+    One spend event per authenticated request, by webhook or by REST, for rebilling your customers.
   </Card>
 </CardGroup>
 
