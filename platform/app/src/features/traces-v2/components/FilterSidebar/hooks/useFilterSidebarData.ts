@@ -321,7 +321,10 @@ export function useFilterSidebarData() {
   const facetItems = useMemo(() => {
     const map = new Map<string, FacetItem[]>();
     for (const cat of categoricals) {
-      const baseItems = buildFacetItems(cat, cat.synthetic ?? isSynthetic);
+      const baseItems = buildFacetItems({
+        cat,
+        synthetic: cat.synthetic ?? isSynthetic,
+      });
       // Surface values that the user typed in the search bar but that
       // discover didn't return (rare value, custom label, paste from
       // another query). Without this, an active filter like
@@ -663,10 +666,13 @@ function buildDiscreteFacetItems(
  * proves nothing if `dotColorFor` stops consulting it, and that wiring is
  * otherwise only observable through the whole sidebar.
  */
-export function buildFacetItems(
-  cat: CategoricalSection,
-  synthetic: boolean,
-): FacetItem[] {
+export function buildFacetItems({
+  cat,
+  synthetic,
+}: {
+  cat: CategoricalSection;
+  synthetic: boolean;
+}): FacetItem[] {
   const curatedColors = FACET_COLORS[cat.key];
   const dimmed = !VIBRANT_FIELDS.has(cat.key);
   const counts = new Map(cat.topValues.map((v) => [v.value, v.count]));

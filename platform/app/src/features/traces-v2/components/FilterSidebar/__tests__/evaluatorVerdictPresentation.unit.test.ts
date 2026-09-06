@@ -32,14 +32,14 @@ describe("evaluator verdict presentation", () => {
   describe("given verdict rows built for the section", () => {
     /** @scenario "Verdicts carry the drilldown's traffic light" */
     it("hands each row the drilldown's colour for its verdict", () => {
-      const rows = buildFacetItems(
-        verdictSection([
+      const rows = buildFacetItems({
+        cat: verdictSection([
           { value: "pass", count: 72 },
           { value: "fail", count: 24 },
           { value: "error", count: 3 },
         ]),
-        false,
-      );
+        synthetic: false,
+      });
 
       expect(
         Object.fromEntries(rows.map((r) => [r.value, r.dotColor])),
@@ -51,13 +51,13 @@ describe("evaluator verdict presentation", () => {
     });
 
     it("keeps the non-verdicts neutral so they do not compete", () => {
-      const rows = buildFacetItems(
-        verdictSection([
+      const rows = buildFacetItems({
+        cat: verdictSection([
           { value: "skipped", count: 2 },
           { value: "unknown", count: 1 },
         ]),
-        false,
-      );
+        synthetic: false,
+      });
 
       expect(
         Object.fromEntries(rows.map((r) => [r.value, r.dotColor])),
@@ -65,10 +65,10 @@ describe("evaluator verdict presentation", () => {
     });
 
     it("renders the curated palette at full strength rather than dimmed", () => {
-      const rows = buildFacetItems(
-        verdictSection([{ value: "pass", count: 1 }]),
-        false,
-      );
+      const rows = buildFacetItems({
+        cat: verdictSection([{ value: "pass", count: 1 }]),
+        synthetic: false,
+      });
 
       expect(rows.map((r) => r.dimmed)).toEqual([false]);
       expect(VIBRANT_FIELDS.has("evaluatorVerdict")).toBe(true);
@@ -76,39 +76,39 @@ describe("evaluator verdict presentation", () => {
 
     /** @scenario "Verdicts read pass, fail, error regardless of counts" */
     it("lists pass, then fail, then error however the counts fall", () => {
-      const rows = buildFacetItems(
-        verdictSection([
+      const rows = buildFacetItems({
+        cat: verdictSection([
           { value: "fail", count: 90 },
           { value: "error", count: 40 },
           { value: "pass", count: 2 },
         ]),
-        false,
-      );
+        synthetic: false,
+      });
 
       expect(rows.map((r) => r.value)).toEqual(["pass", "fail", "error"]);
     });
 
     /** @scenario "Ordering the facet does not invent verdict rows" */
     it("lists no row for a verdict the project never emitted", () => {
-      const rows = buildFacetItems(
-        verdictSection([
+      const rows = buildFacetItems({
+        cat: verdictSection([
           { value: "fail", count: 24 },
           { value: "pass", count: 72 },
         ]),
-        false,
-      );
+        synthetic: false,
+      });
 
       expect(rows.map((r) => r.value)).toEqual(["pass", "fail"]);
     });
 
     it("leaves a facet with no colour rule on the generic hash", () => {
-      const rows = buildFacetItems(
-        {
+      const rows = buildFacetItems({
+        cat: {
           ...verdictSection([{ value: "pass", count: 1 }]),
           key: "someUncuratedFacet",
         } as CategoricalSection,
-        false,
-      );
+        synthetic: false,
+      });
 
       expect(rows[0]?.dotColor).not.toBe("green.solid");
     });
