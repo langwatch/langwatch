@@ -260,12 +260,9 @@ export const useUpdateDrawerParams = () => {
       options: { push?: boolean } = {},
     ) => {
       const push = options.push ?? true;
-      const {
-        path,
-        queryString,
-        hash: routerHash,
-      } = splitAsPath(router.asPath);
-      const hash = liveHash() ?? routerHash;
+      const { path, queryString, hash } = splitAsPath(
+        liveAsPath(router.asPath),
+      );
       const parsed = qs.parse(queryString, URL_QS_PARSE_OPTIONS) as Record<
         string,
         unknown
@@ -382,8 +379,8 @@ function splitAsPath(asPath: string): {
 }
 
 /**
- * The URL fragment as the browser holds it right now, rather than as React
- * Router remembers it.
+ * `router.asPath` with its fragment replaced by the one the browser holds right
+ * now.
  *
  * The traces page keeps its bar state — active lens, query, time range — in
  * the fragment, and writes it with a raw `history.replaceState`
@@ -394,14 +391,22 @@ function splitAsPath(asPath: string): {
  * 24-hour window, open a conversation, and the page re-applied the fragment
  * from before the pick — snapping the table back to the 30-day default.
  *
- * Only the fragment is read live. Path and query move exclusively through the
+ * Only the fragment is swapped. Path and query move exclusively through the
  * router, so `asPath` is authoritative for those; the fragment is the one axis
  * something else writes behind its back (the traces bar state, and the
  * onboarding spotlight marker).
+ *
+ * The swap happens before `splitAsPath` rather than after it, so that the hash
+ * and the query it may need to give up are always read out of the same string —
+ * splitting the router's fragment and then overwriting the hash with the
+ * browser's would promote a `drawer.` param into the query while leaving a
+ * stale copy of it in the fragment.
  */
-function liveHash(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.location.hash.replace(/^#/, "");
+function liveAsPath(asPath: string): string {
+  if (typeof window === "undefined") return asPath;
+  const hashIdx = asPath.indexOf("#");
+  const withoutHash = hashIdx === -1 ? asPath : asPath.slice(0, hashIdx);
+  return withoutHash + window.location.hash;
 }
 
 function buildUrl(path: string, queryString: string, hash: string): string {
@@ -471,12 +476,9 @@ export const useDrawer = () => {
       // Build query from the actual browser URL (router.asPath), not
       // router.query which may be stale after (url, as) shallow pushes.
       // This preserves filter params that only exist in the asPath URL.
-      const {
-        path,
-        queryString,
-        hash: routerHash,
-      } = splitAsPath(router.asPath);
-      const hash = liveHash() ?? routerHash;
+      const { path, queryString, hash } = splitAsPath(
+        liveAsPath(router.asPath),
+      );
       const currentQueryOnly = Object.fromEntries(
         Object.entries(qs.parse(queryString, URL_QS_PARSE_OPTIONS)).filter(
           ([key]) => !key.startsWith("drawer"),
@@ -655,9 +657,8 @@ export const useDrawer = () => {
     const {
       path,
       queryString: currentQs,
-      hash: routerHash,
-    } = splitAsPath(router.asPath);
-    const hash = liveHash() ?? routerHash;
+      hash,
+    } = splitAsPath(liveAsPath(router.asPath));
     const parsedQuery = qs.parse(currentQs, URL_QS_PARSE_OPTIONS);
     const cleanQuery = Object.fromEntries(
       Object.entries(parsedQuery).filter(

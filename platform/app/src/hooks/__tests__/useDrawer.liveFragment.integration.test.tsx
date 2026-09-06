@@ -180,5 +180,28 @@ describe("useDrawer URL fragment", () => {
       expect(beforeHash).toContain("drawer.open=traceV2Details");
       expect(beforeHash).toContain("drawer.mode=conversation");
     });
+
+    it("leaves no copy of them behind in the fragment", () => {
+      // Lifting a param out of the fragment has to remove it from there too.
+      // A leftover `drawer.open` in the fragment is a stale snapshot that the
+      // next drawer navigation lifts again — closing the drawer and then
+      // opening another one would resurrect the old one.
+      staleRouterHash = "#conversations?drawer.open=traceV2Details";
+      window.history.replaceState(
+        {},
+        "",
+        "/acme/traces#conversations?drawer.open=traceV2Details",
+      );
+      const { result } = renderHook(() => useUpdateDrawerParams());
+
+      act(() => {
+        result.current({ mode: "conversation" });
+      });
+
+      const pushed = mockPush.mock.calls[0]?.[0] as string;
+      expect(pushed).toContain("#conversations");
+      const afterHash = pushed.slice(pushed.indexOf("#"));
+      expect(afterHash).toBe("#conversations");
+    });
   });
 });
