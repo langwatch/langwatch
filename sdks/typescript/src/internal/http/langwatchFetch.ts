@@ -198,21 +198,20 @@ export const createLangWatchFetch = ({
 
   /** The GET and HEAD rule: follow with the same method, up to MAX_FOLLOW_HOPS. */
   const follow = async ({
-    input,
+    effective,
     init,
     url,
     method,
     first,
   }: {
-    input: RequestInfo | URL;
+    effective: Request | null;
     init: RequestInit | undefined;
     url: string;
     method: string;
     first: Response;
   }): Promise<Response> => {
-    const isRequest = typeof Request !== "undefined" && input instanceof Request;
-    let headers = new Headers(init?.headers ?? (isRequest ? input.headers : undefined));
-    const signal = init?.signal ?? (isRequest ? input.signal : undefined);
+    let headers = new Headers(effective?.headers ?? init?.headers);
+    const signal = effective?.signal ?? init?.signal;
     let current = url;
     let response = first;
 
@@ -227,7 +226,7 @@ export const createLangWatchFetch = ({
       if (isSchemeUpgrade({ from, to })) warnOnce({ url: current, logger: log });
 
       current = target;
-      response = isRequest
+      response = effective
         ? await send(new Request(target, { method, headers, signal, redirect: "manual" }))
         : await send(target, { ...init, method, headers, body: undefined, redirect: "manual" });
       if (!isRedirect(response)) return response;
@@ -238,19 +237,18 @@ export const createLangWatchFetch = ({
 
   /** The rule for every other method: one hop, and only an https upgrade of the same URL. */
   const upgrade = async ({
-    input,
+    effective,
     init,
     url,
     first,
     spare,
   }: {
-    input: RequestInfo | URL;
+    effective: Request | null;
     init: RequestInit | undefined;
     url: string;
     first: Response;
     spare: Request | null;
   }): Promise<Response> => {
-    const isRequest = typeof Request !== "undefined" && input instanceof Request;
     const location = first.headers.get("location");
     const refused = refusalOf({ url, response: first });
     if (location === null || first.status === 303) throw refused;
@@ -259,13 +257,13 @@ export const createLangWatchFetch = ({
 
     warnOnce({ url, logger: log });
 
-    const second = isRequest
+    const second = effective
       ? await send(
           new Request(target, {
-            method: input.method,
-            headers: input.headers,
+            method: effective.method,
+            headers: effective.headers,
             body: spare ? await spare.arrayBuffer() : null,
-            signal: input.signal,
+            signal: effective.signal,
             redirect: "manual",
           }),
         )
@@ -278,23 +276,25 @@ export const createLangWatchFetch = ({
   return async (input, init) => {
     const isRequest = typeof Request !== "undefined" && input instanceof Request;
     const url = requestUrl(input);
-    const method = (init?.method ?? (isRequest ? input.method : "GET")).toUpperCase();
+    // What `fetch(input, init)` would send: `init` wins over the Request field
+    // by field, so both sends read the same method, headers and body.
+    const effective = isRequest
+      ? new Request(input, { ...init, redirect: "manual" })
+      : null;
+    const method = (effective?.method ?? init?.method ?? "GET").toUpperCase();
     // A Request carries its body as a stream that one send consumes, so a copy
     // is taken before the first send and read only if the replay happens.
-    const spare =
-      isRequest && init?.body === undefined && input.body !== null
-        ? input.clone()
-        : null;
+    const spare = effective !== null && effective.body !== null ? effective.clone() : null;
 
-    const first = isRequest
-      ? await send(new Request(input, { ...init, redirect: "manual" }))
+    const first = effective
+      ? await send(effective)
       : await send(input, { ...init, redirect: "manual" });
     if (!isRedirect(first)) return first;
 
     if (FOLLOWING_METHODS.has(method)) {
-      return follow({ input, init, url, method, first });
+      return follow({ effective, init, url, method, first });
     }
-    return upgrade({ input, init, url, first, spare });
+    return upgrade({ effective, init, url, first, spare });
   };
 };
 
