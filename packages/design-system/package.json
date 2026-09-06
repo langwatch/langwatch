@@ -310,7 +310,7 @@
     "storybook": "^10.5.10",
     "typescript": "^7.0.2",
     "vite": "^8.1.2",
-    "vitest": "^4.1.9"
+    "vitest": "^5.0.0"
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",

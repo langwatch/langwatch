@@ -29,7 +29,7 @@
  * raises is a decision rather than a surprise.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 import type {
   LegacyModelProvider,
   ModelDefaultEffective,

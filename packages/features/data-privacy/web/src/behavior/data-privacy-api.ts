@@ -8,7 +8,7 @@ import type {
   DataPrivacyScopeType,
   DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /** One scope a rule is written at. */
 type PrivacyScopeInput = { scopeType: DataPrivacyScopeType; scopeId: string };

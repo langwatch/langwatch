@@ -19,7 +19,7 @@
  * import below is the only one in the package.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 import type { ProjectHostOrganization, ProjectHostProject } from "../model/project-host";
 
 export type ProjectApiMap = {

@@ -30,7 +30,7 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "../model/prisma-types";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /**
  * Every filter the audit table narrows by, in the one shape both the table and

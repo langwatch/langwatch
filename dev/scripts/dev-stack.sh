@@ -7,7 +7,10 @@
 #
 # Lanes:
 #   ui       apps/ui       — Vite on PORT (default 5560), proxying /api to the api lane
-#   api      apps/api      — tRPC + REST + SSE on PORT + 1000
+#   api      apps/api      — tRPC + REST + SSE on PORT + 1000. Its own `dev`
+#                              script migrates both schemas first (apps/api's
+#                              start:prepare:db), so a stack has exactly one
+#                              migrator wherever the api lane is started from.
 #   workers  apps/worker   — queues, schedulers, projections; metrics on PORT - 2561
 #   gateway  services/aigateway (Go)  — auto-started on PORT + 3 when Go is present
 #   nlpgo    services/nlpgo (Go)      — auto-started on the port the api lane dials

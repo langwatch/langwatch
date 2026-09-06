@@ -7,7 +7,7 @@ import type {
   LangyConversationListItemDto,
 } from "@langwatch/langy-contract";
 import type { ModelDefaultResolvedTrpcOutput } from "@langwatch/model-provider-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /**
  * A payload no contract package publishes yet.

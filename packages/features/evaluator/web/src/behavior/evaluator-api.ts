@@ -33,7 +33,7 @@ import type {
   EvaluatorCopy,
   EvaluatorHistoryEntry,
 } from "@langwatch/evaluator-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /** An evaluator and a project, the input nine of these ten procedures take. */
 export type EvaluatorIdInput = { id: string; projectId: string };

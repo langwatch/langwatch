@@ -27,7 +27,7 @@
  */
 
 import type { OrganizationIntent } from "@langwatch/organization-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /** What a signing-up reader told us about themselves, verbatim. */
 type SignUpData = Readonly<Record<string, unknown>>;

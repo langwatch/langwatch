@@ -118,12 +118,12 @@
     "@types/qs": "^6.15.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitest/browser-playwright": "^4.1.9",
+    "@vitest/browser-playwright": "^5.0.0",
     "jsdom": "^30.0.1",
     "playwright": "1.61.1",
     "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.9"
+    "vitest": "^5.0.0"
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",

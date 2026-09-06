@@ -27,7 +27,7 @@
  */
 
 import type { AuthzManagedOrganizationBinding, AuthzPermission } from "@langwatch/authz-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 import type { Role } from "@langwatch/role-contract";
 
 /** One organization, the tenant key every procedure on these surfaces takes. */

@@ -10,6 +10,18 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./feature-api": {
+      "types": "./src/feature-api.ts",
+      "default": "./src/feature-api.ts"
+    },
+    "./query-key": {
+      "types": "./src/trpc-query-key.ts",
+      "default": "./src/trpc-query-key.ts"
+    },
+    "./invalidate": {
+      "types": "./src/use-invalidate-procedure.ts",
+      "default": "./src/use-invalidate-procedure.ts"
     }
   },
   "scripts": {
@@ -27,7 +39,7 @@
   "devDependencies": {
     "@types/react": "^19.2.14",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.9"
+    "vitest": "^5.0.0"
   },
   "peerDependencies": {
     "react": "^19.2.7"

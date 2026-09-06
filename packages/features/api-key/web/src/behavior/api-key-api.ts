@@ -43,7 +43,7 @@ import type {
   ApiKeyUser,
   NamedApiKeyBinding,
 } from "@langwatch/api-key-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /** The organization every API key procedure is narrowed to. */
 type OrganizationScope = { organizationId: string };

@@ -25,7 +25,7 @@
  */
 
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /**
  * The deployment facts only a request can answer.

@@ -14,7 +14,7 @@
  */
 
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /**
  * What kind of thing the reader touched.

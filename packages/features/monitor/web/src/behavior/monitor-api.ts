@@ -30,7 +30,7 @@
  */
 
 import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /**
  * A monitor, as this list reads it.

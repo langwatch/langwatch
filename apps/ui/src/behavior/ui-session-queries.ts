@@ -4,7 +4,7 @@
  * package's queries and the application's own share ONE cache entry.
  */
 
-import { trpcQueryKey } from "@langwatch/platform-api-client";
+import { trpcQueryKey } from "@langwatch/platform-api-client/query-key";
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { UiScopeOrganization } from "../model/ui-scope";
 import type { UiFeatureApiTransport } from "./ui-feature-transport";

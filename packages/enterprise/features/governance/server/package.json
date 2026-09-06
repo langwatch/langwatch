@@ -64,6 +64,6 @@
     "@langwatch/test-harness": "workspace:*",
     "nanoid": "^6.0.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.9"
+    "vitest": "^5.0.0"
   }
 }

@@ -49,7 +49,7 @@
     "@types/node": "^26.0.1",
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.9"
+    "vitest": "^5.0.0"
   },
   "packageManager": "pnpm@10.24.0"
 }

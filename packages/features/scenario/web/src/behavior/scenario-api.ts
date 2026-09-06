@@ -7,7 +7,7 @@ import type {
   ModelDefaultResolvedTrpcOutput,
   ModelProviderListAllForProjectTrpcOutput,
 } from "@langwatch/model-provider-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /**
  * A payload no contract package publishes yet.

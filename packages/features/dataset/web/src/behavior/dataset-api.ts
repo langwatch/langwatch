@@ -34,7 +34,7 @@ import type {
   DatasetRecordMutationResult,
   DatasetSummary,
 } from "@langwatch/dataset-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /** The project every dataset procedure is scoped to. */
 type ProjectScope = { projectId: string };

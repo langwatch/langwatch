@@ -18,7 +18,7 @@
  * cache with the `api.codingAgents.*` call sites that have not moved.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 import type {
   CodingAgentPersonalPullRequestUsage,
   CodingAgentPullRequestDetail,

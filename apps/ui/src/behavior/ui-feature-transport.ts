@@ -8,7 +8,7 @@ import {
   type FeatureApiClient,
   type FeatureApiMap,
   type RouterFromMap,
-} from "@langwatch/platform-api-client";
+} from "@langwatch/platform-api-client/feature-api";
 import type { AppRouter } from "@langwatch/platform-api/app-trpc/types";
 import type { QueryClient } from "@tanstack/react-query";
 import {

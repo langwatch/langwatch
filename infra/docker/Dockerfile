@@ -218,19 +218,21 @@ EXPOSE 5560
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-# The boot chain: three tasks from apps/tasks, then the API process. Each
-# task is a `@langwatch/task` class resolved by name from apps/tasks' own
-# catalogue — prisma-migrate (packages/prisma-client's history),
-# clickhouse-migrate (the goose runner, TTL reconciler and ClickHouse SQL,
-# now packages/clickhouse-client's), and lwql-provision. The same words run
-# on a laptop: `pnpm --filter @langwatch/tasks task <name>`.
+# The boot chain lives in apps/api, not here: `pnpm -s run start` is
+# `start:prepare:db && tsx src/api.entrypoint.ts`, and start:prepare:db runs
+# the three tasks from apps/tasks in order — prisma-migrate (packages/prisma-
+# client's history), clickhouse-migrate (the goose runner, TTL reconciler and
+# ClickHouse SQL, now packages/clickhouse-client's), and lwql-provision. Written
+# once so a container, a laptop and the api lane haven supervises boot the same
+# way; a copy here would migrate twice and drift.
 #
 # The order is load-bearing: LangWatchQL provisioning reads both the Postgres
 # schema and the ClickHouse one, so it cannot run before either. Sequenced with
 # `&&` so a failed migration stops the boot rather than serving against a schema
 # that was never applied.
 #
-# `pnpm -s run start` is `tsx src/api.entrypoint.ts`. The API process serves the
-# REST, tRPC and SSE families AND the browser bundle it finds at
-# /app/apps/ui/dist/client, so this one container is the whole interactive tier.
-CMD cd /app/apps/tasks && pnpm -s task prisma-migrate && pnpm -s task clickhouse-migrate && pnpm -s task lwql-provision && cd /app/apps/api && pnpm -s run start
+# The API process serves the REST, tRPC and SSE families AND the browser bundle
+# it finds at /app/apps/ui/dist/client, so this one container is the whole
+# interactive tier. The worker deployment runs the same image from
+# /app/apps/worker, whose own start script migrates nothing.
+CMD cd /app/apps/api && pnpm -s run start

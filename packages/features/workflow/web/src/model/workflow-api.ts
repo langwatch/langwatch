@@ -71,7 +71,7 @@ import type {
   WorkflowApiRestoreVersionInput,
   WorkflowApiRestoreVersionOutput,
 } from "@langwatch/workflow-contract";
-import { createFeatureApi, type RouterFromMap } from "@langwatch/platform-api-client";
+import { createFeatureApi, type RouterFromMap } from "@langwatch/platform-api-client/feature-api";
 
 /** Where a workflow lives, as the copy lineage tooltip spells it out. */
 export type WorkflowProjectPath = {

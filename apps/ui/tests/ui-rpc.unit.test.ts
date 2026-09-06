@@ -2,7 +2,7 @@
  * That a procedure dispatched by name lands in the cache everything else reads.
  */
 
-import { trpcQueryFilter, trpcQueryKey } from "@langwatch/platform-api-client";
+import { trpcQueryFilter, trpcQueryKey } from "@langwatch/platform-api-client/query-key";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { BrowserUiRpc } from "../src/behavior/ui-rpc";

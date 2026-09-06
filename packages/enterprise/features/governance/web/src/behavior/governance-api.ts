@@ -27,7 +27,7 @@
  * that name, and nothing checks that promise until the generator exists.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorSummary,

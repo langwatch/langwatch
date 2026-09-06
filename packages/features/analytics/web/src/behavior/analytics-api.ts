@@ -47,7 +47,7 @@ import type {
   GraphLayout,
   SavedWorkbenchChart,
 } from "@langwatch/dashboard-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 import type { FilterField } from "../model/analytics-filter-definition";
 import type { FilterParam } from "../model/analytics-filter-params";

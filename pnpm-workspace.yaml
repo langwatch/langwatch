@@ -52,6 +52,20 @@ minimumReleaseAgeExclude:
   - ws@8.21.1
   - "@browserbasehq/sdk@2.16.0"
   - postcss@8.5.19
+  # vitest 5.0.0 shipped 2026-09-03; Alex approved the early pull on 2026-09-06.
+  # Drop these once 5.0.0 ages past the gate on 2026-09-10. @vitest/mocker is
+  # not a direct declaration anywhere in the workspace — it is vitest's own
+  # dependency, installed transitively, and pnpm's install still gates it the
+  # same as a direct one, so it needs the same exclusion as the four we chose.
+  - vitest@5.0.0
+  - "@vitest/browser@5.0.0"
+  - "@vitest/browser-playwright@5.0.0"
+  - "@vitest/coverage-v8@5.0.0"
+  - "@vitest/mocker@5.0.0"
+  - "@vitest/spy@5.0.0"
+  - "@vitest/ui@5.0.0"
+  - "@vitest/utils@5.0.0"
+  - "@vitest/pretty-format@5.0.0"
   # deepmerge-ts prototype pollution: the patched 8.0.0 (and 8.0.1) both
   # published 2026-08-16, inside the age gate. Drop this once they age out.
   - deepmerge-ts@8.0.0

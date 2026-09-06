@@ -33,7 +33,7 @@ import type {
   AnnotationQueueRecord,
   AnnotationScore,
 } from "@langwatch/annotation-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import type { AnnotationTrace } from "../model/annotation-row";
 

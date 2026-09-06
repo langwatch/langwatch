@@ -32,8 +32,9 @@
     }
   },
   "scripts": {
-    "start": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/api.entrypoint.ts",
-    "dev": "tsx watch $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/api.entrypoint.ts",
+    "start:prepare:db": "cd ../tasks && pnpm -s task prisma-migrate && pnpm -s task clickhouse-migrate && pnpm -s task lwql-provision",
+    "start": "pnpm -s run start:prepare:db && tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/api.entrypoint.ts",
+    "dev": "pnpm -s run start:prepare:db && tsx watch $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/api.entrypoint.ts",
     "task": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/tasks/tasks.entrypoint.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
@@ -176,6 +177,6 @@
     "@types/node": "^26.0.1",
     "simple-statistics": "^7.9.2",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.9"
+    "vitest": "^5.0.0"
   }
 }

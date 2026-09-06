@@ -4,7 +4,7 @@
  * deliberately not an org permission) — cached under `trpcQueryKey`.
  */
 
-import { trpcQueryKey } from "@langwatch/platform-api-client";
+import { trpcQueryKey } from "@langwatch/platform-api-client/query-key";
 import { useQuery } from "@tanstack/react-query";
 import { readPublicAppConfig } from "./public-config";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

@@ -17,7 +17,7 @@
  * import below is the only one in the package.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /** The organization every SCIM procedure is scoped to. */
 type OrganizationScope = { organizationId: string };

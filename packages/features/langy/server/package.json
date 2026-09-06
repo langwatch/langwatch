@@ -94,6 +94,7 @@
     "generate:setup-skill-bodies": "node --experimental-strip-types scripts/generate-setup-skill-bodies.ts"
   },
   "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-server": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",

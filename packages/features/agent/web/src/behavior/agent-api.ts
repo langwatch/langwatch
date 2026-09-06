@@ -30,7 +30,7 @@
  */
 
 import type { AgentListView } from "@langwatch/agent-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /** The project every agent procedure is scoped to. */
 type ProjectScope = { projectId: string };

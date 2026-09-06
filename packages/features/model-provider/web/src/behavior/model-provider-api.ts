@@ -43,7 +43,7 @@ import type {
   ModelProviderListEntry,
   ModelProviderScopeType,
 } from "@langwatch/model-provider-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /** The project every project-scoped procedure is narrowed to. */
 type ProjectScope = { projectId: string };

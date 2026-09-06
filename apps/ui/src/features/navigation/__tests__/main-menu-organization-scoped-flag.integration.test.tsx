@@ -14,9 +14,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The menu's own reads go through a per-package tRPC client whose provider the
 // shell mounts; only the flag read is under test, so they answer nothing.
-vi.mock("@langwatch/platform-api-client", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/platform-api-client")>(
-    "@langwatch/platform-api-client",
+vi.mock("@langwatch/platform-api-client/feature-api", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/platform-api-client/feature-api")>(
+    "@langwatch/platform-api-client/feature-api",
   );
   return {
     ...actual,

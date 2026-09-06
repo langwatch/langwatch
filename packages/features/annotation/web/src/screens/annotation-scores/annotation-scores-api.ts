@@ -24,7 +24,7 @@
  */
 
 import type { AnnotationScore } from "@langwatch/annotation-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 /** The project every score procedure is scoped to. */
 type ProjectScope = { projectId: string };

@@ -6,7 +6,7 @@
 
 import type { AgentType } from "@langwatch/agent-contract";
 import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
 export type NavigationHomeResolution = {
   destination: string;
