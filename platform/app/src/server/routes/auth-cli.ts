@@ -48,6 +48,7 @@ import { PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE } from "@ee/governance/services/platf
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
+import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import {
@@ -74,6 +75,10 @@ import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import {
+  publishDeviceCodeSettled,
+  waitForDeviceCodeSettled,
+} from "./_lib/device-approval-signal";
 
 const logger = createLogger("langwatch:auth-cli");
 
@@ -659,29 +664,37 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
 
   const { device_code } = parsed.data;
 
+  const raw = await redis.get(deviceCodeKey(device_code));
+  const settledEarly =
+    raw !== null && (JSON.parse(raw) as DeviceCodeRecord).status !== "pending";
+
   // Per-device polling rate-limit. RFC 8628 says clients respect the
   // server-issued interval but defensive servers must enforce it too.
   // We use SET NX EX — first call writes the key with TTL, subsequent
-  // calls within window see existing key and get rejected.
-  const setResult = await redis.set(
-    pollRateKey(device_code),
-    "1",
-    "EX",
-    POLL_RATE_LIMIT_SECONDS,
-    "NX",
-  );
-  if (setResult !== "OK") {
-    return c.json(
-      {
-        error: "slow_down",
-        error_description:
-          "Polling too fast. Increase your interval before retrying.",
-      },
-      429,
+  // calls within window see existing key and get rejected. A code that has
+  // already been approved or denied skips the window: that poll is the one
+  // `/device-approval` just told the CLI to make, and answering it with
+  // slow_down would put back the wait the stream exists to remove.
+  if (!settledEarly) {
+    const setResult = await redis.set(
+      pollRateKey(device_code),
+      "1",
+      "EX",
+      POLL_RATE_LIMIT_SECONDS,
+      "NX",
     );
+    if (setResult !== "OK") {
+      return c.json(
+        {
+          error: "slow_down",
+          error_description:
+            "Polling too fast. Increase your interval before retrying.",
+        },
+        429,
+      );
+    }
   }
 
-  const raw = await redis.get(deviceCodeKey(device_code));
   if (!raw) {
     // Either the device_code never existed or it expired and Redis evicted it.
     // RFC 8628 recommends `expired_token` here.
@@ -1067,6 +1080,88 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     { error: "server_error", error_description: "Unknown device code state" },
     500,
   );
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/cli/device-approval
+// ---------------------------------------------------------------------------
+
+/** How often the stream writes a comment so proxies keep it open. */
+const APPROVAL_KEEPALIVE_MS = 15_000;
+
+/**
+ * Tell the CLI the moment its device code settles, so `langwatch login` does
+ * not sit on the spinner until its next scheduled poll.
+ *
+ * The device_code is the credential, exactly as it is on `/exchange`, and the
+ * stream carries no session material: the CLI still has to POST `/exchange` to
+ * get its tokens. That keeps this route a latency fix rather than a second way
+ * to authenticate.
+ *
+ * The stream is an accelerator, never the contract. It ends on the first
+ * settle, on the device code's own deadline, or when the client disconnects,
+ * and a CLI that never reaches it just polls at the interval it was given.
+ */
+secured.access(CLI_POLICY).get("/device-approval", async (c: Context) => {
+  const redis = getRedis();
+  const deviceCode = c.req.query("device_code");
+  if (!deviceCode) {
+    return c.json(
+      {
+        error: "invalid_request",
+        error_description: "device_code is required",
+      },
+      400,
+    );
+  }
+
+  const raw = await redis.get(deviceCodeKey(deviceCode));
+  const record = raw ? (JSON.parse(raw) as DeviceCodeRecord) : null;
+  const deadline = record?.expires_at ?? Date.now();
+
+  return streamSSE(c, async (stream) => {
+    // An already-settled code (or one Redis no longer holds) needs no wait:
+    // the CLI's next poll is the one that matters and it can make it now.
+    if (record?.status !== "pending" || Date.now() > deadline) {
+      await stream.writeSSE({
+        data: JSON.stringify({ status: record?.status ?? "expired" }),
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    const closeOnDeadline = setTimeout(
+      () => controller.abort(),
+      Math.max(1000, deadline - Date.now()),
+    );
+    stream.onAbort(() => controller.abort());
+
+    const keepalive = setInterval(() => {
+      void stream.writeSSE({ data: "", event: "ping" }).catch(() => {
+        controller.abort();
+      });
+    }, APPROVAL_KEEPALIVE_MS);
+
+    try {
+      const status = await waitForDeviceCodeSettled(
+        redis,
+        deviceCode,
+        controller.signal,
+      );
+      if (status) {
+        await stream.writeSSE({ data: JSON.stringify({ status }) });
+      }
+    } catch (error) {
+      logger.debug(
+        { error },
+        "[auth-cli] device-approval stream ended early; the CLI's own poll still settles the login",
+      );
+    } finally {
+      clearInterval(keepalive);
+      clearTimeout(closeOnDeadline);
+      controller.abort();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -3121,6 +3216,7 @@ export async function approveDeviceCode({
     "EX",
     remainingSeconds,
   );
+  await publishDeviceCodeSettled(redis, deviceCode, "approved");
   return { approved: true };
 }
 
@@ -3141,4 +3237,5 @@ export async function denyDeviceCode(deviceCode: string): Promise<void> {
     "EX",
     Math.ceil(remainingMs / 1000),
   );
+  await publishDeviceCodeSettled(redis, deviceCode, "denied");
 }

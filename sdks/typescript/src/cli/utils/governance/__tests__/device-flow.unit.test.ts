@@ -167,38 +167,140 @@ describe("exchange", () => {
 });
 
 describe("pollUntilDone", () => {
+  const deviceCode = {
+    device_code: "DC",
+    user_code: "u",
+    verification_uri: "http://x/cli/auth",
+    expires_in: 60,
+    interval: 0.05,
+  } as any;
+
+  const sessionBody = {
+    access_token: "at",
+    refresh_token: "rt",
+    expires_in: 3600,
+    user: { id: "u", email: "j@x", name: "J" },
+    organization: { id: "o", slug: "x", name: "X" },
+  };
+
+  /** An approval stream that emits one settle frame and stays open. */
+  const approvalFrame = () =>
+    new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode('data: {"status":"approved"}\n\n'),
+          );
+        },
+      }),
+      { status: 200, headers: { "Content-Type": "text/event-stream" } },
+    );
+
+  /**
+   * A fetch that answers /exchange from `exchanges` in order and gives the
+   * approval stream whatever `approval` returns. Counts only the polls: the
+   * stream is an accelerator, not part of the poll contract.
+   */
+  function routedFetch({
+    exchanges,
+    approval = () => emptyResponse(404),
+  }: {
+    exchanges: Array<() => Response>;
+    approval?: () => Response;
+  }) {
+    const polls: string[] = [];
+    const fetchImpl = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("/device-approval")) {
+        return Promise.resolve(approval());
+      }
+      polls.push(String(url));
+      const next =
+        exchanges[polls.length - 1] ?? exchanges[exchanges.length - 1];
+      return Promise.resolve(next!());
+    });
+    return { fetchImpl, polls };
+  }
+
   it("retries on pending, returns on success", async () => {
-    let calls = 0;
-    const fetchImpl = vi.fn().mockImplementation(() => {
-      calls++;
-      if (calls < 2) return Promise.resolve(emptyResponse(428));
-      return Promise.resolve(
-        jsonResponse(200, {
-          access_token: "at",
-          refresh_token: "rt",
-          expires_in: 3600,
-          user: { id: "u", email: "j@x", name: "J" },
-          organization: { id: "o", slug: "x", name: "X" },
-        }),
-      );
+    const { fetchImpl, polls } = routedFetch({
+      exchanges: [
+        () => emptyResponse(428),
+        () => jsonResponse(200, sessionBody),
+      ],
     });
     const r = await pollUntilDone(
       { baseUrl: "http://x", fetchImpl },
-      { device_code: "DC", user_code: "u", verification_uri: "http://x/cli/auth", expires_in: 60, interval: 0.05 } as any,
+      deviceCode,
     );
     expect(r.kind).toBe("device_session");
     if (r.kind !== "device_session") throw new Error("unreachable");
     expect(r.access_token).toBe("at");
-    expect(calls).toBe(2);
+    expect(polls).toHaveLength(2);
+  });
+
+  /** @scenario "The CLI asks once before it starts waiting" */
+  it("polls before the first wait", async () => {
+    const { fetchImpl, polls } = routedFetch({
+      exchanges: [() => jsonResponse(200, sessionBody)],
+    });
+
+    const started = Date.now();
+    await pollUntilDone(
+      { baseUrl: "http://x", fetchImpl },
+      { ...deviceCode, interval: 30 },
+    );
+
+    expect(polls).toHaveLength(1);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  /** @scenario "The approval stream cuts the wait short" */
+  it("polls as soon as the approval stream emits", async () => {
+    const { fetchImpl, polls } = routedFetch({
+      exchanges: [
+        () => emptyResponse(428),
+        () => jsonResponse(200, sessionBody),
+      ],
+      approval: approvalFrame,
+    });
+
+    const started = Date.now();
+    const r = await pollUntilDone(
+      { baseUrl: "http://x", fetchImpl },
+      { ...deviceCode, interval: 30 },
+    );
+
+    expect(r.kind).toBe("device_session");
+    expect(polls).toHaveLength(2);
+    // Two polls at a 30s interval, finished in a fraction of one of them.
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  /** @scenario "A server without the approval stream still logs in" */
+  it("falls back to the interval when the stream is unavailable", async () => {
+    const { fetchImpl, polls } = routedFetch({
+      exchanges: [
+        () => emptyResponse(428),
+        () => jsonResponse(200, sessionBody),
+      ],
+      approval: () => emptyResponse(404),
+    });
+
+    const started = Date.now();
+    await pollUntilDone(
+      { baseUrl: "http://x", fetchImpl },
+      { ...deviceCode, interval: 0.2 },
+    );
+
+    expect(polls).toHaveLength(2);
+    // The second poll waited the interval out rather than firing at once.
+    expect(Date.now() - started).toBeGreaterThanOrEqual(150);
   });
 
   it("propagates denied without retrying further", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(410));
     await expect(
-      pollUntilDone(
-        { baseUrl: "http://x", fetchImpl },
-        { device_code: "DC", user_code: "u", verification_uri: "http://x/cli/auth", expires_in: 60, interval: 0.05 } as any,
-      ),
+      pollUntilDone({ baseUrl: "http://x", fetchImpl }, deviceCode),
     ).rejects.toMatchObject({ kind: "denied" });
   });
 });

@@ -243,9 +243,104 @@ export async function exchange(
 }
 
 /**
- * Poll `exchange` at the cadence the server requested until the user
- * approves, denies, or the device-code expires. Honours RFC 8628 §3.5
- * by doubling the polling interval on `slow_down` responses.
+ * `GET /api/auth/cli/device-approval` — a stream that emits one frame the
+ * moment the browser approves or denies the code. It carries no credential;
+ * it only says "poll now", which is what turns the wait from "up to the poll
+ * interval" into "as fast as the round trip".
+ *
+ * Resolves when a frame arrives, and never otherwise: a server that predates
+ * the route, a proxy that buffers the body, or a dropped connection all leave
+ * the poll timer in charge rather than making it fire early.
+ */
+function watchDeviceApproval(
+  opts: DeviceFlowOptions,
+  deviceCode: string,
+): { settled: Promise<void>; close: () => void } {
+  const controller = new AbortController();
+  const settled = new Promise<void>((resolve) => {
+    readApprovalStream(opts, deviceCode, controller.signal).then(
+      (sawFrame) => {
+        if (sawFrame) resolve();
+      },
+      () => {
+        // Never settles: polling stays in charge.
+      },
+    );
+  });
+  return { settled, close: () => controller.abort() };
+}
+
+/** Whether the approval stream delivered a frame before it ended. */
+async function readApprovalStream(
+  opts: DeviceFlowOptions,
+  deviceCode: string,
+  signal: AbortSignal,
+): Promise<boolean> {
+  const base = normalizeEndpoint(opts.baseUrl);
+  const f = opts.fetchImpl ?? fetch;
+  const res = await f(
+    `${base}/api/auth/cli/device-approval?device_code=${encodeURIComponent(deviceCode)}`,
+    {
+      headers: { Accept: "text/event-stream", Origin: base },
+      signal,
+    },
+  );
+  if (!res.ok || !res.body) return false;
+
+  const reader = (
+    res.body as ReadableStream<Uint8Array>
+  ).getReader();
+  const decoder = new TextDecoder();
+  let buffered = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return false;
+      buffered += decoder.decode(value, { stream: true });
+      // Any data frame means "the code settled, poll now". The payload does
+      // not decide anything: /exchange is what says approved or denied.
+      if (/^data:.*\S/m.test(buffered)) return true;
+    }
+  } finally {
+    void reader.cancel().catch(() => {
+      // The stream is already going away.
+    });
+  }
+}
+
+/** Sleep, cut short by the approval signal when one is still worth racing. */
+async function waitForNextPoll(
+  ms: number,
+  approval: Promise<void> | null,
+): Promise<void> {
+  if (!approval) {
+    await wait(ms);
+    return;
+  }
+  const timer = new AbortController();
+  try {
+    await Promise.race([
+      wait(ms, undefined, { signal: timer.signal }).catch(() => {
+        // Aborted because the approval landed first.
+      }),
+      approval,
+    ]);
+  } finally {
+    timer.abort();
+  }
+}
+
+/**
+ * Poll `exchange` until the user approves, denies, or the device-code
+ * expires. Honours RFC 8628 §3.5 by doubling the polling interval on
+ * `slow_down` responses.
+ *
+ * Two things keep the wait short. The first poll goes out immediately, since
+ * a login approved while the browser was still opening should not cost a
+ * whole interval; and the approval stream cuts every later wait short the
+ * moment the browser settles the code. Both are accelerators over the same
+ * timer, so a server or network that supports neither still logs in at the
+ * cadence the server asked for.
  */
 export async function pollUntilDone(
   opts: DeviceFlowOptions,
@@ -255,22 +350,39 @@ export async function pollUntilDone(
   const ceiling = 60_000;
   const deadline = Date.now() + dc.expires_in * 1000;
 
-  for (;;) {
-    if (Date.now() > deadline) {
-      throw new DeviceFlowError("expired", "authorization request expired");
-    }
-    await wait(interval);
-    try {
-      return await exchange(opts, dc.device_code);
-    } catch (err) {
-      if (!(err instanceof DeviceFlowError)) throw err;
-      if (err.kind === "pending") continue;
-      if (err.kind === "slow_down") {
-        interval = Math.min(interval * 2, ceiling);
-        continue;
+  const watch = watchDeviceApproval(opts, dc.device_code);
+  let approval: Promise<void> | null = watch.settled;
+  // A signal fires once. Racing a resolved promise every round would turn the
+  // loop into a hot poll if /exchange somehow still answered `pending`.
+  void watch.settled.then(() => {
+    approval = null;
+  });
+
+  try {
+    let firstPoll = true;
+    for (;;) {
+      if (Date.now() > deadline) {
+        throw new DeviceFlowError("expired", "authorization request expired");
       }
-      throw err;
+      if (firstPoll) {
+        firstPoll = false;
+      } else {
+        await waitForNextPoll(interval, approval);
+      }
+      try {
+        return await exchange(opts, dc.device_code);
+      } catch (err) {
+        if (!(err instanceof DeviceFlowError)) throw err;
+        if (err.kind === "pending") continue;
+        if (err.kind === "slow_down") {
+          interval = Math.min(interval * 2, ceiling);
+          continue;
+        }
+        throw err;
+      }
     }
+  } finally {
+    watch.close();
   }
 }
 
