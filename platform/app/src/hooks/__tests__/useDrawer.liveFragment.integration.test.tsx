@@ -203,4 +203,59 @@ describe("useDrawer URL fragment", () => {
       });
     });
   });
+
+  describe("given drawer params were parked after the fragment of a URL that already had a query", () => {
+    beforeEach(() => {
+      // Same malformed shape, but with a real query string in front of the
+      // `#`. The two orderings used to be parsed by different branches, and
+      // only one of them rescued `drawer.` params — so a filter on the URL
+      // was enough to strand the drawer after the fragment.
+      routerQuery = { filter: "active" };
+      staleRouterHash = "#conversations?drawer.open=traceV2Details";
+      window.history.replaceState(
+        {},
+        "",
+        "/acme/traces?filter=active#conversations?drawer.open=traceV2Details",
+      );
+    });
+
+    describe("when drawer params are updated", () => {
+      it("lifts them back into the real query string", () => {
+        const { result } = renderHook(() => useUpdateDrawerParams());
+
+        act(() => {
+          result.current({ mode: "conversation" });
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        const [beforeHash] = pushed.split("#");
+        expect(beforeHash).toContain("drawer.open=traceV2Details");
+        expect(beforeHash).toContain("drawer.mode=conversation");
+      });
+
+      it("keeps the query that was already there", () => {
+        const { result } = renderHook(() => useUpdateDrawerParams());
+
+        act(() => {
+          result.current({ mode: "conversation" });
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        const [beforeHash] = pushed.split("#");
+        expect(beforeHash).toContain("filter=active");
+      });
+
+      it("leaves no copy of them behind in the fragment", () => {
+        const { result } = renderHook(() => useUpdateDrawerParams());
+
+        act(() => {
+          result.current({ mode: "conversation" });
+        });
+
+        const pushed = mockPush.mock.calls[0]?.[0] as string;
+        const afterHash = pushed.slice(pushed.indexOf("#"));
+        expect(afterHash).toBe("#conversations");
+      });
+    });
+  });
 });

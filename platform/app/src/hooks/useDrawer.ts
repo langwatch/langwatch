@@ -364,18 +364,42 @@ function splitAsPath(asPath: string): {
   if (rest.startsWith("?")) {
     const h = rest.indexOf("#");
     if (h === -1) return { path, queryString: rest.slice(1), hash: "" };
-    return { path, queryString: rest.slice(1, h), hash: rest.slice(h + 1) };
+    const query = rest.slice(1, h);
+    const rescued = rescueFragmentQuery(rest.slice(h + 1));
+    return {
+      path,
+      queryString: [query, rescued.queryString].filter(Boolean).join("&"),
+      hash: rescued.hash,
+    };
   }
   if (rest.startsWith("#")) {
-    const q = rest.indexOf("?");
-    if (q === -1) return { path, queryString: "", hash: rest.slice(1) };
-    const fragmentQuery = rest.slice(q + 1);
-    if (!/(^|&)drawer\./.test(fragmentQuery)) {
-      return { path, queryString: "", hash: rest.slice(1) };
-    }
-    return { path, queryString: fragmentQuery, hash: rest.slice(1, q) };
+    return { path, ...rescueFragmentQuery(rest.slice(1)) };
   }
   return { path, queryString: "", hash: "" };
+}
+
+/**
+ * Pull a fragment apart into the part that belongs in the real query string and
+ * the part that stays a fragment.
+ *
+ * Shared by both orderings on purpose. A URL can reach us as `#h?q` or as
+ * `?q#h`, and only the first used to rescue `drawer.` params — so
+ * `/traces?filter=active#conversations?drawer.open=x` left `drawer.open` parked
+ * after the `#`, where `router.query` cannot see it, purely because a real
+ * query happened to come first.
+ *
+ * The rescue still only fires for a fragment query carrying `drawer.` params;
+ * bar state like `#conversations?preset=24h` is left where its owner reads it.
+ */
+function rescueFragmentQuery(hash: string): {
+  queryString: string;
+  hash: string;
+} {
+  const q = hash.indexOf("?");
+  if (q === -1) return { queryString: "", hash };
+  const fragmentQuery = hash.slice(q + 1);
+  if (!/(^|&)drawer\./.test(fragmentQuery)) return { queryString: "", hash };
+  return { queryString: fragmentQuery, hash: hash.slice(0, q) };
 }
 
 /**
