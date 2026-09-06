@@ -12,6 +12,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/ui-host/use-drawer", () => ({
@@ -71,6 +72,13 @@ vi.mock("@langwatch/workflow-web/surfaces/studio-drawer-footer", () => ({
   useRegisterDrawerFooter: () => void 0,
 }));
 
+// The model control the sticky header carries, stubbed to something nameable:
+// what the header scenario is about is where the control sits, not which models
+// the project has configured.
+vi.mock("../../../elements/prompts/forms/fields/model-select-field-mini", () => ({
+  ModelSelectFieldMini: () => <button data-testid="model-select">gpt-5-mini</button>,
+}));
+
 vi.mock("../../../../behavior/prompts/use-latest-prompt-version", () => ({
   useLatestPromptVersion: () => ({ data: void 0, isLoading: false }),
 }));
@@ -98,10 +106,10 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
 
 const { PromptEditorDrawer } = await import("../prompt-editor-drawer");
 
-function renderEditor() {
+function renderEditor(props: Partial<ComponentProps<typeof PromptEditorDrawer>> = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <PromptEditorDrawer headless />
+      <PromptEditorDrawer headless {...props} />
     </ChakraProvider>,
   );
 }
@@ -124,6 +132,26 @@ describe("given a prompt open in the prompt editor", () => {
       ).toBeTruthy();
     });
 
+    /**
+     * @scenario "The model selector header stays opaque above scrolling messages"
+     *
+     * The model selector rides in a sticky header over the messages. Without a
+     * solid background the messages scrolled through it and the two read as one
+     * smear. jsdom resolves no custom property, so what is pinned here is that
+     * the header is sticky, holds the selector, and carries a background token
+     * at all — deleting the prop leaves the rule unset and fails this.
+     */
+    it("pins the model selector in a sticky header that paints its own background", () => {
+      renderEditor();
+
+      const header = screen.getByTestId("prompt-editor-sticky-header");
+
+      expect(header).toContainElement(screen.getByTestId("model-select"));
+      const style = getComputedStyle(header);
+      expect(style.position).toBe("sticky");
+      expect((style.background || "").trim()).toMatch(/var\(--chakra-colors-/);
+    });
+
     /** @scenario "Inputs section shows the Add button in the prompt editor" */
     it("offers an Add button on the inputs section, so adding is one click away", () => {
       renderEditor();
@@ -144,6 +172,30 @@ describe("given a prompt open in the prompt editor", () => {
       // The default "input" variable already exists, so the new one dedupes
       // to input_1 and shows as a variable row.
       expect(await screen.findByText("input_1")).toBeTruthy();
+    });
+  });
+});
+
+describe("given a studio node whose library prompt is not in this project", () => {
+  describe("when the prompt drawer is opened for the node", () => {
+    /** @scenario "A node whose library prompt is missing shows its inline config" */
+    it("opens on the node's own inline config rather than an empty new prompt", async () => {
+      // The prompt read answers nothing for this id — the imported-workflow
+      // case. Without the fallback the author met a blank form and the node's
+      // real prompt was one save away from being overwritten with it.
+      renderEditor({
+        promptId: "missing-prompt",
+        inlineConfigFallback: {
+          llm: { model: "openai/gpt-5-mini" },
+          messages: [{ role: "system", content: "INLINE-FALLBACK-CONTENT" }],
+          inputs: [{ identifier: "question", type: "str" }],
+          outputs: [{ identifier: "answer", type: "str" }],
+        },
+      });
+
+      expect(await screen.findByDisplayValue("INLINE-FALLBACK-CONTENT")).toBeTruthy();
+      expect(await screen.findByText("question")).toBeTruthy();
+      expect(await screen.findByText("answer")).toBeTruthy();
     });
   });
 });

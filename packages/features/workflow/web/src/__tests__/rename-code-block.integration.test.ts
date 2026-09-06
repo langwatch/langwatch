@@ -59,6 +59,7 @@ describe("rename code blocks", () => {
   });
 
   describe("when renaming a code block via setNode", () => {
+    /** @scenario "Rename updates the node ID and Python class name" */
     it("updates the node name and id", () => {
       const nodes = [
         makeCodeNode({
@@ -80,6 +81,7 @@ describe("rename code blocks", () => {
       expect(state.nodes.find((n) => n.id === "code1")).toBeFalsy();
     });
 
+    /** @scenario "Rename updates the node ID and Python class name" */
     it("updates the Python class name in the code", () => {
       const nodes = [
         makeCodeNode({

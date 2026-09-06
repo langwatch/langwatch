@@ -2,6 +2,7 @@ import {
   AgentCopiesNotFoundError,
   AgentCopySelectionError,
   AgentIsNotCopyError,
+  AgentRegisterOnlyError,
   AgentSourceNotFoundError,
   type Agent,
   AgentService as AgentServiceContract,
@@ -53,6 +54,12 @@ export class AgentCopyService {
       id: command.sourceAgentId,
       projectId: command.sourceProjectId,
     });
+    // A connected agent is a running process that registered itself, and its
+    // identity is the pair of that process and its environment. A copy would
+    // carry no such process, so it would be a row nothing can ever connect to.
+    if (source.type === "connected") {
+      throw new AgentRegisterOnlyError();
+    }
     let workflowId: string | undefined;
     const sourceWorkflowId = linkedWorkflowId(source);
     if (source.type === "workflow" && sourceWorkflowId) {

@@ -1,13 +1,6 @@
 /**
- * How a dataset list counts its entries, against real Postgres.
- *
- * The behaviour is not only "the number is right" — it is WHAT the database is
- * asked to read to produce it. Prisma's relation-count `include` returns
- * correct numbers while aggregating the whole `DatasetRecord` table across
- * every tenant, so a correctness-only test passes on the slow path and the fast
- * one alike. The guard the connection is opened with records every query the
- * repository issues, which is what tells the two apart.
- *
+ * How a dataset list counts its entries: not only that the number is right, but
+ * WHAT is read to produce it. The connection's guard records every query.
  * @see specs/datasets/datasets-list-page.feature
  */
 import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
