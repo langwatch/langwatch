@@ -4,7 +4,7 @@ description: Configure Azure OpenAI (deployment-based model ids) as a provider b
 sidebarTitle: Azure OpenAI
 ---
 
-Azure OpenAI is enterprise OpenAI with data-residency, AAD integration, and SLA guarantees, but with a deployment-based model-id convention that breaks most OpenAI SDKs out of the box. The gateway handles Azure's quirks via bifrost/core so any OpenAI-shaped client just works.
+Azure OpenAI is enterprise OpenAI with data-residency, AAD integration, and SLA guarantees, but with a deployment-based model-id convention that the plain OpenAI client does not speak out of the box. The gateway handles Azure's quirks via bifrost/core, so an OpenAI-shaped client needs no change.
 
 ## Configure the provider credential
 
@@ -32,7 +32,7 @@ Azure OpenAI binds models to **deployments**, which have customer-chosen names. 
 }
 ```
 
-Now an OpenAI-SDK client that sends `model: "gpt-4o"` reaches the correct Azure deployment without knowing Azure exists. This is a key value-prop of aliases, the VK owner maps generic model names to their Azure infrastructure, and application code never changes.
+Now an OpenAI-SDK client that sends `model: "gpt-4o"` reaches the correct Azure deployment without knowing Azure exists. The VK owner maps generic model names to their Azure infrastructure, and application code never changes.
 
 ## Supported endpoints
 
@@ -67,4 +67,4 @@ Token caching + refresh are handled by bifrost/core.
 
 ## Bifrost/core handles the ceremony
 
-The key-selling-point of the `bifrost/core` library: it hides the Azure idiosyncrasies (deployment URL construction, `api-key` vs `Bearer`, API-version query param, AAD vs key auth, regional endpoint detection). Users of the gateway see a plain OpenAI-shape API.
+The `bifrost/core` library hides the Azure idiosyncrasies (deployment URL construction, `api-key` vs `Bearer`, API-version query param, AAD vs key auth, regional endpoint detection). Users of the gateway see a plain OpenAI-shape API.

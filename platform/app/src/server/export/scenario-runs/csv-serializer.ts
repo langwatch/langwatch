@@ -21,13 +21,15 @@
 import Parse from "papaparse";
 import type { ExportableRun } from "~/server/app-layer/simulations/repositories/simulation.repository";
 import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
+import { neutralizeFormula } from "~/utils/csvFormulaGuard";
 
 /**
  * The columns a person reads, shortest and highest-signal first so the useful
  * ones fit on screen before the long prose pushes everything sideways.
  *
- * `status` is the resolved status (the same value the run history shows,
- * including derived STALLED) and `status_category` is its outcome bucket. Both
+ * `status` is the resolved status (the same value the run history shows;
+ * STALLED appears only on legacy stored rows) and `status_category` is its
+ * outcome bucket. Both
  * are emitted: the category is what you pivot on, the status is what you need
  * when a single run looks wrong.
  *
@@ -65,6 +67,7 @@ const TAIL_COLUMNS = [
   "target_type",
   "target_reference_id",
   "simulation_suite_id",
+  "parameters",
   "trace_ids",
 ] as const;
 
@@ -229,8 +232,27 @@ function buildTailValues(run: ExportableRun): string[] {
     text(target.targetType),
     text(target.targetReferenceId),
     text(target.simulationSuiteId),
+    extractParameters(run.metadata),
     jsonArray(collectTraceIds(run)),
   ];
+}
+
+/**
+ * The parameter values the run resolved, as one JSON object.
+ *
+ * One column rather than one per name: which parameters exist is a property of
+ * the scenario, not of the export, so a per-name column would make the header
+ * depend on which runs happened to be in the file and stop two exports lining
+ * up. A run that resolved none leaves the cell empty.
+ */
+function extractParameters(
+  metadata: Record<string, unknown> | null | undefined,
+): string {
+  const parameters = metadata?.parameters;
+  if (parameters == null || typeof parameters !== "object") return "";
+  if (Array.isArray(parameters)) return "";
+  if (Object.keys(parameters).length === 0) return "";
+  return text(JSON.stringify(parameters));
 }
 
 /**
@@ -312,19 +334,20 @@ function stringOrEmpty(value: unknown): string {
 /**
  * Neutralize a free-text cell against spreadsheet formula injection.
  *
- * A cell whose first character is `=`, `+`, `-`, `@`, TAB or CR is evaluated
- * as a formula by Excel and Sheets. RFC 4180 quoting does not prevent this —
- * quoting protects the CSV grammar, not the spreadsheet that reads it. Since
- * scenario names, judge reasoning, criteria and message content are all
- * user- or model-controlled, and the entire point of this file is to be
- * opened in a spreadsheet, every free-text cell is prefixed with an
- * apostrophe, which those tools strip on display and treat as literal text.
+ * Scenario names, judge reasoning, criteria and message content are all user-
+ * or model-controlled, and the entire point of this file is to be opened in a
+ * spreadsheet, so every free-text cell goes through the guard.
  *
- * Deliberately applied only to text: numbers and timestamps are generated
- * here, and prefixing a negative number would corrupt it.
+ * The rule itself lives in `~/utils/csvFormulaGuard`; this file used to carry
+ * its own copy, written independently of the browser-side one. Delegating also
+ * picks up the guard's number exemption, so a text cell that happens to read
+ * `-5` stays a number to the reader rather than becoming quoted text.
+ *
+ * Still applied only to text: numbers and timestamps are generated here and
+ * never need it.
  */
 function text(value: string): string {
-  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return neutralizeFormula(value);
 }
 
 /**

@@ -1,7 +1,11 @@
-import { HandledError, ValidationError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  isZodLikeError,
+  ValidationError,
+  type ZodLikeError,
+} from "@langwatch/handled-error";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { ZodError } from "zod";
 
 import { httpStatusText } from "./types.js";
 
@@ -36,8 +40,13 @@ class SchemaFailure extends HandledError {
  * `getLogLevelForRequest`). A bare `ZodError` has neither `httpStatus` nor
  * `fault`, so it was logged as a 500 `error` while the response went out 422 —
  * validation noise landing in the 5xx error budget.
+ *
+ * Typed `ZodLikeError`, not `ZodError`: routes mounted on this app validate
+ * with whichever zod their schema was authored against, and the repo now runs
+ * both majors. `issue.code`, `issue.path` and `issue.message` are identical
+ * across them, so the reasons this builds are too.
  */
-function validationErrorFromZod(err: ZodError): ValidationError {
+function validationErrorFromZod(err: ZodLikeError): ValidationError {
   return new ValidationError("Validation error", {
     reasons: err.issues.map(
       (issue) =>
@@ -152,7 +161,10 @@ function formatError({
   }
 
   // 2. ZodError -- promoted to a ValidationError so it travels the same path.
-  if (err instanceof ZodError) {
+  //    Matched by shape, so a route whose schema is on `zod/v4` is promoted
+  //    the same as one still on v3; an `instanceof` would see only one major
+  //    and drop the other's rejections through to the unknown-error 500 below.
+  if (isZodLikeError(err)) {
     return handledErrorToResponse({
       err: validationErrorFromZod(err),
       isVersioned,
@@ -236,8 +248,7 @@ export function createErrorHandler(): (
     // Promote first so the response and the log agree on one error. Reporting
     // the raw ZodError would log it as unhandled, at `error`, against the 500
     // it no longer is.
-    const effective =
-      err instanceof ZodError ? validationErrorFromZod(err) : err;
+    const effective = isZodLikeError(err) ? validationErrorFromZod(err) : err;
     const { status, body } = formatError({ err: effective, isVersioned });
 
     const resolved: ResolvedError = {

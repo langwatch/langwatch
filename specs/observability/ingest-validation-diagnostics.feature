@@ -73,6 +73,45 @@ Feature: Ingest validation diagnostics
     And the body does not appear in the captured error report
 
   # ---------------------------------------------------------------------------
+  # Before the schema: decoding the body
+  #
+  # A body that is not valid protobuf or JSON never reaches the schema, so
+  # nothing above governs it. The same principle does: the shape is ours to
+  # log, the bytes are the customer's.
+  #
+  # The trap here is second-hand, and it defeated the rule above for months. No
+  # line of ours logs the body — we log the PARSER's error, and a JSON parser
+  # quotes the input it choked on inside that message. So roughly ten bytes of
+  # the customer's payload reach the log sink with nothing in our code putting
+  # them there, and because those bytes are arbitrary they are frequently not
+  # valid UTF-8. That is not only a disclosure: it made the field unreadable to
+  # anything downstream that has to parse a log record's own metadata.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: A body that cannot be decoded reports the stage that rejected it
+    When a trace body cannot be decoded
+    Then the failure names the decoding stage that rejected it
+    And the failure carries the size of the body in bytes
+
+  @unit @regression
+  Scenario: The parser's quoted snippet of the body never survives
+    Given a trace body carrying recognisable customer content
+    When the parser quotes that content back inside its own error message
+    Then no part of the body appears in the reported failure
+
+  @unit @regression
+  Scenario: A decode failure carries only characters we can render
+    When a trace body of arbitrary bytes fails to decode
+    Then the reported failure is printable ASCII throughout
+    And the reported failure is bounded in length
+
+  @unit @regression
+  Scenario: A structural decoder error keeps the detail that names the fault
+    When a protobuf body fails to decode on a structural error
+    Then the reported failure keeps the decoder's description of the fault
+
+  # ---------------------------------------------------------------------------
   # Level
   #
   # A validation failure is the sender's error, answered with a 400. It is

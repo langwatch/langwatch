@@ -20,17 +20,16 @@ export function formatStatus(status: VirtualKey["status"]): string {
 }
 
 /**
- * Build the public-facing LangWatch UI URL for a VK detail page. After the
- * multi-scope refactor (PR #3524), VKs live at the org-scoped settings
- * surface (/settings/gateway/virtual-keys/:id) regardless of their scope
- * rows; the per-project gateway pages are gone. Honours
+ * Build the public-facing LangWatch UI URL for a VK detail page. VKs live at
+ * the org-scoped surface (/gateway/virtual-keys/:id) regardless of their
+ * scope rows; the per-project gateway pages are gone. Honours
  * `LANGWATCH_UI_ENDPOINT` for split UI/API hosts.
  */
 export function virtualKeyDetailUrl(vkId: string): string {
   const uiOverride = process.env.LANGWATCH_UI_ENDPOINT;
   const base = normalizeEndpoint(uiOverride ?? resolveControlPlaneUrl());
   if (!base) return "";
-  return `${base}/settings/gateway/virtual-keys/${encodeURIComponent(vkId)}`;
+  return `${base}/gateway/virtual-keys/${encodeURIComponent(vkId)}`;
 }
 
 const SCOPE_TYPES: VirtualKeyScopeType[] = ["organization", "team", "project"];

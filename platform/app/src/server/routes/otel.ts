@@ -161,7 +161,6 @@ async function authenticate(
   // access on OTLP ingestion — same semantics as the collector path.
   try {
     await enforceApiKeyCeiling({
-      prisma,
       resolved,
       permission: "traces:create",
     });
@@ -292,6 +291,9 @@ async function enforcePlanLimit({
       .usageLimits.notifyPlanLimitReached({
         organizationId: project.team.organizationId,
         planName: activePlan.name ?? "free",
+        usageUnit: limitResult.usageUnit,
+        current: limitResult.count,
+        max: limitResult.maxMessagesPerMonth,
       })
       .catch((error: unknown) => {
         logger.error(

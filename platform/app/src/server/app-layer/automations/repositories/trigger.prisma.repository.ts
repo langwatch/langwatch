@@ -117,6 +117,25 @@ export class PrismaTriggerRepository implements TriggerRepository {
     return existing !== null;
   }
 
+  async findClaimedTraceIds({
+    triggerId,
+    traceIds,
+    projectId,
+  }: {
+    triggerId: string;
+    traceIds: string[];
+    projectId: string;
+  }): Promise<Set<string>> {
+    if (traceIds.length === 0) return new Set();
+    const rows = await this.prisma.triggerSent.findMany({
+      where: { triggerId, projectId, traceId: { in: traceIds } },
+      select: { traceId: true },
+    });
+    return new Set(
+      rows.flatMap((row) => (row.traceId === null ? [] : [row.traceId])),
+    );
+  }
+
   async updateLastRunAt(triggerId: string, projectId: string): Promise<void> {
     await this.prisma.trigger.update({
       where: { id: triggerId, projectId },

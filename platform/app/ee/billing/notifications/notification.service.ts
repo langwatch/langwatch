@@ -391,7 +391,7 @@ export class NotificationService {
     await this.sendSlackMessage({
       channelUrl: this.config.slackPlanLimitChannel,
       body: {
-        text: `Plan limit reached: ${context.organizationName}, ${context.adminEmail ?? "unknown"}, Plan: ${context.planName}`,
+        text: `Plan limit reached: ${context.organizationName}, ${context.adminEmail ?? "unknown"}, Plan: ${context.planName}, ${context.limitType}: ${context.current}/${context.max}`,
       },
       errorLog: "Failed to send Slack plan-limit notification",
     });

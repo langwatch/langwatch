@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { shouldShowGenericTranslateError } from "~/components/messages/translationError";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { shouldShowGenericTranslateError } from "../utils/translationError";
 
 export interface UseTextTranslationResult {
   /** The texts to render: translations when active, originals otherwise. */
@@ -98,7 +98,6 @@ export function useTextTranslation({
             description:
               "There was an error translating the message, please try again.",
             type: "error",
-            meta: { closable: true },
           });
         }
       })

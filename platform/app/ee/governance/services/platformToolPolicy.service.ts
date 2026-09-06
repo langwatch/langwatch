@@ -73,3 +73,25 @@ export const PLATFORM_TOOL_POLICY_DEFAULTS: Record<
 export function isPlatformToolSlug(slug: string): slug is PlatformToolSlug {
   return (PLATFORM_TOOL_SLUGS as readonly string[]).includes(slug);
 }
+
+/**
+ * The ingest `source_type` a wrapped tool stamps, read back to its CLI slug.
+ * Mirrors SOURCE_TYPE_BY_TOOL in
+ * sdks/typescript/src/cli/utils/governance/otel-env-block.ts, which is the
+ * only writer of these values on the direct-OTLP path.
+ *
+ * Deliberately partial, and the mint route treats an unmapped source type as
+ * ungoverned: `cursor` and `copilot_app` have no direct-OTLP wiring to gate,
+ * and an SDK or a template mints under source types that no per-tool policy
+ * describes.
+ */
+export const PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE: Readonly<
+  Record<string, PlatformToolSlug>
+> = {
+  claude_code: "claude",
+  codex: "codex",
+  gemini: "gemini",
+  opencode: "opencode",
+  copilot_cli: "copilot",
+  copilot_vscode: "code",
+};

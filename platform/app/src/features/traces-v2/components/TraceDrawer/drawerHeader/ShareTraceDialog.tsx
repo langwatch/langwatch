@@ -116,7 +116,6 @@ function ShareLinkRow({
           description: url,
           type: "success",
           duration: 2500,
-          meta: { closable: true },
         });
         return;
       }
@@ -128,7 +127,6 @@ function ShareLinkRow({
           "Clipboard access is restricted. This can happen on non-HTTPS domains.",
         type: "error",
         duration: 6000,
-        meta: { closable: true },
       });
     }
   };

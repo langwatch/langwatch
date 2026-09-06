@@ -7,6 +7,7 @@ on:
       - ".github/workflows/*.yaml"
       - ".github/actions/**"
       - ".github/scripts/guard-pull-request-target*.ts"
+      - ".github/scripts/guard-path-filters*.ts"
   push:
     branches:
       - main
@@ -15,6 +16,7 @@ on:
       - ".github/workflows/*.yaml"
       - ".github/actions/**"
       - ".github/scripts/guard-pull-request-target*.ts"
+      - ".github/scripts/guard-path-filters*.ts"
   workflow_dispatch:
 
 concurrency:
@@ -70,6 +72,28 @@ jobs:
         if: github.event_name == 'pull_request'
         run: node --test --experimental-strip-types pr/.github/scripts/guard-pull-request-target.test.ts
 
+      # Same trusted-script rule as above: run the BASE copy of the path-filter
+      # guard against the PR's workflows, so a pull request cannot disable the
+      # guard in the same commit that breaks a filter. Falls back to the PR's
+      # copy only when base has none, which is the commit that adds it.
+      - name: Resolve trusted path-filter guard
+        if: github.event_name == 'pull_request'
+        id: path-filter-script
+        run: |
+          if [ -f base/.github/scripts/guard-path-filters.ts ]; then
+            echo "path=base/.github/scripts/guard-path-filters.ts" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=pr/.github/scripts/guard-path-filters.ts" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check path filters on PR
+        if: github.event_name == 'pull_request'
+        run: node --experimental-strip-types "${{ steps.path-filter-script.outputs.path }}" pr/.github/workflows
+
+      - name: Check path-filter guard tests on PR
+        if: github.event_name == 'pull_request'
+        run: node --test --experimental-strip-types pr/.github/scripts/guard-path-filters.test.ts
+
       - name: Checkout repository
         if: github.event_name != 'pull_request'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -83,3 +107,11 @@ jobs:
       - name: Check guard tests
         if: github.event_name != 'pull_request'
         run: node --test --experimental-strip-types .github/scripts/guard-pull-request-target.test.ts
+
+      - name: Check path filters
+        if: github.event_name != 'pull_request'
+        run: node --experimental-strip-types .github/scripts/guard-path-filters.ts
+
+      - name: Check path-filter guard tests
+        if: github.event_name != 'pull_request'
+        run: node --test --experimental-strip-types .github/scripts/guard-path-filters.test.ts

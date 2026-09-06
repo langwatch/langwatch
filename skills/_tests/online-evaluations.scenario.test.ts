@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import {
 	assertSkillWasRead,
+	bashCommands,
 	createClaudeCodeAgent,
 	createSkillTestWorkDir,
 	installSkillToWorkDir,
@@ -99,15 +100,17 @@ async function deleteMonitor(id: string): Promise<void> {
 	}
 }
 
-function executedCommandTranscript(state: ScenarioExecutionStateLike): string {
-	return state.messages
-		.map((message) =>
-			typeof message.content === "string"
-				? message.content
-				: JSON.stringify(message.content ?? ""),
-		)
-		.join("\n")
-		.replace(/\\/g, "");
+/**
+ * The shell commands the agent ran, one per line.
+ *
+ * Reads the Bash tool calls rather than the JSON of the whole transcript. A
+ * command that quotes an argument before the one under test, such as
+ * `export PATH="./bin:$PATH" && langwatch monitor create`, defeats a regex
+ * written over that JSON, and a negative assertion then passes for the wrong
+ * reason.
+ */
+function executedCommands(state: ScenarioExecutionStateLike): string {
+	return bashCommands(state).join("\n");
 }
 
 describe("Online Evaluations Skill", () => {
@@ -152,13 +155,9 @@ describe("Online Evaluations Skill", () => {
 						),
 						scenario.agent(),
 						(state) => {
-							const transcript = executedCommandTranscript(state);
-							expect(transcript).toMatch(
-								/"command":"[^"]*langwatch monitor create/,
-							);
-							expect(transcript).toMatch(
-								/"command":"[^"]*langwatch monitor (get|list)/,
-							);
+								const commands = executedCommands(state);
+							expect(commands).toMatch(/langwatch monitor create/);
+							expect(commands).toMatch(/langwatch monitor (get|list)/);
 							toolCallFix(state);
 							assertSkillWasRead(state, "online-evaluations");
 						},
@@ -236,10 +235,8 @@ describe("Online Evaluations Skill", () => {
 					),
 					scenario.agent(),
 					(state) => {
-						const transcript = executedCommandTranscript(state);
-						expect(transcript).not.toMatch(
-							/"command":"[^"]*langwatch monitor create/,
-						);
+						const commands = executedCommands(state);
+						expect(commands).not.toMatch(/langwatch monitor create/);
 						toolCallFix(state);
 						assertSkillWasRead(state, "online-evaluations");
 					},

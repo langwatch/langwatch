@@ -141,7 +141,6 @@ export function DeployPromptDialog({
         title: "Tags saved",
         type: "success",
         duration: 2000,
-        meta: { closable: true },
       });
       onClose();
     } catch {
@@ -149,7 +148,6 @@ export function DeployPromptDialog({
         title: "Failed to save tags",
         type: "error",
         duration: 3000,
-        meta: { closable: true },
       });
     } finally {
       setIsSaving(false);
@@ -226,7 +224,6 @@ export function DeployPromptDialog({
           title: "Failed to delete tag",
           type: "error",
           duration: 3000,
-          meta: { closable: true },
         });
       }
     },

@@ -4,7 +4,7 @@ description: Diagnostic paths for the most common LangWatch AI Gateway failure m
 sidebarTitle: Troubleshooting
 ---
 
-When the gateway misbehaves, this page is the first stop. Each symptom below points to the diagnostic you'd run first and, where possible, the single log line or metric that nails the root cause.
+Each symptom below names the diagnostic to run first and, where possible, the single log line or metric that identifies the root cause.
 
 Gateway responses carry `X-LangWatch-Gateway-Request-Id` once the request is authenticated. Grab it from your client's error output and paste into the LangWatch search bar, the full trace gives you attempts, upstream latency, cache outcome, and guardrail decisions in one view. **Do this before anything else** for a specific broken request.
 
@@ -199,7 +199,7 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 
 1. **You're still on a static token instead of the per-project resolver.** The gateway resolves the X-Auth-Token from the VK's owning project on every bundle refresh, each tenant's spans route to their own inbox automatically. If you've hand-set `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN` in your pod env, it takes precedence over the per-project token and every project's spans land in whatever project that static token points at. Unset it and let the resolver do its job.
 
-   <Info>**Default dev setup needs no config.** The gateway defaults `GATEWAY_OTEL_DEFAULT_ENDPOINT` to `http://localhost:5560/api/otel` and uses the per-project token from the bundle. `pnpm dev` and `make run-dev` Just Work, no env override needed. Override the endpoint only for prod/self-hosted.</Info>
+   <Info>**Default dev setup needs no config.** The gateway defaults `GATEWAY_OTEL_DEFAULT_ENDPOINT` to `http://localhost:5560/api/otel` and uses the per-project token from the bundle. `pnpm dev` and `make run-dev` need no env override. Override the endpoint only for prod/self-hosted.</Info>
 
 2. **Endpoint is empty.** `GATEWAY_OTEL_DEFAULT_ENDPOINT` unset = no exporter wired. Spans are created in-pod and flushed to a no-op channel. Helm umbrella chart defaults this to `http://langwatch-app:5560/api/otel`, if you've overridden to empty, you've disabled trace export.
 

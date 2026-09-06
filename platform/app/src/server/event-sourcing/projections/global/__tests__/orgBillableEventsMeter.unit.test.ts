@@ -47,6 +47,8 @@ const { mockInsert, mockGetApp, mockPrisma, mockLoggerWarn, createMockLogger } =
 // in for the store means standing in for `getApp()`.
 vi.mock("~/server/app-layer/app", () => ({
   getApp: mockGetApp,
+  // Reached through the TtlCache these paths read; null keeps it in-memory.
+  tryGetApp: () => null,
 }));
 
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));

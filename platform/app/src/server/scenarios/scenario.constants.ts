@@ -37,3 +37,15 @@ export const CHILD_PROCESS = {
   /** Timeout for scenario child process execution (ms) */
   TIMEOUT_MS: 15 * 60 * 1000, // 15 minutes
 } as const;
+
+/**
+ * Threshold in milliseconds after which a run without activity is
+ * considered stalled. Set to 2x the child process timeout
+ * to cover all reasonable completion scenarios.
+ *
+ * This is the simulationRunExecution process manager's stall-watchdog
+ * threshold: the wake fires once a run has been quiet this long and
+ * force-finishes it ERROR with reason "stalled". Stored status is the
+ * only truth — nothing derives STALLED at read time anymore.
+ */
+export const STALL_THRESHOLD_MS = CHILD_PROCESS.TIMEOUT_MS * 2;

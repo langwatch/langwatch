@@ -4,6 +4,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,
@@ -13,13 +17,17 @@ import type {
   ProjectWithOrgAdmin,
   ProjectWithTeam,
   SearchProjectsResult,
+  TouchCodingAgentActivityInput,
   TraceSharingConfig,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "./project.repository";
 
 export class PrismaProjectRepository implements ProjectRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+  ) {}
 
   async getById(id: string): Promise<Project | null> {
     return this.prisma.project.findUnique({ where: { id } });
@@ -37,6 +45,53 @@ export class PrismaProjectRepository implements ProjectRepository {
     data,
   }: UpdateProjectMetadataInput): Promise<void> {
     await this.prisma.project.update({ where: { id }, data });
+  }
+
+  /**
+   * `updateMany` rather than `update`, and that is the guard rather than a
+   * style choice. `update` addresses one row by its primary key and throws
+   * when the extra predicates exclude it, so the "still recent, skip it" case
+   * would arrive as an error on the hot path. `updateMany` answers the same
+   * question with a count, and the staleness predicate rides in the same
+   * statement as the write: two concurrent folds cannot both read "stale" and
+   * both write, because there is no read.
+   */
+  async touchCodingAgentSessionSeen({
+    projectId,
+    at,
+    staleBefore,
+  }: TouchCodingAgentActivityInput): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: {
+        id: projectId,
+        // An archived project shows no rail links, so a late fold must not
+        // stamp activity that would make one look current again.
+        archivedAt: null,
+        OR: [
+          { lastCodingAgentSessionAt: null },
+          { lastCodingAgentSessionAt: { lte: staleBefore } },
+        ],
+      },
+      data: { lastCodingAgentSessionAt: at },
+    });
+  }
+
+  async touchCodingAgentPullRequestSeen({
+    projectId,
+    at,
+    staleBefore,
+  }: TouchCodingAgentActivityInput): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: {
+        id: projectId,
+        archivedAt: null,
+        OR: [
+          { lastCodingAgentPullRequestAt: null },
+          { lastCodingAgentPullRequestAt: { lte: staleBefore } },
+        ],
+      },
+      data: { lastCodingAgentPullRequestAt: at },
+    });
   }
 
   async getWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {
@@ -173,12 +228,18 @@ export class PrismaProjectRepository implements ProjectRepository {
     organizationId,
     page,
     limit,
+    projectIds,
   }: {
     organizationId: string;
     page: number;
     limit: number;
+    projectIds?: string[];
   }): Promise<PaginatedResult<Project>> {
-    const where = { archivedAt: null, team: { organizationId } };
+    const where = {
+      archivedAt: null,
+      team: { organizationId },
+      ...(projectIds ? { id: { in: projectIds } } : {}),
+    };
     const [data, total] = await Promise.all([
       this.prisma.project.findMany({
         where,
@@ -226,15 +287,22 @@ export class PrismaProjectRepository implements ProjectRepository {
       },
     });
 
-    await this.prisma.roleBinding.create({
-      data: {
-        id: input.roleBindingId,
-        organizationId: input.organizationId,
-        userId: input.userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: team.id,
-      },
+    // The team row is not a grant fact; the creator's admin grant on it is,
+    // so it is emitted as a command once the scope it points at exists.
+    await this.writer.attachBindings({
+      organizationId: input.organizationId,
+      bindings: [
+        {
+          bindingId: input.roleBindingId,
+          principal: { userId: input.userId },
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: team.id,
+        },
+      ],
+      actor: { type: "user", id: input.userId },
+      onDuplicate: "skip",
     });
 
     return team;

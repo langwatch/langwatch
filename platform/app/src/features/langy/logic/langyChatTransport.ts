@@ -16,6 +16,14 @@ import { trpcClient } from "~/utils/api";
 export interface LangyTurnRequestContext {
   projectId: string;
   conversationId: string | null;
+  /**
+   * The conversation id a panel-open warm minted ahead of the first message
+   * (specs/langy/langy-worker-prewarm.feature). Only consulted when there is
+   * no active conversation: the create call adopts it so the first turn lands
+   * on the worker the warm already booted, instead of spawning under a fresh
+   * server-minted id.
+   */
+  pendingConversationId?: string | null;
   modelOverride?: string;
   pageContext?: LangyResourceContext[];
   skills?: LangySkillContext[];
@@ -27,10 +35,21 @@ export interface LangyTurnRequestContext {
  * manager's typed plan snapshot into the store, which the plan card prefers over
  * parsing the raw `todowrite` tool part.
  */
-export type LangyTurnSignalEntry = Extract<
-  LangyStreamEntry,
-  { type: "status" | "progress" | "milestone" | "reasoning" | "plan" }
->;
+export type LangyTurnSignalEntry =
+  | (Extract<LangyStreamEntry, { type: "status" }> & {
+      /**
+       * The status arrived BEFORE this stream produced any output — the
+       * manager's readiness placeholder for silence ("Starting Langy…",
+       * "Thinking…"). The panel suppresses a readiness status once the answer
+       * is visible: a replayed stream re-delivers it after text is already on
+       * screen, and a placeholder under the reply reads as a contradiction.
+       */
+      readiness?: boolean;
+    })
+  | Extract<
+      LangyStreamEntry,
+      { type: "progress" | "milestone" | "reasoning" | "plan" }
+    >;
 
 /**
  * How a turn stream terminated. "end" is the genuine end-of-turn frame — the
@@ -53,6 +72,25 @@ export interface LangyChatTransportDeps {
    * holds both the router and the active turn id the dedup key needs.
    */
   onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
+  /**
+   * Forward a live-only UI action for the page to claim and execute, bare
+   * passthrough like `onNavigate` — dedup, the claim race, and the handler
+   * lookup all live in the panel's orchestration (`executeUiAction`).
+   */
+  onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
+  /**
+   * A card the developer has to answer while the turn runs (ADR-129) — a
+   * permission ask, or a question. Bare passthrough like `onUiAction`: the
+   * durable `user_wait_started` event is the truth, and this is the fast path
+   * that puts the card on screen before the tail arrives.
+   */
+  onLocalWait?: (
+    entry: Extract<LangyStreamEntry, { type: "local_permission" | "question" }>,
+  ) => void;
+  /** The shared folder came or went while the turn ran. */
+  onLocalWorkspace?: (
+    entry: Extract<LangyStreamEntry, { type: "local_workspace" }>,
+  ) => void;
   /** Fired when a turn stream terminates — the reconcile trigger. */
   onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   /**
@@ -97,6 +135,15 @@ export function createLangyChatTransport(
   return {
     async sendMessages(options) {
       const ctx = deps.getContext();
+      // A create carries THIS send and nothing else. The useChat state can still
+      // hold the previous conversation when the user starts a new chat
+      // mid-stream, and anything else in it seeds the new conversation, and the
+      // title generated from it, with the old exchange. Every user message was
+      // the same failure with the answers stripped out: the old questions still
+      // went through.
+      const lastUserMessage = options.messages.findLast(
+        (message) => message.role === "user",
+      );
       const turnInput = {
         // One logical send, one identity: minted fresh on every sendMessages
         // call (each composer submit / regenerate re-arms with a new key), so
@@ -117,7 +164,15 @@ export function createLangyChatTransport(
             ...turnInput,
             conversationId: ctx.conversationId,
           })
-        : await trpcClient.langy.createConversation.mutate(turnInput);
+        : await trpcClient.langy.createConversation.mutate({
+            ...turnInput,
+            messages: lastUserMessage ? [lastUserMessage] : [],
+            // Adopt the warmed conversation when the panel holds one, so the
+            // first turn reuses the worker the panel open already booted.
+            ...(ctx.pendingConversationId
+              ? { conversationId: ctx.pendingConversationId }
+              : {}),
+          });
       deps.onIds({ conversationId, turnId });
 
       return subscribeTurnStream({
@@ -126,6 +181,11 @@ export function createLangyChatTransport(
         turnId,
         onSignal: deps.onSignal,
         ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
+        ...(deps.onUiAction ? { onUiAction: deps.onUiAction } : {}),
+        ...(deps.onLocalWait ? { onLocalWait: deps.onLocalWait } : {}),
+        ...(deps.onLocalWorkspace
+          ? { onLocalWorkspace: deps.onLocalWorkspace }
+          : {}),
         onSettled: deps.onTurnSettled,
         ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
         abortSignal: options.abortSignal,
@@ -151,6 +211,9 @@ function subscribeTurnStream({
   turnId,
   onSignal,
   onNavigate,
+  onUiAction,
+  onLocalWait,
+  onLocalWorkspace,
   onSettled,
   onWireEntry,
   abortSignal,
@@ -160,6 +223,13 @@ function subscribeTurnStream({
   turnId: string;
   onSignal: (signal: LangyTurnSignalEntry) => void;
   onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
+  onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
+  onLocalWait?: (
+    entry: Extract<LangyStreamEntry, { type: "local_permission" | "question" }>,
+  ) => void;
+  onLocalWorkspace?: (
+    entry: Extract<LangyStreamEntry, { type: "local_workspace" }>,
+  ) => void;
   onSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
   abortSignal?: AbortSignal;
@@ -168,13 +238,32 @@ function subscribeTurnStream({
 
   return new ReadableStream<UIMessageChunk>({
     start(controller) {
-      const textId = crypto.randomUUID();
+      // The prose of a turn is not one block: it is the paragraphs written
+      // between the calls. A single text id held open for the whole turn made
+      // every delta land in the SAME part, so the message's parts said "all the
+      // text, then all the tools" whatever order they arrived in, and the panel
+      // had no way to draw a card between two paragraphs. A run is opened by
+      // the first delta after a tool and closed when the next tool starts, so
+      // the parts array is the turn's own order.
+      let openTextId: string | null = null;
       let closed = false;
+
+      const openText = () => {
+        if (openTextId) return openTextId;
+        openTextId = crypto.randomUUID();
+        controller.enqueue({ type: "text-start", id: openTextId });
+        return openTextId;
+      };
+      const closeText = () => {
+        if (!openTextId) return;
+        controller.enqueue({ type: "text-end", id: openTextId });
+        openTextId = null;
+      };
 
       const finish = (reason: LangyTurnSettleReason) => {
         if (closed) return;
         closed = true;
-        controller.enqueue({ type: "text-end", id: textId });
+        closeText();
         controller.enqueue({ type: "finish" });
         controller.close();
         sub?.unsubscribe();
@@ -182,9 +271,8 @@ function subscribeTurnStream({
       };
 
       controller.enqueue({ type: "start" });
-      controller.enqueue({ type: "text-start", id: textId });
 
-      // The manager emits a readiness status ("Waking Langy up…") into the cold window
+      // The manager emits a readiness status ("Starting Langy…") into the cold window
       // (worker tool prep produces no frames for many seconds). It is a
       // placeholder for SILENCE, so the first real output — text, a tool, the
       // model's reasoning — retires it; without this the status line would
@@ -208,12 +296,18 @@ function subscribeTurnStream({
             clearColdStartStatus();
             controller.enqueue({
               type: "text-delta",
-              id: textId,
+              id: openText(),
               delta: entry.text,
             });
             return;
           case "tool":
             clearColdStartStatus();
+            // A starting call ends the paragraph before it, which is what puts
+            // its card between that paragraph and the next. An ENDING call
+            // updates the part it already opened, wherever that sits, so the
+            // card stays where the work began and the text after it is not cut
+            // in two by an output that lands late.
+            if (entry.phase === "start") closeText();
             enqueueToolChunk(controller, entry);
             return;
           case "reasoning":
@@ -227,6 +321,8 @@ function subscribeTurnStream({
             onSignal(entry);
             return;
           case "status":
+            onSignal({ ...entry, readiness: !sawOutput });
+            return;
           case "progress":
           case "milestone":
             onSignal(entry);
@@ -235,6 +331,22 @@ function subscribeTurnStream({
             // Not a message part, not a signal the status line renders — a
             // one-shot action. Bare passthrough; the panel owns dedup + routing.
             onNavigate?.(entry);
+            return;
+          case "ui":
+            // Same contract as navigate: a one-shot instruction for the page,
+            // never a message part. The panel owns dedup, the claim, and the
+            // handler execution.
+            onUiAction?.(entry);
+            return;
+          case "local_permission":
+          case "question":
+            // A card the turn is waiting on. It never retires the cold-start
+            // status, because a turn that is waiting for a person has produced
+            // no output yet and the status line still reads correctly.
+            onLocalWait?.(entry);
+            return;
+          case "local_workspace":
+            onLocalWorkspace?.(entry);
             return;
           case "error":
             controller.enqueue({ type: "error", errorText: entry.error });

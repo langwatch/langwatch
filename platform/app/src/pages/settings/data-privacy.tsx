@@ -17,6 +17,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { overBroadSecretPatternProbe } from "@langwatch/redaction";
 import {
   Building2,
   Eye,
@@ -31,7 +32,6 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
 import SettingsLayout from "~/components/SettingsLayout";
 import {
   ALL_MEMBERS_VALUE,
@@ -611,6 +611,21 @@ function secretPatternError(pattern: string): string | null {
   return null;
 }
 
+/**
+ * The custom-secret input carries one check the PII exception input does not: a
+ * pattern broad enough to match ordinary text rewrites trace content at
+ * ingestion, and that is not recoverable. The probe is the one the server and
+ * the pipeline use, so this page cannot disagree with what actually happens.
+ */
+function customSecretPatternError(pattern: string): string | null {
+  const invalid = secretPatternError(pattern);
+  if (invalid) return invalid;
+  const eaten = overBroadSecretPatternProbe(pattern);
+  return eaten
+    ? `Too broad: this also matches ordinary text like ${eaten}`
+    : null;
+}
+
 function attributePatternError(pattern: string): string | null {
   const trimmed = pattern.trim();
   if (trimmed.length === 0) return null;
@@ -754,7 +769,7 @@ export function PrivacyRuleDrawer({
   );
 
   const hasInvalidPatterns =
-    secretsPatterns.some((p) => secretPatternError(p) !== null) ||
+    secretsPatterns.some((p) => customSecretPatternError(p) !== null) ||
     piiExceptPatterns.some((p) => secretPatternError(p) !== null) ||
     customAttributes.some((row) => attributePatternError(row.pattern) !== null);
 
@@ -1247,7 +1262,7 @@ export function PrivacyRuleDrawer({
                     </Text>
                   )}
                   {secretsPatterns.map((pattern, index) => {
-                    const error = secretPatternError(pattern);
+                    const error = customSecretPatternError(pattern);
                     return (
                       <VStack key={index} gap={1} align="stretch">
                         <HStack gap={2}>

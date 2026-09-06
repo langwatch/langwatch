@@ -13,7 +13,7 @@ LangWatch provides role-based access control (RBAC) to manage user permissions a
 
 # Role-Based Access Control (RBAC) System
 
-LangWatch implements a comprehensive Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. Role bindings can be assigned directly to users or to groups, including groups synced from your identity provider via SCIM.
+LangWatch implements a Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. Role bindings can be assigned directly to users or to groups, including groups synced from your identity provider via SCIM.
 
 <Info>
   For group-based access control and identity provider integration, see [SCIM Groups](/platform/scim-groups).
@@ -79,7 +79,7 @@ Full administrative access to all team resources and settings.
 Same permissions as Admin but cannot manage team settings.
 
 #### Viewer
-Read-only access to most resources for observation and reporting purposes.
+Read-only access to the resources listed below, for observation and reporting.
 
 | Resource | Permissions |
 |----------|-------------|
@@ -232,5 +232,3 @@ Role bindings can be assigned to users directly from **Settings → Members**, o
 - **Separation of Duties**: Use different roles for different functions
 - **Access Reviews**: Implement regular access reviews for sensitive roles
 - **Monitoring**: Track permission usage and changes for security auditing
-
-This RBAC system provides the flexibility to implement complex organizational structures while maintaining security and ease of management.

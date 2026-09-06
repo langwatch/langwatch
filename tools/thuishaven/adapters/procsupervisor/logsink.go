@@ -12,25 +12,43 @@ import (
 // kept (<file>.1), so a service's footprint is bounded at ~2× this.
 const logSinkMaxBytes = 10 << 20
 
+// logSinkRetryAfter is how long the sink waits before it touches the log file
+// again after an open or a write failure. A full disk or a log directory that
+// is momentarily unwritable then costs one failed syscall per interval instead
+// of one per line, and capture comes back on its own once the condition clears.
+const logSinkRetryAfter = 5 * time.Second
+
 // logSink captures a supervised child's output lines to a per-service file,
 // each line prefixed with an RFC3339Nano timestamp — the tap `haven logs`
 // replays, follows, and filters, whether the stack ran attached or detached.
-// Best-effort by design: a full disk or a permissions hiccup must never take
-// the service itself down, so write errors are swallowed after disabling the
-// sink for this process's lifetime.
+//
+// Best-effort by design: a full disk or a permissions hiccup must never take the
+// service itself down. Best-effort is not the same as one-way, though. Every
+// failure here is transient in the field (a disk that fills and is cleared, a
+// directory that is briefly replaced by a worktree switch), so the sink backs
+// off and retries rather than going silent for the life of the process, and a
+// rotation it cannot complete degrades to appending past the cap.
 type logSink struct {
-	mu       sync.Mutex
-	path     string
-	file     *os.File
-	written  int64
-	disabled bool
+	mu      sync.Mutex
+	path    string
+	file    *os.File
+	written int64
+	// rotateAt is the byte count at which rotation is next attempted. It is
+	// pushed a whole cap ahead when a rotation fails, so an unrotatable file
+	// costs one rename attempt per cap's worth of output rather than one per
+	// line, and the open/rotate cycle stays provably finite.
+	rotateAt int64
+	// retryAt is when a failed open or write may be tried again; the zero time
+	// means "now".
+	retryAt time.Time
+	now     func() time.Time
 }
 
 func newLogSink(path string) *logSink {
 	if path == "" {
 		return nil
 	}
-	return &logSink{path: path}
+	return &logSink{path: path, rotateAt: logSinkMaxBytes, now: time.Now}
 }
 
 func (s *logSink) writeLine(line string) {
@@ -39,24 +57,35 @@ func (s *logSink) writeLine(line string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.disabled {
-		return
-	}
 	if s.file == nil {
+		if s.now().Before(s.retryAt) {
+			return
+		}
 		if err := s.open(); err != nil {
-			s.disabled = true
+			s.backOff()
 			return
 		}
 	}
-	n, err := fmt.Fprintf(s.file, "%s %s\n", time.Now().UTC().Format(time.RFC3339Nano), line)
+	n, err := fmt.Fprintf(s.file, "%s %s\n", s.now().UTC().Format(time.RFC3339Nano), line)
+	s.written += int64(n)
 	if err != nil {
-		s.disabled = true
+		// The descriptor is unusable (the disk filled, the file was replaced).
+		// Drop it and let a later line open a fresh one.
+		_ = s.file.Close()
+		s.backOff()
 		return
 	}
-	s.written += int64(n)
-	if s.written >= logSinkMaxBytes {
+	if s.written >= s.rotateAt {
 		s.rotate()
 	}
+}
+
+// backOff parks capture until logSinkRetryAfter has passed. The file handle is
+// dropped, so the next attempt reopens by path and picks up a directory or a
+// device that has come back.
+func (s *logSink) backOff() {
+	s.file = nil
+	s.retryAt = s.now().Add(logSinkRetryAfter)
 }
 
 // open appends to the existing file (mode 0600 — service output can carry
@@ -82,26 +111,30 @@ func (s *logSink) openFile(mayRotate bool) error {
 		s.written = info.Size()
 	}
 	s.file = f
-	if mayRotate && s.written >= logSinkMaxBytes {
+	if mayRotate && s.written >= s.rotateAt {
 		s.rotate()
 	}
 	return nil
 }
 
 // rotate moves the live file to its single kept generation and reopens fresh.
-// A capture sink must never take the service down, so every failure here
-// disables capture rather than propagating.
+// A capture sink must never take the service down, and it must not go quiet
+// either: when the rename fails the oversized file stays in place and capture
+// keeps appending to it past the cap, with the next attempt a cap's worth of
+// output away.
 func (s *logSink) rotate() {
 	_ = s.file.Close()
 	s.file = nil
 	if err := os.Rename(s.path, s.path+".1"); err != nil {
-		// The oversized file is still in place; reopening would find it over the
-		// cap again and rotate forever.
-		s.disabled = true
+		s.rotateAt = s.written + logSinkMaxBytes
+		if err := s.openFile(false); err != nil {
+			s.backOff()
+		}
 		return
 	}
 	s.written = 0
+	s.rotateAt = logSinkMaxBytes
 	if err := s.openFile(false); err != nil {
-		s.disabled = true
+		s.backOff()
 	}
 }

@@ -105,7 +105,7 @@ export function BatchTargetCell({
   const handleViewTrace = useCallback(() => {
     if (!targetOutput.traceId) return;
     setIsOutputExpanded(false);
-    openDrawer("traceDetails", { traceId: targetOutput.traceId });
+    openDrawer("traceV2Details", { traceId: targetOutput.traceId });
   }, [targetOutput.traceId, openDrawer]);
 
   // Handler to expand output

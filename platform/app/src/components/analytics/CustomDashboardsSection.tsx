@@ -85,7 +85,6 @@ export function CustomDashboardsSection({
               title: "Error renaming dashboard",
               type: "error",
               duration: 3000,
-              meta: { closable: true },
             });
           },
         },
@@ -122,7 +121,6 @@ export function CustomDashboardsSection({
             title: "Error reordering dashboards",
             type: "error",
             duration: 3000,
-            meta: { closable: true },
           });
         },
       },
@@ -138,7 +136,6 @@ export function CustomDashboardsSection({
         title: "Cannot delete the last dashboard",
         type: "warning",
         duration: 3000,
-        meta: { closable: true },
       });
       return;
     }
@@ -195,7 +192,6 @@ export function CustomDashboardsSection({
                   title: "Error deleting dashboard",
                   type: "error",
                   duration: 3000,
-                  meta: { closable: true },
                 });
               },
               onSettled: () => setDashboardToDelete(null),

@@ -10,10 +10,19 @@ const { mockClickHouseQuery, mockPrismaFindUnique } = vi.hoisted(() => ({
   mockPrismaFindUnique: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: () =>
-    Promise.resolve({ query: mockClickHouseQuery }),
-}));
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: () => Promise.resolve({ query: mockClickHouseQuery }),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("~/server/db", () => ({
   prisma: {},
@@ -148,8 +157,10 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const result = await service.getAllTracesForProject(
           baseInput,
@@ -168,8 +179,10 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-A"]);
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const inputWithTraceIds = {
           ...baseInput,
@@ -208,8 +221,10 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-A"]);
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const inputWithTraceIds = {
           ...baseInput,
@@ -233,8 +248,10 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const result = await service.getAllTracesForProject(
           baseInput,
@@ -282,8 +299,10 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId();
 
           const service = new ClickHouseTraceService({
-            project: { findUnique: mockPrismaFindUnique },
-          } as never);
+            prisma: {
+              project: { findUnique: mockPrismaFindUnique },
+            } as never,
+          });
 
           const result = await service.getAllTracesForProject(
             baseInput,
@@ -309,8 +328,10 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId();
 
           const service = new ClickHouseTraceService({
-            project: { findUnique: mockPrismaFindUnique },
-          } as never);
+            prisma: {
+              project: { findUnique: mockPrismaFindUnique },
+            } as never,
+          });
 
           const inputWithScrollId = {
             ...baseInput,
@@ -340,8 +361,10 @@ describe("ClickHouseTraceService", () => {
           setupMocksForCursorTest();
 
           const service = new ClickHouseTraceService({
-            project: { findUnique: mockPrismaFindUnique },
-          } as never);
+            prisma: {
+              project: { findUnique: mockPrismaFindUnique },
+            } as never,
+          });
 
           const result = await service.getAllTracesForProject(
             baseInput,
@@ -366,8 +389,10 @@ describe("ClickHouseTraceService", () => {
           setupMocksForCursorTest();
 
           const service = new ClickHouseTraceService({
-            project: { findUnique: mockPrismaFindUnique },
-          } as never);
+            prisma: {
+              project: { findUnique: mockPrismaFindUnique },
+            } as never,
+          });
 
           const result = await service.getAllTracesForProject(
             baseInput,
@@ -396,8 +421,10 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId({ sortDirection: "asc" });
 
           const service = new ClickHouseTraceService({
-            project: { findUnique: mockPrismaFindUnique },
-          } as never);
+            prisma: {
+              project: { findUnique: mockPrismaFindUnique },
+            } as never,
+          });
 
           const result = await service.getAllTracesForProject(
             baseInput,
@@ -424,8 +451,10 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId({ pageSize: 10 });
 
           const service = new ClickHouseTraceService({
-            project: { findUnique: mockPrismaFindUnique },
-          } as never);
+            prisma: {
+              project: { findUnique: mockPrismaFindUnique },
+            } as never,
+          });
 
           const result = await service.getAllTracesForProject(
             baseInput,
@@ -455,8 +484,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
@@ -476,8 +507,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
@@ -497,8 +530,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
@@ -513,8 +548,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           {
@@ -540,8 +577,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
@@ -561,8 +600,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
@@ -584,8 +625,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
@@ -619,8 +662,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "co" } as GetAllTracesForProjectInput,
@@ -640,8 +685,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
@@ -659,8 +706,10 @@ describe("ClickHouseTraceService", () => {
     describe("when user cannot see input or output", () => {
       it("returns empty results when searching without I/O access", async () => {
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const result = await service.getAllTracesForProject(
           { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
@@ -679,8 +728,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
@@ -701,8 +752,10 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
@@ -725,8 +778,10 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getAllTracesForProject(
           { ...baseInput, query: "ab" } as GetAllTracesForProjectInput,
@@ -744,8 +799,10 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const result = await service.getAllTracesForProject(
           baseInput,
@@ -800,8 +857,10 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const result = await service.getAllTracesForProject(
           { ...baseInput, pageSize: 4 } as GetAllTracesForProjectInput,
@@ -846,8 +905,10 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const result = await service.getAllTracesForProject(
           { ...baseInput, pageSize: 30 } as GetAllTracesForProjectInput,
@@ -878,8 +939,10 @@ describe("ClickHouseTraceService", () => {
           .mockRejectedValueOnce(new Error("SYNTAX_ERROR: bad query"));
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await expect(
           service.getAllTracesForProject(baseInput, protections),
@@ -915,8 +978,10 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const result = await service.getAllTracesForProject(
           baseInput,
@@ -960,8 +1025,10 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const result = await service.getAllTracesForProject(
           baseInput,
@@ -1021,8 +1088,10 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const traces = await service.getTracesWithSpans(
           "proj_123",
@@ -1076,8 +1145,10 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const traces = await service.getTracesWithSpans(
           "proj_123",
@@ -1100,8 +1171,10 @@ describe("ClickHouseTraceService", () => {
         );
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await expect(
           service.getTracesWithSpans("proj_123", ["trace-0"], protections),
@@ -1125,8 +1198,10 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getTracesWithSpans("proj_123", ["trace-0"], protections, {
           from: 1_000_000,
@@ -1166,8 +1241,10 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
 
@@ -1199,8 +1276,10 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
 
@@ -1224,8 +1303,10 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
-          project: { findUnique: mockPrismaFindUnique },
-        } as never);
+          prisma: {
+            project: { findUnique: mockPrismaFindUnique },
+          } as never,
+        });
 
         const traces = await service.getTracesWithSpans(
           "proj_123",

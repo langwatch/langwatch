@@ -42,7 +42,7 @@ secured
     }
     const events = Array.isArray(body) ? body : [body];
 
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     for (const event of events) {
       if (!isScimEvent(event)) continue;

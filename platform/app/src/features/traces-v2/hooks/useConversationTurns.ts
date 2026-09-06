@@ -1,8 +1,8 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useIsReadOnlyTrace } from "../context/TraceViewerContext";
+import { useDrawerProjectId } from "./useDrawerProjectId";
 
 const HOUR_MS = 60 * 60 * 1000;
 const WINDOW_DAYS = 90;
@@ -39,20 +39,20 @@ export function conversationTurnsWindow(nowMs: number): {
  * forever and the UI would never settle.
  */
 export function useConversationTurns(conversationId: string | null) {
-  const { project } = useOrganizationTeamProject();
+  const projectId = useDrawerProjectId();
   const isReadOnly = useIsReadOnlyTrace();
 
   const timeRange = useMemo(
     () => conversationTurnsWindow(Date.now()),
-    // Recompute only when the target conversation changes; the hour-rounded
-    // window keeps the key stable across renders within the same hour.
+    // Recompute only when the target conversation or its project changes; the
+    // hour-rounded window keeps the key stable across renders within the hour.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [project?.id, conversationId],
+    [projectId, conversationId],
   );
 
   return api.tracesV2.list.useQuery(
     {
-      projectId: project?.id ?? "",
+      projectId,
       timeRange,
       sort: { columnId: "time", direction: "asc" },
       page: 1,
@@ -67,7 +67,7 @@ export function useConversationTurns(conversationId: string | null) {
       // Backed by `tracesV2.list`, which stays project-protected (it is the
       // traces-table query with arbitrary filters). A share grant must never
       // open it, so read-only viewers skip conversation turns entirely.
-      enabled: !!project?.id && !!conversationId && !isReadOnly,
+      enabled: !!projectId && !!conversationId && !isReadOnly,
       staleTime: 30_000,
       placeholderData: keepPreviousData,
     },

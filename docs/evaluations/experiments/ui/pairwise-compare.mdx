@@ -4,9 +4,9 @@ sidebarTitle: Comparison
 description: Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation.
 ---
 
-When you are choosing between two prompts, two models, or several agent configurations, absolute evaluator scores can be hard to calibrate. A score of `0.78` does not always tell you whether one variant is actually better than the others for your users.
+**Comparison** is an evaluator that shows an LLM judge every candidate output for the same dataset row and asks which one is best, or whether it's a tie. The result is a per-row verdict naming the winning candidate, plus an aggregate win/tie summary across the run. One card, one config form, and one result column handle any number of variants from two upward.
 
-**Comparison** is built for that decision. It shows an LLM judge every candidate output for the same dataset row and asks which one is best, or whether it's a tie. The result is a per-row verdict naming the winning candidate, plus an aggregate win/tie summary across the run. Comparing two candidates isn't a different feature from comparing five — one card, one config form, one result column handle any number of variants from two upward.
+When you are choosing between two prompts, two models, or several agent configurations, absolute evaluator scores can be hard to calibrate. A score of `0.78` does not always tell you whether one variant is actually better than the others for your users.
 
 <Frame>
   <img
@@ -48,7 +48,7 @@ It is not the best first tool when:
 1. Open the [Experiments Workbench](https://app.langwatch.ai/@project/experiments).
 2. Add the two or more prompts, agents, models, or other targets you want to compare.
 3. Add **Comparison** from Add to Evaluation. If you already have a saved Comparison evaluator, pick it from the list, or select **New Comparison** to start blank.
-4. Select the targets you want as variants — they lay out in an even grid as you add more (3–4 per row).
+4. Select the targets you want as variants. They lay out in an even grid as you add more (3–4 per row).
 5. If a variant's target produces a structured output (for example `{answer, confidence}`), pick which field the judge should see for that variant. Each variant chooses its field independently.
 6. If your dataset has a reference answer, keep **Has Golden Answer** on (the default) and select the golden field. If there is no reference answer, turn it off and use judge instructions to define the preference criteria instead.
 7. Save. Saving is disabled until at least two variants are selected.
@@ -62,15 +62,15 @@ By default Comparison shuffles candidate order deterministically (seeded per row
 
 1. Candidates are presented to the judge in a shuffled order that's stable for that row, so re-evaluating the same row produces the same order and a comparable verdict. `randomize_order` governs the shuffle: turn it off and the judge sees the candidates in the order their targets were registered.
 2. The judge picks the single best candidate, or a tie if none is clearly better and ties are allowed.
-3. The verdict is mapped back to the winning candidate's real identifier before it's shown to you — never the shuffled slot position.
+3. The verdict is mapped back to the winning candidate's real identifier before it's shown to you, never the shuffled slot position.
 
-One comparison covers every variant at once, however many there are, instead of a round of one-against-one matchups. The judge is asked twice per row, the second time with the candidate order reversed, and a row whose two answers disagree is recorded with no winner rather than as a tie: an answer that flips when the order flips has not separated the candidates.
+One comparison covers every variant at once, however many there are, instead of a round of one-against-one matchups. With `swap_and_reconcile` on (the default), the judge is asked twice per row, the second time with the candidate order reversed, and a row whose two answers disagree is recorded with no winner rather than as a tie: an answer that flips when the order flips has not separated the candidates.
 
 The verdict names the winning candidate's own identifier (for a prompt variant, its prompt handle) rather than a generic slot label. The details include the judge's reasoning so you can inspect why a row went the way it did.
 
 ## Golden answer vs direct preference
 
-**Has Golden Answer** is on by default. When enabled, the evaluator judges every candidate relative to the reference answer you select. When disabled, the evaluator compares the candidates directly on their own merits, with no reference answer involved — and the judge prompt drops golden-answer framing entirely rather than asking about a reference that doesn't exist.
+**Has Golden Answer** is on by default. When enabled, the evaluator judges every candidate relative to the reference answer you select. When disabled, the evaluator compares the candidates directly on their own merits, with no reference answer involved. The judge prompt drops golden-answer framing entirely rather than asking about a reference that doesn't exist.
 
 Use a golden answer when correctness is the primary question. Use direct preference when the task is open-ended and you care about qualities such as tone, completeness, helpfulness, structure, or policy adherence.
 
@@ -99,13 +99,13 @@ Review the aggregate result and the row-level explanations together:
 
 | Setting | Default | Description |
 | ------- | ------- | ----------- |
-| `model` | — | The judge model. |
+| `model` | - | The judge model. |
 | `has_golden_answer` | `true` | Compare each candidate against a reference answer. Disable it to compare the candidates directly. |
 | `randomize_order` | `true` | Shuffle candidate order per row (deterministically, seeded by row index) before presenting them to the judge, to reduce position bias. |
 | `allow_tie` | `true` | Allow the judge to return a tie when the candidates are effectively equivalent. |
 | `swap_and_reconcile` | `true` | Ask the judge a second time with the candidate order reversed, and record no winner when the two answers disagree. Doubles the judge cost per row. |
 | `include_metrics` | `[]` | Include per-candidate metrics such as cost or duration in the judge context. |
-| `prompt` | — | Optional custom judge instructions. |
+| `prompt` | - | Optional custom judge instructions. |
 
 ## Using it from the SDK
 

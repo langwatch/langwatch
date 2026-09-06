@@ -29,6 +29,7 @@ type HttpNodeData = {
 };
 
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { buildHttpNodeParameters } from "~/server/agents/http-node";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
@@ -389,6 +390,13 @@ const buildTargetNode = (
           throw new Error(
             `Workflow agent target ${targetConfig.id} has no loaded workflow — it must be dispatched to executeWorkflowCell, not buildTargetNode`,
           );
+        case "connected":
+          // A connected agent runs in the customer's own process, reached
+          // through the relay by the scenario runner. An experiment cell has
+          // no node that speaks that protocol.
+          throw new Error(
+            `Connected agent target ${targetConfig.id} cannot run inside an experiment workflow`,
+          );
         default: {
           const _exhaustive: never = loadedData.agent.type;
           throw new Error(`Unknown agent type: ${_exhaustive}`);
@@ -507,10 +515,20 @@ export const buildSignatureNodeFromPrompt = ({
     verbosity: prompt.verbosity,
   });
 
-  const messages: ChatMessage[] = prompt.messages.map((m) => ({
-    role: m.role as "user" | "assistant" | "system",
-    content: m.content,
-  }));
+  // The VersionedPrompt read model prepends a synthesized
+  // `{role:"system", content: prompt.prompt}` to `messages` (storage keeps
+  // system text only in the `prompt` column — see hoistSystemMessage).
+  // `instructions` below already carries that same text, so forwarding the
+  // synthesized entry would send the system prompt twice. Strip system
+  // roles here: for a prompt with no template messages this leaves the
+  // list empty, which makes the engine fold the scalar inputs into a user
+  // turn instead of sending a request with no user message at all.
+  const messages: ChatMessage[] = prompt.messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
 
   return {
     id: nodeId,
@@ -769,7 +787,11 @@ export const buildSignatureNodeFromAgent = (
 const buildSignatureNodeParameters = (
   config: TypedAgent["config"],
 ): Field[] => {
-  const baseParams = config.parameters ?? [];
+  // Only the studio node kinds carry node fields as parameters; a connected
+  // agent's parameters are run parameter declarations, never node fields.
+  const baseParams = (
+    "sdk" in config ? [] : (config.parameters ?? [])
+  ) as Field[];
 
   // Start with existing parameters (may already have llm, instructions, messages)
   const resultParams: Field[] = [...baseParams];
@@ -854,7 +876,9 @@ export const buildCodeNodeFromAgent = (
       name: agent.name,
       inputs,
       outputs,
-      parameters: config.parameters ?? [],
+      // The caller dispatched on `agent.type === "code"`, so the parameters
+      // are the code node's own fields.
+      parameters: ("sdk" in config ? [] : (config.parameters ?? [])) as Field[],
       cls: "Code",
     },
   };
@@ -910,89 +934,9 @@ export const buildHttpNodeFromAgent = (
   // HTTP agents always have a single "output" output
   const outputs = [{ identifier: "output", type: "str" as const }];
 
-  // Build parameters array with HTTP config (consistent with other node types)
-  const parameters: Field[] = [
-    { identifier: "url", type: "str", value: config.url },
-    { identifier: "method", type: "str", value: config.method ?? "POST" },
-  ];
-
-  if (config.bodyTemplate) {
-    parameters.push({
-      identifier: "body_template",
-      type: "str",
-      value: config.bodyTemplate,
-    });
-  }
-
-  if (config.outputPath) {
-    parameters.push({
-      identifier: "output_path",
-      type: "str",
-      value: config.outputPath,
-    });
-  }
-
-  if (config.headers && config.headers.length > 0) {
-    // Convert array of {key, value} to dict
-    const headersDict: Record<string, string> = {};
-    for (const h of config.headers) {
-      if (h.key) {
-        headersDict[h.key] = h.value ?? "";
-      }
-    }
-    parameters.push({
-      identifier: "headers",
-      type: "dict",
-      value: headersDict,
-    });
-  }
-
-  if (config.timeoutMs) {
-    parameters.push({
-      identifier: "timeout_ms",
-      type: "int",
-      value: config.timeoutMs,
-    });
-  }
-
-  // Add auth params if configured
-  if (config.auth && config.auth.type !== "none") {
-    parameters.push({
-      identifier: "auth_type",
-      type: "str",
-      value: config.auth.type,
-    });
-
-    if (config.auth.type === "bearer" && "token" in config.auth) {
-      parameters.push({
-        identifier: "auth_token",
-        type: "str",
-        value: config.auth.token,
-      });
-    } else if (config.auth.type === "api_key" && "header" in config.auth) {
-      parameters.push({
-        identifier: "auth_header",
-        type: "str",
-        value: config.auth.header,
-      });
-      parameters.push({
-        identifier: "auth_value",
-        type: "str",
-        value: config.auth.value,
-      });
-    } else if (config.auth.type === "basic" && "username" in config.auth) {
-      parameters.push({
-        identifier: "auth_username",
-        type: "str",
-        value: config.auth.username,
-      });
-      parameters.push({
-        identifier: "auth_password",
-        type: "str",
-        value: config.auth.password,
-      });
-    }
-  }
+  // The same parameters the agent editor's test button builds, so testing an
+  // agent and running it here are the same request.
+  const parameters = buildHttpNodeParameters(config);
 
   return {
     id: nodeId,

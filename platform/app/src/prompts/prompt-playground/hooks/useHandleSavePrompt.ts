@@ -52,7 +52,6 @@ export function useHandleSavePrompt() {
         title: "Validation error",
         description: getSaveBlockerMessage(methods),
         type: "error",
-        meta: { closable: true },
       });
       return;
     }
@@ -93,7 +92,6 @@ export function useHandleSavePrompt() {
         title: "Prompt saved",
         description: `Prompt ${prompt.handle} is now at version ${prompt.version}`,
         type: "success",
-        meta: { closable: true },
       });
     };
 

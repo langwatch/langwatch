@@ -1,7 +1,11 @@
 import { HandledError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
-import { describe, expect, it, vi } from "vitest";
-import { handleTrpcCallLogging } from "../trpc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  handleTrpcCallLogging,
+  recordTrpcCall,
+  resetSlowCallThrottle,
+} from "../trpc";
 
 function createMockLog() {
   return {
@@ -265,6 +269,235 @@ describe("handleTrpcCallLogging", () => {
           "trpc call",
         );
         expect(capture).not.toHaveBeenCalled();
+      });
+    });
+  });
+});
+
+/**
+ * specs/observability/slow-work-warnings.feature, the API-call half.
+ *
+ * This half covers the calls whose slow work is not a Postgres query: a
+ * ClickHouse read, a provider call, serialization. The procedure record is
+ * the one place that always carries the full duration.
+ */
+describe("a call that succeeds slowly", () => {
+  const BUDGET_MS = 3000;
+  const THROTTLE_MS = 60_000;
+
+  beforeEach(() => {
+    resetSlowCallThrottle();
+  });
+
+  describe("given a budget of 3000 milliseconds", () => {
+    describe("when a call succeeds inside the budget", () => {
+      /** @scenario "A call inside the budget stays at info" */
+      it("stays at info level", () => {
+        const log = createMockLog();
+
+        handleTrpcCallLogging({
+          ...baseArgs,
+          duration: 42,
+          result: { ok: true },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: BUDGET_MS,
+          now: 0,
+        });
+
+        expect(log.info).toHaveBeenCalledTimes(1);
+        expect(log.warn).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a call succeeds over the budget", () => {
+      /** @scenario "A call over the budget is raised to warning" */
+      it("raises the record to warning, naming the path, duration and budget", () => {
+        const log = createMockLog();
+
+        handleTrpcCallLogging({
+          ...baseArgs,
+          path: "limits.getUsage",
+          duration: 9000,
+          result: { ok: true },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: BUDGET_MS,
+          now: 0,
+        });
+
+        expect(log.info).not.toHaveBeenCalled();
+        expect(log.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            path: "limits.getUsage",
+            duration: 9000,
+            budgetMs: BUDGET_MS,
+          }),
+          "trpc call",
+        );
+      });
+    });
+
+    describe("when a slow call also failed", () => {
+      /** @scenario "A failed slow call keeps the level its failure earned" */
+      it("keeps the level its failure earned rather than the slow warning", () => {
+        const log = createMockLog();
+        const error = new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "boom",
+        });
+
+        handleTrpcCallLogging({
+          ...baseArgs,
+          duration: 9000,
+          result: { ok: false, error },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: BUDGET_MS,
+          now: 0,
+        });
+
+        expect(log.error).toHaveBeenCalledTimes(1);
+        expect(log.warn).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the budget is set to zero", () => {
+      /** @scenario "A call inside the budget stays at info" */
+      it("turns the warning off entirely", () => {
+        const log = createMockLog();
+
+        handleTrpcCallLogging({
+          ...baseArgs,
+          duration: 60_000,
+          result: { ok: true },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: 0,
+          now: 0,
+        });
+
+        expect(log.info).toHaveBeenCalledTimes(1);
+        expect(log.warn).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a procedure that is slow on every call", () => {
+    const callSlowly = ({
+      log,
+      times,
+      now,
+    }: {
+      log: ReturnType<typeof createMockLog>;
+      times: number;
+      now: number;
+    }) => {
+      for (let i = 0; i < times; i++) {
+        handleTrpcCallLogging({
+          ...baseArgs,
+          path: "limits.getUsage",
+          duration: 9000,
+          result: { ok: true },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: BUDGET_MS,
+          now,
+        });
+      }
+    };
+
+    describe("when it runs 50 times inside one throttle interval", () => {
+      /** @scenario "A call over the budget is raised to warning" */
+      it("warns once and leaves the rest at info, so no record is lost", () => {
+        const log = createMockLog();
+
+        callSlowly({ log, times: 50, now: 0 });
+
+        expect(log.warn).toHaveBeenCalledTimes(1);
+        expect(log.info).toHaveBeenCalledTimes(49);
+      });
+    });
+
+    describe("when the interval elapses and it is slow again", () => {
+      /** @scenario "A call over the budget is raised to warning" */
+      it("reports how many calls the throttle suppressed", () => {
+        const log = createMockLog();
+        callSlowly({ log, times: 50, now: 0 });
+
+        callSlowly({ log, times: 1, now: THROTTLE_MS });
+
+        expect(log.warn).toHaveBeenCalledTimes(2);
+        expect(log.warn.mock.calls[1]![0]).toMatchObject({
+          suppressedSincePrevious: 49,
+        });
+      });
+    });
+  });
+
+  describe("given a silenced path", () => {
+    describe("when a presence heartbeat succeeds slowly", () => {
+      /** @scenario "A silenced path stays silent even when slow" */
+      it("logs nothing at all, warning included", () => {
+        const log = createMockLog();
+
+        recordTrpcCall({
+          ...baseArgs,
+          path: "presence.heartbeat",
+          duration: 9000,
+          result: { ok: true },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: BUDGET_MS,
+          now: 0,
+        });
+
+        expect(log.warn).not.toHaveBeenCalled();
+        expect(log.info).not.toHaveBeenCalled();
+        expect(log.error).not.toHaveBeenCalled();
+      });
+
+      /**
+       * Without this the test above passes on a `recordTrpcCall` that logs
+       * nothing for anyone.
+       */
+      it("still warns for an ordinary path that is equally slow", () => {
+        const log = createMockLog();
+
+        recordTrpcCall({
+          ...baseArgs,
+          path: "scenarios.getById",
+          duration: 9000,
+          result: { ok: true },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: BUDGET_MS,
+          now: 0,
+        });
+
+        expect(log.warn).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when a heartbeat fails", () => {
+      /** @scenario "A silenced path still reports its failures" */
+      it("reports it, because the volume that earns the silence is happy-path volume", () => {
+        const log = createMockLog();
+
+        recordTrpcCall({
+          ...baseArgs,
+          path: "presence.heartbeat",
+          result: {
+            ok: false,
+            error: new TRPCError({ code: "INTERNAL_SERVER_ERROR" }),
+          },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: BUDGET_MS,
+          now: 0,
+        });
+
+        expect(log.error).toHaveBeenCalledTimes(1);
       });
     });
   });

@@ -2,11 +2,12 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
-import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
+import { getApp } from "~/server/app-layer/app";
+import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
@@ -17,7 +18,9 @@ import {
 } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { DataRetentionPolicyRepository } from "~/server/data-retention/policy/dataRetentionPolicy.repository";
+import { RetentionPolicyCache } from "~/server/data-retention/retentionPolicyCache";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { prisma as defaultPrisma } from "~/server/db";
 import {
   type ClickHouseEvaluationRunRow,
@@ -60,6 +63,7 @@ import type {
   TopicCountsResult,
   TraceDateField,
   TracesForProjectResult,
+  TraceWithGuardrail,
 } from "./types";
 
 /**
@@ -205,6 +209,27 @@ const JOINED_SPAN_READ_SETTINGS = {
 const SPAN_READ_FLOOR_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 /** Per-trace cap on projected events (events are a small subset of spans). */
 const MAX_EVENTS_PER_TRACE = 1_000;
+
+/**
+ * How many spans the traces-with-spans OOM fallback will hold in memory before
+ * it gives up on the read.
+ *
+ * The fallback re-runs a memory-capped ClickHouse query in batches of 25 and
+ * merges every batch into one map. That bounds ClickHouse's peak memory and
+ * not ours: the same full result set is materialised, just on this side of the
+ * socket. On 2026-08-12..16 that turned a single MEMORY_LIMIT_EXCEEDED on a
+ * 980-trace read into 50 V8 heap deaths — the whole worker fleet, 16:48 UTC,
+ * every day, because every pod ran the same sweep at the same time.
+ *
+ * The read that triggers the fallback has ALREADY failed once in ClickHouse, so
+ * refusing it here costs that caller nothing it had: it fails either way. What
+ * it buys is that the failure stays inside one job instead of taking the
+ * process — a failed job is retried and visible, a dead pod is neither.
+ *
+ * Sized well above any legitimate trace-detail read (10k spans is one very
+ * large trace) and far below a heap-filling sweep.
+ */
+const MAX_SPANS_PER_JOINED_FALLBACK = 50_000;
 /** Bounds the bounded events stored_spans scan to the page's occurrence weeks. */
 const EVENT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -381,20 +406,38 @@ export class ClickHouseTraceService {
    */
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
 
-  constructor(
-    private readonly prisma: PrismaClient,
-    resolveTraceSpans?: ResolveTraceSpansFn,
-    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
-  ) {
+  private readonly prisma: PrismaClient;
+
+  constructor({
+    prisma,
+    resolveTraceSpans,
+    resolveTraceSpansBatch,
+    retentionResolver,
+  }: {
+    prisma: PrismaClient;
+    resolveTraceSpans?: ResolveTraceSpansFn;
+    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
+    /**
+     * Widens the span read's retention floor to this tenant's own policy.
+     * Optional: without it the floor stays at {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
+     */
+    retentionResolver?: RetentionPolicyResolver;
+  }) {
+    this.prisma = prisma;
     this.resolveTraceSpans = resolveTraceSpans;
     this.resolveTraceSpansBatch = resolveTraceSpansBatch;
+    this.retentionFloor = createRetentionFloorService(retentionResolver);
   }
+
+  private readonly retentionFloor: ReturnType<
+    typeof createRetentionFloorService
+  >;
 
   /**
    * Resolve the ClickHouse client for a given project.
    *
    * The returned client is already wrapped with wrapWithDefaultSettings
-   * by getClickHouseClientForProject, so every query automatically receives
+   * by the App's per-tenant resolver, so every query automatically receives
    * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
    *
    * @throws ClickHouseClientUnavailableError when no client resolves —
@@ -402,26 +445,46 @@ export class ClickHouseTraceService {
    *   configuration error, never a signal to fall back.
    */
   private async resolveClient(projectId: string): Promise<ClickHouseClient> {
-    const client = await getClickHouseClientForProject(projectId);
-    if (!client) {
+    const { clickhouse } = getApp();
+    if (!clickhouse.enabled) {
       throw new ClickHouseClientUnavailableError(projectId);
     }
-    return client;
+    return clickhouse.resolveClient(projectId);
   }
 
   /**
    * Static factory method for creating ClickHouseTraceService with default dependencies.
+   *
+   * The retention resolver defaults to a live cascade over the same Prisma
+   * client, which is what makes the span read's floor actually tenant-aware in
+   * production. Left to the constructor's optional parameter it never was:
+   * every production path reaches the service through here, none of them
+   * passed a resolver, and the floor quietly stayed at the fixed
+   * {@link SPAN_READ_FLOOR_LOOKBACK_MS} for every project — including the ones
+   * on a longer policy that this exists to serve.
+   *
+   * `new ClickHouseTraceService({...})` stays resolver-free, so unit tests keep
+   * the platform default without a database in the graph.
    */
-  static create(
-    prisma: PrismaClient = defaultPrisma,
-    resolveTraceSpans?: ResolveTraceSpansFn,
-    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
-  ): ClickHouseTraceService {
-    return new ClickHouseTraceService(
+  static create({
+    prisma = defaultPrisma,
+    resolveTraceSpans,
+    resolveTraceSpansBatch,
+    retentionResolver = new RetentionPolicyCache(
+      new DataRetentionPolicyRepository(prisma),
+    ),
+  }: {
+    prisma?: PrismaClient;
+    resolveTraceSpans?: ResolveTraceSpansFn;
+    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
+    retentionResolver?: RetentionPolicyResolver;
+  } = {}): ClickHouseTraceService {
+    return new ClickHouseTraceService({
       prisma,
       resolveTraceSpans,
       resolveTraceSpansBatch,
-    );
+      retentionResolver,
+    });
   }
 
   /**
@@ -498,14 +561,19 @@ export class ClickHouseTraceService {
           // message and losing the mismatch.
           if (error instanceof TraceSpansBatchResolverContractError)
             throw error;
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               error: error instanceof Error ? error.message : error,
             },
             "Failed to fetch traces from ClickHouse",
           );
-          throw new Error("Failed to fetch traces with spans");
+          // Keep the cause. Without it the only record of WHY this failed is
+          // the warn line above, so a caller that logs the throw — or a test
+          // that asserts on it — sees a message that could mean anything.
+          throw new Error("Failed to fetch traces with spans", {
+            cause: error,
+          });
         }
       },
     );
@@ -571,7 +639,7 @@ export class ClickHouseTraceService {
           const rows = (await result.json()) as Array<{ TraceId: string }>;
           return rows.map((r) => r.TraceId);
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               prefix,
@@ -641,7 +709,7 @@ export class ClickHouseTraceService {
           const rows = (await result.json()) as Array<{ TraceId: string }>;
           return rows.map((row) => row.TraceId);
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               traceIdCount: traceIds.length,
@@ -747,7 +815,7 @@ export class ClickHouseTraceService {
           // not a fetch failure — surface it verbatim.
           if (error instanceof TraceSpansBatchResolverContractError)
             throw error;
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               threadId,
@@ -854,7 +922,7 @@ export class ClickHouseTraceService {
           // thread router and the evaluation-execution service.)
           if (error instanceof TraceSpansBatchResolverContractError)
             throw error;
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               threadIds,
@@ -1222,7 +1290,7 @@ export class ClickHouseTraceService {
               : {}),
           };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
@@ -1324,7 +1392,7 @@ export class ClickHouseTraceService {
             ),
           };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
@@ -1435,7 +1503,7 @@ export class ClickHouseTraceService {
             labels: Array.from(labelsSet),
           };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
@@ -1587,7 +1655,7 @@ export class ClickHouseTraceService {
 
           return result;
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               spanId,
@@ -1820,7 +1888,7 @@ export class ClickHouseTraceService {
 
           return { spanNames, metadataKeys, evaluationNames };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               error: error instanceof Error ? error.message : error,
@@ -2999,10 +3067,31 @@ export class ClickHouseTraceService {
         // large list can exceed the per-query memory cap and fail with
         // MEMORY_LIMIT_EXCEEDED. Run the list as one query on the happy path, and
         // on OOM retry in fixed-size batches (same fallback as fetchTraceSummaryRows
-        // / fetchEvaluationRows) so peak memory is bounded without dropping data.
-        const runBatch = async (
-          batchTraceIds: string[],
-        ): Promise<
+        // / fetchEvaluationRows).
+        //
+        // That bounds CLICKHOUSE's peak memory only. The batches merge back into
+        // one map here, so this process still materialises the whole result set —
+        // which is how a 980-trace read became 50 V8 heap deaths across the worker
+        // fleet. The merge is therefore capped too; see
+        // {@link MAX_SPANS_PER_JOINED_FALLBACK}.
+        const runBatch = async ({
+          batchTraceIds,
+          maxSpanRows,
+        }: {
+          batchTraceIds: string[];
+          /**
+           * Rows the span read may return before ClickHouse refuses it.
+           *
+           * Set only by the OOM fallback below, which is the path with a heap
+           * budget to spend. Checking the merged total AFTER a batch is decoded
+           * is too late: one batch is `SUMMARY_BATCH_SIZE` traces at up to
+           * {@link MAX_SPANS_PER_TRACE} spans each — 250,000 heavy rows, five
+           * times the cap it is supposed to be enforcing — and materialising
+           * that is the heap death the cap exists to prevent. Bounding the
+           * query means the rows never cross the socket.
+           */
+          maxSpanRows?: number;
+        }): Promise<
           Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
         > => {
           // When the caller knows the traces' approximate time, bound the
@@ -3192,13 +3281,41 @@ export class ClickHouseTraceService {
             ? (spanRange.to - spanRange.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
             : DEFAULT_PARTITION_WINDOW_MS;
 
+          // Resolved here rather than inside `run` below: the callback is
+          // re-invoked per window attempt and the budget does not vary with the
+          // window.
+          //
+          // `throw`, never `break`: `break` truncates the result and returns
+          // it, which would silently hand back a partial span list as if it
+          // were complete. One row of headroom so an exactly-at-budget batch
+          // still succeeds and only a genuine overrun trips it.
+          const spanReadSettings =
+            maxSpanRows === undefined
+              ? JOINED_SPAN_READ_SETTINGS
+              : {
+                  ...JOINED_SPAN_READ_SETTINGS,
+                  max_result_rows: String(maxSpanRows + 1),
+                  result_overflow_mode: "throw" as const,
+                };
+
           const spanRows = await queryWindowed<SpanRow[]>({
             table: "stored_spans",
             hintMs: spanHintMs,
             windowMs: spanWindowMs,
             fallback: spanRange
               ? "none"
-              : { lookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS },
+              : {
+                  // Per tenant, floored at the historical 90-day reach so this
+                  // can only widen. A project on a 400-day policy previously
+                  // got 90 days here and simply could not see its own older
+                  // spans; one on a short policy no longer pays for a reach it
+                  // has no rows in. See {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
+                  lookbackMs: await this.retentionFloor.getLookbackMs({
+                    table: "stored_spans",
+                    tenantId: projectId,
+                    minLookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS,
+                  }),
+                },
             isEmpty: (rows) => rows.length === 0,
             run: async (window) => {
               // Always present now: a hint yields the hinted fragment, and the
@@ -3257,7 +3374,7 @@ export class ClickHouseTraceService {
                   traceIds: batchTraceIds,
                   ...(window?.params ?? {}),
                 },
-                clickhouse_settings: JOINED_SPAN_READ_SETTINGS,
+                clickhouse_settings: spanReadSettings,
                 format: "JSONEachRow",
               });
               return (await spansResult.json()) as SpanRow[];
@@ -3307,7 +3424,7 @@ export class ClickHouseTraceService {
         };
 
         try {
-          return await runBatch(traceIds);
+          return await runBatch({ batchTraceIds: traceIds });
         } catch (error) {
           if (!isClickHouseMemoryLimitError(error)) {
             throw error;
@@ -3321,6 +3438,7 @@ export class ClickHouseTraceService {
             string,
             { summary: TraceSummaryData; spans: NormalizedSpan[] }
           >();
+          let mergedSpanCount = 0;
           for (
             let i = 0;
             i < traceIds.length;
@@ -3330,9 +3448,50 @@ export class ClickHouseTraceService {
               i,
               i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
             );
-            const batchMap = await runBatch(batch);
+
+            // Batching caps ClickHouse's peak memory, not ours — the merge
+            // rebuilds the whole result set here. Stop before the heap does,
+            // and stop at the QUERY rather than after decoding its rows: the
+            // budget goes into the read so an over-budget batch is refused by
+            // ClickHouse instead of arriving in this process first.
+            // See {@link MAX_SPANS_PER_JOINED_FALLBACK}.
+            const remainingSpanBudget =
+              MAX_SPANS_PER_JOINED_FALLBACK - mergedSpanCount;
+            let batchMap: Map<
+              string,
+              { summary: TraceSummaryData; spans: NormalizedSpan[] }
+            >;
+            try {
+              batchMap = await runBatch({
+                batchTraceIds: batch,
+                maxSpanRows: remainingSpanBudget,
+              });
+            } catch (batchError) {
+              if (!isClickHouseResultOverflowError(batchError))
+                throw batchError;
+              throw new Error(
+                `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
+                  `(${mergedSpanCount} already merged across ${merged.size} of ${traceIds.length} traces, ` +
+                  `and the next batch of ${batch.length} overran the remaining ${remainingSpanBudget}); ` +
+                  `refusing to materialise the rest`,
+                { cause: batchError },
+              );
+            }
+
             for (const [traceId, value] of batchMap) {
               merged.set(traceId, value);
+              mergedSpanCount += value.spans.length;
+            }
+
+            // Belt to the query's braces: the read is bounded per batch, so
+            // this only trips if a batch landed exactly on its budget and the
+            // total still cleared the cap.
+            if (mergedSpanCount > MAX_SPANS_PER_JOINED_FALLBACK) {
+              throw new Error(
+                `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
+                  `(${mergedSpanCount} across ${merged.size} of ${traceIds.length} traces); ` +
+                  `refusing to materialise the rest`,
+              );
             }
           }
           return merged;
@@ -3586,6 +3745,29 @@ interface PromptStudioCandidateRow {
   ParentSpanId: string | null;
   SpanAttributes: Record<string, unknown>;
   StartTime: number;
+}
+
+/**
+ * ClickHouse refused a query because its result exceeded `max_result_rows`
+ * under `result_overflow_mode = 'throw'` (TOO_MANY_ROWS_OR_BYTES, code 396).
+ *
+ * That is a deliberate refusal on our side, not a fault: the joined-span
+ * fallback sets the limit from its own remaining heap budget so an over-budget
+ * batch never reaches this process. Matched by code and by name because the
+ * driver surfaces one or the other depending on how far the error has been
+ * wrapped.
+ */
+export function isClickHouseResultOverflowError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (HandledError.isHandled(error)) {
+    return (error.reasons ?? []).some(isClickHouseResultOverflowError);
+  }
+  return (
+    error.message.includes("TOO_MANY_ROWS_OR_BYTES") ||
+    (error as { type?: string }).type === "TOO_MANY_ROWS_OR_BYTES" ||
+    (error as { code?: string | number }).code === 396 ||
+    (error as { code?: string | number }).code === "396"
+  );
 }
 
 export function isClickHouseMemoryLimitError(error: unknown): boolean {

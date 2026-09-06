@@ -23,7 +23,7 @@
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { nextResetAt } from "~/server/gateway/budgetWindow";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
@@ -103,7 +103,7 @@ async function purgePrevious(target: SeedTarget) {
   });
 
   if (previous.length > 0) {
-    const client = await getClickHouseClientForProject(target.projectId);
+    const client = await getClickHouseClientForTenant(target.projectId);
     if (!client) {
       throw new Error(
         `refusing to delete ${previous.length} previous fixture key(s): no ClickHouse client for ${target.projectId}, so their ledger and rollup rows would be stranded`,

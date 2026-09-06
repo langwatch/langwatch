@@ -23,7 +23,7 @@ const SLACK_DEFAULTS = {
 function makeTraceRow(index: number): ReportTraceRow {
   return {
     traceId: `trace_${String(index).padStart(6, "0")}`,
-    url: `https://app.langwatch.ai/acme/messages/trace_${index}`,
+    url: `https://app.langwatch.ai/acme/traces/trace_${index}`,
     timestamp: "2026-06-21T10:00:00.000Z",
     input: "Summarize the Q3 earnings call for the leadership team".repeat(2),
     output: "Revenue grew 12% year over year.",
@@ -42,7 +42,7 @@ function makeReportContext(traceCount: number): ReportTemplateContext {
       scheduleLabel: "every Monday at 09:00 (UTC)",
       sourceKind: "traceQuery",
     },
-    viewUrl: "https://app.langwatch.ai/acme/messages",
+    viewUrl: "https://app.langwatch.ai/acme/traces",
     traces: Array.from({ length: traceCount }, (_, i) => makeTraceRow(i)),
     occurredAt: new Date("2026-06-21T10:00:00.000Z"),
     project: { id: "proj_1", name: "Acme", slug: "acme" },

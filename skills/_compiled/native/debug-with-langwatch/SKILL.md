@@ -15,22 +15,6 @@ If traces themselves look broken (empty inputs/outputs, disconnected spans), swi
 
 ## Prerequisites
 
-Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
-
-```bash
-langwatch docs                                    # Docs index
-langwatch docs integration/python/guide           # Python integration
-langwatch docs integration/typescript/guide       # TypeScript integration
-langwatch docs prompt-management/cli              # Prompts CLI
-langwatch scenario-docs                           # Scenario docs index
-```
-
-Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
-
-If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
-
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
-
 ## Step 0: Point the CLI at the Right Project
 
 ```bash
@@ -42,12 +26,13 @@ A fast sanity check that the API key, endpoint, and project are the ones you mea
 ## Step 1: Find the Errored Traces
 
 ```bash
-langwatch trace search --limit 25 -o json
-langwatch trace search -q "timeout" --start-date 2026-01-01 -o json
+langwatch trace search --errors-only --limit 25 -o json
+langwatch trace search --errors-only -q "timeout" --start-date 2026-01-01 -o json
 ```
 
+- `--errors-only` is how you find failures. An error is recorded on the span, not in the trace's searchable text, so `-q "error"` finds nothing and reads like a clean project.
 - `--start-date`/`--end-date` bound the window (ISO strings or epoch ms; default is the last 24h).
-- `-q` does a text search: the error message, a user id, a thread id.
+- `-q` does a text search over one phrase: the error message, a user id, a thread id. AND, OR and NOT are matched as words, not as operators.
 - The result is `{ "traces": [...], "pagination": { "totalHits": N } }`. Pull fields out with `--jq` instead of reading the whole payload:
 
 ```bash
@@ -106,4 +91,4 @@ langwatch help-tree            # compact annotated tree (fits in context)
 langwatch <group> --help       # flags for one group
 ```
 
-Pass `--agent` to any command for compact single-line JSON with colour and spinners off (auto-detected under most coding agents).
+Pass `--agent` to any command for compact single-line JSON with colour and spinners off (the CLI sets it by itself under Claude Code, Cursor, Copilot CLI and Amazon Q).

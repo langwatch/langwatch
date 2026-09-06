@@ -103,8 +103,8 @@ Feature: Scenario run CSV export
   # Status: the file must agree with the screen
   # ============================================================================
 
-  # A run shown as stalled on screen exports as stalled. It is never possible
-  # for the CSV and the run history to disagree about a run's outcome.
+  # A run's outcome reads the same on screen and in the file. It is never
+  # possible for the CSV and the run history to disagree about a run's outcome.
 
   @unit
   Scenario: Every row reports both the run's status and its category
@@ -121,12 +121,12 @@ Feature: Scenario run CSV export
     And their status columns read "FAILED" and "ERROR" respectively
 
   @integration
-  Scenario: A run that stalled exports as stalled
-    Given a run stopped emitting events long enough to be considered stalled
-    And the run history shows it as stalled
+  Scenario: A run quiet past the stall threshold exports as in progress
+    Given a run stopped emitting events without finishing
+    And the run history shows it as in progress
     When I export
-    Then its status column reads "STALLED"
-    And its status_category column reads "stalled"
+    Then its status column reads "IN_PROGRESS"
+    And its status_category column reads "in_progress"
 
   @unit
   Scenario: The export computes no pass rate of its own

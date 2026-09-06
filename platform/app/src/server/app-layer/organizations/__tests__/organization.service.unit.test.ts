@@ -14,9 +14,19 @@ vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
 }));
 
-const { mockRevokeAllTraceShares, mockCheckLimit } = vi.hoisted(() => ({
-  mockRevokeAllTraceShares: vi.fn(),
-  mockCheckLimit: vi.fn(),
+const { mockRevokeAllTraceShares, mockCheckLimit, mockInvalidateOrganization } =
+  vi.hoisted(() => ({
+    mockInvalidateOrganization: vi.fn(),
+    mockRevokeAllTraceShares: vi.fn(),
+    mockCheckLimit: vi.fn(),
+  }));
+
+// Disabling a seat is not a grant write, so the service retires the
+// organization's cached authorization snapshots itself.
+vi.mock("../../authz/runtime", () => ({
+  grantsService: () => ({
+    invalidateOrganization: mockInvalidateOrganization,
+  }),
 }));
 
 // The seat check on re-enabling a membership; the service builds it from the
@@ -267,9 +277,12 @@ describe("OrganizationService", () => {
           actingUserId: "admin-789",
         });
 
+        // The acting user travels with the removal: the grant revocation it
+        // emits is attributed to whoever made the decision.
         expect(mockRepo.deleteMember).toHaveBeenCalledWith({
           organizationId: "org-123",
           userId: "user-456",
+          actingUserId: "admin-789",
         });
       });
     });
@@ -320,6 +333,63 @@ describe("OrganizationService", () => {
     });
 
     describe("when disabling another member", () => {
+      /** @scenario Disabling or re-enabling a membership takes effect on the next request */
+      it("retires the organization's cached authorization answers", async () => {
+        // Disabling writes a column, not a grant, so nothing else bumps the
+        // authz epoch. Without this the revocation an admin just performed
+        // stays invisible to any cached snapshot until it ages out.
+        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          user: { id: "user-456", name: null, email: null },
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(mockInvalidateOrganization).toHaveBeenCalledWith({
+          organizationId: "org-123",
+        });
+      });
+
+      /** @scenario Disabling or re-enabling a membership takes effect on the next request */
+      it("retires them again on re-enable, so nobody waits out a cache to get back in", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: new Date("2026-08-01T00:00:00Z"),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          user: { id: "user-456", name: null, email: null },
+        });
+        mockCheckLimit.mockResolvedValue({
+          allowed: true,
+          limitType: "members",
+          current: 1,
+          max: 5,
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(mockInvalidateOrganization).toHaveBeenCalledWith({
+          organizationId: "org-123",
+        });
+      });
+
       it("delegates to the repository without a seat check", async () => {
         vi.mocked(mockRepo.findMembership).mockResolvedValue({
           userId: "user-456",

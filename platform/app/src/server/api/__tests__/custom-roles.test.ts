@@ -86,6 +86,7 @@ describe("Custom Role Functionality Tests", () => {
     mockPrisma.project.findUnique.mockResolvedValue(mockProjectResult);
     mockPrisma.organizationUser.findFirst.mockResolvedValue({
       role: OrganizationUserRole.MEMBER,
+      disabledAt: null,
     });
     mockPrisma.groupMembership.findMany.mockResolvedValue([]);
   });

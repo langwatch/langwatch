@@ -79,6 +79,24 @@ describe("the session context hook's per-session fingerprint", () => {
     });
   });
 
+  describe("given a session that was renamed between runs", () => {
+    /** @scenario "A renamed session re-posts its context" */
+    it("posts again carrying the new name", async () => {
+      const named = (title: string) => ({
+        session_id: SESSION_ID,
+        cwd: "/repo/worktrees/review",
+        session_title: title,
+      });
+      await hook.runHook({ input: named("pr-reviewer") });
+      await hook.runHook({ input: named("pr-hound") });
+
+      expect(posted).toHaveLength(2);
+      expect(attributesOf(posted[1]!)).toMatchObject({
+        "langwatch.session.name": "pr-hound",
+      });
+    });
+  });
+
   describe("given a post that does not land", () => {
     it("records nothing when the collector cannot be reached", async () => {
       await hook.runHook({ fetchImpl: unreachableCollector });

@@ -1,7 +1,9 @@
 package controlplane
 
 import (
+	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -25,8 +27,14 @@ type configWire struct {
 	// plane normalises [] back to null on read).
 	ProvidersAllowed []string `json:"providers_allowed"`
 	// RoutingMode is none | fallback_all | policy (contract §4.2).
-	RoutingMode string         `json:"routing_mode"`
-	RateLimits  rateLimitsWire `json:"rate_limits"`
+	RoutingMode string `json:"routing_mode"`
+	// RoutingExcludedProviders / AccessExcludedProviders / RoutingPolicyName
+	// name why a provider a request could resolve to is absent from Providers,
+	// so a block can say the reason instead of failing opaque (contract §4.2).
+	RoutingExcludedProviders []excludedProviderWire `json:"routing_excluded_providers"`
+	AccessExcludedProviders  []excludedProviderWire `json:"access_excluded_providers"`
+	RoutingPolicyName        string                 `json:"routing_policy_name"`
+	RateLimits               rateLimitsWire         `json:"rate_limits"`
 	// Guardrails is the flat per-project catalog every VK in the project
 	// may reference; GuardrailAttachments is this VK's opt-in tuples
 	// (control-plane materialiser config.materialiser.ts, bug-7 step vd).
@@ -44,6 +52,45 @@ type configWire struct {
 	// | "skip"). Present and non-skip only for Langy virtual keys, so ordinary
 	// customer traffic is never mirrored. Empty/absent ⇒ no mirror.
 	LangyMirrorTier string `json:"langy_mirror_tier"`
+	// ExpiresAt is the key's own expiration date in unix seconds, or null when
+	// the key has no date. Held raw so decode can tell an explicit null from a
+	// field a control plane older than it never sent, which are different
+	// answers: see keyExpiry.
+	ExpiresAt json.RawMessage `json:"expires_at"`
+}
+
+// keyExpiry reads the key's own expiration date off the wire as the tri-state
+// domain.ConfigFetchResult carries: the instant, whether the response said
+// anything about expiry at all, and an error for a field that is neither a unix
+// timestamp nor null.
+//
+// json.RawMessage is what separates the three: an absent field leaves it empty,
+// while an explicit null decodes to the four bytes of the literal.
+func (w *configWire) keyExpiry() (time.Time, bool, error) {
+	if len(w.ExpiresAt) == 0 {
+		return time.Time{}, false, nil
+	}
+	var seconds *int64
+	if err := json.Unmarshal(w.ExpiresAt, &seconds); err != nil {
+		return time.Time{}, false, err
+	}
+	if seconds == nil {
+		return time.Time{}, true, nil
+	}
+	return time.Unix(*seconds, 0).UTC(), true, nil
+}
+
+// excludedProviderWire is one provider the gateway will not dispatch to,
+// carried with its type so the gateway can match it against the provider a
+// request resolved to (these rows are absent from Providers, so the type is
+// not otherwise knowable). Mirrors the {id, type} shape of providerSlotWire.
+type excludedProviderWire struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+	// Handle is the row's routing handle, carried so a request naming the
+	// handle of a dropped provider is told which setting dropped it instead of
+	// being told the handle means nothing.
+	Handle string `json:"handle,omitempty"`
 }
 
 type providerSlotWire struct {
@@ -60,12 +107,23 @@ type providerSlotWire struct {
 	// etc.). Emitted by the control-plane materialiser as a top-level
 	// sibling of credentials — see config.materialiser.ts:buildProviderSlot.
 	DeploymentMap map[string]string `json:"deployment_map,omitempty"`
+	// Handle is the operator-chosen routing handle of this ModelProvider row
+	// (ModelProvider.routingHandle), unique inside the organization. Absent
+	// when the operator set none.
+	Handle string `json:"handle,omitempty"`
+	// Models is what this provider declares it serves: the customer's declared
+	// custom models and embeddings models, and for the hosted families the
+	// model catalog the platform ships. Used for ROUTING a bare model name to
+	// the provider that owns it; authorization stays with models_allowed.
+	Models []string `json:"models,omitempty"`
 }
 
+// fallbackWire is the fallback block of the config payload. Only max_attempts
+// and chain are read. A control plane that predates this build still sends
+// "on" and "timeout_ms"; they are ignored on decode, which is what keeps a
+// rolling deploy from needing the two sides to agree.
 type fallbackWire struct {
-	On          []string `json:"on"`
 	Chain       []string `json:"chain"`
-	TimeoutMs   int      `json:"timeout_ms"`
 	MaxAttempts int      `json:"max_attempts"`
 }
 
@@ -165,18 +223,20 @@ func (w *configWire) toDomain() domain.BundleConfig {
 	}
 
 	cfg := domain.BundleConfig{
-		Credentials:      creds,
-		TraceProjectID:   w.ProjectID,
-		ProjectOTLPToken: w.ProjectOTLPToken,
-		MirrorTier:       w.LangyMirrorTier,
-		VKDisplayPrefix:  w.DisplayPrefix,
-		VKTags:           w.VKTags,
-		AllowedModels:    w.ModelsAllowed,
-		ProvidersAllowed: w.ProvidersAllowed,
-		RoutingMode:      w.RoutingMode,
+		Credentials:              creds,
+		TraceProjectID:           w.ProjectID,
+		ProjectOTLPToken:         w.ProjectOTLPToken,
+		MirrorTier:               w.LangyMirrorTier,
+		VKDisplayPrefix:          w.DisplayPrefix,
+		VKTags:                   w.VKTags,
+		AllowedModels:            w.ModelsAllowed,
+		ProvidersAllowed:         w.ProvidersAllowed,
+		RoutingMode:              w.RoutingMode,
+		RoutingExcludedProviders: toExcludedProviders(w.RoutingExcludedProviders),
+		AccessExcludedProviders:  toExcludedProviders(w.AccessExcludedProviders),
+		RoutingPolicyName:        w.RoutingPolicyName,
 		Fallback: domain.FallbackConfig{
 			MaxAttempts: w.Fallback.MaxAttempts,
-			On:          w.Fallback.On,
 		},
 		Guardrails: buildGuardrails(w.Guardrails, w.GuardrailAttachments),
 	}
@@ -203,23 +263,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 		}
 	}
 
-	cfg.Budget.Scopes = make([]domain.BudgetScope, len(w.Budgets))
-	for i := range w.Budgets {
-		b := &w.Budgets[i]
-		cfg.Budget.Scopes[i] = domain.BudgetScope{
-			ID:            b.ID,
-			Scope:         b.Scope,
-			ScopeID:       b.ScopeID,
-			PrincipalID:   b.PrincipalID,
-			PerUser:       b.PerUser,
-			ProviderKey:   b.ProviderKey,
-			Window:        b.Window,
-			LimitMicroUSD: b.LimitMicroUSD,
-			SpentMicroUSD: b.SpentMicroUSD,
-			OnBreach:      b.OnBreach,
-		}
-	}
-
+	cfg.Budget.Scopes = toBudgetScopes(w.Budgets)
 	cfg.PolicyRules = buildPolicyRules(w.PolicyRules)
 	cfg.CacheRules = buildCacheRules(w.CacheRules)
 
@@ -298,12 +342,14 @@ func failsClosed(g guardrailWire) bool {
 // provider a model name it has never heard of. A bare target carries no
 // provider and resolves against the credential chain like any other
 // unqualified model.
+// The prefix has to name a provider family the gateway knows. A target whose
+// first segment is a routing handle, or a model id that simply contains a
+// slash, is left whole for the resolver, which holds the key's config and can
+// tell the two apart. Splitting those here produced an alias pointing at a
+// provider nobody holds, so no request for it could ever be served.
 func buildModelAlias(target string) domain.ModelAlias {
-	provider, model, found := strings.Cut(target, "/")
-	if !found || provider == "" || model == "" {
-		return domain.ModelAlias{Model: target}
-	}
-	return domain.ModelAlias{ProviderID: normalizeProviderType(provider), Model: model}
+	providerID, model, _ := domain.SplitModelSpelling(target)
+	return domain.ModelAlias{ProviderID: providerID, Model: model}
 }
 
 func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {
@@ -382,10 +428,50 @@ func buildCacheRules(wires []cacheRuleWire) []domain.CacheRule {
 	return rules
 }
 
+func toBudgetScopes(ws []budgetWire) []domain.BudgetScope {
+	scopes := make([]domain.BudgetScope, len(ws))
+	for i := range ws {
+		b := &ws[i]
+		scopes[i] = domain.BudgetScope{
+			ID:            b.ID,
+			Scope:         b.Scope,
+			ScopeID:       b.ScopeID,
+			PrincipalID:   b.PrincipalID,
+			PerUser:       b.PerUser,
+			ProviderKey:   b.ProviderKey,
+			Window:        b.Window,
+			LimitMicroUSD: b.LimitMicroUSD,
+			SpentMicroUSD: b.SpentMicroUSD,
+			OnBreach:      b.OnBreach,
+		}
+	}
+	return scopes
+}
+
+// toExcludedProviders maps the {id, type} exclusion wire entries onto domain
+// rows, normalizing the provider type the same way credentials are so the
+// gateway matches a resolved request's provider kind consistently.
+func toExcludedProviders(ws []excludedProviderWire) []domain.ExcludedModelProvider {
+	if len(ws) == 0 {
+		return nil
+	}
+	out := make([]domain.ExcludedModelProvider, 0, len(ws))
+	for _, w := range ws {
+		out = append(out, domain.ExcludedModelProvider{
+			ID:         w.ID,
+			ProviderID: domain.NormalizeProviderID(w.Type),
+			Handle:     strings.ToLower(w.Handle),
+		})
+	}
+	return out
+}
+
 func providerSlotToCredential(p providerSlotWire) domain.Credential {
 	cred := domain.Credential{
 		ID:         p.ID,
-		ProviderID: normalizeProviderType(p.Type),
+		ProviderID: domain.NormalizeProviderID(p.Type),
+		Handle:     strings.ToLower(p.Handle),
+		Models:     p.Models,
 	}
 
 	getString := func(key string) string {
@@ -461,25 +547,4 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 	}
 
 	return cred
-}
-
-func normalizeProviderType(t string) domain.ProviderID {
-	switch t {
-	case "azure":
-		return domain.ProviderAzure
-	case "bedrock", "aws_bedrock":
-		return domain.ProviderBedrock
-	case "vertex", "vertex_ai", "google_vertex":
-		return domain.ProviderVertex
-	case "gemini", "google_gemini":
-		return domain.ProviderGemini
-	case "anthropic":
-		return domain.ProviderAnthropic
-	case "openai":
-		return domain.ProviderOpenAI
-	case "openai_codex":
-		return domain.ProviderOpenAICodex
-	default:
-		return domain.ProviderID(t)
-	}
 }

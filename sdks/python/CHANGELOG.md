@@ -1,5 +1,146 @@
 # Changelog
 
+## [1.3.1](https://github.com/langwatch/langwatch/compare/python-sdk@v1.3.0...python-sdk@v1.3.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **agents:** a finished connected-agent run reaches its verdict, and the transcript stays whole ([#7696](https://github.com/langwatch/langwatch/issues/7696)) ([4f7b665](https://github.com/langwatch/langwatch/commit/4f7b665623e1e453e8f505c259f2351bd074ad72))
+* **python-sdk:** read the rejected field out of the REST refusal envelope ([#7684](https://github.com/langwatch/langwatch/issues/7684)) ([730f161](https://github.com/langwatch/langwatch/commit/730f161e73e0da2c5fb2aa31cc788d39edaadc6f))
+
+
+### Documentation
+
+* **agent-testing:** connect from a function beside your service startup ([#7698](https://github.com/langwatch/langwatch/issues/7698)) ([60e7d4c](https://github.com/langwatch/langwatch/commit/60e7d4cedd0b0d70ed271891b24b507a0258a05e))
+
+## [1.3.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.2.1...python-sdk@v1.3.0) (2026-08-31)
+
+
+### Features
+
+* **agent-cache:** take a name with a claim, so one row does the work ([#7596](https://github.com/langwatch/langwatch/issues/7596)) ([6dfa6d7](https://github.com/langwatch/langwatch/commit/6dfa6d74c824ae5e04bb97196e33911940861cb0))
+* **agent-testing:** compare agents in one run ([#7654](https://github.com/langwatch/langwatch/issues/7654)) ([3e73916](https://github.com/langwatch/langwatch/commit/3e7391698f5e9b1cac2f8c5f0d0cacc9dec4d02a))
+* **agent-testing:** v2 polish round 6 ([#7590](https://github.com/langwatch/langwatch/issues/7590)) ([1f9efad](https://github.com/langwatch/langwatch/commit/1f9efad30ab94e86d00f57ea478bf0685b437f23))
+* **agents:** connected agents, a decorated function is a simulation target ([#7655](https://github.com/langwatch/langwatch/issues/7655)) ([56922c0](https://github.com/langwatch/langwatch/commit/56922c0ee429bd5a38717960c09ede0d1905c0c3))
+
+
+### Bug Fixes
+
+* optional legacy answer fields, one vocabulary for test suites and run plans, and named targets for runs from code ([#7638](https://github.com/langwatch/langwatch/issues/7638)) ([6fd37f3](https://github.com/langwatch/langwatch/commit/6fd37f30428c9fc468230fa9e4a79e3dee8cc58f))
+* **python-sdk:** the agent cache takes a dict or list, and a refusal names the field ([#7641](https://github.com/langwatch/langwatch/issues/7641)) ([78e1cd7](https://github.com/langwatch/langwatch/commit/78e1cd7efd068ddd3c94d7eb8e713d574558fc33))
+* **scenarios:** fix the seven defects found while dogfooding a customer onboarding demo ([#7271](https://github.com/langwatch/langwatch/issues/7271)) ([7eeac5b](https://github.com/langwatch/langwatch/commit/7eeac5ba6809ed217ce3179d0a1fbb7656f2db52))
+
+## [1.2.1](https://github.com/langwatch/langwatch/compare/python-sdk@v1.2.0...python-sdk@v1.2.1) (2026-08-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **spend:** POST /api/gateway/v1/virtual-keys refuses an organization- or team-scoped key, and a key scoped to more than one project, when it does not carry trace_project_id and the organization has projects to choose from. Send trace_project_id, or scope the key to exactly one project. Existing keys are unaffected until they are next edited.
+
+### Features
+
+* **agent-cache:** a code agent logs in once for a whole run ([#7545](https://github.com/langwatch/langwatch/issues/7545)) ([52bedc0](https://github.com/langwatch/langwatch/commit/52bedc0bb7d23fd8cd72efc2207edf6172096083))
+* **gateway:** view traces from a virtual key, and teams/projects management in both SDKs ([#6807](https://github.com/langwatch/langwatch/issues/6807)) ([2c55fe3](https://github.com/langwatch/langwatch/commit/2c55fe30ee1dbd89fd2877cede5af645fe49889e))
+* **scenarios:** scenario run parameters and http secret references ([#6906](https://github.com/langwatch/langwatch/issues/6906)) ([a21b7a1](https://github.com/langwatch/langwatch/commit/a21b7a15f0a98e6a5a4754eea0b8a33729561d24))
+* **scenarios:** secret run parameters and a truthful batch completion signal ([#7397](https://github.com/langwatch/langwatch/issues/7397)) ([ab564c0](https://github.com/langwatch/langwatch/commit/ab564c0e01afefeebe1864e2990d0c9afebfe806))
+* **sdk:** judge n-way target comparisons from the experiment SDKs ([#6863](https://github.com/langwatch/langwatch/issues/6863)) ([9c34d3c](https://github.com/langwatch/langwatch/commit/9c34d3c37418ecf6d29b0e521d66fca0661a45d8))
+* **spend:** one filter vocabulary on both reads, and a grouping that refuses to lie ([#6656](https://github.com/langwatch/langwatch/issues/6656)) ([dd3be46](https://github.com/langwatch/langwatch/commit/dd3be46de9aa70d40f256b26a4ee49a1ec753e53))
+
+
+### Bug Fixes
+
+* **clickhouse:** three audit defects — dropped EventVersion, decimal money sums, unbounded events read ([#6627](https://github.com/langwatch/langwatch/issues/6627)) ([984dd6d](https://github.com/langwatch/langwatch/commit/984dd6d3dddef5d053a99698544d6422feebbf23))
+* **python-sdk:** a refused call keeps the platform's own explanation ([#6837](https://github.com/langwatch/langwatch/issues/6837)) ([2576dbd](https://github.com/langwatch/langwatch/commit/2576dbd96617f44c6bf2945e65c360ec54425c55))
+* **python-sdk:** send X-Project-Id for keys that cannot name their own project ([#7138](https://github.com/langwatch/langwatch/issues/7138)) ([231c57d](https://github.com/langwatch/langwatch/commit/231c57dae98ee6ecb6293e33af6e8d7794fc0576))
+* **sdks/python:** migrate haystack examples to the 3.x chat API ([#7300](https://github.com/langwatch/langwatch/issues/7300)) ([2102e57](https://github.com/langwatch/langwatch/commit/2102e57dfb726c845c6ea5ee31076901d515b68e))
+* **traces:** reject pageOffset, and pin the updated-axis scroll to a snapshot ([#6812](https://github.com/langwatch/langwatch/issues/6812)) ([e490008](https://github.com/langwatch/langwatch/commit/e49000891dbd58fe0e033230dfc83c380e1b1615))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump haystack-ai from 2.30.2 to 3.0.0 in /sdks/python ([#6538](https://github.com/langwatch/langwatch/issues/6538)) ([4547ab7](https://github.com/langwatch/langwatch/commit/4547ab735a8602ea2adc4788ed25991773b20f11))
+* **deps-dev:** bump langchain from 1.3.14 to 1.3.15 in /sdks/python in the langchain group ([#7290](https://github.com/langwatch/langwatch/issues/7290)) ([fdf42e8](https://github.com/langwatch/langwatch/commit/fdf42e8f7b9c7e16ce04e80e5a01eefbf17624a9))
+* **deps-dev:** bump langchain in /sdks/python in the langchain group ([fdf42e8](https://github.com/langwatch/langwatch/commit/fdf42e8f7b9c7e16ce04e80e5a01eefbf17624a9))
+* **deps-dev:** bump langchain-openai ([c9cc6f8](https://github.com/langwatch/langwatch/commit/c9cc6f8b1ee4fe85a287eb348aa54bb0be66e0fd))
+* **deps-dev:** bump langchain-openai from 1.4.2 to 1.4.3 in /sdks/python in the langchain group ([#7223](https://github.com/langwatch/langwatch/issues/7223)) ([c9cc6f8](https://github.com/langwatch/langwatch/commit/c9cc6f8b1ee4fe85a287eb348aa54bb0be66e0fd))
+* **deps-dev:** bump litellm ([40168ab](https://github.com/langwatch/langwatch/commit/40168abd6707ab550eb403b981efe03371cf2b86))
+* **deps-dev:** bump litellm from 1.96.0 to 1.96.2 in /sdks/python in the minor-and-patch group across 1 directory ([#7295](https://github.com/langwatch/langwatch/issues/7295)) ([40168ab](https://github.com/langwatch/langwatch/commit/40168abd6707ab550eb403b981efe03371cf2b86))
+* **deps-dev:** bump openai ([738d8d0](https://github.com/langwatch/langwatch/commit/738d8d0dcc9a908ca496746947868f947ec88ffe))
+* **deps-dev:** bump openai from 2.53.0 to 2.54.0 in /sdks/python in the minor-and-patch group across 1 directory ([#7270](https://github.com/langwatch/langwatch/issues/7270)) ([738d8d0](https://github.com/langwatch/langwatch/commit/738d8d0dcc9a908ca496746947868f947ec88ffe))
+* **deps-dev:** bump pytest-asyncio from 0.21.2 to 1.4.0 in /sdks/python ([#6539](https://github.com/langwatch/langwatch/issues/6539)) ([1c42334](https://github.com/langwatch/langwatch/commit/1c42334dbf44ae4effec385e4f81dbd6515319f9))
+* **deps-dev:** bump pytest-asyncio in /sdks/python ([1c42334](https://github.com/langwatch/langwatch/commit/1c42334dbf44ae4effec385e4f81dbd6515319f9))
+* **deps-dev:** bump the minor-and-patch group ([428c03e](https://github.com/langwatch/langwatch/commit/428c03ed824a74084ee35c7958fbd886ad199f3c))
+* **deps-dev:** bump the minor-and-patch group ([9fe3451](https://github.com/langwatch/langwatch/commit/9fe34516ffa596b71807396031c68932e8d6691f))
+* **deps-dev:** bump the minor-and-patch group in /sdks/python with 2 updates ([#7292](https://github.com/langwatch/langwatch/issues/7292)) ([428c03e](https://github.com/langwatch/langwatch/commit/428c03ed824a74084ee35c7958fbd886ad199f3c))
+* **deps-dev:** bump the minor-and-patch group in /sdks/python with 3 updates ([#7249](https://github.com/langwatch/langwatch/issues/7249)) ([9fe3451](https://github.com/langwatch/langwatch/commit/9fe34516ffa596b71807396031c68932e8d6691f))
+* **deps-dev:** update black requirement from &gt;=26.3.1 to &gt;=26.5.1 in /mcp/typescript ([#7232](https://github.com/langwatch/langwatch/issues/7232)) ([1444629](https://github.com/langwatch/langwatch/commit/14446291f6eafddd99463e7ee83288653ba62346))
+* **deps-dev:** update black requirement in /mcp/typescript ([1444629](https://github.com/langwatch/langwatch/commit/14446291f6eafddd99463e7ee83288653ba62346))
+* **deps-dev:** update cloudpickle requirement from &gt;=3.1.1 to &gt;=3.1.2 in /mcp/typescript ([#7209](https://github.com/langwatch/langwatch/issues/7209)) ([bc02a83](https://github.com/langwatch/langwatch/commit/bc02a8309ad0f69ce350557b35c1bc7d9ea1777b))
+* **deps-dev:** update cloudpickle requirement in /mcp/typescript ([bc02a83](https://github.com/langwatch/langwatch/commit/bc02a8309ad0f69ce350557b35c1bc7d9ea1777b))
+* **deps-dev:** update dspy-ai requirement from &lt;4,&gt;=3.0.3 to &gt;=3.3.0,&lt;4 in /mcp/typescript ([#7225](https://github.com/langwatch/langwatch/issues/7225)) ([81f1590](https://github.com/langwatch/langwatch/commit/81f1590cc08af237d6b6b4fbb81e814ebddbb893))
+* **deps-dev:** update dspy-ai requirement in /mcp/typescript ([81f1590](https://github.com/langwatch/langwatch/commit/81f1590cc08af237d6b6b4fbb81e814ebddbb893))
+* **deps-dev:** update faiss-cpu requirement from &lt;2.0.0,&gt;=1.8.0 to &gt;=1.15.0,&lt;2.0.0 in /mcp/typescript ([#7227](https://github.com/langwatch/langwatch/issues/7227)) ([80b6ae4](https://github.com/langwatch/langwatch/commit/80b6ae45742964508f0a5b44015b433c4887ee19))
+* **deps-dev:** update faiss-cpu requirement in /mcp/typescript ([80b6ae4](https://github.com/langwatch/langwatch/commit/80b6ae45742964508f0a5b44015b433c4887ee19))
+* **deps-dev:** update fastapi requirement from &gt;=0.115.12 to &gt;=0.141.1 in /mcp/typescript ([#7226](https://github.com/langwatch/langwatch/issues/7226)) ([62b3bbf](https://github.com/langwatch/langwatch/commit/62b3bbf4bee00c51316c1e06b3c67788013d8bdb))
+* **deps-dev:** update fastapi requirement in /mcp/typescript ([62b3bbf](https://github.com/langwatch/langwatch/commit/62b3bbf4bee00c51316c1e06b3c67788013d8bdb))
+* **deps-dev:** update fonttools requirement from &gt;=4.62.0 to &gt;=4.63.0 in /mcp/typescript ([#7235](https://github.com/langwatch/langwatch/issues/7235)) ([573fc99](https://github.com/langwatch/langwatch/commit/573fc997c07fbbfbe1dc71acb78635c2c329497c))
+* **deps-dev:** update fonttools requirement in /mcp/typescript ([573fc99](https://github.com/langwatch/langwatch/commit/573fc997c07fbbfbe1dc71acb78635c2c329497c))
+* **deps-dev:** update haystack-ai requirement from &lt;4.0.0,&gt;=2.13.2 to &gt;=3.0.0,&lt;4.0.0 in /mcp/typescript ([#7248](https://github.com/langwatch/langwatch/issues/7248)) ([72df892](https://github.com/langwatch/langwatch/commit/72df892f20134b0a335f3783ef9caa26141888f7))
+* **deps-dev:** update haystack-ai requirement in /mcp/typescript ([72df892](https://github.com/langwatch/langwatch/commit/72df892f20134b0a335f3783ef9caa26141888f7))
+* **deps-dev:** update json-repair requirement from &gt;=0.42.0 to &gt;=0.63.0 in /mcp/typescript ([#7247](https://github.com/langwatch/langwatch/issues/7247)) ([6376930](https://github.com/langwatch/langwatch/commit/6376930151c7d995264c6e1480c08091ecd5830d))
+* **deps-dev:** update json-repair requirement in /mcp/typescript ([6376930](https://github.com/langwatch/langwatch/commit/6376930151c7d995264c6e1480c08091ecd5830d))
+* **deps-dev:** update jupyter requirement from &lt;2.0.0,&gt;=1.0.0 to &gt;=1.1.1,&lt;2.0.0 in /mcp/typescript ([#7243](https://github.com/langwatch/langwatch/issues/7243)) ([7f39887](https://github.com/langwatch/langwatch/commit/7f3988779cc72824bbe3dc5b30c4f0ffbb5bab1c))
+* **deps-dev:** update jupyter requirement in /mcp/typescript ([7f39887](https://github.com/langwatch/langwatch/commit/7f3988779cc72824bbe3dc5b30c4f0ffbb5bab1c))
+* **deps-dev:** update jupyterlab requirement from &gt;=4.5.6 to &gt;=4.6.3 in /mcp/typescript ([#7242](https://github.com/langwatch/langwatch/issues/7242)) ([d714c43](https://github.com/langwatch/langwatch/commit/d714c436982dbda46ce714a4664fa6eb10e47122))
+* **deps-dev:** update jupyterlab requirement in /mcp/typescript ([d714c43](https://github.com/langwatch/langwatch/commit/d714c436982dbda46ce714a4664fa6eb10e47122))
+* **deps-dev:** update langchain-community requirement ([d63a5a8](https://github.com/langwatch/langwatch/commit/d63a5a85e6124030729111f98a4de516f10162bf))
+* **deps-dev:** update langchain-community requirement from &lt;1.0.0,&gt;=0.3.0 to &gt;=0.4.2,&lt;1.0.0 in /mcp/typescript ([#7222](https://github.com/langwatch/langwatch/issues/7222)) ([d63a5a8](https://github.com/langwatch/langwatch/commit/d63a5a85e6124030729111f98a4de516f10162bf))
+* **deps-dev:** update langchain-openai requirement from &lt;2.0.0,&gt;=1.1.14 to &gt;=1.4.3,&lt;2.0.0 in /mcp/typescript ([#7218](https://github.com/langwatch/langwatch/issues/7218)) ([d62efb1](https://github.com/langwatch/langwatch/commit/d62efb14d5cdaf9345a213f86f21804d00890833))
+* **deps-dev:** update langchain-openai requirement in /mcp/typescript ([d62efb1](https://github.com/langwatch/langwatch/commit/d62efb14d5cdaf9345a213f86f21804d00890833))
+* **deps-dev:** update langsmith requirement from &gt;=0.8.0 to &gt;=0.10.18 in /mcp/typescript ([#7230](https://github.com/langwatch/langwatch/issues/7230)) ([f0e1d71](https://github.com/langwatch/langwatch/commit/f0e1d717a416e45f916bd2f777abb5c26598a4d4))
+* **deps-dev:** update langsmith requirement in /mcp/typescript ([f0e1d71](https://github.com/langwatch/langwatch/commit/f0e1d717a416e45f916bd2f777abb5c26598a4d4))
+* **deps-dev:** update nltk requirement from &gt;=3.9.4 to &gt;=3.10.2 in /mcp/typescript ([#7215](https://github.com/langwatch/langwatch/issues/7215)) ([61e9f51](https://github.com/langwatch/langwatch/commit/61e9f515d026cc71f48bffe56f0debff5621f741))
+* **deps-dev:** update nltk requirement in /mcp/typescript ([61e9f51](https://github.com/langwatch/langwatch/commit/61e9f515d026cc71f48bffe56f0debff5621f741))
+* **deps-dev:** update openinference-instrumentation-dspy requirement ([2926e6e](https://github.com/langwatch/langwatch/commit/2926e6efc2aa44faf231c8ed87d26f9f4e588523))
+* **deps-dev:** update openinference-instrumentation-dspy requirement from &lt;0.2.0,&gt;=0.1.23 to &gt;=0.1.39,&lt;0.2.0 in /mcp/typescript ([#7224](https://github.com/langwatch/langwatch/issues/7224)) ([2926e6e](https://github.com/langwatch/langwatch/commit/2926e6efc2aa44faf231c8ed87d26f9f4e588523))
+* **deps-dev:** update openinference-instrumentation-litellm requirement ([8e55d60](https://github.com/langwatch/langwatch/commit/8e55d60f32982070202c61ef53886fb22a74f931))
+* **deps-dev:** update openinference-instrumentation-litellm requirement from &gt;=0.1.19 to &gt;=0.1.36 in /mcp/typescript ([#7250](https://github.com/langwatch/langwatch/issues/7250)) ([8e55d60](https://github.com/langwatch/langwatch/commit/8e55d60f32982070202c61ef53886fb22a74f931))
+* **deps-dev:** update opentelemetry-instrumentation-fastapi requirement ([7a17c8e](https://github.com/langwatch/langwatch/commit/7a17c8edc72629b1500f2f5ee02e398d874d0cb0))
+* **deps-dev:** update opentelemetry-instrumentation-fastapi requirement from &gt;=0.53b1 to &gt;=0.65b0 in /mcp/typescript ([#7228](https://github.com/langwatch/langwatch/issues/7228)) ([7a17c8e](https://github.com/langwatch/langwatch/commit/7a17c8edc72629b1500f2f5ee02e398d874d0cb0))
+* **deps-dev:** update opentelemetry-instrumentation-langchain requirement ([d779795](https://github.com/langwatch/langwatch/commit/d7797954d2099355c3f342cc7a2d580e81926ab0))
+* **deps-dev:** update opentelemetry-instrumentation-langchain requirement from &gt;=0.40.4 to &gt;=0.62.3 in /mcp/typescript ([#7241](https://github.com/langwatch/langwatch/issues/7241)) ([d779795](https://github.com/langwatch/langwatch/commit/d7797954d2099355c3f342cc7a2d580e81926ab0))
+* **deps-dev:** update pypdf requirement from &gt;=6.8.0 to &gt;=6.15.0 in /mcp/typescript ([#7213](https://github.com/langwatch/langwatch/issues/7213)) ([f5160d6](https://github.com/langwatch/langwatch/commit/f5160d686e0d488afc4e6da02e58fc7e973272c2))
+* **deps-dev:** update pypdf requirement in /mcp/typescript ([f5160d6](https://github.com/langwatch/langwatch/commit/f5160d686e0d488afc4e6da02e58fc7e973272c2))
+* **deps-dev:** update pytest requirement from &lt;10.0.0,&gt;=7.4.2 to &gt;=9.1.1,&lt;10.0.0 in /mcp/typescript ([#7211](https://github.com/langwatch/langwatch/issues/7211)) ([d30d016](https://github.com/langwatch/langwatch/commit/d30d0165f77dbd035e25c3fe2ae93ac23d438378))
+* **deps-dev:** update pytest requirement in /mcp/typescript ([d30d016](https://github.com/langwatch/langwatch/commit/d30d0165f77dbd035e25c3fe2ae93ac23d438378))
+* **deps-dev:** update pytest-asyncio requirement from &lt;1.5.0,&gt;=0.21.1 to &gt;=1.4.0,&lt;1.5.0 in /mcp/typescript ([#7231](https://github.com/langwatch/langwatch/issues/7231)) ([752f2f9](https://github.com/langwatch/langwatch/commit/752f2f9e638b5ea98bf6d2d7a4cfc58a67dde7d1))
+* **deps-dev:** update pytest-asyncio requirement in /mcp/typescript ([752f2f9](https://github.com/langwatch/langwatch/commit/752f2f9e638b5ea98bf6d2d7a4cfc58a67dde7d1))
+* **deps-dev:** update strands-agents[otel] requirement ([fd972d9](https://github.com/langwatch/langwatch/commit/fd972d99251385b4dcd16e72a8a444cd4483944b))
+* **deps-dev:** update strands-agents[otel] requirement from &lt;2.0.0,&gt;=1.14.0 to &gt;=1.51.0,&lt;2.0.0 in /mcp/typescript ([#7246](https://github.com/langwatch/langwatch/issues/7246)) ([fd972d9](https://github.com/langwatch/langwatch/commit/fd972d99251385b4dcd16e72a8a444cd4483944b))
+* **deps-dev:** update streamlit requirement from &lt;2.0.0,&gt;=1.37.1 to &gt;=1.61.1,&lt;2.0.0 in /mcp/typescript ([#7233](https://github.com/langwatch/langwatch/issues/7233)) ([042aa3a](https://github.com/langwatch/langwatch/commit/042aa3aa875389929d85cd0896d04ae57490ca43))
+* **deps-dev:** update streamlit requirement in /mcp/typescript ([042aa3a](https://github.com/langwatch/langwatch/commit/042aa3aa875389929d85cd0896d04ae57490ca43))
+* **deps:** bump attrs from 25.3.0 to 26.1.0 in /mcp/typescript ([#7234](https://github.com/langwatch/langwatch/issues/7234)) ([040afbd](https://github.com/langwatch/langwatch/commit/040afbd9d4292d6ae0ef1da958137e7a32873fc3))
+* **deps:** bump coolname from 2.2.0 to 5.0.0 in /mcp/typescript ([#7240](https://github.com/langwatch/langwatch/issues/7240)) ([0b7d6fa](https://github.com/langwatch/langwatch/commit/0b7d6fa30305ee1ca4d02b0a483593f0792a16dd))
+* **deps:** bump cryptography from 48.0.1 to 50.0.0 in /sdks/python ([#6532](https://github.com/langwatch/langwatch/issues/6532)) ([46caee5](https://github.com/langwatch/langwatch/commit/46caee5e9065d6dab223a910832f8765243d00ad))
+* **deps:** bump langchain-core ([97db684](https://github.com/langwatch/langwatch/commit/97db684407ce20ec7a24b57ed66a44b424ab86e0))
+* **deps:** bump langchain-core from 1.5.3 to 1.5.4 in /sdks/python in the langchain group across 1 directory ([#7269](https://github.com/langwatch/langwatch/issues/7269)) ([97db684](https://github.com/langwatch/langwatch/commit/97db684407ce20ec7a24b57ed66a44b424ab86e0))
+* **deps:** bump pi-heif from 1.1.0 to 1.3.0 in /sdks/python ([#6523](https://github.com/langwatch/langwatch/issues/6523)) ([f48fc19](https://github.com/langwatch/langwatch/commit/f48fc199d2398d0fff95bd66a2238cc08059dd89))
+* **deps:** bump pillow from 12.2.0 to 12.3.0 in /sdks/python ([#6521](https://github.com/langwatch/langwatch/issues/6521)) ([881b2e2](https://github.com/langwatch/langwatch/commit/881b2e28f7053302027867dfb5f51fec534763dd))
+* **deps:** bump pyasn1 from 0.6.3 to 0.6.4 in /sdks/python ([#6534](https://github.com/langwatch/langwatch/issues/6534)) ([1656cf9](https://github.com/langwatch/langwatch/commit/1656cf975d488d591d239c664489179099c92ac2))
+* **deps:** bump setuptools from 80.9.0 to 83.0.0 in /sdks/python ([#6524](https://github.com/langwatch/langwatch/issues/6524)) ([3921078](https://github.com/langwatch/langwatch/commit/3921078237046d4365b4f76a5877b856ae67d120))
+* **deps:** bump the langchain group across 1 directory with 3 updates ([#6888](https://github.com/langwatch/langwatch/issues/6888)) ([b71daf0](https://github.com/langwatch/langwatch/commit/b71daf0cdbfcb099e385c5971228422bc5d79490))
+* **deps:** bump the minor-and-patch group ([8976b2f](https://github.com/langwatch/langwatch/commit/8976b2f420dc9b9eefd5584465b611b9064bf79e))
+* **deps:** bump the minor-and-patch group ([cd0a93b](https://github.com/langwatch/langwatch/commit/cd0a93bd713d9fbb963119d2fcc9ba33a01011e3))
+* **deps:** bump the minor-and-patch group across 1 directory with 16 updates ([#6873](https://github.com/langwatch/langwatch/issues/6873)) ([b8414ec](https://github.com/langwatch/langwatch/commit/b8414ec3c0aac75c132de1dbac8de397cb5451bc))
+* **deps:** bump the minor-and-patch group in /mcp/typescript with 2 updates ([#7208](https://github.com/langwatch/langwatch/issues/7208)) ([8976b2f](https://github.com/langwatch/langwatch/commit/8976b2f420dc9b9eefd5584465b611b9064bf79e))
+* **deps:** bump the minor-and-patch group in /sdks/python with 9 updates ([#7090](https://github.com/langwatch/langwatch/issues/7090)) ([cd0a93b](https://github.com/langwatch/langwatch/commit/cd0a93bd713d9fbb963119d2fcc9ba33a01011e3))
+* **deps:** bump the opentelemetry group across 1 directory with 12 updates ([#7179](https://github.com/langwatch/langwatch/issues/7179)) ([f555c95](https://github.com/langwatch/langwatch/commit/f555c951f2e32faf36b6f2b0d86d2d43f1431f43))
+* **deps:** update langchain-core requirement from &lt;2.0.0,&gt;=0.3.0 to &gt;=1.5.4,&lt;2.0.0 in /mcp/typescript ([#7239](https://github.com/langwatch/langwatch/issues/7239)) ([ed9ba32](https://github.com/langwatch/langwatch/commit/ed9ba32c4851339a45c3914eb28da8a2ffaf040a))
+* **deps:** update langchain-core requirement in /mcp/typescript ([ed9ba32](https://github.com/langwatch/langwatch/commit/ed9ba32c4851339a45c3914eb28da8a2ffaf040a))
+* **deps:** update ruff requirement from &gt;=0.11.1 to &gt;=0.16.2 in /mcp/typescript ([#7244](https://github.com/langwatch/langwatch/issues/7244)) ([5e33035](https://github.com/langwatch/langwatch/commit/5e33035b20bceb14c7c541d784c79d3817f35540))
+* **deps:** update ruff requirement in /mcp/typescript ([5e33035](https://github.com/langwatch/langwatch/commit/5e33035b20bceb14c7c541d784c79d3817f35540))
+* **release:** pin python-sdk at 1.2.1 ([#6767](https://github.com/langwatch/langwatch/issues/6767)) ([d91dc55](https://github.com/langwatch/langwatch/commit/d91dc550e9408e1b274948e922accd649955f93d))
+
 ## [1.2.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.1.0...python-sdk@v1.2.0) (2026-08-07)
 
 

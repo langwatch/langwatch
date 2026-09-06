@@ -75,6 +75,7 @@ import { createLogger } from "@langwatch/observability";
 // Hono — unified API router
 import type { Hono } from "hono";
 import { register } from "prom-client";
+import { env } from "./env.mjs";
 import { createMcpHandler } from "./mcp/handler";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
@@ -82,20 +83,35 @@ import {
   initializeInProcessApp,
   initializeWebApp,
 } from "./server/app-layer/presets";
+import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
+import { ConnectGateway } from "./server/connected-agents/connect.gateway";
+import { closeLongPollTransport } from "./server/connected-agents/long-poll.process";
+import {
+  closeConnectedAgentRuntime,
+  getConnectedAgentRuntime,
+} from "./server/connected-agents/runtime";
+import { prisma } from "./server/db";
+import { LocalControlGateway } from "./server/langy-local-control/control.gateway";
+import {
+  closeLocalControlRuntime,
+  getLocalControlSessionCore,
+} from "./server/langy-local-control/runtime";
 import {
   getWorkerMetricsPort,
   isMetricsAuthorized,
   normalizeMetricsPath,
 } from "./server/metrics";
+import { isRootDiscoveryPath } from "./server/openapi/discovery-locations";
 import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
-import { verifyRedisReady } from "./server/redis";
 import { buildSecurityHeaders } from "./server/securityHeaders";
 import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
+import { createHttpServerClosePhase } from "./server/shutdown/httpServerClosePhase";
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
+import { createUpgradeRouter } from "./server/websockets/upgrade-router";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 
 const logger = createLogger("langwatch:start");
@@ -164,7 +180,26 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // Fail fast if Redis is unreachable — better-auth uses it as secondary
   // session store, and without it every request ends in a "Redirecting to
   // Sign in…" loop with no actionable error for the developer.
-  await verifyRedisReady();
+  //
+  // Exiting is this caller's decision, not the probe's: the web server owns the
+  // process, and one that cannot reach Redis has nothing to serve. The probe
+  // has already logged what and where (ADR-093).
+  try {
+    await assertRedisReady();
+  } catch (err) {
+    // Synchronous stderr before exiting, for the same reason the server error
+    // handler below does it: the probe logs through pino, whose transports are
+    // async worker threads that never flush past `process.exit(1)`. Without
+    // this, an unreachable Redis is an exit(1) with no output anywhere — the
+    // exact onboarding dead-end this check exists to prevent.
+    writeSync(
+      2,
+      `[langwatch:start] Redis is not reachable, exiting: ${
+        err instanceof Error ? (err.stack ?? err.message) : String(err)
+      }\n`,
+    );
+    process.exit(1);
+  }
 
   // Partial-config assertion on LW_VIRTUAL_KEY_PEPPER /
   // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET now lives in
@@ -295,9 +330,16 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       // and a 200 — the exporter reads that as success and drops the batch.
       // Those paths belong to the API, which canonicalises them
       // (src/server/routes/otel-path-aliases.ts).
+      //
+      // `/.well-known/openapi` and `/llms.txt` are here for the same reason:
+      // they are root-level by convention, which is the whole point of them,
+      // and the SPA fallback would answer both with the HTML shell and a 200.
+      // A discovery URL that returns HTML and calls it success is worse than
+      // one that 404s (src/server/routes/api-discovery.ts).
       if (
         pathname.startsWith("/api/") ||
-        canonicalOtlpPath(pathname) !== null
+        canonicalOtlpPath(pathname) !== null ||
+        isRootDiscoveryPath(pathname)
       ) {
         await apiListener(req, res);
         return;
@@ -340,12 +382,32 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
     server = createServer(handler);
   }
 
+  // One upgrade listener, routed by path: the tRPC transport and the
+  // connected agent gateway share the HTTP server, and an unknown path is
+  // answered 404 instead of hanging.
+  const upgradeRouter = createUpgradeRouter(
+    server as ReturnType<typeof createServer>,
+  );
   // Bind the tRPC router to a WebSocket transport on the same HTTP server.
   // Lets high-frequency procedures (presence cursor today) escape the
   // browser's 6-connection HTTP cap by riding a single long-lived socket.
-  const wsHandle = setupTRPCWebSocket(
-    server as ReturnType<typeof createServer>,
-  );
+  const wsHandle = setupTRPCWebSocket(upgradeRouter);
+  // Connected agents (ADR-128): the SDK's outbound socket lands here.
+  const connectGateway = new ConnectGateway({
+    runtime: getConnectedAgentRuntime(),
+    prisma,
+    replicaCount: env.LANGWATCH_APP_REPLICAS,
+  });
+  connectGateway.mount(upgradeRouter);
+
+  // Langy local control (ADR-129): the outbound socket of
+  // `langwatch langy --share-control` lands here. Bearer session key, no
+  // Origin check, so the dev proxy and the ingress carry it with no per-path
+  // entry of their own.
+  const localControlGateway = new LocalControlGateway({
+    core: getLocalControlSessionCore(),
+  });
+  localControlGateway.mount(upgradeRouter);
 
   server.once("error", (err) => {
     // Write synchronously to stderr BEFORE the structured log: pino's
@@ -401,7 +463,9 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // rather than a literal here: this handler used to force-exit after 5s,
   // which is inside the GroupQueue's own drain budget, so under the `all`
   // role (this process hosting the worker stack) a drain could never finish
-  // however long the queue was told it had.
+  // however long the queue was told it had. The http drain grace comes from
+  // the same place for the same reason — see createHttpServerClosePhase.
+
   installShutdownHandlers((signal) => ({
     signal,
     logger,
@@ -416,25 +480,24 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
           await wsHandle.close();
         },
       },
+      createHttpServerClosePhase({
+        server,
+        closeSessions: () => mcpHandler.closeAllSessions(),
+        logger,
+      }),
+      // Connected agent sockets close after the HTTP drain, with 1012 so the
+      // SDKs reconnect at once to the next pod. A call in flight outlives any
+      // drain budget, so this phase comes after the drain, not inside it.
       {
-        name: "http-server",
+        name: "connected-agents",
         run: async () => {
-          // Stop accepting, then let requests already in flight finish.
-          // closeAllConnections() destroys active sockets, so calling it
-          // outright turned every rolling deploy into a burst of 502s for
-          // whatever was mid-request. Idle connections go immediately; the
-          // rest get the phase's budget and are only destroyed if they
-          // outlast it.
-          const closed = new Promise<void>((resolve) =>
-            server.close(() => resolve()),
-          );
-          if ("closeIdleConnections" in server) server.closeIdleConnections();
-          await mcpHandler.closeAllSessions();
-          try {
-            await closed;
-          } finally {
-            if ("closeAllConnections" in server) server.closeAllConnections();
-          }
+          await connectGateway.close();
+          await closeLongPollTransport();
+          await closeConnectedAgentRuntime();
+          // The shared folders close the same way and for the same reason: a
+          // local command in flight outlives any drain budget.
+          await localControlGateway.close();
+          await closeLocalControlRuntime();
         },
       },
       // Drain in-process workers (if any) before closing the shared App below,

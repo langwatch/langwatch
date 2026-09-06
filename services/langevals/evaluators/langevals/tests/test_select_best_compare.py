@@ -1569,3 +1569,363 @@ def test_disagreement_details_may_blame_order_when_the_judge_is_deterministic():
 
     assert result.details is not None
     assert "changed with candidate order" in result.details
+
+
+# @scenario "An unsettled row's account is readable, not a wall of text"
+def test_disagreement_details_separate_the_two_passes_into_blocks():
+    """The two accounts used to be joined into one paragraph with semicolons
+    and parentheses. Each pass writes prose containing both already, so the
+    result nested to a depth no reader could follow and the reader could not
+    see where one pass ended and the other began. Dogfooding produced a
+    900-character run-on for a row that had paid for two judge calls."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+    entry = _make_entry(num_candidates=2, row_index=0)
+
+    responses = [
+        _mock_completion_response("variant_0 is concise (and clear); direct", "A"),
+        _mock_completion_response("variant_1 is thorough (with examples)", "A"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert result.details is not None
+    blocks = [b for b in result.details.split("\n\n") if b.strip()]
+    # Headline, one block per pass, and the caveat. Four, not one.
+    assert len(blocks) == 4, result.details
+    assert blocks[0].endswith("this row does not establish a winner.")
+    assert blocks[1].startswith("Original order picked ")
+    assert blocks[2].startswith("Reversed order picked ")
+    # Each pass's own words sit under its own heading rather than inside a
+    # parenthesis hanging off the previous clause.
+    assert "\n" in blocks[1]
+    assert "\n" in blocks[2]
+
+
+# @scenario "An unsettled row's account is readable, not a wall of text"
+def test_agreement_details_put_the_confirmation_on_its_own_line():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+    entry = _make_entry(num_candidates=2, row_index=0)
+
+    responses = [
+        _mock_completion_response("variant_0 answers directly", "A"),
+        _mock_completion_response("variant_0 answers directly", "B"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.details is not None
+    blocks = [b for b in result.details.split("\n\n") if b.strip()]
+    assert len(blocks) == 2, result.details
+    assert blocks[0].startswith("Confirmed")
+    assert blocks[1] == "variant_0 answers directly"
+
+
+def _mock_completion_response_without_winner(reasoning: str = "both are fine"):
+    """A tool call whose arguments carry no `winner`, which is what two of
+    roughly 200 live judge calls actually returned."""
+    arguments_json = json.dumps({"reasoning": reasoning})
+    tool_call = SimpleNamespace(function=SimpleNamespace(arguments=arguments_json))
+    message = SimpleNamespace(tool_calls=[tool_call])
+    choice = SimpleNamespace(message=message)
+    return SimpleNamespace(choices=[choice])
+
+
+def _mock_completion_response_without_tool_call():
+    """A response that ignored `tool_choice` entirely."""
+    message = SimpleNamespace(tool_calls=None, content="I cannot decide.")
+    choice = SimpleNamespace(message=message)
+    return SimpleNamespace(choices=[choice])
+
+
+def _mock_completion_response_with_null_winner():
+    """A tool call carrying the `winner` key with nothing in it. Shaped like an
+    answer, so the key-presence check passes and only the value gives it
+    away."""
+    arguments_json = json.dumps({"winner": None, "reasoning": "hard to say"})
+    tool_call = SimpleNamespace(function=SimpleNamespace(arguments=arguments_json))
+    message = SimpleNamespace(tool_calls=[tool_call])
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
+def test_answer_without_a_winner_is_reported_as_no_verdict():
+    """A forced tool call is a request, not a guarantee. The row the provider
+    fumbled should read like a row with no verdict, not like a broken
+    evaluator: the reader can act on the first and can do nothing with the
+    second."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response_without_winner(),
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert getattr(result, "label", None) is None
+    assert result.details is not None
+    assert "no verdict" in result.details
+    assert result.cost is not None
+    assert result.cost.amount == 0.0002
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
+def test_answer_with_no_tool_call_at_all_is_reported_as_no_verdict():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response_without_tool_call(),
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert result.details is not None
+    assert "no verdict" in result.details
+    assert result.cost is not None
+    assert result.cost.amount == 0.0002
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
+def test_unreadable_tool_arguments_are_reported_as_no_verdict():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    tool_call = SimpleNamespace(function=SimpleNamespace(arguments="{not json"))
+    message = SimpleNamespace(tool_calls=[tool_call])
+    broken = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=broken,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert result.details is not None
+    assert "no verdict" in result.details
+    assert result.cost is not None
+    assert result.cost.amount == 0.0002
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
+def test_a_present_but_empty_winner_names_nobody():
+    """The nastiest shape of the three, because it looks like an answer. The
+    slot lookup below the check degrades an unrecognised slot LETTER to the
+    first candidate on purpose, so a `winner` of `None` reaching it would be
+    read as candidate A winning: a row nobody judged, reported as decided."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response_with_null_winner(),
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert getattr(result, "label", None) is None
+    assert result.details is not None
+    assert "no verdict" in result.details
+    assert result.cost is not None
+    assert result.cost.amount == 0.0002
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
+def test_a_tool_call_with_no_function_on_it_is_reported_as_no_verdict():
+    """The tool call itself can arrive in a shape that carries no arguments to
+    read. Reaching into it blind is the same crash the missing `winner` key
+    used to be, one level further out."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    message = SimpleNamespace(tool_calls=[SimpleNamespace()])
+    response = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=response,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert result.details is not None
+    assert "no verdict" in result.details
+    assert result.cost is not None
+    assert result.cost.amount == 0.0002
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
+@pytest.mark.parametrize(
+    "unusable_reasoning",
+    [{"why": "A"}, ["A wins"], 42, True, None, "   "],
+    ids=["object", "array", "number", "boolean", "null", "blank"],
+)
+def test_a_winner_with_an_unreadable_reason_still_counts_as_a_verdict(
+    unusable_reasoning,
+):
+    """`reasoning` is free text in the tool schema, so a provider that does not
+    strictly enforce it can put a whole object there. The judge still named a
+    winner, which is the part the row turns on, so the row stays a verdict and
+    only the explanation falls back. Reading the value as text without checking
+    it raised on the slot translation, taking a decided row down with it."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    arguments_json = json.dumps({"winner": "A", "reasoning": unusable_reasoning})
+    tool_call = SimpleNamespace(function=SimpleNamespace(arguments=arguments_json))
+    message = SimpleNamespace(tool_calls=[tool_call])
+    response = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=response,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "processed"
+    assert result.label is not None
+    assert result.label != "tie"
+    assert result.details is not None
+    assert "The judge gave no explanation." in result.details
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
+def test_one_unusable_pass_is_not_read_as_a_disagreement():
+    """Reconciliation compares two answers. When one of them never arrived
+    there is nothing to compare, and calling that a disagreement would tell
+    the reader the candidates are inseparable when the truth is that the judge
+    did not answer. Both calls are still billed."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    responses = [
+        _mock_completion_response("variant_0 is more concise", "A"),
+        _mock_completion_response_without_winner(),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert mock_completion.call_count == 2
+    assert result.status == "skipped"
+    assert result.details is not None
+    assert "no verdict" in result.details
+    # Not the disagreement wording: nothing about this row flipped.
+    assert "did not survive" not in result.details
+    assert "changed with candidate order" not in result.details
+    # Both calls were made, so both are charged.
+    assert result.cost is not None
+    assert result.cost.amount == 0.0004
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
+def test_two_unusable_passes_do_not_agree_with_each_other():
+    """Two `None` winners are equal, so the agreement branch would have
+    reported "confirmed under order swap" over a winner nobody named."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    responses = [
+        _mock_completion_response_without_winner(),
+        _mock_completion_response_without_winner(),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert getattr(result, "label", None) is None
+    assert result.details is not None
+    assert "Confirmed" not in result.details
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
+def test_an_answer_missing_only_its_reasoning_still_names_the_winner():
+    """The winner is the part a row cannot do without. A missing explanation
+    degrades the row to a verdict without one rather than throwing the verdict
+    away."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    arguments_json = json.dumps({"winner": "A"})
+    tool_call = SimpleNamespace(function=SimpleNamespace(arguments=arguments_json))
+    message = SimpleNamespace(tool_calls=[tool_call])
+    response = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=response,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "processed"
+    assert result.label == "variant_0"

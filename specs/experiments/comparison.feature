@@ -411,3 +411,65 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     When I read why the row was inconclusive
     Then each pass's explanation names the variants that pass was shown
     And no words are attributed to the variant that held that slot in the other pass
+
+  # The row a reader most wants explained was answered with a bare dash, and a
+  # dash reads as missing data rather than as a finding: the first question
+  # dogfooding drew was whether the results had failed to load. The account of
+  # the disagreement was stored and paid for the whole time.
+  @integration
+  Scenario: A row the judge could not settle says so, and why
+    Given a row whose two judge passes disagreed
+    When I view that row on the results page
+    Then the row says the judge reached no verdict
+    And I can read the judge's account of the disagreement on that row
+    And the row is not labelled a tie
+
+  # An unsettled row is not evidence. Counting it as a tie would hand the
+  # chart and the ranking a result nobody produced, which is the same mistake
+  # the judge itself refuses to make when its two passes disagree.
+  @unit
+  Scenario: An unsettled row stays out of the win-rate chart and the ranking
+    Given 10 rows were evaluated, 6 naming a winner and 4 left unsettled
+    When I view the run on the results page
+    Then the win-rate chart counts no ties from the unsettled rows
+    And the ranking takes no evidence from them
+    And the run still reports 4 rows without a verdict
+
+  # Empty cells said the same thing as a row the judge never ran, so a
+  # spreadsheet could not tell "no answer" from "an answer we would not trust".
+  # The winner column names the outcome, and the reasoning column carries the
+  # text rather than dropping it.
+  @unit
+  Scenario: An unsettled row exports its explanation
+    Given a row whose two judge passes disagreed
+    When I export the run to CSV
+    Then that row's winner column reads "no_verdict"
+    And its candidates column names the candidates that were judged
+    And its reasoning column carries the judge's account of the disagreement
+    And a row the judge never ran still exports three empty cells
+
+  # Each pass writes prose with its own commas, semicolons and parentheses.
+  # Joining two of them with more of the same nested to a depth no reader could
+  # follow: a 900-character run-on where the one thing needed first, where one
+  # pass's account ends and the other's begins, was the hardest thing to find.
+  @unit
+  Scenario: An unsettled row's account is readable, not a wall of text
+    Given a row whose two judge passes disagreed
+    When I read the judge's account of that row
+    Then it opens by saying the row establishes no winner
+    And each pass's pick and reasoning stand as their own block
+    And the caveat about what can be blamed for the disagreement comes last
+
+  # Asking the judge for a winner is a request, not a guarantee: two of roughly
+  # 200 live calls came back with nothing usable in them. Erroring the row
+  # throws away both the money and the reason, when the honest report is that
+  # the judge did not answer. An answer naming nobody is one of these, not a
+  # win for whichever candidate happened to be listed first.
+  @unit
+  Scenario: A judge answer that names no winner is reported, not raised
+    Given the judge answers without naming any candidate as the winner
+    When the row is evaluated
+    Then the row reports no verdict rather than an error
+    And no candidate is recorded as having won it
+    And it still reports the cost of the calls that were made
+    And an answer that names a winner but gives no reason still counts as a verdict

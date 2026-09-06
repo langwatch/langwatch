@@ -1141,6 +1141,15 @@ func (o *Orchestrator) preparePlaySandbox(ctx context.Context, pl PlaySandbox, s
 	if err := o.sup.RunOnce(ctx, "codegen", pl.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
 		o.log.Warn("play codegen failed (continuing)", zap.Error(err))
 	}
+	// A sandbox supervises the SAME child plan as `up` (planChildren below), so
+	// its api lane runs the production bundle too and the checkout it was cut
+	// from has no dist/. Fatal for the same reason it is fatal there: without
+	// the bundle the api never starts and the app lane never leaves its ready
+	// probe, so the sandbox serves nothing at all — and a sandbox that serves
+	// nothing is not "worth looking at" the way stale codegen is.
+	if err := o.ensureAPIBundle(ctx, pl.LwDir, env); err != nil {
+		return err
+	}
 	if err := o.sup.RunOnce(ctx, "prepare", pl.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
 		return fmt.Errorf("play migrations failed: %w", err)
 	}

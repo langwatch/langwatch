@@ -63,7 +63,6 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
             title: "Failed to generate token",
             type: "error",
             duration: 5000,
-            meta: { closable: true },
           });
         },
       },
@@ -80,7 +79,6 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
             title: "Token revoked",
             type: "success",
             duration: 3000,
-            meta: { closable: true },
           });
           void queryClient.scimToken.list.invalidate();
         },
@@ -89,7 +87,6 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
             title: "Failed to revoke token",
             type: "error",
             duration: 5000,
-            meta: { closable: true },
           });
         },
       },

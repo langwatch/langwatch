@@ -1,37 +1,34 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
-import { PermissionsService } from "~/server/app-layer/permissions/permissions.service";
+import { getApp } from "~/server/app-layer/app";
 
 /**
  * Asserts that a user holds the given permission on a project.
  *
- * Thin wrapper around {@link PermissionsService#requireProjectPermission} that
- * accepts a caller-supplied Prisma client, keeping backward compatibility with
- * existing call sites that pass `prisma` as a named parameter.
- *
- * Pure async function — no tRPC dependency. Safe to call from Hono routes,
- * background workers, or any other non-tRPC surface.
+ * Thin wrapper around the App-composed permissions service
+ * (`getApp().permissions`) for non-tRPC surfaces — Hono routes, background
+ * workers, anywhere with a userId and a projectId in hand.
  *
  * Throws {@link LiteMemberRestrictedError} when the denial is caused by the
- * user being a Lite Member (EXTERNAL org role). Throws a plain `Error` for
- * all other denials (not a member, or member without the permission).
+ * user being a Lite Member (EXTERNAL org role), and
+ * {@link ProjectPermissionDeniedError} for every other denial (not a member,
+ * or member without the permission). Both are handled errors carrying a code.
  *
  * @param params.userId     - The authenticated user's ID.
  * @param params.projectId  - The project being accessed.
  * @param params.permission - The permission that must be held.
- * @param params.prisma     - Prisma client instance (injected for testability).
  */
 export async function requireProjectPermission({
   userId,
   projectId,
   permission,
-  prisma,
 }: {
   userId: string;
   projectId: string;
   permission: Permission;
-  prisma: PrismaClient;
 }): Promise<void> {
-  const service = new PermissionsService(prisma);
-  return service.requireProjectPermission({ userId, projectId, permission });
+  return getApp().permissions.requireProjectPermission({
+    userId,
+    projectId,
+    permission,
+  });
 }

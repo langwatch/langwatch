@@ -12,7 +12,7 @@ import { seedDemoPlatform } from "../prisma/seed-demo-platform";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
-import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "../src/server/clickhouse/clickhouseClient";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { getSuiteSetId } from "../src/server/suites/suite-set-id";
 import {
@@ -33,6 +33,7 @@ import {
 
 const PROJECT_ID = "local-dev-project";
 const USER_ID = "local-dev-admin-user";
+const ORG_ID = "local-dev-organization";
 const target: CollectorTarget = {
   endpoint: process.env.HAVEN_SEED_ENDPOINT ?? "http://localhost:5560",
   apiKey:
@@ -392,7 +393,7 @@ interface ProjectionCounts {
 }
 
 async function projectionCounts(): Promise<ProjectionCounts> {
-  const client = await getClickHouseClientForProject(PROJECT_ID);
+  const client = await getClickHouseClientForTenant(PROJECT_ID);
   if (!client) throw new Error("ClickHouse client is unavailable");
   const result = await client.query({
     query: `
@@ -451,7 +452,12 @@ async function main(): Promise<void> {
     adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
   });
   try {
-    await seedDemoPlatform({ prisma, projectId: PROJECT_ID, userId: USER_ID });
+    await seedDemoPlatform({
+      prisma,
+      projectId: PROJECT_ID,
+      organizationId: ORG_ID,
+      userId: USER_ID,
+    });
     const historicalRuns = buildHistoricalScenarioRuns();
     const traces = buildTraceFixtures(historicalRuns);
     for (const [index, trace] of traces.entries()) {

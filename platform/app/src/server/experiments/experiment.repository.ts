@@ -1,9 +1,33 @@
 import { nanoid } from "nanoid";
 import type {
   Experiment,
+  ExperimentType,
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
+
+/**
+ * Max wall-clock a workbench save may run before Prisma aborts it with P2028.
+ *
+ * The body is four indexed statements, but two of them write a whole workbench
+ * state, and an inline dataset makes that state megabytes rather than
+ * kilobytes. On top of that, a second writer on the same experiment waits on
+ * the row lock the first one holds until it commits, so the wait is bounded by
+ * the slowest write ahead of it and not by this transaction's own work.
+ *
+ * 20 seconds is the same budget `invite.service.ts` gives its batch: enough
+ * that only a database in real trouble reaches it, small enough that one save
+ * cannot pin a pool connection for a minute. `dataset-lock.ts` sits at 120s
+ * because its body does object-storage round-trips, which nothing here does.
+ */
+const WORKBENCH_TXN_TIMEOUT_MS = 20_000;
+
+/**
+ * How long to wait for a pool connection before starting, raised from Prisma's
+ * 2s default for the same reason the dataset and invite transactions raise it:
+ * a busy pool must not fail a save before it has done any work.
+ */
+const WORKBENCH_TXN_MAX_WAIT_MS = 10_000;
 
 /**
  * Repository layer for experiment data access.
@@ -231,6 +255,238 @@ export class ExperimentRepository {
     });
     if (!row) return { exists: false };
     return { exists: true, archived: row.archivedAt !== null, slug: row.slug };
+  }
+
+  /**
+   * Runs `fn` inside one transaction. The seam's compare-and-set needs it.
+   *
+   * The options are not tuning. Prisma's 5s default would abort a legitimate
+   * save with P2028, which is an unnamed failure the caller cannot act on, and
+   * it would do so from inside the compare-and-set, so the caller loses the
+   * 409 that tells it to reload. The body is four indexed statements, but two
+   * of them carry a whole workbench state, and a second writer on the same
+   * experiment waits on the row lock until the first commits.
+   */
+  async runInTransaction<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return await this.prisma.$transaction(fn, {
+      timeout: WORKBENCH_TXN_TIMEOUT_MS,
+      maxWait: WORKBENCH_TXN_MAX_WAIT_MS,
+      isolationLevel: "ReadCommitted",
+    });
+  }
+
+  /**
+   * The columns the workbench seam reads, for an active row addressed by id
+   * or by slug. Archived rows are excluded like every other read here, which
+   * is what makes an archived experiment read as gone rather than editable.
+   */
+  async findWorkbenchRow(
+    input: { projectId: string; id?: string; slug?: string },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<{
+    id: string;
+    slug: string;
+    name: string | null;
+    type: ExperimentType;
+    workbenchState: Prisma.JsonValue;
+    workbenchVersion: number;
+    updatedAt: Date;
+  } | null> {
+    if (!input.id && !input.slug) return null;
+    return this.findFirstActive(
+      {
+        where: {
+          projectId: input.projectId,
+          ...(input.id ? { id: input.id } : {}),
+          ...(input.slug ? { slug: input.slug } : {}),
+        },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          type: true,
+          workbenchState: true,
+          workbenchVersion: true,
+          updatedAt: true,
+        },
+      },
+      options,
+    );
+  }
+
+  /**
+   * Writes the workbench state only while the stored version still equals
+   * `expectedVersion`, which is the compare-and-set itself: the version rides
+   * in the WHERE, so a racing writer that already bumped it makes this update
+   * match no row and Prisma raises P2025 rather than overwriting newer state.
+   */
+  async casUpdateWorkbenchState(
+    input: {
+      id: string;
+      projectId: string;
+      expectedVersion: number;
+      nextVersion: number;
+      name?: string | null;
+      workbenchState: Prisma.InputJsonValue;
+    },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<Experiment> {
+    const client = options?.tx ?? this.prisma;
+    return await client.experiment.update({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        archivedAt: null,
+        workbenchVersion: input.expectedVersion,
+      },
+      data: {
+        workbenchState: input.workbenchState,
+        workbenchVersion: input.nextVersion,
+        ...(input.name === undefined ? {} : { name: input.name }),
+      },
+    });
+  }
+
+  /**
+   * The single rolling autosave row for an experiment, if it has one. There
+   * is at most one by construction: the seam updates it in place instead of
+   * inserting, so a long editing session leaves one row behind, not hundreds.
+   */
+  async findRollingAutosaveVersion(
+    input: { projectId: string; experimentId: string },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<{ id: string } | null> {
+    const client = options?.tx ?? this.prisma;
+    return await client.experimentVersion.findFirst({
+      where: {
+        projectId: input.projectId,
+        experimentId: input.experimentId,
+        autoSaved: true,
+      },
+      select: { id: true },
+      orderBy: { counterVersion: "desc" },
+    });
+  }
+
+  /**
+   * The highest number the experiment's numbered versions hold, or 0 when it
+   * has none. The next numbered write takes one more than this, which is what
+   * makes the numbers a reader sees run 1, 2, 3 with no gaps.
+   */
+  async findMaxNumberedVersion(
+    input: { projectId: string; experimentId: string },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<number> {
+    const client = options?.tx ?? this.prisma;
+    const highest = await client.experimentVersion.findFirst({
+      where: {
+        projectId: input.projectId,
+        experimentId: input.experimentId,
+        autoSaved: false,
+      },
+      select: { version: true },
+      orderBy: { version: "desc" },
+    });
+    return highest?.version ?? 0;
+  }
+
+  async createVersion(
+    input: { data: Prisma.ExperimentVersionUncheckedCreateInput },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<void> {
+    const client = options?.tx ?? this.prisma;
+    await client.experimentVersion.create({ data: input.data });
+  }
+
+  async updateVersionById(
+    input: {
+      id: string;
+      projectId: string;
+      data: Prisma.ExperimentVersionUncheckedUpdateInput;
+    },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<void> {
+    const client = options?.tx ?? this.prisma;
+    await client.experimentVersion.update({
+      where: { id: input.id, projectId: input.projectId },
+      data: input.data,
+    });
+  }
+
+  async findVersionByNumber(input: {
+    projectId: string;
+    experimentId: string;
+    version: number;
+  }): Promise<{
+    version: number;
+    autoSaved: boolean;
+    state: Prisma.JsonValue;
+  } | null> {
+    return await this.prisma.experimentVersion.findFirst({
+      where: {
+        projectId: input.projectId,
+        experimentId: input.experimentId,
+        version: input.version,
+      },
+      select: { version: true, autoSaved: true, state: true },
+    });
+  }
+
+  /**
+   * Version list, newest content first. The order is `counterVersion`, not
+   * `version`: the rolling autosave row is rewritten in place and keeps the
+   * number it was last written at, while a numbered row takes the next number
+   * in its own sequence, so only the counter says which row is newer.
+   *
+   * `beforeCounterVersion` pages backwards through the same order.
+   */
+  async findVersions(
+    input: {
+      projectId: string;
+      experimentId: string;
+      take: number;
+      beforeCounterVersion?: number;
+    },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<
+    Array<{
+      version: number;
+      counterVersion: number;
+      autoSaved: boolean;
+      commitMessage: string | null;
+      authorId: string | null;
+      authorLabel: string;
+      /** The run that wrote this version, when a run wrote it. */
+      runId: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>
+  > {
+    const client = options?.tx ?? this.prisma;
+    return await client.experimentVersion.findMany({
+      where: {
+        projectId: input.projectId,
+        experimentId: input.experimentId,
+        ...(input.beforeCounterVersion === undefined
+          ? {}
+          : { counterVersion: { lt: input.beforeCounterVersion } }),
+      },
+      select: {
+        version: true,
+        counterVersion: true,
+        autoSaved: true,
+        commitMessage: true,
+        authorId: true,
+        authorLabel: true,
+        runId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { counterVersion: "desc" },
+      take: input.take,
+    });
   }
 
   async updateById(

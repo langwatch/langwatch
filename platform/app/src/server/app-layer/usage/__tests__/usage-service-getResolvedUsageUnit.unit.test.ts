@@ -17,7 +17,7 @@ vi.mock("../../tracing", () => ({
 
 vi.mock("../../../clickhouse/clickhouseClient", () => ({
   isClickHouseEnabled: () => false,
-  getClickHouseClientForProject: () => Promise.resolve(null),
+  getClickHouseClientForTenant: () => Promise.resolve(null),
 }));
 
 const PAID_TIERED_PLAN: PlanInfo = {

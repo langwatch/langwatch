@@ -1,0 +1,15 @@
+# Findings reviewed and cleared, keyed by gitleaks fingerprint
+# (commit:path:rule:line). This file clears ONE finding in ONE commit — unlike
+# a `.gitleaks.toml` allowlist, which is a standing rule that keeps matching
+# new values forever. Prefer this whenever the finding is historical and the
+# working tree is already clean, so the scanner keeps its teeth on the path.
+#
+# A test fixture for the credential-redaction path used a realistic PKCS#8
+# base64 prefix. It is the standard ASN.1 header every RSA private key starts
+# with, carries no key material, and was never a credential — but its entropy
+# is a key's, which is the whole point of the rule and not something gitleaks
+# should be asked to tell apart. The fixture was replaced in fbbfc1d35b with a
+# low-entropy marker, so the tree is clean; the finding survives only because
+# the gate walks every commit in the pull request's range, and this one is now
+# history.
+4c7f177f4f5b4a4290d9281031dc4cdeff2d23a6:services/aigateway/adapters/providers/bifrost_error_test.go:generic-api-key:217

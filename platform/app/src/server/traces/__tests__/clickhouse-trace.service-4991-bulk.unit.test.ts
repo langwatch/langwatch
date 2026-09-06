@@ -39,10 +39,19 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: () =>
-    Promise.resolve({ query: mockClickHouseQuery }),
-}));
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: () => Promise.resolve({ query: mockClickHouseQuery }),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
@@ -118,9 +127,9 @@ function makeEventRefBlobStore(): {
 function buildService(blobStore: BlobStore): ClickHouseTraceService {
   const ioExtractionService = new TraceIOExtractionService();
   const logger = createLogger("test");
-  return new ClickHouseTraceService(
-    { project: { findUnique: vi.fn() } } as never,
-    (projectId, normalizedSpans) =>
+  return new ClickHouseTraceService({
+    prisma: { project: { findUnique: vi.fn() } } as never,
+    resolveTraceSpans: (projectId, normalizedSpans) =>
       resolveOffloadedTraces({
         projectId,
         normalizedSpans,
@@ -128,7 +137,7 @@ function buildService(blobStore: BlobStore): ClickHouseTraceService {
         ioExtractionService,
         logger,
       }),
-    (projectId, spansPerTrace) =>
+    resolveTraceSpansBatch: (projectId, spansPerTrace) =>
       resolveOffloadedTracesBatch({
         projectId,
         spansPerTrace,
@@ -136,7 +145,7 @@ function buildService(blobStore: BlobStore): ClickHouseTraceService {
         ioExtractionService,
         logger,
       }),
-  );
+  });
 }
 
 /** Mocks the getAllTracesForProject query sequence for an includeSpans read. */
@@ -286,11 +295,10 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
       spansPerTrace: NormalizedSpan[][],
     ) => Promise<ResolvedTraceSpans[]>,
   ): ClickHouseTraceService {
-    return new ClickHouseTraceService(
-      { project: { findUnique: vi.fn() } } as never,
-      undefined,
-      resolve,
-    );
+    return new ClickHouseTraceService({
+      prisma: { project: { findUnique: vi.fn() } } as never,
+      resolveTraceSpansBatch: resolve,
+    });
   }
 
   /** Passthrough resolution for a trace's spans (resolves nothing). */

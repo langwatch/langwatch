@@ -12,6 +12,7 @@
 import numeral from "numeral";
 import Parse from "papaparse";
 
+import { neutralizeFormula, neutralizeRows } from "~/utils/csvFormulaGuard";
 import type {
   BatchComparisonColumn,
   BatchComparisonVerdict,
@@ -58,6 +59,21 @@ const TIE_WINNER = "tie";
 const UNRESOLVED_WINNER = "unresolved";
 
 /**
+ * Written when a comparison produced no winner: the two judge passes named
+ * different winners, the judge answered without naming one, or the row had too
+ * few candidate outputs to compare at all.
+ *
+ * One token for all of them because the stored row cannot tell them apart: the
+ * SDKs report `inconclusive` and `skipped` as distinct verdicts but record both
+ * under the same batch status, so naming either one here would be a guess. The
+ * reasoning cell beside it says which happened, in the judge's own words.
+ *
+ * These used to export as three empty cells, which read exactly like a row with
+ * no comparison result at all, and dropped the explanation with them.
+ */
+const NO_VERDICT_WINNER = "no_verdict";
+
+/**
  * Name of one comparison candidate, resolved the way the results page resolves
  * it: the variant's display name, falling back to the raw identifier for a
  * candidate the run has dropped since it was judged.
@@ -77,6 +93,7 @@ const formatComparisonWinner = (
   verdict: BatchComparisonVerdict,
 ): string => {
   if (verdict.winnerId === null) {
+    if (verdict.isUnsettled) return NO_VERDICT_WINNER;
     return verdict.isUnresolved ? UNRESOLVED_WINNER : TIE_WINNER;
   }
   return comparisonVariantName(column, verdict.winnerId);
@@ -113,39 +130,43 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
 
   // Target columns with their outputs, cost, duration, and evaluator results
   for (const target of data.targetColumns) {
+    // The name the reader sees, so two targets stored under one name keep
+    // their own header block rather than repeating it.
+    const targetName = target.displayName ?? target.name;
+
     // Target metadata columns (model, prompt info, custom metadata)
     if (target.model) {
-      headers.push(`${target.name}_model`);
+      headers.push(`${targetName}_model`);
     }
     if (target.promptId) {
-      headers.push(`${target.name}_prompt_id`);
-      headers.push(`${target.name}_prompt_version`);
+      headers.push(`${targetName}_prompt_id`);
+      headers.push(`${targetName}_prompt_version`);
     }
     // Custom metadata keys
     if (target.metadata) {
       for (const key of Object.keys(target.metadata)) {
-        headers.push(`${target.name}_${key}`);
+        headers.push(`${targetName}_${key}`);
       }
     }
 
     // Target output (may have multiple fields)
     for (const field of target.outputFields) {
-      headers.push(`${target.name}_${field}`);
+      headers.push(`${targetName}_${field}`);
     }
     // If no output fields detected, add a generic output column
     if (target.outputFields.length === 0) {
-      headers.push(`${target.name}_output`);
+      headers.push(`${targetName}_output`);
     }
 
     // Cost and duration for this target
-    headers.push(`${target.name}_cost`);
-    headers.push(`${target.name}_duration_ms`);
+    headers.push(`${targetName}_cost`);
+    headers.push(`${targetName}_duration_ms`);
 
     // Error column
-    headers.push(`${target.name}_error`);
+    headers.push(`${targetName}_error`);
 
     // Trace ID
-    headers.push(`${target.name}_trace_id`);
+    headers.push(`${targetName}_trace_id`);
 
     // Evaluator results for this target
     // Get unique evaluator IDs used by this target
@@ -161,12 +182,12 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
 
     for (const evalId of evaluatorIds) {
       const evalName = data.evaluatorNames[evalId] ?? evalId;
-      headers.push(`${target.name}_${evalName}_score`);
-      headers.push(`${target.name}_${evalName}_passed`);
-      headers.push(`${target.name}_${evalName}_label`);
-      headers.push(`${target.name}_${evalName}_details`);
-      headers.push(`${target.name}_${evalName}_cost`);
-      headers.push(`${target.name}_${evalName}_duration_ms`);
+      headers.push(`${targetName}_${evalName}_score`);
+      headers.push(`${targetName}_${evalName}_passed`);
+      headers.push(`${targetName}_${evalName}_label`);
+      headers.push(`${targetName}_${evalName}_details`);
+      headers.push(`${targetName}_${evalName}_cost`);
+      headers.push(`${targetName}_${evalName}_duration_ms`);
     }
   }
 
@@ -289,9 +310,10 @@ const buildCsvRow = (
   for (const comparison of data.comparisonColumns ?? []) {
     const verdict = comparison.verdictsByRow[row.index];
 
-    // No verdict at all: the judge either never ran on this row or declined to
-    // call it. Leaving the block empty says that, where any winner value would
-    // claim a comparison happened.
+    // The judge never ran on this row. Leaving the block empty says that,
+    // where any winner value would claim a comparison happened. A row it DID
+    // run and could not settle is a different thing and exports as
+    // `no_verdict`, carrying the judge's account of it.
     if (!verdict) {
       values.push("", "", "");
       continue;
@@ -317,13 +339,19 @@ export const buildCsvData = (
 };
 
 /**
- * Generate CSV content string from BatchEvaluationData
+ * Generate CSV content string from BatchEvaluationData.
+ *
+ * The formula guard is applied here rather than in `buildCsvData`: the builders
+ * return the values as they are so callers can assert on content, and the
+ * apostrophe belongs to the file, not to the data. Both halves need it — the
+ * dataset columns and the evaluator names in the header row are named by
+ * whoever set the experiment up.
  */
 export const generateCsvContent = (data: BatchEvaluationData): string => {
   const { headers, rows } = buildCsvData(data);
   return Parse.unparse({
-    fields: headers,
-    data: rows,
+    fields: headers.map(neutralizeFormula),
+    data: neutralizeRows(rows),
   });
 };
 

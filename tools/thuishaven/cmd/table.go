@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
@@ -87,6 +88,16 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 	for i := 0; i < len(rest); i++ {
 		a := rest[i]
 		switch {
+		case a == "--":
+			// The standard end-of-flags separator: everything after it is a
+			// positional verbatim, so a wrapped command's own flags (`haven
+			// slot run -- tsgo --noEmit`) can never be read as haven's.
+			for _, tail := range rest[i+1:] {
+				if err := addPositional(tail); err != nil {
+					return inv, err
+				}
+			}
+			return inv, nil
 		case strings.HasPrefix(a, "--"):
 			name, embedded, hasEmbedded := strings.Cut(a, "=")
 			f := findLong(name)
@@ -218,6 +229,10 @@ var table = []commandSpec{
 			if upRunsAttached(d.isAgent, stdoutIsTTY()) {
 				return runUpAttached(ctx, d, inv.raw)
 			}
+			// The foreground run dies with whoever launched it; the detached
+			// child above runs under Setsid and is naturally exempt.
+			ctx, unwatch := watchLaunchingGroup(ctx)
+			defer unwatch()
 			return d.orch.Up(ctx, d.params, d.opts)
 		},
 	},
@@ -249,6 +264,24 @@ var table = []commandSpec{
 				name = inv.args[0]
 			}
 			return d.orch.Restart(ctx, d.params, name, inv.has("--rebuild"))
+		},
+	},
+	{
+		name:    "idp",
+		summary: "run only the IdP simulator — no app, API or databases; routed at idp.langwatch.localhost",
+		flags: []flagSpec{
+			{long: "--tenants", takesValue: true, value: "<n>", summary: "tenant range size (default 3)"},
+		},
+		run: func(ctx context.Context, d deps, inv invocation) error {
+			tenants := 0
+			if raw := inv.value("--tenants"); raw != "" {
+				n, err := strconv.Atoi(raw)
+				if err != nil || n < 1 {
+					return fmt.Errorf("--tenants needs a positive integer, got %q", raw)
+				}
+				tenants = n
+			}
+			return d.orch.RunIdPSolo(ctx, tenants)
 		},
 	},
 	{
@@ -412,6 +445,19 @@ var table = []commandSpec{
 		name:    "gate",
 		summary: "answer a Claude Code PreToolUse hook on stdin (install it with `haven setup gate-hook`)",
 		run:     runGate,
+	},
+	{
+		name:    "slot",
+		summary: "run any command under the machine-wide check slot (`slot run -- <cmd>`, `slot explain`)",
+		args:    "run [--label <name>] -- <command> [args…] | explain",
+		maxArgs: -1,
+		// The wrapped command lives after the `--` separator; only --label is
+		// ours, and it arrives before the `--`.
+		minusArgs: true,
+		flags: []flagSpec{
+			{long: "--label", value: "<name>", takesValue: true, summary: "how the run is named while it queues"},
+		},
+		run: runSlot,
 	},
 	{
 		name:    "typecheck",

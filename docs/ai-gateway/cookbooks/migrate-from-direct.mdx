@@ -4,7 +4,7 @@ description: Move from app → OpenAI/Anthropic to app → LangWatch Gateway →
 sidebarTitle: Migrate from direct
 ---
 
-You're already calling OpenAI, Anthropic, Bedrock, etc. from your application. You want to add governance, budgets, fallback, policy-rule patterns, per-engineer attribution, without rewriting everything. This cookbook shows the minimum-effort migration.
+The LangWatch Gateway sits between your application and the providers you already call directly (OpenAI, Anthropic, Bedrock, and the rest). It adds governance, budgets, fallback, policy-rule patterns, and per-engineer attribution. This cookbook shows the migration: each client gets the gateway's `baseURL` and reads one virtual key instead of the provider key, and the rest of your integration code stays as it is.
 
 ## Before
 
@@ -26,7 +26,7 @@ const anthropic = new Anthropic({
 });
 ```
 
-Two env-var changes. That's the whole code migration if you're happy with default gateway behaviour (no budget, cache-respect, fallback disabled). Read on for the policy additions.
+Two lines per client: the `baseURL` and the key it reads. That's the whole code migration if you're happy with default gateway behaviour (no budget, cache-respect, fallback disabled). Read on for the policy additions.
 
 ## Pre-migration checklist
 
@@ -40,13 +40,13 @@ For each provider (OpenAI, Anthropic, Bedrock, Azure, Vertex, Gemini) configure 
 
 Then open each row and switch to the **Advanced (Gateway)** tab to set the gateway-only fields:
 
-- **Rate limit (RPM / TPM / RPD)** — caps the gateway applies before dispatch.
-- **Fallback priority** — used when the org's default RoutingPolicy resolves more than one eligible MP (lower wins; tiebreak by createdAt).
-- **Provider config (JSON)** — region/deployment overrides (e.g. `{"region": "us-east-1"}`).
+- **Rate limit (RPM / TPM / RPD)**: caps the gateway applies before dispatch.
+- **Fallback priority**: used when the org's default RoutingPolicy resolves more than one eligible MP (lower wins; tiebreak by createdAt).
+- **Provider config (JSON)**: region/deployment overrides (e.g. `{"region": "us-east-1"}`).
 
 No separate "gateway provider" entity to mint. The credential itself is the only thing.
 
-<Note>If you've never configured ModelProviders in LangWatch before, this is the same Settings page you'd use for prompt playground + evaluators — the gateway just reads from the same store.</Note>
+<Note>If you've never configured ModelProviders in LangWatch before, this is the same Settings page you'd use for prompt playground + evaluators. The gateway reads from the same store.</Note>
 
 ## Step 2: Mint your first virtual key
 
@@ -97,7 +97,7 @@ You should see `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Trace-Id`, `X-Lang
 
 ## Step 4: Add your first policy
 
-The whole point of the migration. Pick the policy that maps to a real pain you have today:
+Pick the policy that maps to a real pain you have today:
 
 ### Hard cap on engineering spend
 
@@ -170,7 +170,7 @@ After a week of running through the gateway, the original upstream keys (`sk-pro
 |---|---|---|
 | `401 invalid_api_key` on every request | VK env var not loaded; or VK revoked | `echo $LANGWATCH_VK` to verify; check LangWatch UI for VK status |
 | `403 model_not_allowed` on a model you used before | VK's `models_allowed` is set restrictively | Edit VK to add the model, or remove the allowlist |
-| Calls succeed but no trace in LangWatch UI | Scope-id mismatch between VK and where you're looking | `langwatch virtual-keys get <id>` → check `scopes` (and resolved `project_id` per vk-config-bundle rules — TEAM/ORG-scoped VKs file traces in the org's `internal_governance` project) |
+| Calls succeed but no trace in LangWatch UI | Scope-id mismatch between VK and where you're looking | `langwatch virtual-keys get <id>` → check `scopes` (and resolved `project_id` per vk-config-bundle rules: TEAM/ORG-scoped VKs file traces in the org's `internal_governance` project) |
 | Anthropic-side calls return `400 must provide max_tokens` | You removed `max_tokens` because OpenAI doesn't require it | Anthropic requires it; keep it set |
 | Response latency jumped by ~50 ms | Fallback is running every call (primary is down) | Check `X-LangWatch-Fallback-Count`, if > 0, fix the primary |
 

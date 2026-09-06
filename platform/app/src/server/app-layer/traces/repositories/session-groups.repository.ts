@@ -69,6 +69,13 @@ export interface SessionGroupRow {
   errorCount: number;
   warningCount: number;
   totalSpans: number;
+  /**
+   * The session's most recent trace, by occurrence then version. It is what
+   * the row's previews were read from, and what a click on the row opens.
+   * Empty only for a session the rollup found no trace for, which the group
+   * itself rules out.
+   */
+  lastTraceId: string;
   /** Latest trace's computed previews, read separately for the page only. */
   input: string | null;
   output: string | null;

@@ -6,7 +6,7 @@ keywords: LangWatch, concepts, tracing, observability, LLM, AI, travel, blog, us
 
 import AgentReportNotice from "/snippets/agent-report-notice.mdx";
 
-Understanding the core concepts of LangWatch is essential for effective observability in your LLM applications. This guide explains key terms and their relationships using practical examples, like building an AI travel assistant or a text generation service.
+LangWatch organizes what your LLM application sends into threads, traces and spans, each with its own ID. The optional `user_id`, `customer_id` and `labels` fields add correlation and filtering on top of them. The examples below come from an AI travel assistant and a text generation service.
 
 ### Threads: The Whole Conversation
 
@@ -50,18 +50,18 @@ Simple but crucial: The **User ID** identifies the actual end-user interacting w
 
 Field: `customer_id`
 
-Are you building a platform *for other companies* to create *their own* LLM apps? That's where the **Customer ID** shines. If you're providing the tools for others (your customers) to build AI assistants for *their* users, the `customer_id` lets you (and them!) track usage and performance per customer account. It's perfect for offering custom analytics dashboards, showing your customers how *their* AI implementations are doing.
+Are you building a platform *for other companies* to create *their own* LLM apps? That is what the **Customer ID** is for. If you're providing the tools for others (your customers) to build AI assistants for *their* users, the `customer_id` lets you (and them!) track usage and performance per customer account. Scoping analytics by `customer_id` is what lets you give each customer a dashboard of how *their* AI implementation is doing.
 
-### Labels: Your Organizational Superpowers
+### Labels: Organizing and Filtering Traces
 
 Field: `labels`
 
-Think of **Labels** as flexible tags you can slap onto Traces to organize, filter, and compare anything you want! They're your secret weapon for slicing and dicing your data.
+**Labels** are flexible tags you attach to Traces to organize, filter, and compare them.
 
 * **Categorize Actions:** Use labels like `blogpost_title` or `blogpost_keywords`.
 * **Track Versions:** Label traces with `version:v1.0.0`, then deploy an improved prompt and label new traces `version:v1.0.1`.
 * **Run Experiments:** Tag traces with `experiment:prompt_a` vs. `experiment:prompt_b`.
 
-Labels make it easy to zoom in on specific features or A/B test different approaches right within the LangWatch dashboard.
+Labels let you zoom in on specific features or A/B test different approaches right within the LangWatch dashboard.
 
 <AgentReportNotice />

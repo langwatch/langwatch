@@ -31,6 +31,20 @@ Feature: Gateway errors are logged with fault attribution
     When the gateway forwards the rejection to the client
     Then an info log records the failure with customer fault, status and message
 
+  # The forwarded response holds the provider's own sentence, and the log line
+  # held only our summary of it ("codex backend HTTP 400"). A production outage
+  # on codex models took a live probe of the backend to name, because the one
+  # place an operator looks never carried the reply that said "Unsupported
+  # parameter: prompt_cache_retention".
+  @unit
+  Scenario: A forwarded provider rejection names the provider's own reason
+    Given the upstream provider rejects the request with a reason in its body
+    When the gateway forwards the rejection to the client
+    Then the operator reads that reason next to the status
+    And a rejection worded in any of the ways providers word it reads the same
+    And a body that states no reason is described, never quoted, so nothing the customer sent can reach the log
+    And a reason our own message already states is not repeated
+
   @unit
   Scenario: A gateway-classified error is logged by its error code
     Given the gateway rejects or fails a request with one of its own error codes

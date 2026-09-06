@@ -220,9 +220,7 @@ export async function runSeedPersonas(
           },
           name: "developer-default",
           isDefault: true,
-          strategy: "priority",
           modelProviderIds: [modelProvider.id],
-          modelAllowlist: ["gpt-5-mini", "gpt-5", "gpt-4o", "gpt-4o-mini"],
         },
       });
       modelProviderSeeded = true;
@@ -270,7 +268,7 @@ export async function runSeedPersonas(
     // Personal $1/month BLOCK budget so a live-fire loop (fire-completion
     // or `langwatch claude`) actually populates gateway_budget_ledger_events
     // out-of-box. Without this, traces ingest cleanly but the trace-fold
-    // reactor finds zero applicable budgets and skips the ledger insert.
+    // subscriber finds zero applicable budgets and skips the ledger insert.
     // Idempotent per (org, principal) — finds existing or creates.
     const existingBudget = await prisma.gatewayBudget.findFirst({
       where: {

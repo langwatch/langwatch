@@ -30,8 +30,13 @@ const BEGIN = "# >>> langwatch otel begin >>>";
 const END = "# <<< langwatch otel end <<<";
 
 export interface CodexOtelBlockInputs {
-	/** Full OTLP endpoint, e.g. https://app.langwatch.ai/api/otel */
-	endpoint: string;
+	/**
+	 * The bare ingestion base, e.g. https://app.langwatch.ai/api/otel. The
+	 * block derives BOTH signal endpoints from it (codex's OTLP config is
+	 * signal-specific and appends no path of its own): /v1/traces for the
+	 * trace exporter and /v1/logs for the events exporter.
+	 */
+	baseEndpoint: string;
 	/** Plaintext personal ingest key (sk-lw-<...>). */
 	ingestionToken: string;
 	/** Logical environment label (e.g. user@org). Lands on resource.deployment.environment.name. */
@@ -62,22 +67,41 @@ export function codexTraceEndpoint(baseEndpoint: string): string {
 	return `${normalizeEndpoint(baseEndpoint)}/v1/traces`;
 }
 
+/**
+ * The log-signal endpoint codex's EVENTS exporter (`[otel.exporter]`) posts
+ * to — same reasoning as {@link codexTraceEndpoint}: codex appends nothing.
+ */
+export function codexLogsEndpoint(baseEndpoint: string): string {
+	return `${normalizeEndpoint(baseEndpoint)}/v1/logs`;
+}
+
 /** Escape a value for a TOML basic (double-quoted) string. */
 function tomlStr(s: string): string {
 	return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 /**
- * Build the bracketed [otel] + [otel.trace_exporter.otlp-http] block.
- * Returned WITH leading + trailing markers and a trailing newline.
+ * Build the bracketed [otel] block with BOTH signal exporters. Returned WITH
+ * leading + trailing markers and a trailing newline.
  *
- * codex 0.137+ separates `trace_exporter` (spans) from `exporter`
- * (logs) in its config schema. We emit the trace_exporter form so
- * Path B span ingestion fires; the older `[otel.exporter.otlp-http]`
- * form is silently ignored on traces in the current schema.
+ * codex splits its `[otel]` exporters by signal: `trace_exporter` posts spans
+ * (`session_task.turn` carries the turn's tokens and session key) and
+ * `exporter` posts the EVENTS as log records (`codex.user_prompt`,
+ * `codex.tool_result`, `codex.turn_ttft`, ...) — the half that carries the
+ * tools, prompts and TTFT no codex span reports. Both default to none, so
+ * the block enables both; `metrics_exporter` is deliberately left alone
+ * (its default is codex's own analytics, not ours to redirect).
+ *
+ * The TRACE exporter stays FIRST: `codexOtelBlockEndpoint` reads the block's
+ * first `endpoint =` line, and the login-time staleness compare checks it
+ * against {@link codexTraceEndpoint}.
+ *
+ * `log_user_prompt` is not set: codex then exports the prompt LENGTH and
+ * redacts the text, and the conversation content arrives through the notify
+ * harvest instead, on the user's existing opt-in.
  *
  * `includeAuthHeader` controls whether the write-only ingest key is
- * inlined as a `headers` entry on the trace exporter. codex reads that
+ * inlined as a `headers` entry on each exporter. codex reads that
  * header on every run, so persisting it makes a plain `codex` (no
  * langwatch wrapper) capture without leaking OTEL vars into the shell
  * rc. When false, the header comes from OTEL_EXPORTER_OTLP_HEADERS at
@@ -102,15 +126,20 @@ export function buildCodexOtelBlock(
 				`# this file persists only the endpoint + environment label.`,
 			];
 
-	const exporter = [
+	const headerLine = `headers = { "Authorization" = "Bearer ${tomlStr(inputs.ingestionToken)}" }`;
+	const traceExporter = [
 		"[otel.trace_exporter.otlp-http]",
-		`endpoint = "${tomlStr(inputs.endpoint)}"`,
+		`endpoint = "${tomlStr(codexTraceEndpoint(inputs.baseEndpoint))}"`,
+		`protocol = "json"`,
+	];
+	const eventsExporter = [
+		"[otel.exporter.otlp-http]",
+		`endpoint = "${tomlStr(codexLogsEndpoint(inputs.baseEndpoint))}"`,
 		`protocol = "json"`,
 	];
 	if (includeAuthHeader) {
-		exporter.push(
-			`headers = { "Authorization" = "Bearer ${tomlStr(inputs.ingestionToken)}" }`,
-		);
+		traceExporter.push(headerLine);
+		eventsExporter.push(headerLine);
 	}
 
 	return [
@@ -121,7 +150,9 @@ export function buildCodexOtelBlock(
 		"[otel]",
 		`environment = "${tomlStr(env)}"`,
 		"",
-		...exporter,
+		...traceExporter,
+		"",
+		...eventsExporter,
 		END,
 		"",
 	].join("\n");
@@ -168,6 +199,32 @@ export function codexOtelBlockEndpoint(
 	const block = content.slice(begin, end);
 	const match = /^\s*endpoint\s*=\s*"([^"]*)"/m.exec(block);
 	return match?.[1] ?? null;
+}
+
+/**
+ * The log-signal endpoint from the langwatch `[otel]` block: the `endpoint`
+ * line whose URL ends in `/v1/logs` (the events exporter's). Null on a block
+ * written before the events exporter existed, which is the caller's cue that
+ * there is no log endpoint to post to rather than a URL to guess.
+ */
+export function codexOtelBlockLogsEndpoint(
+	filePath: string = defaultCodexConfigPath(),
+): string | null {
+	let content: string;
+	try {
+		content = fs.readFileSync(filePath, "utf8");
+	} catch {
+		return null;
+	}
+	const begin = content.indexOf(BEGIN);
+	const end = content.indexOf(END);
+	if (begin === -1 || end === -1 || end < begin) return null;
+	const block = content.slice(begin, end);
+	for (const match of block.matchAll(/^\s*endpoint\s*=\s*"([^"]*)"/gm)) {
+		const url = match[1];
+		if (url?.endsWith("/v1/logs")) return url;
+	}
+	return null;
 }
 
 /**

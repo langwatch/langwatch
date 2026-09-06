@@ -7,8 +7,13 @@
  *
  *   terminationGracePeriodSeconds   kubelet SIGKILL      (charts/langwatch)
  *   └─ processDeadlineMs            force-exit watchdog  (start.ts, workers.ts)
+ *      ├─ httpClosePhaseMs          http-server phase    (httpServerClosePhase.ts)
+ *      │  └─ httpDrainGraceMs       in-flight requests   (httpServerClosePhase.ts)
  *      └─ appCloseMs                App.close backstop   (app-layer/app.ts)
  *         └─ queueDrainMs           GroupQueueProcessor  (groupQueue.ts)
+ *
+ * The http pair is a sibling of appCloseMs rather than a parent: the phases
+ * run in sequence, so both are spent out of the same process deadline.
  *
  * They used to be four independent literals in four files, agreeing only by
  * comment — and they did not agree. start.ts force-exited at 5s while the
@@ -40,6 +45,20 @@ const APP_CLOSE_SLACK_MS = 5_000;
  * server and websockets, tearing down the worker stack, flushing PostHog.
  */
 const PROCESS_SLACK_MS = 15_000;
+
+/**
+ * The share of PROCESS_SLACK_MS the http-server phase may spend. The rest of
+ * that slack pays for the worker stack teardown and the telemetry flush that
+ * run after it, so the drain cannot have all of it.
+ */
+const HTTP_CLOSE_PHASE_SHARE = 0.5;
+
+/**
+ * Room inside the http-server phase for the work either side of the drain:
+ * the MCP session teardown before it, and the close callback firing after the
+ * stragglers are destroyed. What is left is what in-flight requests get.
+ */
+const HTTP_CLOSE_SLACK_MS = 2_000;
 
 /**
  * Slack between the process giving up on its own and the kubelet's SIGKILL.
@@ -90,6 +109,14 @@ export interface ShutdownBudget {
   appCloseMs: number;
   /** The entrypoint watchdog: exit on our own terms before the kubelet does. */
   processDeadlineMs: number;
+  /** The http-server phase's own ceiling, named so it never inherits the default. */
+  httpClosePhaseMs: number;
+  /**
+   * How long in-flight requests get before the leftover sockets are destroyed.
+   * Sits inside httpClosePhaseMs, or the runner abandons the phase before the
+   * destroy it exists to perform.
+   */
+  httpDrainGraceMs: number;
   /**
    * The smallest terminationGracePeriodSeconds that can hold all of the above.
    * The chart asserts against this; nothing at runtime can enforce it, because
@@ -102,10 +129,15 @@ export function resolveShutdownBudget(): ShutdownBudget {
   const queueDrainMs = resolveDrainMs();
   const appCloseMs = queueDrainMs + APP_CLOSE_SLACK_MS;
   const processDeadlineMs = appCloseMs + PROCESS_SLACK_MS;
+  const httpClosePhaseMs = Math.floor(
+    PROCESS_SLACK_MS * HTTP_CLOSE_PHASE_SHARE,
+  );
   return {
     queueDrainMs,
     appCloseMs,
     processDeadlineMs,
+    httpClosePhaseMs,
+    httpDrainGraceMs: httpClosePhaseMs - HTTP_CLOSE_SLACK_MS,
     requiredGracePeriodSeconds: Math.ceil(
       (processDeadlineMs + KUBELET_SLACK_MS) / 1000,
     ),

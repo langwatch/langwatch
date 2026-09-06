@@ -28,7 +28,6 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
@@ -74,7 +73,7 @@ export const aiToolsRouter = createTRPCRouter({
    */
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("aiTools:view"))
+    .permission("aiTools:view")
     .query(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       try {
@@ -107,7 +106,7 @@ export const aiToolsRouter = createTRPCRouter({
    */
   providerAvailability: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("aiTools:view"))
+    .permission("aiTools:view")
     .query(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       const configuredProviders = await service.listConfiguredProvidersForUser({
@@ -133,7 +132,7 @@ export const aiToolsRouter = createTRPCRouter({
    */
   claudeCodeOtlpEndpoint: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("aiTools:view"))
+    .permission("aiTools:view")
     .query(async ({ ctx, input }) => {
       const source = await ctx.prisma.ingestionSource.findFirst({
         where: {
@@ -151,11 +150,11 @@ export const aiToolsRouter = createTRPCRouter({
 
   /**
    * Admin list - includes disabled (but not deleted) tiles. Powers the
-   * catalog editor at /settings/governance/tool-catalog.
+   * catalog editor at /governance/tool-catalog.
    */
   adminList: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .query(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       return await service.listForAdmin({
@@ -165,7 +164,7 @@ export const aiToolsRouter = createTRPCRouter({
 
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .query(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       const row = await service.findById({
@@ -190,7 +189,7 @@ export const aiToolsRouter = createTRPCRouter({
         config: z.record(z.string(), z.unknown()),
       }),
     )
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       try {
@@ -232,7 +231,7 @@ export const aiToolsRouter = createTRPCRouter({
         config: z.record(z.string(), z.unknown()).optional(),
       }),
     )
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       try {
@@ -267,7 +266,7 @@ export const aiToolsRouter = createTRPCRouter({
    */
   remove: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       return await service.remove({
@@ -291,7 +290,7 @@ export const aiToolsRouter = createTRPCRouter({
         enabled: z.boolean(),
       }),
     )
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       return await service.update({
@@ -321,7 +320,7 @@ export const aiToolsRouter = createTRPCRouter({
         slugs: z.array(z.string()).min(1).optional(),
       }),
     )
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       return await service.seedStarterPack({
@@ -338,7 +337,7 @@ export const aiToolsRouter = createTRPCRouter({
    */
   starterPackCatalog: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .query(() => {
       return AiToolEntryService.listStarterPackTiles();
     }),
@@ -353,7 +352,7 @@ export const aiToolsRouter = createTRPCRouter({
    */
   providerOptions: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .query(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       return await service.listProviderOptionsForAdmin({
@@ -369,7 +368,7 @@ export const aiToolsRouter = createTRPCRouter({
    */
   routingPolicyOptions: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .query(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       return await service.listRoutingPolicyOptionsForAdmin({
@@ -386,7 +385,7 @@ export const aiToolsRouter = createTRPCRouter({
           .min(1),
       }),
     )
-    .use(checkOrganizationPermission("aiTools:manage"))
+    .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       await service.reorder({

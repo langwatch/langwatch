@@ -40,7 +40,7 @@ import { TRPCError } from "@trpc/server";
  * that, not the path.
  */
 import {
-  Prisma,
+  type Prisma,
   type PrismaClient,
   type RoutingPolicy,
   type RoutingPolicyScope as RoutingPolicyScopeRow,
@@ -48,6 +48,7 @@ import {
 } from "~/generated/prisma/client";
 
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
+import { isLatestAlias } from "~/server/modelProviders/latestAliases";
 
 export type RoutingPolicyScope = "organization" | "team" | "project";
 
@@ -99,16 +100,73 @@ export class RoutingPolicyMustHaveScopeError extends Error {
   }
 }
 
+/**
+ * A policy may only name concrete models. A moving name such as
+ * `openai/latest` resolves in the product, never in the gateway: the resolver
+ * looks a model name up literally, so a stored alias would make every request
+ * that reaches it dispatch a model called "latest".
+ *
+ * The editor already writes the concrete id it resolved. This guards the paths
+ * that do not go through the editor.
+ */
+export class RoutingPolicyModelMustBeConcreteError extends Error {
+  readonly code = "routing_policy_model_must_be_concrete" as const;
+  constructor(
+    readonly field: string,
+    readonly value: string,
+  ) {
+    super(
+      `"${value}" names whichever model is newest rather than a specific one, ` +
+        `so it cannot be stored on a routing policy. Use the model id it currently resolves to.`,
+    );
+    this.name = "RoutingPolicyModelMustBeConcreteError";
+  }
+}
+
+/**
+ * Refuses every moving name a policy could carry, across the default model and
+ * every entry in the name mapping, tiers included.
+ */
+function assertModelsAreConcrete({
+  defaultModel,
+  modelAliases,
+}: {
+  defaultModel?: string | null;
+  modelAliases?: Record<string, string>;
+}): void {
+  if (defaultModel && isLatestAlias(defaultModel.trim())) {
+    throw new RoutingPolicyModelMustBeConcreteError(
+      "defaultModel",
+      defaultModel.trim(),
+    );
+  }
+  for (const [from, to] of Object.entries(modelAliases ?? {})) {
+    if (isLatestAlias(to.trim())) {
+      throw new RoutingPolicyModelMustBeConcreteError(
+        `modelAliases.${from}`,
+        to.trim(),
+      );
+    }
+  }
+}
+
 export interface CreateRoutingPolicyInput {
   organizationId: string;
   scopes: RoutingPolicyScopeEntry[];
   name: string;
   description?: string | null;
   modelProviderIds: string[];
-  modelAllowlist?: string[] | null;
-  strategy?: "priority" | "cost" | "latency" | "round_robin";
   isDefault?: boolean;
+  /**
+   * Model name mapping. The reserved tier names (complex / reasoning / fast)
+   * are ordinary entries in here; see src/utils/modelTierPresets.ts.
+   */
   modelAliases?: Record<string, string>;
+  /**
+   * The model a reserved tier name resolves to when this policy names no
+   * target of its own for it. Concrete model id, never a moving name.
+   */
+  defaultModel?: string | null;
   policyRules?: Record<string, unknown>;
   actorUserId: string;
 }
@@ -119,9 +177,8 @@ export interface UpdateRoutingPolicyInput {
   name?: string;
   description?: string | null;
   modelProviderIds?: string[];
-  modelAllowlist?: string[] | null;
-  strategy?: "priority" | "cost" | "latency" | "round_robin";
   modelAliases?: Record<string, string>;
+  defaultModel?: string | null;
   policyRules?: Record<string, unknown>;
   actorUserId: string;
 }
@@ -188,6 +245,10 @@ export class RoutingPolicyService {
     if (input.modelProviderIds.length === 0) {
       throw new RoutingPolicyMustHaveProviderError();
     }
+    assertModelsAreConcrete({
+      defaultModel: input.defaultModel,
+      modelAliases: input.modelAliases,
+    });
     await this.assertModelProvidersBelongToOrg(
       input.organizationId,
       input.modelProviderIds,
@@ -215,12 +276,9 @@ export class RoutingPolicyService {
           name: input.name,
           description: input.description ?? null,
           modelProviderIds: input.modelProviderIds as Prisma.InputJsonValue,
-          modelAllowlist: input.modelAllowlist
-            ? (input.modelAllowlist as Prisma.InputJsonValue)
-            : Prisma.JsonNull,
-          strategy: input.strategy ?? "priority",
           isDefault: input.isDefault ?? false,
           modelAliases: (input.modelAliases ?? {}) as Prisma.InputJsonValue,
+          defaultModel: input.defaultModel ?? null,
           policyRules: (input.policyRules ?? {}) as Prisma.InputJsonValue,
           createdById: input.actorUserId,
           updatedById: input.actorUserId,
@@ -250,6 +308,10 @@ export class RoutingPolicyService {
     input: UpdateRoutingPolicyInput,
   ): Promise<RoutingPolicyWithScopes> {
     const existing = await this.requireOwn(input.id, input.organizationId);
+    assertModelsAreConcrete({
+      defaultModel: input.defaultModel,
+      modelAliases: input.modelAliases,
+    });
     if (input.modelProviderIds !== undefined) {
       if (input.modelProviderIds.length === 0) {
         throw new RoutingPolicyMustHaveProviderError();
@@ -267,13 +329,10 @@ export class RoutingPolicyService {
     if (input.description !== undefined) data.description = input.description;
     if (input.modelProviderIds !== undefined)
       data.modelProviderIds = input.modelProviderIds as Prisma.InputJsonValue;
-    if (input.modelAllowlist !== undefined)
-      data.modelAllowlist = input.modelAllowlist
-        ? (input.modelAllowlist as Prisma.InputJsonValue)
-        : Prisma.JsonNull;
-    if (input.strategy !== undefined) data.strategy = input.strategy;
     if (input.modelAliases !== undefined)
       data.modelAliases = input.modelAliases as Prisma.InputJsonValue;
+    if (input.defaultModel !== undefined)
+      data.defaultModel = input.defaultModel;
     if (input.policyRules !== undefined)
       data.policyRules = input.policyRules as Prisma.InputJsonValue;
 

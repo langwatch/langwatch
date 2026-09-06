@@ -47,6 +47,7 @@ import {
   providerDeprecation,
 } from "../../server/modelProviders/registry";
 import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
+import { broadestScopeRank } from "../../utils/scopeBreadth";
 
 export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
@@ -138,15 +139,32 @@ export default function ModelsPage() {
   // Client-side filter for the scope dropdown at the top of the page.
   // The list query returns every provider the caller can see; this just
   // narrows the visible rows. See specs/model-providers/scope-filter.feature.
-  const enabledProviders = useMemo(
-    () =>
-      filterProvidersByScope(allEnabledProviders, scopeFilter, {
-        hierarchy,
-        currentTeamId: team?.id,
-        currentProjectId: project?.id,
-      }),
-    [allEnabledProviders, scopeFilter, hierarchy, team?.id, project?.id],
-  );
+  // Rows read broadest scope first (organization, then team, then project),
+  // and by name within a scope, so the same order the virtual-key picker uses.
+  const enabledProviders = useMemo(() => {
+    const filtered = filterProvidersByScope(allEnabledProviders, scopeFilter, {
+      hierarchy,
+      currentTeamId: team?.id,
+      currentProjectId: project?.id,
+    });
+    const scopeTypesOf = (p: (typeof filtered)[number]): string[] => {
+      const scopes = (p as { scopes?: Array<{ scopeType: string }> }).scopes;
+      if (scopes && scopes.length > 0) return scopes.map((s) => s.scopeType);
+      const fallback = (p as { scopeType?: string }).scopeType;
+      return fallback ? [fallback] : [];
+    };
+    const labelOf = (p: (typeof filtered)[number]): string =>
+      (p as { name?: string }).name ??
+      modelProvidersRegistry[p.provider as keyof typeof modelProvidersRegistry]
+        ?.name ??
+      p.provider;
+    return [...filtered].sort(
+      (a, b) =>
+        broadestScopeRank(scopeTypesOf(a)) -
+          broadestScopeRank(scopeTypesOf(b)) ||
+        labelOf(a).localeCompare(labelOf(b)),
+    );
+  }, [allEnabledProviders, scopeFilter, hierarchy, team?.id, project?.id]);
 
   // Every registry provider is always addable — iter 109 allows multiple
   // rows per provider type so users can configure "OpenAI" at org scope

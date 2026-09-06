@@ -1,3 +1,4 @@
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
@@ -154,6 +155,9 @@ export class OtlpSpanTokenEstimationService {
       {
         distinctId: "global",
         defaultValue: false,
+        // A global switch: no tenant takes part in it.
+        projectId: NOT_TARGETED,
+        organizationId: NOT_TARGETED,
         cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
       },
     );
@@ -167,6 +171,9 @@ export class OtlpSpanTokenEstimationService {
           distinctId: tenantId,
           defaultValue: false,
           projectId: tenantId,
+          // A per-span hot path. It buys no organization lookup, so an
+          // operator stops one project by project id.
+          organizationId: NOT_TARGETED,
           cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
         },
       );

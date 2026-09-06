@@ -7,10 +7,11 @@
 
 import type { Logger } from "@langwatch/observability";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import { trace } from "@opentelemetry/api";
 import { generateText } from "ai";
 import { Liquid } from "liquidjs";
+import type { RunParameterValues } from "../../parameters";
 import { createChildProcessLogger } from "../child-logger";
 import { createModelFromParams } from "../model.factory";
 import {
@@ -18,6 +19,7 @@ import {
   templateReferencesConversation,
 } from "../prompt-template-context";
 import type { LiteLLMParams, PromptConfigData } from "../types";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 // Shared Liquid engine instance for template interpolation
 const liquid = new Liquid();
@@ -26,7 +28,7 @@ const liquid = new Liquid();
  * Serialized prompt config adapter that uses pre-fetched configuration.
  * No database access required.
  */
-export class SerializedPromptConfigAdapter extends AgentAdapter {
+export class SerializedPromptConfigAdapter extends SerializedAgentAdapter {
   role = AgentRole.AGENT;
 
   private readonly logger: Logger;
@@ -34,18 +36,22 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
   private readonly config: PromptConfigData;
   private readonly litellmParams: LiteLLMParams;
   private readonly nlpServiceUrl: string;
+  private readonly parameters: RunParameterValues;
 
   constructor(options: {
     config: PromptConfigData;
     litellmParams: LiteLLMParams;
     nlpServiceUrl: string;
     logger?: Logger;
+    /** The run's resolved values, read from the template as `params.NAME`. */
+    parameters?: RunParameterValues;
   }) {
     super();
     this.name = "SerializedPromptConfigAdapter";
     this.config = options.config;
     this.litellmParams = options.litellmParams;
     this.nlpServiceUrl = options.nlpServiceUrl;
+    this.parameters = options.parameters ?? {};
     this.logger =
       options.logger ??
       createChildProcessLogger("langwatch:scenarios:prompt-adapter");
@@ -57,6 +63,7 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
         input,
         inputs: this.config.inputs,
         scenarioMappings: this.config.scenarioMappings,
+        parameters: this.parameters,
       });
 
     if (unboundInputs.length > 0) {

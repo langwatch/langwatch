@@ -17,6 +17,13 @@
 export const LANGY_SESSION_API_KEY_NAME = "Langy session";
 
 /**
+ * Name of the short-lived key `mintAgentSandboxApiKey` puts in a code agent's
+ * sandbox. One is created per run and auto-expires, so the same listing rule
+ * as the Langy session key applies (see HIDDEN_SYSTEM_KEY_NAMES).
+ */
+export const AGENT_SANDBOX_API_KEY_NAME = "Agent sandbox run";
+
+/**
  * Keys with these names are system-managed and short-lived; they are excluded
  * from both the per-user and the admin (org-wide) API-keys listings so the UI
  * shows only keys a human created and manages. They remain fully functional for
@@ -34,4 +41,5 @@ export const LANGY_SESSION_API_KEY_NAME = "Langy session";
  */
 export const HIDDEN_SYSTEM_KEY_NAMES: readonly string[] = [
   LANGY_SESSION_API_KEY_NAME,
+  AGENT_SANDBOX_API_KEY_NAME,
 ];

@@ -183,7 +183,7 @@ export class TraceAnalyticsClickHouseRepository
         clickhouse_settings: READ_BACK_FOLD_INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId: row.tenantId,
           traceId: row.traceId,
@@ -235,7 +235,7 @@ export class TraceAnalyticsClickHouseRepository
         clickhouse_settings: READ_BACK_FOLD_INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           count: entries.length,
@@ -321,7 +321,7 @@ export class TraceAnalyticsClickHouseRepository
       // the row, so without this the deploy window ADR-066 documents — workers
       // rolling ahead of migration 00056, every read throwing
       // UNKNOWN_IDENTIFIER — surfaces as an untraceable line.
-      logger.error(
+      logger.warn(
         { tenantId, traceId, error },
         "Failed to read back trace analytics row",
       );

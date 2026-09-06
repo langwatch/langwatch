@@ -92,29 +92,33 @@ func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 			// Rejected before anything was attempted, so it is permanent and
 			// operator-fixable: misconfigured, never the retryable code.
 			name: "azure configuration error: deployments not set",
-			berr: bfproviderutils.NewConfigurationError("deployments not set", bfschemas.Azure),
+			berr: bfproviderutils.NewConfigurationError("deployments not set"),
 			want: domain.ErrProviderMisconfigured,
 		},
 		{
 			// Same constructor, different cause — the fix must key on the
 			// error's shape, not on one message.
 			name: "azure configuration error: endpoint not set",
-			berr: bfproviderutils.NewConfigurationError("endpoint not set", bfschemas.Azure),
+			berr: bfproviderutils.NewConfigurationError("endpoint not set"),
 			want: domain.ErrProviderMisconfigured,
 		},
 		{
-			// AC18b: the request type is not served by this provider. Carries
-			// the vendor's own Error.Code, so it stays on the retryable code:
-			// the next credential in the chain may serve the type.
+			// AC18b: the request type is not served by this provider. It carries
+			// the vendor's own Error.Code ("unsupported_operation"), which the
+			// classifier reads before the bare-shape arm and maps to
+			// provider_config_invalid — the domain code whose own definition
+			// names "the provider does not implement the operation". Terminal for
+			// this slot, not the permanent-misconfigured bucket the bare shapes
+			// land in.
 			name: "unsupported operation",
 			berr: bfproviderutils.NewUnsupportedOperationError(bfschemas.EmbeddingRequest, bfschemas.Anthropic),
-			want: domain.ErrProviderError,
+			want: domain.ErrProviderConfigInvalid,
 		},
 		{
 			// AC18b: an attempt that failed short of a response, carrying the
 			// Go error it failed on. Retryable for the same reason.
 			name: "bifrost operation error",
-			berr: bfproviderutils.NewBifrostOperationError("error marshaling request", errors.New("boom"), bfschemas.Azure),
+			berr: bfproviderutils.NewBifrostOperationError("error marshaling request", errors.New("boom")),
 			want: domain.ErrProviderError,
 		},
 		{
@@ -134,7 +138,7 @@ func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 			// request: nil"); the transient ones among them sit on the video and
 			// batch paths this gateway never calls.
 			name: "operation error raised without a Go error",
-			berr: bfproviderutils.NewBifrostOperationError("request body is not provided", nil, bfschemas.Azure),
+			berr: bfproviderutils.NewBifrostOperationError("request body is not provided", nil),
 			want: domain.ErrProviderMisconfigured,
 		},
 		{
@@ -229,7 +233,7 @@ func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 // @scenario "The operator can identify the cause from the response alone"
 func TestClassifyBifrostError_KeepsTheUnderlyingBifrostMessage(t *testing.T) {
 	err := classifyBifrostError(context.Background(),
-		bfproviderutils.NewConfigurationError("deployments not set", bfschemas.Azure))
+		bfproviderutils.NewConfigurationError("deployments not set"))
 
 	var e herr.E
 	require.ErrorAs(t, err, &e)
@@ -243,7 +247,7 @@ func TestClassifyBifrostError_KeepsTheUnderlyingBifrostMessage(t *testing.T) {
 //
 // @scenario "A genuine provider timeout still classifies as a timeout"
 func TestClassifyBifrostError_VendorTimeoutStaysATimeout(t *testing.T) {
-	berr := bfproviderutils.NewBifrostTimeoutError("request timed out", errors.New("context deadline exceeded"), bfschemas.Azure)
+	berr := bfproviderutils.NewBifrostTimeoutError("request timed out", errors.New("context deadline exceeded"))
 	require.NotNil(t, berr.StatusCode, "fixture precondition: a real timeout carries an explicit status")
 	require.Equal(t, http.StatusGatewayTimeout, *berr.StatusCode)
 

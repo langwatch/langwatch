@@ -25,6 +25,23 @@ const {
   invalidateMock: vi.fn(),
 }));
 
+// A full-page reload used to run in the same tick as the toast below and tore
+// it off the screen — the restart instruction is the one thing an operator has
+// to read. `trpc.invalidate()` replaced it, and this keeps the regression
+// guarded: the hook must not reload.
+//
+// Guarded through the navigation seam rather than by spying on
+// `window.location.reload`, which is impossible — jsdom defines both `location`
+// and its methods as non-configurable and non-writable, so every form of spy,
+// stub and redefine throws in a VM realm.
+const { reloadPage } = vi.hoisted(() => ({ reloadPage: vi.fn() }));
+
+vi.mock("~/utils/browserNavigation", () => ({
+  reloadPage,
+  hardNavigate: vi.fn(),
+  replaceLocation: vi.fn(),
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({ invalidate: invalidateMock }),
@@ -67,20 +84,10 @@ const renderActions = () =>
   );
 
 describe("useLicenseActions", () => {
-  let reloadMock: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
     uploadMutationOptions.current = null;
     removeMutationOptions.current = null;
-    // A full-page reload used to run in the same tick as the toast below and
-    // tore it off the screen. Spying on it is how that regression announces
-    // itself here rather than only in a browser.
-    reloadMock = vi.fn();
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: { ...window.location, reload: reloadMock },
-    });
   });
 
   describe("when a license is activated on a self-hosted deployment", () => {
@@ -163,7 +170,7 @@ describe("useLicenseActions", () => {
           description: expect.stringContaining("restart the server"),
         }),
       );
-      expect(reloadMock).not.toHaveBeenCalled();
+      expect(reloadPage).not.toHaveBeenCalled();
       // The state the reload used to refresh: plan, navigation, feature gates.
       expect(invalidateMock).toHaveBeenCalled();
     });
@@ -178,7 +185,7 @@ describe("useLicenseActions", () => {
       expect(toaster.create).toHaveBeenCalledWith(
         expect.objectContaining({ title: "License removed" }),
       );
-      expect(reloadMock).not.toHaveBeenCalled();
+      expect(reloadPage).not.toHaveBeenCalled();
       expect(invalidateMock).toHaveBeenCalled();
     });
   });

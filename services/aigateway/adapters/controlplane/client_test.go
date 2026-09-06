@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -84,6 +85,8 @@ type configServer struct {
 	// omitETag drops the ETag header from the 200, the way a proxy that strips
 	// it would, so the caller has nothing to revalidate with next time.
 	omitETag bool
+	// body overrides the config the 200 carries. Empty takes the default below.
+	body string
 
 	// mu guards requestHeaders, which the handler goroutine appends to and the
 	// test goroutine reads. Do returning is not a documented happens-before
@@ -109,7 +112,11 @@ func (s *configServer) start(t *testing.T) *Client {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"models_allowed":["openai/gpt-5-mini"]}`))
+		body := s.body
+		if body == "" {
+			body = `{"models_allowed":["openai/gpt-5-mini"]}`
+		}
+		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(srv.Close)
 
@@ -204,6 +211,56 @@ func TestFetchConfig_Conditional(t *testing.T) {
 		// does not have and call it fresh.
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "304")
+	})
+}
+
+// The key's own expiration date rides the config response as well as the auth
+// token, so a date an admin changes reaches the gateway on whichever channel
+// answers first. The result has to carry all three answers the endpoint can
+// give, or the caller cannot tell "no date" from "no answer".
+//
+// Spec: specs/ai-gateway/auth-cache.feature, Rule "A changed expiration date
+// reaches the gateway on the config channel".
+func TestFetchConfig_CarriesTheKeyExpiry(t *testing.T) {
+	t.Run("when the response carries a date", func(t *testing.T) {
+		srv := &configServer{revision: "42", body: `{"expires_at":1734568790}`}
+
+		res, err := srv.start(t).FetchConfig(context.Background(), "vk_acme", "")
+
+		require.NoError(t, err)
+		assert.True(t, res.VirtualKeyExpiryKnown)
+		assert.True(t, res.VirtualKeyExpiresAt.Equal(time.Unix(1734568790, 0)),
+			"got %s", res.VirtualKeyExpiresAt)
+	})
+
+	t.Run("when the response carries an explicit null", func(t *testing.T) {
+		srv := &configServer{revision: "42", body: `{"expires_at":null}`}
+
+		res, err := srv.start(t).FetchConfig(context.Background(), "vk_acme", "")
+
+		require.NoError(t, err)
+		assert.True(t, res.VirtualKeyExpiryKnown, "the endpoint answered: this key has no date")
+		assert.True(t, res.VirtualKeyExpiresAt.IsZero())
+	})
+
+	t.Run("when the response has no expiry field", func(t *testing.T) {
+		srv := &configServer{revision: "42"}
+
+		res, err := srv.start(t).FetchConfig(context.Background(), "vk_acme", "")
+
+		require.NoError(t, err)
+		assert.False(t, res.VirtualKeyExpiryKnown,
+			"a control plane older than the field said nothing, so the caller keeps the date it holds")
+		assert.True(t, res.VirtualKeyExpiresAt.IsZero())
+	})
+
+	t.Run("when the date is not a unix timestamp", func(t *testing.T) {
+		srv := &configServer{revision: "42", body: `{"expires_at":"2026-09-01T00:00:00Z"}`}
+
+		_, err := srv.start(t).FetchConfig(context.Background(), "vk_acme", "")
+
+		require.Error(t, err, "the whole fetch fails rather than the date being guessed at")
+		assert.Contains(t, err.Error(), "expires_at")
 	})
 }
 

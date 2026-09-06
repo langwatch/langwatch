@@ -1,4 +1,5 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { CannotImpersonateWithoutSecondFactorError } from "@langwatch/identity";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { isAdmin } from "./isAdmin";
 
@@ -110,12 +111,72 @@ export class ImpersonationService {
    *   - The target user does not exist → {@link UserToImpersonateNotFoundError}
    *   - The target is deactivated       → {@link CannotImpersonateDeactivatedUserError}
    *   - The target is an admin          → {@link CannotImpersonateAdminError}
+   *   - The target belongs to an organization requiring a second factor and
+   *     the OPERATOR has not set one up
+   *     → {@link CannotImpersonateWithoutSecondFactorError}
    *
    * The audit log is written before the session mutation so a DB failure
    * during the update still leaves a trail of the *attempt* — matching the
    * behaviour of the previous inline handler.
    */
+  /**
+   * Borrowing somebody's access inside an organization that requires a second
+   * factor requires one on the OPERATOR'S own account (D06).
+   *
+   * The requirement is about the operator, not the target, and that is the
+   * whole point: impersonation would otherwise be a way to reach an
+   * organization's data while holding less than its own members must hold.
+   * A person who has set one up is challenged at every sign-in, so
+   * `twoFactorEnabled` is the durable answer and no session evidence can add
+   * to it.
+   *
+   * Reads the TARGET's organizations, because those are the ones whose data
+   * the operator is about to see. Those slugs are read off the target row in
+   * `start` rather than here — see the note on that query.
+   */
+  private async assertOperatorCanProveSecondFactor({
+    operatorUserId,
+    targetUserId,
+    requiringOrganizationSlugs,
+  }: {
+    operatorUserId: string;
+    targetUserId: string;
+    requiringOrganizationSlugs: readonly string[];
+  }): Promise<void> {
+    if (requiringOrganizationSlugs.length === 0) return;
+
+    const operator = await this.prisma.user.findUnique({
+      where: { id: operatorUserId },
+      select: { twoFactorEnabled: true },
+    });
+    if (operator?.twoFactorEnabled) return;
+
+    throw new CannotImpersonateWithoutSecondFactorError(
+      `impersonate: operator ${operatorUserId} has no second factor; target ${targetUserId} belongs to ${requiringOrganizationSlugs.join(
+        ", ",
+      )}`,
+    );
+  }
+
   async start(input: StartImpersonationInput): Promise<void> {
+    /**
+     * The target, plus the memberships that decide whether the operator needs
+     * a second factor of their own.
+     *
+     * The memberships ride along as a NESTED read on purpose. "Which of this
+     * person's organizations require a factor" is a question about one person
+     * across many organizations, so a top-level
+     * `organizationUser.findMany({ where: { userId, ... } })` carries no
+     * single-organization predicate and `guardOrganizationId` (ADR-021)
+     * rejects it outright — which is exactly what took every impersonation
+     * down with a 500 rather than merely skipping the check. The guard runs on
+     * top-level model operations (`$allOperations` in `src/server/db.ts`), so
+     * reading the memberships through the target row asks the same question
+     * without presenting the guard a query it must refuse. Same reason, same
+     * shape as the nurturing lookup in `src/server/better-auth/hooks.ts`.
+     *
+     * It also costs one round trip instead of two.
+     */
     const target = await this.prisma.user.findUnique({
       where: { id: input.userIdToImpersonate },
       select: {
@@ -124,6 +185,10 @@ export class ImpersonationService {
         email: true,
         image: true,
         deactivatedAt: true,
+        orgMemberships: {
+          where: { organization: { mfaRequired: true } },
+          select: { organization: { select: { slug: true } } },
+        },
       },
     });
 
@@ -136,6 +201,13 @@ export class ImpersonationService {
     if (isAdmin(target)) {
       throw new CannotImpersonateAdminError(target.id);
     }
+    await this.assertOperatorCanProveSecondFactor({
+      operatorUserId: input.impersonatorUserId,
+      targetUserId: target.id,
+      requiringOrganizationSlugs: target.orgMemberships.map(
+        (membership) => membership.organization.slug,
+      ),
+    });
 
     await this.auditLog({
       userId: input.impersonatorUserId,

@@ -31,7 +31,7 @@ export interface BackfillDeps {
    * lexically behind the cursor (ids are nanoid, not monotonic) — harmless
    * here, because a project created after the walk started has
    * `firstMessage: false` and gets its schedule from the projectMetadata
-   * reactor's bootstrap on first trace, not from this walk.
+   * subscriber's bootstrap on first trace, not from this walk.
    */
   findEligibleProjectsPage: (params: {
     afterId: string | null;

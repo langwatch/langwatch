@@ -1,6 +1,19 @@
 import { statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
-import ts from "typescript";
+import type {
+  CallExpression,
+  Expression,
+  Node,
+  SourceFile,
+} from "typescript/unstable/ast";
+import {
+  isCallExpression,
+  isIdentifier,
+  isNoSubstitutionTemplateLiteral,
+  isPropertyAccessExpression,
+  isStringLiteral,
+  SyntaxKind,
+} from "typescript/unstable/ast";
 import type { ModuleAlias } from "./vitestAliasTable";
 
 /**
@@ -64,13 +77,7 @@ const NODE_NEXT_REWRITES: Record<string, string[]> = {
   ".cjs": [".cts"],
 };
 
-function lineOf({
-  source,
-  node,
-}: {
-  source: ts.SourceFile;
-  node: ts.Node;
-}): number {
+function lineOf({ source, node }: { source: SourceFile; node: Node }): number {
   return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
 }
 
@@ -78,27 +85,27 @@ function lineOf({
 function literalTextOf({
   node,
 }: {
-  node: ts.Expression | undefined;
+  node: Expression | undefined;
 }): string | undefined {
   if (!node) return undefined;
-  if (ts.isStringLiteral(node)) return node.text;
-  if (ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (isStringLiteral(node)) return node.text;
+  if (isNoSubstitutionTemplateLiteral(node)) return node.text;
   // Vitest 3's typed form, `vi.mock(import("./foo"), factory)`, names the
   // module through an import call rather than a bare string.
   if (
-    ts.isCallExpression(node) &&
-    node.expression.kind === ts.SyntaxKind.ImportKeyword
+    isCallExpression(node) &&
+    node.expression.kind === SyntaxKind.ImportKeyword
   ) {
     return literalTextOf({ node: node.arguments[0] });
   }
   return undefined;
 }
 
-function isMockCall({ node }: { node: ts.CallExpression }): boolean {
+function isMockCall({ node }: { node: CallExpression }): boolean {
   const callee = node.expression;
   return (
-    ts.isPropertyAccessExpression(callee) &&
-    ts.isIdentifier(callee.expression) &&
+    isPropertyAccessExpression(callee) &&
+    isIdentifier(callee.expression) &&
     (callee.expression.text === "vi" || callee.expression.text === "vitest") &&
     MOCK_METHODS.has(callee.name.text)
   );
@@ -126,32 +133,29 @@ export function mightContainMockCall({
 }
 
 /**
- * Every module named by a mock call in one file. Pure: takes text, returns
- * call sites, so the rule itself is unit-testable.
+ * Every module named by a mock call in one file. Pure: takes a parsed file,
+ * returns call sites, so the rule itself is unit-testable.
+ *
+ * Parsing is the caller's, not this function's, because it is no longer free:
+ * TypeScript 7 parses in the compiler process, and a whole-tree scan that asked
+ * per file paid a round trip per file. The callers that walk the tree parse
+ * every file in one exchange (`parseSourceTexts`) and hand the results here.
  */
 export function scanSourceForMockSpecifiers({
-  fileName,
-  sourceText,
+  source,
 }: {
-  fileName: string;
-  sourceText: string;
+  source: SourceFile;
 }): MockSpecifierSite[] {
-  const source = ts.createSourceFile(
-    fileName,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-  );
   const sites: MockSpecifierSite[] = [];
 
-  const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) && isMockCall({ node })) {
+  const visit = (node: Node): void => {
+    if (isCallExpression(node) && isMockCall({ node })) {
       sites.push({
         line: lineOf({ source, node }),
         specifier: literalTextOf({ node: node.arguments[0] }),
       });
     }
-    ts.forEachChild(node, visit);
+    node.forEachChild(visit);
   };
   visit(source);
 

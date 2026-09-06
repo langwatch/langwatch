@@ -3,7 +3,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";
 import { encrypt } from "~/utils/encryption";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const MAX_SECRETS_PER_PROJECT = 50;
@@ -52,7 +51,7 @@ export const secretsRouter = createTRPCRouter({
    */
   list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("secrets:view"))
+    .permission("secrets:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.projectSecret.findMany({
         where: {
@@ -79,7 +78,7 @@ export const secretsRouter = createTRPCRouter({
           .max(10_000, "Secret value is too long"),
       }),
     )
-    .use(checkProjectPermission("secrets:manage"))
+    .permission("secrets:manage")
     .mutation(async ({ ctx, input }) => {
       // The uppercase-only name schema can never produce a reserved
       // (lowercase) name today; this check pins the boundary rather than
@@ -145,7 +144,7 @@ export const secretsRouter = createTRPCRouter({
           .max(10_000, "Secret value is too long"),
       }),
     )
-    .use(checkProjectPermission("secrets:manage"))
+    .permission("secrets:manage")
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.prisma.projectSecret.findFirst({
         where: { id: input.secretId, projectId: input.projectId },
@@ -186,7 +185,7 @@ export const secretsRouter = createTRPCRouter({
         secretId: z.string(),
       }),
     )
-    .use(checkProjectPermission("secrets:manage"))
+    .permission("secrets:manage")
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.prisma.projectSecret.findFirst({
         where: { id: input.secretId, projectId: input.projectId },

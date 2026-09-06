@@ -64,6 +64,167 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     # Server resolves the caller's personal project; cross-user issuance is unrepresentable.
 
   # ---------------------------------------------------------------------------
+  # Project-scoped mint from the CLI
+  # ---------------------------------------------------------------------------
+  # `POST /api/auth/cli/governance/ingestion-key` also mints into a named team
+  # project, so a repository checkout can send its coding-agent traces to the
+  # project that owns the code instead of the developer's personal workspace.
+  # The named-project mint is create-only: two machines working on the same
+  # repository each keep their own live key, and revoking one leaves the other
+  # working. Omitting `project` mints into the personal workspace on the same
+  # terms, one key per device, capped per tool (see the personal-device
+  # scenarios below).
+
+  @integration @ingest-api-key @issue @project-scoped
+  Scenario: The CLI mints an ingestion key for a project named by id
+    Given jane holds a device session in organization "acme"
+    And jane has traces:create on team project "checkout-api"
+    When the CLI POSTs `{ source_type: "claude_code", project: "<the project id>" }`
+    Then the response status is 201
+    And the body carries the one-time `token`, its `prefix`, the OTLP `endpoint`
+    And the body carries `project` with the resolved id, slug and name
+    And the key is bound to "checkout-api" only
+
+  @integration @ingest-api-key @issue @project-scoped
+  Scenario: The CLI mints an ingestion key for a project named by slug
+    Given jane holds a device session in organization "acme"
+    And jane has traces:create on team project "checkout-api"
+    When the CLI POSTs `{ source_type: "claude_code", project: "checkout-api" }`
+    Then the response status is 201
+    And the resolved project in the body is "checkout-api"
+
+  @integration @ingest-api-key @issue @project-scoped
+  Scenario: Minting into a project the caller cannot write to is refused
+    Given jane holds a device session in organization "acme"
+    And jane has no traces:create on team project "payments-api"
+    When the CLI POSTs `{ source_type: "claude_code", project: "payments-api" }`
+    Then the response status is 403
+    And the response body contains `{ "error": "forbidden" }`
+    And no ingestion key is created
+
+  @integration @ingest-api-key @issue @project-scoped
+  Scenario: A project in another organization is not found
+    Given jane holds a device session in organization "acme"
+    And project "other-co-api" belongs to organization "other-co"
+    When the CLI POSTs `{ source_type: "claude_code", project: "other-co-api" }`
+    Then the response status is 404
+    And the response body contains `{ "error": "project_not_found" }`
+    And nothing tells jane whether that project exists elsewhere
+
+  @integration @ingest-api-key @issue @project-scoped @create-only
+  Scenario: Two machines each keep a live key for the same project and tool
+    Given jane already minted an ingestion key for "checkout-api" and "claude_code"
+    When her second machine mints one for the same project and source type
+    Then both tokens authorize trace writes into "checkout-api"
+    And neither key is revoked by the other
+
+  # ---------------------------------------------------------------------------
+  # Personal-workspace mint from the CLI: one key per device
+  # ---------------------------------------------------------------------------
+  # A person runs one tool from a laptop, a desktop and a few cloud machines
+  # under one login, and forks a golden image into many. The personal mint
+  # used to rotate in place, so any one machine's setup silently revoked the
+  # key every other machine was still exporting with, and nothing on those
+  # machines could tell. The personal mint is now create-only per device, and
+  # a cap keeps the list bounded by revoking the key unused the longest.
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: Two devices each keep a live personal key for the same tool
+    Given jane's laptop already minted a personal ingestion key for "claude_code"
+    When her second device mints one for the same source type
+    Then both tokens authorize trace writes into her personal workspace
+    And neither key is revoked by the other
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: Personal keys per tool are capped, least recently used first
+    Given jane's personal workspace holds the cap of live "claude_code" keys
+    And one of them was used less recently than the rest
+    When another device mints a personal key for "claude_code"
+    Then the new key is live
+    And the key used least recently is revoked
+    And every other key still authorizes trace writes
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: The cap counts one tool at a time
+    Given jane's personal workspace holds the cap of live "claude_code" keys
+    When a device mints a personal key for "codex"
+    Then no "claude_code" key is revoked
+
+  # The cap is per source type, so the set of source types must be finite or
+  # a device session holds the cap again under every value it invents. The
+  # personal mint accepts the tools the CLI wraps and nothing else.
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: A personal key is minted only for a tool the CLI wraps
+    Given jane holds a device session
+    When the CLI POSTs a personal mint for a source type no wrapped tool stamps
+    Then the response status is 400
+    And no ingestion key is created under that source type
+
+  # The cap runs after the new key exists, and it is the only part of the mint
+  # that touches keys the caller does not own. Two devices minting at the same
+  # moment read the same list and can pick the same key to retire, and a key
+  # revoked from the API-keys page mid-call reads the same way. A device whose
+  # key is already live must not be told the mint failed, so a retirement that
+  # fails is logged and the mint stands. The bound is recounted on every mint,
+  # so the next one trims what a race left over.
+
+  @unit @ingest-api-key @issue @personal @create-only
+  Scenario: An eviction that fails does not fail the mint
+    Given a personal mint past the cap
+    And the key it picked to retire was already revoked by another device
+    When the mint finishes
+    Then the caller still receives the new key
+    And the remaining keys past the cap are still retired
+
+  # ---------------------------------------------------------------------------
+  # Revocation records its cause
+  # ---------------------------------------------------------------------------
+  # A device whose key died asks the platform why before it re-mints. The
+  # platform's own revocations, a hard-cut rotation and the cap, name
+  # themselves. Everything a person does through the API-keys page or the REST
+  # API is recorded as that person's decision, and the CLI leaves such a key
+  # dead until the person sets the device up again.
+
+  @unit @ingest-api-key
+  Scenario: A revoke from the API keys page records a person as its cause
+    Given jane revokes one of her keys from the API keys page
+    When the row is written
+    Then its revocation cause is "user"
+
+  @unit @ingest-api-key @rotation
+  Scenario: A hard-cut rotation names itself as the cause
+    Given a project mint that replaces a prior key
+    When the prior key is revoked
+    Then its revocation cause is "rotation"
+
+  @unit @ingest-api-key @issue @personal @create-only
+  Scenario: The cap names itself as the cause of the keys it retires
+    Given a personal mint past the cap
+    When the key used least recently is revoked
+    Then its revocation cause is "cap"
+
+  @integration @ingest-api-key @issue @personal
+  Scenario: The CLI can ask what became of its own key
+    Given jane's device minted a personal key and a person then revoked it
+    When the CLI asks the platform about that key's lookup id
+    Then the answer is revoked, with "user" as the cause
+    And a key the cap retired answers with "cap"
+    And a key that is still live answers live
+    And a lookup id that names none of jane's keys answers unknown
+
+  # A person's revoke and the cap can land on one key at the same moment. The
+  # cause is what the CLI reads to decide whether it may mint a replacement,
+  # so the first revocation keeps it: a "cap" written over a "user" would let
+  # a device mint its way past the decision made on the API-keys page.
+
+  @integration @ingest-api-key @issue @personal
+  Scenario: The first revocation decides the recorded cause
+    Given a personal key a person revoked
+    When the cap's revocation, which read the key live, lands after it
+    Then the key still names "user" as the cause
+
+  # ---------------------------------------------------------------------------
   # Ingest-only RBAC — the genuinely-write-only guarantee
   # ---------------------------------------------------------------------------
 
@@ -188,3 +349,57 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Then the key's `lastUsedAt` reflects the most recent trace timestamp
     But NO audit rows are emitted per trace
     And only the issue / rotate / revoke state-changes emit audit rows
+
+  # ---------------------------------------------------------------------------
+  # Pull-source key suppression — #7616
+  # ---------------------------------------------------------------------------
+  # Pull-mode and S3-mode sources authenticate outbound (workspace tokens,
+  # client secrets, S3 credentials stored in parserConfig). They never
+  # receive inbound OTLP pushes, so the `lw_is_*` ingest secret is dead
+  # weight: generated, hashed, stored, shown to the admin, never used.
+  #
+  # The `ingestSecretHash` column is non-nullable (String, not String?),
+  # so the suppression stores an empty-string sentinel rather than NULL.
+  # `findByIngestSecret` hashes inbound tokens before matching, so ""
+  # can never collide with a real hash — the sentinel is inert.
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating a pull-mode source does not generate an ingest secret
+    When jane creates an ingestion source with sourceType "copilot_studio_dataverse"
+    Then the IngestionSource row has `ingestSecretHash` = "" (empty sentinel)
+    And the create response carries `ingestSecret` = null
+    And no secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating an S3-mode source does not generate an ingest secret
+    When jane creates an ingestion source with sourceType "openai_compliance"
+    Then the IngestionSource row has `ingestSecretHash` = "" (empty sentinel)
+    And the create response carries `ingestSecret` = null
+    And no secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating an s3_custom source generates a secret for webhook callback
+    When jane creates an ingestion source with sourceType "s3_custom"
+    Then the IngestionSource row has a real `ingestSecretHash` (non-empty)
+    And the create response carries `ingestSecret` with a valid `lw_is_` prefix
+    And the secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating a push-mode source still generates an ingest secret
+    When jane creates an ingestion source with sourceType "claude_code"
+    Then the IngestionSource row has a real `ingestSecretHash` (non-empty)
+    And the create response carries `ingestSecret` with a valid `lw_is_` prefix
+    And the secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @rotation-guard
+  Scenario: Rotating a pull-mode source's secret is refused
+    Given jane has a pull-mode source with sourceType "databricks_genie"
+    When jane requests a secret rotation for that source
+    Then the rotation is refused with a validation error
+    And the source's ingestSecretHash remains "" (empty sentinel)
+
+  @bdd @ingest-api-key @pull-source @rotation-guard
+  Scenario: Rotating a push-mode source's secret still works
+    Given jane has a push-mode source with sourceType "otel_generic"
+    When jane requests a secret rotation for that source
+    Then a new secret is minted and the prior hash enters the grace window

@@ -43,6 +43,45 @@ function handledError({
   return { message: code, data: { error: { code, httpStatus, ...rest } } };
 }
 
+/**
+ * The canonical envelope the GO gateway writes (pkg/herr WriteHTTP →
+ * ErrorResponse): the whole failure nested under `error`, lower_snake_case
+ * throughout. Distinct from the tRPC helper above, and the distinction is the
+ * point — the gateway's fields are `docs_url` / `trace_id`, and reading them
+ * under the camelCase names is the bug `fromCanonicalEnvelope` was added to
+ * fix. A fixture in the tRPC shape cannot exercise that path at all.
+ */
+function gatewayError({
+  code,
+  message,
+  meta,
+  tips,
+  docsUrl,
+  traceId,
+  fault = "customer",
+}: {
+  code: string;
+  message?: string;
+  meta?: Record<string, unknown>;
+  tips?: string[];
+  docsUrl?: string;
+  traceId?: string;
+  fault?: string;
+}) {
+  return {
+    error: {
+      type: code,
+      code,
+      message: message ?? code,
+      ...(meta ? { meta } : {}),
+      ...(tips ? { tips } : {}),
+      ...(docsUrl ? { docs_url: docsUrl } : {}),
+      ...(traceId ? { trace_id: traceId } : {}),
+      fault,
+    },
+  };
+}
+
 const renderAlert = (props: Parameters<typeof HandledErrorAlert>[0]) =>
   render(
     <ChakraProvider value={defaultSystem}>
@@ -51,6 +90,157 @@ const renderAlert = (props: Parameters<typeof HandledErrorAlert>[0]) =>
   );
 
 describe("<HandledErrorAlert />", () => {
+  /**
+   * The gateway's provider-setup failures, rendered from the envelope the Go
+   * service actually writes: the nested `{error:{...}}` shape with
+   * lower_snake_case fields, so these exercise `fromCanonicalEnvelope` rather
+   * than the tRPC reading.
+   *
+   * The tips are the four the server sends for this failure, pinned on the Go
+   * side by `TestRemediate_CapsTipsSoTheProviderSpecificOnesSurvive`: the top
+   * three of `remediation.go#providerCredentialTips["vertex"]`, then the
+   * statement that the failure is terminal, whose slot `tipsFor` reserves.
+   * Four, not more: `capTips` caps the server at the client's MAX_TIPS, so a
+   * fifth would be written only to be discarded.
+   *
+   * These failures used to reach customers as `provider_timeout`: "The model
+   * provider timed out. Try again in a moment." for a pasted credential that
+   * would never work. Nothing about which provider, which model, what a
+   * correct value looks like, or where it is documented.
+   */
+  describe("given a gateway provider-setup failure", () => {
+    const vertexCredentialEnvelope = {
+      code: "provider_credential_invalid",
+      message:
+        "The credentials configured for this model provider were not accepted. Check the provider's credentials in your model provider settings.",
+      fault: "customer",
+      docsUrl: "https://docs.langwatch.ai/ai-gateway/providers/vertex",
+      traceId: "827cbb32e654bf7700000000827cbb32",
+      meta: { provider: "vertex", model: "gemini-2.5-flash" },
+      tips: [
+        "Vertex AI authenticates with a Google Cloud service-account JSON document, not an API key — paste the whole file contents into the provider's credentials field",
+        'The document must be valid JSON with a top-level "type" of "service_account"; a file PATH, or the OAuth client JSON that has no "type", is rejected here',
+        'Vertex Location may be a region such as us-central1, or "global" — both are valid, and neither one causes this error',
+        "This failed before the request left LangWatch, so it is not a provider outage and retrying will not clear it",
+      ],
+    };
+
+    /**
+     * The sentence stays provider-neutral on purpose (see the note on
+     * `provider_credential_invalid` in presentation.ts). The provider is named
+     * by the gateway's own tips, which is the line that also says what to do
+     * about it — so this asserts the customer still learns it was Vertex.
+     *
+     * @scenario "A provider-setup failure tells the customer how to fix it"
+     */
+    it("sends the customer to the credentials, and the tips name the provider", () => {
+      renderAlert({ error: gatewayError(vertexCredentialEnvelope) });
+
+      expect(
+        screen.getByText(
+          /The credentials saved for this provider could not be used to authenticate/,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Vertex AI authenticates with a Google Cloud service-account JSON document/,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    /**
+     * The client caps the list at `MAX_TIPS` (4) — "more than this is a
+     * document, not remediation" — so the server orders the advice with the
+     * provider-specific, actionable lines first and truncates to the same
+     * number before sending. This asserts the surviving tips are the ones
+     * worth surviving, which is the half a cap can get wrong.
+     *
+     * @scenario "A provider-setup failure tells the customer how to fix it"
+     */
+    it("renders the remediation tips the gateway sent, up to the client's cap", () => {
+      renderAlert({ error: gatewayError(vertexCredentialEnvelope) });
+
+      for (const tip of vertexCredentialEnvelope.tips) {
+        expect(screen.getByText(tip)).toBeInTheDocument();
+      }
+    });
+
+    /**
+     * The cap only constrains anything if the far side is asserted too:
+     * asserting the first four are present passes just as well with the cap
+     * raised to eight.
+     *
+     * @scenario "A provider-setup failure tells the customer how to fix it"
+     */
+    it("drops a tip past the client's cap rather than rendering a document", () => {
+      const overLong = [
+        ...vertexCredentialEnvelope.tips,
+        "a fifth tip nobody should read",
+      ];
+      renderAlert({
+        error: gatewayError({ ...vertexCredentialEnvelope, tips: overLong }),
+      });
+
+      expect(screen.getByText(overLong[0]!)).toBeInTheDocument();
+      expect(screen.queryByText(overLong[4]!)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A provider-setup failure tells the customer how to fix it" */
+    it("links the provider's own docs page, not a generic one", () => {
+      renderAlert({ error: gatewayError(vertexCredentialEnvelope) });
+
+      const link = screen.getByRole("link");
+      expect(link).toHaveAttribute(
+        "href",
+        "https://docs.langwatch.ai/ai-gateway/providers/vertex",
+      );
+    });
+
+    /** @scenario "A provider-setup failure tells the customer how to fix it" */
+    it("never tells the customer to retry a credential that cannot work", () => {
+      const { container } = renderAlert({
+        error: gatewayError(vertexCredentialEnvelope),
+      });
+
+      expect(container.textContent).not.toContain("timed out");
+      expect(container.textContent).not.toContain("Try again in a moment");
+    });
+
+    /** @scenario "A provider-setup failure tells the customer how to fix it" */
+    it("names the model the provider is not configured for", () => {
+      renderAlert({
+        error: gatewayError({
+          code: "provider_config_invalid",
+          fault: "customer",
+          docsUrl: "https://docs.langwatch.ai/ai-gateway/providers/vertex",
+          meta: { provider: "vertex", model: "gemini-3.1-pro-preview" },
+          tips: [
+            "Add the model to this provider's model list in Settings → Model Providers",
+          ],
+        }),
+      });
+
+      expect(
+        screen.getByText(
+          "No provider on this project is configured for gemini-3.1-pro-preview. Add it to one in Settings → Model Providers.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    /**
+     * The cause that distinguishes the five credential failures from each
+     * other is the operator's, and stays on the log line.
+     */
+    it("shows nothing of the engine's internal cause", () => {
+      const { container } = renderAlert({
+        error: gatewayError(vertexCredentialEnvelope),
+      });
+
+      expect(container.textContent).not.toContain("auth token source");
+      expect(container.textContent).not.toContain("google auth credentials");
+    });
+  });
+
   describe("given a code the registry has copy for", () => {
     /** @scenario "A caller's generic headline loses to specific copy" */
     it("shows that copy rather than the caller's generic headline", () => {

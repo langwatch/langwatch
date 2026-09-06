@@ -34,7 +34,9 @@ export type HttpConfigEditorProps = {
   onAuthChange: (auth: HttpAuth | undefined) => void;
   headers: HttpHeader[];
   onHeadersChange: (headers: HttpHeader[]) => void;
-  onTest: (requestBody: string) => Promise<HttpTestResult>;
+  onTest: (
+    templateVariables: Record<string, unknown>,
+  ) => Promise<HttpTestResult>;
   /** Horizontal padding for the endpoint and tab content areas. Defaults to 4. */
   paddingX?: number | string;
 };

@@ -188,6 +188,7 @@ export function buildAutomationDispatchPorts({
                 now,
                 cap: env.TRIGGER_EMAIL_HOURLY_CAP,
                 dedupKey,
+                redis,
               }),
             emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
             consumeTenantEmailCapSlot: ({
@@ -203,6 +204,7 @@ export function buildAutomationDispatchPorts({
                 cap,
                 recipientCount,
                 dedupKey,
+                redis,
               }),
             tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
             // ADR-031 per-recipient at-most-once ledger — the SAME
@@ -254,6 +256,7 @@ export function buildAutomationDispatchPorts({
         now,
         cap: env.TRIGGER_EMAIL_HOURLY_CAP,
         dedupKey,
+        redis,
       }),
     tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
     consumeTenantEmailCapSlot: ({
@@ -269,6 +272,7 @@ export function buildAutomationDispatchPorts({
         cap,
         recipientCount,
         dedupKey,
+        redis,
       }),
     filterSuppressedEmails: ({ projectId, triggerId, emails }) =>
       emailSuppressions.filterSuppressed({ projectId, triggerId, emails }),
@@ -284,7 +288,8 @@ export function buildAutomationDispatchPorts({
     },
     recordWebhookDelivery,
     resolvePersistDailyCap: (projectId) => resolvePersistDailyCap(projectId),
-    consumePersistCapSlot: (params) => consumePersistCapSlot(params),
+    consumePersistCapSlot: (params) =>
+      consumePersistCapSlot({ ...params, redis }),
     handlePersistCapBreach: (breach) =>
       handlePersistCapBreach(
         defaultRunawayContainmentDeps({
@@ -294,6 +299,7 @@ export function buildAutomationDispatchPorts({
           emailSuppressions,
           baseHost,
           resolveClickHouseClient,
+          redis,
         }),
         breach,
       ),

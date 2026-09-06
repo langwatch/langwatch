@@ -52,10 +52,10 @@ describe("onRouteMounted", () => {
         onRouteMounted: (route) => mounted.push(route),
       })
         .version("2025-03-15", (v) => {
-          v.get("/items", { output: z.array(z.string()) }, async () => []);
+          v.get("/items", { noPermission: { reason: "framework test endpoint" }, output: z.array(z.string()) }, async () => []);
           v.post(
             "/items",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               input: z.object({ name: z.string() }),
               output: z.object({ name: z.string() }),
               status: 201,
@@ -172,12 +172,12 @@ describe("onRouteMounted", () => {
         onRouteMounted: (route) => mounted.push(route),
       })
         .version("2025-03-15", (v) => {
-          v.get("/", { output: z.object({ ok: z.boolean() }) }, async () => ({
+          v.get("/", { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }) }, async () => ({
             ok: true,
           }));
           v.get(
             "/items/:id",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               params: z.object({ id: z.string() }),
               output: z.object({ id: z.string() }),
             },
@@ -220,7 +220,7 @@ describe("onRouteMounted", () => {
         .version("2025-01-01", (v) => {
           v.get(
             "/old",
-            { meta, output: z.object({ ok: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, meta, output: z.object({ ok: z.boolean() }) },
             async () => ({ ok: true }),
           );
         })
@@ -270,7 +270,7 @@ describe("onRouteMounted", () => {
         .version("2025-03-15", (v) => {
           v.sse(
             "/stream",
-            { events: { tick: z.object({ n: z.number() }) } },
+            { noPermission: { reason: "framework test endpoint" }, events: { tick: z.object({ n: z.number() }) } },
             async (_c, _args, stream) => {
               stream.close();
             },
@@ -279,7 +279,7 @@ describe("onRouteMounted", () => {
         .preview((v) => {
           v.get(
             "/beta",
-            { output: z.object({ beta: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ beta: z.boolean() }) },
             async () => ({ beta: true }),
           );
         })

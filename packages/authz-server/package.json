@@ -1,0 +1,40 @@
+{
+  "name": "@langwatch/authz-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The server-side runtime of the unified authorization engine (ADR-092): AuthzService, GrantsService, shadow mode, and the storage ports they run on. Storage-engine-free - the app implements the repository interfaces with Prisma.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./migration": {
+      "types": "./src/migration.ts",
+      "default": "./src/migration.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/authz": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/system-migrations": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

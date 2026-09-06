@@ -3,13 +3,51 @@
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { guardAgainstGlobalFetch } from "../../../../../test-utils/globalFetchGuard";
+import { closeNlpFetchDispatchers } from "../../../../nlpgo/timeouts";
 import type { WorkflowAgentData } from "../../types";
+
+vi.mock("@langwatch/observability/tracing", () => ({
+  injectTraceContextHeaders: vi.fn(
+    ({ headers }: { headers: Record<string, string> }) => ({
+      headers,
+      traceId: undefined,
+    }),
+  ),
+}));
+
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
 
-// Mock global fetch
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
+
+// The adapter calls undici's own fetch, so that export is the interception
+// point. Hoisted, because the vi.mock factory below is hoisted above this file.
+const mockFetch = vi.hoisted(() => vi.fn());
+
+// Undici's Agent does not read back the timeouts it was constructed with, so
+// the only way to assert on the dispatcher the adapter passes is to record the
+// constructor's arguments.
+const agentOptions = vi.hoisted(() => [] as Record<string, unknown>[]);
+
+vi.mock("undici", async () => {
+  const actual = await vi.importActual<typeof import("undici")>("undici");
+  return {
+    ...actual,
+    fetch: mockFetch,
+    Agent: class RecordingAgent extends actual.Agent {
+      constructor(opts?: Record<string, unknown>) {
+        agentOptions.push(opts ?? {});
+        super(opts);
+      }
+    },
+  };
+});
+
+// Pointing the global fetch at the same mock would let a regression back to it
+// pass this suite, which is how that bug reached production once already.
+guardAgainstGlobalFetch();
 
 describe("SerializedWorkflowAgentAdapter", () => {
   /** Minimal published workflow DSL with an entry node, a signature node, and an end node. */
@@ -91,9 +129,30 @@ describe("SerializedWorkflowAgentAdapter", () => {
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    agentOptions.length = 0;
+    // createNlpFetchDispatcher now memoizes by timeoutMs at module scope
+    // (nlpgo/timeouts.ts). Without clearing the cache here, a dispatcher
+    // built by an earlier test for the same timeoutMs is returned again
+    // without touching the mocked undici.Agent constructor, so agentOptions
+    // stays empty and this test's assertions see stale/undefined values.
+    await closeNlpFetchDispatchers();
+    // Pin the timeout explicitly so the test doesn't rely on ambient env.
+    // Stubbed, not assigned: a raw assignment here outlives the file and
+    // reaches whatever else shares this vitest worker.
+    vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "600");
+    // clearAllMocks keeps implementations, so pin the no-active-context
+    // default here; tests that need a trace context override it themselves.
+    mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+      headers,
+      traceId: undefined,
+    }));
     mockFetch.mockResolvedValue(nlpResponse({ output: "Hi there!" }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe("basic contract", () => {
@@ -498,6 +557,230 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const fetchOptions = mockFetch.mock.calls[0]![1];
       expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+    });
+  });
+
+  describe("the fetch deadline it arms", () => {
+    /** Never resolves; rejects only when the adapter's own timer aborts it. */
+    const abortAwareFetch = (signal: AbortSignal) =>
+      new Promise<Response>((_resolve, reject) => {
+        if (signal.aborted) {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+          return;
+        }
+        const onAbort = () => {
+          signal.removeEventListener("abort", onAbort);
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        };
+        signal.addEventListener("abort", onAbort);
+      });
+
+    /**
+     * Whether the adapter aborted its own fetch within `advanceMs` of virtual
+     * time. The deadline is not reported on a span or in the thrown message,
+     * so bracketing it from both sides is the only way to pin the value.
+     */
+    const abortsWithin = async (advanceMs: number): Promise<boolean> => {
+      mockFetch.mockImplementation(
+        async (_url: string, opts: { signal: AbortSignal }) =>
+          abortAwareFetch(opts.signal),
+      );
+      vi.useFakeTimers();
+      let aborted = false;
+      try {
+        const adapter = new SerializedWorkflowAgentAdapter({
+          config: defaultConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+        // Attach the rejection handler before advancing timers so the abort
+        // doesn't surface as an unhandled rejection. The promise stays pending
+        // forever when no abort fires, so it is deliberately not awaited.
+        void adapter.call(defaultInput).catch(() => {
+          aborted = true;
+        });
+        await vi.advanceTimersByTimeAsync(advanceMs);
+      } finally {
+        vi.useRealTimers();
+      }
+      return aborted;
+    };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("still holds the socket just under the 630s default deadline", async () => {
+      expect(await abortsWithin(629_999)).toBe(false);
+    });
+
+    it("aborts at the 630s default deadline (engine ceiling + headroom)", async () => {
+      // Regression guard for the production bug this adapter's own hardcoded
+      // 120_000 caused: a run the engine was still legitimately working on
+      // was cut off client-side.
+      expect(await abortsWithin(630_001)).toBe(true);
+    });
+
+    it("still holds the socket just under the 900s platform maximum when the engine ceiling is raised past it", async () => {
+      vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "1200");
+
+      expect(await abortsWithin(899_999)).toBe(false);
+    });
+
+    it("aborts at the 900s platform maximum when the engine ceiling is raised past it", async () => {
+      vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "1200");
+
+      expect(await abortsWithin(900_001)).toBe(true);
+    });
+
+    // The abort deadline is only one of the two clocks on this call: undici's
+    // own headersTimeout lives on the dispatcher and defaults to 300s, which no
+    // AbortSignal can raise. A run past 300s died with HeadersTimeoutError well
+    // inside the 630s abort, so the dispatcher must carry the same deadline.
+    it("passes a dispatcher whose headers timeout matches the 630s default deadline", async () => {
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+      await adapter.call(defaultInput);
+
+      const fetchOptions = mockFetch.mock.calls[0]![1];
+      expect(fetchOptions.dispatcher).toBeDefined();
+      expect(agentOptions.at(-1)?.headersTimeout).toBe(630_000);
+      expect(agentOptions.at(-1)?.bodyTimeout).toBe(630_000);
+    });
+  });
+
+  describe("given a run that resolved parameter values", () => {
+    function callWithParameters(
+      parameters: Record<string, string | number | boolean>,
+    ) {
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters,
+      });
+      return adapter.call(defaultInput);
+    }
+
+    function sentPayload() {
+      return JSON.parse(mockFetch.mock.calls[0]![1].body).payload;
+    }
+
+    /** @scenario "A workflow target receives params as entry inputs" */
+    it("sends each one as an entry input", async () => {
+      await callWithParameters({ region: "eu-central" });
+
+      expect(sentPayload().inputs[0]).toMatchObject({ region: "eu-central" });
+    });
+
+    /** @scenario "A workflow target receives params as entry inputs" */
+    it("sends an entry input as a string, whatever the value's type", async () => {
+      await callWithParameters({ seats: 12, trial: false });
+
+      expect(sentPayload().inputs[0]).toMatchObject({
+        seats: "12",
+        trial: "false",
+      });
+    });
+
+    it("keeps the mapped conversation input alongside them", async () => {
+      await callWithParameters({ region: "eu-central" });
+
+      expect(sentPayload().inputs[0].input).toBe("Hello");
+    });
+
+    it("leaves a declared input alone when a parameter shares its name", async () => {
+      // The workflow's own `input` carries the conversation turn. A parameter
+      // that replaced it would leave the target answering the wrong question,
+      // and the run would read as an agent that ignored the user.
+      await callWithParameters({ input: "not the conversation" });
+
+      expect(sentPayload().inputs[0].input).toBe("Hello");
+    });
+
+    /** @scenario "A code target reads params.NAME the same way it reads secrets.NAME" */
+    it("carries them on the workflow with their native types, beside its secrets", async () => {
+      await callWithParameters({ region: "eu-central", seats: 12 });
+
+      expect(sentPayload().workflow.params).toEqual({
+        region: "eu-central",
+        seats: 12,
+      });
+      expect(sentPayload().workflow.secrets).toEqual({});
+    });
+  });
+
+  describe("when a turn has an active trace context", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+    const injectTraceContext = () => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = TRACEPARENT;
+        return { headers, traceId: TRACE_ID };
+      });
+    };
+
+    function sentPayload() {
+      return JSON.parse(mockFetch.mock.calls[0]![1].body).payload;
+    }
+
+    /** @scenario "A workflow execution receives the trace context in its params" */
+    it("carries params.trace_id and params.traceparent on the workflow", async () => {
+      injectTraceContext();
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentPayload().workflow.params).toEqual({
+        region: "eu-central",
+        trace_id: TRACE_ID,
+        traceparent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "The trace context wins over a run parameter with the same name" */
+    it("overrides a run parameter named trace_id or traceparent", async () => {
+      injectTraceContext();
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { trace_id: "supplied", traceparent: "supplied" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentPayload().workflow.params).toEqual({
+        trace_id: TRACE_ID,
+        traceparent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "A workflow execution receives the trace context in its params" */
+    it("keeps the trace context out of the entry inputs", async () => {
+      injectTraceContext();
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      const entryInputs = sentPayload().inputs[0];
+      expect(entryInputs.trace_id).toBeUndefined();
+      expect(entryInputs.traceparent).toBeUndefined();
+      expect(entryInputs.region).toBe("eu-central");
     });
   });
 });

@@ -33,8 +33,11 @@ class ExactMatchResult(EvaluationResult):
 
 
 class ExactMatchEntry(EvaluatorEntry):
-    output: str = None
-    expected_output: str = None
+    # Both sides are required: an entry missing either one compares empty to
+    # empty and reports a pass, which reads as a correct answer everywhere the
+    # score is aggregated.
+    output: str
+    expected_output: str
 
 
 class ExactMatchEvaluator(

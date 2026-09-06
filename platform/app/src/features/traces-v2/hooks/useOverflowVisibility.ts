@@ -32,6 +32,13 @@ interface UseOverflowVisibilityOptions {
    * `"data-value"` when reusing the hook there.
    */
   attribute?: string;
+  /**
+   * Re-runs the measurement whenever this value changes. Pass it when the
+   * row holds something other than the items and that thing changes width:
+   * the ResizeObserver only reports the scroller's own box, which a flexed
+   * row keeps no matter what its contents do.
+   */
+  remeasureKey?: string | number;
 }
 
 /**
@@ -57,6 +64,7 @@ export function useOverflowVisibility({
   activeId,
   reservePx = 56,
   attribute = "data-overflow-id",
+  remeasureKey,
 }: UseOverflowVisibilityOptions): ReadonlySet<string> {
   const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(EMPTY_SET);
   const [measureSeq, setMeasureSeq] = useState(0);
@@ -66,7 +74,7 @@ export function useOverflowVisibility({
   useEffect(() => {
     setHiddenIds(EMPTY_SET);
     setMeasureSeq((s) => s + 1);
-  }, [items, activeId]);
+  }, [items, activeId, remeasureKey]);
 
   // Reset on container resize so a wider parent can re-show items.
   useEffect(() => {
@@ -91,6 +99,11 @@ export function useOverflowVisibility({
     if (els.length === 0) return;
 
     const containerRect = root.getBoundingClientRect();
+    // A row with no width is not laid out — it is `display: none`, or not in
+    // the document yet. Measuring it would put every item past the cutoff and
+    // collapse the whole row; the resize observer re-measures once it has a
+    // size.
+    if (containerRect.width === 0) return;
     const limit = containerRect.right - reservePx;
 
     const next = new Set<string>();

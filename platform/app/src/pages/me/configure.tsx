@@ -6,15 +6,20 @@ import {
   HStack,
   Input,
   Spacer,
+  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { AvatarUploadControl } from "~/components/me/avatar/AvatarUploadControl";
+import { BudgetOverviewList } from "~/components/me/BudgetOverviewList";
+import { DevicesPanel } from "~/components/me/DevicesPanel";
 import { HomePagePicker } from "~/components/me/HomePagePicker";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalOtlpEndpointPanel } from "~/components/me/PersonalOtlpEndpointPanel";
+import { formatRelativeTime } from "~/components/me/relativeTime";
 import {
   type PersonalApiKeyRow,
   usePersonalContext,
@@ -26,24 +31,9 @@ import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import Head from "~/utils/compat/next-head";
 
-const fmtRelative = (iso: string | null): string => {
-  if (!iso) return "Never";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} min ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d ago`;
-  return new Date(iso).toLocaleDateString();
-};
-
-const fmtUsd = (amount: number): string =>
-  amount === 0
-    ? "$0.00"
-    : `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** The personal keys carry ISO timestamps; the ladder counts milliseconds. */
+const fmtRelative = (iso: string | null): string =>
+  formatRelativeTime(iso ? new Date(iso).getTime() : null);
 
 function MySettingsPage() {
   const ctx = usePersonalContext();
@@ -55,6 +45,24 @@ function MySettingsPage() {
     baseUrl: string;
   } | null>(null);
   const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
+  // Which tab is open is part of the address rather than a choice the page
+  // forgets on reload: the devices inventory is linked to directly, from the
+  // docs and from the old /me/devices path, and a link that lands on the keys
+  // tab does not take the reader where it said it would.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const credentialsTab =
+    searchParams.get("tab") === "devices" ? "devices" : "keys";
+  const selectCredentialsTab = (tab: string) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        // Keys is the default, so it stays out of the address entirely.
+        if (tab === "devices") next.set("tab", tab);
+        else next.delete("tab");
+        return next;
+      },
+      { replace: true },
+    );
 
   const utils = api.useUtils();
   const issueMutation = api.personalVirtualKeys.issuePersonal.useMutation({
@@ -219,9 +227,10 @@ function MySettingsPage() {
         </SectionCard>
 
         <SectionCard
-          title="Personal Virtual Keys"
-          description="These keys let your CLI tools (Claude Code, Cursor, etc.) talk to LangWatch."
+          title="Personal credentials"
+          description="The keys your tools (Claude Code, Cursor, and the rest) use to reach LangWatch, and the devices your CLI is signed in on. Revoke anything that is stale, lost or compromised."
           action={
+            credentialsTab === "keys" &&
             !showAddForm && (
               <Button
                 size="sm"
@@ -233,81 +242,101 @@ function MySettingsPage() {
             )
           }
         >
-          {revealedSecret && (
-            <RevealedSecretBanner
-              secret={revealedSecret}
-              onDismiss={() => setRevealedSecret(null)}
-            />
-          )}
+          <Tabs.Root
+            value={credentialsTab}
+            onValueChange={(event) => selectCredentialsTab(event.value)}
+            colorPalette="blue"
+            // The devices panel reads its inventory on mount, so it is not
+            // mounted until the reader is actually on that tab.
+            lazyMount
+          >
+            <Tabs.List marginBottom={3}>
+              <Tabs.Trigger value="keys">Virtual keys</Tabs.Trigger>
+              <Tabs.Trigger value="devices">Devices</Tabs.Trigger>
+            </Tabs.List>
 
-          {showAddForm && (
-            <Box
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="sm"
-              padding={3}
-              marginBottom={3}
-            >
-              <VStack align="stretch" gap={2}>
-                <Text fontSize="sm" fontWeight="medium">
-                  New personal key
-                </Text>
-                <Input
-                  placeholder="e.g. jane-laptop-2"
-                  size="sm"
-                  value={newKeyLabel}
-                  onChange={(e) => setNewKeyLabel(e.target.value)}
+            <Tabs.Content value="keys">
+              {revealedSecret && (
+                <RevealedSecretBanner
+                  secret={revealedSecret}
+                  onDismiss={() => setRevealedSecret(null)}
                 />
-                <Text fontSize="xs" color="fg.muted">
-                  Lowercase letters, numbers, dash, underscore. The secret is
-                  shown once on creation.
-                </Text>
-                <HStack gap={2}>
-                  <Button
-                    size="sm"
-                    onClick={onIssue}
-                    loading={issueMutation.isPending}
-                    disabled={!newKeyLabel.trim()}
-                  >
-                    Create key
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setShowAddForm(false);
-                      setNewKeyLabel("");
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </HStack>
-              </VStack>
-            </Box>
-          )}
+              )}
 
-          {ctx.apiKeys.length === 0 ? (
-            <Text fontSize="sm" color="fg.muted">
-              No personal keys yet. Run <code>langwatch login</code> in your
-              terminal to issue your first one.
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={2}>
-              {ctx.apiKeys.map((key) => (
-                <ApiKeyRow
-                  key={key.id}
-                  apiKey={key}
-                  isPendingRevoke={pendingRevokeId === key.id}
-                  isRevoking={
-                    revokeMutation.isPending && pendingRevokeId === key.id
-                  }
-                  onRequestRevoke={() => setPendingRevokeId(key.id)}
-                  onCancelRevoke={() => setPendingRevokeId(null)}
-                  onConfirmRevoke={() => onRevoke(key.id)}
-                />
-              ))}
-            </VStack>
-          )}
+              {showAddForm && (
+                <Box
+                  borderWidth="1px"
+                  borderColor="border.muted"
+                  borderRadius="sm"
+                  padding={3}
+                  marginBottom={3}
+                >
+                  <VStack align="stretch" gap={2}>
+                    <Text fontSize="sm" fontWeight="medium">
+                      New personal key
+                    </Text>
+                    <Input
+                      placeholder="e.g. jane-laptop-2"
+                      size="sm"
+                      value={newKeyLabel}
+                      onChange={(e) => setNewKeyLabel(e.target.value)}
+                    />
+                    <Text fontSize="xs" color="fg.muted">
+                      Lowercase letters, numbers, dash, underscore. The secret
+                      is shown once on creation.
+                    </Text>
+                    <HStack gap={2}>
+                      <Button
+                        size="sm"
+                        onClick={onIssue}
+                        loading={issueMutation.isPending}
+                        disabled={!newKeyLabel.trim()}
+                      >
+                        Create key
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setShowAddForm(false);
+                          setNewKeyLabel("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </HStack>
+                  </VStack>
+                </Box>
+              )}
+
+              {ctx.apiKeys.length === 0 ? (
+                <Text fontSize="sm" color="fg.muted">
+                  No personal keys yet. Run <code>langwatch login</code> in your
+                  terminal to issue your first one.
+                </Text>
+              ) : (
+                <VStack align="stretch" gap={2}>
+                  {ctx.apiKeys.map((key) => (
+                    <ApiKeyRow
+                      key={key.id}
+                      apiKey={key}
+                      isPendingRevoke={pendingRevokeId === key.id}
+                      isRevoking={
+                        revokeMutation.isPending && pendingRevokeId === key.id
+                      }
+                      onRequestRevoke={() => setPendingRevokeId(key.id)}
+                      onCancelRevoke={() => setPendingRevokeId(null)}
+                      onConfirmRevoke={() => onRevoke(key.id)}
+                    />
+                  ))}
+                </VStack>
+              )}
+            </Tabs.Content>
+
+            <Tabs.Content value="devices">
+              <DevicesPanel />
+            </Tabs.Content>
+          </Tabs.Root>
         </SectionCard>
 
         {ctx.organizationId ? (
@@ -357,30 +386,22 @@ function MySettingsPage() {
           </SectionCard>
         ) : null}
 
-        <SectionCard title="Personal budget">
-          {ctx.summary.budgetUsd === null ? (
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" color="fg.muted">
-                No personal budget set by your admin.
-              </Text>
-              <Text fontSize="xs" color="fg.muted">
-                If you'd like one, ask your admin.
-              </Text>
-            </VStack>
-          ) : (
-            <VStack align="stretch" gap={3}>
-              <Field
-                label="Monthly limit"
-                value={fmtUsd(ctx.summary.budgetUsd)}
-                hint={`Set by your ${ctx.organizationName} admin · cannot edit`}
-              />
-              <Field
-                label="Current spend"
-                value={fmtUsd(ctx.summary.spentThisMonthUsd)}
-              />
-            </VStack>
-          )}
-        </SectionCard>
+        {ctx.budgetOverview.gatewayAccess && (
+          <SectionCard title="Budgets that apply to you">
+            {ctx.budgetOverview.budgets.length > 0 ? (
+              <BudgetOverviewList items={ctx.budgetOverview.budgets} />
+            ) : ctx.budgetOverview.isResolved ? (
+              <VStack align="start" gap={1}>
+                <Text fontSize="sm" color="fg.muted">
+                  No budgets apply to your usage yet.
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  If you'd like one, ask your admin.
+                </Text>
+              </VStack>
+            ) : null}
+          </SectionCard>
+        )}
       </VStack>
     </MyLayout>
   );

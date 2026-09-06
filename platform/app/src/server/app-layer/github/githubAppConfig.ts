@@ -6,6 +6,9 @@
  * deployment and in every operator's secret store; renaming them is an infra
  * change with its own rollout, tracked separately. Nothing outside this module
  * should name them, so that rename is a one-file edit here plus the env schema.
+ *
+ * `GITHUB_LANGY_HOST` is read next door in `githubHost.ts`, which owns the host
+ * and the two base URLs derived from it.
  */
 import { env } from "~/env.mjs";
 
@@ -16,7 +19,7 @@ export interface GithubAppConfig {
   privateKey: string;
   /** Verifies X-Hub-Signature-256 on inbound installation webhooks. */
   webhookSecret: string;
-  /** The App's slug, for github.com/apps/<slug>/installations/new. */
+  /** The App's slug, which addresses its public installation page. */
   appSlug: string;
   /**
    * Whether an installation can actually be started and used: the key mints

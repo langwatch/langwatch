@@ -26,9 +26,22 @@ export type LLMModelPricing = {
   // number and take precedence over the derivation.
   inputCacheWritePerToken?: number;
   inputCacheWrite1hPerToken?: number;
+  // Image token rates for the token-billed image models (OpenAI's gpt-image
+  // family). `imageCostPerToken` is the price per INPUT image token, what an
+  // edit call pays for the pixels it reads; `imageOutputCostPerToken` is the
+  // price per OUTPUT image token, what every generated image is billed by.
+  // Text prompt tokens on the same call price at `inputCostPerToken`. The
+  // counts these price are disjoint from the text token counts. Hand-curated
+  // in llmModels.overlay.json.
   imageCostPerToken?: number;
   imageOutputCostPerToken?: number;
+  // Audio token rates. `audioCostPerToken` is the INPUT side, the only one
+  // the upstream catalog carries; `audioOutputCostPerToken` is the output
+  // side, hand-curated in llmModels.overlay.json and otherwise derived at
+  // load time for OpenAI's audio families, which price it at twice the
+  // input rate.
   audioCostPerToken?: number;
+  audioOutputCostPerToken?: number;
   internalReasoningCostPerToken?: number;
   webSearchCostPerQuery?: number;
   // Audio pricing: TTS models bill per input character synthesized,
@@ -93,8 +106,8 @@ export type LLMModelEntry = {
   defaultParameters: Record<string, unknown> | null;
   /** Raw modality string, e.g. "text->text" */
   modality: string;
-  /** Derived mode: "chat", "embedding", or "audio" (TTS/STT) */
-  mode: "chat" | "embedding" | "audio";
+  /** Derived mode: "chat", "embedding", "audio" (TTS/STT) or "image" (generation/edit) */
+  mode: "chat" | "embedding" | "audio" | "image";
   /** Model description (optional) */
   description?: string;
   // Multimodal support flags

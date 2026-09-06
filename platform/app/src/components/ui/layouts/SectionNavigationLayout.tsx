@@ -2,6 +2,7 @@ import { Box, Container, Stack, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
+import { ProductPageFrame } from "~/features/navigation/shell/ProductPageFrame";
 
 export interface SectionNavigationItem {
   label: string;
@@ -22,6 +23,14 @@ interface SectionNavigationFrameProps {
 interface SectionNavigationLayoutProps extends SectionNavigationFrameProps {
   pageTitle?: string;
   orgScope?: boolean;
+  /**
+   * Set when the product sidebar lists the same pages this rail does
+   * (Gateway, Governance). The rail then stands down and the content
+   * takes the full width; a section whose rail lists page-local
+   * destinations (Automations) leaves this unset and keeps its rail.
+   * Spec: specs/navigation/shared-section-navigation-layout.feature
+   */
+  standDownRailInProductShell?: boolean;
 }
 
 /**
@@ -36,16 +45,21 @@ export function SectionNavigationLayout({
   sidebarFooter,
   pageTitle,
   orgScope = false,
+  standDownRailInProductShell = false,
 }: SectionNavigationLayoutProps) {
   return (
     <DashboardLayout orgScope={orgScope} pageTitle={pageTitle}>
-      <SectionNavigationFrame
-        sectionLabel={sectionLabel}
-        navigationItems={navigationItems}
-        sidebarFooter={sidebarFooter}
-      >
-        {children}
-      </SectionNavigationFrame>
+      {standDownRailInProductShell ? (
+        <ProductPageFrame>{children}</ProductPageFrame>
+      ) : (
+        <SectionNavigationFrame
+          sectionLabel={sectionLabel}
+          navigationItems={navigationItems}
+          sidebarFooter={sidebarFooter}
+        >
+          {children}
+        </SectionNavigationFrame>
+      )}
     </DashboardLayout>
   );
 }

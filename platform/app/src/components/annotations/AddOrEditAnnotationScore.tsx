@@ -139,9 +139,6 @@ export const AddOrEditAnnotationScore = ({
           : "Error creating annotation score",
         description: "Please add at least one option",
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
       return;
     }
@@ -160,9 +157,6 @@ export const AddOrEditAnnotationScore = ({
           : "Error creating annotation score",
         description: "Duplicate options are not allowed (case-insensitive)",
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
       return;
     }
@@ -189,9 +183,6 @@ export const AddOrEditAnnotationScore = ({
               : "Annotation Score Created",
             description: `Successfully ${annotationScoreId ? "updated" : "created"} ${data.name} annotation score`,
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
 
           onClose();

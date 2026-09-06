@@ -619,6 +619,7 @@ function DbAgentPanel({
     headers,
     auth,
     outputPath,
+    bodyTemplate,
   });
 
   // Register footer

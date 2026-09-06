@@ -140,7 +140,7 @@ function viewUrl(source: ReportSource, baseHost: string, slug: string): string {
   const base = `${baseHost}/${slug}`;
   switch (source.kind) {
     case "traceQuery":
-      return `${base}/messages`;
+      return `${base}/traces`;
     case "customGraph":
       return `${base}/analytics/custom/${source.customGraphId}`;
     case "dashboard":

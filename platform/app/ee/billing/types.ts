@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { UsageUnit } from "../../src/server/app-layer/usage/usage-meter-policy";
 import type { LimitType } from "../../src/server/license-enforcement/types";
 import type { signUpDataSchema } from "../../src/server/schemas/sign-up-data.schema";
 import type { PlanInfo } from "../licensing/planInfo";
@@ -21,6 +22,12 @@ export type BillingPlanProvider = {
 export type PlanLimitNotifierInput = {
   organizationId: string;
   planName: string;
+  /** Counting unit the plan cap is measured in. */
+  usageUnit: UsageUnit;
+  /** Usage counted so far this month, in `usageUnit`. */
+  current: number;
+  /** Monthly cap allowed by the plan, in `usageUnit`. */
+  max: number;
 };
 
 export type PlanLimitNotificationContext = {
@@ -29,6 +36,10 @@ export type PlanLimitNotificationContext = {
   adminName?: string;
   adminEmail?: string;
   planName: string;
+  /** Display label for the cap that was hit, for example "Monthly Traces". */
+  limitType: string;
+  current: number;
+  max: number;
 };
 
 type SubscriptionPlan = PlanTypes | (string & {});

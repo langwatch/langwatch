@@ -111,6 +111,7 @@ type selectionFields struct {
 	Gateway *bool `json:"gateway"`
 	NLP     *bool `json:"nlp"`
 	Langy   *bool `json:"langy"`
+	IDP     *bool `json:"idp"`
 }
 
 // applyTo overlays the services this file actually states onto sel.
@@ -120,6 +121,7 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Gateway, &sel.Gateway},
 		{f.NLP, &sel.NLP},
 		{f.Langy, &sel.Langy},
+		{f.IDP, &sel.IDP},
 	} {
 		if field.stated != nil {
 			*field.target = *field.stated
@@ -163,6 +165,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Gateway: &sel.Gateway,
 		NLP:     &sel.NLP,
 		Langy:   &sel.Langy,
+		IDP:     &sel.IDP,
 	}}, "", "  ")
 	if err != nil {
 		return err
@@ -499,4 +502,35 @@ func (s *Store) ReadPressure() (domain.PressureRecord, bool) {
 		return rec, false
 	}
 	return rec, true
+}
+
+func (s *Store) reapEventsPath() string { return filepath.Join(s.home, "reap-events.json") }
+
+// AppendReapEvent appends one daemon reclamation to the bounded record. The
+// daemon is the only writer (its monitor goroutine), so read-modify-write with
+// an atomic replace is race-free in practice; the hub only ever reads.
+func (s *Store) AppendReapEvent(ev domain.ReapEvent) error {
+	events := domain.AppendReapEvent(s.ReapEvents(), ev)
+	b, err := json.Marshal(events)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(s.home, 0o750); err != nil {
+		return err
+	}
+	return writeFileAtomic(s.reapEventsPath(), b, 0o644)
+}
+
+// ReapEvents reads the record newest-last. Absent or unreadable is an empty
+// record — the hub shows "nothing reaped", never an error.
+func (s *Store) ReapEvents() []domain.ReapEvent {
+	b, err := os.ReadFile(s.reapEventsPath())
+	if err != nil {
+		return nil
+	}
+	var events []domain.ReapEvent
+	if json.Unmarshal(b, &events) != nil {
+		return nil
+	}
+	return events
 }

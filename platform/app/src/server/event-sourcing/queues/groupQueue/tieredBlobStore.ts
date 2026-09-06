@@ -330,7 +330,7 @@ export class TieredBlobStore {
     } catch (err) {
       // A genuinely-absent or oversized/corrupt object is a missing blob → null
       // → decode fail-safe, which DISCARDS the job (#5538: replay rebuilds fold
-      // projections and never re-invokes reactors, so for a reactor-bearing fold
+      // projections and never re-invokes subscribers, so for a subscriber-bearing fold
       // this is permanent loss, not "recover via replay" as this once claimed —
       // see `GroupQueue.dropStagedJob`). Anything else (network/5xx) is
       // transient and must retry, not drop the job (ADR-030 §2). Oversize is

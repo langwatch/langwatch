@@ -12,22 +12,28 @@
  * membership reports `hasLegacyAccessNotice: true`: their first explicit binding
  * switches the team-derived fallback off, which is worth telling the operator
  * even though the write itself is exactly what they asked for.
+ *
+ * Every write here is a grants-ledger command (ADR-092 §13), so the audit
+ * trail is the pipeline's insert-only subscriber (decision 17): these
+ * handlers never emit `management.roleBinding.*` rows of their own — that
+ * would record the same mutation twice.
  */
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
 import type { Context } from "hono";
 import { z } from "zod";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import {
   type Organization,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { emitManagementAudit } from "~/server/api/management/audit";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { prisma } from "~/server/db";
 import { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
+import { optimisticBindingWire } from "./read-back";
 
 const { service, guard } = createManagementService({
   name: "role-bindings",
@@ -140,9 +146,13 @@ const organizationOf = (c: Context): Organization =>
 
 /**
  * The just-written binding as the list reports it, so a write's response is
- * byte-compatible with a later read. The service list excludes personal
- * workspaces, but a write into one was already refused, so a missing row here
- * is a platform inconsistency rather than a nameable caller error.
+ * byte-compatible with a later read — or null while the grants projection is
+ * still behind the append that created it.
+ *
+ * Null is not an error here. `attachBindings` waits for the projection, but
+ * that wait is bounded and timeout-tolerant, so a miss means "durable, not
+ * yet projected". What each caller does with the miss differs, and is stated
+ * at the call site.
  */
 const readBackBinding = async ({
   roleBindings,
@@ -152,15 +162,10 @@ const readBackBinding = async ({
   roleBindings: RoleBindingService;
   organizationId: string;
   bindingId: string;
-}): Promise<z.infer<typeof bindingSchema>> => {
+}): Promise<z.infer<typeof bindingSchema> | null> => {
   const rows = await roleBindings.listForOrg({ organizationId });
   const row = rows.find((candidate) => candidate.id === bindingId);
-  if (!row) {
-    throw new Error(
-      `Role binding ${bindingId} was written but does not read back`,
-    );
-  }
-  return bindingWire(row);
+  return row ? bindingWire(row) : null;
 };
 
 // ── handlers ─────────────────────────────────────────────────────────────────
@@ -208,25 +213,32 @@ const createBindingHandler = async (
   const created = await app.roleBindings.create({
     organizationId: organization.id,
     ...input,
+    actor: orgRequestLedgerActor(c),
   });
 
-  emitManagementAudit({
-    c,
-    organizationId: organization.id,
-    action: "management.roleBinding.create",
-    args: {
+  // The write landed; the projection may not have. Answer with what was
+  // written rather than failing a successful create over ordinary lag — the
+  // id is what the caller needs, and a retry would append a second grant for
+  // the same slot rather than being absorbed (it only answers 409
+  // role_binding_already_exists once the first row is projected).
+  const binding =
+    (await readBackBinding({
+      roleBindings: app.roleBindings,
+      organizationId: organization.id,
       bindingId: created.id,
+    })) ??
+    optimisticBindingWire({
+      id: created.id,
+      principal: {
+        userId: input.userId,
+        groupId: input.groupId,
+        apiKeyId: input.apiKeyId,
+      },
+      role: input.role,
+      customRoleId: input.customRoleId,
       scopeType: input.scopeType,
       scopeId: input.scopeId,
-      role: input.role,
-    },
-  });
-
-  const binding = await readBackBinding({
-    roleBindings: app.roleBindings,
-    organizationId: organization.id,
-    bindingId: created.id,
-  });
+    });
   return {
     ...binding,
     ...(hasLegacyAccessNotice ? { hasLegacyAccessNotice: true } : {}),
@@ -253,18 +265,25 @@ const updateBindingHandler = async (
     ...(input.customRoleId !== undefined
       ? { customRoleId: input.customRoleId }
       : {}),
+    actor: orgRequestLedgerActor(c),
   });
-  emitManagementAudit({
-    c,
-    organizationId: organization.id,
-    action: "management.roleBinding.update",
-    args: { bindingId: params.id, role: input.role },
-  });
-  return readBackBinding({
+  const binding = await readBackBinding({
     roleBindings: app.roleBindings,
     organizationId: organization.id,
     bindingId: updated.id,
   });
+  // A patch, unlike a create, changed a row the service had already read from
+  // the projection, so lag cannot explain its absence from the listing: only
+  // an unexpected state can (the principal leaving the organization while the
+  // request was in flight, say). Nothing the caller can act on, so it stays a
+  // plain Error and degrades to the generic failure plus a trace id (ADR-045)
+  // rather than pretending to be a nameable refusal.
+  if (!binding) {
+    throw new Error(
+      `Role binding ${updated.id} was written but does not read back`,
+    );
+  }
+  return binding;
 };
 
 const deleteBindingHandler = async (
@@ -281,12 +300,7 @@ const deleteBindingHandler = async (
   await app.roleBindings.delete({
     organizationId: organization.id,
     bindingId: params.id,
-  });
-  emitManagementAudit({
-    c,
-    organizationId: organization.id,
-    action: "management.roleBinding.delete",
-    args: { bindingId: params.id },
+    actor: orgRequestLedgerActor(c),
   });
   return { success: true as const };
 };
@@ -318,7 +332,7 @@ const registerCollectionEndpoints = (v: RoleBindingsVersion): void => {
       output: createdBindingSchema,
       status: 201,
       description:
-        "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists.",
+        "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.",
       docs: { operationId: "createRoleBinding", tags: ["Role Bindings"] },
     },
     createBindingHandler,
@@ -359,11 +373,11 @@ const registerItemEndpoints = (v: RoleBindingsVersion): void => {
 export const app = service
   .provide({
     roleBindings: () =>
-      new RoleBindingService(
+      new RoleBindingService({
         prisma,
-        new PrismaRoleBindingRepository(prisma),
-        new RoleService(prisma),
-      ),
+        repo: new PrismaRoleBindingRepository(prisma),
+        roleService: new RoleService(prisma),
+      }),
   })
   .version(MANAGEMENT_API_VERSION, (v) => {
     registerCollectionEndpoints(v);

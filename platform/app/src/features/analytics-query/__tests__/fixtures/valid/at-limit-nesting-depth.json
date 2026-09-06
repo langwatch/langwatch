@@ -1,0 +1,69 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"vconcat": [
+		{
+			"vconcat": [
+				{
+					"vconcat": [
+						{
+							"vconcat": [
+								{
+									"vconcat": [
+										{
+											"vconcat": [
+												{
+													"vconcat": [
+														{
+															"vconcat": [
+																{
+																	"vconcat": [
+																		{
+																			"vconcat": [
+																				{
+																					"vconcat": [
+																						{
+																							"vconcat": [
+																								{
+																									"vconcat": [
+																										{
+																											"vconcat": [
+																												{
+																													"vconcat": [
+																														{
+																															"mark": {
+																																"type": "point"
+																															}
+																														}
+																													]
+																												}
+																											]
+																										}
+																									]
+																								}
+																							]
+																						}
+																					]
+																				}
+																			]
+																		}
+																	]
+																}
+															]
+														}
+													]
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

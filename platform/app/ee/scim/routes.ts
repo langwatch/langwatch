@@ -39,6 +39,8 @@ import {
 } from "@ee/scim/scim.types";
 import { ScimGroupService } from "@ee/scim/scim-group.service";
 import { ScimTokenService } from "@ee/scim/scim-token.service";
+import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute } from "hono-openapi";
 import { ENTERPRISE_FEATURE_ERRORS } from "~/server/api/enterprise";
@@ -49,8 +51,20 @@ import {
 } from "~/server/api/security";
 import { prisma } from "~/server/db";
 
-/** The organization the bearer credential resolved to, set by {@link scimAuth}. */
-type ScimEnv = { Variables: { scimOrganizationId: string } };
+/**
+ * What the bearer credential resolved to, set by {@link scimAuth}: the
+ * organization, and the CONNECTION the token was issued for — the whole of
+ * its write authority (D08). `scimConnectionId` is null only for a token
+ * minted before connection scoping whose organization had no connection to
+ * be backfilled onto; such a token keeps the organization-wide authority it
+ * was sold with.
+ */
+type ScimEnv = {
+  Variables: {
+    scimOrganizationId: string;
+    scimConnectionId: string | null;
+  };
+};
 
 /**
  * Discovery carries no credential, and the policy has to say so. RFC 7644
@@ -63,6 +77,8 @@ type ScimEnv = { Variables: { scimOrganizationId: string } };
 const SCIM_DISCOVERY_POLICY = publicEndpoint(
   "SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists",
 );
+
+const logger = createLogger("langwatch:scim:routes");
 
 // ── helpers ──────────────────────────────────────────────────────────
 
@@ -124,6 +140,7 @@ const scimAuth: MiddlewareHandler<ScimEnv> = async (c, next) => {
   }
 
   c.set("scimOrganizationId", result.organizationId);
+  c.set("scimConnectionId", result.connectionId);
   await next();
 };
 
@@ -380,7 +397,7 @@ secured
   .get("/Users", describeRoute(LIST_USERS), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const filter = c.req.query("filter") ?? undefined;
     const startIndex = positiveIntegerQuery(c.req.query("startIndex"), 1);
@@ -401,7 +418,7 @@ secured
   .post("/Users", describeRoute(CREATE_USER), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const body = await parseJsonBody(c);
     if (body === null) {
@@ -416,6 +433,7 @@ secured
     const result = await scimService.createUser({
       request: parsed.data,
       organizationId,
+      connectionId: c.get("scimConnectionId"),
     });
 
     if (isScimError(result)) {
@@ -431,7 +449,7 @@ secured
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const result = await scimService.getUser({ id, organizationId });
 
@@ -448,7 +466,7 @@ secured
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const body = await parseJsonBody(c);
     if (body === null) {
@@ -464,6 +482,7 @@ secured
       id,
       organizationId,
       request: parsed.data,
+      connectionId: c.get("scimConnectionId"),
     });
 
     if (isScimError(result)) {
@@ -479,7 +498,7 @@ secured
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
     const body = await parseJsonBody(c);
     if (body === null) {
@@ -495,6 +514,7 @@ secured
       id,
       organizationId,
       patchRequest: parsed.data,
+      connectionId: c.get("scimConnectionId"),
     });
 
     if (isScimError(result)) {
@@ -510,9 +530,13 @@ secured
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create({ prisma });
 
-    const result = await scimService.deleteUser({ id, organizationId });
+    const result = await scimService.deleteUser({
+      id,
+      organizationId,
+      connectionId: c.get("scimConnectionId"),
+    });
 
     if (result && isScimError(result)) {
       return scimJson(c, result, parseInt(result.status, 10));
@@ -528,7 +552,7 @@ secured
   .get("/Groups", describeRoute(LIST_GROUPS), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
-    const service = ScimGroupService.create(prisma);
+    const service = ScimGroupService.create({ prisma });
 
     const excludedAttributes = (c.req.query("excludedAttributes") ?? "")
       .split(",")
@@ -551,7 +575,7 @@ secured
   .post("/Groups", describeRoute(CREATE_GROUP), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
-    const service = ScimGroupService.create(prisma);
+    const service = ScimGroupService.create({ prisma });
 
     const body = await parseJsonBody(c);
     if (body === null) {
@@ -566,6 +590,7 @@ secured
     const result = await service.createGroup({
       request: parsed.data,
       organizationId,
+      connectionId: c.get("scimConnectionId"),
     });
 
     if (isScimError(result)) {
@@ -587,8 +612,8 @@ secured
       .map((s) => s.trim())
       .filter(Boolean);
 
-    const result = await ScimGroupService.create(prisma).getGroup({
-      externalScimId: id,
+    const result = await ScimGroupService.create({ prisma }).getGroup({
+      scimResourceId: id,
       organizationId,
       excludeMembers: excludedAttributes.includes("members"),
     });
@@ -617,8 +642,8 @@ secured
       return scimError(c, 400, parsed.error.message);
     }
 
-    const result = await ScimGroupService.create(prisma).replaceGroup({
-      externalScimId: id,
+    const result = await ScimGroupService.create({ prisma }).replaceGroup({
+      scimResourceId: id,
       organizationId,
       request: parsed.data,
     });
@@ -647,8 +672,8 @@ secured
       return scimError(c, 400, parsed.error.message);
     }
 
-    const result = await ScimGroupService.create(prisma).updateGroup({
-      externalScimId: id,
+    const result = await ScimGroupService.create({ prisma }).updateGroup({
+      scimResourceId: id,
       organizationId,
       patchRequest: parsed.data,
     });
@@ -666,8 +691,8 @@ secured
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const result = await ScimGroupService.create(prisma).deleteGroup({
-      externalScimId: id,
+    const result = await ScimGroupService.create({ prisma }).deleteGroup({
+      scimResourceId: id,
       organizationId,
     });
 
@@ -677,5 +702,42 @@ secured
 
     return c.body(null, 204);
   });
+
+/**
+ * The family's own error shape (D08).
+ *
+ * The caller here is an identity provider speaking SCIM, not one of our
+ * clients, so a refusal has to arrive as RFC 7644's error resource rather
+ * than the app's JSON envelope — an Okta or Entra sync reads `status` and
+ * `detail` and nothing else, and a shape it cannot parse reads as an outage.
+ *
+ * A `HandledError` is a refusal we can name, so its status and its
+ * customer-safe message travel. Anything else is a 500 with no detail beyond
+ * that: an unhandled failure has nothing a customer could act on, and its
+ * internals belong in the log line the framework already wrote, never in a
+ * response body. The `code` rides in `scimType` so a provisioning tool can
+ * branch on the stable slug rather than on prose.
+ */
+secured.hono.onError((error, c) => {
+  if (error instanceof HandledError) {
+    return new Response(
+      JSON.stringify({
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: String(error.httpStatus),
+        scimType: error.code,
+        detail: error.message,
+      }),
+      {
+        status: error.httpStatus,
+        headers: new Headers({ "Content-Type": "application/scim+json" }),
+      },
+    );
+  }
+  logger.error(
+    { error, path: c.req.path },
+    "unhandled failure on a SCIM route",
+  );
+  return scimError(c, 500, "The request could not be completed");
+});
 
 export const app = secured.hono;

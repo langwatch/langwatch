@@ -1,15 +1,16 @@
 /**
- * Retry middleware.
+ * Retrying a statement that failed for a reason worth trying again.
  *
  * Composes the policies in ./resilience.ts rather than restating them, so the
  * classifier this uses is the same one the outer job queue uses and the two
  * cannot drift into disagreeing about what "transient" means.
  *
- * Compose this *inside* the rate limiter, so a retrying statement keeps its
- * slot instead of rejoining the queue behind fresh work.
+ * {@link ClickHouseQueryClient} runs this *inside* the concurrency limiter, so
+ * a retrying statement keeps its slot instead of rejoining the queue behind
+ * fresh work.
  */
 
-import type { QueryMiddleware, QueryRequest } from "./pipeline";
+import type { AbortSignalLike, QueryRequest } from "./query";
 import {
   isTransientClickHouseError,
   jitteredBackoffMs,
@@ -17,7 +18,13 @@ import {
 } from "./resilience";
 
 export interface RetryNotice {
-  request: QueryRequest;
+  /**
+   * Absent when the policy was run without one — `run(task)` is a supported
+   * form. Optional rather than cast away: a callback that reads tenant or table
+   * off this would otherwise throw into runWithRetry's guard, and the retry
+   * telemetry would vanish rather than fail loudly.
+   */
+  request?: QueryRequest | undefined;
   /** Zero-based. */
   attempt: number;
   maxAttempts: number;
@@ -79,10 +86,11 @@ export interface RunWithRetryOptions
 /**
  * Retry any operation under this package's policy.
  *
- * The loop lives here rather than in the middleware so a caller that is not
- * yet on the pipeline - the app's `ResilientClickHouseClient`, which wraps the
- * vendor client's own `query`/`insert` - can share one implementation instead
- * of keeping a second copy that drifts.
+ * The loop lives here rather than in the client class so callers that are not
+ * on the {@link ClickHouseQueryClient} port - `VendorClientResilience`, which
+ * wraps the vendor client's own `query`/`insert`, and any host retrying
+ * non-statement work - share one implementation instead of keeping a second
+ * copy that drifts.
  */
 export async function runWithRetry<T>(
   fn: () => Promise<T>,
@@ -160,17 +168,51 @@ export async function runWithRetry<T>(
   throw lastError;
 }
 
-export function retry({
-  onRetry,
-  ...options
-}: RetryOptions = {}): QueryMiddleware {
-  return (next) =>
-    <Row>(request: QueryRequest) =>
-      runWithRetry(() => next<Row>(request), {
-        ...options,
-        isAborted: () => request.signal?.aborted === true,
-        ...(onRetry === undefined
-          ? {}
-          : { onRetry: (notice) => onRetry({ ...notice, request }) }),
-      });
+/**
+ * A configured retry policy, reusable across statements.
+ *
+ * Holds its options once instead of threading them through every call, which
+ * is what lets the client hold one policy rather than rebuilding the argument
+ * object per query.
+ */
+export class RetryPolicy {
+  private readonly onRetry: ((notice: RetryNotice) => void) | undefined;
+  private readonly options: Omit<RetryOptions, "onRetry">;
+
+  constructor({ onRetry, ...options }: RetryOptions = {}) {
+    this.onRetry = onRetry;
+    this.options = options;
+  }
+
+  /**
+   * Run `task`, retrying transient failures until the budget is spent.
+   *
+   * `request` is optional and only decorates the retry notice: a caller that
+   * has one gets it echoed back for logging, and a caller retrying something
+   * that is not a statement still gets the same backoff.
+   */
+  run<T>(
+    task: () => Promise<T>,
+    {
+      signal,
+      request,
+    }: { signal?: AbortSignalLike | undefined; request?: QueryRequest | undefined } = {},
+  ): Promise<T> {
+    const onRetry = this.onRetry;
+    // Falls back to the request's own signal. A caller that passes a request
+    // carrying a signal and no explicit `signal` means for it to be honoured;
+    // reading only the explicit one would silently retry work nobody is
+    // waiting for, which is the exact failure this option exists to prevent.
+    const abortSignal = signal ?? request?.signal;
+    return runWithRetry(task, {
+      ...this.options,
+      isAborted: () => abortSignal?.aborted === true,
+      ...(onRetry === undefined
+        ? {}
+        : {
+            onRetry: (notice: Omit<RetryNotice, "request">) =>
+              onRetry({ ...notice, request }),
+          }),
+    });
+  }
 }

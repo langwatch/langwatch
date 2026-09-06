@@ -93,7 +93,6 @@ export function CreateProjectDrawer({
             title: "Project Created",
             description: `Successfully created ${result.projectSlug}`,
             type: "success",
-            meta: { closable: true },
           });
 
           onCreated?.({ projectSlug: result.projectSlug });

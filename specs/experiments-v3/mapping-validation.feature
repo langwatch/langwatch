@@ -31,6 +31,7 @@ Feature: Mapping Validation and Missing Mapping Detection
   # Drawer Highlights
   # ============================================================================
 
+  @integration
   Scenario: Opening drawer shows missing mapping warning
     Given I have a runner with missing mappings
     When I click to open the runner's drawer
@@ -139,19 +140,52 @@ Feature: Mapping Validation and Missing Mapping Detection
   # ============================================================================
   # Declared-but-unused prompt variables
   # ============================================================================
+  #
+  # Every prompt is born with an "input" variable, and deleting the "{{input}}"
+  # reference from the template never removes the declaration. A mapping is
+  # required only when the template proves the prompt consumes the variable.
 
-  @regression
-  Scenario: A declared prompt variable not referenced by any message is not required
-    Given I have a prompt target with an explicit user message
-    And the message content does not reference "{{input}}"
+  @regression @unit
+  Scenario: A declared input the template does not use needs no mapping
+    Given I have a prompt target whose messages reference "{{brand}}" and "{{product_name}}"
     And "input" is still a declared variable on the prompt
-    And the prompt target follows the latest version with no local edits
+    And "input" is not mapped for the active dataset
     Then "input" is not reported as a missing required mapping
     And the experiment can run without mapping "input"
 
-  @regression
+  @regression @integration
+  Scenario: The column header stays quiet for a declared input the template does not use
+    Given I have a prompt target whose messages reference "{{brand}}" and "{{product_name}}"
+    And "brand" and "product_name" are mapped for the active dataset
+    And "input" is declared but unmapped
+    Then the column header shows no alert icon
+    And the column play button starts the run
+
+  @regression @unit
   Scenario: A declared prompt variable that IS referenced still requires a mapping
     Given I have a prompt target whose user message references "{{product_name}}"
     And "product_name" is a declared variable on the prompt
     And "product_name" is not mapped for the active dataset
     Then "product_name" is reported as a missing required mapping
+
+  @regression @integration
+  Scenario: The column header warns for a referenced variable that is unmapped
+    Given I have a prompt target whose user message references "{{product_name}}"
+    And "product_name" is not mapped for the active dataset
+    Then the column header shows a pulsing alert icon
+    And the column play button opens the prompt editor instead of running
+
+  # With no template turn to render, the engine sends the declared variables as
+  # the user turn, so each of them reaches the model and needs a value.
+  @regression @unit
+  Scenario: A prompt with no user or assistant message needs every declared variable
+    Given I have a prompt target whose template has only a system message
+    And "input" and "product_name" are declared variables on the prompt
+    Then both variables are reported as missing required mappings
+
+  @regression @unit
+  Scenario: A prompt target with no loaded template requires nothing
+    Given I have a prompt target that follows the latest version with no local edits
+    And its saved template has not loaded yet
+    Then no variable is reported as a missing required mapping
+    And the experiment can run

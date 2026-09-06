@@ -1,10 +1,67 @@
-import { Navigate } from "react-router";
+import { Skeleton, Text, VStack } from "@chakra-ui/react";
+
+import MyLayout from "~/components/me/MyLayout";
+import { SessionsTable } from "~/components/me/SessionsTable";
+import { usePersonalContext } from "~/components/me/usePersonalContext";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import Head from "~/utils/compat/next-head";
 
 /**
- * The devices inventory lived here before it was renamed, and the docs and
- * old bookmarks still point at this path, so it forwards instead of
- * dead-ending on the 404 page.
+ * The personal Sessions page: every coding-agent session of the last quarter
+ * and what it cost in context. Routing and the layout only, the table owns its
+ * own reads.
+ *
+ * Spec: specs/coding-agent/sessions-screen.feature.
  */
-export default function MeSessionsRedirect() {
-  return <Navigate to="/me/devices" replace />;
+function MySessionsPage() {
+  const {
+    ready,
+    isPersonalProjectResolved,
+    personalProjectId,
+    personalProjectSlug,
+  } = usePersonalContext();
+
+  return (
+    <MyLayout>
+      <Head>
+        <title>My Sessions · LangWatch</title>
+      </Head>
+
+      <VStack align="stretch" gap={6} width="full">
+        <VStack align="start" gap={0}>
+          <PageLayout.Heading>Sessions</PageLayout.Heading>
+          <Text color="fg.muted" fontSize="sm">
+            Every coding-agent session you ran over the last ninety days, with
+            the context it carried, how often it compacted, how long it worked
+            against how long it waited on you, and the pull requests it drove.
+            Choosing a session replays it in the terminal.
+          </Text>
+        </VStack>
+
+        {/* The workspace is resolved before anything is claimed about it, and
+            that takes both flags: `ready` covers the session and the
+            organization, and the project is read only once those land, so
+            `ready` alone still leaves a window with no project id yet. Saying
+            "no sessions" in that window states a fact that is not known to be
+            true. */}
+        {!ready || !isPersonalProjectResolved ? (
+          <Skeleton height="180px" borderRadius="md" />
+        ) : personalProjectId ? (
+          <SessionsTable
+            projectId={personalProjectId}
+            projectSlug={personalProjectSlug}
+          />
+        ) : (
+          <Text fontSize="sm" color="fg.muted">
+            No sessions yet
+          </Text>
+        )}
+      </VStack>
+    </MyLayout>
+  );
 }
+
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(MySessionsPage);

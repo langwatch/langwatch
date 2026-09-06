@@ -547,7 +547,6 @@ export function UploadCSVForm({
         toaster.create({
           title: "Preparing your dataset",
           type: "success",
-          meta: { closable: true },
         });
         setIsUploading(false);
         onClose?.();
@@ -992,9 +991,6 @@ function ParsingCSVReader({
               title: "Error",
               description: "Failed to parse JSON file",
               type: "error",
-              meta: {
-                closable: true,
-              },
             });
           }
         } else {
@@ -1064,9 +1060,6 @@ function buildDatasetFromRows(data: string[][], name: string): InMemoryDataset {
         title: "Column Renamed",
         description: `Column "${col}" is reserved or conflicts with existing columns and has been renamed to "${safeColumnName}"`,
         type: "warning",
-        meta: {
-          closable: true,
-        },
       });
     }
 

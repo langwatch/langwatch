@@ -290,7 +290,6 @@ export function EvaluateModalContent({
             title: "Error saving version",
             type: "error",
             duration: 5000,
-            meta: { closable: true },
           });
           throw error;
         }
@@ -303,7 +302,6 @@ export function EvaluateModalContent({
           title: "Version ID not found for evaluation",
           type: "error",
           duration: 5000,
-          meta: { closable: true },
         });
         return;
       }

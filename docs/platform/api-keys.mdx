@@ -9,7 +9,7 @@ LangWatch uses API keys to authenticate SDK calls, MCP connections, and API requ
 
 ## Ingestion keys vs API keys
 
-LangWatch splits credentials into two concepts, the same way Datadog separates ingest-only API keys from RBAC-scoped application keys. Both are `sk-lw-…` strings, but they carry very different power:
+LangWatch splits credentials into two concepts, the same way Datadog separates ingest-only API keys from RBAC-scoped application keys. An ingestion key is an `ik-lw-…` string and an API key is an `sk-lw-…` string, so you can tell them apart at a glance. They carry very different power:
 
 | | Ingestion key | API key |
 |---|---|---|
@@ -28,7 +28,7 @@ Because an ingestion key is genuinely write-only, it's safe to drop into an agen
 | **Tied to** | A specific user | No user (org-level) |
 | **Best for** | Local development, AI assistants (MCP), personal workflows | CI/CD pipelines, automation, service-to-service |
 | **Permissions** | Inherits your RBAC permissions (ceiling model) | Scoped to specific projects with ADMIN access |
-| **Survives user removal** | No — disabled when user leaves the org | Yes — independent of any user |
+| **Survives user removal** | No, disabled when user leaves the org | Yes, independent of any user |
 | **Requires `LANGWATCH_PROJECT_ID`** | Yes | Yes |
 
 <Info>
@@ -54,12 +54,12 @@ Personal keys are ideal for local development, connecting your AI coding assista
     - **Scope**: Select which projects, teams, or the whole organization the key can access
     - **Expiration**: Optionally set an expiration date
     - **Permissions**: Choose a permission mode:
-      - **All** — inherits your full permissions at each scope
-      - **Restricted** — fine-grained control over individual permission categories (see [Permission Categories](#permission-categories))
+      - **All**: inherits your full permissions at each scope
+      - **Restricted**: fine-grained control over individual permission categories (see [Permission Categories](#permission-categories))
   </Step>
 
   <Step title="Copy your key">
-    After creation, your key is shown **once**. Copy it and store it securely — you won't be able to see the full key again.
+    After creation, your key is shown **once**. Copy it and store it securely. You cannot see the full key again.
 
     The key format is: `sk-lw-<id>_<secret>`
   </Step>
@@ -78,7 +78,7 @@ You can find your project ID in **Settings → Projects** or in the project URL.
 
 ## Creating a Service API Key
 
-Service keys are designed for automated systems — CI/CD pipelines, production services, and multi-project setups. They aren't tied to any user, so they keep working even if team members leave.
+Service keys are designed for automated systems: CI/CD pipelines, production services, and multi-project setups. They aren't tied to any user, so they keep working even if team members leave.
 
 <Note>
   Only organization **admins** can create service keys.
@@ -150,7 +150,7 @@ When using **Restricted** permissions, you can grant read or write access to ind
 | Category | Read | Write |
 |---|---|---|
 | **Traces** | View traces and spans | Create, update, and share traces |
-| **Cost** | View cost analytics | — |
+| **Cost** | View cost analytics | None |
 | **Scenarios** | View test scenarios | Create and manage scenarios |
 | **Annotations** | View annotations | Create and manage annotations |
 | **Analytics** | View analytics dashboards | Create and manage dashboards |
@@ -160,15 +160,15 @@ When using **Restricted** permissions, you can grant read or write access to ind
 | **Workflows** | View workflows | Create and manage workflows |
 | **Prompts** | View prompts | Create and manage prompts |
 | **Secrets** | View secrets | Create and manage secrets |
-| **Audit Log** | View audit log | — |
+| **Audit Log** | View audit log | None |
 | **Team** | View team members | Manage team membership |
 | **Project** | View project settings | Create, update, and delete projects |
 
-Categories marked with "—" for write are read-only by design.
+Categories marked "None" for write are read-only by design.
 
 ## Connecting to AI Assistants (MCP)
 
-Personal API keys work with the [LangWatch MCP Server](/integration/mcp) to give your AI coding assistant access to LangWatch features — tracing, analytics, prompt management, and more.
+Personal API keys work with the [LangWatch MCP Server](/integration/mcp) to give your AI coding assistant access to LangWatch features: tracing, analytics, prompt management, and more.
 
 <Steps>
   <Step title="Create a personal API key">
@@ -218,7 +218,7 @@ API key permissions follow a **ceiling model**: a personal key can never exceed 
 - If you have **MEMBER** access and create a key with **All** permissions, the key gets MEMBER (not ADMIN)
 - **Restricted** keys let you manually narrow access to specific permission categories at read or write level
 
-Service keys bypass the user ceiling since they have no associated user — their permissions come directly from their scope and permission mode.
+Service keys bypass the user ceiling since they have no associated user. Their permissions come directly from their scope and permission mode.
 
 For more on roles and permissions, see [Access Control (RBAC)](/platform/rbac).
 
@@ -226,9 +226,9 @@ For more on roles and permissions, see [Access Control (RBAC)](/platform/rbac).
 
 From the **Settings → API Keys** page you can:
 
-- **View all keys** — see name, type, status, scope, permissions, creation date, last used, and creator
-- **Edit a key** — update the name, permission mode, or permission categories
-- **Revoke a key** — immediately disables the key (cannot be undone)
+- **View all keys**: see name, type, status, scope, permissions, creation date, last used, and creator
+- **Edit a key**: update the name, permission mode, or permission categories
+- **Revoke a key**: immediately disables the key (cannot be undone)
 
 <Tip>
   Rotate keys regularly and revoke any that are no longer in use. Set expiration dates on keys used for temporary workflows.

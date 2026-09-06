@@ -112,6 +112,11 @@ export interface SessionGroupDto {
   errorCount: number;
   warningCount: number;
   totalSpans: number;
+  /**
+   * The session's most recent trace, the one a click on the row opens. Null
+   * when the rollup named none.
+   */
+  lastTraceId: string | null;
   /** Latest trace's computed input/output previews for the row label. */
   input: string | null;
   output: string | null;
@@ -180,6 +185,7 @@ export function mapSessionGroupRowToDto({
     errorCount: row.errorCount,
     warningCount: row.warningCount,
     totalSpans: row.totalSpans,
+    lastTraceId: emptyToNull(row.lastTraceId),
     input: row.input,
     output: row.output,
     codingAgent,

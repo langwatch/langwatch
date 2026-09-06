@@ -3,7 +3,11 @@ import {
   type Prisma,
   type PrismaClient,
 } from "../src/generated/prisma/client";
-import { DEMO_PLATFORM_IDS } from "./demo-platform-ids";
+import {
+  DEMO_HTTP_AGENT_CONFIG,
+  DEMO_PLATFORM_IDS,
+  DEMO_PROMPT_CONFIG_DATA,
+} from "./demo-platform-ids";
 
 const DATASET_ROWS = [
   {
@@ -41,10 +45,12 @@ const DATASET_ROWS = [
 export async function seedDemoPlatform({
   prisma,
   projectId,
+  organizationId,
   userId,
 }: {
   prisma: PrismaClient;
   projectId: string;
+  organizationId: string;
   userId: string;
 }): Promise<void> {
   const supportAgent = await prisma.agent.upsert({
@@ -75,6 +81,46 @@ export async function seedDemoPlatform({
       },
     },
     update: { archivedAt: null },
+  });
+
+  await prisma.agent.upsert({
+    where: { id: DEMO_PLATFORM_IDS.agents.httpEcho },
+    create: {
+      id: DEMO_PLATFORM_IDS.agents.httpEcho,
+      projectId,
+      name: "HTTP Echo Agent",
+      type: "http",
+      config: DEMO_HTTP_AGENT_CONFIG as Prisma.InputJsonValue,
+    },
+    update: { archivedAt: null },
+  });
+
+  const prompt = await prisma.llmPromptConfig.upsert({
+    where: { id: DEMO_PLATFORM_IDS.prompt },
+    create: {
+      id: DEMO_PLATFORM_IDS.prompt,
+      handle: "demo-support-copilot",
+      name: "Support Copilot Prompt",
+      projectId,
+      organizationId,
+      scope: "PROJECT",
+    },
+    update: { deletedAt: null },
+  });
+
+  await prisma.llmPromptConfigVersion.upsert({
+    where: { configId_version: { configId: prompt.id, version: 1 } },
+    create: {
+      id: DEMO_PLATFORM_IDS.promptVersion,
+      configId: prompt.id,
+      version: 1,
+      commitMessage: "Seed the demo support-copilot prompt",
+      authorId: userId,
+      projectId,
+      schemaVersion: "1.0",
+      configData: DEMO_PROMPT_CONFIG_DATA as Prisma.InputJsonValue,
+    },
+    update: {},
   });
 
   const qualityEvaluator = await prisma.evaluator.upsert({
@@ -310,6 +356,6 @@ export async function seedDemoPlatform({
   });
 
   console.log(
-    `✅ Demo platform: 2 agents, 2 evaluators, ${scenarios.length} scenarios, 1 suite, ${DATASET_ROWS.length} dataset rows, experiment ${experiment.slug}`,
+    `✅ Demo platform: 3 agents, 1 prompt, 2 evaluators, ${scenarios.length} scenarios, 1 suite, ${DATASET_ROWS.length} dataset rows, experiment ${experiment.slug}`,
   );
 }

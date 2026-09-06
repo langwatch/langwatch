@@ -148,13 +148,125 @@ describe("CodexExtractor.applyLog", () => {
         "langwatch.span.type": "agent",
         "gen_ai.request.model": "gpt-5.5",
         "gen_ai.response.model": "gpt-5.5",
-        "gen_ai.usage.input_tokens": 14365,
+        // Codex reports the WHOLE input; the canonical key is the disjoint
+        // non-cached bucket, so the cache read comes off it.
+        "gen_ai.usage.input_tokens": 14365 - 10112,
         "gen_ai.usage.output_tokens": 6,
         "gen_ai.usage.cache_read.input_tokens": 10112,
         "gen_ai.request.reasoning_effort": "high",
         "gen_ai.conversation.id": "019e939c-48a1-7021-a71d-714f74d6ad64",
       });
       expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
+    });
+
+    /** @scenario "A codex turn's cached input is priced once, not twice" */
+    it("prefers codex's own non-cached count over the subtraction", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.6-sol",
+          "codex.turn.token_usage.input_tokens": "43001",
+          "codex.turn.token_usage.cached_input_tokens": "36096",
+          "codex.turn.token_usage.non_cached_input_tokens": "6905",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(6905);
+      expect(ctx.out["gen_ai.usage.cache_read.input_tokens"]).toBe(36096);
+    });
+
+    /** @scenario "A codex turn's cached input is priced once, not twice" */
+    it("takes the cache write off the input as well", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.6-sol",
+          "codex.turn.token_usage.input_tokens": "1000",
+          "codex.turn.token_usage.cached_input_tokens": "600",
+          "codex.turn.token_usage.cache_write_input_tokens": "300",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(100);
+    });
+
+    /** @scenario "A codex turn is filed under its session, not under itself" */
+    it("files the turn under the session id when the span carries one", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+          "codex.turn.token_usage.input_tokens": "14365",
+          "thread.id": "019e9bfe-7749-7440-8506-39152afbc9ff",
+          "turn.id": "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.conversation.id"]).toBe(
+        "019e9bfe-7749-7440-8506-39152afbc9ff",
+      );
+    });
+
+    /** @scenario "A codex turn is filed under its session, not under itself" */
+    it("keeps the turn id when the span's thread is a worker rather than a session", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+          "codex.turn.token_usage.input_tokens": "14365",
+          "thread.id": "10",
+          "turn.id": "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.conversation.id"]).toBe(
+        "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+      );
+    });
+
+    /** @scenario "A codex turn is filed under its session, not under itself" */
+    it("keeps the turn id when the thread is hyphenated but not a session id", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "gpt-5.5",
+          "codex.turn.token_usage.input_tokens": "14365",
+          // Hyphenated but not a UUID. A bare "10" fails even a loose check,
+          // so only this shape catches a guard that tests for a hyphen rather
+          // than for the session id shape.
+          "thread.id": "worker-10",
+          "turn.id": "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+        },
+        {
+          name: "session_task.turn",
+          instrumentationScope: { name: "codex_cli_rs", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.conversation.id"]).toBe(
+        "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+      );
     });
 
     /** @scenario "Codex reasoning effort is canonicalised from the turn span" */
@@ -423,7 +535,7 @@ describe("CodexExtractor.applyLog", () => {
   });
 });
 
-describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollup)", () => {
+describe("CodexExtractor.apply on the codex_exec scope (exec wire)", () => {
   it("keeps the response span's tokens counted: no skip marker under codex_exec", () => {
     const ctx = createExtractorContext(
       {
@@ -502,6 +614,48 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
 
     expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("high");
     expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+  });
+
+  // Newer codex emits a `session_task.turn` rollup under exec too, carrying
+  // the same totals its response spans already report per call. The response
+  // spans stay the counted record on this wire, so the rollup defers.
+  /** @scenario "Codex exec turn tokens are counted once when the rollup repeats the response spans' usage" */
+  it("flags a usage-bearing exec turn rollup as the redundant token copy", () => {
+    const ctx = createExtractorContext(
+      {
+        "codex.turn.token_usage.non_cached_input_tokens": "5842",
+        "codex.turn.token_usage.total_tokens": "30112",
+        "gen_ai.usage.input_tokens": 29906,
+        "gen_ai.usage.output_tokens": 206,
+        "gen_ai.usage.cache_read.input_tokens": "24064",
+      },
+      {
+        name: "session_task.turn",
+        instrumentationScope: { name: "codex_exec", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+    expect(ctx.recordRule).toHaveBeenCalledWith("codex/skip-exec-rollup-usage");
+  });
+
+  /** @scenario "Codex exec turn tokens are counted once when the rollup repeats the response spans' usage" */
+  it("leaves an exec turn rollup without usage unflagged", () => {
+    const ctx = createExtractorContext(
+      { "codex.turn.reasoning_effort": "high" },
+      {
+        name: "session_task.turn",
+        instrumentationScope: { name: "codex_exec", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(
+      ctx.out["langwatch.reserved.skip_token_accumulation"],
+    ).toBeUndefined();
   });
 });
 

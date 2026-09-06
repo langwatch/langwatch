@@ -114,6 +114,11 @@ export function WinRateChart({
   const winsByVariantId = new Map<string, number>();
   let ties = 0;
   for (const verdict of verdicts) {
+    // A row the judge never settled also has no winner, and charting it as a
+    // tie would put a result nobody produced on the bar the reader trusts
+    // most. It is counted as a row without a verdict instead, which the
+    // leaderboard's trust panel reports.
+    if (verdict.isUnsettled) continue;
     if (verdict.winnerId === null) {
       ties += 1;
       continue;

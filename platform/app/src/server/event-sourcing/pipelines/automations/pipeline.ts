@@ -13,6 +13,7 @@ import {
   digestBatchKey,
   drainDue,
   INITIAL_SETTLEMENT_STATE,
+  pagePersistMatches,
   type SettlementState,
   settleBoundary,
 } from "./process-manager/triggerSettlement.process";
@@ -82,6 +83,12 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
         )
         .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
           const { state: nextState, flushed } = addPending(state, data, ctx.at);
+          const flushedPersist = flushed.filter(
+            ({ match }) => match.actionClass === "persist",
+          );
+          const flushedNotify = flushed.filter(
+            ({ match }) => match.actionClass !== "persist",
+          );
           return {
             state: nextState,
             // Cap hit: the oldest matches dispatch NOW instead of being
@@ -89,20 +96,26 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
             intents:
               flushed.length > 0
                 ? [
-                    ...flushed.map(({ traceId, match }) =>
-                      match.actionClass === "persist"
-                        ? ctx.intents.persistMatch(
-                            `persist:${traceId}:${match.settleWindowBucket}`,
-                            { triggerId: ctx.key, traceId },
-                          )
-                        : ctx.intents.notifyDigest(
-                            `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
-                            {
-                              triggerId: ctx.key,
-                              traceIds: [traceId],
-                              boundary: match.dispatchDueAt,
-                            },
-                          ),
+                    ...pagePersistMatches({
+                      matches: flushedPersist.map(({ traceId, match }) => ({
+                        traceId,
+                        settleWindowBucket: match.settleWindowBucket,
+                      })),
+                    }).map((page) =>
+                      ctx.intents.persistMatch(`persist:${page.pageKey}`, {
+                        triggerId: ctx.key,
+                        traceIds: page.traceIds,
+                      }),
+                    ),
+                    ...flushedNotify.map(({ traceId, match }) =>
+                      ctx.intents.notifyDigest(
+                        `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
+                        {
+                          triggerId: ctx.key,
+                          traceIds: [traceId],
+                          boundary: match.dispatchDueAt,
+                        },
+                      ),
                     ),
                     // The message key is what the outbox dedups on, so it
                     // decides how many DURABLE ROWS a log line costs. Keyed on
@@ -113,11 +126,15 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
                     // EVENT time, a storm coalesces to at most one row per
                     // trigger per minute, and a redelivery of the same event
                     // produces a byte-identical key so it dedups rather than
-                    // adding a row. `ctx.key` is in the key because the outbox
-                    // uniqueness is (processName, projectId, messageKey) and
-                    // carries no processKey of its own. The payload still
-                    // carries the running total, so the storm rate is
-                    // recoverable from any single surviving row.
+                    // adding a row. The payload still carries the running
+                    // total, so the storm rate is recoverable from any single
+                    // surviving row.
+                    //
+                    // A key written here only has to be unique inside ONE
+                    // trigger: the outbox unique index is (processName,
+                    // projectId, messageKey), and the runtime prefixes every
+                    // builder-authored key with `process:<processKey>:`, so
+                    // two triggers never collide on identical bodies.
                     ctx.intents.logOverflow(
                       `overflow:${ctx.key}:${Math.floor(ctx.at / 60_000)}`,
                       {
@@ -146,20 +163,20 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
                   },
                 ),
               ),
-              ...due.settledMatches.map((match) =>
-                ctx.intents.persistMatch(
-                  `persist:${match.traceId}:${match.settleWindowBucket}`,
-                  {
-                    triggerId: ctx.key,
-                    traceId: match.traceId,
-                  },
-                ),
+              ...due.persistPages.map((page) =>
+                ctx.intents.persistMatch(`persist:${page.pageKey}`, {
+                  triggerId: ctx.key,
+                  traceIds: page.traceIds,
+                }),
               ),
             ],
             nextWakeAt: due.nextBoundary,
           };
         })
-        .outbox({ maxAttempts: 8, leaseDurationMs: 120_000 }),
+        // The lease covers a full page of degraded per-trace confirms with
+        // room to spare (see PERSIST_PAGE_MAX); the dispatcher releases any
+        // batch tail that would run past it.
+        .outbox({ maxAttempts: 8, leaseDurationMs: 300_000 }),
     )
     .withProcessManager("graphAlertSweep", (pm) =>
       pm

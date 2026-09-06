@@ -20,10 +20,6 @@ vi.mock("~/components/SetupWithAgentButton", () => ({
 
 import type { SimulationSuite } from "~/generated/prisma/client";
 
-// The existing `vi.mock("~/hooks/useOrganizationTeamProject", ...)` below
-// (richer shape with slug / hasAnyPermission / isLoading) covers
-// VoiceAgentsCallout's `project.id` requirement — no separate mock needed here.
-
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
@@ -151,6 +147,8 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     projectId: "project_1",
     name: "Critical Path",
     slug: "critical-path",
+    kind: "run_plan",
+    scope: null,
     description: null,
     scenarioIds: [],
     targets: [],

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { computeMetricStats } from "~/components/shared/metricStats";
 import type { EvaluationResults, EvaluatorConfig } from "../../types";
 import {
   computeComparisonAggregate,
-  computeMetricStats,
   computeTargetAggregates,
   formatCost,
   formatLatency,

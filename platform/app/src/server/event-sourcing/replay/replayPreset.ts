@@ -1,10 +1,11 @@
-import IORedis from "ioredis";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { getApp } from "../../app-layer/app";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { EvaluationRunStore } from "../pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-processing/projections/experimentRunState.store";
 import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
+import { SimulationRunStateFoldStore } from "../pipelines/simulation-processing/projections/simulationRunState.store";
 import { SimulationRunStateRepositoryClickHouse } from "../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processing/schemas/constants";
 import { SuiteRunStateRepositoryClickHouse } from "../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository";
@@ -59,7 +60,21 @@ const STORELESS_REPLAYABLE = new Set(["metric_processing", "log_processing"]);
 export function createReplayRuntime(config: {
   redisUrl: string;
 }): ReplayRuntime {
-  const redis = new IORedis(config.redisUrl, { maxRetriesPerRequest: null });
+  // Replay runs its own connection rather than the App's on purpose: a full
+  // rebuild should not share a socket with live traffic. It is still built by
+  // the client package, so a `rediss://` target gets TLS and the dev database
+  // index applies — building it by hand here silently dropped both (ADR-093).
+  //
+  // Standalone specifically: ReplayService runs multi-key operations that a
+  // Redis Cluster rejects with CROSSSLOT.
+  const redis = new RedisConnectionService().connectStandalone({
+    url: config.redisUrl,
+  });
+  if (!redis) {
+    throw new Error(
+      "Replay requires a Redis URL — none was resolved from the supplied config.",
+    );
+  }
 
   const clientResolver = getApp().clickhouse.resolveClient;
 
@@ -74,7 +89,9 @@ export function createReplayRuntime(config: {
     [
       "evaluation_processing",
       new EvaluationRunStore(
-        new EvaluationRunClickHouseRepository(clientResolver),
+        new EvaluationRunClickHouseRepository({
+          resolveClient: clientResolver,
+        }),
       ),
     ],
     [
@@ -85,10 +102,12 @@ export function createReplayRuntime(config: {
     ],
     [
       "simulation_processing",
-      new RepositoryFoldStore(
-        new SimulationRunStateRepositoryClickHouse(clientResolver),
-        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-      ),
+      // The same store the pipeline writes through, so a replay obeys the same
+      // gate: an aggregate holding cost and no lifecycle event writes no run.
+      new SimulationRunStateFoldStore({
+        repository: new SimulationRunStateRepositoryClickHouse(clientResolver),
+        version: SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      }),
     ],
     [
       "suite_run_processing",

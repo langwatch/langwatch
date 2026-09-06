@@ -143,7 +143,7 @@ export function TargetCellContent({
   const handleViewTrace = useCallback(() => {
     if (!traceId) return;
     setIsOutputExpanded(false);
-    openDrawer("traceDetails", { traceId });
+    openDrawer("traceV2Details", { traceId });
   }, [traceId, openDrawer]);
 
   // Handler to expand output

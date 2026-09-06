@@ -31,6 +31,23 @@ const (
 	AttrGenAIUsageInputChars   = "gen_ai.usage.input_chars"
 	AttrGenAIUsageAudioSeconds = "gen_ai.usage.audio_seconds"
 
+	// Audio token counts, which audio-native models bill several times above
+	// text: OpenAI charges $32 per million audio input tokens against $4 for
+	// text on gpt-realtime. Both are DISJOINT from gen_ai.usage.input_tokens
+	// and gen_ai.usage.output_tokens, the same exclusive convention the cache
+	// buckets above use, so the cost pipeline prices each token once and a
+	// trace costs what the budget was charged.
+	AttrGenAIUsageInputAudioTokens  = "gen_ai.usage.input_audio_tokens"
+	AttrGenAIUsageOutputAudioTokens = "gen_ai.usage.output_audio_tokens"
+
+	// Image token counts and the number of images returned, on the same
+	// exclusive convention as the audio buckets above: an output image token
+	// on the gpt-image family costs four times a text one, and some vendors
+	// price the call per image instead of per token.
+	AttrGenAIUsageInputImageTokens  = "gen_ai.usage.input_image_tokens"
+	AttrGenAIUsageOutputImageTokens = "gen_ai.usage.output_image_tokens"
+	AttrGenAIUsageImageCount        = "gen_ai.usage.image_count"
+
 	// AttrLabels carries the VK's tags; the trace pipeline ingests this
 	// exact key into metadata.labels (otel.traces.ts), which the Trace
 	// Explorer filters as "Label".
@@ -49,4 +66,12 @@ const (
 	// into billing spend events so the caller's billing system can join
 	// events back to its own entities without a lookup.
 	AttrRequestMetadata = "langwatch.reserved.request_metadata"
+
+	// AttrRequestedModel is the model name the client sent, present only when
+	// a routing policy rewrote it. gen_ai.request.model carries the model that
+	// was dispatched, so without this the caller's own vocabulary is not in
+	// the trace at all: a policy that points the "complex" tier somewhere new
+	// would silently change what every trace says the caller asked for, and
+	// "who still sends gpt-4o" becomes unanswerable.
+	AttrRequestedModel = "langwatch.requested_model"
 )

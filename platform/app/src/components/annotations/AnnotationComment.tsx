@@ -138,9 +138,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               title: "Annotation Updated",
               description: `You have successfully updated the annotation`,
               type: "success",
-              meta: {
-                closable: true,
-              },
             });
 
             reset();
@@ -152,9 +149,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               title: "Error",
               description: "Error updating annotation",
               type: "error",
-              meta: {
-                closable: true,
-              },
             });
           },
         },
@@ -176,9 +170,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               title: "Annotation Created",
               description: `You have successfully created an annotation`,
               type: "success",
-              meta: {
-                closable: true,
-              },
             });
 
             reset();
@@ -189,9 +180,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               title: "Error",
               description: "Error creating annotation",
               type: "error",
-              meta: {
-                closable: true,
-              },
             });
           },
         },
@@ -213,9 +201,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             title: "Annotation Deleted",
             description: `You have successfully deleted the annotation`,
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
           commentState.resetComment();
         },

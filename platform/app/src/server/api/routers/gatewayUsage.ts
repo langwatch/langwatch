@@ -45,7 +45,12 @@ export const gatewayUsageRouter = createTRPCRouter({
         toDate: z.string().datetime(),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "loadMembershipSet + isVisibleToMembership: usage is summed only over keys visible to the caller's membership in this organization",
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const membership = await loadMembershipSet(
         ctx.prisma,
@@ -72,9 +77,16 @@ export const gatewayUsageRouter = createTRPCRouter({
         virtualKeyId: z.string(),
         fromDate: z.string().datetime(),
         toDate: z.string().datetime(),
+        /** Narrows the recent-activity list, and nothing else, to one model. */
+        model: z.string().min(1).max(256).optional(),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "the key is loaded within this organization and must be visible to the caller's membership set; a miss is NOT_FOUND",
+      }),
+    )
     .query(async ({ ctx, input }) => {
       // Same visibility rule as virtualKeys.get: a key the caller can't
       // see is indistinguishable from one that doesn't exist.
@@ -100,6 +112,7 @@ export const gatewayUsageRouter = createTRPCRouter({
           fromDate: new Date(input.fromDate),
           toDate: new Date(input.toDate),
         },
+        model: input.model,
       });
     }),
 });

@@ -63,7 +63,7 @@ export interface GatewaySpendProcessingPipelineDeps {
  *
  * Projection: gatewaySpend (fold) → `gateway_spend`, one row per request,
  * rated in the fold to integer nano-USD. Consumption is projections + (in
- * M2) a process manager, no reactors, per the post-event-work ADR line.
+ * M2) a process manager, no subscribers, per the post-event-work ADR line.
  */
 export function createGatewaySpendProcessingPipeline(
   deps: GatewaySpendProcessingPipelineDeps,

@@ -700,6 +700,72 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/* ============================================================ */}}
+{{/* nlpgo timeout coordination                                    */}}
+{{/* ============================================================ */}}
+
+{{/* The engine's code-block ceiling, range-checked, as a bare number.
+
+     The check lives WITH the value rather than in the NLP Deployment because
+     `langwatch.sharedEnv` hands the same number to the app and the workers,
+     and those render even when `langwatch_nlp.enabled` is false (an external,
+     shared or serverless nlpgo). A guard placed inside the optional Deployment
+     does not run in that supported mode, so an out-of-range ceiling would
+     reach the app and workers unchecked and their derived client deadline
+     would cut every turn short of the engine's own ceiling.
+
+     710 is the ceiling — the engine's stream idle timeout default, 720
+     (`NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`, `httpapi.DefaultStreamIdleTimeout`
+     in services/nlpgo; `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS` in
+     platform/app/src/server/nlpgo/timeouts.ts), minus the same 10s margin
+     (`CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS`, also in timeouts.ts) that
+     `clampCodeBlockTimeoutSeconds`
+     (platform/app/src/optimization_studio/server/lambda/index.ts) subtracts
+     before it silently clamps a Lambda's env override. Anything above 710
+     races the stream shutting down with no margin left for nlpgo to report
+     its own timeout first — and, left at 720, would sail through here and
+     be silently cut to 710 on the Lambda path, the exact two-numbers drift
+     this pair exists to prevent.
+
+     With `langwatch_nlp.enabled` false the engine is external and the chart
+     cannot impose the ceiling, only report it to the clients. The value is
+     passed through as given: the operator sets the real ceiling on the external
+     service and matches it here, and the chart has no way to check that pairing,
+     so it does not pretend to. */}}
+{{- define "langwatch.codeBlockTimeoutSeconds" -}}
+{{- $raw := .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 -}}
+{{- $seconds := int $raw -}}
+{{- $streamIdleTimeoutSeconds := 720 -}}
+{{- $safetyMarginSeconds := 10 -}}
+{{- $maxSeconds := sub $streamIdleTimeoutSeconds $safetyMarginSeconds -}}
+{{/* An explicit 0 never reaches this check: `default` above counts it as empty and
+     substitutes 600, so 0 is indistinguishable from unset by the time we get here.
+     Everything else unusable does reach it — `int` reads a value it cannot parse as
+     a whole number as 0, and passes a negative one straight through. */}}
+{{- if lt $seconds 1 -}}
+{{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must be a positive whole number of seconds, at most %d. Got %v. Helm reads a value it cannot parse as a whole number — text, a fraction, exponent notation, or a number past int64 — as 0, and passes a negative one through unchanged, so without this check either would reach every nlpgo caller as its ceiling." $maxSeconds $raw) -}}
+{{- end -}}
+{{- if gt $seconds $maxSeconds -}}
+{{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must stay at or below %d — the engine's %ds stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS) minus the %ds safety margin (CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS in platform/app/src/server/nlpgo/timeouts.ts) that lets nlpgo report its own timeout before the enclosing Lambda deadline fires. Got %d." $maxSeconds $streamIdleTimeoutSeconds $safetyMarginSeconds $seconds) -}}
+{{- end -}}
+{{- $seconds -}}
+{{- end -}}
+
+{{/* Refuses an extraEnvs list that sets a timeout variable the chart owns.
+     Two of them are reserved: setting either by hand puts a second, unchecked
+     number next to `langwatch_nlp.codeBlockTimeoutSeconds` in exactly the
+     processes that must agree on one.
+
+     Call with (dict "envs" <list> "path" "<values path>"); `path` only names
+     the offending list in the message. */}}
+{{- define "langwatch.assertNoReservedTimeoutEnvs" -}}
+{{- range .envs }}
+{{- if or (eq .name "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS") (eq .name "NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS") }}
+{{- fail (printf "%s must not set %s — it is a reserved timeout env var; use langwatch_nlp.codeBlockTimeoutSeconds instead" $.path .name) }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/* ============================================================ */}}
 {{/* Shared Environment Variables                                  */}}
 {{/* ============================================================ */}}
 {{/* Common env vars shared between app and workers deployments */}}
@@ -732,6 +798,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.app.upstreams.nlp.scheme | default "http" }}://{{ .Values.app.upstreams.nlp.name | default (printf "%s-langwatch-nlp" .Release.Name) }}:{{ .Values.app.upstreams.nlp.port | default 5561 }}
 - name: LANGEVALS_ENDPOINT
   value: {{ .Values.app.upstreams.langevals.scheme | default "http" }}://{{ .Values.app.upstreams.langevals.name | default (printf "%s-langevals" .Release.Name) }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
+
+# Engine code-block timeout (seconds), propagated to all processes that invoke
+# nlpgo. Range-checked by the helper, which is why this is emitted through it
+# and not read straight from values.
+- name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
+  value: {{ include "langwatch.codeBlockTimeoutSeconds" . | quote }}
 
 # PostgreSQL connection string
 {{- if .Values.postgresql.chartManaged }}
@@ -1236,6 +1308,169 @@ podAffinity:
           app.kubernetes.io/name: {{ .Release.Name }}-app
           app.kubernetes.io/instance: {{ .Release.Name }}
       topologyKey: kubernetes.io/hostname
+{{- end -}}
+
+{{/*
+  Shared pod spec for the stored-objects upgrade hook Jobs, up to and including
+  the `containers:` key. Both the pre-upgrade and the post-upgrade Job run the
+  same image with the same identity, so the parts that are not the script live
+  here rather than being written twice.
+
+  automountServiceAccountToken is true on purpose. These Jobs are the only
+  workloads in the release that call the Kubernetes API, so they need the token
+  global.automountServiceAccountToken withholds from the rest.
+
+  nodeSelector, tolerations, affinity and priorityClassName come from
+  global.scheduling so the Jobs land where the rest of the release lands. On a
+  cluster whose nodes are tainted or whose workloads carry a required node
+  affinity, a hook that ignored them would sit Pending and stall every upgrade.
+
+  global.scheduling.topologySpreadConstraints is deliberately NOT copied. A
+  spread constraint describes how the replicas of a service should be
+  distributed; on a single-run Job it can only make the pod unschedulable when
+  whenUnsatisfiable is DoNotSchedule, which for a fail-closed pre-upgrade hook
+  means a blocked upgrade.
+
+  imagePullSecrets are their own value rather than a chart-wide one, because
+  these Jobs run under their OWN ServiceAccount. Pull secrets an operator
+  attached to the namespace's `default` ServiceAccount, which is what the rest
+  of the release uses when global.serviceAccount.create is false, do not reach
+  them.
+
+  See templates/app/stored-objects-serialize-upgrade.yaml.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookPodSpec" -}}
+restartPolicy: Never
+serviceAccountName: {{ .Release.Name }}-stored-objects-upgrade
+automountServiceAccountToken: true
+{{- with .Values.app.storedObjects.localFilesystem.serializeUpgradesPullSecrets }}
+imagePullSecrets:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.nodeSelector }}
+nodeSelector:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.tolerations }}
+tolerations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.affinity }}
+affinity:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.priorityClassName }}
+priorityClassName: {{ . | quote }}
+{{- end }}
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  seccompProfile:
+    type: RuntimeDefault
+containers:
+{{- end -}}
+
+{{/*
+  Shell functions both stored-objects upgrade hook Jobs use. They read the
+  `ns`, `deploy` and `selector` variables the Job's script sets above them.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookShellHelpers" -}}
+deployment_exists() {
+  kubectl -n "$ns" get deployment "$deploy" >/dev/null 2>&1
+}
+
+scale_workers() {
+  kubectl -n "$ns" patch deployment "$deploy" --subresource=scale --type=merge -p "{\"spec\":{\"replicas\":${1}}}"
+}
+
+wait_for_workers_gone() {
+  printf 'serialize-upgrade: waiting up to %ss for the %s pods to go away\n' "${1}" "$deploy"
+  out=$(kubectl -n "$ns" wait --for=delete pod --selector="$selector" --timeout="${1}s" 2>&1)
+  status=$?
+  printf '%s\n' "$out"
+  [ "$status" -eq 0 ] && return 0
+  # kubectl below 1.31 reports an empty selector result as an error. No pods
+  # left IS the state this waits for, so it must not read as a failure.
+  case "$out" in
+    *'no matching resources found'*) return 0 ;;
+  esac
+  return 1
+}
+{{- end -}}
+
+{{/*
+  The post-upgrade hook's wait for the app rollout. Reads `ns` and `app`.
+
+  It polls rather than calling `kubectl rollout status`, which LISTs
+  Deployments. Kubernetes ignores resourceNames on `list`, so `rollout status`
+  cannot run under a Role restricted to two Deployments by name, and using it
+  would mean granting read access to every Deployment in the namespace. The
+  condition below is the one `rollout status` itself applies.
+
+  All four parts are needed to prove the NEW app pod, not the one it replaced,
+  is the pod holding the volume:
+
+    observedGeneration >= generation   the controller has seen the new spec
+    updatedReplicas    == replicas     every pod asked for is from the new spec
+    statusReplicas     == updated      no pod from the old spec is left
+    available          >= updated      the new pods are ready
+
+  readyReplicas alone is not enough, and getting that wrong would reintroduce
+  the wedge this hook exists to prevent: it counts ready pods across EVERY
+  ReplicaSet, so during a kill-then-start rollout there is a window where the
+  controller has already recorded the new generation while the still-Ready OLD
+  pod satisfies the count. The workers would then come back against the node
+  the app is leaving.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookAppRolloutHelper" -}}
+is_number() {
+  case "${1:-}" in
+    '' | *[!0-9]*) return 1 ;;
+  esac
+  return 0
+}
+
+app_rollout_done() {
+  # Pipe-separated, not space-separated. A status field that is absent (which
+  # is how the API reports zero) renders as nothing, so on whitespace splitting
+  # every later field shifts left and is read as the wrong one. With an
+  # explicit separator the empty field keeps its place, and an empty field
+  # fails is_number below, which reads as "not done yet" and keeps waiting.
+  state=$(kubectl -n "$ns" get deployment "$app" -o jsonpath='{.metadata.generation}|{.status.observedGeneration}|{.spec.replicas}|{.status.updatedReplicas}|{.status.replicas}|{.status.availableReplicas}|' 2>/dev/null)
+  old_ifs=$IFS
+  IFS='|'
+  set -- $state
+  IFS=$old_ifs
+  # The three status counters default to 0, because the API omits a zero-valued
+  # one and an app parked at replicaCount 0 is a finished rollout, not one that
+  # never starts. The desired count stays mandatory: with it missing there is
+  # nothing to compare against. Defaulting the counters does not weaken the
+  # check, since a rollout that has not produced its pods yet reports 0 against
+  # a desired count above 0 and still reads as unfinished.
+  generation="${1:-}"; observed="${2:-}"; want="${3:-}"; updated="${4:-0}"; current="${5:-0}"; available="${6:-0}"
+  is_number "$generation" || return 1
+  is_number "$observed" || return 1
+  is_number "$want" || return 1
+  is_number "$updated" || return 1
+  is_number "$current" || return 1
+  is_number "$available" || return 1
+  [ "$observed" -ge "$generation" ] || return 1
+  [ "$updated" -eq "$want" ] || return 1
+  [ "$current" -eq "$updated" ] || return 1
+  [ "$available" -ge "$updated" ] || return 1
+  return 0
+}
+
+wait_for_app_rollout() {
+  deadline=$(( $(date +%s) + ${1} ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    if app_rollout_done; then
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
+}
 {{- end -}}
 
 {{/* ClickHouse: Cluster name for the app (only when replicas > 1 or external.cluster set) */}}

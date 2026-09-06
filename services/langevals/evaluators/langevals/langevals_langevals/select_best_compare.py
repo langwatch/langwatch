@@ -20,11 +20,11 @@ BDD spec:     specs/experiments/comparison.feature
 """
 
 import json
-import os
 import random
 import re
 from typing import Literal, Optional, cast
 
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluationResult,
@@ -258,11 +258,6 @@ class SelectBestCompareEvaluator(
     is_guardrail = False
 
     def evaluate(self, entry: SelectBestCompareEntry) -> SingleEvaluationResult:
-        os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
-        if self.env:
-            for key, env in self.env.items():
-                os.environ[key] = env
-
         candidates = [c for c in entry.candidates if c.output]
         if len(candidates) < 2:
             return EvaluationResultSkipped(
@@ -376,6 +371,20 @@ class SelectBestCompareEvaluator(
             None if cost1 is None and cost2 is None else (cost1 or 0.0) + (cost2 or 0.0)
         )
 
+        # One unusable answer is not a disagreement. Reading it as one would
+        # tell the reader the candidates could not be separated, when what
+        # actually happened is that the judge never answered; and two unusable
+        # answers would agree with each other and report a winner of None as
+        # though it had been confirmed twice.
+        if verdict1.get("unanswered") or verdict2.get("unanswered"):
+            unusable = verdict1 if verdict1.get("unanswered") else verdict2
+            return {
+                "winner": None,
+                "unanswered": True,
+                "reasoning": unusable["reasoning"],
+                "cost": total_cost,
+            }
+
         if winner1 == winner2:
             # Same winner both times (including both "tie") — agreement.
             #
@@ -392,7 +401,7 @@ class SelectBestCompareEvaluator(
             )
             return {
                 "winner": winner1,
-                "reasoning": f"{confirmation} {verdict1['reasoning']}",
+                "reasoning": f"{confirmation}\n\n{verdict1['reasoning']}",
                 "cost": total_cost,
             }
 
@@ -410,21 +419,27 @@ class SelectBestCompareEvaluator(
         # establish a winner. Only the explanation has to be earned.
         pinned = self._effective_temperature() == 0.0
         cause = (
-            "The verdict changed with candidate order, so this row does not "
-            "establish a winner."
+            "The verdict changed with candidate order."
             if pinned
             else (
                 "The verdict did not survive being asked again with the "
-                "candidate order reversed, so this row does not establish a "
-                "winner. This judge does not run at a fixed temperature, so "
-                "the disagreement is not necessarily caused by the order."
+                "candidate order reversed. This judge does not run at a fixed "
+                "temperature, so the disagreement is not necessarily caused "
+                "by the order."
             )
         )
         label = "Order-sensitive verdict" if pinned else "Unreproducible verdict"
+        # Laid out as blocks rather than one paragraph. Each pass writes prose
+        # carrying its own commas, semicolons and parentheses, so joining two
+        # of them with more of the same buried the one thing the reader needs
+        # first — where one pass's account ends and the other's begins — under
+        # a wall of nested punctuation. The headline states the finding, each
+        # pass gets its own block, and the caveat lands last.
         details = (
-            f"{label}: original order picked {winner1} "
-            f"({verdict1['reasoning']}); reversed order picked {winner2} "
-            f"({verdict2['reasoning']}). {cause}"
+            f"{label}: this row does not establish a winner.\n\n"
+            f"Original order picked {winner1}:\n{verdict1['reasoning']}\n\n"
+            f"Reversed order picked {winner2}:\n{verdict2['reasoning']}\n\n"
+            f"{cause}"
         )
 
         # No winner, regardless of `allow_tie`.
@@ -559,6 +574,7 @@ class SelectBestCompareEvaluator(
         # customer-facing prose and the schema already asks for brevity.
         response = completion(
             model=self.settings.model,
+            **azure_api_version(self.settings.model, "2023-12-01-preview"),
             temperature=effective_temperature,
             drop_params=True,
             messages=[
@@ -620,11 +636,43 @@ class SelectBestCompareEvaluator(
 
         response = cast(ModelResponse, response)
         choice = cast(Choices, response.choices[0])
-        arguments = json.loads(
-            cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
-        )
 
-        displayed = arguments["winner"]
+        # Read the cost before reading the answer. The call was made and billed
+        # whatever came back inside it, so an answer we cannot use still has to
+        # carry its price to the row.
+        try:
+            call_cost = completion_cost(completion_response=response)
+        except Exception:
+            call_cost = None
+
+        # A forced `tool_choice` is a request, not a guarantee. Providers
+        # occasionally answer with no tool call, or with one whose arguments
+        # are unreadable or carry no `winner`; two of roughly 200 live calls
+        # did while dogfooding. Each of those is the judge failing to answer,
+        # which is a verdict-shaped outcome the reader can act on, so it is
+        # reported as no verdict rather than raised as an evaluator error.
+        tool_calls = getattr(cast(Message, choice.message), "tool_calls", None)
+        if not tool_calls:
+            return _unanswered("returned no answer to read", call_cost)
+
+        try:
+            raw_arguments = tool_calls[0].function.arguments
+        except AttributeError:
+            return _unanswered("returned no answer to read", call_cost)
+
+        try:
+            arguments = json.loads(raw_arguments)
+        except (TypeError, ValueError):
+            return _unanswered("returned an answer that could not be read", call_cost)
+
+        # A present-but-empty `winner` is the same non-answer as an absent one:
+        # `{"winner": null}` names nobody. It is checked here rather than left
+        # to the slot lookup below, whose fallback deliberately degrades an
+        # unrecognised slot LETTER to a real candidate — a fallback that would
+        # otherwise turn "the judge named no one" into "candidate A won".
+        displayed = arguments.get("winner") if isinstance(arguments, dict) else None
+        if not isinstance(displayed, str) or not displayed.strip():
+            return _unanswered("answered without naming a winner", call_cost)
         if displayed == "tie":
             winner_id = "tie"
         elif displayed in slot_to_candidate:
@@ -641,10 +689,14 @@ class SelectBestCompareEvaluator(
             # still yields a processed result naming a real candidate.
             winner_id = slot_to_candidate[_slot_label(0)].id
 
-        try:
-            call_cost = completion_cost(completion_response=response)
-        except Exception:
-            call_cost = None
+        # `reasoning` is free text in the tool schema, and a provider that does
+        # not strictly enforce the schema can put an object, a list or a number
+        # there. Anything that is not text is the same as no explanation: it
+        # cannot be read by the customer, and it cannot be slot-translated
+        # below, where a non-string would raise instead of returning a verdict.
+        explanation = arguments.get("reasoning")
+        if not isinstance(explanation, str) or not explanation.strip():
+            explanation = "The judge gave no explanation."
 
         # The judge argues in terms of the slot labels it was shown, so the
         # reasoning is translated before it leaves `_judge`, with the same
@@ -654,9 +706,7 @@ class SelectBestCompareEvaluator(
         # against the wrong candidates.
         return {
             "winner": winner_id,
-            "reasoning": _translate_slot_references(
-                arguments["reasoning"], slot_to_candidate
-            ),
+            "reasoning": _translate_slot_references(explanation, slot_to_candidate),
             "cost": call_cost,
         }
 
@@ -680,6 +730,29 @@ class SelectBestCompareEvaluator(
             suffix = f"  [{', '.join(metric_parts)}]" if metric_parts else ""
             lines.append(f"- {slot}: {cand.output}{suffix}")
         return "\n".join(lines)
+
+
+def _unanswered(what_happened: str, cost: float | None) -> dict:
+    """
+    A judge call that came back without a usable verdict, in the same
+    `{"winner", "reasoning", "cost"}` shape a real verdict has, plus the
+    `unanswered` marker `_reconcile` reads.
+
+    The marker matters because a `None` winner already means "the two passes
+    disagreed", and the two are not the same finding: a disagreement is
+    something the row established about the candidates, an unanswered call is
+    something that went wrong with the provider. Merging them would report a
+    provider slip as evidence the candidates are too close to separate.
+    """
+    return {
+        "winner": None,
+        "unanswered": True,
+        "reasoning": (
+            f"The judge {what_happened}, so this row has no verdict. "
+            "The call was still made and billed."
+        ),
+        "cost": cost,
+    }
 
 
 def _slot_label(index: int) -> str:

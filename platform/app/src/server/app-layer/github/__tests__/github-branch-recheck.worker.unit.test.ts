@@ -95,6 +95,26 @@ describe("runBranchRecheckPass", () => {
       );
     });
 
+    /**
+     * The sweep selects on `lastRequestedAt`, so a pass that presented itself
+     * as demand would renew the column it reads and no branch would ever leave
+     * the sweep. The origin is what the mapping service reads to decide.
+     */
+    /** @scenario "The sweep does not renew the demand it selects on" */
+    it("asks the mapping on its own account rather than as demand", async () => {
+      const mapBranch = vi.fn().mockResolvedValue(undefined);
+
+      await runBranchRecheckPass({
+        repository: repositoryHolding([checkRow({})]),
+        mapping: { mapBranch },
+        now: () => NOW,
+      });
+
+      expect(mapBranch).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: "sweep" }),
+      );
+    });
+
     it("asks with a one-week activity window", async () => {
       const repository = repositoryHolding([]);
       await runBranchRecheckPass({
@@ -144,27 +164,26 @@ describe("runBranchRecheckPass", () => {
         repositoryOwner: "acme",
         repositoryName: "widgets",
         headBranch: "feat/linkage",
+        origin: "sweep",
       });
     });
   });
 });
 
 describe("runBranchRetentionPrune", () => {
-  describe("given rows nobody has asked about", () => {
+  describe("given rows outside the activity window", () => {
     /**
      * One horizon, not two. A branch outside the sweep's activity window has
      * already stopped being maintained by the feature, so keeping its
-     * bookkeeping and its pull requests keeps rows that are never read and
-     * never refreshed. Bounding the prune by a knob of its own would let the
-     * two drift into disagreeing about what "abandoned" means.
-     *
-     * @scenario "Linkage rows nobody asks about stop accumulating"
+     * bookkeeping keeps a row that is never read and never refreshed. Bounding
+     * the prune by a knob of its own would let the two drift into disagreeing
+     * about what "abandoned" means.
      */
     it("prunes at the same horizon the sweep stops sweeping at", async () => {
       const repository = repositoryHolding([]);
       repository.deleteStaleBefore = vi
         .fn()
-        .mockResolvedValue({ branchChecks: 7, pullRequests: 2 });
+        .mockResolvedValue({ branchChecks: 7 });
 
       const pruned = await runBranchRetentionPrune({
         repository,
@@ -174,7 +193,7 @@ describe("runBranchRetentionPrune", () => {
       expect(repository.deleteStaleBefore).toHaveBeenCalledWith({
         before: new Date(NOW - RECHECK_ACTIVE_WITHIN_MS),
       });
-      expect(pruned).toEqual({ branchChecks: 7, pullRequests: 2 });
+      expect(pruned).toEqual({ branchChecks: 7 });
     });
   });
 });

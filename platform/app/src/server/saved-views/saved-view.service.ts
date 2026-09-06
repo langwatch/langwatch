@@ -91,9 +91,9 @@ export class SavedViewService {
       period?: Prisma.InputJsonValue;
       userId?: string;
       /**
-       * Storage shape. Omit for the legacy "v1-traces-filter" default;
-       * the new traces v2 lens client sends "v2-traces-lens" so its
-       * rows stay isolated from the legacy /messages UI.
+       * Storage shape. Omit for the "v1-traces-filter" default; the
+       * traces v2 lens client sends "v2-traces-lens" so its rows stay
+       * isolated from the v1 filter bar's.
        */
       kind?: string;
     };

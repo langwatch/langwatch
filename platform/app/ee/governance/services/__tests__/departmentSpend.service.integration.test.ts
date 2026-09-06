@@ -13,12 +13,16 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Organization } from "~/generated/prisma/client";
-
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { ActivityMonitorService } from "../activity-monitor/activityMonitor.service";
 
 const USER_KEY = "langwatch.user_id";
@@ -93,6 +97,9 @@ describe("ActivityMonitorService.spendByDepartment", () => {
     const maybeCh = getTestClickHouseClient();
     if (!maybeCh) throw new Error("ClickHouse test container not available");
     ch = maybeCh;
+    // The service resolves its org client through getApp().clickhouse now
+    // (two-door access), so the fixture installs the App the seam expects.
+    installClickHouseTestApp({ resolveClient: async () => ch });
 
     org = await prisma.organization.create({
       data: { name: ns, slug: `org-${ns}` },
@@ -216,6 +223,7 @@ describe("ActivityMonitorService.spendByDepartment", () => {
   });
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     await prisma.project
       .deleteMany({
         where: { team: { organizationId: { in: [org.id, crossOrg.id] } } },
@@ -244,7 +252,10 @@ describe("ActivityMonitorService.spendByDepartment", () => {
   describe("given spend across personal, team, and agent projects", () => {
     /** @scenario Spend by department aggregates across every project in the org */
     it("rolls personal, agent, and unattributed spend up by department across all projects", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByDepartment({
         organizationId: org.id,
         windowDays: 7,
@@ -257,7 +268,7 @@ describe("ActivityMonitorService.spendByDepartment", () => {
 
       // The whole org's spend rolls up (2 + 3 + 1 = 6), proving the card is
       // not limited to a single governance ingestion project.
-      const total = rows.reduce((sum, r) => sum + r.spendUsd, 0);
+      const total = rows.reduce((sum, r) => sum + Number(r.spendUsd), 0);
       expect(total).toBeCloseTo(6.0, 2);
     });
   });
@@ -265,12 +276,15 @@ describe("ActivityMonitorService.spendByDepartment", () => {
   describe("given another org with spend under a like-named department", () => {
     /** @scenario Spend-by-department query stays tenant-isolated */
     it("never includes the other org's spend in this org's rollup", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByDepartment({
         organizationId: org.id,
         windowDays: 7,
       });
-      const total = rows.reduce((sum, r) => sum + r.spendUsd, 0);
+      const total = rows.reduce((sum, r) => sum + Number(r.spendUsd), 0);
       // The cross-org $50 must not leak - primary's total stays at $6.
       expect(total).toBeLessThan(10);
       // The Engineering row is this org's $3 agent spend, not the cross
@@ -283,7 +297,10 @@ describe("ActivityMonitorService.spendByDepartment", () => {
   describe("given members with personal spend in different departments", () => {
     /** @scenario Marketing-versus-engineering comparison reads from departments */
     it("shows each department's combined personal and project spend", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByDepartment({
         organizationId: org.id,
         windowDays: 7,

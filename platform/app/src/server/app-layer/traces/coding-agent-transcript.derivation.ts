@@ -6,6 +6,7 @@ import {
   parseMcpToolName,
   resolveConversationKey,
   resolveToolName,
+  WITHHELD_PROMPT_TEXT,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-normalization";
 import { isReplyTextPart } from "./canonicalisation/extractors/_parts";
 
@@ -190,7 +191,33 @@ export function buildCodingAgentTranscript({
   const fromSpans = collectSpanEntries(spans, codexToolLogs);
   const fromLogs = collectLogEntries(logs, fromSpans.claimedToolCalls);
 
-  const entries = [...fromSpans.entries, ...fromLogs.entries];
+  // Prompts recovered from a content span carry the user's words verbatim, so
+  // a withheld-text prompt EVENT for the SAME turn (codex substitutes the
+  // literal redaction sentinel for the words) is that prompt again with less
+  // in it. Only the withheld stubs defer: an agent that puts the text on the
+  // event has no span twin.
+  //
+  // The join is the character count AND the moment, not a trace-wide flag:
+  // codex reports the real length on `prompt_length` even while it withholds
+  // the words, and a recovered prompt measures the text it carries, so equal
+  // counts identify a candidate twin. The count alone is not enough, because
+  // two turns can type prompts of the same length; suppressing whichever stub
+  // came first would then delete the turn that was NOT recovered and show the
+  // recovered one twice. A stub and its recovered span describe one turn
+  // milliseconds apart while separate turns are far apart, so the nearest
+  // unclaimed stub of equal length is the twin.
+  //
+  // Matched one-to-one, so a trace whose rollout recovery covered only some
+  // turns keeps the stubs of the turns it missed — for those, the stub is the
+  // only record the prompt happened at all. A stub that matches nothing
+  // survives, which is the safe direction: the worst case is one prompt
+  // rendered twice, against losing a turn entirely.
+  const logEntries = withoutStubsOfRecoveredPrompts({
+    spanEntries: fromSpans.entries,
+    logEntries: fromLogs.entries,
+  });
+
+  const entries = [...fromSpans.entries, ...logEntries];
 
   // Replies derived from span OUTPUT are held apart: when the same CALL also
   // has a reply-bearing LOG event (gemini emits both an llm_call span and an
@@ -242,6 +269,93 @@ export function buildCodingAgentTranscript({
  * couple of seconds). Kept tight: the NEXT turn's reply must never fall in.
  */
 const LOG_REPLY_FLUSH_SLACK_MS = 2_000;
+
+/** A prompt entry, narrowed off the union so its `chars` is reachable. */
+type UserPromptEntry = Extract<TranscriptEntry, { kind: "user_prompt" }>;
+
+const isUserPromptEntry = (entry: TranscriptEntry): entry is UserPromptEntry =>
+  entry.kind === "user_prompt";
+
+/**
+ * Drop each withheld prompt stub whose turn was recovered, and keep the rest.
+ *
+ * A stub and the recovered span for one turn land milliseconds apart, while
+ * separate turns are far apart, so among the stubs of equal length the nearest
+ * unclaimed one is the twin. Claimed one-to-one and nearest-first, so two turns
+ * that typed prompts of the same length cannot make the recovered one suppress
+ * the other's stub.
+ */
+function withoutStubsOfRecoveredPrompts({
+  spanEntries,
+  logEntries,
+}: {
+  spanEntries: TranscriptEntry[];
+  logEntries: TranscriptEntry[];
+}): TranscriptEntry[] {
+  const stubs = logEntries.flatMap((entry, index) =>
+    isUserPromptEntry(entry) && isWithheldPromptText(entry.text)
+      ? [{ entry, index }]
+      : [],
+  );
+  if (stubs.length === 0) return logEntries;
+
+  const claimed = new Set<number>();
+  const recovered = spanEntries
+    .filter(isUserPromptEntry)
+    .sort((a, b) => a.atMs - b.atMs);
+  for (const prompt of recovered) {
+    const twin = nearestUnclaimedStub({ stubs, claimed, prompt });
+    if (twin !== null) claimed.add(twin);
+  }
+  return logEntries.filter((_entry, index) => !claimed.has(index));
+}
+
+/**
+ * How far apart a prompt event and the recovered span for the SAME turn may
+ * sit. The event fires as the turn starts and the span opens on the model call
+ * right after it, so the real gap is milliseconds; this is loose enough to
+ * absorb a slow start and tight enough that the next turn never falls in.
+ *
+ * Bounding it is what stops a recovered turn whose own event never arrived
+ * (the log read is capped) from claiming some older stub of the same length
+ * and deleting the one turn that stub was the only record of. Past the window
+ * nothing is claimed, so the cost of being wrong is a prompt shown twice
+ * rather than a turn lost.
+ */
+const PROMPT_STUB_SAME_TURN_MS = 2_000;
+
+/**
+ * The index of the closest unclaimed stub of the same length within the
+ * same-turn window, or null when no stub is near enough to be that turn's.
+ */
+function nearestUnclaimedStub({
+  stubs,
+  claimed,
+  prompt,
+}: {
+  stubs: { entry: UserPromptEntry; index: number }[];
+  claimed: Set<number>;
+  prompt: UserPromptEntry;
+}): number | null {
+  let nearestIndex: number | null = null;
+  let nearestDistanceMs = Number.POSITIVE_INFINITY;
+  for (const { entry, index } of stubs) {
+    if (claimed.has(index)) continue;
+    if (entry.chars !== prompt.chars) continue;
+    const distanceMs = Math.abs(entry.atMs - prompt.atMs);
+    if (distanceMs > PROMPT_STUB_SAME_TURN_MS) continue;
+    if (distanceMs < nearestDistanceMs) {
+      nearestDistanceMs = distanceMs;
+      nearestIndex = index;
+    }
+  }
+  return nearestIndex;
+}
+
+/** Whether a prompt entry's text is absent or the withheld-text sentinel. */
+function isWithheldPromptText(text: string | null): boolean {
+  return text === null || text === WITHHELD_PROMPT_TEXT;
+}
 
 /** A span-derived reply plus the call window a log duplicate would land in. */
 interface SpanReply {
@@ -835,12 +949,13 @@ function logToEntry({
   switch (event) {
     case "user_prompt": {
       const text = readString(attrs, "prompt");
-      return {
-        kind: "user_prompt",
-        atMs,
-        text,
-        chars: text?.length ?? readNumber(attrs, "prompt_length") ?? 0,
-      };
+      // A withheld prompt's chars come from prompt_length: the sentinel's own
+      // length says nothing about what the user typed.
+      const chars =
+        text !== null && text !== WITHHELD_PROMPT_TEXT
+          ? text.length
+          : (readNumber(attrs, "prompt_length") ?? 0);
+      return { kind: "user_prompt", atMs, text, chars };
     }
 
     case "assistant_response":

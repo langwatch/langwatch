@@ -5,8 +5,11 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useRunScenario } from "../useRunScenario";
 
-// Mock tRPC api
+// Mock tRPC api. `mockBatchRunFetch` is hoisted and stable across renders so a
+// test can inspect the options the hook hands to react-query — the fetch is
+// what the poll ultimately calls, and its caching options are load-bearing.
 const mockMutateAsync = vi.fn();
+const mockBatchRunFetch = vi.hoisted(() => vi.fn());
 vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
@@ -17,13 +20,13 @@ vi.mock("~/utils/api", () => ({
         }),
       },
       getBatchRunData: {
-        fetch: vi.fn(),
+        fetch: mockBatchRunFetch,
       },
     },
     useUtils: () => ({
       scenarios: {
         getBatchRunData: {
-          fetch: vi.fn(),
+          fetch: mockBatchRunFetch,
         },
       },
     }),
@@ -221,7 +224,145 @@ describe("useRunScenario()", () => {
     });
   });
 
-  describe("when run fails with an error", () => {
+  describe("when the run finished and did not pass", () => {
+    beforeEach(() => {
+      mockPollForScenarioRun.mockResolvedValue({
+        success: false,
+        error: "run_failed",
+        scenarioRunId: "not-passed-run-123",
+      });
+    });
+
+    it("does not tell the user execution errored", async () => {
+      const { result } = renderHook(() =>
+        useRunScenario({
+          projectId: "project-123",
+          projectSlug: "my-project",
+        }),
+      );
+
+      await result.current.runScenario({
+        scenarioId: "scenario-123",
+        target: { type: "prompt", id: "prompt-123" },
+      });
+
+      await waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalled();
+      });
+
+      const toastCall = mockToasterCreate.mock.calls[0]![0] as {
+        title?: string;
+        description?: string;
+      };
+      // The run executed fine — the agent just did not pass. Reporting an
+      // execution error sends the user to debug infrastructure that is healthy.
+      expect(toastCall.description).not.toContain(
+        "encountered an error during execution",
+      );
+      expect(toastCall.title).not.toBe("Scenario run failed");
+    });
+
+    it("offers the run so the user can read the outcome", async () => {
+      const onRunFailed = vi.fn();
+      const { result } = renderHook(() =>
+        useRunScenario({
+          projectId: "project-123",
+          projectSlug: "my-project",
+          onRunFailed,
+        }),
+      );
+
+      await result.current.runScenario({
+        scenarioId: "scenario-123",
+        target: { type: "prompt", id: "prompt-123" },
+      });
+
+      await waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalled();
+      });
+
+      const toastCall = mockToasterCreate.mock.calls[0]![0] as {
+        action?: { onClick: () => void };
+      };
+      toastCall.action?.onClick();
+
+      expect(onRunFailed).toHaveBeenCalledWith({
+        scenarioRunId: "not-passed-run-123",
+        setId: "set-123",
+        batchRunId: "batch-123",
+      });
+    });
+
+    it("does not navigate on its own", async () => {
+      const onRunComplete = vi.fn();
+      const { result } = renderHook(() =>
+        useRunScenario({
+          projectId: "project-123",
+          projectSlug: "my-project",
+          onRunComplete,
+        }),
+      );
+
+      await result.current.runScenario({
+        scenarioId: "scenario-123",
+        target: { type: "prompt", id: "prompt-123" },
+      });
+
+      await waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalled();
+      });
+
+      // onRunComplete navigates (useDrawerRunCallbacks pushes a route). A run
+      // that did not pass must not yank the user off the page they are on —
+      // navigation stays opt-in via the toast action.
+      expect(onRunComplete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the poll asks the server for batch-run data", () => {
+    it("asks for fresh data and does not retry", async () => {
+      const { result } = renderHook(() =>
+        useRunScenario({
+          projectId: "project-123",
+          projectSlug: "my-project",
+        }),
+      );
+
+      await result.current.runScenario({
+        scenarioId: "scenario-123",
+        target: { type: "prompt", id: "prompt-123" },
+      });
+
+      await waitFor(() => {
+        expect(mockPollForScenarioRun).toHaveBeenCalled();
+      });
+
+      // The poll calls this fetcher up to 60 times over 30s with an identical
+      // input. Under the app's default staleTime (30_000) every call after the
+      // first is served from the first one's cached answer, so the poll can
+      // never observe the run appearing. staleTime: 0 forces a real request.
+      // retry: false matters too: fetchQuery only defaults retry off when it is
+      // undefined, and the app defines it globally — 4 retries with backoff
+      // would burn the whole polling budget inside a single attempt.
+      const { fetchBatchRunData: fetcher } = mockPollForScenarioRun.mock
+        .calls[0]![0] as {
+        fetchBatchRunData: (params: unknown) => Promise<unknown>;
+      };
+      const params = {
+        projectId: "project-123",
+        scenarioSetId: "set-123",
+        batchRunId: "batch-123",
+      };
+      await fetcher(params);
+
+      expect(mockBatchRunFetch).toHaveBeenCalledWith(
+        params,
+        expect.objectContaining({ staleTime: 0, retry: false }),
+      );
+    });
+  });
+
+  describe("when the run could not execute", () => {
     beforeEach(() => {
       mockPollForScenarioRun.mockResolvedValue({
         success: false,

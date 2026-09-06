@@ -2,6 +2,7 @@ package domain
 
 import (
 	"slices"
+	"sort"
 	"strings"
 	"time"
 )
@@ -21,6 +22,24 @@ type Bundle struct {
 
 	// ExpiresAt is when this bundle's JWT expires (for cache refresh).
 	ExpiresAt time.Time
+
+	// VirtualKeyExpiresAt is the terminal validity instant of the KEY itself,
+	// from the vk_expires_at claim. Unlike ExpiresAt, which is a refresh
+	// boundary a grace window may be built on, nothing extends this one: past
+	// it the key is finished and the request is refused. The zero value means
+	// the key has no expiration date and never runs out.
+	VirtualKeyExpiresAt time.Time
+}
+
+// KeyExpired reports whether the virtual key's own expiration date has passed
+// at instant now. A bundle carrying no date never expires.
+//
+// The date itself counts as expired, which is why this asks "not before"
+// rather than "after": the control plane refuses the key when expiresAt is at
+// or below the current time, and a cache that served the exact boundary
+// instant would answer a request the control plane rejects.
+func (b *Bundle) KeyExpired(now time.Time) bool {
+	return !b.VirtualKeyExpiresAt.IsZero() && !now.Before(b.VirtualKeyExpiresAt)
 }
 
 // BundleConfig holds the policy knobs configured per virtual key.
@@ -103,6 +122,199 @@ type BundleConfig struct {
 	// RoutingModeNone by the control plane AND at wire decode, so a drifted
 	// control plane cannot silently re-arm fallback on a no-fallback key).
 	RoutingMode string
+
+	// RoutingExcludedProviders and AccessExcludedProviders are ModelProvider
+	// rows a request could resolve to but that are absent from Credentials,
+	// split by WHY, so a request-time block can name the reason instead of
+	// failing opaque (contract §4.2). Routing: reachable from the key's scope
+	// and inside its provider access, but dropped by the routing policy.
+	// Access: reachable from scope but outside providers_allowed. A provider in
+	// neither list with no credential is not reachable from the key's scope.
+	RoutingExcludedProviders []ExcludedModelProvider
+	AccessExcludedProviders  []ExcludedModelProvider
+
+	// RoutingPolicyName is the display name of the key's routing policy, used
+	// only to name the routing-exclusion reason. Empty when the key is not on a
+	// routing policy.
+	RoutingPolicyName string
+}
+
+// ExcludedModelProvider is a ModelProvider row the control plane dropped from a
+// key's dispatch chain, paired with its provider kind. The kind is carried, not
+// just the row id, because a request resolves to a provider KIND and an
+// excluded row is absent from Credentials, so its kind is not otherwise
+// knowable at the gateway.
+type ExcludedModelProvider struct {
+	// ID is the ModelProvider row id, in the same id space as Credentials and
+	// ProvidersAllowed.
+	ID string
+	// ProviderID is the provider kind (openai, anthropic, ...), the axis a
+	// resolved request is matched on.
+	ProviderID ProviderID
+	// Handle is the row's routing handle, carried so a request that names the
+	// handle of a dropped row is told WHY it was dropped rather than being
+	// told the handle means nothing. Empty when the row has no handle.
+	Handle string
+}
+
+// CredentialByHandle finds the dispatchable credential a routing handle names.
+// The handle is compared lowercased, the form the control plane stores.
+func (c BundleConfig) CredentialByHandle(handle string) (Credential, bool) {
+	if handle == "" {
+		return Credential{}, false
+	}
+	for _, cred := range c.Credentials {
+		if cred.Handle != "" && strings.EqualFold(cred.Handle, handle) {
+			return cred, true
+		}
+	}
+	return Credential{}, false
+}
+
+// ExcludedByHandle finds a NON-dispatchable provider row a routing handle
+// names. A handle the key's routing policy or provider access dropped is still
+// a real name the operator chose, so recognizing it here is what lets the
+// refusal say which setting removed the provider instead of reporting the
+// handle as an unknown prefix.
+func (c BundleConfig) ExcludedByHandle(handle string) (ExcludedModelProvider, bool) {
+	if handle == "" {
+		return ExcludedModelProvider{}, false
+	}
+	for _, group := range [][]ExcludedModelProvider{c.RoutingExcludedProviders, c.AccessExcludedProviders} {
+		for _, row := range group {
+			if row.Handle != "" && strings.EqualFold(row.Handle, handle) {
+				return row, true
+			}
+		}
+	}
+	return ExcludedModelProvider{}, false
+}
+
+// ReadSpelling turns a model string into the provider it names and the model
+// id that reaches the provider.
+//
+// The first segment is a qualifier only when it names something real: a
+// routing handle on one of the key's provider rows, or a provider family the
+// gateway knows. Everything else is a model id in full, slashes and all,
+// because self-hosted servers and proxies serve models whose own ids contain
+// one ("stealth/ox-alpha", "meta-llama/Llama-3-70B").
+//
+// A handle belonging to a row the key's routing policy or provider access
+// dropped is recognized too, and returns that row's id. Credential selection
+// then finds no dispatchable credential for it and reports which setting
+// removed the provider, which is a far better answer than treating the
+// operator's own handle as an unknown prefix.
+//
+// It hangs off the config because only the key's own config can tell a handle
+// from a model id that happens to contain a slash. Dispatch and the model
+// listing both read spellings, and a second copy of this rule would let the
+// list offer a name dispatch refuses.
+func (c BundleConfig) ReadSpelling(spelling string) ResolvedModel {
+	qualifier, remainder, found := strings.Cut(spelling, "/")
+	if !found || qualifier == "" || remainder == "" {
+		return ResolvedModel{ModelID: spelling, Source: ModelSourceImplicit}
+	}
+
+	if cred, ok := c.CredentialByHandle(qualifier); ok {
+		return ResolvedModel{
+			ModelID:      remainder,
+			ProviderID:   cred.ProviderID,
+			CredentialID: cred.ID,
+			Source:       ModelSourceExplicit,
+		}
+	}
+	if excluded, ok := c.ExcludedByHandle(qualifier); ok {
+		return ResolvedModel{
+			ModelID:      remainder,
+			ProviderID:   excluded.ProviderID,
+			CredentialID: excluded.ID,
+			Source:       ModelSourceExplicit,
+		}
+	}
+	if KnownProviderFamily(qualifier) {
+		return ResolvedModel{
+			ModelID:    remainder,
+			ProviderID: NormalizeProviderID(strings.ToLower(qualifier)),
+			Source:     ModelSourceExplicit,
+		}
+	}
+
+	return ResolvedModel{ModelID: spelling, Source: ModelSourceImplicit}
+}
+
+// RoutingHandles lists the handles of the key's dispatchable credentials,
+// sorted so an error message reads the same twice. Handles of excluded rows
+// are deliberately absent: a refusal must not offer a row the key cannot use.
+func (c BundleConfig) RoutingHandles() []string {
+	seen := make(map[string]bool)
+	var out []string
+	add := func(handle string) {
+		if handle == "" || seen[handle] {
+			return
+		}
+		seen[handle] = true
+		out = append(out, handle)
+	}
+	for _, cred := range c.Credentials {
+		add(cred.Handle)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// BlockedRowReason reports why one specific ModelProvider row is absent from
+// the dispatch chain. Distinct from BlockedProviderReason, which answers for a
+// provider KIND: a routing handle names one row, and a key holding two
+// Anthropic rows must not borrow the surviving row's answer for the dropped
+// one.
+func (c BundleConfig) BlockedRowReason(id string) ProviderBlockReason {
+	if id == "" {
+		return ProviderBlockNone
+	}
+	for _, e := range c.RoutingExcludedProviders {
+		if e.ID == id {
+			return ProviderBlockRouting
+		}
+	}
+	for _, e := range c.AccessExcludedProviders {
+		if e.ID == id {
+			return ProviderBlockAccess
+		}
+	}
+	return ProviderBlockNone
+}
+
+// ProviderBlockReason names why a provider a request resolved to is not in the
+// dispatch chain, so a block can say which of the key's own settings removed it.
+type ProviderBlockReason int
+
+const (
+	// ProviderBlockNone means nothing the control plane reported excludes this
+	// provider kind; the chain simply carries no credential for it (the
+	// provider is not reachable from the key's scope).
+	ProviderBlockNone ProviderBlockReason = iota
+	// ProviderBlockRouting means the key's routing policy dropped this provider.
+	ProviderBlockRouting
+	// ProviderBlockAccess means the key's provider access (allowlist) dropped it.
+	ProviderBlockAccess
+)
+
+// BlockedProviderReason reports why a resolved provider kind has no dispatchable
+// credential on this key. Routing takes precedence over access: a provider the
+// policy dropped is named by the policy even if the allowlist would also drop a
+// different row of the same kind.
+func (c BundleConfig) BlockedProviderReason(kind ProviderID) ProviderBlockReason {
+	for _, e := range c.RoutingExcludedProviders {
+		if e.ProviderID == kind {
+			return ProviderBlockRouting
+		}
+	}
+	for _, e := range c.AccessExcludedProviders {
+		if e.ProviderID == kind {
+			return ProviderBlockAccess
+		}
+	}
+	return ProviderBlockNone
 }
 
 // ConfigFetchResult is one answer from the control plane's virtual-key config
@@ -125,6 +337,24 @@ type ConfigFetchResult struct {
 	// NotModified is the control plane confirming the caller's ETag is still
 	// current, so the caller keeps the config it already has.
 	NotModified bool
+
+	// VirtualKeyExpiresAt is the key's own expiration date as this response
+	// reports it, and is meaningful only when VirtualKeyExpiryKnown is set.
+	// Read together with that flag it is a tri-state: known with a value is the
+	// date the key stops, known and zero is a key with no date that never runs
+	// out, and not known is a response that said nothing about expiry.
+	//
+	// The endpoint's ETag covers this field, so a date an admin changes brings
+	// the whole config back with it (contract §4.2) and the caller learns the
+	// new date on the same revalidation that brings the new credentials.
+	VirtualKeyExpiresAt time.Time
+
+	// VirtualKeyExpiryKnown reports whether the response carried the expiry
+	// field at all. A control plane older than the field omits it, and a caller
+	// must then keep the date its bundle already holds. Absent must never be
+	// read as "this key never expires": a refresh against an older control
+	// plane would then lift the cap off a key whose own token says it expires.
+	VirtualKeyExpiryKnown bool
 }
 
 // Routing modes carried on the bundle wire (contract §4.2 routing_mode).
@@ -178,6 +408,73 @@ func ModelPatternIsWildcard(pattern string) bool {
 	return strings.HasSuffix(pattern, "*")
 }
 
+// ModelSpellings returns the ways one resolved model can be written: the bare
+// model id, plus the provider-qualified form when the provider is known.
+//
+// Both models_allowed and the policy model rules judge every spelling, because
+// an operator writes whichever one their client sends and neither is more
+// canonical than the other. Judging only the bare id turns "openai/*" into a
+// rule that allows nothing, and judging only the qualified id turns
+// "gpt-5-mini" into one that allows nothing either. A rule that silently
+// matches no model is worse than a wrong answer, because nothing about the
+// traffic reveals it.
+func ModelSpellings(providerID ProviderID, modelID string) []string {
+	if modelID == "" {
+		return nil
+	}
+	if providerID == "" {
+		return []string{modelID}
+	}
+	return []string{modelID, string(providerID) + "/" + modelID}
+}
+
+// SplitModelSpelling splits a provider-qualified model name into the provider
+// the request would be dispatched to and the model id sent upstream, the same
+// way the resolver reads it. A name with no qualifier reports ok false.
+//
+// One function so the model listing and the dispatcher cannot disagree about
+// which provider a name means, which is how a listing came to advertise names
+// that dispatch refused.
+//
+// The qualifier has to name a family the gateway knows. Without that check
+// every model id containing a slash read as a provider prefix, so an
+// allowlist entry naming a real self-hosted model was attributed to a
+// provider that does not exist. This function knows no key, so it cannot
+// recognize a routing handle; callers holding a BundleConfig resolve handles
+// through CredentialByHandle first.
+//
+// The qualifier is lowercased before it becomes a ProviderID. KnownProviderFamily
+// accepts any casing, while NormalizeProviderID matches its aliases literally, so
+// passing the raw segment through turned "OpenAI/gpt-5-mini" into the provider id
+// "OpenAI", which matches no credential.
+func SplitModelSpelling(spelling string) (ProviderID, string, bool) {
+	qualifier, model, ok := strings.Cut(spelling, "/")
+	if !ok || qualifier == "" || model == "" {
+		return "", spelling, false
+	}
+	if !KnownProviderFamily(qualifier) {
+		return "", spelling, false
+	}
+	return NormalizeProviderID(strings.ToLower(qualifier)), model, true
+}
+
+// AllowsResolvedModel reports whether a model the resolver settled on
+// satisfies models_allowed, in either spelling. This is the check every
+// resolution path owes the allowlist: the model that actually reaches a
+// provider is the one the allowlist is about, whether the caller named it
+// directly or reached it through an alias.
+func (c BundleConfig) AllowsResolvedModel(providerID ProviderID, modelID string) bool {
+	if len(c.AllowedModels) == 0 {
+		return true
+	}
+	for _, spelling := range ModelSpellings(providerID, modelID) {
+		if c.AllowsModel(spelling) {
+			return true
+		}
+	}
+	return false
+}
+
 // ModelAlias maps a friendly name to a provider + model.
 type ModelAlias struct {
 	ProviderID ProviderID
@@ -185,9 +482,15 @@ type ModelAlias struct {
 }
 
 // FallbackConfig controls retry/fallback behavior.
+//
+// MaxAttempts is the whole of it. Which failures are worth another provider
+// is decided in one place, classifyProviderError, from the real upstream
+// outcome: 5xx, 429, 404 and transport failures walk the chain, and a
+// terminal 4xx does not. That is not configurable, on purpose. A per-key
+// trigger list could only ever narrow it, and every narrowing turns a
+// recoverable failure into a customer-visible one.
 type FallbackConfig struct {
 	MaxAttempts int
-	On          []string // trigger codes: "5xx", "timeout", "rate_limit", "network"
 }
 
 // GuardrailsConfig holds per-direction guardrail policies.

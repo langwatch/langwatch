@@ -13,6 +13,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import {
+  FrontDoorShell,
+  useIdentityFrontDoor,
+  VerificationFirstSignUp,
+} from "~/features/auth-front-door";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { signIn, useSession } from "~/utils/auth-client";
 import { useSearchParams } from "~/utils/compat/next-navigation";
@@ -43,7 +48,43 @@ const SIGN_UP_FALLBACK =
 const RECOVERY_FALLBACK =
   "That email already has an account. Sign in with it instead.";
 
+/**
+ * Which sign-up screen this deployment has (ADR-117 §7). The legacy screen
+ * below is untouched and answers whenever the front door is not enforced.
+ */
 export default function SignUp() {
+  const frontDoor = useIdentityFrontDoor();
+
+  if (!frontDoor.isResolved) return null;
+  if (frontDoor.enabled) {
+    return (
+      // The pitch is the hosted product's, and it lives OUTSIDE the card: the
+      // card itself is the same on every installation.
+      //
+      // Nothing sits under the tagline. `trustStrip` stayed empty because the
+      // one thing that belongs there is a customer — a quote or a logo row —
+      // and both are somebody else's decision to be named. A row of INTEGRATION
+      // marks was tried in that slot and is the wrong module for this page: it
+      // argues we are compatible, when the question a stranger is asking is
+      // whether anybody else trusts us. Leave it empty until there is a cleared
+      // name to put in it; an empty slot beats furniture.
+      <FrontDoorShell
+        headline={"See what your agents\nare actually doing."}
+        headlineAccent="actually"
+        // Names the thing they are seconds away from, rather than listing what
+        // the product has. "Traces, evaluations and monitoring" was a feature
+        // list read by somebody who has not agreed to want any of them yet.
+        tagline="You are a minute away from watching a simulated user push your agent until it breaks. Free to start, no credit card."
+      >
+        <VerificationFirstSignUp />
+      </FrontDoorShell>
+    );
+  }
+
+  return <LegacySignUp />;
+}
+
+function LegacySignUp() {
   const { data: session } = useSession();
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
@@ -198,9 +239,6 @@ function SignUpForm() {
         title: "Couldn't sign you in",
         description: message,
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
     }
   };

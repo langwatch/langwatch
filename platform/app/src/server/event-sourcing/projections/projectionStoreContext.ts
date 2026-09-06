@@ -90,6 +90,15 @@ export interface ProjectionStoreContext {
    * Which delivery of this job is being folded. 1 is a fresh delivery, higher
    * values are retries of a chain that has not acked.
    *
+   * This is `JobDelivery.attempt` under a longer name, and the pair below is
+   * `JobDelivery.isContinuation`. The prefix is deliberate rather than drift:
+   * `JobDelivery` describes one delivery and nothing else, so a bare `attempt`
+   * reads fine there, while this context is a grab-bag also carrying
+   * `aggregateId`, `tenantId`, `key` and `retentionPolicy` — an unqualified
+   * `attempt` here would not say attempt of what. Noted once so the next
+   * reader following the value across the boundary does not have to re-derive
+   * it (#6699).
+   *
    * A caching store uses it to decide whether the ids it already recorded are
    * still live. On a fresh delivery the previous batch for this group must have
    * acked — the queue holds one active batch per group — so those ids can never

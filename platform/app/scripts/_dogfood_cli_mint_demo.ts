@@ -14,6 +14,7 @@ import {
   PersonalVirtualKeyAlreadyExistsError,
   PersonalVirtualKeyService,
 } from "@ee/governance/services/personalVirtualKey.service";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { prisma } from "~/server/db";
 import { approveDeviceCode } from "~/server/routes/auth-cli";
 
@@ -89,9 +90,14 @@ async function main() {
   // that lookup by hitting Redis directly via the server's auth-cli
   // helpers — easier than re-implementing the magic-link auth + CSRF
   // dance the browser approve UI requires.
-  const { default: Redis } = await import("ioredis");
-  const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
-  const redis = new Redis(redisUrl);
+  // This script boots no App, so it owns the connection it needs — built
+  // through the sanctioned service rather than by constructing ioredis here
+  // (ADR-093). It is closed by the `redis.quit()` at the end of main(),
+  // which is also what keeps the process from hanging on an open socket.
+  const redis = new RedisConnectionService().connectStandalone({
+    url: process.env.REDIS_URL ?? "redis://localhost:6379",
+  });
+  if (!redis) throw new Error("REDIS_URL did not resolve to a connection");
   // Mirror userCodeKey() in src/server/routes/auth-cli.ts (line 213).
   const deviceCode = await redis.get(`lwcli:device:usercode:${userCode}`);
   if (!deviceCode) {
@@ -143,17 +149,10 @@ async function main() {
   }
   console.error(`[runner] minted personal VK id=${issued.virtualKey.id}`);
 
-  await approveDeviceCode({
-    deviceCode,
-    userId,
-    organizationId,
-    personalVk: {
-      id: issued.virtualKey.id,
-      label: issued.virtualKey.name,
-      secret: issued.secret,
-      base_url: issued.baseUrl,
-    },
-  });
+  // A device-session approval carries no credential: the CLI issues the
+  // personal virtual key itself on the first gateway call. The key minted
+  // above is what `whoami` reports below.
+  await approveDeviceCode({ deviceCode, userId, organizationId });
   console.error(`[runner] approveDeviceCode flipped to approved`);
 
   // CLI polls every ~3s; wait for it to complete.

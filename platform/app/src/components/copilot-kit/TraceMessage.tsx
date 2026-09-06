@@ -42,8 +42,8 @@ function TraceSuccessState({
   traceId,
   ...props
 }: { traceId: string } & StackProps) {
-  // useTraceDetailsDrawer opens the Trace Explorer drawer (see
-  // `routeTraceDrawerForV2`). The hover-peek popover is unaffected.
+  // useTraceDetailsDrawer opens the Trace Explorer drawer. The hover-peek
+  // popover is unaffected.
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
 
   return (
@@ -55,9 +55,7 @@ function TraceSuccessState({
       <TracePreviewHoverCard traceId={traceId}>
         <Button
           colorPalette="gray"
-          onClick={() =>
-            openTraceDetailsDrawer({ traceId, selectedTab: "traceDetails" })
-          }
+          onClick={() => openTraceDetailsDrawer({ traceId })}
         >
           <LuListTree />
           View Trace

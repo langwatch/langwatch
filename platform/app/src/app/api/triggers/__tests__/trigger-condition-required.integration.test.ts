@@ -21,6 +21,8 @@ import { prisma } from "~/server/db";
 // That is the only thing it needs the app layer for, and booting the whole app
 // to no-op one cache drop would buy nothing this suite asserts.
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({ triggers: { invalidate: async () => {} } }),
 }));
 

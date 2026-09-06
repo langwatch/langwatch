@@ -10,6 +10,7 @@ export function LinkedStat({
   color,
   testId,
   warning,
+  hint,
 }: {
   label: string;
   value: string;
@@ -18,6 +19,8 @@ export function LinkedStat({
   color?: string;
   testId?: string;
   warning?: boolean;
+  /** Hover explanation of what the figure is measured over. */
+  hint?: string;
 }) {
   const content = (
     <Stat.Root
@@ -27,6 +30,7 @@ export function LinkedStat({
       padding={2}
       transition="background 0.1s"
       data-testid={testId}
+      title={hint}
       data-warning={
         warning === undefined ? undefined : warning ? "true" : "false"
       }

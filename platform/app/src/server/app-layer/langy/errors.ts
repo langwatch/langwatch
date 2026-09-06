@@ -93,6 +93,40 @@ export class LangyConversationNotOwnedError extends HandledError {
   }
 }
 
+/**
+ * A caller opted into conversation-id ADOPTION (`adoptConversationId: true`)
+ * with an id that cannot be adopted: it fails the shape gate, or it collides
+ * with an archived conversation whose closed history must not be silently
+ * resurrected (HTTP 409).
+ *
+ * Loud on purpose. Adoption exists for callers that key continuity on an
+ * externally-chosen id (scenario runs bind `{{ threadId }}` once per run); the
+ * pre-adoption behavior — silently minting a fresh id — degraded every
+ * multi-turn run to single-turn with no signal anywhere (#7187). An adoption
+ * that cannot happen must therefore fail the turn, never fall back.
+ */
+export class LangyConversationIdUnadoptableError extends HandledError {
+  declare readonly code: "langy_conversation_id_unadoptable";
+
+  constructor(
+    public readonly conversationId: string,
+    reason: "invalid_shape" | "archived",
+  ) {
+    super(
+      "langy_conversation_id_unadoptable",
+      reason === "archived"
+        ? "This conversation id belongs to an archived conversation and cannot be adopted."
+        : "This conversation id cannot be adopted: use 6-120 characters from [A-Za-z0-9_-].",
+      {
+        meta: { conversationId, reason },
+        httpStatus: 409,
+        ...remediation("langy_conversation_id_unadoptable"),
+      },
+    );
+    this.name = "LangyConversationIdUnadoptableError";
+  }
+}
+
 /** No model is configured for the project's Langy (HTTP 409). */
 export class LangyModelNotConfiguredError extends HandledError {
   declare readonly code: "langy_model_not_configured";
@@ -295,5 +329,81 @@ export class LangyAgentUnavailableError extends HandledError {
       ...remediation("langy_agent_unavailable"),
     });
     this.name = "LangyAgentUnavailableError";
+  }
+}
+
+// ── the key-authed public turn surface (`/api/langy`) ─────────────────────
+//
+// Transport refusals, not domain rules: they say why a REQUEST could not be
+// admitted, before any conversation exists to have a rule about. They live
+// here rather than in the route so the route throws and never serialises —
+// `createServiceApp`'s canonical envelope owns the wire shape (ADR-045).
+//
+// The flag-off refusal is deliberately absent from this list. A dark surface
+// answers the platform's generic `not_found`, because a Langy-specific code
+// would tell an unauthorised caller the surface exists.
+
+/** No credential presented at all. */
+export class LangyApiCredentialMissingError extends HandledError {
+  declare readonly code: "langy_api_credential_missing";
+  constructor() {
+    super("langy_api_credential_missing", "Authentication token is required.", {
+      httpStatus: 401,
+      ...remediation("langy_api_credential_missing"),
+    });
+    this.name = "LangyApiCredentialMissingError";
+  }
+}
+
+/** A credential was presented but resolved to no project. */
+export class LangyApiCredentialInvalidError extends HandledError {
+  declare readonly code: "langy_api_credential_invalid";
+  constructor() {
+    super("langy_api_credential_invalid", "Invalid auth token.", {
+      httpStatus: 401,
+      ...remediation("langy_api_credential_invalid"),
+    });
+    this.name = "LangyApiCredentialInvalidError";
+  }
+}
+
+/**
+ * The key authenticates but cannot be bridged to a user to act as.
+ *
+ * One class, three codes: the caller branches on the code, and the three cases
+ * need genuinely different remediation (mint a personal key / ask an admin for
+ * Langy access / the owner is gone). Splitting them into three classes would
+ * duplicate the body for no caller-visible gain.
+ */
+export class LangyApiIdentityDeniedError extends HandledError {
+  declare readonly code:
+    | "langy_api_key_unowned"
+    | "langy_api_key_no_langy_access"
+    | "langy_api_actor_missing";
+  constructor(
+    code:
+      | "langy_api_key_unowned"
+      | "langy_api_key_no_langy_access"
+      | "langy_api_actor_missing",
+    message: string,
+  ) {
+    super(code, message, {
+      httpStatus: 403,
+      ...remediation(code),
+    });
+    this.name = "LangyApiIdentityDeniedError";
+  }
+}
+
+/** The body did not parse against the turn schema. */
+export class LangyApiRequestInvalidError extends HandledError {
+  declare readonly code: "langy_api_request_invalid";
+  constructor(issues: readonly unknown[]) {
+    super("langy_api_request_invalid", "Invalid request body.", {
+      httpStatus: 400,
+      meta: { issues },
+      ...remediation("langy_api_request_invalid"),
+    });
+    this.name = "LangyApiRequestInvalidError";
   }
 }

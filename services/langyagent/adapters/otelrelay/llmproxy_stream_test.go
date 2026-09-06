@@ -95,6 +95,50 @@ func TestLLMProxyStreamCut_InStreamHardLimit(t *testing.T) {
 	}
 }
 
+// The gateway forwarding an upstream rejection under a 200 stream content
+// type: ONE bare JSON error object, no SSE framing, no trailing newline (the
+// shape observed live for an Anthropic invalid_request_error).
+const bareJSONErrorBody = `{"type":"error","error":{"type":"invalid_request_error","message":"thinking.type.enabled is not supported for this model."}}`
+
+// @scenario "A bare JSON error body under a stream content type is captured as the cause"
+func TestLLMProxyStreamCut_BareJSONErrorBody(t *testing.T) {
+	frames := bareJSONErrorBody
+	gateway := sseStreamGateway(t, &frames)
+	defer gateway.Close()
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-bare-json", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	// The body passes through untouched for the worker's SDK.
+	resp := rateLimitCall(t, relay, token)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("call answered %d, want the 200 passed through", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != bareJSONErrorBody {
+		t.Errorf("body was altered in flight:\n got %s\nwant %s", body, bareJSONErrorBody)
+	}
+
+	// Reading to EOF must CAPTURE the rejection, not clear it as a clean end.
+	e, ok := relay.LastLLMError(token)
+	if !ok {
+		t.Fatal("a bare JSON error body must leave a captured cause")
+	}
+	if _, hasMessage := e.Meta["message"]; hasMessage {
+		t.Errorf("captured message = %v, want the provider's prose dropped", e.Meta["message"])
+	}
+	hasDiscriminant := e.Code == "invalid_request_error"
+	for _, reason := range e.Reasons {
+		var cause herr.E
+		if errors.As(reason, &cause) && cause.Code == "invalid_request_error" {
+			hasDiscriminant = true
+		}
+	}
+	if !hasDiscriminant {
+		t.Errorf("captured code = %q, reasons = %v, want the invalid_request_error discriminant", e.Code, e.Reasons)
+	}
+}
+
 // @scenario "A clean stream clears the in-stream failure capture"
 func TestLLMProxyStreamCut_CleanStreamClears(t *testing.T) {
 	frames := cleanStream

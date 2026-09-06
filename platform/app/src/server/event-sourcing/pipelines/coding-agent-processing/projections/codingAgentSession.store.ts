@@ -47,18 +47,32 @@ function carriesReadBackColumns(row: CodingAgentSessionRow): boolean {
 export class CodingAgentSessionStore
   implements FoldProjectionStore<CodingAgentSessionState>
 {
-  constructor(private readonly repo: CodingAgentSessionRepository) {}
+  constructor(
+    private readonly repo: CodingAgentSessionRepository,
+    private readonly hooks: {
+      /**
+       * Called after a commit with the distinct tenants whose sessions were
+       * stored — the seam the project's Sessions-destination stamp rides
+       * (`createCodingAgentSessionSeenTouch`). Fire-and-forget: the callback
+       * owns its own errors and throttling, and the committed row must never
+       * wait on it.
+       */
+      onSessionsStored?: (tenantIds: string[]) => Promise<void>;
+    } = {},
+  ) {}
 
   async store(
     state: CodingAgentSessionState,
     context: ProjectionStoreContext,
   ): Promise<void> {
+    if (!hasPersistableSignal(state)) return;
     const entry = this.toRow(state, context);
     await this.repo.upsert(
       entry.row,
       entry.retentionDays,
       entry.appliedEventIds,
     );
+    this.reportSessionsStored([String(context.tenantId)]);
   }
 
   async storeBatch(
@@ -67,13 +81,20 @@ export class CodingAgentSessionStore
       context: ProjectionStoreContext;
     }>,
   ): Promise<void> {
-    const rows = entries.map(({ state, context }) =>
+    const persistable = entries.filter(({ state }) =>
+      hasPersistableSignal(state),
+    );
+    const rows = persistable.map(({ state, context }) =>
       this.toRow(state, context),
     );
     if (rows.length === 0) return;
 
+    const tenantIds = [
+      ...new Set(persistable.map(({ context }) => String(context.tenantId))),
+    ];
     if (this.repo.upsertBatch) {
       await this.repo.upsertBatch(rows);
+      this.reportSessionsStored(tenantIds);
       return;
     }
     await Promise.all(
@@ -81,6 +102,17 @@ export class CodingAgentSessionStore
         this.repo.upsert(row, retentionDays, appliedEventIds),
       ),
     );
+    this.reportSessionsStored(tenantIds);
+  }
+
+  /**
+   * Fire-and-forget by contract: the callback logs and swallows its own
+   * failures (`createCodingAgentSessionSeenTouch`), and the committed row must
+   * never wait on it — but a hook that rejects anyway must surface as nothing
+   * worse than a dropped stamp, not as an unhandled rejection in the worker.
+   */
+  private reportSessionsStored(tenantIds: string[]): void {
+    void this.hooks.onSessionsStored?.(tenantIds).catch(() => undefined);
   }
 
   private toRow(
@@ -207,4 +239,38 @@ export class CodingAgentSessionStore
   ): Promise<CodingAgentSessionState | null> {
     return (await this.getWithApplied(aggregateId, context)).state;
   }
+}
+
+/**
+ * A session state is worth a row once the session has said something: a
+ * prompt, a model or tool call, tokens, cost, a name, or the repository it
+ * works in. An agent that starts and dies before its first prompt still
+ * emits lifecycle and error telemetry, and folding that minted untitled
+ * rows with a dash in every column — twelve of them in one boot when a
+ * fleet's agents all resumed against an expired credential. The canonical
+ * records stay stored either way; the contributions before the first real
+ * signal are the price of not storing the noise, and they amount to
+ * lifecycle timing nothing reads.
+ */
+function hasPersistableSignal(state: CodingAgentSessionState): boolean {
+  return (
+    state.prompts > 0 ||
+    state.modelCalls > 0 ||
+    state.toolCalls > 0 ||
+    state.subAgents > 0 ||
+    state.inputTokens > 0 ||
+    state.outputTokens > 0 ||
+    state.costUsd > 0 ||
+    // A metrics-only session must still appear
+    // (specs/coding-agent/session-aggregate.feature) — its tokens and cost
+    // usually say so, and the work counters cover one that reported neither.
+    state.linesAdded > 0 ||
+    state.linesRemoved > 0 ||
+    state.commits > 0 ||
+    state.pullRequests > 0 ||
+    state.editsAccepted > 0 ||
+    state.editsRejected > 0 ||
+    (state.title !== null && state.title !== "") ||
+    (state.repositoryName !== null && state.repositoryName !== "")
+  );
 }

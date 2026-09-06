@@ -17,7 +17,7 @@ const settle = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * The throttle contract the reactors rely on has to hold on the in-memory
+ * The throttle contract the subscribers rely on has to hold on the in-memory
  * queue too, not only on the Redis one — memory mode is a supported
  * single-process deployment, and a window that silently does nothing there
  * would let every event through while the code reads as if it were throttled.

@@ -208,9 +208,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               </Link>
             ),
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
         },
         onError: () => {
@@ -219,9 +216,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             description:
               "Please check if the rows were not already inserted in the dataset",
             type: "error",
-            meta: {
-              closable: true,
-            },
           });
         },
       },

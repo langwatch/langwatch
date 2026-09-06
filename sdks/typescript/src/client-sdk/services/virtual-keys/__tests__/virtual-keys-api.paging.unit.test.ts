@@ -41,6 +41,7 @@ const virtualKey = (id: string): VirtualKey => ({
   updated_at: "2026-06-01T00:00:00.000Z",
   last_used_at: null,
   revoked_at: null,
+  expires_at: null,
 });
 
 const page = (ids: string[], next_cursor: string | null): unknown => ({

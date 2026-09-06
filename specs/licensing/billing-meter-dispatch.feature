@@ -5,7 +5,7 @@ Feature: Billing Meter Dispatch
   # reporting worker (cross-project event aggregation, SaaS-mode skip,
   # crash recovery with two-phase checkpoint, transient-error retry,
   # event deduplication). Backend code lives in
-  # ee/billing/services/usageReportingService and the BillingDispatchReactor;
+  # ee/billing/services/usageReportingService and the billingMeterDispatch subscriber;
   # the integration-test fixture covers happy-path Stripe report submission
   # but not the worker-loop / recovery / dedup paths — all aspirational
   # pending the worker-test harness.
@@ -64,14 +64,43 @@ Feature: Billing Meter Dispatch
     Then the error is re-thrown for the worker to retry
 
   # ============================================================================
-  # Billing Dispatch Reactor — Post-Fold Side Effect
+  # Billing Dispatch Subscriber — Post-Fold Side Effect
   # ============================================================================
 
   @integration @unimplemented
   Scenario: Deduplicates concurrent events for the same organization
     Given multiple billable events for the same organization arrive rapidly
-    When the billing dispatch reactor processes them
+    When the billing dispatch subscriber processes them
     Then only one reporting job is active for the organization
+
+  # ============================================================================
+  # Skip conditions: what is an anomaly, and what is Tuesday
+  # ============================================================================
+
+  # The dispatch is per active organization and takes no view on pricing, so
+  # every organization reaches the reporting handler and most of them stop
+  # there. Which of those stops deserves an operator's attention is the point
+  # of these three.
+
+  @unit
+  Scenario: An organization that does not buy usage is skipped quietly
+    Given an organization that is not on usage-based pricing
+    When the usage reporting handler runs for it
+    Then no usage is reported
+    And the skip is recorded at debug, not as a warning
+
+  @unit
+  Scenario: A dispatch naming an organization that does not exist is a warning
+    Given a dispatch for an organization id that no organization has
+    When the usage reporting handler runs for it
+    Then no usage is reported
+    And the skip is recorded as a warning
+
+  @integration
+  Scenario: The billing lookup tells an absent organization from one that does not buy usage
+    Given an organization on usage-based pricing and another on tiered pricing
+    When the billing lookup runs for each of them and for an unused id
+    Then it answers usage_billed, not_usage_billed, and not_found respectively
 
   # ============================================================================
   # Known Limitations (v1)

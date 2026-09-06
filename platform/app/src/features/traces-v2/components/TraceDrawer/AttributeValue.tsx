@@ -1,6 +1,5 @@
 import {
   Box,
-  Button,
   chakra,
   HStack,
   Icon,
@@ -34,6 +33,7 @@ import {
   stringifyForCopy,
   tryParseJson,
 } from "./attributeFormat";
+import { FormatSelect } from "./FormatSelect";
 import { safePrettyJson } from "./JsonHighlight";
 import { ShikiCodeBlock } from "./markdownView";
 
@@ -224,13 +224,19 @@ function FormatGlyph({ format }: { format: Exclude<AttributeFormat, "leaf"> }) {
   );
 }
 
+/**
+ * The formats a reader can pick. `json-string` is missing on purpose: it is a
+ * detection result that renders through the JSON option, never a choice.
+ */
+type OverridableFormat = Exclude<AttributeFormat, "leaf" | "json-string">;
+
 const OVERRIDE_OPTIONS: ReadonlyArray<{
-  format: AttributeFormat;
+  value: OverridableFormat;
   label: string;
 }> = [
-  { format: "chat", label: "Chat" },
-  { format: "json", label: "JSON" },
-  { format: "text", label: "Text" },
+  { value: "chat", label: "Chat" },
+  { value: "json", label: "JSON" },
+  { value: "text", label: "Text" },
 ];
 
 function FormatToggle({
@@ -240,6 +246,11 @@ function FormatToggle({
   active: AttributeFormat;
   onChange: (next: AttributeFormat | null) => void;
 }) {
+  // Chat and text map to themselves; `json`, `json-string` and `leaf` all
+  // render through the JSON option. Without this, a detected `json-string`
+  // would match no option and the selector would read as the first one.
+  const value: OverridableFormat =
+    active === "chat" || active === "text" ? active : "json";
   return (
     <HStack gap={1} flexShrink={0}>
       <Text
@@ -251,24 +262,12 @@ function FormatToggle({
       >
         Format
       </Text>
-      {OVERRIDE_OPTIONS.map((opt) => {
-        const selected =
-          active === opt.format ||
-          (opt.format === "json" && active === "json-string");
-        return (
-          <Button
-            key={opt.format}
-            size="2xs"
-            variant={selected ? "solid" : "ghost"}
-            colorPalette={selected ? "blue" : undefined}
-            onClick={() => onChange(opt.format)}
-            paddingX={2}
-            fontWeight="medium"
-          >
-            {opt.label}
-          </Button>
-        );
-      })}
+      <FormatSelect
+        value={value}
+        onChange={onChange}
+        options={OVERRIDE_OPTIONS}
+        ariaLabel="Attribute value format"
+      />
     </HStack>
   );
 }

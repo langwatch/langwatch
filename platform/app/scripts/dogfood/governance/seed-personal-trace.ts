@@ -5,7 +5,7 @@
  * OTLP/HTTP traces payload directly to the personal project's
  * `/api/otel/v1/traces` endpoint using the project's apiKey. Lands
  * one trace in trace_summaries scoped to the personal projectId
- * within the existing receiver auth + reactor pipeline.
+ * within the existing receiver auth + subscriber pipeline.
  *
  * Use case: B6.2 modal callsite QA needs at least one clickable
  * trace row in /me/traces; spinning up the gateway + a working
@@ -64,7 +64,7 @@ function nowNs(): string {
 /**
  * Minimal OTLP/HTTP traces payload (proto JSON shape) carrying one
  * span. The receiver translates this into a stored_spans row +
- * trace_summaries fold + reactor pipeline. We don't need a chat
+ * trace_summaries fold + subscriber pipeline. We don't need a chat
  * payload — a generic instrumented span is enough to show up in
  * the trace explorer.
  */

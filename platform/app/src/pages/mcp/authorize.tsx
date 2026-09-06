@@ -12,10 +12,8 @@ import { useEffect, useState } from "react";
 import { isAllowedRedirectScheme } from "~/mcp/redirectSchemes";
 import { useSession } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  DashboardLayout,
-  ProjectSelector,
-} from "../../components/DashboardLayout";
+import { DashboardLayout } from "../../components/DashboardLayout";
+import { ProjectSelector } from "../../components/ProjectSelector";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
@@ -59,7 +57,6 @@ export default function McpAuthorize() {
       title: "Authorization failed",
       description: message,
       type: "error",
-      meta: { closable: true },
     });
     setIsSubmitting(false);
   };

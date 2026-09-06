@@ -26,7 +26,10 @@ vi.mock("~/optimization_studio/server/loadDatasets", () => ({
   loadDatasets: (event: unknown) => Promise.resolve(event),
 }));
 
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
+
+wireDefaultTestApp();
 
 describe("Workflows REST API", () => {
   let testApiKey: string;
@@ -448,7 +451,15 @@ describe("Workflows REST API", () => {
 
       /** @scenario "The latest committed version is evaluated by default" */
       it("evaluates the latest committed version by default", async () => {
-        await createVersion("1", entryDsl());
+        // "Latest" is createdAt-ordered at millisecond precision; two
+        // back-to-back creates can land in the same millisecond, making the
+        // winner arbitrary. Real commits are never simultaneous, so the
+        // fixture says so explicitly.
+        const v1 = await createVersion("1", entryDsl());
+        await prisma.workflowVersion.update({
+          where: { id: v1.id, projectId: testProjectId },
+          data: { createdAt: new Date(Date.now() - 60_000) },
+        });
         const v2 = await createVersion("2", entryDsl());
 
         const res = await postEvaluate(

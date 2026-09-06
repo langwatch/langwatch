@@ -259,6 +259,20 @@ export const ATTR_KEYS = {
   // character- and duration-priced audio models bill by.
   GEN_AI_USAGE_INPUT_CHARS: "gen_ai.usage.input_chars",
   GEN_AI_USAGE_AUDIO_SECONDS: "gen_ai.usage.audio_seconds",
+  // Audio token counts, which audio-native models bill several times above
+  // text ($32 per million against $4 on gpt-realtime). Emitted DISJOINT from
+  // the input/output token attributes, the same exclusive convention as the
+  // cache buckets, so each token prices once.
+  GEN_AI_USAGE_INPUT_AUDIO_TOKENS: "gen_ai.usage.input_audio_tokens",
+  GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS: "gen_ai.usage.output_audio_tokens",
+  // Image token counts on the gateway's image_generation / image_edit spans,
+  // which the token-billed image models price far above text ($30 to $40 per
+  // million output image tokens on gpt-image). Emitted DISJOINT from the
+  // input/output token attributes, so each token prices once. The image
+  // count is observability only and prices nothing.
+  GEN_AI_USAGE_INPUT_IMAGE_TOKENS: "gen_ai.usage.input_image_tokens",
+  GEN_AI_USAGE_OUTPUT_IMAGE_TOKENS: "gen_ai.usage.output_image_tokens",
+  GEN_AI_USAGE_IMAGE_COUNT: "gen_ai.usage.image_count",
 
   // Set by an extractor on a span whose token usage is a redundant copy of
   // another span's (e.g. codex emits one turn-rollup span AND a lower-level

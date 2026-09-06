@@ -369,8 +369,8 @@ describe("ES pipeline metrics", () => {
     });
   });
 
-  describe("when reactor metrics are recorded", () => {
-    it("increments reactor total with correct labels", async () => {
+  describe("when subscriber metrics are recorded", () => {
+    it("increments subscriber total with correct labels", async () => {
       incrementEsReactorTotal(
         "test-pipeline",
         "evaluationTrigger",
@@ -383,7 +383,7 @@ describe("ES pipeline metrics", () => {
       expect(lines).toContain('status="completed"');
     });
 
-    it("records reactor duration with correct labels", async () => {
+    it("records subscriber duration with correct labels", async () => {
       observeEsReactorDuration("test-pipeline", "evaluationTrigger", 150.0);
 
       const lines = await register.getSingleMetricAsString(

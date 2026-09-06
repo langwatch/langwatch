@@ -12,7 +12,13 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -171,6 +177,22 @@ const headingFor = (label: string) =>
   screen
     .getByRole("button", { name: `Sort by ${label}` })
     .closest("th") as HTMLElement;
+
+/**
+ * Waits until the period popover is off the screen.
+ *
+ * The popover holds one button per preset, and the trigger takes the name of
+ * the preset that was picked, so while the popover is still on screen that
+ * name is on screen twice and a query by name finds two buttons. Picking an
+ * entry closes the popover, but its content stays on screen for one more
+ * animation frame, and `user.click` returns before that frame. Waiting for the
+ * popover to go is what leaves one button for the next query to name.
+ */
+async function periodPopoverClosed() {
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+}
 
 /** What a case may pin about a row's money, and what is derived from it. */
 type CostOverrides = {
@@ -390,8 +412,6 @@ describe("the personal Pull Requests table", () => {
       expect(
         screen.getByText("Link sessions to pull requests"),
       ).toBeInTheDocument();
-      // Session counts read in full; token counts step up a tier.
-      expect(screen.getByText("6")).toBeInTheDocument();
       expect(screen.getByText("10.0K")).toBeInTheDocument();
       expect(screen.getByText("$12.50")).toBeInTheDocument();
     });
@@ -783,28 +803,11 @@ describe("the personal Pull Requests table", () => {
     });
   });
 
-  describe("given a row whose contributors and models are known", () => {
-    /** @scenario "A row names who worked on the pull request" */
-    it("names the contributors and the models behind the counts", async () => {
+  describe("given a row whose models are known", () => {
+    it("names the leading model and how many others rode along", () => {
       pinUsage({
         rows: [
           mappedRow({
-            contributorsSummary: [
-              {
-                contributorLabel: "Riley Chase",
-                projectId: "project-1",
-                projectSlug: "riley-personal",
-                contributorIsProject: false,
-                sessionsCount: 2,
-              },
-              {
-                contributorLabel: "Gateway",
-                projectId: "project-2",
-                projectSlug: "gateway",
-                contributorIsProject: true,
-                sessionsCount: 1,
-              },
-            ],
             modelBreakdown: [
               { model: "claude-fable-5", totalTokens: 8_000, costUsd: 10 },
               { model: "gpt-5-mini", totalTokens: 2_000, costUsd: 2.5 },
@@ -814,16 +817,9 @@ describe("the personal Pull Requests table", () => {
         unlinked: [],
         connection: { connected: true, installUrl: INSTALL_URL },
       });
-      const user = userEvent.setup();
       renderTable();
 
       expect(screen.getByText("claude-fable-5 +1")).toBeInTheDocument();
-
-      await user.hover(screen.getByText("6"));
-      expect(
-        await screen.findByText("Riley Chase: 2 sessions"),
-      ).toBeInTheDocument();
-      expect(await screen.findByText("Gateway: 1 session")).toBeInTheDocument();
     });
   });
 
@@ -931,12 +927,14 @@ describe("the personal Pull Requests table", () => {
 
       await user.click(screen.getByRole("button", { name: /all time/i }));
       await user.click(await screen.findByText("Last 7 days"));
+      await periodPopoverClosed();
       expect(
         screen.queryByText("Untouched for a month"),
       ).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /last 7 days/i }));
       await user.click(await screen.findByRole("button", { name: "All time" }));
+      await periodPopoverClosed();
 
       expect(screen.getByText("Untouched for a month")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /all time/i })).toBeVisible();

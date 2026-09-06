@@ -7,7 +7,7 @@
  * or the CI service container), a real StoredObjectsService backed by a
  * LocalFilesystemDriver on a per-test temp dir, the real event_log repository,
  * and the real evaluation_runs repository. No boundary under test is mocked -
- * only `getClickHouseClientForProject` is wired to the test client so the
+ * only `getClickHouseClientForTenant` is wired to the test client so the
  * stored-objects repository routes to the same database.
  *
  * Covers the feature-file scenarios:
@@ -69,7 +69,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async () => {
   );
   return {
     ...actual,
-    getClickHouseClientForProject: vi.fn(),
+    getClickHouseClientForTenant: vi.fn(),
   };
 });
 
@@ -166,10 +166,12 @@ beforeAll(async () => {
   // than resolving a client, so the fixture has to provide one.
   installClickHouseTestApp({ resolveClient: async () => ch });
   vi.mocked(
-    clickhouseClientModule.getClickHouseClientForProject,
+    clickhouseClientModule.getClickHouseClientForTenant,
   ).mockResolvedValue(ch);
 
-  evalRepo = new EvaluationRunClickHouseRepository(async () => ch);
+  evalRepo = new EvaluationRunClickHouseRepository({
+    resolveClient: async () => ch,
+  });
   eventRepo = new EventRepositoryClickHouse(async () => ch);
 
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "eval-offload-int-"));
@@ -322,7 +324,7 @@ describe("evaluation inputs offload (integration)", () => {
 
       // The v1 read service resolves the marker at the read boundary. Inject
       // the same stored-objects service the write used (its client is the test
-      // client via the getClickHouseClientForProject mock).
+      // client via the getClickHouseClientForTenant mock).
       // The repository is injected so the read goes through the same test
       // client the write used. The fixture App resolves one too, but the
       // injected dependency path is the one this asserts on.

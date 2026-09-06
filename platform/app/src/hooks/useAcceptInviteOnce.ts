@@ -120,7 +120,6 @@ export function useAcceptInviteOnce({
         title: "Invite Accepted",
         description: `You have successfully accepted the invite for ${data.invite.organization.name}.`,
         type: "success",
-        meta: { closable: true },
         duration: 5000,
       });
 

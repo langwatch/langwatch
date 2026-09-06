@@ -62,9 +62,9 @@ function emptyContent({
   }
   if (activeLensId === "conversations") {
     return {
-      title: "No sessions to show",
+      title: "No conversations to show",
       description:
-        "A session is every trace from one conversation, rolled up together. They appear here once your integration links related traces into a conversation.",
+        "A conversation gathers every trace of one exchange, so you can review a whole piece of work end to end instead of a trace at a time. They appear here once your traces carry a conversation identifier.",
     };
   }
   if (hasFilters) {

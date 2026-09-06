@@ -4,18 +4,24 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { formatDurationSeconds } from "~/components/me/duration";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import {
   formatCost,
   formatDuration,
   formatTokens,
 } from "../../../utils/formatters";
-import { findCacheRebuilds } from "../sessionView/tokenTimeline";
+import {
+  type CacheRebuildEvent,
+  findCacheRebuilds,
+} from "../sessionView/tokenTimeline";
 import { toolResultBodyToString } from "../transcript";
+import { classifyPromptText } from "./injectedNotice";
 import {
   CLAUDE_MARK_GRADIENT,
   TERMINAL_FONT_STACK,
@@ -23,6 +29,7 @@ import {
 } from "./palette";
 import { SyntaxHighlightedCode } from "./SyntaxHighlightedCode";
 import type { SessionBanner } from "./sessionBanner";
+import type { TurnDivider } from "./sessionScrollback";
 import { TerminalDiff } from "./TerminalDiff";
 import { TerminalOutput } from "./TerminalOutput";
 import { TerminalPatch } from "./TerminalPatch";
@@ -33,6 +40,11 @@ import {
   toolPrimaryArg,
 } from "./terminalSession";
 import { parsePatchHunks, type TerminalToolSpan } from "./toolSpans";
+import {
+  CONVERSATION_TURN_CAP,
+  type EarlierTotals,
+  type ScrollbackStatus,
+} from "./useSessionScrollback";
 
 /** What actually ran, keyed by the tool span's OWN id (matches `entry.spanId`). */
 export type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;
@@ -72,6 +84,19 @@ const MARK_ROWS = [" ▐▛███▜▌", "▝▜█████▛▘", "  �
 
 /** How close to the true bottom counts as "at the bottom", in pixels. */
 const NEAR_BOTTOM_PX = 32;
+
+/**
+ * How much loaded session the view keeps above the reader, in viewports. The
+ * view opens pinned to the session's latest line, so this buffer is what fills
+ * the screen with the turns before it on open, and what keeps a short turn
+ * from visibly loading in front of the reader on the way up: the next turn is
+ * already asked for while the top is still this far away.
+ */
+const PRELOAD_VIEWPORTS = 2;
+
+function preloadThresholdPx(el: HTMLElement): number {
+  return el.clientHeight * PRELOAD_VIEWPORTS;
+}
 
 /**
  * Context-size bands for the "heatmap" note — a growing context costs more
@@ -121,11 +146,69 @@ type ContextMarker =
  * single turn. Dead sites always show — `findCacheRebuilds` is already
  * gated to genuine rebuilds (≥1000 tokens, ≥50% of the prior context), so
  * it doesn't need the same restraint.
+ *
+ * A crossing is a comparison against the call BEFORE it. While earlier turns
+ * are still unloaded, the band state at the walk's start is unknown, and a
+ * note drawn from a guess gets redrawn when the truth arrives: the note the
+ * reader was looking at vanishes and the transcript under it shifts by a
+ * line. So until the first loaded call that carries a band, `historyComplete:
+ * false` suppresses the note — loading history can then only add lines above
+ * the reader, never remove one below them.
  */
-function buildContextMarkers(
-  entries: TranscriptEntry[],
-  visibleIndices: readonly number[],
-): Map<number, ContextMarker[]> {
+/**
+ * The size band the walk believes the session is in. `known` says whether that
+ * belief is the truth rather than a guess: a call with no band leaves it as it
+ * was, since the sticky label above it could have been anything.
+ */
+type BandState = { label: string | null; known: boolean };
+
+/**
+ * The notes one model call contributes, and the band state after it.
+ */
+function markersForModelCall({
+  entry,
+  rebuild,
+  band: bandState,
+}: {
+  entry: Extract<TranscriptEntry, { kind: "model_call" }>;
+  rebuild: CacheRebuildEvent | undefined;
+  band: BandState;
+}): { markers: ContextMarker[]; band: BandState } {
+  const markers: ContextMarker[] = [];
+  if (rebuild) {
+    markers.push({
+      kind: "deadSite",
+      atMs: entry.atMs,
+      cacheCreationTokens: rebuild.cacheCreationTokens,
+      previousContextTokens: rebuild.previousContextTokens,
+    });
+  }
+
+  const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
+  const band = contextHeatBand(contextTokens);
+  if (!band) return { markers, band: bandState };
+
+  if (bandState.known && band.label !== bandState.label) {
+    markers.push({
+      kind: "heat",
+      atMs: entry.atMs,
+      contextTokens,
+      color: band.color,
+      label: band.label,
+    });
+  }
+  return { markers, band: { label: band.label, known: true } };
+}
+
+function buildContextMarkers({
+  entries,
+  visibleIndices,
+  historyComplete,
+}: {
+  entries: TranscriptEntry[];
+  visibleIndices: readonly number[];
+  historyComplete: boolean;
+}): Map<number, ContextMarker[]> {
   const visibleSet = new Set(visibleIndices);
   const rebuildsByAtMs = new Map(
     findCacheRebuilds(entries).map((rebuild) => [rebuild.atMs, rebuild]),
@@ -133,32 +216,17 @@ function buildContextMarkers(
 
   const markers = new Map<number, ContextMarker[]>();
   let pending: ContextMarker[] = [];
-  let lastBandLabel: string | null = null;
+  let band: BandState = { label: null, known: historyComplete };
 
   entries.forEach((entry, fullIndex) => {
     if (entry.kind === "model_call") {
-      const rebuild = rebuildsByAtMs.get(entry.atMs);
-      if (rebuild) {
-        pending.push({
-          kind: "deadSite",
-          atMs: entry.atMs,
-          cacheCreationTokens: rebuild.cacheCreationTokens,
-          previousContextTokens: rebuild.previousContextTokens,
-        });
-      }
-
-      const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
-      const band = contextHeatBand(contextTokens);
-      if (band && band.label !== lastBandLabel) {
-        pending.push({
-          kind: "heat",
-          atMs: entry.atMs,
-          contextTokens,
-          color: band.color,
-          label: band.label,
-        });
-      }
-      lastBandLabel = band?.label ?? lastBandLabel;
+      const step = markersForModelCall({
+        entry,
+        rebuild: rebuildsByAtMs.get(entry.atMs),
+        band,
+      });
+      pending.push(...step.markers);
+      band = step.band;
       return;
     }
 
@@ -169,6 +237,88 @@ function buildContextMarkers(
   });
 
   return markers;
+}
+
+/**
+ * A turn can open on entries that render nothing (a `model_call` carries
+ * economics only), and a divider drawn at an index that never reaches the
+ * screen is a boundary the reader never sees. Each one moves down to the first
+ * entry that does render, exactly as {@link buildContextMarkers} does with its
+ * pending notes.
+ */
+function forwardDividersToVisible({
+  turnDividers,
+  entries,
+  visibleIndices,
+}: {
+  turnDividers: ReadonlyMap<number, TurnDivider> | undefined;
+  entries: TranscriptEntry[];
+  visibleIndices: readonly number[];
+}): Map<number, TurnDivider> | null {
+  if (!turnDividers || turnDividers.size === 0) return null;
+
+  const visibleSet = new Set(visibleIndices);
+  const forwarded = new Map<number, TurnDivider>();
+  let pending: TurnDivider | null = null;
+
+  entries.forEach((_, fullIndex) => {
+    pending = turnDividers.get(fullIndex) ?? pending;
+    if (pending !== null && visibleSet.has(fullIndex)) {
+      forwarded.set(fullIndex, pending);
+      pending = null;
+    }
+  });
+
+  return forwarded;
+}
+
+/**
+ * A row the screen holds still across a commit, and where it sat under the top
+ * edge. Following it is what keeps the reader's eyes on the same line while
+ * history stacks up above them.
+ *
+ * Held by the row's own key rather than its index, since a prepend shifts every
+ * index down by the number of entries that arrived. A view drawn without
+ * `rowKeys` has no stable row identity and takes no anchor at all.
+ */
+interface ScrollAnchor {
+  rowKey: string;
+  offsetFromTop: number;
+}
+
+/** The row carrying this key, wherever its index moved to. */
+function findRow(
+  rows: ReadonlyMap<number, HTMLDivElement>,
+  rowKey: string,
+): HTMLDivElement | undefined {
+  for (const node of rows.values()) {
+    if (node.dataset.rowKey === rowKey) return node;
+  }
+  return undefined;
+}
+
+/**
+ * Which beat is at the bottom of the viewport, read back off the DOM. Rows are
+ * laid out in order, so the last one whose top has not scrolled past the
+ * bottom edge is the one in view there, and that is the beat the bottom bar's
+ * running totals report.
+ */
+function trackedIndexAt({
+  rows,
+  visibleIndices,
+  viewportBottom,
+}: {
+  rows: ReadonlyMap<number, HTMLDivElement>;
+  visibleIndices: readonly number[];
+  viewportBottom: number;
+}): number {
+  let best = visibleIndices[0] ?? -1;
+  for (const fullIndex of visibleIndices) {
+    const node = rows.get(fullIndex);
+    if (!node || node.offsetTop > viewportBottom) break;
+    best = fullIndex;
+  }
+  return best;
 }
 
 interface TerminalViewProps {
@@ -185,6 +335,38 @@ interface TerminalViewProps {
   banner?: SessionBanner;
   /** The trace's name, shown in the bottom bar where Claude Code shows its input. */
   sessionName?: string | null;
+  /**
+   * A stable identity per entry, parallel to `entries`. Without it rows are
+   * keyed by position, which is only safe while nothing is ever prepended.
+   */
+  rowKeys?: string[];
+  /** Where one turn of the session ends and the next begins, by entry index. */
+  turnDividers?: ReadonlyMap<number, TurnDivider>;
+  /** The rest of the session, above the turn on screen. Absent: this turn is all there is. */
+  scrollback?: {
+    status: ScrollbackStatus;
+    earlierCount: number;
+    onLoadEarlier: () => void;
+  };
+  /**
+   * Totals of the session's turns above the loaded window, so the bottom bar
+   * reports the whole session up to the reader's position rather than only
+   * what happens to be loaded. Loading a turn moves its share from here into
+   * the entries, so the sum never moves. A null field means one of those turns
+   * does not carry it, so the bar leaves that stat out.
+   */
+  earlierTotals?: EarlierTotals | null;
+  /** When the session's first turn started — anchors the bar's elapsed time. */
+  sessionStartAtMs?: number | null;
+  /**
+   * The whole session's cost off the session row — the same figure the Usage
+   * tab shows. The bar states it beside the running figure ("$12.34 of
+   * $210.00") so the position-scoped number can never pass for the session
+   * total: the replay walks backward only and its turn list is bounded, so
+   * the running figure alone understates any session bigger than what
+   * loaded.
+   */
+  sessionCostUsd?: number | null;
 }
 
 /**
@@ -209,8 +391,17 @@ export const TerminalView = memo(function TerminalView({
   toolSpans = NO_TOOL_SPANS,
   banner,
   sessionName,
+  rowKeys,
+  turnDividers,
+  scrollback,
+  earlierTotals,
+  sessionStartAtMs,
+  sessionCostUsd,
 }: TerminalViewProps) {
-  const timeline = useMemo(() => buildEntryTimeline(entries), [entries]);
+  const timeline = useMemo(
+    () => buildEntryTimeline({ entries, startAtMs: sessionStartAtMs }),
+    [entries, sessionStartAtMs],
+  );
 
   // `model_call` entries carry economics for the HUD but render nothing.
   const visibleIndices = useMemo(
@@ -222,12 +413,26 @@ export const TerminalView = memo(function TerminalView({
     [entries],
   );
   const lastVisibleFullIndex = visibleIndices[visibleIndices.length - 1] ?? -1;
+  // The session's history is fully on screen when there is no scrollback at
+  // all, when the walk reached the first turn, or when there never was a
+  // session behind this trace. "available"/"loading"/"error"/"unavailable"
+  // all mean calls exist above the window that the markers cannot see.
+  const scrollbackStatus = scrollback?.status;
+  const historyComplete =
+    scrollbackStatus === undefined ||
+    scrollbackStatus === "hidden" ||
+    scrollbackStatus === "start";
   const contextMarkers = useMemo(
-    () => buildContextMarkers(entries, visibleIndices),
-    [entries, visibleIndices],
+    () => buildContextMarkers({ entries, visibleIndices, historyComplete }),
+    [entries, visibleIndices, historyComplete],
+  );
+  const dividersAtVisibleIndex = useMemo(
+    () => forwardDividersToVisible({ turnDividers, entries, visibleIndices }),
+    [turnDividers, entries, visibleIndices],
   );
 
   const screenRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const setRowRef = useCallback(
     (fullIndex: number, node: HTMLDivElement | null) => {
@@ -241,35 +446,167 @@ export const TerminalView = memo(function TerminalView({
   const [trackedFullIndex, setTrackedFullIndex] =
     useState(lastVisibleFullIndex);
 
-  // Re-derive which beat is "at the bottom of the viewport" from the DOM —
-  // rows are laid out in order, so the last one whose top hasn't scrolled
-  // past the viewport's bottom edge is the one currently in view there.
+  // What the screen measured last, so a prepend can be told apart from a
+  // resize and undone by exactly the height that arrived above the reader.
+  const prevFirstEntryRef = useRef<TranscriptEntry | undefined>(entries[0]);
+  const lastScrollHeightRef = useRef(0);
+  const prependedThisCommitRef = useRef(false);
+  // Armed until the view has opened at the session's latest line: consumed by
+  // the first commit whose content can actually scroll, or by the reader
+  // taking over the scroll themselves.
+  const pinToEndArmedRef = useRef(true);
+
+  const onLoadEarlier = scrollback?.onLoadEarlier;
+  const requestEarlierTurn = useCallback(() => {
+    if (scrollbackStatus === "available") onLoadEarlier?.();
+  }, [scrollbackStatus, onLoadEarlier]);
+
+  // The row the reader is on, and how far it sat below the top of the screen.
+  const anchorRef = useRef<ScrollAnchor | null>(null);
+  const rememberAnchor = useCallback(
+    ({ el, fullIndex }: { el: HTMLDivElement; fullIndex: number }) => {
+      const node = rowRefs.current.get(fullIndex);
+      const rowKey = node?.dataset.rowKey;
+      anchorRef.current =
+        node && rowKey
+          ? { rowKey, offsetFromTop: node.offsetTop - el.scrollTop }
+          : null;
+    },
+    [],
+  );
+
+  // Put the reader back on the row they were on. What arrived ABOVE it moved
+  // its offset, so following the row moves the screen by exactly that; what
+  // arrived BELOW it left the offset alone, so following the row ignores it.
+  // The screen's own height delta cannot tell the two apart and would move the
+  // reader by both, which is what a completed history does when it lets the
+  // walk draw a context note further down the transcript.
+  const restoreAnchor = useCallback((el: HTMLDivElement) => {
+    const anchor = anchorRef.current;
+    const node = anchor ? findRow(rowRefs.current, anchor.rowKey) : undefined;
+    if (anchor && node) {
+      el.scrollTop = node.offsetTop - anchor.offsetFromTop;
+      return;
+    }
+    // No row to follow: the reader has not taken the screen over yet, so what
+    // arrived is above them by definition.
+    el.scrollTop += el.scrollHeight - lastScrollHeightRef.current;
+  }, []);
+
   const syncToScroll = useCallback(() => {
     const el = screenRef.current;
     if (!el) return;
-    const viewportBottom = el.scrollTop + el.clientHeight;
+    const scrollTop = el.scrollTop;
+    const viewportBottom = scrollTop + el.clientHeight;
     setIsAtBottom(el.scrollHeight - viewportBottom <= NEAR_BOTTOM_PX);
+    lastScrollHeightRef.current = el.scrollHeight;
 
-    let best = visibleIndices[0] ?? -1;
-    for (const fullIndex of visibleIndices) {
-      const node = rowRefs.current.get(fullIndex);
-      if (!node || node.offsetTop > viewportBottom) break;
-      best = fullIndex;
+    // Keep the buffer of earlier turns ahead of the reader: the next one is
+    // asked for while the top is still a couple of viewports away, so a short
+    // turn never visibly loads in front of them.
+    if (scrollTop < preloadThresholdPx(el)) requestEarlierTurn();
+
+    const tracked = trackedIndexAt({
+      rows: rowRefs.current,
+      visibleIndices,
+      viewportBottom,
+    });
+    setTrackedFullIndex(tracked);
+    rememberAnchor({ el, fullIndex: tracked });
+  }, [visibleIndices, requestEarlierTurn, rememberAnchor]);
+
+  // The reader scrolling is the reader taking control of the position: from
+  // here on the view never jumps them to the end on its own.
+  const onScroll = useCallback(() => {
+    pinToEndArmedRef.current = false;
+    syncToScroll();
+  }, [syncToScroll]);
+
+  // Earlier turns arrived ABOVE the reader: everything they were looking at
+  // just moved down by the height of what was inserted, so the screen moves
+  // with it and the row under their eyes stays under their eyes. The same
+  // correction covers the top slot swapping what it offers (its affordance
+  // appearing once the turn list resolves, the banner landing at the session
+  // start): those commits change nothing below the first row either. Runs
+  // before the follow-the-tail effect below, which must not fire on a prepend
+  // commit.
+  const prevStatusRef = useRef(scrollbackStatus);
+  useLayoutEffect(() => {
+    const previousFirst = prevFirstEntryRef.current;
+    const nextFirst = entries[0];
+    const prepended =
+      previousFirst !== undefined &&
+      nextFirst !== previousFirst &&
+      entries.includes(previousFirst);
+    prependedThisCommitRef.current = prepended;
+    prevFirstEntryRef.current = nextFirst;
+    const statusChanged = prevStatusRef.current !== scrollbackStatus;
+    prevStatusRef.current = scrollbackStatus;
+
+    const el = screenRef.current;
+    if (!el) return;
+    if (prepended || (statusChanged && nextFirst === previousFirst)) {
+      restoreAnchor(el);
     }
-    setTrackedFullIndex(best);
-  }, [visibleIndices]);
+    lastScrollHeightRef.current = el.scrollHeight;
+  }, [entries, scrollbackStatus, restoreAnchor]);
+
+  // Opening a session lands at its latest line, the way a terminal sits at
+  // its prompt. Runs after the correction above, so during the initial fill
+  // each prepend leaves the view pinned at the end while history stacks up
+  // above it. Armed until the first commit that can actually scroll, because
+  // the first commits may be shorter than the screen; disarmed for good once
+  // the reader scrolls themselves.
+  useLayoutEffect(() => {
+    if (!pinToEndArmedRef.current) return;
+    const el = screenRef.current;
+    if (!el || entries.length === 0) return;
+    if (el.scrollHeight > el.clientHeight) {
+      pinToEndArmedRef.current = false;
+      el.scrollTop = el.scrollHeight;
+      lastScrollHeightRef.current = el.scrollHeight;
+    }
+  }, [entries]);
+
+  // Fill and keep the buffer without waiting for a gesture: on open this is
+  // what loads the turns before the opened one until the screen (plus the
+  // preload buffer) is full, and after each landed turn it asks for the next
+  // one while the reader is still near the top.
+  useEffect(() => {
+    const el = screenRef.current;
+    if (!el) return;
+    if (el.scrollTop < preloadThresholdPx(el)) requestEarlierTurn();
+  }, [entries, requestEarlierTurn]);
+
+  // A row can change height outside any commit of this component: a tool
+  // output expanded, syntax highlighting landing, an image loading. The
+  // prepend correction above subtracts the last measured height, so the
+  // measurement has to follow those silent changes or the next prepend would
+  // move the screen by the wrong amount.
+  useEffect(() => {
+    const el = screenRef.current;
+    const content = contentRef.current;
+    if (!el || !content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      lastScrollHeightRef.current = el.scrollHeight;
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
 
   // New output arrives while the reader is caught up at the bottom: follow
   // it down, the way a real terminal does. Scrolled up reading history: stay
   // put — the point of the affordance below is that this is a choice, not
-  // something the screen fights you on.
+  // something the screen fights you on. History arriving at the TOP is never
+  // new output, however short the turn is and however close to the bottom the
+  // reader happens to be sitting.
   const prevEntryCountRef = useRef(entries.length);
   useEffect(() => {
     const hasGrown = entries.length > prevEntryCountRef.current;
     prevEntryCountRef.current = entries.length;
     const el = screenRef.current;
     if (!el) return;
-    if (hasGrown && isAtBottom) {
+    if (hasGrown && isAtBottom && !prependedThisCommitRef.current) {
       el.scrollTop = el.scrollHeight;
     }
     syncToScroll();
@@ -286,10 +623,16 @@ export const TerminalView = memo(function TerminalView({
     setTrackedFullIndex(lastVisibleFullIndex);
   }, [lastVisibleFullIndex]);
 
-  const point = timeline[trackedFullIndex];
+  // Where the bottom bar counts to. Normally the beat the reader is on; when
+  // the transcript renders nothing at all (an agent that reported economics
+  // and no content), there is no row to stand on and the bar counts the whole
+  // loaded window, which is what the message on screen calls real.
+  const barIndex =
+    visibleIndices.length === 0 ? entries.length - 1 : trackedFullIndex;
+  const point = timeline[barIndex];
   const modelAtScroll = useMemo(
-    () => modelAt(entries, trackedFullIndex) ?? banner?.model ?? null,
-    [entries, trackedFullIndex, banner?.model],
+    () => modelAt({ entries, fullIndex: barIndex }) ?? banner?.model ?? null,
+    [entries, barIndex, banner?.model],
   );
   // An agent that reported usage but no content has entries and no beats to
   // walk, which read as "step 1/0" while standing on nothing.
@@ -323,40 +666,64 @@ export const TerminalView = memo(function TerminalView({
     >
       <Box
         ref={screenRef}
+        data-testid="terminal-screen"
         flex={1}
         minHeight={0}
         overflow="auto"
+        // A column flex box so the content's `marginTop: auto` can push a
+        // session shorter than the screen down against the bottom bar, where
+        // a terminal keeps its last line.
+        display="flex"
+        flexDirection="column"
         bg={TERMINAL_TOKENS.screenBg}
         color={TERMINAL_TOKENS.screenFg}
         paddingX={3}
         paddingY={2}
-        onScroll={syncToScroll}
+        onScroll={onScroll}
+        // Anchoring is the browser holding a row still by moving `scrollTop`
+        // itself, which would fight the prepend correction above and land the
+        // reader somewhere neither of them intended.
+        style={{ overflowAnchor: "none" }}
       >
-        <VStack align="stretch" gap={2.5}>
-          <TerminalBanner banner={banner} />
+        <VStack ref={contentRef} align="stretch" gap={2.5} marginTop="auto">
+          <ScrollbackTop
+            banner={banner}
+            scrollback={scrollback}
+            loadedTurnCount={(turnDividers?.size ?? 0) + 1}
+          />
           {visibleIndices.length === 0 && entries.length > 0 && (
             <Text {...CELL} color={TERMINAL_TOKENS.faint}>
               This agent reported tokens and timing only: its telemetry carries
               no conversation content to replay. The totals below are real.
             </Text>
           )}
-          {visibleIndices.map((fullIndex) => (
-            <Fragment key={fullIndex}>
-              {contextMarkers.get(fullIndex)?.map((marker, i) => (
-                <ContextMarkerLine
-                  key={`${fullIndex}-marker-${i}`}
-                  marker={marker}
-                />
-              ))}
-              <Box
-                ref={(node: HTMLDivElement | null) =>
-                  setRowRef(fullIndex, node)
-                }
-              >
-                <EntryLine entry={entries[fullIndex]!} toolSpans={toolSpans} />
-              </Box>
-            </Fragment>
-          ))}
+          {visibleIndices.map((fullIndex) => {
+            const divider = dividersAtVisibleIndex?.get(fullIndex);
+            return (
+              <Fragment key={rowKeys?.[fullIndex] ?? fullIndex}>
+                {divider && <TurnDividerLine divider={divider} />}
+                {contextMarkers.get(fullIndex)?.map((marker, i) => (
+                  <ContextMarkerLine
+                    key={`${fullIndex}-marker-${i}`}
+                    marker={marker}
+                  />
+                ))}
+                <Box
+                  // The row's identity, which the scroll anchor follows across
+                  // a prepend that moves every index down.
+                  data-row-key={rowKeys?.[fullIndex]}
+                  ref={(node: HTMLDivElement | null) =>
+                    setRowRef(fullIndex, node)
+                  }
+                >
+                  <EntryLine
+                    entry={entries[fullIndex]!}
+                    toolSpans={toolSpans}
+                  />
+                </Box>
+              </Fragment>
+            );
+          })}
         </VStack>
       </Box>
 
@@ -365,8 +732,15 @@ export const TerminalView = memo(function TerminalView({
       <StatusLine
         stepCount={visibleIndices.length}
         currentStep={trackedStep}
-        tokens={point?.cumulativeTokens ?? 0}
-        costUsd={point?.cumulativeCostUsd ?? 0}
+        tokens={sessionTotal({
+          earlier: earlierTotals?.tokens,
+          loaded: point?.cumulativeTokens ?? 0,
+        })}
+        costUsd={sessionTotal({
+          earlier: earlierTotals?.costUsd,
+          loaded: point?.cumulativeCostUsd ?? 0,
+        })}
+        sessionCostUsd={sessionCostUsd ?? null}
         elapsedMs={point?.elapsedMs ?? 0}
         model={modelAtScroll}
         sessionName={sessionName}
@@ -375,8 +749,35 @@ export const TerminalView = memo(function TerminalView({
   );
 });
 
+/**
+ * The session's running total at the reader's position: what the turns above
+ * the loaded window carry, plus what the loaded window has counted so far.
+ *
+ * `undefined` for the earlier part means there is no session above the loaded
+ * window, so the loaded total IS the session total. `null` means the turns are
+ * there but one of them does not carry this field, so the session total cannot
+ * be stated and the bar drops the stat rather than reporting a sum that is
+ * short by the turns it could not read.
+ */
+function sessionTotal({
+  earlier,
+  loaded,
+}: {
+  earlier: number | null | undefined;
+  loaded: number;
+}): number | null {
+  if (earlier === null) return null;
+  return (earlier ?? 0) + loaded;
+}
+
 /** The nearest model in effect at or before `fullIndex` — sessions mostly use one. */
-function modelAt(entries: TranscriptEntry[], fullIndex: number): string | null {
+function modelAt({
+  entries,
+  fullIndex,
+}: {
+  entries: TranscriptEntry[];
+  fullIndex: number;
+}): string | null {
   for (let i = fullIndex; i >= 0; i--) {
     const entry = entries[i];
     if (entry?.kind === "model_call" && entry.model) return entry.model;
@@ -609,6 +1010,180 @@ function TerminalBanner({ banner }: { banner?: SessionBanner }) {
   );
 }
 
+/**
+ * The top of the screen. The banner IS the session-start marker: it is what
+ * the agent printed when the session began, so it belongs above the FIRST
+ * turn and nowhere else. While earlier turns are still out there, the same
+ * slot carries the affordance that reaches them.
+ */
+function ScrollbackTop({
+  banner,
+  scrollback,
+  loadedTurnCount,
+}: {
+  banner?: SessionBanner;
+  scrollback?: TerminalViewProps["scrollback"];
+  /** How many turns of the session are on screen right now. */
+  loadedTurnCount: number;
+}) {
+  const status = scrollback?.status ?? "hidden";
+
+  // Whether anything sits above this turn is not yet known: showing the
+  // banner or an affordance now would swap it out a beat later.
+  if (status === "pending") return null;
+
+  if (status === "hidden" || status === "start") {
+    return (
+      <>
+        <TerminalBanner banner={banner} />
+        {/* Only worth saying once the reader has walked back far enough to
+            wonder whether there is more above them. */}
+        {status === "start" && loadedTurnCount > 1 && (
+          <RuleLine label="session start" />
+        )}
+      </>
+    );
+  }
+
+  if (status === "loading") {
+    return (
+      <ScrollbackLine
+        glyph="⋯"
+        color={TERMINAL_TOKENS.faint}
+        text="loading earlier turn"
+      />
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <ScrollbackButton
+        glyph={GLYPH.note}
+        color={TERMINAL_TOKENS.red}
+        text="couldn't load the earlier turn, click to retry"
+        onClick={() => scrollback?.onLoadEarlier()}
+      />
+    );
+  }
+
+  if (status === "unavailable") {
+    return (
+      <ScrollbackLine
+        glyph={GLYPH.note}
+        color={TERMINAL_TOKENS.faint}
+        text={`earlier turns unavailable, this session is longer than the ${CONVERSATION_TURN_CAP} turns the view can walk`}
+      />
+    );
+  }
+
+  const count = scrollback?.earlierCount ?? 0;
+  return (
+    <ScrollbackButton
+      glyph="↑"
+      color={TERMINAL_TOKENS.faint}
+      text={`${count} earlier ${count === 1 ? "turn" : "turns"}, scroll to load`}
+      onClick={() => scrollback?.onLoadEarlier()}
+    />
+  );
+}
+
+/** A single faint row, the same shape the session's other notes use. */
+function ScrollbackLine({
+  glyph,
+  color,
+  text,
+}: {
+  glyph: string;
+  color: string;
+  text: string;
+}) {
+  return (
+    <HStack align="flex-start" gap={2}>
+      <Glyph char={glyph} color={color} />
+      <Text {...CELL} color={color} flex={1} minWidth={0}>
+        {text}
+      </Text>
+    </HStack>
+  );
+}
+
+/** The same row, when it is something the reader can act on. */
+function ScrollbackButton({
+  glyph,
+  color,
+  text,
+  onClick,
+}: {
+  glyph: string;
+  color: string;
+  text: string;
+  onClick: () => void;
+}) {
+  return (
+    <HStack asChild align="flex-start" gap={2} cursor="pointer" width="100%">
+      {/* A real button rather than a clickable row: it has to answer Enter
+          and Space too. Typed explicitly so a surrounding form cannot make
+          it a submit. */}
+      <button type="button" onClick={onClick}>
+        <Glyph char={glyph} color={color} />
+        <Text {...CELL} color={color} flex={1} minWidth={0} textAlign="start">
+          {text}
+        </Text>
+      </button>
+    </HStack>
+  );
+}
+
+/**
+ * The boundary between two turns of the session: a faint rule with its label
+ * inline, drawn with the rule glyph itself and clipped by overflow, the same
+ * idiom {@link AsciiBox} uses, rather than a CSS border standing in for one.
+ */
+function TurnDividerLine({ divider }: { divider: TurnDivider }) {
+  return (
+    <RuleLine
+      label={`turn ${divider.turnNumber}/${divider.turnCount} · ${clockTime(
+        divider.atMs,
+      )}`}
+    />
+  );
+}
+
+function RuleLine({ label }: { label: string }) {
+  const rule = "─".repeat(400);
+  return (
+    <HStack
+      gap={2}
+      align="center"
+      overflow="hidden"
+      color={TERMINAL_TOKENS.faint}
+    >
+      <Text {...CELL} flexShrink={0} aria-hidden>
+        ──
+      </Text>
+      <Text {...CELL} flexShrink={0}>
+        {label}
+      </Text>
+      <Text
+        {...CELL}
+        flex={1}
+        overflow="hidden"
+        whiteSpace="nowrap"
+        aria-hidden
+      >
+        {rule}
+      </Text>
+    </HStack>
+  );
+}
+
+/** Local wall-clock time, the way a terminal stamps its own output. */
+function clockTime(atMs: number): string {
+  const at = new Date(atMs);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`;
+}
+
 /** The startup mark, drawn from its precomputed per-row color segments. */
 function AgentMark({ mark }: { mark: MarkSpec }) {
   return (
@@ -665,7 +1240,7 @@ function EntryLine({
     case "system_prompt":
       return <SystemContextLine text={entry.text} chars={entry.chars} />;
     case "user_prompt":
-      return <PromptLine text={entry.text} />;
+      return <UserMessage text={entry.text} />;
     case "assistant_message":
       return <AssistantLine text={entry.text} />;
     case "tool":
@@ -726,6 +1301,78 @@ function SystemContextLine({ text, chars }: { text: string; chars: number }) {
             minWidth={0}
           >
             {text}
+          </Text>
+        </HStack>
+      )}
+    </VStack>
+  );
+}
+
+/**
+ * The user's turn, which is not always the user. Agents inject blocks the human
+ * never typed into this same message (a monitor firing, a hook's reminder, a
+ * queued task notification), and behind the prompt caret those read as the
+ * reader's own words. Each one is drawn as a note about the session instead,
+ * and only what the human actually wrote keeps the caret.
+ */
+function UserMessage({ text }: { text: string | null }) {
+  const { notices, remainder } = classifyPromptText(text ?? "");
+  if (notices.length === 0) return <PromptLine text={text} />;
+  return (
+    <VStack align="stretch" gap={2}>
+      {notices.map((notice, index) => (
+        <NotificationLine
+          key={`${index}-${notice.label}`}
+          label={notice.label}
+          body={notice.body}
+        />
+      ))}
+      {remainder !== null && <PromptLine text={remainder} />}
+    </VStack>
+  );
+}
+
+/**
+ * One injected block, collapsed to its own line. Same family as
+ * {@link SystemContextLine}, because it is the same kind of thing: context the
+ * session carried that the reader may or may not want to open.
+ */
+function NotificationLine({ label, body }: { label: string; body: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <VStack align="stretch" gap={0.5}>
+      <HStack asChild align="flex-start" gap={2} cursor="pointer" width="100%">
+        {/* A real button, typed explicitly: inside a form, the default `type`
+            would be submit. */}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+        >
+          <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
+          <Text
+            {...CELL}
+            color={TERMINAL_TOKENS.faint}
+            flex={1}
+            minWidth={0}
+            textAlign="start"
+          >
+            {label} {expanded ? "(click to collapse)" : "(click to expand)"}
+          </Text>
+        </button>
+      </HStack>
+      {expanded && (
+        <HStack align="flex-start" gap={2}>
+          <Glyph char={GLYPH.elbow} color={TERMINAL_TOKENS.faint} />
+          <Text
+            {...CELL}
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+            color={TERMINAL_TOKENS.faint}
+            flex={1}
+            minWidth={0}
+          >
+            {body}
           </Text>
         </HStack>
       )}
@@ -1095,18 +1742,23 @@ function StatusLine({
   currentStep,
   tokens,
   costUsd,
+  sessionCostUsd,
   elapsedMs,
   model,
   sessionName,
 }: {
   stepCount: number;
   currentStep: number;
-  tokens: number;
-  costUsd: number;
+  /** Null when the session total cannot be stated, which is not zero. */
+  tokens: number | null;
+  costUsd: number | null;
+  /** The whole session's cost off the session row; null when there is none. */
+  sessionCostUsd: number | null;
   elapsedMs: number;
   model?: string | null;
   sessionName?: string | null;
 }) {
+  const costLabel = statusLineCostLabel({ costUsd, sessionCostUsd });
   return (
     <VStack
       align="stretch"
@@ -1157,13 +1809,45 @@ function StatusLine({
         </HStack>
         <HStack gap={3} flexWrap="wrap" justify="flex-end">
           {model && <Stat label={model} />}
-          {elapsedMs > 0 && <Stat label={formatDuration(elapsedMs)} />}
-          {tokens > 0 && <Stat label={`${formatTokens(tokens)} tokens`} />}
-          {costUsd > 0 && <Stat label={formatCost(costUsd)} accent />}
+          {/* Session-scale time: the clock is anchored at the session's first
+              turn, so it runs into hours and reads as a person says it. */}
+          {elapsedMs > 0 && (
+            <Stat label={formatDurationSeconds(elapsedMs / 1000)} />
+          )}
+          {tokens !== null && tokens > 0 && (
+            <Stat label={`${formatTokens(tokens)} tokens`} />
+          )}
+          {costLabel !== null && <Stat label={costLabel} accent />}
         </HStack>
       </HStack>
     </VStack>
   );
+}
+
+/**
+ * The bar's cost stat: the running figure at the reader's position, and the
+ * session total beside it when the session holds more than the position
+ * covers. "$12.34 of $210.00" — the first number moves with the scroll, the
+ * second is the same figure the Usage tab shows. They fold from the same
+ * spans, so once everything is loaded and read to the end the two meet, and
+ * the suffix drops rather than stating "$210.00 of $210.00". Tiny fold
+ * rounding is not "more session", hence the cent of slack.
+ */
+export function statusLineCostLabel({
+  costUsd,
+  sessionCostUsd,
+}: {
+  costUsd: number | null;
+  sessionCostUsd: number | null;
+}): string | null {
+  const running = costUsd !== null && costUsd > 0 ? costUsd : null;
+  const session =
+    sessionCostUsd !== null && sessionCostUsd > 0 ? sessionCostUsd : null;
+  if (running === null) return session === null ? null : formatCost(session);
+  if (session === null || session <= running + 0.01) {
+    return formatCost(running);
+  }
+  return `${formatCost(running)} of ${formatCost(session)}`;
 }
 
 function Stat({ label, accent }: { label: string; accent?: boolean }) {

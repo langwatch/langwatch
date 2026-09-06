@@ -330,7 +330,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     expect(Number.parseFloat(before[0]!.spentUsd)).toBeCloseTo(42, 3);
 
     const ledgerBefore = await chRepo.recentEventsForBudget(
-      PROJECT_ID,
+      [PROJECT_ID],
       manual.id,
       10,
     );
@@ -358,7 +358,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     expect(Number.parseFloat(after[0]!.spentUsd)).toBe(0);
 
     const ledgerAfter = await chRepo.recentEventsForBudget(
-      PROJECT_ID,
+      [PROJECT_ID],
       manual.id,
       10,
     );

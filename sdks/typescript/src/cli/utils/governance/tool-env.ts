@@ -36,11 +36,11 @@ export interface ToolEnv {
  * gateway already captures every request + response server-side
  * (full I/O, exact cost). Injecting OTEL_* on top would make the
  * wrapped tool emit its own telemetry for the SAME calls = double
- * trace + double cost in /messages. The OTLP ingest path is for
+ * trace + double cost in /traces. The OTLP ingest path is for
  * users who can't go through the gateway at all (Claude Max
  * subscription, no swappable API key); they paste the OTEL env
  * block from the /me drawer manually. See
- * docs/ai-governance/track-your-claude-code-usage.mdx (Path A vs
+ * docs/coding-agents/claude-code-usage.mdx (Path A vs
  * Path B).
  */
 export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {

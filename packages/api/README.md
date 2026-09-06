@@ -260,6 +260,52 @@ v.sse(
 );
 ```
 
+## RPC endpoints
+
+`v.rpc()` registers an RPC-named endpoint: a dotted `<resource>.<verb>` path that mounts as a real POST. The name carries the verb, so the HTTP method never does. This is a **pilot on the `webhooks` family**, not the default for new services.
+
+> The ADR for this decision is not written yet, and the number it was drafted against (094) belongs to the simulation process-manager work. Until it exists, this section and `specs/api-reference/api-discovery.feature` are the record. Pick the number when writing it — not from `main` alone, since sibling branches claim numbers too. The four resource-REST management families stay as they are; use `v.get`/`v.post`/... unless you are extending `webhooks`.
+
+```ts
+v.rpc(
+  "/endpoints.rollSecret",
+  {
+    ...guard("webhookEndpoints:manage"),
+    input: z.object({ id: z.string() }),
+    output: endpointWithSecretSchema,
+    docs: { operationId: "rollWebhookEndpointSecret" },
+  },
+  async (_c, { input, app }) => app.endpoints.rollSecret({ id: input.id }),
+);
+```
+
+Three rules, all load-bearing:
+
+- **Every argument travels in the JSON body.** No path params, no query string — which is what puts zod on identifiers that a REST `:id` left unvalidated.
+- **An RPC with no required arguments declares no `input`**, and its handler ignores the body. The pipeline only installs the json validator when `input` is present, so a bodyless POST and a `{}` POST both succeed. Writing `input: z.object({}).optional()` instead reinstates the parse and rejects the bodyless call.
+- **Reads are POST too.** Uniform method is the point; it also forecloses HTTP caching, which is acceptable for an API-key-only management surface and would not be on a high-volume read surface.
+
+Two of those three are machine-checked, twice each — in the editor by the types on `v.rpc`, and at startup by `assertRpcPath` / `assertRpcConfig`. The name grammar and the no-`params`/`query` rule are the two; "reads are POST too" is a convention review has to hold, because nothing distinguishes a read from a write at registration.
+
+```text
+^/[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$   →  /endpoints.rollSecret   ✓
+                                                /endpoints/:id          ✗
+                                                /endpoints.Roll_Secret  ✗
+```
+
+```ts
+v.rpc("/endpoints.rollSecret", { input, output }, handler);        // ✓
+v.rpc("/endpoints", { output }, handler);                          // ✗ not assignable to
+                                                                   //   '"/endpoints" & RpcPathMustBeDottedLowerCamelCase'
+v.rpc("/endpoints.get", { params: idSchema, output }, handler);    // ✗ Type '...' is not assignable to type 'never'
+```
+
+The asserts are not redundant with the types. Types are erased, so they are what still holds for a JavaScript caller, for a config widened to `EndpointConfig` on its way through a helper, and for anything that arrived behind an `any`. `rpc-types.unit.test.ts` drives both statements from one table of names, so a change to either that forgets the other fails there.
+
+`isRpcPath` exports the same grammar for a consumer that has to recognise an RPC name after the fact rather than refuse one up front — the platform's discovery catalogue reads them back out of the published OpenAPI document. Ask it rather than writing a second regex that agrees until one of them changes.
+
+Versioning, forward-copying and withdrawal need no special handling: endpoint identity is `` `${method}:${path}` ``, so `post:/endpoints.create` is unique and `v.withdraw("post", "/endpoints.create")` works unmodified.
+
 ## Error handling
 
 Throw `HandledError` subclasses (from `@langwatch/handled-error`). The framework:

@@ -1,10 +1,15 @@
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 
 /**
- * One session as the pull-request rollup reads it: the numbers it adds up, and
- * the labels it groups by. No title, no file list, no transcript: this row
- * exists to be summed and grouped, and everything it does not carry is
- * something the usage response can never accidentally disclose.
+ * One session as the pull-request rollup reads it: the numbers it adds up, the
+ * labels it groups by, and the one-line title the agent generated for it. No
+ * file list and no transcript: this row exists to be summed, grouped and
+ * named, and everything it does not carry is something the usage response can
+ * never accidentally disclose.
+ *
+ * The title is conversation-derived content, so whether a reader gets to see
+ * it is decided at the read boundary against the protections of the project
+ * the session ran in, never here.
  */
 export interface CodingAgentBranchSessionRow {
   sessionId: string;
@@ -26,6 +31,14 @@ export interface CodingAgentBranchSessionRow {
   /** The AGENT's reported identity, not the LangWatch account. */
   userId: string;
   gitBranch: string;
+  /**
+   * Every branch the session drove, first seen first. Empty for a row folded
+   * before the column existed, where `gitBranch` is the whole of what is known;
+   * read both through `branchesOf` rather than either one alone.
+   */
+  gitBranches: string[];
+  /** The generated conversation title, empty when the agent never made one. */
+  title: string;
 }
 
 /**
@@ -124,6 +137,18 @@ export interface CodingAgentSessionRepository {
     branches: string[];
     startedAtFromMs: number;
   }): Promise<CodingAgentBranchSessionRow[]>;
+
+  /**
+   * The same rows as `listByRepositoryBranch`, fetched by session id instead
+   * of by repository: the read behind fact-stamp discovery, where a session's
+   * stamped rows name a repository its own row has since moved away from.
+   * `startedAtFromMs` is required for the same partition-pruning reason.
+   */
+  listBySessionIds(params: {
+    tenantIds: string[];
+    sessionIds: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]>;
 }
 
 /** No-op store for deployments without ClickHouse. */
@@ -150,6 +175,10 @@ export class NullCodingAgentSessionRepository
   }
 
   async listByRepositoryBranch(): Promise<CodingAgentBranchSessionRow[]> {
+    return [];
+  }
+
+  async listBySessionIds(): Promise<CodingAgentBranchSessionRow[]> {
     return [];
   }
 }

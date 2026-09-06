@@ -29,7 +29,7 @@ func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 			token := extractToken(r)
 			if token == "" {
 				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidAPIKey, herr.M{
-					"message": "missing API key; supply Authorization: Bearer <key>, x-api-key, or x-goog-api-key header",
+					"message": "missing API key; supply Authorization: Bearer <key>, x-api-key, x-goog-api-key, or xi-api-key header",
 				}))
 				return
 			}
@@ -166,6 +166,12 @@ func extractToken(r *http.Request) string {
 	// without changing its auth wiring; the VK secret slots into the same
 	// place the SDK would normally put a Google API key.
 	if k := r.Header.Get("X-Goog-Api-Key"); k != "" {
+		return strings.TrimSpace(k)
+	}
+	// xi-api-key — the ElevenLabs SDKs' auth header. The realtime session
+	// mint mirrors that vendor's own path, so an SDK reaches it by base URL
+	// alone; without this header it would also need its auth rewired.
+	if k := r.Header.Get("Xi-Api-Key"); k != "" {
 		return strings.TrimSpace(k)
 	}
 	return ""

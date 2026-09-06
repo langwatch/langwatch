@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { splitLangyCardFences } from "./fence";
+import { mightContainLangyCardFence, splitLangyCardFences } from "./fence";
 
 describe("splitLangyCardFences", () => {
   describe("given plain prose", () => {
@@ -107,6 +107,59 @@ describe("splitLangyCardFences", () => {
     it("keeps it as text", () => {
       const text = ["odd but fine:", "```", "still text"].join("\n");
       expect(splitLangyCardFences(text)).toEqual([{ type: "text", text }]);
+    });
+  });
+
+  describe("given an opening fence written loosely", () => {
+    it("opens a block for a space between the backticks and the tag", () => {
+      const text = ["``` langy-card", '{"kind": "stats"}', "```"].join("\n");
+      expect(splitLangyCardFences(text)).toEqual([
+        { type: "fence", raw: '{"kind": "stats"}', closed: true },
+      ]);
+    });
+
+    it("opens a block for an indented fence", () => {
+      const text = ["   ```langy-card", '{"kind": "stats"}', "```"].join("\n");
+      expect(splitLangyCardFences(text)).toEqual([
+        { type: "fence", raw: '{"kind": "stats"}', closed: true },
+      ]);
+    });
+  });
+});
+
+/**
+ * The pre-scan exists to let a fence-less stream skip the line scan, so the
+ * one thing it must never do is answer false for text the splitter would
+ * open a block in. A caller that guesses this with its own substring test
+ * misses the loose forms above and shows the reader a card's JSON as a code
+ * block, which is exactly what the gate was meant to be too cheap to get
+ * wrong.
+ */
+describe("mightContainLangyCardFence", () => {
+  const opensABlock = (text: string): boolean =>
+    splitLangyCardFences(text).some((segment) => segment.type === "fence");
+
+  describe("given text the splitter opens a block in", () => {
+    /** @scenario "The pre-scan accepts every opening the grammar accepts" */
+    it.each([
+      ["the plain form", "```langy-card"],
+      ["a space before the tag", "``` langy-card"],
+      ["a tab before the tag", "```\tlangy-card"],
+      ["an indented fence", "   ```langy-card"],
+      ["four backticks", "````langy-card"],
+      ["trailing space after the tag", "```langy-card "],
+    ])("answers true for %s", (_name, opening) => {
+      const text = [opening, '{"kind": "stats"}', "```"].join("\n");
+      expect(opensABlock(text)).toBe(true);
+      expect(mightContainLangyCardFence(text)).toBe(true);
+    });
+  });
+
+  describe("given text with no block in it", () => {
+    it("stays false for prose, so the fast path keeps paying", () => {
+      expect(mightContainLangyCardFence("no blocks here\n```json\n{}\n```")).toBe(
+        false,
+      );
     });
   });
 });

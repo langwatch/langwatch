@@ -60,7 +60,6 @@ export function CreateTeamDrawer({
               title: "Team created successfully",
               type: "success",
               duration: 5000,
-              meta: { closable: true },
             });
             closeDrawer();
           },
@@ -69,7 +68,6 @@ export function CreateTeamDrawer({
               title: "Failed to create team",
               type: "error",
               duration: 5000,
-              meta: { closable: true },
             });
           },
         },

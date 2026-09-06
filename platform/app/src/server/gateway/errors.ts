@@ -59,6 +59,38 @@ export class VirtualKeyNotFoundError extends HandledError {
   }
 }
 
+/**
+ * A key was written with an expiration date that had already passed.
+ *
+ * The key would be refused by the gateway on its first request, and nothing
+ * about that refusal would point back at the date the caller typed. Refusing
+ * at write time is the only moment the field is still on screen, so the
+ * failure names it: `meta.fieldErrors` carries the field the drawers paint
+ * the complaint under, both on the camel and the snake spelling, because the
+ * tRPC form and the REST body call it different things.
+ */
+export class VirtualKeyExpiryInPastError extends HandledError {
+  declare readonly code: "virtual_key_expiry_in_past";
+
+  constructor() {
+    super(
+      "virtual_key_expiry_in_past",
+      "The expiration date has already passed",
+      {
+        meta: {
+          fieldErrors: {
+            expiresAt: ["Pick a date in the future"],
+            expires_at: ["Pick a date in the future"],
+          },
+        },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "VirtualKeyExpiryInPastError";
+  }
+}
+
 /** A gateway budget the caller asked for isn't there. */
 export class GatewayBudgetNotFoundError extends HandledError {
   declare readonly code: "gateway_budget_not_found";

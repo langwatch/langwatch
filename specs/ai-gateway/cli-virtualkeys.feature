@@ -198,7 +198,7 @@ Feature: langwatch CLI — virtual-keys subcommands (multi-scope)
   Scenario: Get a VK's config
     Given I know the id of VK "prod-key"
     When I run `langwatch virtual-keys get prod-key`
-    Then stdout shows: id, name, environment, status, prefix, principal, scopes (formatted as `TYPE:id, …`), routing policy id (or `(default)`), created/last-used/revoked timestamps, view-in-UI link `/settings/gateway/virtual-keys/<id>`, and the config JSON
+    Then stdout shows: id, name, environment, status, prefix, principal, scopes (formatted as `TYPE:id, …`), routing policy id (or `(default)`), created/last-used/revoked timestamps, view-in-UI link `/gateway/virtual-keys/<id>`, and the config JSON
 
   # ============================================================================
   # Errors

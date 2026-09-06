@@ -119,6 +119,10 @@ const PUBLIC_TOKEN_ROLE_NAME = "local-dev-public-ingestion";
 
 const MODEL_DEFAULT_CONFIG_ID = "local-dev-model-default-config";
 
+/** The prompt tag `resolveLangyPrompt` reads by default. */
+const DEFAULT_PROMPT_TAG = "production";
+const DEFAULT_PROMPT_TAG_ID = "local-dev-prompt-tag-production";
+
 async function main() {
   // Prefer the haven-injected local credential (HAVEN_SEED_LANGWATCH_API_KEY); the
   // platform never carries LANGWATCH_API_KEY anymore, but keep it as a fallback for
@@ -153,6 +157,25 @@ async function main() {
       license: ENTERPRISE_LICENSE_KEY,
     },
     update: { license: ENTERPRISE_LICENSE_KEY },
+  });
+
+  // Prompt tags are org-defined, and `production` is the one
+  // `resolveLangyPrompt` reads by default — so without it `seed:langy-prompts`
+  // fails on a fresh stack with "Invalid tag", and every prompt seeded into a
+  // new database needs the tag created by hand first.
+  await prisma.promptTag.upsert({
+    where: {
+      organizationId_name: {
+        organizationId: organization.id,
+        name: DEFAULT_PROMPT_TAG,
+      },
+    },
+    create: {
+      id: DEFAULT_PROMPT_TAG_ID,
+      organizationId: organization.id,
+      name: DEFAULT_PROMPT_TAG,
+    },
+    update: {},
   });
 
   const team = await prisma.team.upsert({
@@ -214,11 +237,17 @@ async function main() {
     create: {
       userId: user.id,
       provider: "credential",
+      // better-auth 1.7 keys an account by `(issuer, accountId)`; the local
+      // credential provider's issuer is `local:credential`, not
+      // `local:oauth:credential`. Without it sign-in cannot find this row.
+      issuer: "local:credential",
       providerAccountId: user.id,
       type: "credentials",
       password: hashedPassword,
     },
-    update: { password: hashedPassword },
+    // Repeated on the update leg so a re-run also repairs a row seeded before
+    // the column existed.
+    update: { issuer: "local:credential", password: hashedPassword },
   });
 
   await prisma.organizationUser.upsert({
@@ -387,6 +416,7 @@ async function main() {
     await seedDemoPlatform({
       prisma,
       projectId: project.id,
+      organizationId: organization.id,
       userId: user.id,
     });
   }

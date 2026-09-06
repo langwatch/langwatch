@@ -1,17 +1,13 @@
-import {
-  Center,
-  EmptyState,
-  Grid,
-  Skeleton,
-  Spacer,
-  VStack,
-} from "@chakra-ui/react";
-import { Bot, Plus } from "lucide-react";
+import { Button, Grid, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { AgentCard } from "~/components/agents/AgentCard";
 import { CopyAgentDialog } from "~/components/agents/CopyAgentDialog";
+import { ConnectedAgentsSection } from "~/components/agents/connected/ConnectedAgentsSection";
+import type { ConnectedAgentView } from "~/components/agents/connected/connected-agent-rows";
 import { getAgentEditorDrawer } from "~/components/agents/getAgentEditorDrawer";
 import { PushToCopiesDialog } from "~/components/agents/PushToCopiesDialog";
+import { useAgentTestRun } from "~/components/agents/useAgentTestRun";
 import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -23,6 +19,9 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+
+/** How often the page reads presence again, in milliseconds. */
+const PRESENCE_REFRESH_MS = 5000;
 
 /**
  * Agents management page
@@ -36,6 +35,7 @@ function Page() {
   const { openDrawer } = useDrawer();
   const utils = api.useUtils();
   const router = useRouter();
+  const { testAgent } = useAgentTestRun({ projectId: project?.id ?? "" });
 
   // State for tracking which agent is being deleted
   const [agentToDelete, setAgentToDelete] = useState<TypedAgent | null>(null);
@@ -59,7 +59,6 @@ function Page() {
         title: "Agent updated",
         description: "Agent has been updated from source.",
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (error) =>
@@ -77,9 +76,11 @@ function Page() {
     [project?.id, syncFromSource],
   );
 
+  // Presence dies with the process that holds it, so the list is read again
+  // on a short clock: an agent that connects now appears without a reload.
   const agentsQuery = api.agents.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project },
+    { enabled: !!project, refetchInterval: PRESENCE_REFRESH_MS },
   );
 
   // Query related entities when delete dialog is open
@@ -107,7 +108,6 @@ function Page() {
           ? "Also deleted: 1 workflow"
           : undefined,
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (error) =>
@@ -146,7 +146,6 @@ function Page() {
             toaster.create({
               title: "Agent deleted",
               type: "success",
-              meta: { closable: true },
             });
           },
           onError: (error) =>
@@ -162,8 +161,13 @@ function Page() {
     }
   };
 
-  const hasAgents = agentsQuery.data && agentsQuery.data.length > 0;
-  const showEmptyState = !agentsQuery.isLoading && !hasAgents;
+  const connectedAgents = (agentsQuery.data ?? []).filter(
+    (agent) => agent.type === "connected",
+  ) as unknown as ConnectedAgentView[];
+  const otherAgents = (agentsQuery.data ?? []).filter(
+    (agent) => agent.type !== "connected",
+  );
+  const hasAgents = connectedAgents.length + otherAgents.length > 0;
 
   return (
     <DashboardLayout>
@@ -177,27 +181,21 @@ function Page() {
         </PageLayout.HeaderButton>
       </PageLayout.Header>
 
-      {showEmptyState ? (
-        <Center flex={1} padding={6}>
-          <EmptyState.Root>
-            <EmptyState.Content>
-              <EmptyState.Indicator>
-                <Bot size={32} />
-              </EmptyState.Indicator>
-              <EmptyState.Title>No agents yet</EmptyState.Title>
-              <EmptyState.Description>
-                Create reusable agents for your evaluations.
-              </EmptyState.Description>
-              <PageLayout.HeaderButton
-                onClick={() => openDrawer("agentTypeSelector")}
-              >
-                <Plus size={16} /> Create your first agent
-              </PageLayout.HeaderButton>
-            </EmptyState.Content>
-          </EmptyState.Root>
-        </Center>
-      ) : (
-        <VStack gap={6} width="full" align="start" padding={6}>
+      <VStack gap={6} width="full" align="stretch" padding={6}>
+        {!hasAgents && !agentsQuery.isLoading ? (
+          <VStack gap={3} paddingY={16}>
+            <Text color="fg.muted" fontSize="sm">
+              No agents yet
+            </Text>
+            <Button
+              size="sm"
+              onClick={() => openDrawer("agentTypeSelector")}
+              data-testid="agents-empty-new-agent"
+            >
+              <Plus size={16} /> New Agent
+            </Button>
+          </VStack>
+        ) : (
           <Grid
             templateColumns="repeat(auto-fill, minmax(300px, 1fr))"
             gap={4}
@@ -205,15 +203,34 @@ function Page() {
           >
             {agentsQuery.isLoading &&
               Array.from({ length: 3 }).map((_, index) => (
-                <Skeleton key={index} height="100px" borderRadius="md" />
+                <Skeleton key={index} height="142px" borderRadius="md" />
               ))}
-            {agentsQuery.data?.map((agent) => (
+            <ConnectedAgentsSection
+              agents={connectedAgents}
+              onOpen={(agent) =>
+                openDrawer("agentConnectedDetail", {
+                  urlParams: { agentId: agent.id },
+                })
+              }
+              onDelete={(agent) =>
+                setAgentToDelete(
+                  agentsQuery.data?.find((row) => row.id === agent.id) ?? null,
+                )
+              }
+              onTest={(agent) => testAgent(agent.id)}
+            />
+            {otherAgents.map((agent) => (
               <AgentCard
                 key={agent.id}
                 agent={agent}
                 onClick={() => handleEditAgent(agent)}
                 onEdit={() => handleEditAgent(agent)}
                 onDelete={() => handleDeleteAgent(agent)}
+                onTest={
+                  agent.type === "signature"
+                    ? undefined
+                    : () => testAgent(agent.id)
+                }
                 onOpenWorkflow={
                   agent.type === "workflow"
                     ? () => handleOpenWorkflow(agent)
@@ -234,8 +251,8 @@ function Page() {
               />
             ))}
           </Grid>
-        </VStack>
-      )}
+        )}
+      </VStack>
 
       {/* Drawers are rendered by CurrentDrawer in DashboardLayout */}
 

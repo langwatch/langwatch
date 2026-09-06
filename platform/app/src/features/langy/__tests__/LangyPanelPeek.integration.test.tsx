@@ -192,6 +192,20 @@ vi.mock("~/utils/api", () => ({
       onConversationUpdate: {
         useSubscription: () => undefined,
       },
+      warmWorker: {
+        useMutation: () => ({ mutate: () => undefined }),
+      },
+      // ADR-129: the panel reads the shared folder and answers a
+      // question card's wait; neither is what these tests drive.
+      getLocalWorkspace: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      localRecord: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      answerQuestion: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false }),
+      },
       stopTurn: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
@@ -218,6 +232,12 @@ vi.mock("~/utils/api", () => ({
       },
     },
     modelProvider: {
+      setRoleAssignmentForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
+      setFeatureOverrideForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       getResolvedDefault: {
         useQuery: () => ({
           data: resolvedDefaultRef.current.data,

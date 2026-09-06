@@ -3,11 +3,15 @@
  *
  * Displays the suite name, scenario/target counts, and estimated job count
  * so the user can review what will be executed before confirming.
+ *
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 
 import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Crosshair, FileText, Repeat } from "lucide-react";
+import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { Dialog } from "../ui/dialog";
+import { RunParameterFields } from "./RunParameterFields";
 
 export function SuiteRunConfirmationDialog({
   open,
@@ -18,6 +22,9 @@ export function SuiteRunConfirmationDialog({
   targetCount,
   repeatCount = 1,
   isLoading = false,
+  parameters = [],
+  parameterValues = {},
+  onParameterChange,
 }: {
   open: boolean;
   onClose: () => void;
@@ -27,8 +34,21 @@ export function SuiteRunConfirmationDialog({
   targetCount: number;
   repeatCount?: number;
   isLoading?: boolean;
+  /** Every parameter the scenarios in this run declare, between them. */
+  parameters?: ScenarioParameterDefinition[];
+  /** The value offered for each name, keyed by name. */
+  parameterValues?: Record<string, string>;
+  onParameterChange?: (name: string, value: string) => void;
 }) {
   const estimatedJobs = scenarioCount * targetCount * repeatCount;
+
+  // A secret has no default and the run refuses to start without it, so the
+  // dialog holds the run here rather than sending it to be rejected.
+  const missingSecrets = parameters.some(
+    (parameter) =>
+      parameter.secret === true &&
+      (parameterValues[parameter.name] ?? "") === "",
+  );
 
   return (
     <Dialog.Root
@@ -91,6 +111,15 @@ export function SuiteRunConfirmationDialog({
                 </VStack>
               )}
             </HStack>
+
+            {parameters.length > 0 && (
+              <RunParameterFields
+                parameters={parameters}
+                values={parameterValues}
+                onChange={onParameterChange}
+                disabled={isLoading}
+              />
+            )}
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
@@ -110,7 +139,7 @@ export function SuiteRunConfirmationDialog({
               e.stopPropagation();
               onConfirm();
             }}
-            disabled={isLoading}
+            disabled={isLoading || missingSecrets}
           >
             {isLoading ? (
               <Spinner size="sm" />

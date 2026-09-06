@@ -1,14 +1,15 @@
+import type { LedgerActor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import type {
   Group,
   GroupMembership,
-  RoleBinding,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role";
 import { RoleNotAssignableError } from "~/server/role/errors";
+import { RoleBindingAlreadyExistsError } from "~/server/role-bindings/errors";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import {
@@ -22,6 +23,7 @@ import {
   UserNotInOrganizationError,
 } from "./errors";
 import type {
+  CreatedBinding,
   GroupRepository,
   GroupWithDetails,
   GroupWithMembers,
@@ -144,9 +146,11 @@ export class GroupRestService {
     name,
     bindings,
     memberIds,
+    actor,
   }: {
     organizationId: string;
     name: string;
+    actor: LedgerActor;
     bindings?: Array<{
       role: TeamUserRole;
       customRoleId?: string;
@@ -206,6 +210,7 @@ export class GroupRestService {
       group: { id: groupId, organizationId, name, slug },
       bindings: bindingInputs,
       memberIds: memberIds ?? [],
+      actor,
     });
   }
 
@@ -239,21 +244,34 @@ export class GroupRestService {
   async delete({
     id,
     organizationId,
+    actor,
+    shouldBypassDirectoryManagement = false,
   }: {
     id: string;
     organizationId: string;
+    actor: LedgerActor;
+    /**
+     * Whether a directory-owned group may be deleted anyway. The API surface
+     * says no: a caller automating against it cannot be asked. The settings
+     * page says yes, because it asks first — its confirmation reads "This
+     * SCIM group will be re-created by your IdP on next sync. Delete anyway?"
+     * and the admin answers it.
+     */
+    shouldBypassDirectoryManagement?: boolean;
   }): Promise<void> {
     const group = await this.repo.findGroupOnly({ id, organizationId });
     if (!group) throw new GroupNotFoundError();
     // Deleting is the most destructive thing that can happen to a group the
     // directory owns: every grant it carries goes with it, and the next sync
     // pushes the group back without them.
-    if (group.scimSource) {
+    if (group.scimSource && !shouldBypassDirectoryManagement) {
       throw new ScimManagedGroupError(id);
     }
 
+    // The grants go first, so the deny is enforced before the group row
+    // that carries them disappears.
+    await this.repo.deleteAllBindings({ groupId: id, organizationId, actor });
     await this.repo.deleteAllMemberships({ groupId: id });
-    await this.repo.deleteAllBindings({ groupId: id });
     await this.repo.delete({ id, organizationId });
   }
 
@@ -324,8 +342,14 @@ export class GroupRestService {
     await this.repo.removeMember({ groupId, userId });
   }
 
-  async getBindings({ groupId }: { groupId: string }) {
-    return this.repo.findBindings({ groupId });
+  async getBindings({
+    organizationId,
+    groupId,
+  }: {
+    organizationId: string;
+    groupId: string;
+  }) {
+    return this.repo.findBindings({ organizationId, groupId });
   }
 
   async addBinding({
@@ -335,6 +359,7 @@ export class GroupRestService {
     customRoleId,
     scopeType,
     scopeId,
+    actor,
   }: {
     groupId: string;
     organizationId: string;
@@ -342,7 +367,8 @@ export class GroupRestService {
     customRoleId?: string;
     scopeType: RoleBindingScopeType;
     scopeId: string;
-  }): Promise<RoleBinding> {
+    actor: LedgerActor;
+  }): Promise<CreatedBinding> {
     const group = await this.repo.findGroupOnly({
       id: groupId,
       organizationId,
@@ -366,24 +392,49 @@ export class GroupRestService {
     });
     await this.assertNoPersonalTeamScope([{ scopeType, scopeId }]);
 
-    return this.repo.createBinding({
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      groupId,
-      role,
-      customRoleId:
-        role === ("CUSTOM" as TeamUserRole) ? (customRoleId ?? null) : null,
-      scopeType,
-      scopeId,
-    });
+    try {
+      return await this.repo.createBinding({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId,
+          groupId,
+          role,
+          customRoleId:
+            role === ("CUSTOM" as TeamUserRole) ? (customRoleId ?? null) : null,
+          scopeType,
+          scopeId,
+        },
+        actor,
+      });
+    } catch (error) {
+      // The repository rejects duplicate identities rather than skipping
+      // them: a skipped duplicate would return a binding id for a row that
+      // was never created. Matched by CODE, never `instanceof`: the ledger's
+      // `DuplicateBindingError` arrives from `@langwatch/authz-server`, and
+      // identity stops being reliable the moment that package is bundled or
+      // serialised separately (the rule its declaration states).
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code: unknown }).code === "role_binding_already_exists"
+      ) {
+        throw new RoleBindingAlreadyExistsError({
+          meta: { scopeType, scopeId },
+        });
+      }
+      throw error;
+    }
   }
 
   async removeBinding({
     bindingId,
     organizationId,
+    actor,
   }: {
     bindingId: string;
     organizationId: string;
+    actor: LedgerActor;
   }): Promise<void> {
     const binding = await this.repo.findBinding({
       id: bindingId,
@@ -392,6 +443,6 @@ export class GroupRestService {
     if (!binding) throw new BindingNotFoundError();
     await this.assertNoPersonalTeamScope([binding]);
 
-    await this.repo.deleteBinding({ id: bindingId });
+    await this.repo.deleteBinding({ id: bindingId, organizationId, actor });
   }
 }

@@ -25,6 +25,7 @@ function payloadItem(
     errorCount: 0,
     warningCount: 0,
     totalSpans: 400,
+    lastTraceId: "trace-latest",
     input: "make the tests pass",
     output: "all green",
     codingAgent: null,
@@ -76,6 +77,8 @@ describe("given a session group payload from the sessions procedure", () => {
         lastMessage: "make the tests pass",
         lastOutput: "all green",
         worstStatus: "ok",
+        // What a click on the row opens: the conversation's newest trace.
+        lastTraceId: "trace-latest",
       });
       // Turn rows load lazily on expand; the totals never depend on them.
       expect(group.traces).toEqual([]);

@@ -7,6 +7,7 @@
 
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { resolveVerdictLabel } from "~/experiments-v3/utils/normalizeComparison";
+import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
 
 /**
@@ -84,6 +85,13 @@ export type BatchResultRow = {
 export type BatchTargetColumn = {
   id: string;
   name: string;
+  /**
+   * The name to show the reader. Two targets on one board can carry the
+   * identical stored `name`, so this adds the same "(1)" / "(2)" suffix the
+   * workbench adds, over the columns this run renders. Optional, so callers
+   * that build a column literal fall back to `name`.
+   */
+  displayName?: string;
   type: "prompt" | "agent" | "evaluator" | "custom" | "legacy";
   /** For prompts: the config ID */
   promptId?: string | null;
@@ -149,6 +157,20 @@ export type BatchComparisonVerdict = {
    * unresolved label is no evidence and the row must be skipped entirely.
    */
   isUnresolved?: boolean;
+  /**
+   * True when the row produced no verdict at all: the judge's two
+   * swap-and-reconcile passes named different winners, it answered with no
+   * winner in it, or it declined before calling because the row had fewer
+   * than two candidate outputs. A third reason for `winnerId === null`, and
+   * the one the reader most often paid for: `reasoning` holds the judge's own
+   * account of it, and showing that is the whole point of carrying these rows.
+   *
+   * Every consumer that reads `winnerId === null` as "tie" has to exclude
+   * these first. An unsettled row is not 0.5/0.5 evidence and not half a win;
+   * it is a row the run declined to draw a conclusion from, so it belongs in
+   * neither the win-rate chart's Tie bar nor the ranking.
+   */
+  isUnsettled?: boolean;
 };
 
 /** One candidate participating in a comparison, in the order the judge saw them. */
@@ -270,10 +292,47 @@ export const transformBatchEvaluationData = (
   );
 
   if (targets && targets.length > 0) {
-    // V3 style with explicit targets
-    targetColumns = targets.map((target) => ({
+    // V3 style with explicit targets.
+    //
+    // The run's Targets snapshot lists the whole board, so a run scoped to one
+    // column still declares its siblings. Render only the targets this run
+    // holds data for; a target with no rows shows an empty column with no
+    // output, no latency and no score. When the run holds data for none of
+    // them (it has just started, or its rows carry no target id), keep the
+    // declared list so the table is not empty.
+    const targetIdsWithData = new Set<string>();
+    for (const entry of dataset) {
+      if (entry.targetId) targetIdsWithData.add(entry.targetId);
+    }
+    for (const evaluation of evaluations) {
+      if (evaluation.targetId) targetIdsWithData.add(evaluation.targetId);
+      // A comparison wired as its own column-target hosts a verdict rather
+      // than an output, so it owns no dataset row. Its target id is the
+      // evaluator id.
+      targetIdsWithData.add(evaluation.evaluator);
+    }
+    const withData = targets.filter((target) =>
+      targetIdsWithData.has(target.id),
+    );
+    const runTargets = withData.length > 0 ? withData : targets;
+
+    // Number the whole declared board, not only the targets this run holds
+    // rows for. Compare mode merges columns by target id across runs, so a
+    // label worked out from one run's subset would move: the same target reads
+    // `classifier (2)` beside a sibling and plain `classifier` in a run that
+    // covers it alone.
+    const boardNames = disambiguateNames(targets.map((t) => t.name));
+    const displayNameById = new Map(
+      targets.map((target, index) => [
+        target.id,
+        boardNames[index] ?? target.name,
+      ]),
+    );
+
+    targetColumns = runTargets.map((target) => ({
       id: target.id,
       name: target.name,
+      displayName: displayNameById.get(target.id) ?? target.name,
       type:
         target.type === "custom"
           ? "custom"
@@ -670,23 +729,33 @@ const detectComparisonColumns = (
         rawLabel: string;
         reasoning: string | null;
         candidateIds: string[];
+        /**
+         * The comparison produced no verdict for the row. Carried straight
+         * through to the verdict's own `isUnsettled`, whose doc names the
+         * causes.
+         */
+        isUnsettled?: boolean;
       }>;
     }
   >();
 
   for (const ev of evaluations) {
     const isForced = forcedComparisonEvaluatorIds.has(ev.evaluator);
-    if (ev.status !== "processed") {
-      // A comparison the judge RAN and declined to call. Recorded before the
-      // early return discards it, because it is the explanation for a graph
-      // that later fails to connect — see `rowsWithoutVerdict`.
-      if (ev.status === "skipped" && (isComparisonEvaluator(ev) || isForced)) {
-        const skippedKey = ev.name
-          ? `${ev.evaluator}::${ev.name}`
-          : ev.evaluator;
-        skippedByKey.set(skippedKey, (skippedByKey.get(skippedKey) ?? 0) + 1);
-      }
+    const isSkippedComparison =
+      ev.status === "skipped" && (isComparisonEvaluator(ev) || isForced);
+    if (ev.status !== "processed" && !isSkippedComparison) {
       continue;
+    }
+    if (isSkippedComparison) {
+      // A comparison that reached no verdict: the row had too few outputs to
+      // judge, or it was judged and the answer could not be used. Counted for
+      // `rowsWithoutVerdict`, which is the explanation for a win graph that
+      // later fails to connect, AND carried through as a verdict of its own so
+      // the row can say which of those happened instead of showing a bare
+      // dash. Every one of them carries that explanation, and the ones that
+      // reached the judge were paid for.
+      const skippedKey = ev.name ? `${ev.evaluator}::${ev.name}` : ev.evaluator;
+      skippedByKey.set(skippedKey, (skippedByKey.get(skippedKey) ?? 0) + 1);
     }
     const hasLabel = typeof ev.label === "string" && ev.label.length > 0;
     if (!hasLabel && !isComparisonEvaluator(ev) && !isForced) continue;
@@ -736,6 +805,19 @@ const detectComparisonColumns = (
       if (!bucket.candidateIds.includes(resolved)) {
         bucket.candidateIds.push(resolved);
       }
+    }
+
+    if (isSkippedComparison) {
+      // No label to resolve and none coming: this row's whole content is the
+      // judge's account of why it reached no verdict.
+      bucket.verdicts.push({
+        rowIndex: ev.index,
+        rawLabel: "",
+        reasoning: ev.details ?? null,
+        candidateIds: rowCandidateIds,
+        isUnsettled: true,
+      });
+      continue;
     }
 
     if (!hasLabel) continue;
@@ -789,7 +871,23 @@ const detectComparisonColumns = (
       rawLabel,
       reasoning,
       candidateIds,
+      isUnsettled,
     } of bucket.verdicts) {
+      if (isUnsettled) {
+        // Never runs through the label resolution below: there is no label,
+        // and the two states it can produce (tie, unresolved) are both claims
+        // about an answer this row never got.
+        verdictsByRow[rowIndex] = {
+          rowIndex,
+          winnerId: null,
+          reasoning,
+          winnerOutput: null,
+          candidateIds,
+          isUnsettled: true,
+        };
+        continue;
+      }
+
       let winnerId: string | null;
       // Distinguished from a genuinely unresolved label below — both leave
       // winnerId null for every existing (bar-chart) consumer, but a real

@@ -28,9 +28,6 @@ export const useOptimizationExecution = () => {
         title: "Studio is not connected yet",
         type: "error",
         duration: 5000,
-        meta: {
-          closable: true,
-        },
       });
       return false;
     }
@@ -57,9 +54,6 @@ export const useOptimizationExecution = () => {
         } optimization execution`,
         type: "error",
         duration: 5000,
-        meta: {
-          closable: true,
-        },
       });
     }
   }, [triggerTimeout, setOptimizationState, getWorkflow]);

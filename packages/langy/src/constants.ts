@@ -43,6 +43,17 @@ export const LANGY_CONVERSATION_EVENT_TYPES = {
   // Distinct from METADATA_UPDATED (a manual, sticky rename): a title_generated
   // event updates the title ONLY when it has not been set by the user.
   TITLE_GENERATED: "lw.langy_conversation.conversation_title_generated",
+  // ADR-129 local control: the developer's own folder, shared with one
+  // conversation through `langwatch langy --share-control`.
+  LOCAL_CONTROL_REQUESTED: "lw.langy_conversation.local_control_requested",
+  LOCAL_WORKSPACE_CONNECTED: "lw.langy_conversation.local_workspace_connected",
+  LOCAL_WORKSPACE_DISCONNECTED:
+    "lw.langy_conversation.local_workspace_disconnected",
+  LOCAL_POLICY_CHANGED: "lw.langy_conversation.local_policy_changed",
+  // ADR-129 user waits: one primitive behind the permission card and the
+  // question card. The turn stays in flight while the card waits for an answer.
+  USER_WAIT_STARTED: "lw.langy_conversation.user_wait_started",
+  USER_WAIT_ENDED: "lw.langy_conversation.user_wait_ended",
 } as const;
 
 export const LANGY_CONVERSATION_PROCESSING_EVENT_TYPES = [
@@ -62,6 +73,12 @@ export const LANGY_CONVERSATION_PROCESSING_EVENT_TYPES = [
   LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
   LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED,
   LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED,
+  LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED,
+  LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED,
+  LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED,
+  LANGY_CONVERSATION_EVENT_TYPES.LOCAL_POLICY_CHANGED,
+  LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED,
+  LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED,
 ] as const;
 
 export type LangyConversationProcessingEventType =
@@ -113,6 +130,14 @@ export const LANGY_CONVERSATION_COMMAND_TYPES = {
   CONSUME_TURN_HANDOFF: "lw.langy_conversation.consume_turn_handoff",
   // Dispatched by the process-outbox title effect (1:1 → title_generated).
   GENERATE_TITLE: "lw.langy_conversation.generate_conversation_title",
+  // ADR-129 local control and user waits.
+  REQUEST_LOCAL_CONTROL: "lw.langy_conversation.request_local_control",
+  CONNECT_LOCAL_WORKSPACE: "lw.langy_conversation.connect_local_workspace",
+  DISCONNECT_LOCAL_WORKSPACE:
+    "lw.langy_conversation.disconnect_local_workspace",
+  CHANGE_LOCAL_POLICY: "lw.langy_conversation.change_local_policy",
+  START_USER_WAIT: "lw.langy_conversation.start_user_wait",
+  END_USER_WAIT: "lw.langy_conversation.end_user_wait",
 } as const;
 
 export const LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES = [
@@ -132,6 +157,12 @@ export const LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES = [
   LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TURN_HANDOFF,
   LANGY_CONVERSATION_COMMAND_TYPES.CONSUME_TURN_HANDOFF,
   LANGY_CONVERSATION_COMMAND_TYPES.GENERATE_TITLE,
+  LANGY_CONVERSATION_COMMAND_TYPES.REQUEST_LOCAL_CONTROL,
+  LANGY_CONVERSATION_COMMAND_TYPES.CONNECT_LOCAL_WORKSPACE,
+  LANGY_CONVERSATION_COMMAND_TYPES.DISCONNECT_LOCAL_WORKSPACE,
+  LANGY_CONVERSATION_COMMAND_TYPES.CHANGE_LOCAL_POLICY,
+  LANGY_CONVERSATION_COMMAND_TYPES.START_USER_WAIT,
+  LANGY_CONVERSATION_COMMAND_TYPES.END_USER_WAIT,
 ] as const;
 
 export type LangyConversationProcessingCommandType =
@@ -241,6 +272,12 @@ export const LANGY_CONVERSATION_EVENT_VERSIONS = {
   CONVERSATION_HANDOFF_PENDING: "2026-07-11",
   CONVERSATION_HANDOFF_CONSUMED: "2026-07-11",
   TITLE_GENERATED: "2026-07-11",
+  LOCAL_CONTROL_REQUESTED: "2026-09-02",
+  LOCAL_WORKSPACE_CONNECTED: "2026-09-02",
+  LOCAL_WORKSPACE_DISCONNECTED: "2026-09-02",
+  LOCAL_POLICY_CHANGED: "2026-09-02",
+  USER_WAIT_STARTED: "2026-09-02",
+  USER_WAIT_ENDED: "2026-09-02",
 } as const;
 
 /**
@@ -248,6 +285,39 @@ export const LANGY_CONVERSATION_EVENT_VERSIONS = {
  */
 export const LANGY_CONVERSATION_PROJECTION_VERSIONS = {
   CONVERSATION_STATE: "2026-07-10",
-  // Bumped when the turn fold gained its `Plan` field (plan_updated).
-  CONVERSATION_TURN: "2026-07-15",
+  // Bumped when a tool call in the turn fold gained the `wait` it put in front
+  // of the developer (ADR-129 user waits).
+  CONVERSATION_TURN: "2026-09-02",
 } as const;
+
+/**
+ * What a user wait asks for. `permission` is one local command the developer
+ * allows or denies; `question` is a choice Langy needs before it goes on.
+ */
+export const LANGY_USER_WAIT_KINDS = {
+  PERMISSION: "permission",
+  QUESTION: "question",
+} as const;
+
+export type LangyUserWaitKind =
+  (typeof LANGY_USER_WAIT_KINDS)[keyof typeof LANGY_USER_WAIT_KINDS];
+
+/** How a user wait finished. A wait reaches exactly one of these. */
+export const LANGY_USER_WAIT_OUTCOMES = {
+  ANSWERED: "answered",
+  EXPIRED: "expired",
+  CANCELLED: "cancelled",
+} as const;
+
+export type LangyUserWaitOutcome =
+  (typeof LANGY_USER_WAIT_OUTCOMES)[keyof typeof LANGY_USER_WAIT_OUTCOMES];
+
+/** What the developer answered on a permission card. */
+export const LANGY_PERMISSION_DECISIONS = {
+  ALLOW_ONCE: "allow_once",
+  ALLOW_PATTERN: "allow_pattern",
+  DENY: "deny",
+} as const;
+
+export type LangyPermissionDecision =
+  (typeof LANGY_PERMISSION_DECISIONS)[keyof typeof LANGY_PERMISSION_DECISIONS];

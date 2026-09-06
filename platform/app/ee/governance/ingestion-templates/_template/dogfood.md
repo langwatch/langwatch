@@ -199,7 +199,7 @@ Run the same 7-step structure but **using the real UI for clicks, the real upstr
 ### R1 — Admin publishes the template via real admin UI
 
 - Sign in as an admin (NOT via DB-set role; use the real signin flow)
-- Navigate to `/settings/governance/tool-catalog` → "Ingestion Templates" tab (Lane-B Iter 4 folds the new tab into the existing admin tool-catalog surface; no new `/settings/ai-tools` route)
+- Navigate to `/governance/tool-catalog` → "Ingestion Templates" tab (Lane-B Iter 4 folds the new tab into the existing admin tool-catalog surface; no new `/settings/ai-tools` route)
 - Verify `<TEMPLATE_SLUG>` appears as a platform-default tile
 - Click "View OTTL" on the tile and confirm the OTTL rules render correctly (read-only v1)
 - **Screenshot**: `langwatch/docs/images/ai-governance/ingestion-templates/<TEMPLATE_SLUG>-admin-catalog.png`

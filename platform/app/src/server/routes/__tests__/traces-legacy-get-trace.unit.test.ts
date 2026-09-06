@@ -97,6 +97,8 @@ vi.mock("~/server/tracer/spanToReadableSpan", () => ({
 
 // Stub the app-layer (used by share/unshare routes only; not needed for GET).
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(() => ({
     share: {
       createShare: vi.fn(),

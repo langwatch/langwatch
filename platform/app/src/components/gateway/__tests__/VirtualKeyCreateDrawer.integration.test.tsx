@@ -387,9 +387,9 @@ describe("given the new-virtual-key drawer", () => {
       renderDrawer();
 
       await userEvent.click(screen.getByTestId("vk-providers-all"));
-      // Unticking All starts from everything selected; narrowing is one
-      // uncheck away.
-      await userEvent.click(screen.getByTestId("vk-provider-mp-anthropic"));
+      // Unchecking "All providers" clears the selection; pick one provider to
+      // narrow the key to exactly it.
+      await userEvent.click(screen.getByTestId("vk-provider-mp-openai"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
 
@@ -403,9 +403,9 @@ describe("given the new-virtual-key drawer", () => {
     it("refuses to save and says why", async () => {
       renderDrawer();
 
+      // Unchecking "All providers" clears the selection, so no provider is
+      // picked and the drawer refuses the save.
       await userEvent.click(screen.getByTestId("vk-providers-all"));
-      await userEvent.click(screen.getByTestId("vk-provider-mp-openai"));
-      await userEvent.click(screen.getByTestId("vk-provider-mp-anthropic"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
 
       expect(screen.getByTestId("vk-providers-invalid").textContent).toContain(
@@ -508,6 +508,134 @@ describe("given the new-virtual-key drawer", () => {
       await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
       expect(lastCreateInput().routingMode).toBe("POLICY");
       expect(lastCreateInput().routingPolicyId).toBe("policy-eu");
+    });
+  });
+
+  describe("when the expiration is left alone", () => {
+    /** @scenario "The drawer offers an expiration and defaults to never" */
+    it("says the key never expires and sends no date", async () => {
+      renderDrawer();
+
+      expect(
+        (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value,
+      ).toBe("");
+      expect(
+        screen.getByTestId("vk-expiration-resolved").textContent,
+      ).toContain("This key never expires");
+
+      await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
+      await submit();
+
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      expect(lastCreateInput().expiresAt).toBeUndefined();
+    });
+  });
+
+  describe("when a period is picked", () => {
+    /** @scenario "Picking a period states the date the key stops working" */
+    it("states the resolved date and sends it with the key", async () => {
+      renderDrawer();
+
+      await userEvent.selectOptions(
+        screen.getByTestId("vk-expiration-preset"),
+        "7",
+      );
+
+      const expected = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("vk-expiration-resolved").textContent,
+        ).toContain(
+          expected.toLocaleDateString("en-US", {
+            weekday: "short",
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            timeZone: "UTC",
+          }),
+        );
+      });
+
+      await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
+      await submit();
+
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      const sent = lastCreateInput().expiresAt as Date;
+      // Within a minute of seven days out: the drawer resolves the period
+      // as the person picks it, not as the request is built.
+      expect(Math.abs(sent.getTime() - expected.getTime())).toBeLessThan(
+        60_000,
+      );
+    });
+  });
+
+  describe("when a custom date is picked", () => {
+    /** @scenario "A custom date expires the key at the end of that day" */
+    it("keeps the key working for the whole of that day", async () => {
+      renderDrawer();
+
+      await userEvent.selectOptions(
+        screen.getByTestId("vk-expiration-preset"),
+        "custom",
+      );
+      const dateInput = await screen.findByTestId("vk-expiration-date");
+      await userEvent.type(dateInput, "2030-08-20");
+
+      await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
+      await submit();
+
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      expect((lastCreateInput().expiresAt as Date).toISOString()).toBe(
+        "2030-08-20T23:59:59.999Z",
+      );
+    });
+
+    it("holds the save until a date is actually typed", async () => {
+      renderDrawer();
+
+      await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
+      await userEvent.selectOptions(
+        screen.getByTestId("vk-expiration-preset"),
+        "custom",
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+      });
+      expect(createMutateAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the server refuses the date", () => {
+    /** @scenario "An expiration date in the past is refused" */
+    it("paints the complaint under the expiration field", async () => {
+      createMutateAsync.mockRejectedValueOnce({
+        data: {
+          error: {
+            code: "virtual_key_expiry_in_past",
+            httpStatus: 400,
+            meta: {
+              fieldErrors: { expiresAt: ["Pick a date in the future"] },
+            },
+          },
+        },
+      });
+      renderDrawer();
+
+      await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
+      await userEvent.selectOptions(
+        screen.getByTestId("vk-expiration-preset"),
+        "custom",
+      );
+      await userEvent.type(
+        await screen.findByTestId("vk-expiration-date"),
+        "2030-08-20",
+      );
+      await submit();
+
+      await waitFor(() => {
+        expect(screen.getByText("Pick a date in the future")).toBeTruthy();
+      });
     });
   });
 });

@@ -223,7 +223,7 @@ export class StoredObjectsService {
           try {
             await this.registry.delete(storageUri);
           } catch (deleteError) {
-            logger.warn(
+            logger.error(
               {
                 projectId,
                 id,

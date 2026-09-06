@@ -57,6 +57,10 @@ func resolveSecretsInMap(m map[string]string, secrets map[string]string) map[str
 // (e.g. `Get "https://api/x?token=rotated-value": dial ...`) — so a secret
 // substituted into the URL/query/headers could otherwise be reflected into
 // execution events, traces, and logs on failure. Scrub before returning.
+//
+// The code-block path scrubs the same way over what the sandbox printed:
+// stored stdout and stderr travel that same route, so a secret a code node
+// prints would otherwise land in all the same places.
 func redactSecrets(s string, secrets map[string]string) string {
 	if s == "" || len(secrets) == 0 {
 		return s

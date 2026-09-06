@@ -39,6 +39,7 @@
 	],
 	"exclude": [
 		"node_modules",
+		"dist",
 		".next",
 		".next-saas",
 		"**/*.snippet.*",

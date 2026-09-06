@@ -32,12 +32,20 @@ import (
 // resolver, real error-status registry) so the assertions are on the wire, not
 // on an internal.
 //
-// The instrument is a missing Azure endpoint rather than a missing deployment
-// map: both are the same status-less bfschemas.BifrostError from the same
-// vendor constructor, but once Defect A is fixed a missing deployment map no
-// longer produces an error at all, so it cannot isolate the classification
-// half. "deployments not set" is pinned at the unit level in
-// adapters/providers/bifrost_config_error_classification_test.go.
+// The instrument is an Azure credential with no endpoint at all. Under bifrost
+// v1.4.22 this reached the Azure provider's own dispatch and returned a bare
+// status-less "endpoint not set". bifrost v1.5.17 moved endpoint validation up
+// into key-selection (core utils.go validateKey rejects an empty
+// AzureKeyConfig.Endpoint), so an endpointless credential is now dropped as an
+// eligible key BEFORE any provider dispatch and the observed failure is instead
+// "no keys found that support model: X". That is still a permanent, operator-
+// fixable configuration fault — non-retryable, no fallback walk, no breaker
+// failure — but it classifies as provider_config_invalid (400), not
+// provider_misconfigured (502): key-selection subsumes the deployment-specific
+// rejection. The status-less "endpoint not set" -> provider_misconfigured shape
+// is still pinned at the unit level in
+// adapters/providers/bifrost_config_error_classification_test.go, where the
+// vendor constructor is invoked directly.
 //
 // Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
 
@@ -113,15 +121,17 @@ func azureChatRequest(model string) *http.Request {
 	return req
 }
 
-// AC16 + AC20: the client-visible answer to a provider misconfiguration is a
-// bad-gateway, not a gateway timeout, and it still names the cause.
+// AC16 + AC20: the client-visible answer to a provider misconfiguration is not
+// a gateway timeout, and it still names the cause.
 //
-// 502 is asserted concretely: if the fix registers its chosen code at a
-// different status, this test is where that decision has to be made explicit.
-// The status alone cannot discriminate, though — provider_error is registered
-// at 502 too, and it is the RETRYABLE code — so the envelope's error.code is
-// asserted as well. Without it this test passes on the exact classification
-// this change exists to prevent.
+// Under bifrost v1.5.17 an endpointless Azure credential is rejected in
+// key-selection, so the observed fault is "no keys found that support model: X"
+// -> provider_config_invalid -> 400 (not the pre-bump provider_misconfigured ->
+// 502). The status is asserted concretely so a future reclassification has to be
+// made explicit here; the envelope's error.code is asserted alongside it because
+// the status alone cannot discriminate a permanent config fault from a retryable
+// provider_error. Without the code assertion this test would pass on the exact
+// timeout classification this change exists to prevent.
 //
 // @scenario "A configuration error carrying no status code is not classified as a timeout"
 // @scenario "The operator can identify the cause from the response alone"
@@ -130,8 +140,9 @@ func TestAzureLane_ConfigurationErrorIsNotSurfacedAsATimeout(t *testing.T) {
 		ID:         "cred-azure",
 		ProviderID: domain.ProviderAzure,
 		APIKey:     "az-key",
-		// No endpoint: the provider row was never finished. Bifrost rejects
-		// this before dialing, with no HTTP status to report.
+		// No endpoint: the provider row was never finished. bifrost v1.5.17
+		// rejects this in key-selection (validateKey requires a non-empty Azure
+		// endpoint), before any dial and with no HTTP status to report.
 		Extra: map[string]string{"api_version": "2024-10-21"},
 	}})
 
@@ -139,12 +150,17 @@ func TestAzureLane_ConfigurationErrorIsNotSurfacedAsATimeout(t *testing.T) {
 	router.ServeHTTP(rec, azureChatRequest("azure/gpt-5.3-mini"))
 
 	body := rec.Body.String()
-	assert.Equal(t, http.StatusBadGateway, rec.Code,
+	assert.Equal(t, http.StatusBadRequest, rec.Code,
 		"a permanent provider misconfiguration must not be reported as an upstream timeout; body: %s", body)
-	assert.Equal(t, string(domain.ErrProviderMisconfigured), gjson.Get(body, "error.code").String(),
-		"502 is also provider_error's status, so only the code tells the client this is permanent; body: %s", body)
-	assert.Contains(t, body, "endpoint not set",
-		"the operator's only clue to the misconfiguration must survive to the client")
+	assert.Equal(t, string(domain.ErrProviderConfigInvalid), gjson.Get(body, "error.code").String(),
+		"the code, not the status, tells the client this is a permanent settings fault and not a retryable provider error; body: %s", body)
+	// provider_config_invalid scrubs the raw vendor cause ("no keys found...")
+	// off the wire, so the operator's clue is the customer message: it names the
+	// exact model and points at the models/deployments settings to fix.
+	assert.Contains(t, body, "gpt-5.3-mini",
+		"the response must name the model the operator has to configure; body: %s", body)
+	assert.Contains(t, body, "not configured to serve",
+		"the operator's clue to the misconfiguration must survive to the client; body: %s", body)
 }
 
 // AC17, the operational half: a permanent configuration failure must not walk
@@ -153,6 +169,15 @@ func TestAzureLane_ConfigurationErrorIsNotSurfacedAsATimeout(t *testing.T) {
 // both retries AND counts as a breaker failure, so every request pays for
 // every credential in the chain before failing (the production trace showed
 // eight identical attempt pairs) and marches the slot toward an open circuit.
+//
+// bifrost v1.5.17's key-selection now intercepts a no-endpoint credential
+// (validateKey requires a non-empty Azure endpoint) before the deployment-
+// specific rejection, so the fault reads as "no keys found..." ->
+// provider_config_invalid (400) rather than the pre-bump provider_misconfigured
+// (502). The operational guarantees this test exists for are unchanged: the code
+// is still non-retryable, so the healthy second credential is never dialed, the
+// breaker is consulted once and records no failure. Only the status assertion
+// tracks the reclassification.
 //
 // The second credential is fully working, so "it was never dialed" can only be
 // explained by the chain not being walked. The breaker spy is the second
@@ -199,7 +224,7 @@ func TestAzureLane_ConfigurationErrorDoesNotWalkTheFallbackChain(t *testing.T) {
 		"the breaker must be consulted for the first credential and no other: a second Allow is the chain being walked")
 	assert.Zero(t, circuits.failures,
 		"the credential is misconfigured, not unhealthy; counting this would open the circuit on a fault no retry can clear")
-	assert.Equal(t, http.StatusBadGateway, rec.Code,
+	assert.Equal(t, http.StatusBadRequest, rec.Code,
 		"the misconfiguration must be reported, not masked by a fallback; body: %s", rec.Body.String())
 }
 

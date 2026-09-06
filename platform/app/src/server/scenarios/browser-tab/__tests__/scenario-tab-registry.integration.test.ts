@@ -9,9 +9,14 @@
  * set semantics and key scoping are the real ones.
  */
 
+import {
+  type RedisConnection,
+  RedisConnectionService,
+} from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { connection } from "~/server/redis";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   SCENARIO_TAB_DISCONNECT_GRACE_SECONDS,
   SCENARIO_TAB_PENDING_TTL_SECONDS,
@@ -36,19 +41,36 @@ function track(project: string, tabKey: string): string {
   return key;
 }
 
-beforeAll(() => {
+/** The registry reads its connection off the App, so the test hands it one. */
+let connection: RedisConnection | null = null;
+
+beforeAll(async () => {
+  connection = new RedisConnectionService().connect({
+    url: process.env.REDIS_URL,
+    clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+    dbIndex: process.env.REDIS_DB_INDEX,
+  });
   if (!connection) {
     throw new Error(
       "These tests need a real Redis; run them through the integration suite",
     );
   }
+  await resetApp();
+  globalForApp.__langwatch_app = createTestApp({ redis: connection });
 });
 
 afterAll(async () => {
   const keys = [...writtenKeys, ...pendingKeys];
-  if (connection && keys.length > 0) {
-    await connection.del(...keys);
+  if (connection) {
+    // Per-key DEL: a multi-key DEL spanning different hash slots is rejected
+    // with CROSSSLOT when this runs against a cluster, which would throw out
+    // of `afterAll` and leave every test key behind.
+    for (const key of keys) {
+      await connection.del(key);
+    }
   }
+  await resetApp();
+  connection?.disconnect();
 });
 
 describe("scenarioTabRegistry", () => {

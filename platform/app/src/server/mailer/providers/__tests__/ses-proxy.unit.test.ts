@@ -78,12 +78,17 @@ describe("buildSesClientConfig", () => {
   });
 
   describe("given no proxy and no endpoint override", () => {
-    it("configures only the region, as before", () => {
+    it("configures the region and dials directly", () => {
       const config = buildSesClientConfig();
 
       expect(config.region).toBe("eu-central-1");
       expect(config.endpoint).toBeUndefined();
-      expect(config.requestHandler).toBeUndefined();
+      expect(httpsProxyAgentMock).not.toHaveBeenCalled();
+      // A handler is present even with no proxy, because one left to the SDK
+      // has no timeouts: @smithy/node-http-handler reads 0 as "no timeout" and
+      // 0 is its default. The bounds themselves are asserted where they are
+      // set, in awsClientConfig.unit.test.ts.
+      expect(config.requestHandler).toBeDefined();
     });
   });
 
@@ -156,10 +161,16 @@ describe("buildSesClientConfig", () => {
       process.env.HTTPS_PROXY = "http://proxy.corp:8080";
       process.env.NO_PROXY = "email.eu-central-1.amazonaws.com";
 
-      const config = buildSesClientConfig();
+      const excluded = buildSesClientConfig();
 
       expect(httpsProxyAgentMock).not.toHaveBeenCalled();
-      expect(config.requestHandler).toBeUndefined();
+      // Direct now means the shared no-agent handler rather than no handler at
+      // all, so the assertion is that the excluded host gets the same one a
+      // deployment with no proxy at all gets.
+      clearProxyEnv();
+      expect(excluded.requestHandler).toBe(
+        buildSesClientConfig().requestHandler,
+      );
     });
 
     it("connects directly when a parent domain is listed", () => {

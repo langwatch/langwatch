@@ -20,7 +20,7 @@ import { createLogger } from "@langwatch/observability";
 import { JSONPath } from "jsonpath-plus";
 import type { Response as FetchResponse } from "undici";
 import { z } from "zod";
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { RedirectRefusedError, ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import type {
   NormalizedPullEvent,
@@ -196,6 +196,14 @@ export class HttpPollingPullerAdapter
           headers,
           body,
           signal,
+          // The headers above carry the source's decrypted upstream secret,
+          // and `ssrfSafeFetch` follows up to ten redirects by default —
+          // re-sending those headers to each new host. A configured endpoint
+          // that starts answering with a redirect would hand the credential
+          // to wherever it points, and nothing in a pull run would report it.
+          // Three other callers in this codebase already opt out for the same
+          // reason; this one was the exception.
+          followRedirects: false,
         });
         if (response.status >= 500) {
           // Retryable — fall through to the retry-delay branch
@@ -212,6 +220,12 @@ export class HttpPollingPullerAdapter
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        // A refused redirect is a permanent property of the configured
+        // endpoint, not a transient failure — retrying it just delays the
+        // error the admin needs to see.
+        if (error instanceof RedirectRefusedError) {
+          throw error;
+        }
         // 4xx errors land here too (re-thrown above); only retry on
         // network/transport errors and 5xx
         if (error instanceof Error && /^HTTP 4\d{2}/.test(error.message)) {
@@ -353,6 +367,17 @@ export class HttpPollingPullerAdapter
       const n = typeof v === "number" ? v : Number(v);
       return Number.isFinite(n) ? n : 0;
     };
+    /** Preserves string inputs so sub-cent precision is not lost through
+     *  a float round-trip. Falls back to Number→String for numeric inputs. */
+    const asDecimalString = (v: unknown): string => {
+      if (typeof v === "string") {
+        const trimmed = v.trim();
+        if (trimmed === "") return "0";
+        return trimmed;
+      }
+      if (typeof v === "number" && Number.isFinite(v)) return String(v);
+      return "0";
+    };
     const asInt = (v: unknown): number => Math.trunc(asNumber(v));
 
     const extras: Record<string, unknown> = {};
@@ -368,7 +393,7 @@ export class HttpPollingPullerAdapter
       actor: asString(get(config.eventMapping.actor)),
       action: asString(get(config.eventMapping.action)),
       target: asString(get(config.eventMapping.target)),
-      cost_usd: asNumber(get(config.eventMapping.cost_usd)),
+      cost_usd: asDecimalString(get(config.eventMapping.cost_usd)),
       tokens_input: asInt(get(config.eventMapping.tokens_input)),
       tokens_output: asInt(get(config.eventMapping.tokens_output)),
       raw_payload: JSON.stringify(rawEvent),

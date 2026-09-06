@@ -251,6 +251,7 @@ export class GithubPullRequestStatusService {
         isDraft: live.draft,
         prClosedAt: live.closedAt ? new Date(live.closedAt) : null,
         prMergedAt: live.mergedAt ? new Date(live.mergedAt) : null,
+        prUpdatedAt: new Date(live.updatedAt),
       })
       .catch((error: unknown) => {
         logger.warn(

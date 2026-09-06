@@ -16,6 +16,9 @@ const developerMsg = (text: string) =>
   ({ type: "response_item", payload: { type: "message", role: "developer", content: [{ type: "input_text", text }] } });
 const userMsg = (text: string) =>
   ({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text }] } });
+/** A user message carrying several content parts, the shape codex injects in. */
+const userMsgParts = (...texts: string[]) =>
+  ({ type: "response_item", payload: { type: "message", role: "user", content: texts.map((text) => ({ type: "input_text", text })) } });
 const assistantMsg = (text: string) =>
   ({ type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text }] } });
 const agentMessage = (message: string) =>
@@ -33,7 +36,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "A single-turn rollout yields the request body as chat messages on the turn's trace" */
       it("produces one turn carrying the turn's trace_id, request messages, and output", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             turnContext("t1"),
@@ -56,11 +59,49 @@ describe("parseCodexRollout", () => {
     });
   });
 
+  describe("given a conversation many times the request-body cap", () => {
+    describe("when it is parsed", () => {
+      /** @scenario "A conversation far above the cap still harvests in seconds" */
+      it("bounds every turn without reading the conversation again per dropped message", () => {
+        // The cost that mattered grows with the NUMBER of messages, not their
+        // size: every message dropped read the whole conversation again. A
+        // long-lived agent session reaches thousands of short exchanges.
+        const TURNS = 400;
+        const body = "y".repeat(400);
+        const lines: unknown[] = [];
+        for (let turn = 0; turn < TURNS; turn++) {
+          lines.push(
+            taskStarted(`trace-${turn}`, `t-${turn}`),
+            turnContext(`t-${turn}`),
+            userMsg(`${body} ${turn}`),
+            agentMessage(`${body} reply ${turn}`),
+            { type: "event_msg", payload: { type: "task_complete" } },
+          );
+        }
+        const transcript = rollout(...lines);
+
+        const startedAt = Date.now();
+        const { turns } = parseCodexRollout(transcript);
+        const elapsedMs = Date.now() - startedAt;
+
+        expect(turns).toHaveLength(TURNS);
+        for (const turn of turns) {
+          expect(JSON.stringify(turn.inputMessages).length).toBeLessThanOrEqual(
+            120_000,
+          );
+        }
+        // Reading the conversation again per dropped message takes seconds on
+        // this transcript, and minutes on a session that ran for weeks.
+        expect(elapsedMs).toBeLessThan(2_000);
+      });
+    });
+  });
+
   describe("given a developer message", () => {
     describe("when it is parsed", () => {
       /** @scenario "The developer message becomes the system prompt in the request body" */
       it("maps the developer role to a system message at the head of input", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             developerMsg("You are codex. Use the tools."),
@@ -82,7 +123,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "The environment_context is preserved in the request body but the prompt is the headline" */
       it("keeps the environment_context as a message while the last user message is the real prompt", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("<environment_context>\n  <cwd>/tmp</cwd>\n</environment_context>"),
@@ -105,7 +146,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "A multi-turn rollout accumulates prior turns into each turn's request body" */
       it("produces one turn per task_started trace_id and folds prior turns into the next input", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("t-one", "turn1"),
             userMsg("first question"),
@@ -136,7 +177,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "Tool calls and their results are captured in the request body" */
       it("records the function_call as an assistant tool_call and the output as a tool message", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("run ls"),
@@ -177,7 +218,7 @@ describe("parseCodexRollout", () => {
       // still producing a perfectly healthy-looking turn.
       /** @scenario "Tool calls are captured whichever way codex spelled them" */
       it("records a custom_tool_call the same way as a function_call", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("run echo"),
@@ -226,7 +267,7 @@ describe("parseCodexRollout", () => {
 
       /** @scenario "A tool result returned as content blocks reads as its text" */
       it("reads the printed output rather than serialising the blocks", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("run echo"),
@@ -267,7 +308,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "An id-less tool call and its output share one synthetic id so they still pair" */
       it("mints one stable id for the call and reuses it on the output", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("run ls"),
@@ -304,7 +345,7 @@ describe("parseCodexRollout", () => {
     describe("when a later turn has its own id-less tool output", () => {
       /** @scenario "A synthetic tool-call id does not leak across the turn boundary" */
       it("does not pair the later output to the previous turn's orphaned call", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("trace-1", "t1"),
             userMsg("first"),
@@ -344,7 +385,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "The assistant final answer is taken from the agent_message when present" */
       it("prefers the agent_message final answer and keeps it out of the input", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("hi"),
@@ -365,11 +406,179 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "A turn with no assistant reply is dropped rather than emitting an empty span" */
       it("drops the turn entirely", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(taskStarted("abc123", "t1"), userMsg("are you there?")),
         );
 
         expect(turns).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given a session_meta line carrying the session's git identity", () => {
+    describe("when it is parsed", () => {
+      it("yields the session id, directory, branch and remote beside the turns", () => {
+        const { meta } = parseCodexRollout(
+          rollout({
+            type: "session_meta",
+            payload: {
+              id: "019ff127-4a7c-7bc0-af13-de3b1a7f94cb",
+              cwd: "/home/dev/acme-app",
+              git: {
+                commit_hash: "f40dfb14fe962ff5c0e662de43424943ba44ae3e",
+                branch: "feat/pricing",
+                repository_url: "https://github.com/acme/acme-app.git",
+              },
+            },
+          }),
+        );
+
+        expect(meta).toEqual({
+          sessionId: "019ff127-4a7c-7bc0-af13-de3b1a7f94cb",
+          cwd: "/home/dev/acme-app",
+          gitBranch: "feat/pricing",
+          gitRepositoryUrl: "https://github.com/acme/acme-app.git",
+          firstUserMessage: null,
+        });
+      });
+    });
+  });
+
+  describe("given a session_meta line from a codex too old to record git", () => {
+    describe("when it is parsed", () => {
+      it("yields the identity it has and null for the rest", () => {
+        const { meta } = parseCodexRollout(
+          rollout({
+            type: "session_meta",
+            payload: { id: "019ff127-0000-0000-0000-000000000000", cwd: "/w" },
+          }),
+        );
+
+        expect(meta).toEqual({
+          sessionId: "019ff127-0000-0000-0000-000000000000",
+          cwd: "/w",
+          gitBranch: null,
+          gitRepositoryUrl: null,
+          firstUserMessage: null,
+        });
+      });
+    });
+  });
+
+  describe("given user_message events recording what the user typed", () => {
+    const typed = (message: string) =>
+      ({ type: "event_msg", payload: { type: "user_message", message } });
+
+    describe("when the rollout is parsed", () => {
+      /** @scenario "The harvest names the session by the first thing the user asked" */
+      it("keeps the first typed prompt on the meta and ignores later ones", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-1111", cwd: "/w" } },
+            typed("fix the pricing bug"),
+            taskStarted("abc123", "t1"),
+            userMsg("fix the pricing bug"),
+            assistantMsg("done"),
+            typed("now add a test"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("fix the pricing bug");
+      });
+    });
+  });
+
+  describe("given an exec session, which emits no user_message event at all", () => {
+    describe("when the rollout is parsed", () => {
+      /** @scenario "A codex session is named by the prompt it was given" */
+      it("names it by the prompt in the conversation", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-2222", cwd: "/w" } },
+            taskStarted("abc123", "t1"),
+            userMsg("review the diff on this branch"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
+      });
+
+      /** @scenario "Context codex injects as a user message never names the session" */
+      it("skips the context codex writes to itself", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-3333", cwd: "/w" } },
+            taskStarted("abc123", "t1"),
+            userMsg("<recommended_plugins>\nAirtable\nAlpaca\n"),
+            userMsg("review the diff on this branch"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
+      });
+    });
+  });
+
+  describe("given a session that records the prompt in both places", () => {
+    const typedEvent = (message: string) =>
+      ({ type: "event_msg", payload: { type: "user_message", message } });
+
+    describe("when the rollout is parsed", () => {
+      /** @scenario "The event names the session even when the conversation also carries a prompt" */
+      it("keeps the event's prompt over anything in the conversation", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-4444", cwd: "/w" } },
+            typedEvent("review the diff on this branch"),
+            taskStarted("abc123", "t1"),
+            userMsg("<environment_context>\ncwd: /w\n"),
+            userMsg("a later user turn, which must not rename the session"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
+      });
+
+      /** @scenario "An injected bundle never names the session, whichever part carries the tag" */
+      it("skips a bundle whose tag sits behind an untagged heading", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-6666", cwd: "/w" } },
+            taskStarted("abc123", "t1"),
+            // The shape every real session on the agents box has: one message,
+            // two parts, the heading first and the tag second.
+            userMsgParts(
+              "# AGENTS.md instructions\n\n<INSTRUCTIONS>\nThis file is generated by the `agents-box` terraform module ...",
+              "<environment_context>\n  <cwd>/home/ubuntu/agent-workspaces/codex-proof/langwatch</cwd>\n  <shell>bash</shell>\n",
+            ),
+            userMsg(
+              "Review the diff of PR 7417 on this branch and tell me in two sentences what it changes.",
+            ),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe(
+          "Review the diff of PR 7417 on this branch and tell me in two sentences what it changes.",
+        );
+      });
+
+      /** @scenario "An injected event does not shut out the prompt in the conversation" */
+      it("skips an injected event and takes the conversation's typed prompt", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-5555", cwd: "/w" } },
+            typedEvent("<environment_context>\ncwd: /w\n</environment_context>"),
+            taskStarted("abc123", "t1"),
+            userMsg("review the diff on this branch"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
       });
     });
   });

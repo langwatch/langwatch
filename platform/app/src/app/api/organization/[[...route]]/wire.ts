@@ -23,9 +23,9 @@ import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/er
 import type { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import type { OrganizationMemberSummary } from "~/server/app-layer/organizations/repositories/organization.repository";
 import type { InviteService } from "~/server/invites/invite.service";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/server/invites/invite.service";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import type { RoleBindingService } from "~/server/role-bindings/role-binding.service";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
 
 /** The provider context every handler in this family receives. */
 export type OrganizationFamilyApp = BaseApp & {

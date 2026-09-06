@@ -220,11 +220,11 @@ export const app = service
       ),
     invites: () => InviteService.create(prisma),
     roleBindings: () =>
-      new RoleBindingService(
+      new RoleBindingService({
         prisma,
-        new PrismaRoleBindingRepository(prisma),
-        new RoleService(prisma),
-      ),
+        repo: new PrismaRoleBindingRepository(prisma),
+        roleService: new RoleService(prisma),
+      }),
   })
   .version(MANAGEMENT_API_VERSION, (v) => {
     registerProfileEndpoints(v);

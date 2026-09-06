@@ -21,12 +21,13 @@ import * as path from "node:path";
  * - login/logout/config: they MUTATE the identity or the persisted config the
  *   daemon has already resolved and cached. Serving them from a warm process
  *   would leave that process holding stale (or newly-wrong) credentials.
- * - open/request-increase: they launch a browser. The child would inherit the
- *   daemon's environment and session, not the caller's.
+ * - open: it launches a browser. The child would inherit the daemon's
+ *   environment and session, not the caller's.
  * - claude/codex/cursor/gemini/opencode: the gateway wrappers exec a real
  *   binary with inherited stdio and hand it the terminal for an entire
  *   interactive session. That is the caller's process's job, not an RPC's.
- * - init-shell: trivially cheap and its whole purpose is to be `eval`'d.
+ * - instrument: it prompts and rewrites credential wiring on the caller's
+ *   machine; identity and fs side effects belong to the caller's process.
  * - report: a one-shot, network-bound support command, often a customer's
  *   very first `npx langwatch` contact. Leaving a resident daemon behind as
  *   a side effect of filing an issue report would be surprising, and the
@@ -43,7 +44,6 @@ const DENIED_COMMANDS = new Set([
   "logout",
   "config",
   "open",
-  "request-increase",
   "claude",
   "codex",
   "cursor",
@@ -53,7 +53,7 @@ const DENIED_COMMANDS = new Set([
   // (stdio /dev/null, no DISPLAY) breaks them silently.
   "copilot",
   "code",
-  "init-shell",
+  "instrument",
   "report",
   "push",
 ]);
@@ -71,14 +71,32 @@ const DENIED_COMMANDS = new Set([
  */
 const DENIED_COMMAND_PHRASES: readonly (readonly string[])[] = [
   ["tag", "delete"],
+  // `agent dev` / `agent tunnel` run a tunnel session until Ctrl-C: they hold
+  // signal handlers, a local proxy server and a child process, none of which
+  // survive being served from the detached daemon. Denying the bare word
+  // `agent` would take `agent list` with it, so the phrases are matched.
+  ["agent", "dev"],
+  ["agent", "tunnel"],
+  // `ingest context` reads the CALLER's identity out of its environment
+  // (CLAUDE_CODE_SESSION_ID, TRACEPARENT, CODEX_HOME) — none of which the
+  // forwarded-env allowlist carries, so a daemon-served run would resolve
+  // the wrong session or none. `ingest guidance` is a claude hook whose
+  // stdout is injected into the session; same caller-owned contract.
+  ["ingest", "context"],
+  ["ingest", "guidance"],
 ];
 
 /**
  * Flags that make a command unbounded in time. A `--follow` would pin one
  * daemon request open forever, holding the working-directory window (see
  * execution.ts) and defeating the idle timeout.
+ *
+ * `--wait` polls a scheduled run until every scenario settles, which takes
+ * minutes, and the client abandons a daemon request at 25 seconds
+ * (client.ts). Served by the daemon, `test-suite run --wait` printed nothing,
+ * exited 124 and left the run going, although it had been scheduled.
  */
-const DENIED_FLAGS = new Set(["--follow", "--watch"]);
+const DENIED_FLAGS = new Set(["--follow", "--watch", "--wait"]);
 
 /**
  * Flags that make the CALLER's standard input part of the command's input.
@@ -222,7 +240,9 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     return { eligible: false, reason: "denied-command" };
   }
 
-  if (input.args.some((arg) => DENIED_FLAGS.has(arg))) {
+  // `--wait=90` carries its value in the same token, so the flag is read up
+  // to the equals sign.
+  if (input.args.some((arg) => DENIED_FLAGS.has(arg.split("=")[0] ?? arg))) {
     return { eligible: false, reason: "long-running-flag" };
   }
 

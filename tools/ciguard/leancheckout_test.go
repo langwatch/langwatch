@@ -45,6 +45,29 @@ const bareJob = `jobs:
         run: echo hi
 `
 
+// allowlistJob names one file and nothing else, the way shard-durations takes
+// only the committed vitest.durations.json.
+const allowlistJob = `jobs:
+  shard-durations:
+    steps:
+      - uses: actions/checkout@abc123
+        with:
+          sparse-checkout: platform/app/vitest.durations.json
+          sparse-checkout-cone-mode: false
+`
+
+// denylistJob starts from the whole tree, which is the shape that CAN pull the
+// media, so the exclusions are still required of it.
+const denylistJob = `jobs:
+  build:
+    steps:
+      - uses: actions/checkout@abc123
+        with:
+          sparse-checkout: |
+            /*
+          sparse-checkout-cone-mode: false
+`
+
 // writeWorkflows lays out a throwaway repo containing only the workflows the
 // lean-checkout guard reads.
 func writeWorkflows(t *testing.T, contents map[string]string) string {
@@ -95,6 +118,35 @@ func TestLeanCheckoutExemptsAGateJob(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, problems)
+}
+
+// @scenario "A checkout that names the files it wants is already lean"
+func TestLeanCheckoutExemptsAnAllowlistCheckout(t *testing.T) {
+	root := writeWorkflows(t, map[string]string{
+		ciguard.LeanCheckoutWorkflows[0]: allowlistJob,
+	})
+
+	problems, err := ciguard.LeanCheckout(root)
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+}
+
+// The exemption must not swallow the case it exists to catch: a list that
+// starts from the whole tree is a denylist, and the media is back in scope.
+func TestLeanCheckoutStillRequiresExclusionsOnAWholeTreeCheckout(t *testing.T) {
+	root := writeWorkflows(t, map[string]string{
+		ciguard.LeanCheckoutWorkflows[0]: denylistJob,
+	})
+
+	problems, err := ciguard.LeanCheckout(root)
+
+	require.NoError(t, err)
+	require.Len(t, problems, 3)
+	joined := strings.Join(problems, "\n")
+	assert.Contains(t, joined, "does not exclude /docs/media/")
+	assert.Contains(t, joined, "does not exclude /docs/images/")
+	assert.Contains(t, joined, "does not exclude /assets/")
 }
 
 // @scenario "Prose under docs/ is kept, because CI reads it"

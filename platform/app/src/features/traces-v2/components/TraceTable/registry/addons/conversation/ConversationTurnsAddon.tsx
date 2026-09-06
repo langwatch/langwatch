@@ -5,7 +5,7 @@ import { CompactTurns } from "./CompactTurns";
 
 export const ConversationTurnsAddon: AddonDef<ConversationGroup> = {
   id: "conversation-turns",
-  label: "Session turns",
+  label: "Conversation turns",
   shouldRender: ({ isExpanded }) => isExpanded,
   render: ({ row, colSpan, style, density, densityMode, tanstackRow }) => {
     if (densityMode === "comfortable") {

@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  *
  * @see specs/evaluations/experiments-online-evaluations-separation.feature
+ * @see specs/navigation/ops-navigation-v2.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -21,12 +22,13 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Every flag reads on, except the one that replaces the Simulations group
+// with Agent Testing: this file pins the rail as it stands today. The rail
+// under that flag is pinned by MainMenu.agentTesting.integration.test.tsx.
 vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: true }),
-}));
-
-vi.mock("~/hooks/useOpsPermission", () => ({
-  useOpsPermission: () => ({ hasAccess: false }),
+  useFeatureFlag: (flag: string) => ({
+    enabled: flag !== "release_ui_agent_testing_v2_enabled",
+  }),
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
@@ -46,10 +48,6 @@ vi.mock("~/utils/api", () => ({
       isAdmin: { useQuery: () => ({ data: { isAdmin: false } }) },
     },
   },
-}));
-
-vi.mock("~/components/messages/HeaderButtons", () => ({
-  useTableView: () => ({ isTableView: false }),
 }));
 
 vi.mock("~/components/sidebar/CollapsibleMenuGroup", () => ({
@@ -80,7 +78,7 @@ vi.mock("~/components/sidebar/ThemeToggle", () => ({
   ThemeToggle: () => null,
 }));
 
-import { MainMenu } from "../MainMenu";
+import { MainMenuSections } from "../MainMenu";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -89,7 +87,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 const visibleLinkLabels = () =>
   screen.getAllByRole("link").map((link) => link.textContent);
 
-describe("<MainMenu /> navigation", () => {
+describe("<MainMenuSections showExpanded /> navigation", () => {
   afterEach(() => {
     cleanup();
     localStorage.clear();
@@ -97,7 +95,7 @@ describe("<MainMenu /> navigation", () => {
 
   /** @scenario Organize the existing destinations around the product lifecycle */
   it("uses the approved section names and destination order", () => {
-    render(<MainMenu />, { wrapper: Wrapper });
+    render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
     const sectionControls = screen
       .getAllByRole("button", { name: /^(Collapse|Expand) / })
@@ -107,26 +105,34 @@ describe("<MainMenu /> navigation", () => {
       "Collapse Observe",
       "Collapse Test",
       "Expand Build",
-      "Expand Govern",
     ]);
 
     expect(visibleLinkLabels()).toEqual([
       "Home",
       "Analytics",
       "Trace Explorer",
-      "Traces",
       "Online Evals",
       "Simulations",
       "Experiments",
       "Annotations",
-      "Settings",
     ]);
+  });
+
+  /** @scenario "The sidebar no longer offers the legacy Traces page" */
+  it("offers Trace Explorer as the only traces destination", () => {
+    render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
+
+    const tracesLabels = visibleLinkLabels().filter((label) =>
+      /trace/i.test(label ?? ""),
+    );
+
+    expect(tracesLabels).toEqual(["Trace Explorer"]);
   });
 
   /** @scenario Use sensible section defaults without a saved preference */
   it("reveals the Build destinations in their existing order", async () => {
     const user = userEvent.setup();
-    render(<MainMenu />, { wrapper: Wrapper });
+    render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
     expect(screen.queryByRole("link", { name: "Prompts" })).toBeNull();
 

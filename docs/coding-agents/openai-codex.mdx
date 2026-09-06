@@ -1,0 +1,219 @@
+---
+title: OpenAI Codex CLI Monitoring with OpenTelemetry
+sidebarTitle: OpenAI Codex
+description: Monitor the OpenAI Codex CLI with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
+keywords:
+  - codex cli monitoring
+  - codex usage tracking
+  - ccusage for codex
+  - codex opentelemetry
+  - codex cli telemetry
+  - codex cost
+---
+
+The OpenAI Codex command-line tool reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the conversation behind both.
+
+There are two ways to set it up:
+
+- `langwatch codex` starts Codex and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch instrument codex` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
+
+After either one, a plain `codex` run also reports to LangWatch. The connection lives in `~/.codex/config.toml`, so it stays after you close the terminal.
+
+## Before you start
+
+- Install the Codex command-line tool.
+- Install the LangWatch command-line tool: `npm install -g langwatch`
+- Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
+
+## Run Codex through the wrapper
+
+```bash
+langwatch login --device
+langwatch codex
+```
+
+The first run asks one question:
+
+| Answer | What it does |
+| --- | --- |
+| **Using a ChatGPT subscription** | Codex keeps your own plan and your own login. LangWatch receives telemetry only. |
+| **Using an API key** | Codex calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
+
+LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch codex` accepts the same flags and the same subcommands as `codex`, and it returns the same exit code.
+
+<Note>
+  A virtual key is created the first time you choose the gateway, not at login. If you always keep your own subscription, LangWatch never creates one for you.
+</Note>
+
+## Set up a machine without starting Codex
+
+`langwatch instrument codex` writes the connection into `~/.codex/config.toml` and exits. A plain `codex` run on that machine then sends its telemetry to LangWatch. This is the setup for a server that holds many agents, for a machine image, or for a configuration management run.
+
+```bash
+langwatch instrument codex
+```
+
+### Choose where the telemetry goes
+
+Pass one scope flag, and one only:
+
+| Command | Destination |
+| --- | --- |
+| `langwatch instrument codex` | Your personal workspace |
+| `langwatch instrument codex --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects). |
+| `langwatch instrument codex --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument codex --personal` | Back to your personal workspace |
+
+The wrapper accepts the same flags: `langwatch codex --project acme-app` pins the project and then starts Codex. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Codex reads it.
+
+### Remove the setup
+
+```bash
+langwatch logout
+```
+
+This deletes every connection the command-line tool wrote, for every tool.
+
+## What you get in LangWatch
+
+Open your personal page at `/me`, or open the project you pinned Codex to.
+
+- **[Sessions](/coding-agents/sessions)**: one row per Codex session, with the context it carried, how long it worked, and a terminal replay of the whole conversation.
+- **Traces**: one trace per turn, with the model, the tokens and the timing of each step.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn.
+- **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it.
+- **Content**: the prompt of each turn, each tool call with its result, and the answer of the model.
+
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+### Attribute sessions to pull requests
+
+The general model, both reporting channels and their limits, is covered on [Repository and PR attribution](/coding-agents/repository-and-pr-attribution). The Codex specifics live here. `langwatch instrument codex` installs a hook pair, and Codex fires it when the session starts and again at the end of every turn, so the session reports the directory it is working in each time and a `cd` inside the session is picked up at the next turn boundary. The declared channel still carries weight: it lands the moment the agent runs it, mid-turn, without waiting for a turn to end, and it covers a session on a machine where the hooks were never approved, because Codex asks the user to review each new hook before it runs one.
+
+The agent moves the attribution itself. `langwatch ingest context`, run from inside a checkout, declares that repository and branch for the running session, and the session's pull requests reflect every branch it declares. This is what makes a long-lived session work: a standing review agent that runs from a scratch directory and reviews one checkout after another executes the command inside each checkout, and each review lands on its pull request. `langwatch instrument codex` installs a short instruction in `$CODEX_HOME/AGENTS.md`, which is `~/.codex/AGENTS.md` unless you set `CODEX_HOME` yourself. It tells every session to do this when it switches repository, branch or worktree, so the agent does not need to be taught per machine. `langwatch logout` removes the instruction, and your own content in that file is never touched.
+
+The command finds the session itself. Codex keeps the transcript of a session open for as long as the session runs, and it starts the shell that runs the command, so the command looks up its own chain of parent processes and takes the session from the codex process it is running under. The lookup is exact: several codex sessions can work at the same time on one machine, and each one declares for itself.
+
+If the process chain cannot be read, a restrictive sandbox being the usual reason, the command falls back to reading which session wrote to its transcript most recently. That reading cannot tell two sessions apart when both are working at the same moment, so in that case it declares no session and prints one line asking you to name the session. `--agent codex --session-id <id>` names one exactly, and always wins over both.
+
+Codex's default sandbox blocks both the reading of the process chain and network access, so under it the command falls back to the transcript reading and cannot send the record itself. It queues the declaration instead and says so in one line. The next turn delivers it: Codex runs the LangWatch session report from its own process, outside the sandbox, so the report goes out even when the agent's shell has no network. A queued declaration is sent after the report's own directory, which makes the declared checkout the session's current one. It is dropped unsent if it waits more than an hour, because the agent has by then usually switched to other work.
+
+For the full per-turn traces of a review to land on the pull request too, a fresh `codex` session inside a worktree of the pull request's branch is still the most complete setup:
+
+```bash
+git -C "<repo>" fetch origin "<branch>"
+git -C "<repo>" worktree add -B "<branch>" "<repo>/.claude/worktrees/<name>" "origin/<branch>"
+cd "<repo>/.claude/worktrees/<name>" && codex
+```
+
+`-B` points the local branch at `origin/<branch>`, so run this only where that branch has no commits you have not pushed, and where no other worktree has it checked out. The branch name must stay the pull request's own, because that name is what joins the session to the pull request.
+
+## Route through the LangWatch AI Gateway
+
+Everything above is telemetry: Codex keeps your own plan and your own login. Choosing **Using an API key** on the first wrapper run instead routes the model calls themselves through the LangWatch AI Gateway with a virtual key, which adds budgets, model policies and model aliases on top of the same telemetry. [Codex CLI through the gateway](/ai-gateway/cli/codex) covers that setup and the governance recipes.
+
+The same rule decides what a long-lived session reports. A session resumed across days keeps the directory it was first started in, and commands that reach into a checkout from somewhere else, such as `git -C <repo>` or a `cd` inside a subshell, do not move it. So a standing review agent that lives in a scratch directory reports no repository, no branch and no pull request, no matter how many pull requests it reviews. Give such an agent a fresh `codex` session inside a worktree of the pull request's branch for each review:
+
+```bash
+git -C <repo> fetch origin <branch>
+git -C <repo> worktree add -B <branch> <repo>/.claude/worktrees/<name> origin/<branch>
+cd <repo>/.claude/worktrees/<name> && codex
+```
+
+`-B` points the local branch at the ref the fetch just updated, so an old local copy of the branch does not decide what the agent reviews. Git refuses the `worktree add` if the branch is already checked out somewhere else: start `codex` in that worktree instead of making a second one. A pull request from a fork has no branch on `origin`. For one of those, fetch `refs/pull/<number>/head` from `origin` and use `FETCH_HEAD` in place of `origin/<branch>`, and keep `-B <branch>` at the name of the pull request's own branch so the attribution still matches.
+
+Claude Code sessions can switch natively instead, with the EnterWorktree tool. Codex has no equivalent, so the restart is the way. See [the Claude Code page](/integration/tools/integrations/claude-code#attribute-sessions-to-pull-requests) for the Claude Code rules.
+
+## Content and privacy
+
+Content reaches LangWatch on one path only, and you can turn that path off. Codex's own OpenTelemetry export carries no conversation content; the `notify` program LangWatch installs does send it. Read both parts below before you decide.
+
+The OpenTelemetry export carries two signals. The trace exporter reports each turn with the model, the tokens and the timing. The event exporter reports the facts of the session: each tool run with its name, duration and result, each prompt as a length without its text, tool approvals and denials, and the time to the first token. LangWatch enables both, and the session view is built from them. Neither signal includes the prompt text, the tool output or the answer, and no Codex setting turns that content on. So the `[otel]` block alone gives you usage numbers and no record of what was said.
+
+Codex does write the whole conversation to a transcript on your machine, and each turn there records the trace that Codex reported it under. `langwatch codex` and `langwatch instrument codex` register a small program on the Codex `notify` setting, which Codex runs after each completed turn. That program reads the turn from the transcript and records it against the same trace, so a session you started with a plain `codex` still shows what was said. It also reports the repository and branch the session worked in, read from the same transcript, which is what connects the session to its pull request. This is the path that carries content, and LangWatch installs it unless you say otherwise. A `notify` program of your own keeps running: LangWatch calls it after its own.
+
+To collect the usage numbers and no content, remove the `notify` setting from `~/.codex/config.toml` and keep the `[otel]` block. Tokens, cost, model, timing, tool counts and prompt lengths continue.
+
+<Warning>
+  The `[otel]` block holds an ingest key on the `Authorization` header, because Codex reads that header on every run and that is what makes a plain `codex` report. LangWatch writes the file with owner-only permissions (`0600`). Keep those permissions if you edit the file by hand, and never commit it.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="The first run did not ask anything">
+    Two cases skip the question. Your organization allows one connection path only, and LangWatch takes that path without asking. Or the run has no terminal attached, for example in CI: it keeps your own plan and sends telemetry only.
+
+    To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
+  </Accordion>
+
+  <Accordion title="No telemetry arrives in LangWatch">
+    Run `langwatch instrument codex` again and read what it prints. It names the file it wrote and the destination the telemetry goes to.
+
+    Then check that `~/.codex/config.toml` holds a `[otel]` block between the two LangWatch marker lines.
+  </Accordion>
+
+  <Accordion title="Traces arrive but every turn is empty">
+    The turn program is missing. It is the part that recovers the conversation, because Codex itself exports no content. Run `langwatch instrument codex` again and read the result.
+
+    If it reports that your Codex configuration already runs a program of its own after every turn and cannot be moved safely, remove the `notify` setting from `~/.codex/config.toml` and run the command again.
+  </Accordion>
+
+  <Accordion title="Traces arrive but the session shows no tools or prompts">
+    Codex separates the exporters by signal: `[otel.trace_exporter.otlp-http]` sends the spans and `[otel.exporter.otlp-http]` sends the events that carry the tool runs and the prompt lengths. A configuration written before the event exporter was part of the block only has the first one. Run `langwatch instrument codex` again to write both.
+  </Accordion>
+
+  <Accordion title="The endpoint returns 404">
+    Codex does not append the signal path to the endpoint, unlike most OpenTelemetry libraries. Write the full path per exporter: `https://app.langwatch.ai/api/otel/v1/traces` on the trace exporter and `https://app.langwatch.ai/api/otel/v1/logs` on the event exporter.
+  </Accordion>
+
+  <Accordion title="The telemetry goes to the wrong workspace">
+    Run `langwatch instrument codex --project <id-or-slug>` to move it to a team project, or `langwatch instrument codex --personal` to move it back to your own.
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Check that the key is live and that the header reads `Authorization = "Bearer <key>"`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
+
+    On a machine with a login, run `langwatch login --device` again to refresh the session.
+  </Accordion>
+</AccordionGroup>
+
+For more failure modes see [CLI debug](/ai-governance/cli-debug).
+
+## Manual OpenTelemetry setup
+
+Use this when you cannot install the LangWatch command-line tool. The block below is the one `langwatch instrument codex` writes for you.
+
+Add it to `~/.codex/config.toml`:
+
+```toml
+[otel]
+environment = "your-organization"
+
+[otel.trace_exporter.otlp-http]
+endpoint = "https://app.langwatch.ai/api/otel/v1/traces"
+protocol = "json"
+headers = { "Authorization" = "Bearer ik-lw-your-ingest-key" }
+
+[otel.exporter.otlp-http]
+endpoint = "https://app.langwatch.ai/api/otel/v1/logs"
+protocol = "json"
+headers = { "Authorization" = "Bearer ik-lw-your-ingest-key" }
+```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
+Then set the file to owner-only permissions, because it holds a key:
+
+```bash
+chmod 600 ~/.codex/config.toml
+```
+
+For a self-hosted instance, replace the host with the address of your instance and keep the `/api/otel/v1/traces` and `/api/otel/v1/logs` paths.
+
+<Note>
+  The `environment` value is a free label. It arrives on every trace, so a name such as your organization or your team makes the traces easier to filter.
+</Note>
+
+A manual block reports the tokens, the model and the timing of each turn, and with the event exporter also the tool runs, the prompt lengths and the time to first token. It does not report the conversation, because Codex exports no content. The conversation needs the turn program that `langwatch instrument codex` installs.

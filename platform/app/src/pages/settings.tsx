@@ -18,7 +18,8 @@ import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { OrganizationIntent, Project } from "~/generated/prisma/client";
-import { ProjectSelector } from "../components/DashboardLayout";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
+import { ProjectSelector } from "../components/ProjectSelector";
 import SettingsLayout from "../components/SettingsLayout";
 import { DepartmentPicker } from "../components/settings/DepartmentPicker";
 import { useDepartmentColumn } from "../components/settings/useDepartmentColumn";
@@ -108,7 +109,7 @@ function SettingsForm({
   // surface it routes to is reachable (flag on, which is the default).
   const { enabled: governanceEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    { organizationId: organization.id },
+    { projectId: NOT_TARGETED, organizationId: organization.id },
   );
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
@@ -179,9 +180,6 @@ function SettingsForm({
             title: "Organization updated",
             description: "Your organization settings have been saved",
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
         },
         onError: () => {
@@ -189,9 +187,6 @@ function SettingsForm({
             title: "Failed to update organization",
             description: "Your changes could not be saved. Please try again.",
             type: "error",
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -650,9 +645,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             title: "Project updated",
             description: "Your project settings have been saved",
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
         },
         onError: () => {
@@ -660,9 +652,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             title: "Failed to update project",
             description: "Your changes could not be saved. Please try again.",
             type: "error",
-            meta: {
-              closable: true,
-            },
           });
         },
       },

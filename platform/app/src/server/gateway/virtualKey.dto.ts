@@ -95,6 +95,15 @@ export type VirtualKeyCamelDto = {
   updatedAt: string;
   lastUsedAt: string | null;
   revokedAt: string | null;
+  /**
+   * When the key stops serving, or null for a key that never expires.
+   *
+   * `status` stays "active" past this moment on purpose: the three status
+   * values are what clients switch on, and "expired" is a fact any of them
+   * can read off this date. It also keeps the key editable, which is the
+   * whole point of a date over a status.
+   */
+  expiresAt: string | null;
 };
 
 export type VirtualKeySnakeDto = {
@@ -127,9 +136,20 @@ export type VirtualKeySnakeDto = {
   updated_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
+  /** When the key stops serving; null for a key that never expires. */
+  expires_at: string | null;
 };
 
 type BaseVk = Omit<VirtualKeyCamelDto, never>;
+
+const STATUS_BY_ROW: Record<
+  VirtualKeyWithScopes["status"],
+  VirtualKeyCamelDto["status"]
+> = {
+  ACTIVE: "active",
+  DISABLED: "disabled",
+  REVOKED: "revoked",
+};
 
 function baseVk(
   vk: VirtualKeyWithScopes,
@@ -140,12 +160,7 @@ function baseVk(
     organizationId: vk.organizationId,
     name: vk.name,
     description: vk.description,
-    status:
-      vk.status === "ACTIVE"
-        ? "active"
-        : vk.status === "DISABLED"
-          ? "disabled"
-          : "revoked",
+    status: STATUS_BY_ROW[vk.status],
     purpose: vk.purpose === "LANGY" ? "langy" : "user",
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,
@@ -170,6 +185,7 @@ function baseVk(
     updatedAt: vk.updatedAt.toISOString(),
     lastUsedAt: vk.lastUsedAt?.toISOString() ?? null,
     revokedAt: vk.revokedAt?.toISOString() ?? null,
+    expiresAt: vk.expiresAt?.toISOString() ?? null,
   };
 }
 
@@ -216,5 +232,6 @@ export function toVirtualKeySnakeDto({
     updated_at: base.updatedAt,
     last_used_at: base.lastUsedAt,
     revoked_at: base.revokedAt,
+    expires_at: base.expiresAt,
   };
 }

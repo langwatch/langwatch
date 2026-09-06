@@ -10,8 +10,11 @@
  * makes a reconnect work; doing it only for the project that owns the session
  * is what keeps it safe.
  */
+import {
+  type RedisConnection,
+  RedisConnectionService,
+} from "@langwatch/redis-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { connection as redis } from "~/server/redis";
 import {
   initializeBody,
   type ReplicaPair,
@@ -20,6 +23,9 @@ import {
 
 const VALID_API_KEY = "lw_relay_key_a";
 const OTHER_API_KEY = "lw_relay_key_b";
+
+/** Opened in `beforeAll`, and closed by the matching `afterAll`. */
+let redis: RedisConnection | null = null;
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
@@ -57,6 +63,13 @@ describe("Feature: MCP streamable transport across replicas", () => {
   let urlB: string;
 
   beforeAll(async () => {
+    // This suite boots no App of its own, so it owns the connection it opens
+    // and closes it below (ADR-093). The harness lends it to the replicas.
+    redis = new RedisConnectionService().connect({
+      url: process.env.REDIS_URL,
+      clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+      dbIndex: process.env.REDIS_DB_INDEX,
+    });
     if (!redis) {
       throw new Error(
         "These tests need a real Redis — set REDIS_URL / LANGWATCH_TEST_REDIS_URL",
@@ -73,6 +86,7 @@ describe("Feature: MCP streamable transport across replicas", () => {
     // beforeAll throws when Redis is missing, which leaves this unset;
     // dereferencing it here would replace that message with a TypeError.
     await replicas?.stop();
+    redis?.disconnect();
   });
 
   describe("given a streamable session was created on one replica", () => {

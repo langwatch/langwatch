@@ -138,7 +138,6 @@ export const TeamForm = ({
         title: "Failed to archive project",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
     },
   });

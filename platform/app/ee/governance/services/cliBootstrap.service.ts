@@ -23,17 +23,14 @@ import { env } from "~/env.mjs";
  */
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import {
+  type BudgetOverviewForUser,
+  BudgetOverviewService,
+} from "~/server/gateway/budgetOverview.service";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { AiToolEntryService } from "./aiToolEntry.service";
 import { resolveGatewayBaseUrl } from "./gatewayUrl";
-import { PersonalVirtualKeyService } from "./personalVirtualKey.service";
-import { PersonalWorkspaceService } from "./personalWorkspace.service";
-import {
-  PLATFORM_TOOL_POLICY_DEFAULTS,
-  PLATFORM_TOOL_SLUGS,
-  type PlatformToolPolicyMap,
-} from "./platformToolPolicy.service";
+import type { PlatformToolPolicyMap } from "./platformToolPolicy.service";
 
 export interface CliBootstrapResult {
   /**
@@ -69,6 +66,16 @@ export interface CliBootstrapResult {
    * Membership-scoped via `listConfiguredProvidersForUser`.
    */
   gatewayProviders: string[];
+  /**
+   * @deprecated The single-number collapse the login ceremony used to
+   * print. It carries the most binding MONTH-window budget that applies,
+   * so old CLI versions still render a line, but it cannot say WHICH
+   * budget the number belongs to and it can only ever speak for a
+   * monthly one. New consumers read the full per-budget overview from
+   * `GET /api/auth/cli/budget-overview` / `api.user.budgetOverview`;
+   * this field is populated FROM that same overview so the two can
+   * never disagree.
+   */
   budget: {
     monthlyLimitUsd: number | null;
     monthlyUsedUsd: number;
@@ -108,22 +115,14 @@ function resolveGatewayUrl(): string {
   });
 }
 
-const SCOPE_RANK: Record<string, number> = {
-  PRINCIPAL: 0,
-  VIRTUAL_KEY: 1,
-  PROJECT: 2,
-  TEAM: 3,
-  ORGANIZATION: 4,
-};
-
 export class CliBootstrapService {
   private readonly prisma: PrismaClient;
   /**
    * The gateway budget ledger, from the App. `undefined` on a deployment
-   * without ClickHouse, in which case {@link resolveBudget} short-circuits
-   * to the empty budget rather than falling back to Postgres spend — the
-   * CLI ceremony has always reported "no budget data" when the ledger
-   * isn't reachable, not a stale PG figure.
+   * without ClickHouse, in which case the budget overview reports the
+   * empty budget rather than falling back to Postgres spend — the CLI
+   * ceremony has always reported "no budget data" when the ledger isn't
+   * reachable, not a stale PG figure.
    */
   private readonly budgetRepository:
     | GatewayBudgetClickHouseRepository
@@ -179,19 +178,17 @@ export class CliBootstrapService {
       organizationId: input.organizationId,
     });
 
-    const workspaceService = new PersonalWorkspaceService(this.prisma);
-    const workspace = await workspaceService.findExisting({
+    // One computation: the deprecated collapsed field is derived from the
+    // same overview the CLI's budget-overview endpoint serves, so the
+    // legacy line and the labelled list can never disagree.
+    const overview = await BudgetOverviewService.create(
+      this.prisma,
+      this.budgetRepository,
+    ).overviewForUser({
       userId: input.userId,
       organizationId: input.organizationId,
     });
-    const budget = workspace
-      ? await this.resolveBudget({
-          userId: input.userId,
-          organizationId: input.organizationId,
-          teamId: workspace.team.id,
-          projectId: workspace.project.id,
-        })
-      : { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
+    const budget = collapseOverviewToLegacyBudget(overview);
 
     return {
       tools: catalog.tools,
@@ -205,12 +202,14 @@ export class CliBootstrapService {
   }
 
   /**
-   * The login `toolPolicies` map. Derived from the coding_assistant tiles
-   * the user can see (per-tool slug) merged over the hardcoded
-   * {@link PLATFORM_TOOL_POLICY_DEFAULTS}: claude/codex/gemini/opencode =
-   * both paths, cursor = gateway only. A tool with no visible tile keeps
-   * its default, so the map is always complete for every known slug - the
-   * exact wire shape the CLI caches and gates on. Replaces the retired
+   * The login `toolPolicies` map: the effective per-tool policy from
+   * {@link AiToolEntryService.resolveToolPolicyMap}, which is the coding
+   * assistant tiles the user can see merged over the hardcoded defaults
+   * (claude/codex/gemini/opencode = both paths, cursor = gateway only). A
+   * tool with no visible tile keeps its default, so the map is always
+   * complete for every known slug - the exact wire shape the CLI caches and
+   * gates on. The ingestion-key mint reads the same map, so a CLI that skips
+   * its own gate still meets the policy. Replaces the retired
    * PlatformToolPolicy table.
    */
   private async resolveToolPolicies({
@@ -220,65 +219,34 @@ export class CliBootstrapService {
     organizationId: string;
     userId: string;
   }): Promise<PlatformToolPolicyMap> {
-    const overrides = await AiToolEntryService.create(
-      this.prisma,
-    ).resolveToolPolicyOverrides({ organizationId, userId });
-
-    const map = {} as PlatformToolPolicyMap;
-    for (const slug of PLATFORM_TOOL_SLUGS) {
-      map[slug] = overrides[slug] ?? { ...PLATFORM_TOOL_POLICY_DEFAULTS[slug] };
-    }
-    return map;
-  }
-
-  private async resolveBudget(input: {
-    userId: string;
-    organizationId: string;
-    teamId: string;
-    projectId: string;
-  }): Promise<CliBootstrapResult["budget"]> {
-    const vkService = PersonalVirtualKeyService.create(this.prisma);
-    const vks = await vkService.list({
-      userId: input.userId,
-      organizationId: input.organizationId,
+    return await AiToolEntryService.create(this.prisma).resolveToolPolicyMap({
+      organizationId,
+      userId,
     });
-    const personalVk = vks[0];
-
-    if (!personalVk || !this.budgetRepository) {
-      return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
-    }
-
-    const budgetService = GatewayBudgetService.create(
-      this.prisma,
-      this.budgetRepository,
-    );
-    const decision = await budgetService.check({
-      organizationId: input.organizationId,
-      teamId: input.teamId,
-      projectId: input.projectId,
-      virtualKeyId: personalVk.id,
-      principalUserId: input.userId,
-      projectedCostUsd: 0,
-    });
-
-    const ranked = decision.scopes
-      .map((s) => ({
-        scope: s.scope,
-        spent: Number.parseFloat(s.spentUsd) || 0,
-        limit: Number.parseFloat(s.limitUsd) || 0,
-        window: s.window,
-        rank: SCOPE_RANK[s.scope] ?? 99,
-      }))
-      .filter((s) => s.limit > 0)
-      .sort((a, b) => a.rank - b.rank);
-    const chosen = ranked[0];
-    if (!chosen) {
-      return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
-    }
-    return {
-      monthlyLimitUsd: chosen.limit,
-      monthlyUsedUsd: chosen.spent,
-      period: chosen.window,
-    };
   }
+}
+
+/**
+ * Old CLIs render one budget line from a field that says `monthly`, so
+ * they get the most binding MONTH-window budget and nothing else. A
+ * weekly or daily cap put here would travel as a monthly figure and
+ * print as one, which is the mislabel the overview exists to end - and
+ * the labelled list already carries those budgets for any CLI new
+ * enough to ask. No access, no budgets, or no monthly budget collapses
+ * to the shape's long-standing empty state.
+ */
+function collapseOverviewToLegacyBudget(
+  overview: BudgetOverviewForUser,
+): CliBootstrapResult["budget"] {
+  const monthly = overview.gatewayAccess
+    ? overview.budgets.find((b) => b.window === "MONTH")
+    : undefined;
+  if (!monthly) {
+    return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
+  }
+  return {
+    monthlyLimitUsd: Number.parseFloat(monthly.limitUsd) || 0,
+    monthlyUsedUsd: Number.parseFloat(monthly.spentUsd) || 0,
+    period: "MONTHLY",
+  };
 }

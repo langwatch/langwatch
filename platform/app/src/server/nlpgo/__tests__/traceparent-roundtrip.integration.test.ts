@@ -204,7 +204,14 @@ function ensureNlpgoBinary(timeoutMs = 600_000): string {
   return NLPGO_TEST_BIN;
 }
 
-const noopReactor = { name: "noop", options: {}, handle: async () => {} };
+const noopFoldSubscriber = () => ({
+  fold: "traceSummary",
+  handler: async () => {},
+});
+const noopMapSubscriber = () => ({
+  map: "spanStorage",
+  handler: async () => {},
+});
 
 describe.skipIf(!shouldRun)(
   "nlpgo traceparent — full roundtrip through real event-sourcing pipeline into ClickHouse",
@@ -288,16 +295,12 @@ describe.skipIf(!shouldRun)(
           "spanStorage",
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withReactor("traceSummary", "evaluationTrigger", noopReactor as any)
-        .withReactor("traceSummary", "customEvaluationSync", noopReactor as any)
-        .withReactor("traceSummary", "traceUpdateBroadcast", noopReactor as any)
-        .withReactor(
-          "traceSummary",
-          "simulationMetricsSync",
-          noopReactor as any,
-        )
-        .withReactor("traceSummary", "projectMetadata", noopReactor as any)
-        .withReactor("spanStorage", "spanStorageBroadcast", noopReactor as any)
+        .withSubscriber("evaluationTrigger", noopFoldSubscriber() as any)
+        .withSubscriber("customEvaluationSync", noopFoldSubscriber() as any)
+        .withSubscriber("traceUpdateBroadcast", noopFoldSubscriber() as any)
+        .withSubscriber("simulationMetricsSync", noopFoldSubscriber() as any)
+        .withSubscriber("projectMetadata", noopFoldSubscriber() as any)
+        .withSubscriber("spanStorageBroadcast", noopMapSubscriber() as any)
         // REAL RecordSpanCommand with no-op PII/cost/token deps —
         // same pattern as the other event-sourcing integration tests.
         .withCommand(
@@ -355,9 +358,9 @@ describe.skipIf(!shouldRun)(
       otlpDeliveries.length = 0;
       nlpgoStderrBuf = "";
 
-      // Clear reactor-job orphans from prior runs once, so they don't log
+      // Clear subscriber-job orphans from prior runs once, so they don't log
       // "Unknown job in global queue" noise (matches the
-      // loopPrevention.reactor.integration.test.ts pattern). Wrap in
+      // loopPrevention.subscriber.integration.test.ts pattern). Wrap in
       // a one-retry helper so a transient ETIMEDOUT on a saturated CI
       // runner doesn't kill the whole suite before the test even runs.
       //

@@ -97,7 +97,7 @@ export class TriggerService {
    * REPORTs are excluded (ADR-044). A report persists `filters: {}` and no
    * `customGraphId` — byte-identical to a match-everything trace automation —
    * so without the kind check every scheduled report would ALSO fire once per
-   * ingested trace: the notify reactor enqueues a settle for any NOTIFY trigger
+   * ingested trace: the notify subscriber enqueues a settle for any NOTIFY trigger
    * with no evaluation filters, and the settle dispatcher skips the filter
    * guard entirely when `filters` is empty. A report fires from its scheduler
    * calendar entry (`syncReportSchedule`) and nowhere else.
@@ -133,9 +133,9 @@ export class TriggerService {
 
   /**
    * Atomically claim (triggerId, traceId). Returns true on first claim,
-   * false if another reactor already claimed it. Side effects (email,
+   * false if another subscriber already claimed it. Side effects (email,
    * slack, dataset write) must run only when this returns true to avoid
-   * double-fire on concurrent dispatch or reactor retry.
+   * double-fire on concurrent dispatch or subscriber retry.
    */
   async claimSend(params: {
     triggerId: string;
@@ -157,6 +157,19 @@ export class TriggerService {
     projectId: string;
   }): Promise<boolean> {
     return this.repo.isSendClaimed(params);
+  }
+
+  /**
+   * Batched `isSendClaimed`: the subset of `traceIds` already claimed for
+   * this trigger, in one read. A paged persist dispatch filters its whole
+   * page against prior claims at once instead of one round trip per trace.
+   */
+  async filterSendClaimed(params: {
+    triggerId: string;
+    traceIds: string[];
+    projectId: string;
+  }): Promise<Set<string>> {
+    return this.repo.findClaimedTraceIds(params);
   }
 
   async updateLastRunAt(triggerId: string, projectId: string): Promise<void> {

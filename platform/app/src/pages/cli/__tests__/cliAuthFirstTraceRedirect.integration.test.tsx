@@ -127,6 +127,20 @@ vi.mock("~/utils/api", async () => {
           useQuery: () => ({ data: undefined, isLoading: false }),
         },
       },
+      // Org admin ceiling so the device-session flow defaults to a full
+      // organization scope selection and the Approve button stays enabled;
+      // the key-selection UI itself is covered by
+      // cliAuthKeySelection.integration.test.tsx.
+      apiKey: {
+        myBindings: {
+          useQuery: () => ({
+            data: [
+              { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" },
+            ],
+            isLoading: false,
+          }),
+        },
+      },
       project: {
         getHasFirstMessage: {
           useQuery: (
@@ -172,10 +186,10 @@ const serveCliAuthEndpoints = () => {
       );
     }
     if (url.includes("/api/auth/cli/approve")) {
-      return new Response(
-        JSON.stringify({ ok: true, personal_vk_label: "default" }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
     }
     return new Response(JSON.stringify({}), {
       status: 200,
@@ -207,8 +221,18 @@ describe("/cli/auth first-trace watch", () => {
     mockRouter.query = {};
   });
 
+  // Step one of the screen: the code check gates everything below it.
+  const confirmCode = async () => {
+    const user = userEvent.setup();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Confirm" })).toBeDefined(),
+    );
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+  };
+
   const approveDeviceSession = async () => {
     const user = userEvent.setup();
+    await confirmCode();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Approve" })).toBeDefined(),
     );
@@ -269,6 +293,7 @@ describe("/cli/auth first-trace watch", () => {
     renderPage();
 
     const user = userEvent.setup();
+    await confirmCode();
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Send API key" }),

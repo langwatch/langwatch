@@ -15,6 +15,22 @@ export function isUniqueConstraintError(error: unknown): boolean {
 }
 
 /**
+ * Duck-type check for Prisma P2025 "record to update not found".
+ *
+ * A compare-and-set update carries the expected version in its WHERE, so a
+ * racing writer turns the update into a zero-row match and this is how it
+ * arrives. Duck-typed for the same reason as P2002 above.
+ */
+export function isRecordNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: string }).code === "P2025"
+  );
+}
+
+/**
  * The constraint a P2002 names, across both error shapes: the classic engine
  * put field names (or the index name) on `meta.target`; the Prisma 7 driver
  * adapters put them on `meta.driverAdapterError.cause.constraint` as

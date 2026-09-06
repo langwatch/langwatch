@@ -84,7 +84,7 @@ RESP_TRACEPARENT=$(grep -i '^traceparent:' "$HEADERS_FILE" | awk '{print $2}' | 
 # Trace id should match the incoming traceparent's trace id (chars 4..36)
 EXPECTED_TRACE_ID=${TRACEPARENT:3:32}
 if [ "$RESP_TRACE_ID" != "$EXPECTED_TRACE_ID" ]; then
-  echo "FAIL: trace propagation — expected $EXPECTED_TRACE_ID, got $RESP_TRACE_ID"
+  echo "FAIL: trace propagation, expected $EXPECTED_TRACE_ID, got $RESP_TRACE_ID"
   exit 1
 fi
 
@@ -98,7 +98,7 @@ fi
 CONTENT=$(jq -r '.choices[0].message.content' "$RESPONSE_FILE")
 [ -z "$CONTENT" ] || [ "$CONTENT" = "null" ] && { echo "FAIL: empty content"; exit 1; }
 
-echo "OK — smoke test passed (request_id=$REQUEST_ID, trace=$RESP_TRACE_ID)"
+echo "OK: smoke test passed (request_id=$REQUEST_ID, trace=$RESP_TRACE_ID)"
 ```
 
 ## GitHub Actions

@@ -1,5 +1,6 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
-import { Check, Copy } from "lucide-react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
+import { useState } from "react";
 import { useCopyToClipboard } from "~/features/traces-v2/hooks/useCopyToClipboard";
 
 /**
@@ -16,43 +17,126 @@ import { useCopyToClipboard } from "~/features/traces-v2/hooks/useCopyToClipboar
  * click target): the first thing anyone does with a code is paste it somewhere.
  * The button copies the FULL failure document rather than just the code, because
  * that is what a support thread actually needs.
+ *
+ * The engine's own words, a traceback or a wall of stderr, belong here
+ * too, behind the disclosure, never in the card body. A failure that carries
+ * nothing but that text still gets this row, so the reader keeps a way to it.
  */
 export function LangyFailureReference({
   code,
   raw,
 }: {
-  code: string;
+  code?: string;
   raw?: string;
 }) {
   const { copied, copy } = useCopyToClipboard();
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (!code && !raw) return null;
 
   return (
-    <HStack gap={1.5} align="center">
-      <Text
-        textStyle="2xs"
-        fontFamily="mono"
-        color="fg.subtle"
-        userSelect="text"
-        truncate
-        title={code}
-      >
-        {code}
-      </Text>
-      <Button
-        size="2xs"
-        variant="ghost"
-        color={copied ? "green.fg" : "fg.subtle"}
-        aria-label={
-          copied ? "Copied the error details" : "Copy the error details"
-        }
-        onClick={() => copy(raw ?? code)}
-      >
-        {copied ? (
-          <Check size={11} aria-hidden="true" />
-        ) : (
-          <Copy size={11} aria-hidden="true" />
-        )}
-      </Button>
-    </HStack>
+    <VStack align="stretch" gap={1}>
+      <HStack gap={1.5} align="center">
+        {code ? <FailureCode code={code} /> : null}
+        {raw ? (
+          <DetailsToggle isOpen={isOpen} onToggle={() => setIsOpen(!isOpen)} />
+        ) : null}
+        <CopyButton copied={copied} onCopy={() => copy(raw ?? code ?? "")} />
+      </HStack>
+      {isOpen && raw ? <FailureDetails raw={raw} /> : null}
+    </VStack>
+  );
+}
+
+function FailureCode({ code }: { code: string }) {
+  return (
+    <Text
+      textStyle="2xs"
+      fontFamily="mono"
+      color="fg.subtle"
+      userSelect="text"
+      truncate
+      title={code}
+    >
+      {code}
+    </Text>
+  );
+}
+
+function DetailsToggle({
+  isOpen,
+  onToggle,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Button
+      size="2xs"
+      variant="ghost"
+      color="fg.subtle"
+      aria-expanded={isOpen}
+      onClick={onToggle}
+    >
+      {isOpen ? (
+        <ChevronDown size={11} aria-hidden="true" />
+      ) : (
+        <ChevronRight size={11} aria-hidden="true" />
+      )}
+      {isOpen ? "Hide details" : "Show details"}
+    </Button>
+  );
+}
+
+/** Copies the whole failure, which is what a support thread needs, not the code. */
+function CopyButton({
+  copied,
+  onCopy,
+}: {
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <Button
+      size="2xs"
+      variant="ghost"
+      color={copied ? "green.fg" : "fg.subtle"}
+      aria-label={
+        copied ? "Copied the error details" : "Copy the error details"
+      }
+      onClick={onCopy}
+    >
+      {copied ? (
+        <Check size={11} aria-hidden="true" />
+      ) : (
+        <Copy size={11} aria-hidden="true" />
+      )}
+    </Button>
+  );
+}
+
+/** Bounded and scrollable: a traceback is unbounded and the card is not. */
+function FailureDetails({ raw }: { raw: string }) {
+  return (
+    <Box
+      as="pre"
+      textStyle="2xs"
+      fontFamily="mono"
+      color="fg.muted"
+      userSelect="text"
+      whiteSpace="pre-wrap"
+      wordBreak="break-word"
+      maxHeight="180px"
+      overflowY="auto"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      borderRadius="6px"
+      background="bg.subtle"
+      padding={2}
+      margin={0}
+    >
+      {raw}
+    </Box>
   );
 }

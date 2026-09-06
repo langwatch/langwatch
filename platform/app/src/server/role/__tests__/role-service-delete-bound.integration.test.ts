@@ -90,9 +90,12 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
   it("refuses the delete and keeps the role", async () => {
     const service = new RoleService(prisma);
 
-    await expect(service.deleteRole(boundRoleId)).rejects.toBeInstanceOf(
-      RoleInUseError,
-    );
+    await expect(
+      service.deleteRole({
+        roleId: boundRoleId,
+        actor: { type: "user" as const, id: "actor_1" },
+      }),
+    ).rejects.toBeInstanceOf(RoleInUseError);
 
     const survivor = await prisma.customRole.findUnique({
       where: { id: boundRoleId },
@@ -110,14 +113,15 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
 
   it("refuses at the storage layer even with the in-use check skipped", async () => {
     // What a binding written after the service's in-use check runs into: the
-    // condition rides on the delete statement, so the role survives instead of
-    // having its grant silently unhooked.
+    // repository re-reads the holders immediately before it emits, so the role
+    // survives instead of having its grant silently unhooked.
     const repository = new RoleRepository(prisma);
 
     await expect(
       repository.deleteIfUnused({
         roleId: boundRoleId,
         organizationId: testOrganization.id,
+        actor: { type: "user", id: "actor_1" },
       }),
     ).resolves.toBe(false);
 
@@ -170,6 +174,7 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
         repository.deleteIfUnused({
           roleId: role.id,
           organizationId: testOrganization.id,
+          actor: { type: "user", id: "actor_1" },
         }),
       ).resolves.toBe(false);
 
@@ -196,7 +201,12 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
     });
 
     const service = new RoleService(prisma);
-    await expect(service.deleteRole(unboundRole.id)).resolves.toEqual({
+    await expect(
+      service.deleteRole({
+        roleId: unboundRole.id,
+        actor: { type: "user" as const, id: "actor_1" },
+      }),
+    ).resolves.toEqual({
       success: true,
     });
   });

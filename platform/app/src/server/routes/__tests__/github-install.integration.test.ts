@@ -20,9 +20,19 @@
  */
 import { createHmac } from "crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
-const TEST_SIGNING_KEY = "x".repeat(64);
-process.env.CREDENTIALS_SECRET = TEST_SIGNING_KEY;
+wireDefaultTestApp();
+
+// vi.hoisted runs before the import graph executes. A plain module-body
+// assignment is too late: wireDefaultTestApp's import chain reaches
+// ~/env.mjs, whose snapshot would capture the real .env secret first and the
+// route would refuse every state this file signs.
+const { TEST_SIGNING_KEY } = vi.hoisted(() => {
+  const key = "x".repeat(64);
+  process.env.CREDENTIALS_SECRET = key;
+  return { TEST_SIGNING_KEY: key };
+});
 
 // The App credentials are read through getGithubAppConfig, so the suite can
 // take the App away mid-file without fighting the env snapshot t3-env takes at
@@ -42,9 +52,10 @@ vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
 
 const getServerAuthSession = vi.fn();
 const isOrganizationMember = vi.fn();
-const hasOrganizationPermission = vi.fn();
+const probeOrganizationPermission = vi.fn();
 const recordInstallation = vi.fn();
 const handleWebhookEvent = vi.fn();
+const applyPullRequestEvent = vi.fn();
 const auditLog = vi.fn();
 const isEnabled = vi.fn();
 
@@ -59,6 +70,12 @@ vi.mock("~/server/app-layer", () => ({
         recordInstallation: (...a: unknown[]) => recordInstallation(...a),
         handleWebhookEvent: (...a: unknown[]) => handleWebhookEvent(...a),
       },
+      pullRequests: {
+        mapping: {
+          applyPullRequestEvent: (...a: unknown[]) =>
+            applyPullRequestEvent(...a),
+        },
+      },
     },
   }),
 }));
@@ -70,11 +87,16 @@ vi.mock("~/server/featureFlag", () => ({
 }));
 // Partial mock: the route uses only this helper, but other modules in the
 // import graph read further rbac exports (Resources etc.).
-vi.mock(import("~/server/api/rbac"), async (importOriginal) => ({
-  ...(await importOriginal()),
-  hasOrganizationPermission: ((...args: unknown[]) =>
-    hasOrganizationPermission(...args)) as never,
-}));
+// The route reads probeOrganizationPermission from the app-layer imperative
+// module (it moved off ~/server/api/rbac with ADR-092).
+vi.mock(
+  import("~/server/app-layer/permissions/imperative"),
+  async (importOriginal) => ({
+    ...(await importOriginal()),
+    probeOrganizationPermission: ((...args: unknown[]) =>
+      probeOrganizationPermission(...args)) as never,
+  }),
+);
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
 async function request(path: string, init?: RequestInit) {
@@ -114,8 +136,9 @@ beforeEach(() => {
   appConfig.webhookSecret = "whsecret";
   getServerAuthSession.mockResolvedValue({ user: { id: "u1" } });
   isOrganizationMember.mockResolvedValue(true);
-  hasOrganizationPermission.mockResolvedValue(true);
+  probeOrganizationPermission.mockResolvedValue(true);
   recordInstallation.mockResolvedValue({ accountLogin: "acme" });
+  applyPullRequestEvent.mockResolvedValue(true);
   isEnabled.mockResolvedValue(true);
 });
 
@@ -151,12 +174,12 @@ describe("GET /api/github/install", () => {
       // Connecting the App grants repository access to every project in the
       // organization: membership alone must not be enough on the REST twin
       // either.
-      hasOrganizationPermission.mockResolvedValue(false);
+      probeOrganizationPermission.mockResolvedValue(false);
       const res = await request(
         "http://localhost/api/github/install?organizationId=org1",
       );
       expect(res.status).toBe(403);
-      expect(hasOrganizationPermission).toHaveBeenCalledWith(
+      expect(probeOrganizationPermission).toHaveBeenCalledWith(
         expect.anything(),
         "org1",
         "organization:manage",
@@ -269,7 +292,7 @@ describe("GET /api/github/setup", () => {
 
   describe("when the connect permission was lowered mid-flow", () => {
     it("re-checks organization management and refuses to persist the installation", async () => {
-      hasOrganizationPermission.mockResolvedValue(false);
+      probeOrganizationPermission.mockResolvedValue(false);
       const state = await makeState({ mode: "popup" });
 
       const res = await request(
@@ -456,6 +479,99 @@ describe("POST /api/github/webhook", () => {
       });
       expect(res.status).toBe(200);
       expect(handleWebhookEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when GitHub announces a pull request", () => {
+    /** A `pull_request` delivery, trimmed to the fields the route reads. */
+    function pullRequestBody(over: Record<string, unknown> = {}) {
+      return JSON.stringify({
+        action: "opened",
+        installation: { id: 555 },
+        repository: {
+          name: "widgets",
+          full_name: "acme/widgets",
+          owner: { login: "acme" },
+        },
+        pull_request: {
+          number: 7,
+          html_url: "https://github.com/acme/widgets/pull/7",
+          title: "Link sessions to pull requests",
+          state: "open",
+          draft: false,
+          merged_at: null,
+          closed_at: null,
+          created_at: "2026-08-01T10:00:00.000Z",
+          updated_at: "2026-08-01T11:00:00.000Z",
+          user: { login: "someone" },
+          head: { ref: "feat/linkage", repo: { full_name: "acme/widgets" } },
+        },
+        ...over,
+      });
+    }
+
+    async function deliver(body: string, signature?: string) {
+      return await request("http://localhost/api/github/webhook", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-GitHub-Event": "pull_request",
+          "X-Hub-Signature-256": signature ?? sign(body),
+        },
+        body,
+      });
+    }
+
+    it("links the head branch, and touches no installation state", async () => {
+      const res = await deliver(pullRequestBody());
+
+      expect(res.status).toBe(200);
+      expect(applyPullRequestEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "opened",
+          installationId: "555",
+          repositoryOwner: "acme",
+          repositoryName: "widgets",
+          headBranch: "feat/linkage",
+          pullRequest: expect.objectContaining({ number: 7, state: "open" }),
+        }),
+      );
+      expect(handleWebhookEvent).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Every announcement is acknowledged, applied or not" */
+    it("acks a delivery it has nothing to do with", async () => {
+      // A pull request opened from a fork: the head lives somewhere else, so
+      // linkage has nothing to write for it.
+      const forked = pullRequestBody({
+        pull_request: {
+          ...JSON.parse(pullRequestBody()).pull_request,
+          head: {
+            ref: "feat/linkage",
+            repo: { full_name: "contributor/widgets" },
+          },
+        },
+      });
+
+      const res = await deliver(forked);
+
+      expect(res.status).toBe(200);
+      expect(applyPullRequestEvent).not.toHaveBeenCalled();
+    });
+
+    it("refuses a wrongly signed announcement before reading it", async () => {
+      const res = await deliver(pullRequestBody(), "sha256=deadbeef");
+
+      expect(res.status).toBe(401);
+      expect(applyPullRequestEvent).not.toHaveBeenCalled();
+    });
+
+    it("acks even when applying the announcement fails", async () => {
+      applyPullRequestEvent.mockRejectedValue(new Error("postgres is away"));
+
+      const res = await deliver(pullRequestBody());
+
+      expect(res.status).toBe(200);
     });
   });
 });

@@ -71,7 +71,38 @@ describe("runExperimentCommand()", () => {
 
       await runExperimentCommand("quality-check", {});
 
-      expect(mockStartRun).toHaveBeenCalledWith("quality-check");
+      expect(mockStartRun).toHaveBeenCalledWith("quality-check", {
+        parameters: undefined,
+      });
+    });
+  });
+
+  describe("when --param pairs are given", () => {
+    /** @scenario "The experiment run command passes param flags the same way suite run does" */
+    it("starts the run with those names resolved to the flags' values", async () => {
+      mockStartRun.mockResolvedValue({
+        runId: "run_123",
+        status: "running",
+        total: 10,
+      });
+
+      await runExperimentCommand("quality-check", {
+        param: ["account_tier=gold", "seats=12", "beta=true"],
+      });
+
+      expect(mockStartRun).toHaveBeenCalledWith("quality-check", {
+        parameters: { account_tier: "gold", seats: 12, beta: true },
+      });
+    });
+  });
+
+  describe("when a --param pair has no equals sign", () => {
+    it("refuses the command instead of starting a run", async () => {
+      await expect(
+        runExperimentCommand("quality-check", { param: ["account_tier"] }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockStartRun).not.toHaveBeenCalled();
     });
   });
 

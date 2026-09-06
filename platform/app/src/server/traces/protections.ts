@@ -54,3 +54,19 @@ export interface Protections {
    */
   visibilityCutoffMs?: number | null;
 }
+
+/**
+ * Whether this viewer may read text the model wrote FROM the conversation, as
+ * opposed to a fact about it.
+ *
+ * Both sides are required. A summary, a title or an evaluator's prose
+ * routinely paraphrases the prompt and the reply together, so a viewer allowed
+ * only one of them could read the other out of it.
+ *
+ * The one place this rule is written down: every surface carrying such text
+ * (the Sessions lens, the Sessions screen, the pull request detail, evaluator
+ * verdicts) asks here, so none of them can drift behind the others.
+ */
+export const canReadCapturedContent = (protections: Protections): boolean =>
+  protections.canSeeCapturedInput === true &&
+  protections.canSeeCapturedOutput === true;

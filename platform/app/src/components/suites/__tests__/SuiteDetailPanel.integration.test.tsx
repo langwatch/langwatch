@@ -25,6 +25,8 @@ type SimulationSuite = {
   projectId: string;
   name: string;
   slug: string;
+  kind: string;
+  scope: null;
   description: string | null;
   scenarioIds: string[];
   targets: Array<{ type: string; referenceId: string }>;
@@ -129,6 +131,8 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     projectId: "proj_1",
     name: "Critical Path",
     slug: "critical-path",
+    kind: "run_plan",
+    scope: null,
     description: "Core test scenarios",
     scenarioIds: ["scen_1", "scen_2", "scen_3"],
     targets: [{ type: "http", referenceId: "agent_1" }],

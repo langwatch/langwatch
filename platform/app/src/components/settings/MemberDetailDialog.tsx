@@ -250,7 +250,6 @@ export function MemberDetailDialog({
             : undefined,
         type: "success",
         duration: teamsLeftWithoutAdmin.length > 0 ? 10000 : undefined,
-        meta: { closable: true },
       });
       onClose();
     } catch (e) {

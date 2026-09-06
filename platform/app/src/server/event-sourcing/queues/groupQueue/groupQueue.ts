@@ -24,7 +24,17 @@ import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { SHUTDOWN_BUDGET } from "~/server/shutdown/budget";
+import {
+  LATENCY_HOUR_BUCKET_TTL_SECONDS,
+  LATENCY_MINUTE_BUCKET_TTL_SECONDS,
+  LATENCY_SAMPLE_SIZE,
+  latencyAllTimeKey,
+  latencyBucketField,
+  latencyHourBucketKey,
+  latencyMinuteBucketKey,
+} from "~/shared/ops/latency";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { tryGetApp } from "../../../app-layer/app";
 import {
   createContextFromJobData,
   getJobContextMetadata,
@@ -36,7 +46,6 @@ import {
   TenantRateTracker,
   tenantIdFromGroupId,
 } from "../../../observability/tenantRateTracker";
-import { connection } from "../../../redis";
 import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
@@ -351,6 +360,27 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly deathThreshold = readConfirmedDeathThreshold();
 
   private shutdownRequested = false;
+  /**
+   * Whether `send`/`sendBatch` may still stage work.
+   *
+   * NOT the same thing as `shutdownRequested`, and the difference is the whole
+   * point. Shutdown is requested at the START of close(), while the drain that
+   * follows is still running jobs — and those jobs store events and dispatch
+   * them onward, into this same queue, because the projection, subscriber, map
+   * and fold queues are all facades over it. Gating sends on
+   * `shutdownRequested` meant the queue refused the work its own drain was
+   * producing, and nothing above retried it: every rollout quietly dropped a
+   * burst of projection dispatches (prod, 2026-08-24).
+   *
+   * Accepting them is safe. `send` stages into Redis over `redisConnection`,
+   * which the drain leaves alone — only the blocking connection is closed here,
+   * and the shared connections go afterwards, in App.close. Staged work is
+   * durable and shared, so anything staged during a drain is picked up by
+   * another pod rather than lost with this one.
+   *
+   * So the gate closes when the drain is over, however it ended.
+   */
+  private stagingClosed = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
 
@@ -412,7 +442,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       auditAdapter,
     } = definition;
 
-    const effectiveConnection = redisConnection ?? connection;
+    // `tryGetApp`, not `getApp`: this is a constructor, and EventSourcing
+    // builds queues while the composition root is still assembling — so an App
+    // may legitimately not exist yet. The caller that matters always passes a
+    // connection; falling through to the ConfigurationError below states the
+    // real problem, where `getApp()` would raise a boot-order error instead.
+    const effectiveConnection = redisConnection ?? tryGetApp()?.redis ?? null;
     if (!effectiveConnection) {
       throw new ConfigurationError(
         "GroupQueueProcessor",
@@ -604,11 +639,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     payload: Payload,
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
-    if (this.shutdownRequested) {
+    if (this.stagingClosed) {
       throw new QueueError(
         this.queueName,
         "send",
-        "Cannot send to queue after shutdown has been requested",
+        "Cannot send to queue after its drain has finished",
       );
     }
     assertNoReservedKeys(
@@ -720,11 +755,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     payloads: Payload[],
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
-    if (this.shutdownRequested) {
+    if (this.stagingClosed) {
       throw new QueueError(
         this.queueName,
         "sendBatch",
-        "Cannot send to queue after shutdown has been requested",
+        "Cannot send to queue after its drain has finished",
       );
     }
 
@@ -1715,16 +1750,33 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.activeJobCount--;
       const jobDurationMs = performance.now() - jobStartTime;
       gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
-      // Feed the ops dashboard P50/P99 tiles. Capped circular buffer; the
-      // collector LRANGE's it every 2s. Fire-and-forget so an instrumentation
-      // hiccup never bubbles into the worker pipeline.
+      // Feed the ops dashboard latency figures. Two shapes, one write: the
+      // capped circular buffer behind the live P50/P99 tiles (LRANGE'd every
+      // 2s, sized by the same shared constant the tiles quote), and the
+      // time-bucketed histograms behind the hour/day/week/all-time windows
+      // (merged by the elected snapshot writer on its detail cycle).
+      // Fire-and-forget so an instrumentation hiccup never bubbles into the
+      // worker pipeline.
+      const completedAtMs = Date.now();
+      const bucketField = latencyBucketField(jobDurationMs);
+      const minuteKey = latencyMinuteBucketKey(this.queueName, completedAtMs);
+      const hourKey = latencyHourBucketKey(this.queueName, completedAtMs);
       this.redisConnection
         .multi()
         .lpush(
           `${this.queueName}:gq:stats:latencies-ms`,
           String(Math.round(jobDurationMs)),
         )
-        .ltrim(`${this.queueName}:gq:stats:latencies-ms`, 0, 199)
+        .ltrim(
+          `${this.queueName}:gq:stats:latencies-ms`,
+          0,
+          LATENCY_SAMPLE_SIZE - 1,
+        )
+        .hincrby(minuteKey, bucketField, 1)
+        .expire(minuteKey, LATENCY_MINUTE_BUCKET_TTL_SECONDS)
+        .hincrby(hourKey, bucketField, 1)
+        .expire(hourKey, LATENCY_HOUR_BUCKET_TTL_SECONDS)
+        .hincrby(latencyAllTimeKey(this.queueName), bucketField, 1)
         .exec()
         .catch(() => {
           // best-effort stats write; failures are non-fatal
@@ -1748,8 +1800,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * parse failure — the job was already removed from staging, so it is DISCARDED
    * here, mirroring the dispatched job's own parse-failure handling.
    *
-   * This used to say "recoverable via event replay". It is not, for a reactor
-   * job: replay never invokes reactors (see {@link dropStagedJob}). The loss is
+   * This used to say "recoverable via event replay". It is not, for a subscriber
+   * job: replay never invokes subscribers (see {@link dropStagedJob}). The loss is
    * counted instead of asserted away.
    */
   private async parseDrainedPayload({
@@ -1945,7 +1997,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     // Set on BOTH outcomes, and before the split recurses. The flag means "an
     // earlier call in this descent MAY have written", which is what a later
-    // commit needs to know — a handler that stored and then threw (a reactor
+    // commit needs to know — a handler that stored and then threw (a subscriber
     // failing after the fold committed) has written just as surely as one that
     // returned. Treating that as a fresh delivery lets the next sub-batch's
     // commit REPLACE the applied set the failed call recorded (#6578). The
@@ -2310,16 +2362,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * does not — and the proof is structural, not another comment: `ReplayExecutor`
    * calls the fold's pure `projection.apply()` and writes straight to the store
    * via `store.store()`, never constructing a `ProjectionRouter` — which is the
-   * only thing that calls `dispatchToReactors`. Reactors are unreachable from
-   * replay BY CONSTRUCTION. (`replay/` contains no reference to a reactor at all,
+   * only thing that calls `dispatchToSubscribers`. Subscribers are unreachable from
+   * replay BY CONSTRUCTION. (`replay/` contains no reference to a subscriber at all,
    * except two that exist to *suppress* re-fires.)
    *
    * `governanceOcsfEventsSync` (OCSF audit) and `governanceKpisSync` are
-   * reactors on the `traceSummary` fold — so for them this method IS the terminal
+   * subscribers on the `traceSummary` fold — so for them this method IS the terminal
    * event, and the counter below is the only evidence it ever happened. Scoped
    * honestly: fold/map drops genuinely ARE replay-covered (`ReplayService.replay`
    * drives `config.projections` + `config.mapProjections`). The false part is
-   * reactor-specific.
+   * subscriber-specific.
    *
    * **Why `complete()`** — there are THREE options here, not two, and an earlier
    * draft of this comment argued a false binary:
@@ -2582,7 +2634,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         jobDataJson,
         err,
         reason: "transient_exhausted",
-        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover reactor jobs)`,
+        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover subscriber jobs)`,
       });
       return;
     }
@@ -2773,7 +2825,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Group queue processor closed successfully",
       );
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           queueName: this.queueName,
           error,
@@ -2785,6 +2837,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       throw error;
     } finally {
       clearTimeout(shutdownTimer);
+      // Here, not at the top of close(): until this point the drain was still
+      // running jobs whose fan-out has to be allowed to stage. Past it the
+      // shared transports are about to go, so staging more is pointless. The
+      // timeout path lands here too — a drain that overran was abandoned, not
+      // finished, and either way nothing further should be staged.
+      this.stagingClosed = true;
     }
   }
 

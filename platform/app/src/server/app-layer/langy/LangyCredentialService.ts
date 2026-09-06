@@ -77,7 +77,7 @@ export function resolveLangyMirrorTier(
 }
 
 /**
- * The Langy worker hands `gatewayBaseUrl` straight to OpenCode as
+ * The Langy worker hands `gatewayBaseUrl` straight to the agent as
  * `OPENAI_BASE_URL`, so it must point at the gateway's OpenAI-compatible
  * surface — the `/v1` prefix under which `/responses` and `/chat/completions`
  * live. `LW_GATEWAY_BASE_URL` is shared with the Go gateway's control-plane
@@ -118,7 +118,7 @@ export function resolveWorkerCallbackUrl(
 }
 
 /**
- * The AI gateway base URL opencode dials (handed to it as OPENAI_BASE_URL). Same
+ * The AI gateway base URL the worker dials (handed to it as OPENAI_BASE_URL). Same
  * container caveat as {@link resolveWorkerCallbackUrl}: `LANGY_WORKER_GATEWAY_URL`
  * (a `host.docker.internal` address haven injects for a containerized worker) wins
  * when present; otherwise the usual LW_GATEWAY_PUBLIC_URL / LW_GATEWAY_BASE_URL.
@@ -203,11 +203,11 @@ export type LangyCredentials = {
    * what I was given" rather than "mint whatever I name".
    */
   langwatchApiKeyId?: string;
-  /** Project's Langy VK secret. Used by opencode as OPENAI_API_KEY against the AI gateway. */
+  /** Project's Langy VK secret. Used by the worker as OPENAI_API_KEY against the AI gateway. */
   llmVirtualKey: string;
   /** Control plane base URL — set as LANGWATCH_ENDPOINT for the MCP server. */
   langwatchEndpoint: string;
-  /** AI gateway base URL — set as OPENAI_BASE_URL for opencode. */
+  /** AI gateway base URL — set as OPENAI_BASE_URL for the worker. */
   gatewayBaseUrl: string;
   /**
    * The organization the project belongs to. Returned here so callers that
@@ -256,6 +256,19 @@ export type LangyCredentials = {
    */
   mirrorTier?: LangyMirrorTier;
 };
+
+/**
+ * Strip the GitHub capability from a turn's (or warm's) credential bundle when
+ * the per-day PR cap is reached, so the worker never even holds a token the
+ * turn is not allowed to spend. Shared by the turn path (which RESERVES a
+ * permit) and the warm path (which only PEEKS at the cap) so both produce the
+ * same worker signature, a warm that kept the token while the turn stripped
+ * it would boot a worker the turn cannot reuse.
+ */
+export function stripGithubCredentials(credentials: LangyCredentials): void {
+  delete credentials.githubToken;
+  delete credentials.githubLogin;
+}
 
 /**
  * Resolves the credentials a Langy worker subprocess needs in its env.
@@ -370,7 +383,7 @@ export class LangyCredentialService {
         // in this project) — surface it verbatim as the 409 body.
         throw new LangyCredentialResolutionError(error.message);
       }
-      logger.error(
+      logger.warn(
         { error, projectId, userId: actorUserId },
         "failed to mint Langy session key",
       );

@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -26,29 +28,35 @@ import (
 // adapters/controlplane/config_wire.go:385, which never calls
 // domain.WithDeploymentSelfMap, so every Azure request on that path arrives
 // with a nil map. These tests drive the real BifrostRouter against a local
-// stand-in for a customer's Azure resource and assert on the deployment
-// segment of the URL Bifrost builds, which IS Deployments[bfReq.Model] by
-// vendor construction (core@v1.4.22 providers/azure/azure.go getModelDeployment).
+// stand-in for a customer's Azure resource and assert on the deployment Bifrost
+// resolved. bifrost v1.5.17 flattened Azure's chat URL to /openai/v1/chat/
+// completions and moved model->deployment resolution onto Key.Aliases: the
+// resolved value is written into the request body's "model" field
+// (KeyAliases.Resolve -> req.SetModel, core@v1.5.17 bifrost.go:6086/6145), which
+// IS Aliases[bfReq.Model] by vendor construction.
 //
 // Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
 
 // azureResourceStub stands in for a customer's Azure OpenAI resource. It
-// records the deployment segment of every request path it is asked to serve,
-// so a test can read back the value Bifrost resolved without reaching into
-// unexported dispatch internals.
+// records the path and body of every request it is asked to serve, so a test
+// can read back the deployment Bifrost resolved (now the body's "model" field)
+// without reaching into unexported dispatch internals.
 type azureResourceStub struct {
 	*httptest.Server
 
-	mu    sync.Mutex
-	paths []string
+	mu     sync.Mutex
+	paths  []string
+	bodies []string
 }
 
 func newAzureResourceStub(t *testing.T, respondModel string) *azureResourceStub {
 	t.Helper()
 	stub := &azureResourceStub{}
 	stub.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
 		stub.mu.Lock()
 		stub.paths = append(stub.paths, r.URL.Path)
+		stub.bodies = append(stub.bodies, string(body))
 		stub.mu.Unlock()
 
 		// A real Azure resource content-negotiates. Bifrost sends
@@ -105,21 +113,22 @@ func writeChatCompletionSSE(w http.ResponseWriter, model string) {
 }
 
 // deployment returns the single deployment Bifrost resolved for the dispatch.
-// Azure's URL is /openai/deployments/{deployment}/chat/completions and the
-// deployment may itself contain slashes (an unresolved request model keeps its
-// "azure/" prefix), so the segment is taken by trimming both ends.
+// Under bifrost v1.5.17 Azure's chat URL is the flat /openai/v1/chat/completions
+// and the resolved deployment rides in the request body's "model" field
+// (KeyAliases.Resolve -> req.SetModel), so it is read from the body rather than
+// a path segment. The resolved value may itself carry an "azure/" prefix (an
+// unresolved request model keeps it), which the JSON string preserves verbatim.
 func (s *azureResourceStub) deployment(t *testing.T) string {
 	t.Helper()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	require.Len(t, s.paths, 1, "expected exactly one upstream request, got paths %q", s.paths)
-	const prefix = "/openai/deployments/"
-	const suffix = "/chat/completions"
-	path := s.paths[0]
-	require.True(t, strings.HasPrefix(path, prefix) && strings.HasSuffix(path, suffix),
-		"unexpected Azure request path %q", path)
-	return strings.TrimSuffix(strings.TrimPrefix(path, prefix), suffix)
+	require.Equal(t, "/openai/v1/chat/completions", s.paths[0],
+		"unexpected Azure chat request path %q", s.paths[0])
+	model := gjson.Get(s.bodies[0], "model").String()
+	require.NotEmpty(t, model, "the upstream request body carried no model field: %s", s.bodies[0])
+	return model
 }
 
 func newTestBifrostRouter(t *testing.T) *BifrostRouter {
@@ -258,7 +267,11 @@ func TestAzureDispatch_ResolvesDeploymentForControlPlaneCredential(t *testing.T)
 				Type:     domain.RequestTypeChat,
 				Model:    tc.reqModel,
 				Resolved: tc.resolved,
-				Body:     []byte(fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"hi"}]}`, tc.reqModel)),
+				// The body carries bfModel, not the raw reqModel: the pipeline's
+				// ModelResolve stage rewrites the body's model to the resolved id
+				// before dispatch (app/pipeline resolve.go), and Azure chat is
+				// raw-forwarded, so the body IS what reaches the wire.
+				Body: []byte(fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"hi"}]}`, bfModel)),
 			}
 
 			resp, err := router.Dispatch(context.Background(), req, cred)
@@ -332,7 +345,7 @@ func TestCredentialToBifrostKey_NonMappedProvidersGetNoDeploymentConfig(t *testi
 		t.Run(tc.name, func(t *testing.T) {
 			require.Nil(t, tc.cred.DeploymentMap, "fixture precondition")
 
-			key := credentialToBifrostKey(tc.cred, tc.provider)
+			key := credentialToBifrostKey(tc.cred, tc.provider, nil)
 
 			assert.Nil(t, key.AzureKeyConfig, "no AzureKeyConfig may be fabricated for %s", tc.name)
 			assert.Nil(t, key.BedrockKeyConfig, "no BedrockKeyConfig may be fabricated for %s", tc.name)

@@ -18,7 +18,7 @@ import (
 )
 
 // langyDockerfile is the build definition, relative to the repo root.
-const langyDockerfile = "Dockerfile.langyagent"
+const langyDockerfile = "infra/docker/Dockerfile.langyagent"
 
 // langyImageTag derives the content-addressed tag for the langy worker image:
 // langyagent:dev-<12 hex chars>. The hash covers the Dockerfile bytes and, for

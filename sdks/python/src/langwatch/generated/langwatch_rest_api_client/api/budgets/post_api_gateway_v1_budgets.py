@@ -16,7 +16,7 @@ from ...types import UNSET, Response, Unset, safe_http_status
 
 def _get_kwargs(
     *,
-    body: PostApiGatewayV1BudgetsBody | Unset = UNSET,
+    body: PostApiGatewayV1BudgetsBody,
     idempotency_key: str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
@@ -28,8 +28,7 @@ def _get_kwargs(
         "url": "/api/gateway/v1/budgets",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -107,8 +106,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiGatewayV1BudgetsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiGatewayV1BudgetsBody,
     idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1BudgetsResponse201
@@ -120,17 +119,21 @@ def sync_detailed(
 ]:
     """Create budget
 
-     Creates an organization-owned budget. The scope discriminates which resource the budget covers
-    (organization / team / project / virtual_key / principal / group). `group` budgets are per-member
-    allowances and require a deployment with the ClickHouse spend ledger
+     Creates an organization-owned budget. The scope discriminates which resource the budget covers,
+    across all seven scope types (organization / team / project / virtual_key / principal / group /
+    attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-
+    end-user templates; both require a deployment with the ClickHouse spend ledger
     (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one
     model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the
-    calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a
-    retry safe.
+    calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group`
+    budget that none of the organization's active keys can produce traffic for is refused with
+    `gateway_budget_scope_unreachable`, since it would never spend and never block; send
+    `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never
+    refused. Send `Idempotency-Key` to make a retry safe.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1BudgetsBody | Unset):
+        body (PostApiGatewayV1BudgetsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -154,8 +157,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiGatewayV1BudgetsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiGatewayV1BudgetsBody,
     idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1BudgetsResponse201
@@ -168,17 +171,21 @@ def sync(
 ):
     """Create budget
 
-     Creates an organization-owned budget. The scope discriminates which resource the budget covers
-    (organization / team / project / virtual_key / principal / group). `group` budgets are per-member
-    allowances and require a deployment with the ClickHouse spend ledger
+     Creates an organization-owned budget. The scope discriminates which resource the budget covers,
+    across all seven scope types (organization / team / project / virtual_key / principal / group /
+    attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-
+    end-user templates; both require a deployment with the ClickHouse spend ledger
     (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one
     model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the
-    calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a
-    retry safe.
+    calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group`
+    budget that none of the organization's active keys can produce traffic for is refused with
+    `gateway_budget_scope_unreachable`, since it would never spend and never block; send
+    `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never
+    refused. Send `Idempotency-Key` to make a retry safe.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1BudgetsBody | Unset):
+        body (PostApiGatewayV1BudgetsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -197,8 +204,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiGatewayV1BudgetsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiGatewayV1BudgetsBody,
     idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1BudgetsResponse201
@@ -210,17 +217,21 @@ async def asyncio_detailed(
 ]:
     """Create budget
 
-     Creates an organization-owned budget. The scope discriminates which resource the budget covers
-    (organization / team / project / virtual_key / principal / group). `group` budgets are per-member
-    allowances and require a deployment with the ClickHouse spend ledger
+     Creates an organization-owned budget. The scope discriminates which resource the budget covers,
+    across all seven scope types (organization / team / project / virtual_key / principal / group /
+    attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-
+    end-user templates; both require a deployment with the ClickHouse spend ledger
     (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one
     model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the
-    calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a
-    retry safe.
+    calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group`
+    budget that none of the organization's active keys can produce traffic for is refused with
+    `gateway_budget_scope_unreachable`, since it would never spend and never block; send
+    `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never
+    refused. Send `Idempotency-Key` to make a retry safe.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1BudgetsBody | Unset):
+        body (PostApiGatewayV1BudgetsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -242,8 +253,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiGatewayV1BudgetsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiGatewayV1BudgetsBody,
     idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1BudgetsResponse201
@@ -256,17 +267,21 @@ async def asyncio(
 ):
     """Create budget
 
-     Creates an organization-owned budget. The scope discriminates which resource the budget covers
-    (organization / team / project / virtual_key / principal / group). `group` budgets are per-member
-    allowances and require a deployment with the ClickHouse spend ledger
+     Creates an organization-owned budget. The scope discriminates which resource the budget covers,
+    across all seven scope types (organization / team / project / virtual_key / principal / group /
+    attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-
+    end-user templates; both require a deployment with the ClickHouse spend ledger
     (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one
     model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the
-    calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a
-    retry safe.
+    calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group`
+    budget that none of the organization's active keys can produce traffic for is refused with
+    `gateway_budget_scope_unreachable`, since it would never spend and never block; send
+    `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never
+    refused. Send `Idempotency-Key` to make a retry safe.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1BudgetsBody | Unset):
+        body (PostApiGatewayV1BudgetsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

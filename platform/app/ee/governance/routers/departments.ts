@@ -17,13 +17,12 @@ import { HandledError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const departmentsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(async ({ ctx, input }) => {
       return await DepartmentService.create(ctx.prisma).getAll({
         organizationId: input.organizationId,
@@ -32,7 +31,7 @@ export const departmentsRouter = createTRPCRouter({
 
   assignments: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(async ({ ctx, input }) => {
       return await DepartmentService.create(ctx.prisma).getAssignments({
         organizationId: input.organizationId,
@@ -46,7 +45,7 @@ export const departmentsRouter = createTRPCRouter({
         name: z.string().min(1).max(128),
       }),
     )
-    .use(checkOrganizationPermission("governance:manage"))
+    .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       return await DepartmentService.create(ctx.prisma).create({
         organizationId: input.organizationId,
@@ -62,7 +61,7 @@ export const departmentsRouter = createTRPCRouter({
         name: z.string().min(1).max(128),
       }),
     )
-    .use(checkOrganizationPermission("governance:manage"))
+    .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       try {
         return await DepartmentService.create(ctx.prisma).rename({
@@ -77,7 +76,7 @@ export const departmentsRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("governance:manage"))
+    .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       try {
         await DepartmentService.create(ctx.prisma).archive({
@@ -98,7 +97,7 @@ export const departmentsRouter = createTRPCRouter({
         departmentId: z.string().nullable(),
       }),
     )
-    .use(checkOrganizationPermission("governance:manage"))
+    .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       try {
         await DepartmentService.create(ctx.prisma).assignUser(input);
@@ -116,7 +115,7 @@ export const departmentsRouter = createTRPCRouter({
         departmentId: z.string().nullable(),
       }),
     )
-    .use(checkOrganizationPermission("governance:manage"))
+    .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       try {
         await DepartmentService.create(ctx.prisma).assignTeam(input);
@@ -134,7 +133,7 @@ export const departmentsRouter = createTRPCRouter({
         departmentId: z.string().nullable(),
       }),
     )
-    .use(checkOrganizationPermission("governance:manage"))
+    .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       try {
         await DepartmentService.create(ctx.prisma).assignProject(input);

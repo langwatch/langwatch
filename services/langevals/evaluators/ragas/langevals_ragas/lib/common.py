@@ -1,5 +1,6 @@
 from contextlib import contextmanager
-import os
+
+from langevals_core.litellm_patch import azure_api_version
 from typing import List, Optional
 from langevals_core.base_evaluator import (
     BaseEvaluator,
@@ -54,16 +55,20 @@ def prepare_llm(
     settings: RagasSettings = RagasSettings(),
     temperature: float = 0,
 ):
-    os.environ.setdefault("AZURE_API_VERSION", "2024-02-01")
-    if evaluator.env:
-        for key, env in evaluator.env.items():
-            os.environ[key] = env
-
-    gpt = model_to_langchain(settings.model, temperature=temperature)
+    gpt = model_to_langchain(
+        settings.model,
+        temperature=temperature,
+        extra_call_kwargs=azure_api_version(settings.model, "2024-02-01"),
+    )
     llm = LangchainLLMWrapper(langchain_llm=gpt)
 
     if hasattr(settings, "embeddings_model"):
-        embeddings = embeddings_model_to_langchain(settings.embeddings_model)  # type: ignore
+        embeddings = embeddings_model_to_langchain(
+            settings.embeddings_model,  # type: ignore
+            extra_call_kwargs=azure_api_version(
+                settings.embeddings_model, "2024-02-01"  # type: ignore
+            ),
+        )
         embeddings_wrapper = LangchainEmbeddingsWrapper(embeddings)
     else:
         embeddings_wrapper = None

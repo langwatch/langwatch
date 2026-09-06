@@ -1,6 +1,18 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-import type { ErrorCluster, QueueInfo } from "../types";
+import type { ParkedTenant } from "../snapshot/snapshot.types";
+import type { ErrorCluster, ParkedGroupInfo, QueueInfo } from "../types";
+
+/**
+ * Every tenant currently over its in-flight cap, plus how many exist.
+ *
+ * `total` is the honest count even when `tenants` is capped, so a caller can
+ * say "showing N of M" rather than presenting a bounded list as complete.
+ */
+export interface ParkedTenantsPage {
+  tenants: ParkedTenant[];
+  total: number;
+}
 
 export interface BlockedSummary {
   totalBlocked: number;
@@ -22,10 +34,31 @@ export interface DrainPreview {
   byError: Array<{ message: string; count: number }>;
 }
 
+/**
+ * How a job's staged value is stored, read from the envelope header alone
+ * (shape only, never body bytes — see `readEnvelopeDescriptor`). Null for
+ * legacy bare-JSON values that carry no envelope.
+ */
+export interface JobEnvelopeInfo {
+  /** Body encoding — "redis" | "s3" | "ref" | "gz" | "j". */
+  format: string | null;
+  /** Envelope version (1 = GQ1, 2 = GQ2 content-addressed). */
+  version: number | null;
+  /** GQ1 blob id or GQ2 tiered blob hash when the body is offloaded. */
+  blobId: string | null;
+}
+
 export interface JobEntry {
   jobId: string;
   score: number;
   data: Record<string, unknown> | null;
+  /**
+   * Serialized payload size in bytes as the encoder recorded it — the size the
+   * payload has back in a worker's hands, not the (compressed/offloaded)
+   * stored value's length. Null when the value predates the size field.
+   */
+  payloadBytes: number | null;
+  envelope: JobEnvelopeInfo | null;
 }
 
 /** Result returned by {@link QueueRepository.reconcileTotalPending}. */
@@ -57,6 +90,33 @@ export interface QueueRepository {
   }): Promise<{ jobs: JobEntry[]; total: number }>;
 
   getBlockedSummary(params: { queueNames: string[] }): Promise<BlockedSummary>;
+
+  /**
+   * Enumerate tenants parked over their in-flight cap, deepest first.
+   *
+   * The registry of over-cap tenants is naturally tiny (one entry per tenant,
+   * not per group), so this stays cheap even when the parked DEPTH is in the
+   * hundreds of thousands — which is exactly the case the dashboard has to
+   * explain. Bounded by `maxTenants`; the reported `total` is unbounded.
+   */
+  enumerateParkedTenants(params: {
+    queueNames: string[];
+    maxTenants: number;
+  }): Promise<ParkedTenantsPage>;
+
+  /**
+   * One parked tenant's groups, ordered by dispatch eligibility.
+   *
+   * Deliberately request-time rather than snapshot-carried: a parking storm
+   * can hold hundreds of thousands of groups, and shipping those in a snapshot
+   * every pod reads would recreate the size problem ADR-090 removes.
+   */
+  listParkedGroups(params: {
+    queueName: string;
+    tenantId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ groups: ParkedGroupInfo[]; total: number }>;
 
   unblockGroup(params: {
     queueName: string;
@@ -118,6 +178,25 @@ export interface QueueRepository {
     errorFilter?: string;
   }): Promise<{ replayedCount: number; jobsReplayed: number }>;
 
+  /** Redrive an explicit set of DLQ groups — the operator's shown set. */
+  redriveManyFromDlq(params: {
+    queueName: string;
+    groupIds: string[];
+  }): Promise<{ redrivenCount: number; jobsRedriven: number }>;
+
+  /**
+   * Discard an explicit set of DLQ groups: their jobs never run again.
+   * Returns what the audit row must record — counts and an error sample.
+   */
+  discardManyFromDlq(params: {
+    queueName: string;
+    groupIds: string[];
+  }): Promise<{
+    discardedCount: number;
+    jobsDiscarded: number;
+    lastErrors: string[];
+  }>;
+
   canaryRedrive(params: {
     queueName: string;
     count?: number;
@@ -167,6 +246,17 @@ export class NullQueueRepository implements QueueRepository {
 
   async getBlockedSummary(): Promise<BlockedSummary> {
     return { totalBlocked: 0, clusters: [] };
+  }
+
+  async enumerateParkedTenants(): Promise<ParkedTenantsPage> {
+    return { tenants: [], total: 0 };
+  }
+
+  async listParkedGroups(): Promise<{
+    groups: ParkedGroupInfo[];
+    total: number;
+  }> {
+    return { groups: [], total: 0 };
   }
 
   async unblockGroup(): Promise<{ wasBlocked: boolean }> {
@@ -225,6 +315,21 @@ export class NullQueueRepository implements QueueRepository {
     jobsReplayed: number;
   }> {
     return { replayedCount: 0, jobsReplayed: 0 };
+  }
+
+  async redriveManyFromDlq(): Promise<{
+    redrivenCount: number;
+    jobsRedriven: number;
+  }> {
+    return { redrivenCount: 0, jobsRedriven: 0 };
+  }
+
+  async discardManyFromDlq(): Promise<{
+    discardedCount: number;
+    jobsDiscarded: number;
+    lastErrors: string[];
+  }> {
+    return { discardedCount: 0, jobsDiscarded: 0, lastErrors: [] };
   }
 
   async canaryRedrive(): Promise<{

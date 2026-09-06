@@ -13,10 +13,25 @@
 # vector here too; this is the gate that makes that non-optional.
 name: ssrf-conformance
 
+# Filtering happens in `on:` rather than in a gate job. This workflow has no
+# required status check, which is what makes that safe: GitHub evaluates
+# `on.paths` BEFORE allocating a runner, so an irrelevant PR costs nothing at
+# all — where a gate job costs a full runner lease to reach the same verdict in
+# six seconds. A workflow filtered out this way never reports, so a *required*
+# check must never be filtered here; the always-run + green-aggregator pattern
+# stays exactly as it is for the workflows that have one.
 on:
+  # Only `pull_request` is filtered. "Push to main always runs all workflows"
+  # (specs/ci/path-filters.feature) — every commit that lands on main keeps its
+  # own validation, which is the same reason `cancel-in-progress` is off there.
   push:
     branches: [main]
   pull_request:
+    paths:
+      - "pkg/ssrf/**"
+      - "packages/ssrf/**"
+      - ".github/workflows/ssrf-conformance.yaml"
+  # No paths here on purpose: a manual dispatch is an explicit request to run.
   workflow_dispatch:
 
 permissions:
@@ -31,31 +46,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      ssrf: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.ssrf }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/. Checking
-          # out the rest of the tree is pure runner time.
-          sparse-checkout: .github
-      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-        if: github.event_name != 'workflow_dispatch'
-        id: filter
-        with:
-          filters: |
-            ssrf:
-              - 'pkg/ssrf/**'
-              - 'packages/ssrf/**'
-              - '.github/workflows/ssrf-conformance.yaml'
-
   conformance:
-    needs: changes
-    if: ${{ needs.changes.outputs.ssrf == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

@@ -137,7 +137,8 @@ struct tags chain with `_`). See `config.go` for the source of truth.
 |----------------------------------|----------|-----------------------|------------------------------------|
 | `ENVIRONMENT`                    | yes      |                       | e.g. `local`, `production`         |
 | `SERVER_ADDR`                    | no       | `:5563`               | Listen address                     |
-| `SERVER_GRACEFUL_SECONDS`        | no       | `10`                  | Shutdown grace period (seconds)    |
+| `SERVER_GRACEFUL_SECONDS`        | no       | `900`                 | Shutdown grace period (seconds)    |
+| `SERVER_DRAIN_DELAY_SECONDS`     | no       | `3`                   | Pause before the listener closes    |
 | `LOG_LEVEL`                      | no       | `info`                | Log level                          |
 | `LOG_FORMAT`                     | no       | `json`                | `json` or `pretty`                 |
 | `LW_GATEWAY_BASE_URL`           | yes      | `http://localhost:5560` | Control plane URL                 |

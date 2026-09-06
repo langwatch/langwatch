@@ -32,6 +32,11 @@ import {
   type VirtualKeyBudgetValue,
 } from "./VirtualKeyBudgetSection";
 import {
+  NEVER_EXPIRES,
+  VirtualKeyExpirationSection,
+  type VirtualKeyExpirationValue,
+} from "./VirtualKeyExpirationSection";
+import {
   ownershipIncompleteReason,
   ownershipToScopes,
   ownershipTraceProjectId,
@@ -50,6 +55,11 @@ import {
   VirtualKeyRoutingSection,
   type VirtualKeyRoutingValue,
 } from "./VirtualKeyRoutingSection";
+import {
+  expiryFieldErrorFrom,
+  expiryIncompleteReason,
+  resolveExpiresAt,
+} from "./virtualKeyExpiration";
 import {
   parseTagsCsv,
   TAGS_CSV_MAX_LENGTH,
@@ -90,6 +100,9 @@ export function VirtualKeyCreateDrawer({
   const [providerAccess, setProviderAccess] =
     useState<ProviderAccessValue>(ALL_PROVIDERS);
   const [routing, setRouting] = useState<VirtualKeyRoutingValue>(ROUTING_NONE);
+  const [expiration, setExpiration] =
+    useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
+  const [expiryFieldError, setExpiryFieldError] = useState<string | null>(null);
 
   const canCreateShared = hasPermission("virtualKeys:manage");
 
@@ -178,13 +191,20 @@ export function VirtualKeyCreateDrawer({
   );
   const eligible = useMemo(
     () =>
-      resolveEligible(
+      resolveEligible({
         scopes,
         providers,
-        buildScopeHierarchy(availableProjects, organizationId),
-      ),
+        hierarchy: buildScopeHierarchy(availableProjects, organizationId),
+      }),
     [scopes, providers, availableProjects, organizationId],
   );
+
+  // Resolved on every render rather than at submit, because the block
+  // states the date back to the reader as they pick it.
+  const expiresAt = resolveExpiresAt({
+    preset: expiration.preset,
+    customDate: expiration.customDate,
+  });
 
   const reset = () => {
     setName("");
@@ -199,6 +219,8 @@ export function VirtualKeyCreateDrawer({
     setBudget(EMPTY_BUDGET);
     setProviderAccess(ALL_PROVIDERS);
     setRouting(ROUTING_NONE);
+    setExpiration(NEVER_EXPIRES);
+    setExpiryFieldError(null);
   };
 
   const handleClose = () => {
@@ -226,7 +248,7 @@ export function VirtualKeyCreateDrawer({
       eligible,
     );
     if (providerReason) return providerReason;
-    return null;
+    return expiryIncompleteReason({ preset: expiration.preset, expiresAt });
   })();
 
   const handleSubmit = async () => {
@@ -234,6 +256,7 @@ export function VirtualKeyCreateDrawer({
       toaster.create({ title: cannotIssueReason, type: "error" });
       return;
     }
+    setExpiryFieldError(null);
     try {
       const tags = parseTagsCsv(tagsCsv);
       const access = providerAccessToConfig(providerAccess, eligible);
@@ -249,6 +272,7 @@ export function VirtualKeyCreateDrawer({
         traceProjectId: ownershipTraceProjectId(ownership),
         routingMode: routing.mode,
         routingPolicyId: routing.mode === "POLICY" ? routing.policyId : null,
+        ...(expiresAt ? { expiresAt } : {}),
         budget: budget.limitUsd.trim()
           ? {
               limitUsd: budget.limitUsd.trim(),
@@ -275,6 +299,13 @@ export function VirtualKeyCreateDrawer({
       reset();
       onOpenChange(false);
     } catch (error) {
+      // A rejected date belongs on the field the reader is still looking
+      // at; everything else has nowhere better to go than the toast.
+      const expiryError = expiryFieldErrorFrom(error);
+      if (expiryError) {
+        setExpiryFieldError(expiryError);
+        return;
+      }
       toaster.create({
         title: humanizeGatewayError(error, "Failed to create virtual key"),
         type: "error",
@@ -381,6 +412,13 @@ export function VirtualKeyCreateDrawer({
               value={routing}
               onChange={setRouting}
               policies={policies}
+            />
+
+            <Separator />
+            <VirtualKeyExpirationSection
+              value={expiration}
+              onChange={setExpiration}
+              fieldError={expiryFieldError}
             />
           </VStack>
         </Drawer.Body>

@@ -17,7 +17,9 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
       invocation).
     - `codex` → `~/.codex/config.toml`'s `[otel.trace_exporter.otlp-http]`
       block, which takes an inline `headers` field, so the ingest token
-      lives beside the endpoint in one 0600 file.
+      lives beside the endpoint in one 0600 file. codex never enters the
+      offer flow below: the wrapper writes this block, header included,
+      on every ingestion run (see its Rule).
   Tools with no config-file env target (`gemini`, `opencode`, `copilot`) instead get a
   shell function installed in the rc that sets the telemetry env ONLY for that
   tool's invocations, since their OTEL vars use generic names a global
@@ -110,40 +112,57 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
       Then the file's `env` object reflects the LATEST OTEL values verbatim
       And no duplicate keys or stale entries survive
 
-  Rule: `langwatch codex` persists to ~/.codex/config.toml (native [otel] block)
+  Rule: `langwatch codex` persists automatically (no prompt)
 
-    Scenario: Persist target for codex is the Codex config file
-      Given `langwatch codex` resolves to ingestion mode
-      And ~/.codex/config.toml does not yet carry the OTLP Authorization header
-      When the wrapper offers to persist telemetry exports
-      Then the prompt names "~/.codex/config.toml" as the target
-      And the prompt does NOT name ~/.zshrc, ~/.bashrc, or the fish config
-      # Rationale: codex reads its [otel] block from config.toml on every run,
-      # and the otlp-http trace exporter takes an inline `headers` field, so
-      # the ingest token scopes to `codex` runs only instead of leaking into
-      # every shell child via the profile rc.
+    config.toml is the only wiring a plain `codex` reads, and the wrapper
+    already rewrites the langwatch [otel] marker block there on every
+    ingestion run. Withholding the Authorization header behind a consent
+    prompt made codex the one tool where a plain run silently produced
+    nothing until the user noticed the question and answered it. The
+    block lives in a single 0600 marker-managed file and `langwatch
+    logout` removes it, so the header is written inline unconditionally,
+    the same way claude's settings files are.
 
-    Scenario: Accept Y — write the Authorization header into the [otel] block
-      Given ~/.codex/config.toml already carries the langwatch [otel] endpoint
-        block written when the wrapper set up (endpoint + protocol, no header)
-      When the user types "y" at the persistence prompt
-      Then the [otel.trace_exporter.otlp-http] block gains a `headers` entry
-        carrying `Authorization = "Bearer <ingest-token>"`
-      And any config the user authored outside the langwatch marker pair
-        is preserved verbatim
+    @unit @cli-wrappers @shell-rc @codex
+    Scenario: codex wiring persists the Authorization header inline
+      Given `langwatch codex` resolves to ingestion mode (Path B)
+      When the wrapper writes the [otel] block to ~/.codex/config.toml
+      Then the [otel.trace_exporter.otlp-http] block carries a `headers`
+        entry with `Authorization = "Bearer <ingest-token>"`
       And running a plain `codex` captures telemetry with no shell edits
 
-    Scenario: The wrapper's unconditional [otel] write preserves a persisted header
-      Given a previous run persisted the Authorization header into config.toml
-      When `langwatch codex` sets up again and rewrites the [otel] block
-      Then the persisted `headers` entry survives the rewrite
-      And the persistence prompt does NOT re-appear
+    @unit @cli-wrappers @shell-rc @codex
+    Scenario: The wrapper's [otel] write carries the Authorization header, so codex needs no persist prompt
+      Given `langwatch codex` resolves to ingestion mode (Path B)
+      When the wrapper finishes setting up
+      Then the CLI does NOT ask a codex persistence question
+      And the turn-completion harvest hook is installed quietly
+      And config the user authored outside the langwatch marker pair
+        is preserved verbatim
 
-    Scenario: Skip the prompt when config.toml already carries the header
-      Given ~/.codex/config.toml's [otel.trace_exporter.otlp-http] block
-        already carries the Authorization header
-      When `langwatch codex` resolves to ingestion mode
-      Then the CLI does NOT prompt to persist
+    @unit @cli-wrappers @shell-rc @codex
+    Scenario: Every seam that persists the codex exporters wires the turn harvest
+      Given codex telemetry wiring is persisted or refreshed, by the wrapper,
+        by `langwatch instrument codex`, or by a login refresh
+      When the [otel] block is written
+      Then the turn-completion harvest is asserted beside it
+      And a device whose wiring predates the harvest gains it on the next refresh
+
+    # Naming the seams one by one is what let two of them ship with exporters
+    # and no harvest. The check reads the source, so a seam added later fails
+    # it instead of quietly capturing nothing.
+    @unit @cli-wrappers @shell-rc @codex
+    Scenario: A new seam that writes the exporters cannot ship without the harvest
+      Given the places in the CLI that write the codex [otel] block
+      When the persist seams are checked
+      Then each of them wires the turn harvest beside the write
+
+    @unit @cli-wrappers @shell-rc @codex
+    Scenario: A harvest that cannot be wired is reported, never silent
+      Given a codex config the harvest install cannot write
+      When the wiring is persisted
+      Then the failure is printed, naming what stays missing
+      And the exporters stay in place
 
   Rule: Tools without a config-file env target install a scoped shell function
 

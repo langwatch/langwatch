@@ -38,12 +38,20 @@
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 import { GithubPullRequestNotMappedError } from "../github/errors";
+import { normalizeGithubHost } from "../github/githubHost";
 import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,
 } from "../github/repositories/github-pull-requests.repository";
 import { ingestSourceTypeOfAgent } from "./coding-agent-source-type";
-import { assignSessionsToPullRequests } from "./pull-request-assignment";
+import {
+  assignDrivingSessionsToPullRequestsPerBranch,
+  branchesOf,
+} from "./pull-request-assignment";
+import {
+  attributeSessionsToPullRequest,
+  sessionKey,
+} from "./pull-request-share";
 import type {
   CodingAgentBranchSessionRow,
   CodingAgentSessionRepository,
@@ -266,12 +274,15 @@ export interface PersonalPullRequestUsage {
 }
 
 /**
- * One session as the detail lists it: FACTS ONLY.
+ * One session as the detail lists it: facts, plus the one-line title the agent
+ * generated for the session.
  *
- * There is deliberately no title and no content here. A session's title is
- * derived content and is gated behind the content permissions on the session
- * surfaces; this payload answers "what did this pull request consume", which
- * needs none of it. A test pins this row's key set so a title cannot be added
+ * The title is the only conversation-derived value on this payload, and it is
+ * here because a list of anonymous rows makes a reader open each one to find
+ * out which is which. It rides ungated to the read boundary, which blanks it
+ * for every session whose PROJECT this reader may not read the captured
+ * content of: the detail spans an organization, and content visibility is a
+ * project's own. A test pins this row's key set, so nothing else joins it
  * without somebody deciding to disclose it.
  */
 export interface PullRequestSessionFact extends ContributorIdentity {
@@ -280,6 +291,8 @@ export interface PullRequestSessionFact extends ContributorIdentity {
   agent: string;
   totalTokens: number;
   costUsd: number | null;
+  /** Null when the session never generated one. */
+  title: string | null;
 }
 
 export interface PullRequestDetail {
@@ -316,6 +329,8 @@ export interface PersonalSessionLookup {
       repositoryOwner: string;
       repositoryName: string;
       gitBranch: string;
+      /** Every branch the session drove; empty for a row folded before it. */
+      gitBranches: string[];
       inputTokens: number;
       outputTokens: number;
       cacheReadTokens: number;
@@ -327,18 +342,34 @@ export interface PersonalSessionLookup {
   >;
 }
 
-/** What each model consumed, per session, across the permitted projects. */
+/**
+ * The per-call fact reads: what each model consumed per session and stamped
+ * working context, and which sessions ever stamped work onto a repository's
+ * branches (the discovery leg for sessions whose own row moved on).
+ */
 export interface SessionModelTotalsLookup {
   sumTokensByModelPerSession(params: {
     tenantIds: string[];
     sessionIds: string[];
     fromMs: number;
   }): Promise<SessionModelTotalsRow[]>;
+
+  listSessionsByStampedBranch(params: {
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    fromMs: number;
+  }): Promise<Array<{ tenantId: string; sessionId: string }>>;
 }
 
 export interface PullRequestUsageServiceDeps {
   pullRequests: GithubPullRequestsRepository;
-  sessions: Pick<CodingAgentSessionRepository, "listByRepositoryBranch">;
+  sessions: Pick<
+    CodingAgentSessionRepository,
+    "listByRepositoryBranch" | "listBySessionIds"
+  >;
   personalSessions: PersonalSessionLookup;
   sessionEvents: SessionModelTotalsLookup;
   installations: RepositoryCoverageLookup;
@@ -405,7 +436,8 @@ export class PullRequestUsageService {
 
   /**
    * The same pull request, plus who worked on it and which sessions ran, for
-   * the detail surface. Facts only: see {@link PullRequestSessionFact}.
+   * the detail surface. See {@link PullRequestSessionFact} for what a session
+   * carries, and where its title is decided.
    */
   async getPullRequestDetail(
     query: PullRequestUsageQuery,
@@ -434,6 +466,7 @@ export class PullRequestUsageService {
           agent: session.agent,
           totalTokens: tokensOf(session),
           costUsd: costProjects.has(session.tenantId) ? session.costUsd : null,
+          title: session.title === "" ? null : session.title,
         })),
     };
   }
@@ -474,9 +507,11 @@ export class PullRequestUsageService {
         organizationId,
         repositoryHost: group.repositoryHost,
         repositoryFullName: group.repositoryFullName,
-        headBranches: [...new Set(group.sessions.map((s) => s.headBranch))],
+        headBranches: [
+          ...new Set(group.sessions.flatMap((s) => s.headBranches)),
+        ],
       });
-      const assignments = assignSessionsToPullRequests({
+      const assignments = assignDrivingSessionsToPullRequestsPerBranch({
         sessions: group.sessions,
         pullRequests: toAssignable(pullRequests),
       });
@@ -484,12 +519,15 @@ export class PullRequestUsageService {
       // Discovery is personal: only the pull requests this project's own work
       // touched become rows. Their NUMBERS then come from every project the
       // caller may read, which is what makes a row the pull request's price
-      // rather than one person's share of it.
+      // rather than one person's share of it. Per branch, so a session that
+      // drove two pull requests surfaces both — each row then prices only its
+      // own share of the session.
       const discovered = pullRequests.filter((pullRequest) =>
-        group.sessions.some(
-          (session) =>
-            assignments.get(session.sessionId) === pullRequest.prNumber,
-        ),
+        group.sessions.some((session) => {
+          const branchWinners = assignments.get(session.sessionId);
+          if (branchWinners === undefined) return false;
+          return [...branchWinners.values()].includes(pullRequest.prNumber);
+        }),
       );
       if (discovered.length > 0) {
         rows.push(
@@ -556,41 +594,39 @@ export class PullRequestUsageService {
     const [owner, name] = group.repositoryFullName.split("/");
     if (!owner || !name) return [];
 
-    const sessions = await this.deps.sessions.listByRepositoryBranch({
+    const candidates = await this.candidateSessionsFor({
       tenantIds: permittedProjectIds,
       repositoryHost: group.repositoryHost,
       repositoryOwner: owner,
       repositoryName: name,
       branches: [...new Set(discovered.map((row) => row.headBranch))],
-      startedAtFromMs: toMs - USAGE_SESSION_WINDOW_MS,
-    });
-    const assignments = assignSessionsToPullRequests({
-      sessions: sessions.map((session) => ({
-        sessionId: session.sessionId,
-        startedAtMs: session.startedAtMs,
-        headBranch: session.gitBranch,
-      })),
-      pullRequests: toAssignable(pullRequests),
+      fromMs: toMs - USAGE_SESSION_WINDOW_MS,
     });
 
     const nonBillableAgents = await resolveNonBillableAgents({
       deps: this.deps,
       organizationId,
-      agents: sessions.map((session) => session.agent),
+      agents: candidates.sessions.map((session) => session.agent),
     });
     const modelTotals =
       await this.deps.sessionEvents.sumTokensByModelPerSession({
         tenantIds: permittedProjectIds,
-        sessionIds: sessions.map((session) => session.sessionId),
+        sessionIds: candidates.sessions.map((session) => session.sessionId),
         fromMs: toMs - USAGE_SESSION_WINDOW_MS,
       });
     const costProjects = new Set(costProjectIds);
 
     return discovered.map((pullRequest) => {
-      const attached = sessions.filter(
-        (session) =>
-          assignments.get(session.sessionId) === pullRequest.prNumber,
-      );
+      const attribution = attributeSessionsToPullRequest({
+        sessions: candidates.sessions,
+        rowMatchedSessionKeys: candidates.rowMatchedSessionKeys,
+        pullRequests: toAssignable(pullRequests),
+        prNumber: pullRequest.prNumber,
+        repositoryHost: group.repositoryHost,
+        repositoryFullName: group.repositoryFullName,
+        modelTotals,
+      });
+      const attached = attribution.sessions;
       const rows = groupRows({
         sessions: attached,
         costProjects,
@@ -601,7 +637,14 @@ export class PullRequestUsageService {
       return {
         ...toIdentity(pullRequest),
         title: pullRequest.title,
-        lastActivityAtMs: latestActivityAtMs(attached),
+        // Discovery runs on this project's own sessions, the share runs on
+        // the stamps, so a discovered pull request can end up with no session
+        // attached: every stamp of the session that found it landed on a
+        // neighbour. The row stays, reporting no tokens and no cost, and
+        // dates itself by the pull request rather than by the epoch.
+        lastActivityAtMs:
+          latestActivityAtMs(attached) ||
+          (pullRequest.prUpdatedAt ?? pullRequest.prCreatedAt).getTime(),
         sessionsCount: totals.sessionsCount,
         inputTokens: totals.inputTokens,
         outputTokens: totals.outputTokens,
@@ -613,7 +656,7 @@ export class PullRequestUsageService {
         nonBilledCostUsd: totals.nonBilledCostUsd,
         modelBreakdown: modelsFor({
           sessions: attached,
-          modelTotals,
+          modelTotals: attribution.modelTotals,
           costProjects,
         }),
         contributorsSummary: contributorsSummaryFor({
@@ -660,32 +703,37 @@ export class PullRequestUsageService {
     if (!owner || !name) return empty;
 
     const toMs = nowMs(this.deps);
-    const sessions = await this.deps.sessions.listByRepositoryBranch({
+    const candidates = await this.candidateSessionsFor({
       tenantIds: query.permittedProjectIds,
       repositoryHost: target.repositoryHost,
       repositoryOwner: owner,
       repositoryName: name,
       branches: [target.headBranch],
-      startedAtFromMs: toMs - USAGE_SESSION_WINDOW_MS,
+      fromMs: toMs - USAGE_SESSION_WINDOW_MS,
     });
+    const modelTotals =
+      await this.deps.sessionEvents.sumTokensByModelPerSession({
+        tenantIds: query.permittedProjectIds,
+        sessionIds: candidates.sessions.map((session) => session.sessionId),
+        fromMs: toMs - USAGE_SESSION_WINDOW_MS,
+      });
 
-    const attached = attachedToPullRequest({
-      sessions,
-      pullRequests: siblings,
+    const attribution = attributeSessionsToPullRequest({
+      sessions: candidates.sessions,
+      rowMatchedSessionKeys: candidates.rowMatchedSessionKeys,
+      pullRequests: toAssignable(siblings),
       prNumber: target.prNumber,
+      repositoryHost: target.repositoryHost,
+      repositoryFullName: target.repositoryFullName,
+      modelTotals,
     });
+    const attached = attribution.sessions;
     const costProjects = new Set(query.costProjectIds);
     const nonBillableAgents = await resolveNonBillableAgents({
       deps: this.deps,
       organizationId: query.organizationId,
       agents: attached.map((session) => session.agent),
     });
-    const modelTotals =
-      await this.deps.sessionEvents.sumTokensByModelPerSession({
-        tenantIds: query.permittedProjectIds,
-        sessionIds: attached.map((session) => session.sessionId),
-        fromMs: toMs - USAGE_SESSION_WINDOW_MS,
-      });
 
     return {
       target,
@@ -698,9 +746,83 @@ export class PullRequestUsageService {
       }),
       modelBreakdown: modelsFor({
         sessions: attached,
-        modelTotals,
+        modelTotals: attribution.modelTotals,
         costProjects,
       }),
+    };
+  }
+
+  /**
+   * Every session that may have worked on one repository's branches, found two
+   * ways and merged: sessions whose own row matches (the legacy read), plus
+   * sessions whose STAMPED fact rows name the repository even though their row
+   * has since moved to another one — a resumed agent cycling between
+   * repositories is one session, and only its stamps remember everywhere it
+   * has been. The returned key set marks the row-matched ones, which are the
+   * only candidates the unstamped bucket may be priced under here.
+   */
+  private async candidateSessionsFor({
+    tenantIds,
+    repositoryHost,
+    repositoryOwner,
+    repositoryName,
+    branches,
+    fromMs,
+  }: {
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    fromMs: number;
+  }): Promise<{
+    sessions: CodingAgentBranchSessionRow[];
+    rowMatchedSessionKeys: ReadonlySet<string>;
+  }> {
+    // Independent reads, so they go together: the stamped one needs the
+    // row-matched keys only to subtract them, which happens after both land.
+    const [rowMatched, stamped] = await Promise.all([
+      this.deps.sessions.listByRepositoryBranch({
+        tenantIds,
+        repositoryHost,
+        repositoryOwner,
+        repositoryName,
+        branches,
+        startedAtFromMs: fromMs,
+      }),
+      this.deps.sessionEvents.listSessionsByStampedBranch({
+        tenantIds,
+        repositoryHost,
+        repositoryOwner,
+        repositoryName,
+        branches,
+        fromMs,
+      }),
+    ]);
+    const rowMatchedSessionKeys = new Set(rowMatched.map(sessionKey));
+
+    const missing = stamped.filter(
+      (pair) => !rowMatchedSessionKeys.has(sessionKey(pair)),
+    );
+    if (missing.length === 0) {
+      return { sessions: rowMatched, rowMatchedSessionKeys };
+    }
+
+    const fetched = await this.deps.sessions.listBySessionIds({
+      tenantIds,
+      sessionIds: [...new Set(missing.map((pair) => pair.sessionId))],
+      startedAtFromMs: fromMs,
+    });
+    // The id read cannot scope per tenant, so a provider session id shared by
+    // two projects fetches both; keep only the (tenant, session) pairs the
+    // stamps actually named.
+    const missingKeys = new Set(missing.map(sessionKey));
+    const stampedOnly = fetched.filter((session) =>
+      missingKeys.has(sessionKey(session)),
+    );
+    return {
+      sessions: [...rowMatched, ...stampedOnly],
+      rowMatchedSessionKeys,
     };
   }
 }
@@ -733,29 +855,6 @@ async function resolveNonBillableAgents({
   );
   return new Set(
     answers.filter((answer) => answer.nonBillable).map((a) => a.agent),
-  );
-}
-
-/** Keep only the sessions the tenure rule attaches to THIS pull request. */
-function attachedToPullRequest({
-  sessions,
-  pullRequests,
-  prNumber,
-}: {
-  sessions: CodingAgentBranchSessionRow[];
-  pullRequests: GithubPullRequestRow[];
-  prNumber: number;
-}): CodingAgentBranchSessionRow[] {
-  const assignments = assignSessionsToPullRequests({
-    sessions: sessions.map((session) => ({
-      sessionId: session.sessionId,
-      startedAtMs: session.startedAtMs,
-      headBranch: session.gitBranch,
-    })),
-    pullRequests: toAssignable(pullRequests),
-  });
-  return sessions.filter(
-    (session) => assignments.get(session.sessionId) === prNumber,
   );
 }
 
@@ -1092,7 +1191,14 @@ interface PersonalRepositoryGroup {
     startedAtMs: number;
     lastEventOccurredAtMs: number;
     agent: string;
+    /**
+     * The branch the session sits on now. The unlinked rollups group on it, so
+     * a session whose work maps to no pull request is reported once, where the
+     * work currently is, rather than once per branch it ever touched.
+     */
     headBranch: string;
+    /** Every branch it drove, which is what discovery and attribution read. */
+    headBranches: string[];
     inputTokens: number;
     outputTokens: number;
     cacheReadTokens: number;
@@ -1120,9 +1226,7 @@ function groupSessionsByRepository(
     // sees one repository listed twice with its usage divided between the
     // rows, and the group whose host is not already lower case matches no
     // mapping row and reports every branch as unlinked.
-    const repositoryHost = (
-      session.repositoryHost === "" ? "github.com" : session.repositoryHost
-    ).toLowerCase();
+    const repositoryHost = normalizeGithubHost(session.repositoryHost);
     const repositoryFullName =
       `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase();
     const key = `${repositoryHost} ${repositoryFullName}`;
@@ -1137,6 +1241,7 @@ function groupSessionsByRepository(
       lastEventOccurredAtMs: session.lastEventOccurredAt,
       agent: session.agent,
       headBranch: session.gitBranch,
+      headBranches: branchesOf(session),
       inputTokens: session.inputTokens,
       outputTokens: session.outputTokens,
       cacheReadTokens: session.cacheReadTokens,

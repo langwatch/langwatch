@@ -24,6 +24,7 @@ describe("GroupRestService.create", () => {
           organizationId: "org_1",
           name: "Reviewers",
           memberIds: ["member_1", "foreign_user", "member_1"],
+          actor: { type: "user", id: "actor_1" },
         }),
       ).rejects.toMatchObject({ code: "user_not_in_organization" });
 

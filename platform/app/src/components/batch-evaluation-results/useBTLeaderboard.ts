@@ -76,6 +76,7 @@ const signatureOf = (column: BatchComparisonColumn): string => {
     h = hashInto(h, String(verdict.rowIndex));
     h = hashInto(h, verdict.winnerId ?? "-");
     h = hashInto(h, verdict.isUnresolved ? "u" : "-");
+    h = hashInto(h, verdict.isUnsettled ? "s" : "-");
     for (const id of verdict.candidateIds ?? []) h = hashInto(h, id);
   }
   return `${column.evaluatorId}:${h}`;

@@ -323,7 +323,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards â
     {
       "type": "timeseries",
       "title": "Draining pods",
-      "description": "Iter 24: gateway_draining flips to 1 on SIGTERM; a pod stuck at 1 for > terminationGracePeriodSeconds is a hung handler (see Production runbook Recipe 7).",
+      "description": "gateway_draining flips to 1 on SIGTERM; a pod stuck at 1 for > terminationGracePeriodSeconds is a hung handler (see Production runbook Recipe 7).",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 71, "w": 12, "h": 7 },
       "targets": [{
@@ -334,7 +334,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards â
     {
       "type": "timeseries",
       "title": "In-flight requests",
-      "description": "Iter 24: paired with Draining â€” healthy drain curves to 0; flat while draining=1 means a handler is hung.",
+      "description": "Paired with Draining. A healthy drain curves to 0; flat while draining=1 means a handler is hung.",
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 71, "w": 12, "h": 7 },
       "targets": [{

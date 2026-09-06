@@ -96,9 +96,10 @@ function makePrisma({
       findUnique: vi.fn().mockResolvedValue({ organizationId: ORG_ID }),
     },
     organizationUser: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
+      findFirst: vi.fn().mockResolvedValue({
+        role: OrganizationUserRole.MEMBER,
+        disabledAt: null,
+      }),
     },
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     roleBinding: { findMany: vi.fn().mockResolvedValue(bindings) },

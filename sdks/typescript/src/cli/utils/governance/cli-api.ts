@@ -142,6 +142,13 @@ export interface CliApiOptions {
   fetchImpl?: typeof fetch;
   /** Seams for the automatic session refresh. Tests only. */
   refreshDeps?: SessionRefreshDeps;
+  /**
+   * Abort the request after this many milliseconds. Set it on any call
+   * a user is waiting behind: without it a connection that opens and
+   * never answers holds the CLI forever, since fetch has no default
+   * timeout of its own.
+   */
+  timeoutMs?: number;
 }
 
 /** Copy shown when the session cannot be recovered without a fresh login. */
@@ -170,9 +177,18 @@ async function authorizedFetch(
     fetchImpl: opts.fetchImpl,
     ...opts.refreshDeps,
   };
+  // Each attempt gets its own signal: one shared deadline would arm the
+  // clock before the refresh round-trip and abort the retry early.
+  const send = () =>
+    f(url, {
+      ...init(cfg.access_token!),
+      ...(opts.timeoutMs === undefined
+        ? {}
+        : { signal: AbortSignal.timeout(opts.timeoutMs) }),
+    });
   await refreshSessionIfExpired(cfg, deps);
 
-  const res = await f(url, init(cfg.access_token!));
+  const res = await send();
   if (res.status !== 401 || !canRefreshSession(cfg)) return res;
 
   const outcome = await refreshSession(cfg, deps);
@@ -182,7 +198,7 @@ async function authorizedFetch(
   // a 401 first attempt cannot have committed a write. That argument is
   // specific to 401: do not widen this retry to statuses such as 409 or 5xx,
   // which can follow a partially applied write.
-  return f(url, init(cfg.access_token!));
+  return send();
 }
 
 async function getJSON<T>(
@@ -422,6 +438,61 @@ export async function getCliBootstrap(
   }
 }
 
+/**
+ * One budget that binds the user's key, labelled with its scope. Wire
+ * shape of `GET /api/auth/cli/budget-overview` items (which mirrors the
+ * tRPC `api.user.budgetOverview` procedure byte-for-byte).
+ */
+export interface BudgetOverviewItem {
+  id: string;
+  name: string;
+  /** e.g. "whole organization budget", "personal budget". */
+  scopePhrase: string;
+  /** "MONTH" | "WEEK" | "DAY" | "HOUR" | "MINUTE" | "TOTAL". */
+  window: string;
+  limitUsd: string;
+  spentUsd: string;
+  /** Display name when the budget counts a single provider only. */
+  providerLabel: string | null;
+  /** ISO timestamp of the next reset; null for TOTAL windows. */
+  resetsAt: string | null;
+  isPerMember: boolean;
+}
+
+export interface BudgetOverviewResponse {
+  /**
+   * False when the org gives this user no member-facing gateway path
+   * (governance flag off / not a member): render nothing budget-related.
+   */
+  gatewayAccess: boolean;
+  reason?: string;
+  /** Most binding first; empty when no budget applies. */
+  budgets: BudgetOverviewItem[];
+}
+
+/**
+ * Fetch every budget that binds the user's key for the login epilogue.
+ * Returns null on 404 (older server without the endpoint) so the caller
+ * can fall back to the /bootstrap collapsed budget line.
+ */
+export async function getBudgetOverview(
+  cfg: GovernanceConfig,
+  options: CliApiOptions = {},
+): Promise<BudgetOverviewResponse | null> {
+  try {
+    return await getJSON<BudgetOverviewResponse>(
+      cfg,
+      `/api/auth/cli/budget-overview`,
+      options,
+    );
+  } catch (err) {
+    if (err instanceof GovernanceCliError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+
 // ── Public REST: /api/governance/* ─────────────────────────────────────────
 //
 // IngestionTemplate CRUD Hono routes. Wire shape is snake_case in/out.
@@ -527,7 +598,7 @@ async function requestREST<T>(
 // Ingestion key minting ------------------------------------------------------
 
 /**
- * Mint a personal-project ingest-only ApiKey (the `sk-lw-<...>` shape)
+ * Mint a personal-project ingest-only ApiKey (the `ik-lw-<...>` shape)
  * for a wrapped tool. Returns the plaintext key (shown once) plus the
  * OTLP endpoint the caller should point the tool's exporter at.
  *
@@ -548,6 +619,56 @@ export async function mintIngestionKey(
     "/api/auth/cli/governance/ingestion-key",
     { ...options, body: { source_type: sourceType }, mutating: true },
   );
+}
+
+/**
+ * Mint an ingest key scoped to a team project (id or slug within the
+ * caller's org). Unlike the personal mint, the server creates an
+ * ADDITIONAL key per device instead of rotating, so several machines can
+ * be instrumented against the same project. Requires the caller to hold
+ * `traces:create` on the target project.
+ */
+export async function mintProjectIngestionKey(
+  cfg: GovernanceConfig,
+  {
+    sourceType,
+    project,
+    deviceLabel,
+  }: { sourceType: string; project: string; deviceLabel?: string },
+  options: CliApiOptions = {},
+): Promise<{
+  token: string;
+  prefix: string;
+  endpoint: string;
+  project: { id: string; slug: string; name: string };
+}> {
+  return requestREST(cfg, "POST", "/api/auth/cli/governance/ingestion-key", {
+    ...options,
+    body: {
+      source_type: sourceType,
+      project,
+      ...(deviceLabel ? { device_label: deviceLabel } : {}),
+    },
+    mutating: true,
+  });
+}
+
+/**
+ * Issue the personal virtual key on demand. Called at the moment a tool
+ * actually resolves to the gateway path with no VK stored; login no
+ * longer auto-issues one, so subscription-only users never create VKs.
+ * The secret is returned exactly once; the caller persists it.
+ */
+export async function issuePersonalVirtualKey(
+  cfg: GovernanceConfig,
+  { deviceLabel }: { deviceLabel?: string } = {},
+  options: CliApiOptions = {},
+): Promise<{ id: string; secret: string; prefix: string }> {
+  return requestREST(cfg, "POST", "/api/auth/cli/virtual-key", {
+    ...options,
+    body: deviceLabel ? { device_label: deviceLabel } : {},
+    mutating: true,
+  });
 }
 
 
@@ -587,6 +708,53 @@ export async function listIngestionKeys(
     sourceType: k.source_type,
     lookupId: k.lookup_id,
   }));
+}
+
+/** Why the platform revoked a key, as the server records it. */
+export type IngestionKeyRevocationCause = "user" | "rotation" | "cap";
+
+export interface IngestionKeyDescription {
+  /** `unknown` is also what a key of another user reads as. */
+  status: "live" | "revoked" | "unknown";
+  sourceType?: string;
+  /** Null for a live key, and for one revoked before the cause was recorded. */
+  revocationCause: IngestionKeyRevocationCause | null;
+}
+
+/**
+ * What became of one of the caller's own personal ingestion keys. The hook's
+ * self-heal asks this before it re-mints a key the collector rejected: a key
+ * a person revoked from the API-keys page is left dead, one the cap retired or
+ * a rotation replaced is re-minted. A server from before this route answers
+ * 404, which reads as `unknown`, so an older platform heals as it always did.
+ */
+export async function describeIngestionKey(
+  cfg: GovernanceConfig,
+  lookupId: string,
+  options: CliApiOptions = {},
+): Promise<IngestionKeyDescription> {
+  try {
+    const body = await requestREST<{
+      status: "live" | "revoked" | "unknown";
+      source_type?: string;
+      revocation_cause?: IngestionKeyRevocationCause | null;
+    }>(
+      cfg,
+      "GET",
+      `/api/auth/cli/governance/ingestion-keys/${encodeURIComponent(lookupId)}`,
+      options,
+    );
+    return {
+      status: body.status,
+      sourceType: body.source_type,
+      revocationCause: body.revocation_cause ?? null,
+    };
+  } catch (error) {
+    if (error instanceof GovernanceCliError && error.status === 404) {
+      return { status: "unknown", revocationCause: null };
+    }
+    throw error;
+  }
 }
 
 // IngestionTemplate verbs ----------------------------------------------------

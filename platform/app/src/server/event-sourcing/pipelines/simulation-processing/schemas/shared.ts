@@ -2,7 +2,8 @@ import { z } from "zod";
 
 /**
  * Status values stored in ClickHouse.
- * STALLED is computed at read time, not stored.
+ * STALLED is never written: stalled runs finish ERROR via the process-manager
+ * stall watchdog, and nothing derives STALLED at read time anymore.
  */
 export const SIMULATION_RUN_STATUS = [
   "PENDING",

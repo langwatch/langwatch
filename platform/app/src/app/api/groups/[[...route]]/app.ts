@@ -1,5 +1,6 @@
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import {
   type Organization,
   RoleBindingScopeType,
@@ -134,6 +135,7 @@ secured
         name: body.name,
         bindings: body.bindings,
         memberIds: body.memberIds,
+        actor: orgRequestLedgerActor(c),
       });
 
       return c.json(
@@ -235,7 +237,11 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("groupService") as GroupRestService;
 
-      await service.delete({ id, organizationId: organization.id });
+      await service.delete({
+        id,
+        organizationId: organization.id,
+        actor: orgRequestLedgerActor(c),
+      });
 
       return c.json({ success: true });
     },
@@ -338,7 +344,10 @@ secured
       });
       if (!group) throw new GroupNotFoundError(id);
 
-      const bindings = await service.getBindings({ groupId: id });
+      const bindings = await service.getBindings({
+        organizationId: organization.id,
+        groupId: id,
+      });
       return c.json({
         data: bindings.map((b) => ({
           id: b.id,
@@ -373,6 +382,7 @@ secured
         customRoleId: body.customRoleId,
         scopeType: body.scopeType,
         scopeId: body.scopeId,
+        actor: orgRequestLedgerActor(c),
       });
       return c.json(
         {
@@ -414,6 +424,7 @@ secured
       await service.removeBinding({
         bindingId,
         organizationId: organization.id,
+        actor: orgRequestLedgerActor(c),
       });
 
       return c.json({ success: true });

@@ -11,6 +11,7 @@ import { GraphicsQualityProvider } from "./components/GraphicsQualityProvider";
 import { ColorModeProvider } from "./components/ui/color-mode";
 import { Toaster } from "./components/ui/toaster";
 import { CommandBarProvider } from "./features/command-bar";
+import { useNavigationV2Tracking } from "./features/navigation/useNavigationV2Tracking";
 import { useAttributionCapture } from "./hooks/useAttributionCapture";
 import { useBrowserTracing } from "./hooks/useBrowserTracing";
 import { useIsGtagReady } from "./hooks/useIsGtagReady";
@@ -54,6 +55,9 @@ export function InnerProviders({ children }: { children: ReactNode }) {
   // Router context is available here — InnerProviders renders inside
   // RouterProvider — which is what a navigation span needs.
   useNavigationTracing();
+  // Navigation-v2 write points (product memory + settings return capture).
+  // Inert in legacy mode.
+  useNavigationV2Tracking();
 
   return (
     <>

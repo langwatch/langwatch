@@ -49,7 +49,7 @@ vi.mock("~/server/evaluations/evaluation.service", () => ({
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
   isClickHouseEnabled: () => false,
 }));
 

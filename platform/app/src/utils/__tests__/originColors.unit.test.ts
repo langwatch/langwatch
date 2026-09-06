@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getOriginColor, getOriginLabel } from "../originColors";
+import { getOriginColor } from "../originColors";
 
 describe("originColors", () => {
   describe("getOriginColor", () => {
@@ -81,33 +81,6 @@ describe("originColors", () => {
       const result1 = getOriginColor("my-custom");
       const result2 = getOriginColor("my-custom");
       expect(result1).toEqual(result2);
-    });
-  });
-
-  describe("getOriginLabel", () => {
-    it("capitalizes first letter of origin", () => {
-      expect(getOriginLabel("application")).toBe("Application");
-      expect(getOriginLabel("evaluation")).toBe("Evaluation");
-      expect(getOriginLabel("simulation")).toBe("Simulation");
-      expect(getOriginLabel("playground")).toBe("Playground");
-      expect(getOriginLabel("workflow")).toBe("Workflow");
-    });
-
-    it("handles single character origin", () => {
-      expect(getOriginLabel("a")).toBe("A");
-    });
-
-    it("returns empty string for empty input", () => {
-      expect(getOriginLabel("")).toBe("");
-    });
-
-    it("capitalizes custom origin values", () => {
-      expect(getOriginLabel("my-custom-origin")).toBe("My-custom-origin");
-    });
-
-    it("renders multi-word ingest origins from the known-label map", () => {
-      expect(getOriginLabel("coding_agent")).toBe("Coding Agent");
-      expect(getOriginLabel("ai_tool")).toBe("AI Tool");
     });
   });
 });

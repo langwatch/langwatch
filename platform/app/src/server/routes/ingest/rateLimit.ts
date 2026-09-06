@@ -19,7 +19,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import { connection as defaultRedisConnection } from "~/server/redis";
+import { tryGetApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:ingest:rate-limit");
 
@@ -29,6 +29,15 @@ export const DEFAULT_WINDOW_SEC = 60;
 export const DEFAULT_MAX_REQUESTS = 60;
 
 type RedisLike = Redis | Cluster;
+
+/**
+ * Omitting `redis` takes the App's; passing `null` explicitly forces the
+ * open-fail path. A default parameter can't tell "not passed" from "passed
+ * undefined", so the sentinel is how a caller opts out (ADR-093).
+ */
+function resolveRedis(redis: RedisLike | null | undefined): RedisLike | null {
+  return redis === void 0 ? (tryGetApp()?.redis ?? null) : redis;
+}
 
 export interface RateLimitDecision {
   allowed: boolean;
@@ -65,18 +74,17 @@ export async function checkIpRateLimit({
   windowSec?: number;
   maxRequests?: number;
   /**
-   * Explicitly pass `null` to test the open-fail path; omit to use the
-   * default (production) Redis connection. Default parameters can't
-   * distinguish between "not passed" and "passed undefined" in JS, so
-   * the explicit-null sentinel is the cleanest way for tests to opt
-   * out of the default.
+   * Explicitly pass `null` to test the open-fail path; omit to use the App's
+   * Redis connection. Default parameters can't distinguish between "not
+   * passed" and "passed undefined" in JS, so the explicit-null sentinel is the
+   * cleanest way for tests to opt out of the default.
    */
   redis?: RedisLike | null;
 }): Promise<RateLimitDecision> {
   if (isRateLimitDisabled()) {
     return { allowed: true, retryAfterSec: 0, count: 0 };
   }
-  const effectiveRedis = redis === undefined ? defaultRedisConnection : redis;
+  const effectiveRedis = resolveRedis(redis);
   if (!effectiveRedis) {
     logger.warn(
       { ip },

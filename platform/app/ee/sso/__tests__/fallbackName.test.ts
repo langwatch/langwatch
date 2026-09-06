@@ -16,7 +16,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
-vi.mock("~/server/redis", () => ({ connection: undefined }));
 
 import { fallbackName } from "../providers";
 

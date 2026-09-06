@@ -2,6 +2,24 @@ import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 
 export type TeamRoleValue = TeamUserRole | `custom:${string}`;
 
+/**
+ * The one sanctioned translation between the two role enums. ADMIN and
+ * MEMBER are spelled the same in both, which is exactly why every cast
+ * "worked" until the enums diverge — write paths that turn an organization
+ * seat into a team/scope binding must go through this map so a future
+ * divergence fails the typecheck instead of writing a wrong role. EXTERNAL
+ * (a lite member) deliberately lands as VIEWER: a lite seat never confers
+ * write access on a scope it is granted into.
+ */
+export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
+  OrganizationUserRole,
+  TeamUserRole
+> = {
+  [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
+  [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
+  [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+} as const;
+
 export function getOrganizationRoleLabel(role: OrganizationUserRole): string {
   if (role === OrganizationUserRole.ADMIN) return "Organization Admin";
   if (role === OrganizationUserRole.MEMBER) return "Organization Member";

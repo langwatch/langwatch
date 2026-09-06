@@ -24,6 +24,23 @@ name: migration-order
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    # This workflow has no required status check, so filtering here is safe:
+    # a workflow GitHub filters out never reports, and a *required* check that
+    # never reports leaves a PR waiting forever. The always-run + green
+    # aggregator pattern the gated workflows use exists for exactly that
+    # reason, and none of them lose it.
+    #
+    # The two directories are the ones tools/migrationorder actually scans
+    # (tools/migrationorder/set.go). A PR that touches neither adds no
+    # migration, so there is no ordering to judge.
+    paths:
+      - "platform/app/prisma/migrations/**"
+      - "platform/app/src/server/clickhouse/migrations/**"
+      # The checker and its own gate: a change to either has to run against
+      # the real migration sets, not just its unit tests.
+      - "tools/migrationorder/**"
+      - "cmd/migrationorder/**"
+      - ".github/workflows/migration-order.yml"
 
 permissions:
   contents: read

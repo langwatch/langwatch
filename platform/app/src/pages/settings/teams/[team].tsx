@@ -236,7 +236,6 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         title: (error as TRPCClientError<never>).message, // no-raw-error-toast-ok
         type: "error",
         duration: 8000,
-        meta: { closable: true },
       });
       return;
     }
@@ -247,7 +246,6 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
           "You need to be an administrator of the organization to update this team",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
       return;
     }
@@ -280,9 +278,6 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
               title: "Team updated successfully",
               type: "success",
               duration: 2000,
-              meta: {
-                closable: true,
-              },
             });
             void apiContext.organization.getAll.refetch();
           },
@@ -323,7 +318,6 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
             title: error.message, // no-raw-error-toast-ok
             type: "error",
             duration: 8000,
-            meta: { closable: true },
           });
         },
       },

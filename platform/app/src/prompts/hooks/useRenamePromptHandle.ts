@@ -48,7 +48,6 @@ export const useRenamePromptHandle = ({
         title: "Couldn't change the prompt handle",
         description: "Save this prompt before renaming its handle.",
         type: "error",
-        meta: { closable: true },
       });
       return;
     }

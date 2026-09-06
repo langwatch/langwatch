@@ -1,14 +1,9 @@
-import { Box, Grid, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Drawer } from "~/components/ui/drawer";
-import { DocsLinks } from "~/features/onboarding/components/sections/observability/DocsLinks";
-import { FrameworkGrid } from "~/features/onboarding/components/sections/observability/FrameworkGrid";
-import { FrameworkIntegrationCode } from "~/features/onboarding/components/sections/observability/FrameworkIntegrationCode";
-import { InstallPreview } from "~/features/onboarding/components/sections/observability/InstallPreview";
-import { PlatformGrid } from "~/features/onboarding/components/sections/observability/PlatformGrid";
 import {
   PromptList,
   SkillList,
@@ -19,17 +14,9 @@ import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
 } from "~/features/onboarding/contexts/ActiveProjectContext";
-import { getRegistryEntry } from "~/features/onboarding/regions/observability/codegen/registry";
-import type {
-  FrameworkKey,
-  PlatformKey,
-} from "~/features/onboarding/regions/observability/types";
-import {
-  FRAMEWORKS_BY_PLATFORM,
-  PLATFORM_OPTIONS,
-} from "~/features/onboarding/regions/observability/ui-options";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { ApiKeyIntegrationInfoCard } from "./ApiKeyIntegrationInfoCard";
+import { SdkSetup } from "./SdkSetup";
 
 export type Segment = "skill" | "mcp" | "prompt" | "sdk";
 
@@ -264,101 +251,10 @@ export function IntegrationContent({
             <PromptList primarySkillId={TRACING_SKILL_ID} />
           </Tabs.Content>
           <Tabs.Content value="sdk" padding={0}>
-            <ManualSetup />
+            <SdkSetup />
           </Tabs.Content>
         </Tabs.Root>
       </VStack>
     </AnalyticsBoundary>
-  );
-}
-
-/**
- * Direct-SDK setup body. Token + project id are already pre-filled in
- * the env block at the top of the drawer, so this body just shows the
- * platform/framework picker and the matching code snippet.
- */
-function ManualSetup(): React.ReactElement | null {
-  const initialPlatform = PLATFORM_OPTIONS[0]?.key ?? null;
-  const [selectedPlatform, setSelectedPlatform] = useState<PlatformKey | null>(
-    initialPlatform,
-  );
-  const [selectedFramework, setSelectedFramework] =
-    useState<FrameworkKey | null>(
-      initialPlatform
-        ? (FRAMEWORKS_BY_PLATFORM[initialPlatform]?.[0]?.key ?? null)
-        : null,
-    );
-
-  if (!selectedPlatform) return null;
-
-  function handleSelectPlatform(platform: PlatformKey): void {
-    setSelectedPlatform(platform);
-    const firstFramework = FRAMEWORKS_BY_PLATFORM[platform]?.[0]?.key;
-    setSelectedFramework(firstFramework ?? null);
-  }
-
-  const hasFrameworks =
-    (FRAMEWORKS_BY_PLATFORM[selectedPlatform]?.length ?? 0) > 0;
-
-  const selectedEntry = useMemo(
-    () =>
-      getRegistryEntry(
-        selectedPlatform,
-        hasFrameworks ? (selectedFramework ?? undefined) : undefined,
-      ),
-    [selectedPlatform, selectedFramework, hasFrameworks],
-  );
-
-  return (
-    <Grid
-      templateColumns={{ base: "1fr", xl: "1fr 1fr" }}
-      gap={{ base: 6, xl: 10 }}
-      alignItems="start"
-    >
-      <VStack align="stretch" gap={6} overflow="visible">
-        <PlatformGrid
-          selectedLanguage={selectedPlatform}
-          onSelectLanguage={handleSelectPlatform}
-        />
-
-        {hasFrameworks && (
-          <FrameworkGrid
-            language={selectedPlatform}
-            selectedFramework={selectedFramework}
-            onSelectFramework={setSelectedFramework}
-          />
-        )}
-      </VStack>
-
-      <VStack align="stretch" gap={3} minW={0} width="full">
-        {selectedEntry?.customComponent ? (
-          <>
-            <selectedEntry.customComponent />
-            <DocsLinks
-              docs={selectedEntry?.docs}
-              label={selectedEntry?.label ?? ""}
-            />
-          </>
-        ) : (
-          <>
-            <InstallPreview install={selectedEntry?.install} />
-            <Box minW={0} width="full" overflowX="auto">
-              <FrameworkIntegrationCode
-                platform={selectedPlatform}
-                framework={selectedFramework as FrameworkKey}
-                languageIconUrl={
-                  PLATFORM_OPTIONS.find((p) => p.key === selectedPlatform)
-                    ?.iconUrl
-                }
-              />
-            </Box>
-            <DocsLinks
-              docs={selectedEntry?.docs}
-              label={selectedEntry?.label ?? ""}
-            />
-          </>
-        )}
-      </VStack>
-    </Grid>
   );
 }

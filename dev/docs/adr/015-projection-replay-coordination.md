@@ -182,6 +182,60 @@ entries written by previously completed batches are deliberately left intact
 so a re-run still skips completed aggregates (resume). Cleanup is best-effort
 — a marker-cleanup failure is logged and never masks the original batch error.
 
+## Amendment (2026-08-13): One engine, and the pause window shrinks to mark → drain → cutoff
+
+The replay module carried two parallel implementations of the same batch
+protocol: the per-projection serial lanes (`replayFoldPath`, `replayMapPath`)
+and the multi-projection `replayOptimized`. The ops service picked between
+them — and picked the serial path for the WHOLE run whenever a state
+projection was selected, demoting that run's folds and maps to
+one-event-load-per-projection. Both problems are now structural, not
+configurational:
+
+1. **One engine.** `replayFoldPath` and `replayMapPath` are deleted.
+   `ReplayService.replay` routes folds and maps through the shared batch
+   engine (`replayEngine.ts`, previously `replayOptimizedPath.ts`) — one
+   discovery over the union of the selected projections' event types, each
+   batch's events loaded exactly once — and then rebuilds any selected state
+   projections in their own paused lane (`replayStatePath`, unchanged).
+
+2. **The pause window covers mark → drain → cutoff only.** The batch engine
+   previously held the projection-wide pause through load, apply, and write —
+   the phases that dominate batch wall-clock — freezing the projections' live
+   queues for whole batches at a time. But the pause was only ever needed to
+   close the mid-flight race: a job that passed the marker check before the
+   cutoff existed must finish (drain) before the cutoff is taken. Once every
+   aggregate's cutoff marker is recorded, the live checker itself protects the
+   rebuild — events at/before the cutoff are skipped, events after it are
+   deferred — so the engine now unpauses immediately after
+   `markCutoffForProjections` and streams/applies/writes with the queues
+   flowing. Unmarked aggregates process normally throughout; marked ones
+   defer-with-backoff exactly as they already did in the unpaused gaps
+   between batches. The "why pause + drain instead of just markers?"
+   rationale above still holds — for the drain window, which is all that
+   remains paused.
+
+3. **Union event-type filter on the load.** The bulk load previously read
+   EVERY event of the batch's aggregates and let each accumulator drop the
+   types it didn't declare — paying ClickHouse read, decompression, transfer,
+   and JSON.parse for payloads no selected projection would consume. The load
+   now filters `EventType IN (union of selected projections' event types)`,
+   the same union the cutoffs are computed over, so the boundary stays
+   consistent and unconsumed payload bytes never leave ClickHouse.
+
+4. **Streaming apply.** The bulk load materialized the whole batch's rows as
+   one JSON array (`result.json()`) and then applied them; a heavy batch was
+   memory-bound by its event count. `streamEventsForAggregatesBulk` now
+   streams rows and applies each event as it arrives — memory stays bounded
+   by fold states plus the map write buffer, and apply CPU overlaps the
+   network read. Alongside: events are leaned once at row materialization
+   (`rowToEvent`) instead of once per (event × projection) inside the
+   accumulators, `MapAccumulator.apply` is synchronous with the driver
+   awaiting `drainIfNeeded()` so the hot loop carries no per-event await, and
+   the per-batch marker transitions (pending/cutoff/done) each execute as ONE
+   Redis pipeline across all projections instead of a pipeline per
+   projection.
+
 ## References
 
 - Related ADRs:

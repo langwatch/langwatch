@@ -22,7 +22,7 @@ export const GITHUB_BRANCH_RECHECK_PROCESS_NAME = "githubBranchRecheck";
 export const GITHUB_BRANCH_RECHECK_INTERVAL_MS = 10 * 60 * 1000;
 
 /**
- * How often the two GitHub tables are pruned. Retention is a daily concern and
+ * How often the branch bookkeeping is pruned. Retention is a daily concern and
  * the sweep is a ten-minute one, so the prune rides the same schedule and fires
  * on the first wake past its own interval rather than carrying a second
  * singleton. This mirrors the automations pipeline, which hangs its
@@ -54,8 +54,8 @@ export const GITHUB_BRANCH_RECHECK_INITIAL_STATE: GithubBranchRecheckState = {
 export interface GithubBranchRecheckDeps {
   /** One sweep pass; returns how many branches were rechecked. */
   recheck: () => Promise<number>;
-  /** Deletes the rows past the activity horizon; returns what it removed. */
-  prune: () => Promise<{ branchChecks: number; pullRequests: number }>;
+  /** Deletes the bookkeeping past the activity horizon; returns what it removed. */
+  prune: () => Promise<{ branchChecks: number }>;
   deleteDispatchedBefore: (params: {
     processName: string;
     before: number;
@@ -112,11 +112,11 @@ export function runGithubBranchRecheck(deps: GithubBranchRecheckDeps) {
 export function runGithubRetentionPrune(deps: GithubBranchRecheckDeps) {
   return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
-    const { branchChecks, pullRequests } = await deps.prune();
-    if (branchChecks > 0 || pullRequests > 0) {
+    const { branchChecks } = await deps.prune();
+    if (branchChecks > 0) {
       logger.info(
-        { branchChecks, pullRequests },
-        "GitHub pull-request tables pruned past the activity horizon",
+        { branchChecks },
+        "GitHub branch bookkeeping pruned past the activity horizon",
       );
     }
 

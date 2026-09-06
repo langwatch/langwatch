@@ -41,14 +41,19 @@ describe("validateModelAliasesAgainstBoundProviders", () => {
     });
   });
 
-  describe("when no providers are bound on the VK", () => {
-    it("reports 'bound: none' for any prefixed alias", () => {
+  describe("when no providers are bound at all", () => {
+    it("names the mapping, its provider, and that nothing is configured", () => {
       const { errors } = validateModelAliasesAgainstBoundProviders({
         aliases: { mini: "openai/gpt-5-mini" },
         boundProviderTypes: new Set(),
       });
 
-      expect(errors[0]).toContain("bound: none");
+      // The operator has to be able to tell WHICH mapping is wrong and WHY,
+      // so all three facts are load-bearing. The sentence around them is copy.
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("mini");
+      expect(errors[0]).toContain("openai");
+      expect(errors[0]).toContain("none");
     });
   });
 

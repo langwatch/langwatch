@@ -69,9 +69,15 @@ outcomes exist only as events and log lines).
 
 4. **Substrate domains get one outcome metric each.** Topic clustering:
    `topic_clustering_page_total{outcome}` (completed | skipped |
-   failed_retryable | failed_final) and
+   failed_retryable | failed_final | failed_customer) and
    `topic_clustering_page_duration_milliseconds{mode}` from the intent
-   executor. The governance ingestion pullers, now on the same substrate
+   executor. `failed_customer` is deliberately outside the alertable
+   series: a run that fails because the project configured no model for
+   clustering is recorded, surfaced on the settings page with its
+   remediation, and never retried — counting it as `failed_final` would
+   page us for a change only the customer can make, and the dominant
+   production failure is exactly that one. The governance ingestion
+   pullers, now on the same substrate
    (PR #5904), get theirs: `ingestion_pull_total{outcome}` (completed |
    failed_retryable | failed_final) and
    `ingestion_pull_duration_milliseconds` (unlabelled — the executor

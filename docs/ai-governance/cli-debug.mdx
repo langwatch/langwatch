@@ -26,7 +26,7 @@ langwatch login --device
 
 The same `~/.langwatch/config.json` the rest of the governance CLI uses persists the Bearer access token. Token TTL is 1h with a long-lived refresh token; the CLI rotates transparently. `langwatch logout` server-revokes both.
 
-The `ingest` and `governance` subcommands are always registered — `langwatch --help` lists them once the CLI is installed. Per-account governance entitlement is enforced server-side.
+The `ingest` and `governance` subcommands are always registered: `langwatch --help` lists them once the CLI is installed. Per-account governance entitlement is enforced server-side.
 
 ## `langwatch governance status`
 
@@ -70,8 +70,8 @@ The org's IngestionSources, active by default. Pass `--all` to include archived 
 
 ```text
 $ langwatch ingest list
-NAME                        TYPE          STATUS  LAST EVENT
-Dogfood OTel · alexis lane  otel_generic  active  46m ago
+NAME                    TYPE          STATUS  LAST EVENT
+Generic OTel · eu-west  otel_generic  active  46m ago
 ```
 
 Status colouring:
@@ -87,7 +87,7 @@ $ langwatch ingest list --json
 [
   {
     "id": "JxQztBgN90QeX12-afJ0C",
-    "name": "Dogfood OTel · alexis lane",
+    "name": "Generic OTel · eu-west",
     "sourceType": "otel_generic",
     "description": null,
     "status": "active",
@@ -106,7 +106,7 @@ A one-shot snapshot: events received in the last 24h, 7d, 30d, plus the timestam
 
 ```text
 $ langwatch ingest health JxQztBgN90QeX12-afJ0C
-Dogfood OTel · alexis lane  (JxQztBgN90QeX12-afJ0C)
+Generic OTel · eu-west  (JxQztBgN90QeX12-afJ0C)
 Status:        active
 Events (24h):  1
 Events (7d):   1
@@ -121,7 +121,7 @@ $ langwatch ingest health JxQztBgN90QeX12-afJ0C --json
 {
   "source": {
     "id": "JxQztBgN90QeX12-afJ0C",
-    "name": "Dogfood OTel · alexis lane",
+    "name": "Generic OTel · eu-west",
     "status": "active"
   },
   "health": {
@@ -154,7 +154,7 @@ Polls every 3s for new events newest-first, deduplicating by `eventId` so re-rep
 langwatch ingest tail JxQztBgN90QeX12-afJ0C --follow
 ```
 
-`Ctrl-C` exits cleanly. The follow loop is robust to transient errors, control-plane 5xx prints a yellow `warn` and retries on the next tick rather than killing the stream.
+`Ctrl-C` exits cleanly. The follow loop keeps running through transient errors: a control-plane 5xx prints a yellow `warn` and retries on the next tick rather than killing the stream.
 
 ### `--json`
 
@@ -210,14 +210,14 @@ $ langwatch login --device
 … opening https://app.langwatch.ai/cli/auth?code=ABCD-EFGH …
 Error: HTTP 409, no_default_routing_policy
        Your organization has no default routing policy published.
-       Ask your admin to publish one at Settings → Routing Policies
-       (/settings/routing-policies), then re-run `langwatch login`.
+       Ask your admin to publish one at Gateway → Routing Policies
+       (/gateway/routing-policies), then re-run `langwatch login`.
 ```
 
 **Admin remediation:**
 
 1. Sign in to the LangWatch web app as an org admin.
-2. Navigate to **Settings → Routing Policies** (`/settings/routing-policies`).
+2. Navigate to **Gateway → Routing Policies** (`/gateway/routing-policies`).
 3. Create at least one routing policy and toggle it to **Default**.
 4. Ask the developer to re-run `langwatch login --device`.
 
@@ -249,7 +249,7 @@ Three surfaces, one backend:
 | Surface | Audience | Contract |
 |---------|----------|----------|
 | Web `/governance` admin oversight | Governance admin in a browser | tRPC: `api.governance.setupState`, `api.activityMonitor.*`, `api.ingestionSources.*` |
-| Web `/settings/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
+| Web `/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
 | **CLI `governance status`, `ingest list/health/tail`** | **Terminal-first SRE, on-call** | **REST: `GET /api/auth/cli/governance/*`, Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
 
 The REST endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path. Per-account governance entitlement is enforced at the endpoint layer.

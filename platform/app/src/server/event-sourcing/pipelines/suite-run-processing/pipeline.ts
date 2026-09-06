@@ -31,7 +31,7 @@ export interface SuiteRunProcessingPipelineDeps {
  * - recordSuiteRunItemStarted: Emits SuiteRunItemStartedEvent per item
  * - completeSuiteRunItem: Emits SuiteRunItemCompletedEvent when item finishes
  *
- * No reactor on this pipeline — cross-pipeline reactors live on the simulation pipeline.
+ * No subscriber on this pipeline — cross-pipeline subscribers live on the simulation pipeline.
  */
 export function createSuiteRunProcessingPipeline(
   deps: SuiteRunProcessingPipelineDeps,

@@ -66,7 +66,6 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 });
 
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
-vi.mock("~/server/redis", () => ({ connection: undefined }));
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => text,
   decrypt: (text: string) => text,

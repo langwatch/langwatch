@@ -30,7 +30,7 @@ import {
   replayGooseMigrationUp,
   replayRollupRebuild,
 } from "~/server/clickhouse/__tests__/migrationReplay";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -120,7 +120,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     });
 
     repo = new GatewayBudgetClickHouseRepository(async (tenantId) => {
-      const client = await getClickHouseClientForProject(tenantId);
+      const client = await getClickHouseClientForTenant(tenantId);
       if (!client) throw new Error("no ClickHouse client in test environment");
       return client;
     });
@@ -214,7 +214,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     const tzOccurredAt = new Date();
 
     beforeAll(async () => {
-      const client = await getClickHouseClientForProject(TENANT_ID);
+      const client = await getClickHouseClientForTenant(TENANT_ID);
       const occurredAt = tzOccurredAt.getTime();
       await client!.insert({
         table: "gateway_budget_ledger_events",
@@ -291,7 +291,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     // them. UpdatedAt is bookkeeping the rebuild re-stamps by design, so
     // it stays out of the comparison.
     const captureUtcRows = async () => {
-      const client = await getClickHouseClientForProject(TENANT_ID);
+      const client = await getClickHouseClientForTenant(TENANT_ID);
       const result = await client!.query({
         query: `
           SELECT
@@ -318,7 +318,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     };
 
     beforeAll(async () => {
-      const client = await getClickHouseClientForProject(TENANT_ID);
+      const client = await getClickHouseClientForTenant(TENANT_ID);
 
       utcRowsBeforeRebuild = await captureUtcRows();
 
@@ -384,7 +384,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
       // Re-apply the current migration unconditionally so a failure
       // anywhere in this describe can never leave later suites running
       // against the 00055 view. Idempotent by the migration's own design.
-      const client = await getClickHouseClientForProject(TENANT_ID);
+      const client = await getClickHouseClientForTenant(TENANT_ID);
       await replayRollupRebuild(client!);
     }, 120_000);
 
@@ -425,7 +425,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
 
   describe("when comparing the periods the two sides use", () => {
     it("buckets every window into a period the read path asks for", async () => {
-      const client = await getClickHouseClientForProject(TENANT_ID);
+      const client = await getClickHouseClientForTenant(TENANT_ID);
       const result = await client!.query({
         query: `
           SELECT Window, count() AS buckets

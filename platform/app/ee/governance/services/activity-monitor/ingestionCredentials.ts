@@ -22,6 +22,20 @@ function isEncrypted(value: unknown): value is string {
 }
 
 /**
+ * Whether a value is one of our sealed envelopes rather than a fresh secret.
+ *
+ * Callers use this to refuse a client-supplied envelope. Re-encryption is
+ * idempotent by design (so a rollout can re-save an already-encrypted row
+ * safely), and that same property is what would let someone hand an envelope
+ * they cannot open straight back to us alongside a changed destination. A
+ * write path that accepts one is letting a caller keep a secret it never
+ * proved it knows.
+ */
+export function isEncryptedCredentials(value: unknown): value is string {
+  return isEncrypted(value);
+}
+
+/**
  * Return a copy of `parserConfig` with its `credentials` subtree encrypted.
  * Idempotent (an already-encrypted value is left untouched) and a no-op
  * when there are no credentials to protect.

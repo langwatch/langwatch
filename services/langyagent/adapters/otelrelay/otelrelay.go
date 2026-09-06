@@ -5,10 +5,10 @@
 // customer secret beyond what it strictly needs. Two flows used to require a
 // secret in the worker env; both are mediated by the manager now:
 //
-//   - Telemetry (phase 1): the worker's opencode exports OTLP/HTTP over
+//   - Telemetry (phase 1): a worker that exports OTLP/HTTP does so over
 //     loopback to this relay — no Authorization header, no LangWatch key in the
 //     worker. The relay re-parents the spans under the conversation's current
-//     turn trace (the manager knows each turn's traceparent; opencode does not
+//     turn trace (the manager knows each turn's traceparent; the worker does not
 //     speak W3C propagation) and forwards them to the customer's LangWatch
 //     project at POST <endpoint>/api/otel/v1/traces, authenticated with the
 //     session key the manager was handed at spawn.
@@ -67,7 +67,7 @@ import (
 	langyotel "github.com/langwatch/langwatch/services/langyagent/otel"
 )
 
-// maxOTLPBodyBytes caps a worker's OTLP export body. Batches from one opencode
+// maxOTLPBodyBytes caps a worker's OTLP export body. Batches from one worker
 // process are small; 16MB leaves generous room while bounding a hostile worker.
 const maxOTLPBodyBytes = 16 * 1024 * 1024
 
@@ -148,6 +148,35 @@ type workerEntry struct {
 	// answers the NEXT call with a terminal 400 carrying this body instead of
 	// proxying. Cleared by a clean stream, a new turn, or clearLLMError.
 	llmStreamCut []byte
+	// loggedParamsDropped holds every gateway params-dropped set already
+	// logged for this worker, so a busy turn logs each distinct set once,
+	// not once per LLM call. A set the worker saw earlier stays deduped even
+	// when another set arrives in between.
+	loggedParamsDropped map[string]struct{}
+}
+
+// maxLoggedParamsDroppedSets caps how many distinct drop sets one worker
+// logs. The set names come from the caller's own request body, so an unknown
+// field the caller varies per call would otherwise grow the map without a
+// bound. Past the cap the operator already has every set worth reading.
+const maxLoggedParamsDroppedSets = 32
+
+// noteParamsDropped records a gateway drop set and reports whether it is new
+// for this worker; the caller logs only when it is.
+func (e *workerEntry) noteParamsDropped(set string) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if _, seen := e.loggedParamsDropped[set]; seen {
+		return false
+	}
+	if len(e.loggedParamsDropped) >= maxLoggedParamsDroppedSets {
+		return false
+	}
+	if e.loggedParamsDropped == nil {
+		e.loggedParamsDropped = make(map[string]struct{}, 1)
+	}
+	e.loggedParamsDropped[set] = struct{}{}
+	return true
 }
 
 func (e *workerEntry) setTurn(sc trace.SpanContext) {
@@ -300,7 +329,7 @@ type Options struct {
 // ctx is the manager-lifetime context (carries the logger); Shutdown stops the
 // listener.
 func New(ctx context.Context, opts Options) (*Relay, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("otelrelay listen: %w", err)
 	}
@@ -335,7 +364,7 @@ func New(ctx context.Context, opts Options) (*Relay, error) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /w/{token}/v1/traces", r.handleTraces)
-	// opencode's native OTel exports logs too. They are ACCEPTED and DROPPED:
+	// A worker's native OTel exporter ships logs too. They are ACCEPTED and DROPPED:
 	// worker logs carry the highest-density PII/secret surface (raw prompts,
 	// tool output) and the manager deliberately discards the worker's
 	// stdout/stderr for the same reason. Answering 200 keeps the worker-side
@@ -515,7 +544,7 @@ func (r *Relay) SetTurnContext(token string, sc trace.SpanContext) {
 // LastLLMError is the typed gateway herr the worker's most recent mediated
 // LLM call failed with, if any — reset at each turn start (SetTurnContext).
 // The app reads it when the agent reports a turn error, so the terminal frame
-// carries the gateway's real cause instead of opencode's laundered prose.
+// carries the gateway's real cause instead of the agent's laundered prose.
 func (r *Relay) LastLLMError(token string) (herr.E, bool) {
 	if e := r.lookup(token); e != nil {
 		return e.lastLLMError()
@@ -644,7 +673,7 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Content-type-aware decode. opencode's native exporter ships OTLP/HTTP
+	// Content-type-aware decode. A native exporter ships OTLP/HTTP
 	// JSON and IGNORES OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf — a
 	// proto-only parse 400'd every worker batch this relay ever received,
 	// which is exactly why worker spans never reached anyone. Everything
@@ -1008,7 +1037,7 @@ const originLangy = "langy"
 // so the allowed keys are the ones that carry customer meaning: the relay's
 // own stamps (thread, acting user, tags) and the worker's telemetry identity
 // (service.name). Everything else — sdk metadata, environment identity, and
-// whatever a future opencode version starts emitting — fails closed. The
+// whatever a worker starts emitting — fails closed. The
 // origin stamp replaces any worker-supplied value: the worker is a
 // model-driven, prompt-injectable process and must not brand its spans with
 // LangWatch's provenance marker; the platform says these spans are Langy's.

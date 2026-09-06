@@ -72,9 +72,22 @@ export const setComplexProps = (props: Record<string, unknown>): void => {
  * (e.g., onSelectPrompt callback that should work in promptList even when
  * opened from targetTypeSelector).
  *
- * Cleared automatically when closeDrawer() is called.
+ * Cleared automatically when closeDrawer() is called, except for the entries
+ * registered with `keepOnClose`.
  */
 let flowCallbacks: Record<string, Record<string, unknown>> = {};
+
+/**
+ * The drawers whose callbacks belong to a mounted component rather than to one
+ * drawer flow.
+ *
+ * A page-level component that registers a callback for its own drawer holds it
+ * for as long as it is mounted, and takes it back itself on unmount. Closing
+ * an unrelated drawer must not take it away: the component would never know,
+ * because nothing tells it, and the next time the drawer called that callback
+ * there would be nothing there.
+ */
+const keptOnClose = new Set<string>();
 
 /**
  * Set flow callbacks for a specific drawer type.
@@ -91,6 +104,14 @@ let flowCallbacks: Record<string, Record<string, unknown>> = {};
 export const setFlowCallbacks = <T extends DrawerType>(
   drawer: T,
   callbacks: DrawerCallbacks<T>,
+  options?: {
+    /**
+     * True when a mounted component owns the registration, so that closing a
+     * drawer leaves it alone. The owner takes it back on unmount, by
+     * registering an empty set.
+     */
+    keepOnClose?: boolean;
+  },
 ) => {
   // Deliberately does NOT notify. Callers register callbacks BEFORE opening a
   // drawer (the URL change renders it) or, on the re-hydration path, right
@@ -100,6 +121,8 @@ export const setFlowCallbacks = <T extends DrawerType>(
   // CurrentDrawer — and cascade through the open drawer's subtree — every time
   // any unrelated flow registered a callback.
   flowCallbacks[drawer] = callbacks as Record<string, unknown>;
+  if (options?.keepOnClose) keptOnClose.add(drawer);
+  else keptOnClose.delete(drawer);
 };
 
 /**
@@ -113,10 +136,19 @@ export const getFlowCallbacks = <T extends DrawerType>(
 };
 
 /**
- * Clear all flow callbacks. Called automatically by closeDrawer().
+ * Clear the flow callbacks of the drawer flows. Called automatically by
+ * closeDrawer().
+ *
+ * What a mounted component registered with `keepOnClose` stays: it belongs to
+ * that component, which is still there and still expects to be called.
  */
 export const clearFlowCallbacks = () => {
-  flowCallbacks = {};
+  const kept: Record<string, Record<string, unknown>> = {};
+  for (const drawer of keptOnClose) {
+    const callbacks = flowCallbacks[drawer];
+    if (callbacks) kept[drawer] = callbacks;
+  }
+  flowCallbacks = kept;
 };
 
 /**
@@ -470,16 +502,13 @@ export const useDrawer = () => {
         replaceCurrentInStack?: boolean;
       } = {},
     ) => {
-      // The Trace Explorer drawer is the default for every trace open, from
-      // every entry point — not only the call sites that go through
-      // useTraceDetailsDrawer. Only the legacy Traces page keeps the legacy
-      // drawer, so operators who deliberately navigated there get a coherent
-      // legacy view until the page is removed. See routeTraceDrawerForV2.
+      // The Trace Explorer drawer is where every trace open lands, from every
+      // entry point — not only the call sites that go through
+      // useTraceDetailsDrawer. See routeTraceDrawerForV2.
       const { drawer: effectiveDrawer, props: effectiveProps } =
         routeTraceDrawerForV2(
           drawer,
           props as Record<string, unknown> | undefined,
-          router.pathname === "/[project]/messages",
         );
 
       // Extract urlParams and merge with props

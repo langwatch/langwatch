@@ -14,7 +14,10 @@ import type {
   Team,
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
+
+wireDefaultTestApp();
 
 /**
  * Verifies that the REST prompt responses include the `tags` array so that

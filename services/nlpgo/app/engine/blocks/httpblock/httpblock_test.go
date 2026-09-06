@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -301,6 +302,63 @@ func TestExecute_HappyPath(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
 
+// The response headers are diagnostics: they travel into the workflow's
+// execution state and onto the screen of whoever opens it. A cookie handed out
+// by the endpoint is a live session, so the name survives and the value does
+// not, while the headers an author is actually debugging stay readable.
+func TestExecute_RedactsCredentialResponseHeaders(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Request-Id", "req-42")
+		w.Header().Set("X-Api-Version", "2026-08-01")
+		w.Header().Set("X-Idempotency-Key", "req-42")
+		w.Header().Add("Set-Cookie", "session=super-secret; HttpOnly")
+		w.Header().Add("Set-Cookie", "refresh=also-secret")
+		// Convention says these are request headers. An upstream can send them
+		// anyway, and Go hands us whatever arrived.
+		w.Header().Set("Authorization", "Bearer super-secret-echo")
+		w.Header().Set("X-Authorization", "super-secret-variant")
+		w.Header().Set("X-Auth", "super-secret-short")
+		w.Header().Set("X-Amz-Security-Token", "super-secret-sts")
+		w.Header().Set("X-Api-Key", "super-secret-key")
+		// A challenge names the scheme and realm rather than handing out access.
+		w.Header().Set("WWW-Authenticate", `Bearer realm="agents"`)
+		_, _ = io.WriteString(w, `{"result":"pong"}`)
+	}))
+	defer srv.Close()
+	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
+
+	exec := httpblock.New(httpblock.Options{
+		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+	})
+	res, err := exec.Execute(context.Background(), httpblock.Request{
+		URL:    srv.URL + "/echo",
+		Method: http.MethodGet,
+	})
+	require.NoError(t, err)
+
+	for _, name := range []string{
+		"Set-Cookie", "Authorization", "X-Authorization", "X-Auth",
+		"X-Amz-Security-Token", "X-Api-Key",
+	} {
+		assert.Equal(t, "[REDACTED]", res.ResponseHeaders[name],
+			"%s hands out access rather than describing it", name)
+	}
+
+	// Half the value of reporting headers at all is the ones an author came to
+	// read, and none of these is a credential.
+	assert.Equal(t, "req-42", res.ResponseHeaders["X-Request-Id"])
+	assert.Equal(t, "2026-08-01", res.ResponseHeaders["X-Api-Version"])
+	assert.Equal(t, "req-42", res.ResponseHeaders["X-Idempotency-Key"])
+	assert.Equal(t, "application/json", res.ResponseHeaders["Content-Type"])
+	assert.Equal(t, `Bearer realm="agents"`, res.ResponseHeaders["Www-Authenticate"],
+		"a 401 is undebuggable without the challenge that caused it")
+
+	for name, value := range res.ResponseHeaders {
+		assert.NotContains(t, value, "secret", "header %q leaked a credential", name)
+	}
+}
+
 func TestExecute_TimeoutAbortsRequest(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second)
@@ -502,4 +560,100 @@ func TestDefaultTimeoutAccommodatesSlowAgents(t *testing.T) {
 		t.Errorf("httpblock.DefaultTimeout = %s; want 12m (slow agents take 10+ min, Lambda capped at 15min so 3min margin)",
 			httpblock.DefaultTimeout)
 	}
+}
+
+// BLOCK_LOCAL_HTTP_CALLS=false reaches the engine as AllowLocal. A self-hosted
+// install whose agent runs on its own network is the case it exists for, and
+// the engine refusing it regardless of the setting is what made an HTTP agent
+// pass its test button and then fail the evaluation with ssrf_blocked.
+func TestSSRF_WhenLocalDestinationsArePermitted(t *testing.T) {
+	permissive := httpblock.SSRFOptions{
+		AllowLocal: true,
+		Resolver: func(_ string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+		},
+	}
+
+	t.Run("permits the private and loopback set", func(t *testing.T) {
+		for _, u := range []string{
+			"http://127.0.0.1/x",
+			"http://localhost/",
+			"http://0.0.0.0/x",
+			"http://[::1]/",
+			"http://10.0.0.1/x",
+			"http://192.168.0.1/x",
+			"http://172.16.4.9/x",
+		} {
+			t.Run(u, func(t *testing.T) {
+				assert.NoError(t, httpblock.CheckURL(u, permissive))
+			})
+		}
+	})
+
+	t.Run("permits a hostname that resolves to a private address", func(t *testing.T) {
+		err := httpblock.CheckURL("http://agent.internal/", httpblock.SSRFOptions{
+			AllowLocal: true,
+			Resolver: func(_ string) ([]net.IP, error) {
+				return []net.IP{net.ParseIP("10.0.0.5")}, nil
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("still refuses cloud metadata", func(t *testing.T) {
+		for _, u := range []string{
+			"http://169.254.169.254/latest/meta-data/",
+			"http://metadata.google.internal/",
+			"http://168.63.129.16/x",
+		} {
+			t.Run(u, func(t *testing.T) {
+				require.Error(t, httpblock.CheckURL(u, permissive),
+					"%s stays refused however permissive the deployment is", u)
+			})
+		}
+	})
+
+	t.Run("strict egress overrides the permission", func(t *testing.T) {
+		err := httpblock.CheckURL("http://10.0.0.1/x", httpblock.SSRFOptions{
+			AllowLocal:       true,
+			StrictPublicOnly: true,
+		})
+		require.ErrorIs(t, err, httpblock.ErrSSRFBlocked,
+			"strict egress means globally routable only, which a private address is not")
+	})
+
+	t.Run("holds at dial time, not just at the check", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer srv.Close()
+
+		dial := httpblock.SafeDialer(httpblock.SSRFOptions{AllowLocal: true})
+		conn, err := dial(context.Background(), "tcp", strings.TrimPrefix(srv.URL, "http://"))
+		require.NoError(t, err, "the dialer must permit what CheckURL permitted")
+		require.NoError(t, conn.Close())
+	})
+}
+
+// The end-to-end shape a customer reported: an HTTP agent pointed at a service
+// on their own network, which the engine refused while the rest of the product
+// reached it happily.
+func TestExecute_ReachesALocalEndpointWhenPermitted(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"answer":"from the internal service"}`))
+	}))
+	defer srv.Close()
+
+	exec := httpblock.New(httpblock.Options{
+		SSRF: httpblock.SSRFOptions{AllowLocal: true},
+	})
+	res, err := exec.Execute(context.Background(), httpblock.Request{
+		URL:        srv.URL,
+		Method:     http.MethodGet,
+		OutputPath: "$.answer",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "from the internal service", res.Output)
 }

@@ -135,7 +135,7 @@ class AnalyticsTimeseriesClickHouseReadRepository
         timeScale: params.originalTimeScale,
       });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId: params.tenantId,
           error: error instanceof Error ? error.message : String(error),

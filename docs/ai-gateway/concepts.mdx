@@ -17,7 +17,7 @@ A LangWatch-issued credential of the form `vk-lw-{live|test}_<26-char-ULID>` (40
 Every gateway request **must** carry a VK. The VK resolves at the gateway to:
 
 - An **owning organisation** (`organizationId`, always present) plus a **set of scope rows** (`VirtualKeyScope[]`) at any combination of `ORGANIZATION`, `TEAM`, `PROJECT`. The scope set drives the VK's eligible provider set and budget cascade; see [Virtual key scoping](/ai-gateway/virtual-keys#scoping).
-- An optional **principal** (`principalUserId`) — present on personal-access VKs minted via the CLI device-flow, orthogonal to the scope set.
+- An optional **principal** (`principalUserId`): present on personal-access VKs minted via the CLI device-flow, orthogonal to the scope set.
 - A **set of provider credentials**: the underlying OpenAI, Anthropic, Bedrock, etc. keys the VK may use. Resolved at bundle-time by walking the VK's scopes upward and unioning every visible **ModelProvider**. These are **reused** from LangWatch's existing Model Provider settings; the gateway does not duplicate credential storage.
 - A **routing policy** (ordered list of ModelProvider ids the VK may dispatch through, with fallback semantics). The VK may pin a specific policy, or fall back to the org's default policy ordered by `fallbackPriorityGlobal` then `createdAt`.
 - **Model aliases**: a map like `{"gpt-4o": "azure/my-deployment"}` that lets the VK redirect a client-friendly model name to a specific provider/deployment.
@@ -73,17 +73,19 @@ Aliases always win over explicit `provider/model` form if both are defined for t
 
 ## Fallback chain
 
-Ordered list of **ModelProvider** ids (not models) the VK may dispatch through. Carried on the routing policy bound to the VK (or, when the VK pins no policy, on the org's default policy). Triggered by:
+Ordered list of **ModelProvider** ids (not models) the VK can dispatch through. Carried on the routing policy bound to the VK (or, when the VK pins no policy, on the org's default policy). The gateway decides which failures move to the next provider. It reads the real upstream result, and the rule is the same for every key. Triggered by:
 
 - `5xx` from upstream.
-- `timeout` exceeding the VK's configured `fallback.timeout_ms`.
+- `timeout` from upstream.
 - `429 rate_limit_exceeded` from upstream.
 - `network_error` (connection reset, DNS, TLS).
+- Upstream `404`. In a chain with more than one provider, this usually means that this provider does not serve that model.
 - `circuit_breaker`, gateway-internal tripped after N consecutive failures.
 
 **Does not** trigger fallback:
 
-- Upstream `400 / 401 / 403 / 404`, those are client-fault errors; masking them would confuse the caller.
+- Upstream `400 / 401 / 403`. These stop the request. A `400` points to the request itself. A `401` or `403` usually points to the provider credential. A different provider would hide the fault that you must repair.
+- A caller that disconnected, or a caller deadline that ended. This tells nothing about the provider.
 - Any LangWatch-internal error (`invalid_api_key`, `permission_denied`, etc).
 
 For streaming: if the primary fails **before the first chunk**, fallback is transparent. Once chunks have started flowing, the stream stays on the original provider, otherwise the client would see a Frankenstein stream.
@@ -107,7 +109,7 @@ Precedence, from highest to lowest: per-request `X-LangWatch-Cache` header → m
 
 ## Caching passthrough
 
-By default the gateway forwards Anthropic `cache_control` blocks, OpenAI cached-prompt markers, and Gemini implicit caches **byte-identically**. This is load-bearing, prompt caching saves up to 90% on input tokens, and the moment the gateway starts reformatting payloads you lose it.
+By default the gateway forwards Anthropic `cache_control` blocks, OpenAI cached-prompt markers, and Gemini implicit caches **byte-identically**. Prompt caching saves up to 90% on input tokens, and a gateway that reformats the payload loses that saving.
 
 Overrides per-request:
 
@@ -142,7 +144,7 @@ Each block emits an `AuditLog` row (gateway shape) + the `X-LangWatch-Gateway-Re
 
 ## Traces (per-tenant observability)
 
-Every request emits a LangWatch trace. The clever part: the gateway is a shared multi-tenant service, but each trace is routed to the **owning tenant's project**: tenant A never sees tenant B's traffic.
+Every request emits a LangWatch trace. The gateway is a shared multi-tenant service, and it routes each trace to the **owning tenant's project**: tenant A never sees tenant B's traffic.
 
 Attributes always present (source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`):
 

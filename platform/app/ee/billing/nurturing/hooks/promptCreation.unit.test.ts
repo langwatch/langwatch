@@ -24,6 +24,8 @@ const mockNurturing = {
 let currentNurturing: typeof mockNurturing | undefined = mockNurturing;
 
 vi.mock("../../../../src/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     get nurturing() {
       return currentNurturing;

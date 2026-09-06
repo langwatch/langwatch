@@ -1332,6 +1332,204 @@ describe("given a codex trace whose recovered conversation and tool spans descri
   });
 });
 
+describe("given a codex trace whose recovered conversation and prompt event describe the same prompt", () => {
+  // Codex withholds the prompt text on its user_prompt event by design: the
+  // literal "[REDACTED]" rides the prompt attribute and only the length is
+  // real. The recovered conversation carries the words.
+  const redactedPromptEvent = () =>
+    log(
+      {
+        "event.name": "codex.user_prompt",
+        prompt: "[REDACTED]",
+        prompt_length: "34",
+        "conversation.id": "conv-1",
+      },
+      1_042,
+    );
+
+  describe("when the session transcript is derived", () => {
+    /** @scenario "A prompt recovered from the transcript is not shown again as its redacted event" */
+    it("shows the prompt once, with its text", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 1_000,
+            messages: [
+              { role: "system", content: "You are codex." },
+              { role: "user", content: "echo papaya and tell me the output" },
+            ],
+            output: "It printed papaya.",
+          }),
+        ],
+        logs: [redactedPromptEvent()],
+      });
+
+      const prompts = transcript.entries.filter(
+        (entry) => entry.kind === "user_prompt",
+      );
+      expect(prompts).toHaveLength(1);
+      expect(prompts[0]).toMatchObject({
+        text: "echo papaya and tell me the output",
+      });
+    });
+
+    /** @scenario "A prompt recovered from the transcript is not shown again as its redacted event" */
+    it("keeps the redacted event when no conversation was recovered", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [],
+        logs: [redactedPromptEvent()],
+      });
+
+      const prompts = transcript.entries.filter(
+        (entry) => entry.kind === "user_prompt",
+      );
+      expect(prompts).toHaveLength(1);
+      // The sentinel stays visible (it is the only record a prompt happened)
+      // and the chars are the prompt's real length, not the sentinel's.
+      expect(prompts[0]).toMatchObject({ text: "[REDACTED]", chars: 34 });
+    });
+  });
+
+  describe("when the rollout recovered only one turn of two", () => {
+    /** @scenario "A redacted prompt with no recovered turn behind it is kept" */
+    it("keeps the stub of the turn it did not recover", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 1_000,
+            messages: [
+              { role: "system", content: "You are codex." },
+              { role: "user", content: "echo papaya and tell me the output" },
+            ],
+            output: "It printed papaya.",
+          }),
+        ],
+        logs: [
+          redactedPromptEvent(),
+          // A second turn, of a different length, whose conversation never
+          // made it back. Suppressing it on a trace-wide flag would erase the
+          // only record that this prompt happened.
+          log(
+            {
+              "event.name": "codex.user_prompt",
+              prompt: "[REDACTED]",
+              prompt_length: "11",
+              "conversation.id": "conv-1",
+            },
+            2_042,
+          ),
+        ],
+      });
+
+      const prompts = transcript.entries.filter(
+        (entry) => entry.kind === "user_prompt",
+      );
+      expect(prompts).toHaveLength(2);
+      expect(prompts.map((entry) => entry.text)).toEqual([
+        "echo papaya and tell me the output",
+        "[REDACTED]",
+      ]);
+      expect(prompts[1]).toMatchObject({ chars: 11 });
+    });
+  });
+
+  describe("when two prompts are the same length and only the later one was recovered", () => {
+    /** @scenario "A redacted prompt with no recovered turn behind it is kept" */
+    it("keeps the earlier stub and does not show the recovered turn twice", () => {
+      // Both turns typed a 24-character prompt, so the length alone cannot say
+      // which turn the recovered conversation belongs to. Suppressing the
+      // first stub would delete the turn that was never recovered.
+      const later = "tell me about the second";
+      expect(later).toHaveLength(24);
+
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 5_000,
+            messages: [{ role: "user", content: later }],
+            output: "the second one.",
+          }),
+        ],
+        logs: [
+          log(
+            {
+              "event.name": "codex.user_prompt",
+              prompt: "[REDACTED]",
+              prompt_length: "24",
+              "conversation.id": "conv-1",
+            },
+            1_042,
+          ),
+          log(
+            {
+              "event.name": "codex.user_prompt",
+              prompt: "[REDACTED]",
+              prompt_length: "24",
+              "conversation.id": "conv-1",
+            },
+            5_042,
+          ),
+        ],
+      });
+
+      const prompts = transcript.entries.filter(
+        (entry) => entry.kind === "user_prompt",
+      );
+      expect(prompts).toHaveLength(2);
+      // The unrecovered turn keeps its stub, in its own place in time, and the
+      // recovered turn is shown once with its words.
+      expect(prompts.map((entry) => entry.text)).toEqual(["[REDACTED]", later]);
+      expect(prompts[0]).toMatchObject({ atMs: 1_042 });
+    });
+  });
+
+  describe("when the recovered turn's own prompt event never arrived", () => {
+    /** @scenario "A redacted prompt with no recovered turn behind it is kept" */
+    it("leaves an older stub of the same length alone", () => {
+      // The log read is capped, so a recovered turn can arrive with no event
+      // of its own. Claiming the nearest same-length stub regardless of
+      // distance would take the earlier turn's event and delete the only
+      // record of it.
+      const prompt = "tell me about the second";
+      // The stub below is the same length on purpose, so what rejects it is
+      // the distance and not the length. A prompt of any other size would
+      // pass this test through the check it is not about.
+      expect(prompt).toHaveLength(24);
+
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 600_000,
+            messages: [{ role: "user", content: prompt }],
+            output: "the second one.",
+          }),
+        ],
+        logs: [
+          log(
+            {
+              "event.name": "codex.user_prompt",
+              prompt: "[REDACTED]",
+              prompt_length: "24",
+              "conversation.id": "conv-1",
+            },
+            1_042,
+          ),
+        ],
+      });
+
+      const prompts = transcript.entries.filter(
+        (entry) => entry.kind === "user_prompt",
+      );
+      // Both survive: the old turn keeps its record, and the recovered turn
+      // is shown with its words.
+      expect(prompts.map((entry) => entry.text)).toEqual([
+        "[REDACTED]",
+        prompt,
+      ]);
+    });
+  });
+});
+
 describe("given a prompt pasting tens of thousands of unclosed tags", () => {
   describe("when the session transcript is derived", () => {
     /** @scenario "A prompt full of unclosed tags is read without stalling the server" */

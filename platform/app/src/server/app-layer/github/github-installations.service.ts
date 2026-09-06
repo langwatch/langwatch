@@ -123,6 +123,18 @@ export class GithubInstallationsService {
     return this.repo.findAllForOrganization(organizationId);
   }
 
+  /**
+   * One stored installation row, by its GitHub id.
+   *
+   * Not gated on `configured`, unlike the mint and resolve paths. Those need
+   * the App private key to do anything, so an unconfigured instance answering
+   * from stored rows alone would promise access it cannot deliver. This read
+   * reaches no credential: its callers use the row to attribute a webhook to an
+   * organization and to check that an installation belongs to the organization
+   * asking about it, and both answers are correct whether or not the key is
+   * set. Gating it would drop pull-request announcements the payload alone can
+   * be written from, and would hide the uninstall link for a row that exists.
+   */
   getByInstallationId(
     installationId: string,
   ): Promise<GithubInstallationRow | null> {
@@ -384,6 +396,13 @@ export class GithubInstallationsService {
    * repository they cannot actually reach still fails honestly at the mapping
    * call. Deliberately pessimistic for "selected" with no cached list, which
    * means the install-time fetch failed and we genuinely do not know.
+   *
+   * False on an instance with no App configured, for the same reason
+   * `resolveInstallationForRepository` returns null there: stored rows can
+   * outlive the credentials that made them usable, and every lookup they would
+   * authorise short-circuits before it reaches GitHub. Answering "covered" off
+   * those rows alone tells a reader the connection reaches a repository that
+   * nothing on this instance can read.
    */
   async coversRepository({
     organizationId,
@@ -392,6 +411,7 @@ export class GithubInstallationsService {
     organizationId: string;
     repositoryFullName: string;
   }): Promise<boolean> {
+    if (!this.configured) return false;
     const wanted = repositoryFullName.toLowerCase();
     const owner = wanted.split("/")[0] ?? "";
     const installations =

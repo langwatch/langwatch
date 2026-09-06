@@ -1,8 +1,10 @@
 import { createLogger } from "@langwatch/observability";
+import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { RESOLVER_RECENT_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
@@ -64,7 +66,27 @@ type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
 export class EvaluationRunClickHouseRepository
   implements EvaluationRunRepository
 {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  private readonly resolveClient: ClickHouseClientResolver;
+
+  constructor({
+    resolveClient,
+    retentionResolver,
+  }: {
+    resolveClient: ClickHouseClientResolver;
+    /**
+     * Bounds the ScheduledAt resolver's fallback to this tenant's own retention
+     * horizon. Optional so existing construction sites keep working on the
+     * platform default; see {@link resolveScheduledAtMs}.
+     */
+    retentionResolver?: RetentionPolicyResolver;
+  }) {
+    this.resolveClient = resolveClient;
+    this.retentionFloor = createRetentionFloorService(retentionResolver);
+  }
+
+  private readonly retentionFloor: ReturnType<
+    typeof createRetentionFloorService
+  >;
 
   async upsert(
     data: EvaluationRunData,
@@ -101,10 +123,8 @@ export class EvaluationRunClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(
-        { tenantId, evaluationId: data.evaluationId, error: errorMessage },
+      logger.warn(
+        { tenantId, evaluationId: data.evaluationId, error },
         "Failed to store evaluation run in ClickHouse",
       );
       throw error;
@@ -153,10 +173,8 @@ export class EvaluationRunClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(
-        { tenantId, count: entries.length, error: errorMessage },
+      logger.warn(
+        { tenantId, count: entries.length, error },
         "Failed to batch store evaluation runs in ClickHouse",
       );
       throw error;
@@ -182,17 +200,93 @@ export class EvaluationRunClickHouseRepository
    * path on local-disk partitions; only a miss (old or unknown evaluation)
    * pays the unbounded fallback.
    */
-  private async resolveScheduledAtMs(
-    tenantId: string,
-    evaluationId: string,
-  ): Promise<number | undefined> {
+  private async resolveScheduledAtMs({
+    tenantId,
+    evaluationId,
+  }: {
+    tenantId: string;
+    evaluationId: string;
+  }): Promise<{ scheduledAtMs?: number; floorMs: number }> {
+    // Floor the fallback at this tenant's retention horizon rather than leaving
+    // it unbounded. `evaluation_runs` is partitioned on ScheduledAt, so a query
+    // with no lower bound prunes nothing and walks every partition including
+    // cold S3 — which is why this was the single largest source of cold-scan
+    // queries in production. Nothing older than retention survives TTL, so the
+    // floor cannot hide a row the unbounded scan would have found.
+    //
+    // The floor is returned alongside the answer because a MISS needs it too:
+    // it is the bound `getByEvaluationId` falls back to, so the heavy read is
+    // bounded on the one path that used to leave it unbounded.
+    const floorMs = await this.retentionFloor.getFloorMs({
+      table: TABLE_NAME,
+      tenantId,
+    });
+
     const recent = await this.queryScheduledAtMs({
       tenantId,
       evaluationId,
       sinceMs: Date.now() - RESOLVER_RECENT_WINDOW_MS,
     });
-    if (recent !== undefined) return recent;
-    return this.queryScheduledAtMs({ tenantId, evaluationId });
+    if (recent !== undefined) return { scheduledAtMs: recent, floorMs };
+
+    return {
+      scheduledAtMs: await this.queryScheduledAtMs({
+        tenantId,
+        evaluationId,
+        sinceMs: floorMs,
+      }),
+      floorMs,
+    };
+  }
+
+  /**
+   * The `ScheduledAt` bounds {@link getByEvaluationId}'s heavy read runs under.
+   *
+   * Total by construction: every path returns a lower bound, because the path
+   * that did not is the read this exists to remove. A resolver miss used to
+   * drop both predicates and scan every weekly partition, cold S3 included,
+   * for an evaluation that by definition is not there.
+   *
+   * A miss is safe to floor precisely BECAUSE it is a miss: the resolver has
+   * already searched `ScheduledAt >= floor` with no upper bound and found
+   * nothing, so no row above the floor exists for the heavy read to find
+   * either. Anything below the floor is past retention and TTL-eligible.
+   * `ScheduledAt` is `DateTime64(3) DEFAULT now64(3)` — never null — so there
+   * is no unscheduled row hiding beneath the bound.
+   *
+   * The miss branch takes no upper bound: `>= floor` prunes every older
+   * partition, which is the whole win, and capping at `now` would exclude
+   * evaluations legitimately scheduled into the future.
+   */
+  private async resolveScheduledAtRange({
+    tenantId,
+    evaluationId,
+    hintedScheduledAtMs,
+    slackMs,
+  }: {
+    tenantId: string;
+    evaluationId: string;
+    hintedScheduledAtMs?: number;
+    slackMs: number;
+  }): Promise<{ scheduledAtFrom: number; scheduledAtTo?: number }> {
+    const centreOn = (scheduledAtMs: number) => ({
+      scheduledAtFrom: scheduledAtMs - slackMs,
+      scheduledAtTo: scheduledAtMs + slackMs,
+    });
+
+    if (hintedScheduledAtMs !== undefined) return centreOn(hintedScheduledAtMs);
+
+    // No hint (event-sourcing projection reads, internal callers): resolve it
+    // from a cheap sort-key point seek so the heavy read still prunes
+    // partitions instead of scanning every weekly one incl. cold S3.
+    const { scheduledAtMs, floorMs } = await this.resolveScheduledAtMs({
+      tenantId,
+      evaluationId,
+    });
+
+    return scheduledAtMs !== undefined
+      ? centreOn(scheduledAtMs)
+      : { scheduledAtFrom: floorMs };
   }
 
   private async queryScheduledAtMs({
@@ -272,24 +366,21 @@ export class EvaluationRunClickHouseRepository
       // type comparison would break. See
       // dev/docs/best_practices/clickhouse-queries.md.
 
-      const slackMs = hints?.scheduledAtSlackMs ?? 7 * 24 * 60 * 60 * 1000;
-      // When the caller didn't pass a ScheduledAt hint (event-sourcing
-      // projection reads, internal callers), resolve it from a cheap
-      // sort-key point seek so the heavy read below still prunes partitions
-      // instead of scanning every weekly partition incl. cold S3. Resolves
-      // to undefined only when the evaluation isn't in the table at all,
-      // where the read keeps its previous unbounded behaviour.
-      const scheduledAtMs =
-        hints?.scheduledAt?.getTime() ??
-        (await this.resolveScheduledAtMs(tenantId, evaluationId));
-      const partitionPredicate =
-        scheduledAtMs !== undefined
-          ? "AND t.ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND t.ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
-          : "";
-      const innerPartitionPredicate =
-        scheduledAtMs !== undefined
-          ? "AND ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
-          : "";
+      const { scheduledAtFrom, scheduledAtTo } =
+        await this.resolveScheduledAtRange({
+          tenantId,
+          evaluationId,
+          hintedScheduledAtMs: hints?.scheduledAt?.getTime(),
+          slackMs: hints?.scheduledAtSlackMs ?? 7 * 24 * 60 * 60 * 1000,
+        });
+
+      const boundsSql = (column: string) =>
+        `AND ${column} >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64})` +
+        (scheduledAtTo !== undefined
+          ? ` AND ${column} <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})`
+          : "");
+      const partitionPredicate = boundsSql("t.ScheduledAt");
+      const innerPartitionPredicate = boundsSql("ScheduledAt");
 
       const result = await client.query({
         query: `
@@ -334,15 +425,12 @@ export class EvaluationRunClickHouseRepository
             ${partitionPredicate}
           LIMIT 1
         `,
-        query_params:
-          scheduledAtMs !== undefined
-            ? {
-                tenantId,
-                evaluationId,
-                scheduledAtFrom: scheduledAtMs - slackMs,
-                scheduledAtTo: scheduledAtMs + slackMs,
-              }
-            : { tenantId, evaluationId },
+        query_params: {
+          tenantId,
+          evaluationId,
+          scheduledAtFrom,
+          ...(scheduledAtTo !== undefined ? { scheduledAtTo } : {}),
+        },
         format: "JSONEachRow",
       });
 
@@ -352,10 +440,8 @@ export class EvaluationRunClickHouseRepository
 
       return this.fromClickHouseRecord(row);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(
-        { tenantId, evaluationId, error: errorMessage },
+      logger.warn(
+        { tenantId, evaluationId, error },
         "Failed to get evaluation run from ClickHouse",
       );
       throw error;
@@ -426,10 +512,8 @@ export class EvaluationRunClickHouseRepository
       // the surviving rows, not for every duplicate.
       return rows.map((row) => this.fromClickHouseRecord(row));
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(
-        { tenantId, traceId, error: errorMessage },
+      logger.warn(
+        { tenantId, traceId, error },
         "Failed to find evaluation runs by trace ID in ClickHouse",
       );
       throw error;
@@ -526,10 +610,8 @@ export class EvaluationRunClickHouseRepository
 
       return byTrace;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(
-        { tenantId, traceIdCount: traceIds.length, error: errorMessage },
+      logger.warn(
+        { tenantId, traceIdCount: traceIds.length, error },
         "Failed to find evaluation summaries by trace IDs in ClickHouse",
       );
       throw error;

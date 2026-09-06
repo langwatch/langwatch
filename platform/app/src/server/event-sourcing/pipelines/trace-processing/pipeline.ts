@@ -5,11 +5,14 @@ import {
   graphTriggerActivityGroupKey,
 } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
-import type { TriggerContext } from "../../pipeline/processManagerDefinition";
+import type {
+  SubscriberSpec,
+  TriggerContext,
+} from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import { throttledWindow } from "../../subscribers/throttleWindow";
 import {
   AddAnnotationCommand,
   BulkSyncAnnotationsCommand,
@@ -47,7 +50,52 @@ import {
 } from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedSpan } from "./schemas/spans";
+import type { TraceSummarySubscriber } from "./subscribers/_originGuardedSubscriber";
+import {
+  CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
+  CUSTOM_EVAL_SYNC_DELAY_MS,
+  customEvaluationSyncDedupId,
+  hasSyncableEvaluations,
+} from "./subscribers/customEvaluationSync.subscriber";
+import {
+  type CustomerIoTraceSyncSubscriberDeps,
+  createCustomerIoTraceSyncSubscriber,
+} from "./subscribers/customerIoTraceSync.subscriber";
+import {
+  EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
+  EXPERIMENT_METRICS_SYNC_DELAY_MS,
+  hasExperimentCostMetrics,
+} from "./subscribers/experimentMetricsSync.subscriber";
+import {
+  needsOriginResolution,
+  ORIGIN_GATE_DEDUP_TTL_MS,
+  ORIGIN_GATE_DELAY_MS,
+} from "./subscribers/originGate.subscriber";
+import {
+  isRealFirstIngest,
+  PROJECT_METADATA_WINDOW_MS,
+  projectMetadataGroupKey,
+} from "./subscribers/projectMetadata.subscriber";
+import {
+  hasSimulationMetrics,
+  SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
+  SIMULATION_METRICS_SYNC_DELAY_MS,
+} from "./subscribers/simulationMetricsSync.subscriber";
+import { SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS } from "./subscribers/spanStorageBroadcast.subscriber";
+import { TRACE_UPDATE_BROADCAST_WINDOW_MS } from "./subscribers/traceUpdateBroadcast.subscriber";
+import {
+  hasSyncableFeedback,
+  TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
+  TRACKED_EVENT_SYNC_DELAY_MS,
+  trackedEventSyncDedupId,
+} from "./subscribers/trackedEventSync.subscriber";
 import { TraceRequestUtils } from "./utils/traceRequest.utils";
+
+/** A subscriber handler on the committed traceSummary fold state. */
+export type TraceSummaryHandler = (
+  event: TraceProcessingEvent,
+  context: TriggerContext<TraceSummaryData>,
+) => Promise<void>;
 
 export interface TraceProcessingPipelineDeps {
   spanAppendStore: AppendStore<NormalizedSpan>;
@@ -56,35 +104,14 @@ export interface TraceProcessingPipelineDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** ADR-034 Phase 2: slim per-trace fold writer (silent dual-tap, no read path). */
   traceAnalyticsStore: FoldProjectionStore<TraceAnalyticsData>;
-  originGateReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  evaluationTriggerReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  customEvaluationSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  trackedEventSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  traceUpdateBroadcastReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  projectMetadataReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  simulationMetricsSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  experimentMetricsSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  originGateHandler: TraceSummaryHandler;
+  evaluationTrigger: TraceSummarySubscriber;
+  customEvaluationSyncHandler: TraceSummaryHandler;
+  trackedEventSyncHandler: TraceSummaryHandler;
+  traceUpdateBroadcastHandler: TraceSummaryHandler;
+  projectMetadataHandler: TraceSummaryHandler;
+  simulationMetricsSyncHandler: TraceSummaryHandler;
+  experimentMetricsSyncHandler: TraceSummaryHandler;
   automations: {
     triggerMatchHandler: (
       event: TraceProcessingEvent,
@@ -95,11 +122,15 @@ export interface TraceProcessingPipelineDeps {
       context: { tenantId: string },
     ) => Promise<void>;
   };
-  spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
-  customerIoTraceSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  spanStorageBroadcastHandler: (
+    event: TraceProcessingEvent,
+    context: TriggerContext<unknown>,
+  ) => Promise<void>;
+  /**
+   * True when the worker-to-web pub/sub bridge is unavailable (no Redis), so
+   * the broadcast subscribers stay registered but inert.
+   */
+  broadcastDisabled?: boolean;
   /**
    * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
    * commands (fetch from S3 spool) and best-effort delete the spool after
@@ -114,18 +145,12 @@ export interface TraceProcessingPipelineDeps {
    * spanCommandGroupKey.ts.
    */
   spanCommandShardCount?: number;
-  governanceKpisSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  retentionOrphanSweepReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  governanceOcsfEventsSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  /** EE governance rollups, composed as full subscriber specs in the
+   *  registry so this OSS pipeline stays free of `@ee` imports. */
+  governanceKpisSync?: SubscriberSpec<TraceProcessingEvent>;
+  governanceOcsfEventsSync?: SubscriberSpec<TraceProcessingEvent>;
+  /** CRM nurturing sync; absent until the counting strategy is finalised. */
+  customerIoTraceSync?: CustomerIoTraceSyncSubscriberDeps;
   /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
   subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
 }
@@ -167,38 +192,87 @@ export function createTraceProcessingPipeline(
         store: deps.traceAnalyticsRollupAppendStore,
       }),
     )
-    .withReactor("traceSummary", "originGate", deps.originGateReactor)
-    .withReactor(
-      "traceSummary",
-      "evaluationTrigger",
-      deps.evaluationTriggerReactor,
-    )
-    .withReactor(
-      "traceSummary",
-      "customEvaluationSync",
-      deps.customEvaluationSyncReactor,
-    )
-    .withReactor(
-      "traceSummary",
-      "trackedEventSync",
-      deps.trackedEventSyncReactor,
-    )
-    .withReactor(
-      "traceSummary",
-      "traceUpdateBroadcast",
-      deps.traceUpdateBroadcastReactor,
-    )
-    .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
-    .withReactor(
-      "traceSummary",
-      "simulationMetricsSync",
-      deps.simulationMetricsSyncReactor,
-    )
-    .withReactor(
-      "traceSummary",
-      "experimentMetricsSync",
-      deps.experimentMetricsSyncReactor,
-    )
+    // Deferred origin resolution for pure OTEL traces: reject pre-enqueue as
+    // soon as the committed fold shows a resolved origin.
+    .withSubscriber("originGate", {
+      fold: "traceSummary",
+      when: (event, context) =>
+        needsOriginResolution({ event, foldState: context.state }),
+      delay: ORIGIN_GATE_DELAY_MS,
+      ttl: ORIGIN_GATE_DEDUP_TTL_MS,
+      handler: (event, context) => deps.originGateHandler(event, context),
+    })
+    // Evaluation dispatch, origin-guarded (spec + guards composed by
+    // createEvaluationTriggerSubscriber).
+    .withSubscriber(deps.evaluationTrigger.name, deps.evaluationTrigger.spec)
+    // Custom SDK evaluations reported on spans. Stake-sensitive but idempotent
+    // (deterministic evaluation IDs), and the queue's redelivery covers the
+    // post-enqueue path; keeps the subscriber-era name so jobs staged before a
+    // deploy dispatch into this registration after it.
+    .withSubscriber("customEvaluationSync", {
+      fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE],
+      when: hasSyncableEvaluations,
+      delay: CUSTOM_EVAL_SYNC_DELAY_MS,
+      ttl: CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
+      dedupId: customEvaluationSyncDedupId,
+      handler: (event, context) =>
+        deps.customEvaluationSyncHandler(event, context),
+    })
+    // Live span feedback (langwatch.event) → tracked event, same path as the
+    // REST track_event endpoint; deterministic ids keep retries idempotent.
+    .withSubscriber("trackedEventSync", {
+      fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE],
+      when: hasSyncableFeedback,
+      delay: TRACKED_EVENT_SYNC_DELAY_MS,
+      ttl: TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
+      dedupId: trackedEventSyncDedupId,
+      handler: (event, context) => deps.trackedEventSyncHandler(event, context),
+    })
+    // SSE notification, throttled to the listener's own debounce; lossy by
+    // contract and disabled entirely without the Redis pub/sub bridge.
+    .withSubscriber("traceUpdateBroadcast", {
+      fold: "traceSummary",
+      runIn: ["worker"],
+      disabled: deps.broadcastDisabled,
+      ...throttledWindow<TraceProcessingEvent>({
+        makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
+        windowMs: TRACE_UPDATE_BROADCAST_WINDOW_MS,
+      }),
+      handler: (event, context) =>
+        deps.traceUpdateBroadcastHandler(event, context),
+    })
+    // First-ingest project flags, one serialized lane and one dedup key per
+    // project (see projectMetadataGroupKey for why the two must pair).
+    .withSubscriber("projectMetadata", {
+      fold: "traceSummary",
+      runIn: ["worker"],
+      when: (_event, context) => isRealFirstIngest(context.state),
+      groupKeyFn: projectMetadataGroupKey,
+      ...throttledWindow<TraceProcessingEvent>({
+        makeId: (event) => event.tenantId,
+        windowMs: PROJECT_METADATA_WINDOW_MS,
+      }),
+      handler: (event, context) => deps.projectMetadataHandler(event, context),
+    })
+    // Trace-side ECST publishers: fire once per trace after a quiet minute.
+    .withSubscriber("simulationMetricsSync", {
+      fold: "traceSummary",
+      when: (_event, context) => hasSimulationMetrics(context.state),
+      delay: SIMULATION_METRICS_SYNC_DELAY_MS,
+      ttl: SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
+      handler: (event, context) =>
+        deps.simulationMetricsSyncHandler(event, context),
+    })
+    .withSubscriber("experimentMetricsSync", {
+      fold: "traceSummary",
+      when: (_event, context) => hasExperimentCostMetrics(context.state),
+      delay: EXPERIMENT_METRICS_SYNC_DELAY_MS,
+      ttl: EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
+      handler: (event, context) =>
+        deps.experimentMetricsSyncHandler(event, context),
+    })
     .withSubscriber("triggerMatch", {
       fold: "traceSummary",
       events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
@@ -224,41 +298,35 @@ export function createTraceProcessingPipeline(
       handler: (event, context) =>
         deps.automations.graphActivityHandler(event, context),
     })
-    .withReactor(
-      "spanStorage",
-      "spanStorageBroadcast",
-      deps.spanStorageBroadcastReactor,
-    );
+    // SSE notification after span storage commits; the subscriber-scoped
+    // dedup key keeps it independent of traceUpdateBroadcast's window.
+    .withSubscriber("spanStorageBroadcast", {
+      map: "spanStorage",
+      runIn: ["worker"],
+      disabled: deps.broadcastDisabled,
+      ttl: SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
+      handler: (event, context) =>
+        deps.spanStorageBroadcastHandler(event, context),
+    });
 
-  if (deps.customerIoTraceSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "customerIoTraceSync",
-      deps.customerIoTraceSyncReactor,
-    );
-  }
-
-  if (deps.governanceKpisSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
+  if (deps.governanceKpisSync) {
+    builder = builder.withSubscriber(
       "governanceKpisSync",
-      deps.governanceKpisSyncReactor,
+      deps.governanceKpisSync,
     );
   }
 
-  if (deps.governanceOcsfEventsSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
+  if (deps.governanceOcsfEventsSync) {
+    builder = builder.withSubscriber(
       "governanceOcsfEventsSync",
-      deps.governanceOcsfEventsSyncReactor,
+      deps.governanceOcsfEventsSync,
     );
   }
 
-  if (deps.retentionOrphanSweepReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "retentionOrphanSweep",
-      deps.retentionOrphanSweepReactor,
+  if (deps.customerIoTraceSync) {
+    builder = builder.withSubscriber(
+      "customerIoTraceSync",
+      createCustomerIoTraceSyncSubscriber(deps.customerIoTraceSync),
     );
   }
 

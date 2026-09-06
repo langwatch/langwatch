@@ -61,7 +61,7 @@ A budget that could never accrue is refused when you create it, with `gateway_bu
 - Point a key at the target: give it a scope on that team or project, or set the key's trace project.
 - Keep the budget as written by sending `allow_unreachable: true`, which is the right answer when you are provisioning ahead of the keys that will use it. In the app, the refusal offers "Create it anyway".
 
-An organization with no active keys is never refused, since budget first and key second is a normal setup order. On reads, `scope_reach` on each budget says `reachable` or `unreachable`, which is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+An organization with no active keys is never refused, since budget first and key second is a normal setup order. On reads, `scope_reach` on each budget says `reachable` or `unreachable`, which is the only field that tells a budget nothing can reach apart from one that has not been breached.
 
 ### Group budgets are per member
 

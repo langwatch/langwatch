@@ -1,10 +1,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
+import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import type { RedisConnection } from "@langwatch/redis-client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
@@ -38,6 +40,7 @@ import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpe
 export function installClickHouseTestApp({
   resolveClient,
   resolveOrganizationClient,
+  redis,
 }: {
   /**
    * Per-tenant resolver, usually a closure over the test's container client.
@@ -55,6 +58,12 @@ export function installClickHouseTestApp({
   resolveOrganizationClient?: (
     organizationId: string,
   ) => Promise<ClickHouseClientLike | null>;
+  /**
+   * The connection routes under test read as `getApp().redis` (ADR-093).
+   * Defaults to none, which is right for a test that asserts only on rows; a
+   * test whose route needs Redis passes the one it already opened.
+   */
+  redis?: RedisConnection | null;
 }): void {
   const required: ClickHouseClientResolver = async (tenantId) => {
     const client = await resolveClient(tenantId);
@@ -75,7 +84,13 @@ export function installClickHouseTestApp({
   };
 
   globalForApp.__langwatch_app = createTestApp({
-    clickhouse: { enabled: true, resolveClient: required },
+    clickhouse: {
+      enabled: true,
+      resolveClient: required,
+      resolveOrganizationClient: requiredOrg,
+      allInstances: async () => [],
+    },
+    redis: redis ?? null,
     gateway: {
       budgets: new GatewayBudgetClickHouseRepository(required),
       virtualKeySpend: new GatewayVirtualKeySpendRepository(required),
@@ -87,6 +102,7 @@ export function installClickHouseTestApp({
       traceActivity: new GovernanceTraceActivityClickHouseRepository(required),
       kpis: new GovernanceKpisClickHouseRepository(required),
       personalUsage: new PersonalUsageClickHouseRepository(required),
+      activityMonitor: new ActivityMonitorClickHouseRepository(required),
     },
     billableEvents: new BillableEventsClickHouseRepository(
       required,

@@ -6,6 +6,7 @@ import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import type { Session } from "~/server/auth";
 import { getLangySessionKeysCounter } from "~/server/metrics";
+import { langyCandidatePermissions } from "./langyPermissionPolicy";
 
 const logger = createLogger("langwatch:langy:api-key");
 const tracer = getLangWatchTracer("langwatch.langy.api-key");
@@ -17,105 +18,36 @@ const tracer = getLangWatchTracer("langwatch.langy.api-key");
 // key that also drew from this list is gone — the per-turn session key fully
 // supersedes it.)
 //
-// Hand-rolled rather than derived from `computePermissionsFromSelections(...)`
-// because the category system's `"write"` level is too coarse for this key:
+// THAT INTERSECTION IS THE REAL SAFETY PROPERTY, and it is worth being precise
+// about what it does and does not buy, because this list was kept narrow for a
+// long time on the theory that it was the last line of defence. It is not. A
+// user who cannot delete a dataset by hand cannot ask Langy to delete one:
+// `batchProjectPermissions` resolves every candidate below against the caller
+// and drops the ones they do not hold. Widening this list widens the CEILING,
+// never anybody's actual access.
 //
-//   - For non-traces resources, `"write"` expands to `[:view, :manage]` and
-//     `:manage` includes `:delete` via the hierarchy in rbac.ts. The Langy
-//     assistant must never be able to delete a user's prompts/datasets/etc.
-//   - For traces, `"write"` includes `:share`, which creates PUBLIC trace
-//     links. Langy doesn't need to expose user traces; the share endpoint is
-//     a separate user-driven UI affordance.
-//   - `cost:read` was previously included but Langy doesn't need cost data
-//     to do its job — it surfaces spend data only via gateway-emitted
-//     telemetry on the conversation's own messages, never via the key.
+// What the intersection does NOT bound is the axes where "the user could have
+// done it too" stops being reassuring — publishing a PUBLIC trace link, rotating
+// a live credential, reading a stored secret. Those are withheld in
+// `langyPermissionPolicy.ts`, which is where the reasoning now lives.
 //
-// Each resource lists exactly `:view, :create, :update` across the 9 Langy
-// resource families — enough for MCP tools to read, create, and edit data, but
-// stopping short of delete/manage/share. The per-session key never grants more
-// than the caller holds; this list only bounds the maximum surface Langy tools
-// can ever touch.
+// DERIVED, NOT HAND-MAINTAINED. This used to be a hand-written enumeration of
+// 27 lines, and the gap between it and the rule it was meant to express put the
+// same 403 in front of users three times — `project:view`, `scenarios:create`,
+// `experiments:view` — each one a line nobody remembered to add. The rule and
+// the list can no longer disagree, because there is only one of them now.
 //
-// `project:view` is the ONE exception to the nine-families shape, and it is a
-// read. It is the platform's base project read — every built-in role holds it,
-// down to VIEWER and the EXTERNAL lite member — and it is what gates the
-// project-shaped reads that have no resource family of their own: listing the
-// project's agents, its configured model providers (returned masked), and its
-// model defaults. Langy is meant to read the project on the user's behalf, so
-// without it `langwatch agent list` was refused a permission every human in the
-// project already holds. No project WRITE is a candidate: `project:update` is
-// what stores model-provider credentials and `project:manage` regenerates the
-// project's API key, so the assistant gets the read and nothing else.
-//
-// WHAT IS ABSENT FROM THIS LIST IS NOT SELF-EXPLANATORY, so do not rely on
-// reading it to tell an oversight from a decision — that ambiguity is what put
-// the same 403 in front of users three times. `langyPermissionPolicy.ts` states
-// the rule this enumeration expresses, and `langy-permission-coverage` fails CI
-// when a route demands a permission the rule says Langy should hold but this
-// list omits. Add the line here; the reason for any EXCLUSION goes in the policy.
-//
-// THE OTHER HALF OF THIS CONTRACT IS THE ROUTE. A permission listed here is
-// worthless unless the endpoint asks for that grain: `POST /api/scenarios`
-// used to require `scenarios:manage`, so a key holding exactly
-// `scenarios:create` — issued by this list, to a user who genuinely could
-// create scenarios — was refused at the door. The fix belongs on the route
-// (a create asks for `:create`; `:manage` still implies it, so nobody loses
-// access), NOT here: widening this list to `:manage` would hand Langy delete
-// rights it must not have, to buy a create it should already have had. When a
-// Langy write is refused for a permission this list already contains, look at
-// the route's `requires(...)` first.
+// THE OTHER HALF OF THIS CONTRACT IS STILL THE ROUTE. A permission granted here
+// is worthless unless the endpoint asks for a grain the key holds: `POST
+// /api/scenarios` once required `scenarios:manage`, so a key holding exactly
+// `scenarios:create` was refused at the door. Langy now holds `:manage` on the
+// data families, so that class of over-gating no longer locks it out — but the
+// routes are still over-gated for every OTHER restricted key, and
+// `langy-permission-coverage` is what keeps the two halves honest. When a Langy
+// write is refused, check the route's `requires(...)` before touching policy.
 export const LANGY_CANDIDATE_PERMISSIONS: readonly Permission[] = Object.freeze(
-  [
-    "project:view",
-    "traces:view",
-    "traces:create",
-    "traces:update",
-    "evaluations:view",
-    "evaluations:create",
-    "evaluations:update",
-    "datasets:view",
-    "datasets:create",
-    "datasets:update",
-    "scenarios:view",
-    "scenarios:create",
-    "scenarios:update",
-    "annotations:view",
-    "annotations:create",
-    "annotations:update",
-    "analytics:view",
-    "analytics:create",
-    "analytics:update",
-    "prompts:view",
-    "prompts:create",
-    "prompts:update",
-    // Read only, deliberately, and the odd one out in this list.
-    //
-    // Everything else here creates DATA: a row Langy wrote, which does nothing
-    // until someone reads it. A trigger is a standing instruction — it keeps
-    // acting, on its own schedule, on rows Langy never saw. And it is durable, so
-    // it outlives the session key's short TTL by an unbounded margin: the thing
-    // that authorised it is long gone while it is still running.
-    //
-    // A person setting one up chooses its destination and owns what it does
-    // afterwards. Delegating that authorship is a different decision from
-    // delegating a write, and this list is not the place to make it.
-    "triggers:view",
-    "workflows:view",
-    "workflows:create",
-    "workflows:update",
-    // The second read-only family, and for the opposite reason to triggers: the
-    // view is simply all the family has to offer Langy. Experiments used to ride
-    // on `workflows:view`; they now have their own permission, and `GET
-    // /api/experiments` is the one route that asks for it — so leaving it out
-    // refused `langwatch experiment list`, and with it `langwatch status`, a read
-    // every project role already holds down to VIEWER and the EXTERNAL lite
-    // member. The family's only other action is `:manage`, which is the delete
-    // Langy must never hold; RUNNING an experiment is gated by the evaluations
-    // family above, not this one.
-    "experiments:view",
-  ],
+  langyCandidatePermissions(),
 );
-
 // A leaked Langy session key auto-expires after this window. Sized to comfortably
 // outlast a single chat turn / worker idle lifetime (the worker is short-lived)
 // while keeping the blast radius of a leak small. Tune alongside the worker's
@@ -132,7 +64,7 @@ const LANGY_SESSION_KEY_TTL_MS = 6 * 60 * 60 * 1000; // 6h
  *
  * Rehydrating a session object from that id grants NOTHING. Every permission
  * decision `mintLangySessionApiKey` makes is resolved against the database:
- * `hasProjectPermission` reads `session.user.id` and looks up the rest. So the
+ * `probeProjectPermission` reads `session.user.id` and looks up the rest. So the
  * minted key is still exactly the intersection of what this user genuinely holds.
  * We are re-stating WHO the caller is, never asserting what they may do.
  */
@@ -325,7 +257,7 @@ export class LangySessionKeyScopeError extends Error {
  *
  * Identity source: this keys off the CALLER'S user identity, not a browser
  * session per se — it only reads `session.user.id` (to own the key) and passes
- * the session to `hasProjectPermission` (to intersect the caller's own
+ * the session to `probeProjectPermission` (to intersect the caller's own
  * permissions). Langy chat is session-gated today, so `session` always comes
  * from a logged-in user. If/when Langy is exposed to programmatic (API-key)
  * callers, the route resolves the API key to its owning user and passes THAT

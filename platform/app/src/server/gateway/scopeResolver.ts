@@ -34,12 +34,23 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
-
+import { isDispatchableProvider } from "~/server/modelProviders/registry";
 import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
 
 export type EligibleModelProvider = ModelProvider;
 
-export async function eligibleModelProvidersForVk(
+/**
+ * The providers a VK reaches through its scope graph alone: scope cascade
+ * (pass 1) intersected with routable rows (enabled, not withdrawn, registry
+ * dispatchable). The routing policy is NOT applied here.
+ *
+ * This is the set a key's provider allowlist may name, and the set the drawer
+ * offers. A routing policy narrows what the gateway DISPATCHES to, never what
+ * the allowlist may hold: a provider the scope reaches but the policy omits is
+ * still savable, and the policy blocks it at dispatch (see
+ * `eligibleModelProvidersForVk` + `config.materialiser`), not at save.
+ */
+export async function scopeReachableModelProvidersForVk(
   prisma: PrismaClient,
   vk: VirtualKeyWithScopes,
   tx?: Prisma.TransactionClient,
@@ -49,13 +60,33 @@ export async function eligibleModelProvidersForVk(
   const scopePredicates = await buildScopePredicates(client, vk);
   if (scopePredicates.length === 0) return [];
 
-  const candidates = await client.modelProvider.findMany({
-    where: {
-      enabled: true,
-      disabledAt: null,
-      scopes: { some: { OR: scopePredicates } },
-    },
-  });
+  return (
+    await client.modelProvider.findMany({
+      where: {
+        enabled: true,
+        disabledAt: null,
+        scopes: { some: { OR: scopePredicates } },
+      },
+    })
+  ).filter((mp) => isDispatchableProvider(mp.provider));
+}
+
+/**
+ * The providers a VK DISPATCHES to, in dispatch order. Scope-reachable set
+ * (above) then, when the VK carries a `routingPolicyId`, intersected with the
+ * policy's `modelProviderIds` and returned in policy order. Used by the
+ * gateway-config materialiser to build the flat `providers[]` chain. For the
+ * allowlist-validation and UI-parity set, use `scopeReachableModelProvidersForVk`.
+ */
+export async function eligibleModelProvidersForVk(
+  prisma: PrismaClient,
+  vk: VirtualKeyWithScopes,
+  tx?: Prisma.TransactionClient,
+): Promise<EligibleModelProvider[]> {
+  const client = tx ?? prisma;
+
+  const candidates = await scopeReachableModelProvidersForVk(prisma, vk, tx);
+  if (candidates.length === 0) return [];
 
   if (vk.routingPolicyId) {
     const policy = await client.routingPolicy.findUnique({

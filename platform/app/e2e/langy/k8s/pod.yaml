@@ -24,18 +24,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: opencode-agent
+  name: langyagent
   labels:
-    app: opencode-agent
+    app: langyagent
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: opencode-agent
+      app: langyagent
   template:
     metadata:
       labels:
-        app: opencode-agent
+        app: langyagent
     spec:
       # Pod-level securityContext — mirrors charts/langyagent (podSecurityContext).
       # fsGroup is intentionally OMITTED: setting it would group-share every
@@ -47,7 +47,7 @@ spec:
       # runtimeClassName: gvisor  # REQUIRED in prod; omitted locally — see banner
       containers:
         - name: agent
-          image: opencode-agent:v7
+          image: langyagent:dev
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
@@ -75,7 +75,7 @@ spec:
           # (containerSecurityContext). Root + a narrow cap set is what makes
           # per-worker UID isolation function: the manager chowns each per-session
           # dir to a unique UID, writes 0600 config blobs as that UID, and spawns
-          # the OpenCode subprocess directly into it. Drop ALL, then add back ONLY
+          # the worker subprocess directly into it. Drop ALL, then add back ONLY
           # the five per-UID-handoff caps:
           #   CHOWN        — chown per-session dirs to a unique worker UID
           #   DAC_OVERRIDE — write into dirs now owned by the worker UID
@@ -95,33 +95,17 @@ spec:
           # readOnlyRootFilesystem locks everything below /. These emptyDir mounts
           # provide the writable paths the agent + entrypoint actually need.
           #
-          # NOTE ON MOUNTS vs PRODUCTION: the production chart mounts ONLY
-          # /workspace and /tmp — under the per-worker model each worker's HOME
-          # lives UNDER /workspace/sessions/<worker> and TMPDIR is set per-worker,
-          # so a fixed /home/agent is never written. The extra /home/agent/*
-          # mounts below are retained for LOCAL e2e only, as belt-and-suspenders
-          # for the opencode-agent:v7 image (which predates the per-worker-home
-          # model); they are inert writable emptyDirs and do not weaken isolation.
-          # Prod deliberately does NOT carry them.
+          # Same mounts as the production chart: /workspace and /tmp. Under the
+          # per-worker model each worker's HOME lives UNDER
+          # /workspace/sessions/<worker> and TMPDIR is set per-worker, so no
+          # fixed home directory is ever written.
           volumeMounts:
             - name: workspace
               mountPath: /workspace
             - name: tmp
               mountPath: /tmp
-            - name: opencode-config
-              mountPath: /home/agent/.config
-            - name: opencode-cache
-              mountPath: /home/agent/.cache
-            - name: opencode-local
-              mountPath: /home/agent/.local
       volumes:
         - name: workspace
           emptyDir: {}
         - name: tmp
-          emptyDir: {}
-        - name: opencode-config
-          emptyDir: {}
-        - name: opencode-cache
-          emptyDir: {}
-        - name: opencode-local
           emptyDir: {}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPipelineTree } from "../metrics-collector";
+import { buildPipelineTree, mapJobTypeToPhase } from "../metrics-collector";
 import type { GroupInfo, QueueInfo } from "../types";
 
 function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
@@ -68,7 +68,7 @@ describe("buildPipelineTree", () => {
       expect(tree[0]!.name).toBe("ingest");
       expect(tree[0]!.pending).toBe(5);
       expect(tree[0]!.children).toHaveLength(1);
-      expect(tree[0]!.children[0]!.name).toBe("fold"); // "handler" normalizes to "fold"
+      expect(tree[0]!.children[0]!.name).toBe("map"); // "handler" normalizes to "map"
       expect(tree[0]!.children[0]!.children[0]!.name).toBe("processTrace");
     });
   });
@@ -189,7 +189,8 @@ describe("buildPipelineTree", () => {
   });
 
   describe("when job types need normalization", () => {
-    it("normalizes 'handler' to 'fold'", () => {
+    /** @scenario A map projection's live jobs light up its row */
+    it("normalizes 'handler' to 'map' so the health join can find it", () => {
       const queue = createQueue({
         groups: [
           createGroup({ pipelineName: "p", jobType: "handler", jobName: "n" }),
@@ -197,7 +198,23 @@ describe("buildPipelineTree", () => {
       });
 
       const tree = buildPipelineTree({ queues: [queue] });
-      expect(tree[0]!.children[0]!.name).toBe("fold");
+      expect(tree[0]!.children[0]!.name).toBe("map");
+    });
+
+    /** @scenario Every state projection is listed, idle or not */
+    it("normalizes 'stateProjection' to 'state'", () => {
+      const queue = createQueue({
+        groups: [
+          createGroup({
+            pipelineName: "p",
+            jobType: "stateProjection",
+            jobName: "n",
+          }),
+        ],
+      });
+
+      const tree = buildPipelineTree({ queues: [queue] });
+      expect(tree[0]!.children[0]!.name).toBe("state");
     });
 
     it("normalizes 'projection' to 'fold'", () => {
@@ -215,7 +232,7 @@ describe("buildPipelineTree", () => {
       expect(tree[0]!.children[0]!.name).toBe("fold");
     });
 
-    it("normalizes 'reaction' to 'reactor'", () => {
+    it("normalizes 'reaction' to the kept 'reactor' jobType", () => {
       const queue = createQueue({
         groups: [
           createGroup({ pipelineName: "p", jobType: "reaction", jobName: "n" }),
@@ -225,5 +242,21 @@ describe("buildPipelineTree", () => {
       const tree = buildPipelineTree({ queues: [queue] });
       expect(tree[0]!.children[0]!.name).toBe("reactor");
     });
+  });
+});
+
+describe("mapJobTypeToPhase", () => {
+  /** @scenario State projection throughput counts as projection work */
+  it("counts state-projection jobs in the projections phase", () => {
+    expect(mapJobTypeToPhase("stateProjection")).toBe("projections");
+  });
+
+  it("keeps folds and maps in the projections phase", () => {
+    expect(mapJobTypeToPhase("projection")).toBe("projections");
+    expect(mapJobTypeToPhase("handler")).toBe("projections");
+  });
+
+  it("leaves commands in the commands phase", () => {
+    expect(mapJobTypeToPhase("command")).toBe("commands");
   });
 });
