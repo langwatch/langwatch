@@ -49,7 +49,6 @@ func (u *azureUpstream) received() [][]byte {
 	return append([][]byte(nil), u.bodies...)
 }
 
-// deploymentAddressed reports the deployment the nth upstream request names.
 func (u *azureUpstream) deploymentAddressed(t *testing.T, n int) string {
 	t.Helper()
 	bodies := u.received()
