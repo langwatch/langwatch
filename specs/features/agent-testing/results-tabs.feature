@@ -464,6 +464,42 @@ Feature: The Results tab
     Then the pill of that evaluator reads "Skipped"
     And it reads muted
 
+  # The Evaluators column exists only on a run that has evaluators: results
+  # already recorded, or results still owed. A run that will never receive any
+  # shows no column and no header, so the table does not jump when grading
+  # lands and an empty column never takes the width the scenario name needs.
+
+  @integration
+  Scenario: A run without evaluators shows no evaluators column
+    Given a finished run whose scenarios ran no evaluator
+    When the results table is read
+    Then no "Evaluators" heading is drawn
+    And no row carries an Evaluators cell
+    And the scenario column takes the width the column would have taken
+
+  @integration
+  Scenario: A run owed evaluations shows the column from the start
+    Given a run whose scenarios finished and are still waiting for their evaluators
+    When the results table is read
+    Then the "Evaluators" heading is drawn
+    And the Evaluators cell of a waiting row reads "Grading" in muted text
+    And a row of the same run that carries no evaluators has an empty cell
+
+  @integration
+  Scenario: A graded run shows the column with its pills
+    Given a finished run whose evaluators reported
+    When the results table is read
+    Then the "Evaluators" heading is drawn
+    And the Evaluators cell of each row holds its pills
+
+  @integration
+  Scenario: The scenario name stays readable on a narrow table
+    Given a finished run whose evaluators reported
+    When the table is drawn narrower than its columns would like
+    Then the scenario column keeps a readable minimum width
+    And the evaluators column shares the free width and wraps its pills
+    And the evaluators column claims no fixed width of its own
+
   @integration
   Scenario: A failed required evaluator names itself beside the verdict of a row
     Given a run in which one scenario met every criterion and failed a required evaluator

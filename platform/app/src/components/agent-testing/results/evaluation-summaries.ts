@@ -12,6 +12,7 @@
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
 
 export type RunEvaluation = ScenarioEvaluationResult;
@@ -26,6 +27,27 @@ export type RunWithEvaluations = {
 
 export function evaluationsOf(run: RunWithEvaluations): RunEvaluation[] {
   return run.results?.evaluations ?? [];
+}
+
+/**
+ * True when a run is still waiting for its evaluators to report: the judge
+ * decided, and the results are not recorded yet.
+ */
+export function isAwaitingEvaluations(run: {
+  status: ScenarioRunStatus;
+}): boolean {
+  return run.status === ScenarioRunStatus.PENDING_EVALUATION;
+}
+
+/**
+ * True when a run has evaluators: results already recorded, or results still
+ * owed. A run that will never receive any reads false, so a table can leave
+ * the Evaluators column out rather than draw it empty.
+ */
+export function runHasEvaluators(
+  run: RunWithEvaluations & { status: ScenarioRunStatus },
+): boolean {
+  return isAwaitingEvaluations(run) || evaluationsOf(run).length > 0;
 }
 
 /**

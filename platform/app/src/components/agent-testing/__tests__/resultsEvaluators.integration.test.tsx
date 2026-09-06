@@ -366,13 +366,94 @@ describe("<RunResultsTable/> evaluator cells", () => {
     });
   });
 
-  describe("given a scenario that ran no evaluator", () => {
-    it("leaves the Evaluators cell empty", () => {
-      renderTable([makeRun()]);
+  describe("given a finished run whose scenarios ran no evaluator", () => {
+    /** @scenario "A run without evaluators shows no evaluators column" */
+    it("draws no Evaluators heading, no cell, and gives the scenario the width", () => {
+      renderTable([makeRun(), makeRun({ scenarioRunId: "run_2" })]);
 
+      expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
       expect(
         screen.queryByTestId("run-result-evaluators"),
       ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("run-result-evaluators-grading"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("run-results-table-header")).toHaveStyle({
+        gridTemplateColumns: "120px minmax(0,1fr) 130px auto",
+      });
+      expect(screen.getByTestId("run-result-row-run_1")).toHaveStyle({
+        gridTemplateColumns: "120px minmax(0,1fr) 130px auto",
+      });
+    });
+  });
+
+  describe("given a run whose scenarios are still waiting for their evaluators", () => {
+    /** @scenario "A run owed evaluations shows the column from the start" */
+    it("draws the heading, reads Grading on a waiting row and nothing on a row with none", () => {
+      renderTable([
+        makeRun({
+          scenarioRunId: "run_waiting",
+          status: ScenarioRunStatus.PENDING_EVALUATION,
+        }),
+        makeRun({ scenarioRunId: "run_plain" }),
+      ]);
+
+      expect(screen.getByText("Evaluators")).toBeInTheDocument();
+
+      const waiting = screen.getByTestId("run-result-row-run_waiting");
+      const grading = within(waiting).getByTestId(
+        "run-result-evaluators-grading",
+      );
+      expect(within(grading).getByText("Grading")).toHaveStyle({
+        color: cssVarOfToken("fg.muted"),
+      });
+      expect(
+        within(waiting).queryByTestId("run-result-evaluators"),
+      ).not.toBeInTheDocument();
+
+      const plain = screen.getByTestId("run-result-row-run_plain");
+      expect(
+        within(plain).queryByTestId("run-result-evaluators-grading"),
+      ).not.toBeInTheDocument();
+      expect(
+        within(plain).queryByTestId("run-result-evaluators"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a finished run whose evaluators reported", () => {
+    /** @scenario "A graded run shows the column with its pills" */
+    it("draws the heading and one cell of pills per row", () => {
+      renderTable(threeScenarioRuns());
+
+      expect(screen.getByText("Evaluators")).toBeInTheDocument();
+      const cells = screen.getAllByTestId("run-result-evaluators");
+      expect(cells).toHaveLength(3);
+      for (const cell of cells) {
+        expect(
+          within(cell).getAllByTestId(/^evaluator-pill-eval_/),
+        ).toHaveLength(2);
+      }
+      expect(
+        screen.queryByTestId("run-result-evaluators-grading"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The scenario name stays readable on a narrow table" */
+    it("keeps a floor under the scenario column and lets the evaluators share the rest", () => {
+      renderTable(threeScenarioRuns());
+
+      const columns = "120px minmax(160px,1fr) minmax(0,1fr) 130px auto";
+      expect(screen.getByTestId("run-results-table-header")).toHaveStyle({
+        gridTemplateColumns: columns,
+      });
+      expect(screen.getByTestId("run-result-row-run_a")).toHaveStyle({
+        gridTemplateColumns: columns,
+      });
+      // The pills wrap inside the cell rather than widening it.
+      expect(screen.getAllByTestId("run-result-evaluators")[0]).toHaveStyle({
+        flexWrap: "wrap",
+      });
     });
   });
 });
