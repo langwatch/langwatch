@@ -357,6 +357,9 @@ export async function guidedKickoffInput({
     orgName: org.orgName,
     firstName: await firstNameOfTestUser(),
     tourStatus,
+    // The Gateway line: the host takes it from the guided state, where the
+    // instance names the address an app on it points at.
+    gatewayUrl: (await readGuidedState(org.organizationId)).gatewayUrl,
   };
 }
 
@@ -451,6 +454,8 @@ export interface GuidedState {
   providerSkippedAt?: string;
   conversationId?: string;
   tourReplays?: number;
+  /** The gateway URL an app on this instance points at, with its /v1. */
+  gatewayUrl?: string;
 }
 
 export async function readGuidedState(
