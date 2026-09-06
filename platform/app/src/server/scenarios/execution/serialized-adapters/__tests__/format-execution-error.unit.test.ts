@@ -123,15 +123,18 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(typeof out.detail).toBe("string");
     });
 
-    it.each(["42", '"a string"', "null", "[1,2]", "{}"])(
-      "treats JSON that is not an error envelope as opaque: %s",
-      (body) => {
-        const out = parseErrorEnvelope(body);
-        expect(out.code).toBeUndefined();
-        expect(out.detail).toBeUndefined();
-        expect(out.legacyDetail).toBe(false);
-      },
-    );
+    it.each([
+      "42",
+      '"a string"',
+      "null",
+      "[1,2]",
+      "{}",
+    ])("treats JSON that is not an error envelope as opaque: %s", (body) => {
+      const out = parseErrorEnvelope(body);
+      expect(out.code).toBeUndefined();
+      expect(out.detail).toBeUndefined();
+      expect(out.legacyDetail).toBe(false);
+    });
 
     it("treats an unparseable body as opaque", () => {
       const out = parseErrorEnvelope("<html>500</html>");
@@ -154,12 +157,14 @@ describe("format-execution-error helpers (lw#3439)", () => {
       );
     });
 
-    it.each(["engine_error", "llm_executor_unavailable", "invalid_workflow", "context_canceled"])(
-      "classifies the platform type %s as nlp_service",
-      (errorType) => {
-        expect(classifyEngineFailure({ errorType })).toBe("nlp_service");
-      },
-    );
+    it.each([
+      "engine_error",
+      "llm_executor_unavailable",
+      "invalid_workflow",
+      "context_canceled",
+    ])("classifies the platform type %s as nlp_service", (errorType) => {
+      expect(classifyEngineFailure({ errorType })).toBe("nlp_service");
+    });
 
     it("defaults an unrecognised type to user_code, not infra", () => {
       // The workflow is one code node, so anything the engine does not own is
@@ -242,7 +247,9 @@ describe("format-execution-error helpers (lw#3439)", () => {
         status: 400,
         envelope: parseErrorEnvelope(herrBody("invalid_workflow", "bad dsl")),
       });
-      const viaEngine = classifyEngineFailure({ errorType: "invalid_workflow" });
+      const viaEngine = classifyEngineFailure({
+        errorType: "invalid_workflow",
+      });
       expect(viaHerr).toBe(viaEngine);
       expect(viaHerr).toBe("nlp_service");
     });

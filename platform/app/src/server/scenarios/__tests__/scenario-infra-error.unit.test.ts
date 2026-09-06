@@ -669,7 +669,9 @@ describe("resolveScenarioError", () => {
 
       expect(result.code).toBe(ScenarioInfraErrorCode.UserCodeError);
       expect(result.code).not.toBe(ScenarioInfraErrorCode.ExecutionTimeout);
-      expect(result.message).toMatch(/TimeoutException|read operation timed out/);
+      expect(result.message).toMatch(
+        /TimeoutException|read operation timed out/,
+      );
       expect(result.message).not.toMatch(/The simulation timed out/);
     });
 

@@ -8,7 +8,7 @@
 // capability was dead in production for months.
 //
 // The TS side now replays bytes recorded from a real engine
-// (langwatch/src/server/scenarios/execution/serialized-adapters/__tests__/
+// (platform/app/src/server/scenarios/execution/serialized-adapters/__tests__/
 // fixtures/nlpgo-recorded-responses.json). A recording only helps while it
 // stays true, so this test re-derives it from the live engine and fails when
 // the shape the adapter depends on changes. If it fails, the adapter needs
@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const tsFixtureRelPath = "../../../../langwatch/src/server/scenarios/execution/" +
+const tsFixtureRelPath = "../../../../platform/app/src/server/scenarios/execution/" +
 	"serialized-adapters/__tests__/fixtures/nlpgo-recorded-responses.json"
 
 type tsRecordedResponse struct {

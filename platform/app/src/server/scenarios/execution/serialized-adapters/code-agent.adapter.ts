@@ -613,7 +613,10 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
             // config, and it must leave the same span footprint and structured
             // fields as every other failure — otherwise it is the untraced
             // failure lw#3438 exists to eliminate.
-            span.setAttribute("error.kind", "output" satisfies AdapterErrorKind);
+            span.setAttribute(
+              "error.kind",
+              "output" satisfies AdapterErrorKind,
+            );
             throw new SerializedCodeAgentAdapterError(
               outputError instanceof Error
                 ? outputError.message
