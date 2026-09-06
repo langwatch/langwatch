@@ -89,9 +89,13 @@ const parsedSources = new Map<string, ParsedSource>();
 
 function scriptKind(file: string): ts.ScriptKind {
   if (file.endsWith(".tsx") || file.endsWith(".jsx")) return ts.ScriptKind.TSX;
+
   if (file.endsWith(".mts") || file.endsWith(".mjs")) return ts.ScriptKind.TS;
+
   if (file.endsWith(".cts") || file.endsWith(".cjs")) return ts.ScriptKind.TS;
+
   if (file.endsWith(".js")) return ts.ScriptKind.JS;
+
   return ts.ScriptKind.TS;
 }
 
@@ -177,6 +181,7 @@ function parseSource(file: string): ParsedSource {
 
   const parsed: ParsedSource = { sourceFile, imports, rendersJsx };
   parsedSources.set(key, parsed);
+
   return parsed;
 }
 
@@ -219,6 +224,7 @@ export function resolveSourceCandidate({ candidate }: { candidate: string }): st
     const found = paths.find((path) => isFile(path));
     if (found) return found;
   }
+
   return void 0;
 }
 
@@ -231,18 +237,23 @@ export function resolveRelativeModule({
   specifier: string;
 }): string | undefined {
   if (!specifier.startsWith(".")) return void 0;
+
   return resolveSourceCandidate({ candidate: resolve(dirname(file), specifier) });
 }
 
 function conditionTarget(value: unknown): string | undefined {
   if (typeof value === "string") return value;
+
   if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+
   const record = value as Record<string, unknown>;
   for (const condition of EXPORT_CONDITIONS) {
     if (!(condition in record)) continue;
+
     const target = conditionTarget(record[condition]);
     if (target) return target;
   }
+
   return void 0;
 }
 
@@ -255,15 +266,19 @@ function subpathTarget(options: {
   if (map === void 0 || map === null) {
     return subpath === "." ? manifest.main : void 0;
   }
+
   // `"exports": "./src/index.ts"` and `"exports": { "node": ... }` both describe
   // the root only; a subpath asked of either is genuinely not published.
   if (typeof map === "string" || Array.isArray(map)) {
     return subpath === "." ? conditionTarget(map) : void 0;
   }
+
   const record = map as Record<string, unknown>;
   const hasSubpaths = Object.keys(record).some((key) => key.startsWith("."));
   if (!hasSubpaths) return subpath === "." ? conditionTarget(record) : void 0;
+
   if (subpath in record) return conditionTarget(record[subpath]);
+
   return subpath === "." ? manifest.main : void 0;
 }
 
@@ -274,7 +289,9 @@ function readManifestRecord(options: { manifestPath: string }): PackageManifestR
   } catch {
     return void 0;
   }
+
   if (!parsed || typeof parsed !== "object") return void 0;
+
   const manifest = parsed as {
     name?: unknown;
     main?: unknown;
@@ -282,6 +299,7 @@ function readManifestRecord(options: { manifestPath: string }): PackageManifestR
     imports?: unknown;
   };
   if (typeof manifest.name !== "string") return void 0;
+
   return {
     name: manifest.name,
     directory: dirname(options.manifestPath),
@@ -305,16 +323,21 @@ function collectManifests(options: {
     const record = readManifestRecord({ manifestPath });
     if (record) options.found.push(record);
   }
+
   if (options.depth === 0) return;
+
   let entries;
   try {
     entries = readdirSync(options.directory, { withFileTypes: true });
   } catch {
     return;
   }
+
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
+
     if (entry.name.startsWith(".") || IGNORED_DIRECTORIES.has(entry.name)) continue;
+
     collectManifests({
       directory: join(options.directory, entry.name),
       depth: options.depth - 1,
@@ -338,6 +361,7 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
   for (const workspaceRoot of WORKSPACE_ROOTS) {
     const directory = join(root, workspaceRoot);
     if (!existsSync(directory)) continue;
+
     collectManifests({ directory, depth: WORKSPACE_MANIFEST_DEPTH, found });
   }
 
@@ -345,6 +369,7 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
   for (const record of found) {
     if (!packages.has(record.name)) packages.set(record.name, record);
   }
+
   const byDirectory = [...found].sort(
     (left, right) => right.directory.length - left.directory.length,
   );
@@ -359,12 +384,15 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
     const scoped = specifier.startsWith("@");
     const name = scoped ? segments.slice(0, 2).join("/") : segments[0];
     if (!name) return void 0;
+
     const manifest = packages.get(name);
     if (!manifest) return void 0;
+
     const rest = segments.slice(scoped ? 2 : 1);
     const subpath = rest.length > 0 ? `./${rest.join("/")}` : ".";
     const target = subpathTarget({ manifest, subpath });
     if (!target) return void 0;
+
     return resolveSourceCandidate({ candidate: resolve(manifest.directory, target) });
   };
 
@@ -375,27 +403,33 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
     const owner = owningPackage({ file: options.file });
     const map = owner?.imports;
     if (!map) return void 0;
+
     const exact = map[options.specifier];
     const exactTarget = conditionTarget(exact);
     if (exactTarget) {
       return resolveSourceCandidate({ candidate: resolve(owner.directory, exactTarget) });
     }
+
     for (const [pattern, value] of Object.entries(map)) {
       const star = pattern.indexOf("*");
       if (star === -1) continue;
+
       const prefix = pattern.slice(0, star);
       const suffix = pattern.slice(star + 1);
       if (!options.specifier.startsWith(prefix) || !options.specifier.endsWith(suffix)) continue;
+
       const filled = options.specifier.slice(
         prefix.length,
         options.specifier.length - suffix.length,
       );
       const target = conditionTarget(value);
       if (!target) continue;
+
       return resolveSourceCandidate({
         candidate: resolve(owner.directory, target.replace("*", filled)),
       });
     }
+
     return void 0;
   };
 
@@ -430,6 +464,7 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
         ? resolveSubpathImport({ specifier, file })
         : resolveWorkspacePackage(specifier);
     resolutions.set(key, resolved);
+
     return resolved;
   };
 
@@ -478,21 +513,28 @@ export function walkValueImportGraph({
       const reason = forbidden({ specifier: entry.specifier, file, target });
       if (reason !== void 0) {
         if (!seeds.has(file)) seeds.set(file, reason);
+
         continue;
       }
+
       if (target === void 0) continue;
+
       if (terminal?.({ file: target }) === true) continue;
+
       edges.push(target);
     }
+
     // After the specifiers, so an explicit forbidden import stays the reported
     // cause and a compiler-emitted edge is only the fallback.
     if (!seeds.has(file)) {
       const emittedReason = emitted?.({ file });
       if (emittedReason !== void 0) seeds.set(file, emittedReason);
     }
+
     children.set(file, edges);
     for (const edge of edges) {
       if (seen.has(edge)) continue;
+
       seen.add(edge);
       queue.push(edge);
     }
@@ -534,10 +576,12 @@ export function chainsToSeeds({
     via.set(file, void 0);
     work.push(file);
   }
+
   while (work.length > 0) {
     const node = work.pop()!;
     for (const parent of parents.get(node) ?? []) {
       if (via.has(parent)) continue;
+
       via.set(parent, node);
       work.push(parent);
     }
@@ -546,6 +590,7 @@ export function chainsToSeeds({
   const chains = new Map<string, string[]>();
   for (const root of roots) {
     if (!via.has(root)) continue;
+
     const chain: string[] = [];
     const guard = new Set<string>();
     let cursor: string | undefined = root;
@@ -557,9 +602,12 @@ export function chainsToSeeds({
         chain.push(graph.seeds.get(cursor)!);
         break;
       }
+
       cursor = next;
     }
+
     chains.set(root, chain);
   }
+
   return chains;
 }

@@ -143,8 +143,8 @@ export class ProcessWakeWorker {
         lagMs: now - wake.wakeAt,
       });
       const result = await manager.handleWake({ wake, now });
-      if (result.outcome === "committed") {
-        if (result.insertedMessageKeys.length > 0) this.notifyOutbox?.();
+      if (result.outcome === "committed" && result.insertedMessageKeys.length > 0) {
+        this.notifyOutbox?.();
       }
       // staleWake / revisionConflict: another commit advanced the process
       // since this wake was scheduled — it stands down silently.

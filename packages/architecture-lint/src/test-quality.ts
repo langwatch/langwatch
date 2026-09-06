@@ -74,12 +74,15 @@ function baseCalleeName(expression: ts.Expression): string | undefined {
       current = current.expression;
       continue;
     }
+
     if (ts.isCallExpression(current)) {
       current = current.expression;
       continue;
     }
+
     break;
   }
+
   return ts.isIdentifier(current) ? current.text : void 0;
 }
 
@@ -100,6 +103,7 @@ function callbackFromCall(
 
 function testCallback(call: ts.CallExpression, scope: string): TestCall | undefined {
   const callback = callbackFromCall(call, TEST_CALLBACKS);
+
   return callback ? { callback, call, scope } : void 0;
 }
 
@@ -110,25 +114,33 @@ function collectTestCalls(source: ts.SourceFile): TestCall[] {
       const suite = callbackFromCall(node, SUITE_CALLBACKS);
       if (suite) {
         visit(suite.body, `suite:${node.getStart(source)}`);
+
         return;
       }
 
       const test = testCallback(node, scope);
       if (test) tests.push(test);
     }
+
     ts.forEachChild(node, (child) => visit(child, scope));
   };
   visit(source);
+
   return tests;
 }
 
 function isAssertionCall(node: ts.CallExpression): boolean {
   if (matcherCall(node)) return true;
+
   if (ts.isIdentifier(node.expression)) return node.expression.text === "assert";
+
   if (!ts.isPropertyAccessExpression(node.expression)) return false;
+
   if (!ts.isIdentifier(node.expression.expression)) return false;
+
   const namespace = node.expression.expression.text;
   if (ASSERTION_NAMESPACES.has(namespace)) return true;
+
   // `expect.fail(...)` in a catch branch is how a test says "reaching here is
   // the failure". It asserts as surely as a matcher does, and reading it as
   // absent reported two real memory-budget tests as empty.
@@ -141,15 +153,18 @@ function containsAssertion(callback: TestCallback, assertionHelpers: ReadonlySet
   let assertion = false;
   const visit = (node: ts.Node): void => {
     if (assertion) return;
+
     if (ts.isCallExpression(node)) {
       const helper = ts.isIdentifier(node.expression)
         ? assertionHelpers.has(node.expression.text)
         : false;
       if (isAssertionCall(node) || helper) assertion = true;
     }
+
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(callback.body, visit);
+
   return assertion;
 }
 
@@ -199,6 +214,7 @@ function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
         helpers.add(node.name.text);
       }
     }
+
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(source, visit);
@@ -210,40 +226,58 @@ function nodeContainsAssertion(node: ts.Node): boolean {
   let assertion = false;
   const visit = (child: ts.Node): void => {
     if (assertion) return;
+
     if (ts.isCallExpression(child) && isAssertionCall(child)) assertion = true;
+
     ts.forEachChild(child, visit);
   };
   visit(node);
+
   return assertion;
 }
 
 function literalKey(expression: ts.Expression): string | undefined {
   if (ts.isParenthesizedExpression(expression)) return literalKey(expression.expression);
+
   if (expression.kind === ts.SyntaxKind.TrueKeyword) return "boolean:true";
+
   if (expression.kind === ts.SyntaxKind.FalseKeyword) return "boolean:false";
+
   if (expression.kind === ts.SyntaxKind.NullKeyword) return "null";
+
   if (ts.isStringLiteral(expression)) return `string:${expression.text}`;
+
   if (ts.isNumericLiteral(expression)) return `number:${expression.text}`;
+
   if (ts.isBigIntLiteral(expression)) return `bigint:${expression.text}`;
+
   if (ts.isIdentifier(expression) && expression.text === "undefined") return "undefined";
+
   return void 0;
 }
 
 function emptyValue(expression: ts.Expression): boolean {
   if (ts.isParenthesizedExpression(expression)) return emptyValue(expression.expression);
+
   if (ts.isStringLiteral(expression)) return expression.text.length === 0;
+
   if (ts.isNoSubstitutionTemplateLiteral(expression)) return expression.text.length === 0;
+
   if (ts.isArrayLiteralExpression(expression)) return expression.elements.length === 0;
+
   if (ts.isObjectLiteralExpression(expression)) return expression.properties.length === 0;
+
   return false;
 }
 
 function expectCall(expression: ts.Expression): ts.CallExpression | undefined {
   let current = expression;
   while (ts.isPropertyAccessExpression(current)) current = current.expression;
+
   if (!ts.isCallExpression(current)) return void 0;
 
   const base = baseCalleeName(current.expression);
+
   return base && EXPECTATION_CALLEES.has(base) ? current : void 0;
 }
 
@@ -254,26 +288,35 @@ function matcherCall(node: ts.CallExpression):
     }
   | undefined {
   if (!ts.isPropertyAccessExpression(node.expression)) return void 0;
+
   const expect = expectCall(node.expression.expression);
   if (!expect) return void 0;
+
   return { expect, matcher: node.expression.name.text };
 }
 
 function isTautologicalAssertion(node: ts.CallExpression): boolean {
   const assertion = matcherCall(node);
   if (!assertion || !STATIC_MATCHERS.has(assertion.matcher)) return false;
+
   const actual = assertion.expect.arguments[0];
   if (!actual) return false;
+
   const actualKey = literalKey(actual);
   if (!actualKey) return false;
 
   if (assertion.matcher === "toBeTruthy") return actualKey === "boolean:true";
+
   if (assertion.matcher === "toBeFalsy") return actualKey === "boolean:false";
+
   if (assertion.matcher === "toBeDefined") return actualKey !== "undefined";
+
   if (assertion.matcher === "toBeUndefined") return actualKey === "undefined";
+
   if (assertion.matcher === "toBeNull") return actualKey === "null";
 
   const expected = node.arguments[0];
+
   return expected !== void 0 && literalKey(expected) === actualKey;
 }
 
@@ -301,21 +344,26 @@ function isSchemaLiteralEchoAssertion(node: ts.CallExpression): boolean {
   }
 
   const inputKey = literalKey(input);
+
   return inputKey !== void 0 && literalKey(expected) === inputKey;
 }
 
 function isEmptySnapshotAssertion(node: ts.CallExpression): boolean {
   const assertion = matcherCall(node);
   if (!assertion || !SNAPSHOT_MATCHERS.has(assertion.matcher)) return false;
+
   const actual = assertion.expect.arguments[0];
   if (!actual || !emptyValue(actual)) return false;
 
   if (assertion.matcher === "toMatchSnapshot") return true;
+
   const snapshot = node.arguments[0];
   if (snapshot === void 0) return false;
+
   if (ts.isNoSubstitutionTemplateLiteral(snapshot)) {
     return ["", '""', "[]", "{}"].includes(snapshot.text);
   }
+
   return ts.isStringLiteral(snapshot) && ['""', "[]", "{}"].includes(snapshot.text);
 }
 
@@ -325,26 +373,33 @@ function collectImportBindings(source: ts.SourceFile): ImportBinding[] {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
       continue;
     }
+
     const clause = statement.importClause;
     if (!clause || clause.isTypeOnly) continue;
+
     const module = statement.moduleSpecifier.text;
     if (clause.name) bindings.push({ name: clause.name.text, module });
+
     const named = clause.namedBindings;
     if (named && ts.isNamespaceImport(named)) bindings.push({ name: named.name.text, module });
+
     if (named && ts.isNamedImports(named)) {
       for (const element of named.elements) {
         if (!element.isTypeOnly) bindings.push({ name: element.name.text, module });
       }
     }
   }
+
   return bindings;
 }
 
 function isModuleMockCallee(callee: ts.Expression): boolean {
   if (!ts.isPropertyAccessExpression(callee)) return false;
+
   if (!ts.isIdentifier(callee.expression)) return false;
 
   const mockNamespace = ["vi", "jest", "mock"].includes(callee.expression.text);
+
   return mockNamespace && callee.name.text === "mock";
 }
 
@@ -353,17 +408,21 @@ function collectMockedModules(source: ts.SourceFile): Set<string> {
   const visit = (node: ts.Node): void => {
     if (!ts.isCallExpression(node) || node.arguments.length === 0) {
       ts.forEachChild(node, visit);
+
       return;
     }
+
     const callee = node.expression;
     const isMock = isModuleMockCallee(callee);
     const module = node.arguments[0];
     if (isMock && module !== void 0 && ts.isStringLiteral(module)) {
       modules.add(module.text);
     }
+
     ts.forEachChild(node, visit);
   };
   visit(source);
+
   return modules;
 }
 
@@ -371,10 +430,13 @@ function callbackUsesName(callback: TestCallback, name: string): boolean {
   let found = false;
   const visit = (node: ts.Node): void => {
     if (found) return;
+
     if (ts.isIdentifier(node) && node.text === name) found = true;
+
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(callback.body, visit);
+
   return found;
 }
 
@@ -390,6 +452,7 @@ function moduleStem(module: string): string {
 
 function canonicalTestBody(source: ts.SourceFile, callback: TestCallback): string {
   const printer = ts.createPrinter({ removeComments: true });
+
   return printer
     .printNode(ts.EmitHint.Unspecified, callback.body, source)
     .replaceAll(/\s+/g, " ")
@@ -408,7 +471,9 @@ function canonicalTestBody(source: ts.SourceFile, callback: TestCallback): strin
  */
 function canonicalCaseTable(source: ts.SourceFile, call: ts.CallExpression): string {
   if (!ts.isCallExpression(call.expression)) return "";
+
   const printer = ts.createPrinter({ removeComments: true });
+
   return call.expression.arguments
     .map((argument) =>
       printer.printNode(ts.EmitHint.Unspecified, argument, source).replaceAll(/\s+/g, " "),
@@ -430,6 +495,7 @@ function lintTestFile(file: string): ArchitectureViolation[] {
   for (const binding of imports) {
     if (IMPORTED_ASSERTION_HELPER.test(binding.name)) assertionHelpers.add(binding.name);
   }
+
   const duplicateBodies = new Map<string, TestCall>();
 
   for (const test of collectTestCalls(source)) {
@@ -464,7 +530,9 @@ function lintTestFile(file: string): ArchitectureViolation[] {
     for (const binding of imports) {
       const isSubject = moduleStem(binding.module) === testSubjectStem(file);
       if (!isSubject || !mockedModules.has(binding.module)) continue;
+
       if (!callbackUsesName(test.callback, binding.name)) continue;
+
       violations.push({
         policy: "test-quality",
         file,
@@ -479,8 +547,10 @@ function lintTestFile(file: string): ArchitectureViolation[] {
   const visit = (node: ts.Node): void => {
     if (!ts.isCallExpression(node)) {
       ts.forEachChild(node, visit);
+
       return;
     }
+
     if (isTautologicalAssertion(node)) {
       violations.push({
         policy: "test-quality",
@@ -490,6 +560,7 @@ function lintTestFile(file: string): ArchitectureViolation[] {
         allowed: "Assert a value derived from the behaviour under test.",
       });
     }
+
     if (isSchemaLiteralEchoAssertion(node)) {
       violations.push({
         policy: "test-quality",
@@ -499,6 +570,7 @@ function lintTestFile(file: string): ArchitectureViolation[] {
         allowed: "Assert a refinement, default, transform, error, or observable caller behaviour.",
       });
     }
+
     if (isEmptySnapshotAssertion(node)) {
       violations.push({
         policy: "test-quality",
@@ -508,9 +580,11 @@ function lintTestFile(file: string): ArchitectureViolation[] {
         allowed: "Assert behaviour derived from the unit under test instead.",
       });
     }
+
     ts.forEachChild(node, visit);
   };
   visit(source);
+
   return violations;
 }
 
@@ -519,6 +593,7 @@ export function lintTestQuality(
   options: TestQualityLintOptions = {},
 ): ArchitectureViolation[] {
   const files = options.files ?? [];
+
   return files
     .map((file) => resolve(root, file))
     .filter((file) => isTestFile(file) && existsSync(file))

@@ -58,6 +58,7 @@ const baselineSchema = z
           path: ["files", index],
         });
       }
+
       seen.add(file);
       const previous = baseline.files[index - 1];
       const comparison = previous?.localeCompare(file);
@@ -102,6 +103,7 @@ export function readTypedPrismaSeamBaselineFile(file: string): {
   const parsed = baselineSchema.safeParse(raw);
   if (!parsed.success) {
     const reason = parsed.error.issues.at(0)?.message ?? "invalid baseline";
+
     return {
       exists: true,
       files: [],
@@ -130,6 +132,7 @@ export function lintTypedPrismaSeamBaseline(
   if (!baselineReference) {
     return { violations: current.violations };
   }
+
   const reference = readTypedPrismaSeamBaselineFile(resolve(root, baselineReference));
   const referenceSet = new Set(reference.files);
   const violations: ArchitectureViolation[] = [...current.violations, ...reference.violations];
@@ -144,5 +147,6 @@ export function lintTypedPrismaSeamBaseline(
       });
     }
   }
+
   return { violations };
 }

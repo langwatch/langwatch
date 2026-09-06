@@ -133,15 +133,18 @@ function complexityOf(node: ts.Node): number {
   let complexity = 1;
   const visit = (current: ts.Node): void => {
     if (isFunctionLike(current)) return;
+
     const isControlFlow = COMPLEXITY_CONTROL_FLOW.has(current.kind);
     const isShortCircuit =
       ts.isBinaryExpression(current) && COMPLEXITY_SHORT_CIRCUIT.has(current.operatorToken.kind);
     if (isControlFlow || isShortCircuit) {
       complexity += 1;
     }
+
     ts.forEachChild(current, visit);
   };
   ts.forEachChild(node, visit);
+
   return complexity;
 }
 
@@ -164,9 +167,11 @@ function serviceQuality(path: string, source: string): ServiceQuality {
       quality.statements = Math.max(quality.statements, node.body.statements.length);
       quality.complexity = Math.max(quality.complexity, complexityOf(node.body));
     }
+
     ts.forEachChild(node, visit);
   };
   visit(file);
+
   return quality;
 }
 
@@ -243,6 +248,7 @@ export function lintServiceQualityBaseline(
         "Commit the reviewed baseline once, then future merge-base checks may only shrink it.",
     });
   }
+
   if (!baselineReference) {
     return { violations, bootstrapped: false };
   }
@@ -252,9 +258,11 @@ export function lintServiceQualityBaseline(
   if (!reference.exists) {
     return { violations, bootstrapped: current.exists };
   }
+
   violations.push(
     ...compareServiceQualityBaselines(reference.baseline, current.baseline, baselineFile(root)),
   );
+
   return { violations, bootstrapped: false };
 }
 
@@ -276,6 +284,7 @@ export function compareServiceQualityBaselines(
       });
       continue;
     }
+
     const increased = qualityFields.find((field) => entry[field] > previous[field]);
     if (increased) {
       violations.push({
@@ -286,6 +295,7 @@ export function compareServiceQualityBaselines(
       });
     }
   }
+
   return violations;
 }
 
@@ -296,6 +306,7 @@ function exceeds(quality: ServiceQuality, ceiling: ServiceQuality): boolean {
     quality.statements > ceiling.statements;
   const exceedsComplexity =
     quality.complexity > ceiling.complexity || quality.lineLength > ceiling.lineLength;
+
   return exceedsSize || exceedsComplexity;
 }
 
@@ -316,6 +327,7 @@ function matchesCeiling(entry: ServiceQualityCeiling, expected: ServiceQuality):
     entry.statements === expected.statements;
   const matchesComplexity =
     entry.complexity === expected.complexity && entry.lineLength === expected.lineLength;
+
   return matchesShape && matchesComplexity;
 }
 
@@ -337,6 +349,7 @@ function lintServiceQualityFileAgainstBaseline(
       allowed: "Split coherent private collaborators. Existing ceiling entries may only shrink.",
     });
   }
+
   if (entry && !matchesCeiling(entry, expectedCeiling(quality))) {
     violations.push({
       policy: "service-quality-baseline",
@@ -346,12 +359,14 @@ function lintServiceQualityFileAgainstBaseline(
         "Set every ceiling to max(default, current), or delete the entry when all values are default.",
     });
   }
+
   return violations;
 }
 
 /** Fast exact-path check for focused regression tests and targeted migration batches. */
 export function lintServiceQualityFile(root: string, path: string): ArchitectureViolation[] {
   const baselineResult = readServiceQualityBaselineFile(baselineFile(root));
+
   return [
     ...baselineResult.violations,
     ...lintServiceQualityFileAgainstBaseline(root, resolve(root, path), baselineResult.baseline),
@@ -389,6 +404,7 @@ export function lintServiceQuality(
       });
     }
   }
+
   return violations;
 }
 
@@ -405,6 +421,7 @@ export function collectServiceQualityCeilings(
     .flatMap((pkg) => walkFiles(pkg.root, isStrictService))
     .map((file) => {
       const quality = serviceQuality(file, readFileSync(file, "utf8"));
+
       return {
         file: relative(root, file).replaceAll("\\", "/"),
         ...expectedCeiling(quality),

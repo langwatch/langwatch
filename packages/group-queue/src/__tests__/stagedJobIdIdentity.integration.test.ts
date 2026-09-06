@@ -103,7 +103,6 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
   const jobsKey = (name: string, groupId: string) => `${name}:gq:group:${groupId}:jobs`;
   const dataKey = (name: string, groupId: string) => `${name}:gq:group:${groupId}:data`;
   const attemptKey = (name: string, groupId: string) => `${name}:gq:group:${groupId}:attempt`;
-  const failStreakKey = (name: string, groupId: string) => `${name}:gq:group:${groupId}:failstreak`;
   const seedDeadOwner = (name: string, groupId: string) =>
     sharedSeedDeadOwner({ redis, queueName: name, groupId });
   const activeKey = (name: string, groupId: string) => `${name}:gq:group:${groupId}:active`;
@@ -114,7 +113,6 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
   const stagedValue = (name: string, groupId: string, stagedJobId: string) =>
     redis.hget(dataKey(name, groupId), stagedJobId);
   const groupAttempt = (name: string, groupId: string) => redis.get(attemptKey(name, groupId));
-  const failStreak = (name: string, groupId: string) => redis.get(failStreakKey(name, groupId));
   const blockedMembers = (name: string) => redis.smembers(`${name}:gq:blocked`);
   const readyScore = (name: string, groupId: string) => redis.zscore(`${name}:gq:ready`, groupId);
   const totalPending = (name: string) => redis.get(`${name}:gq:stats:total-pending`);

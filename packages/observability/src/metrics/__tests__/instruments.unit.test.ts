@@ -45,7 +45,7 @@ function createRecordingMeterProvider() {
     createHistogram: (name: string) => write(name),
     createGauge: (name: string) => write(name),
     createUpDownCounter: (name: string) => write(name),
-    createObservableGauge: (name: string) => ({
+    createObservableGauge: (_name: string) => ({
       addCallback: (
         callback: (result: { observe: (v: number, a?: Attributes) => void }) => unknown,
       ) => {
@@ -53,11 +53,11 @@ function createRecordingMeterProvider() {
       },
       removeCallback: () => void 0,
     }),
-    createObservableCounter: (name: string) => ({
+    createObservableCounter: (_name: string) => ({
       addCallback: () => void 0,
       removeCallback: () => void 0,
     }),
-    createObservableUpDownCounter: (name: string) => ({
+    createObservableUpDownCounter: (_name: string) => ({
       addCallback: () => void 0,
       removeCallback: () => void 0,
     }),

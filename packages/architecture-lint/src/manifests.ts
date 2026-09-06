@@ -4,6 +4,7 @@ function exportKeys(exportsValue: unknown): string[] {
   if (!exportsValue || typeof exportsValue !== "object" || Array.isArray(exportsValue)) {
     return [];
   }
+
   return Object.keys(exportsValue as Record<string, unknown>);
 }
 
@@ -28,12 +29,15 @@ function isEnterpriseRuntimeDependency(name: string): boolean {
 
 function compatibleEnterpriseCompositionTarget(target: ClassifiedPackage): boolean {
   if (target.kind === "contract") return true;
+
   return Boolean(target.enterprise && target.feature && target.kind === "server");
 }
 
 function matchingEnterpriseComposition(pkg: ClassifiedPackage, target: ClassifiedPackage): boolean {
   if (target.kind !== "enterprise-composition") return true;
+
   if (pkg.kind !== "application") return false;
+
   return pkg.applicationRole === target.enterpriseCompositionRole;
 }
 
@@ -58,6 +62,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
         message: "Package must declare an explicit exports map.",
       });
     }
+
     for (const key of keys) {
       if (key.includes("*") || key === "./src" || key.startsWith("./src/")) {
         violations.push({
@@ -68,6 +73,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           allowed: "Name each supported capability explicitly.",
         });
       }
+
       if (/repositor|prisma/i.test(key)) {
         violations.push({
           policy: "public-exports",
@@ -104,7 +110,9 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           allowed: "Depend only on portable feature contracts.",
         });
       }
+
       if (!target) continue;
+
       if (pkg.kind === "application" && target.kind === "application" && target !== pkg) {
         violations.push({
           policy: "application-boundary",
@@ -114,6 +122,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           allowed: "Move reusable behaviour to its owning feature or infrastructure package.",
         });
       }
+
       if (target.kind === "enterprise-composition" && !matchingEnterpriseComposition(pkg, target)) {
         violations.push({
           policy: "enterprise-composition",
@@ -126,6 +135,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
               : "Only the matching application composition root may consume this package.",
         });
       }
+
       if (pkg.kind === "enterprise-composition" && target.kind === "enterprise-composition") {
         violations.push({
           policy: "enterprise-composition",
@@ -134,6 +144,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           message: "Enterprise API and worker composition packages cannot depend on one another.",
         });
       }
+
       if (
         pkg.kind === "enterprise-composition" &&
         target.feature &&
@@ -147,6 +158,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           allowed: `Depend only on portable contracts and Enterprise ${pkg.enterpriseCompositionRole} or server installers.`,
         });
       }
+
       if (pkg.kind === "enterprise-root" && target.kind !== "contract") {
         violations.push({
           policy: "enterprise-composition",
@@ -157,6 +169,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           allowed: "Depend only on portable feature contracts.",
         });
       }
+
       if (
         !pkg.enterprise &&
         target.enterprise &&
@@ -173,6 +186,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           message: "A core package cannot depend on an enterprise package.",
         });
       }
+
       const isForeignFeature = pkg.feature !== target.feature;
       const isImplementationTarget = target.kind !== "contract";
       const hasFeaturePair = pkg.feature && target.feature;
@@ -185,6 +199,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           allowed: `Depend on ${target.enterprise ? `@langwatch/enterprise-${target.feature}-contract` : `@langwatch/${target.feature}-contract`}.`,
         });
       }
+
       if (pkg.kind === "contract" && target.feature === pkg.feature && target.kind !== "contract") {
         violations.push({
           policy: "package-role",
@@ -193,6 +208,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           message: "A contract package cannot depend on its implementation packages.",
         });
       }
+
       if (pkg.kind === "web" && target.kind === "server") {
         violations.push({
           policy: "package-role",
@@ -201,6 +217,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           message: "A web package cannot depend on a feature server package.",
         });
       }
+
       if (pkg.kind === "server" && target.kind === "web") {
         violations.push({
           policy: "package-role",

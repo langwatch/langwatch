@@ -1,7 +1,6 @@
 import {
   type CodeScenario,
   type ResultAtom,
-  type ResultGroup,
   type ResultsFilter,
   type ResultsGroupBy,
   type ResultsOverview,

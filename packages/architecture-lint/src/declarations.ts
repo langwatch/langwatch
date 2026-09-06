@@ -19,7 +19,9 @@ const FORBIDDEN_DECLARATION = [
 
 function publicSourceTargets(value: unknown): string[] {
   if (typeof value === "string") return [value];
+
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+
   return Object.values(value as Record<string, unknown>).flatMap(publicSourceTargets);
 }
 
@@ -35,6 +37,7 @@ function declarationAt(path: string, outputs: Map<string, string>): string | und
   for (const candidate of [path, `${path}.d.ts`, join(path, "index.d.ts")]) {
     if (outputs.has(candidate)) return candidate;
   }
+
   return undefined;
 }
 
@@ -44,14 +47,17 @@ function reachableDeclarations(roots: Set<string>, outputs: Map<string, string>)
   while (pending.length > 0) {
     const file = pending.pop();
     if (!file || reachable.has(file) || !outputs.has(file)) continue;
+
     reachable.add(file);
     const source = outputs.get(file) ?? "";
     for (const imported of ts.preProcessFile(source, true, true).importedFiles) {
       if (!imported.fileName.startsWith(".")) continue;
+
       const target = declarationAt(resolve(dirname(file), imported.fileName), outputs);
       if (target && !reachable.has(target)) pending.push(target);
     }
   }
+
   return reachable;
 }
 
@@ -60,8 +66,10 @@ export function lintDeclarations(packages: ClassifiedPackage[]): ArchitectureVio
   for (const pkg of packages) {
     const tsconfigPath = join(pkg.root, "tsconfig.json");
     if (!existsSync(tsconfigPath)) continue;
+
     const read = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
     if (read.error) continue;
+
     const parsed = ts.parseJsonConfigFileContent(
       read.config,
       ts.sys,
@@ -93,5 +101,6 @@ export function lintDeclarations(packages: ClassifiedPackage[]): ArchitectureVio
       }
     }
   }
+
   return violations;
 }

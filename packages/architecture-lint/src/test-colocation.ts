@@ -70,8 +70,10 @@ function moduleSpecifierNodes(sourceFile: ts.SourceFile): ts.StringLiteral[] {
   const visit = (node: ts.Node): void => {
     if (!ts.isStringLiteral(node)) {
       ts.forEachChild(node, visit);
+
       return;
     }
+
     const parent = node.parent;
     const isImport = ts.isImportDeclaration(parent) && parent.moduleSpecifier === node;
     const isExport = ts.isExportDeclaration(parent) && parent.moduleSpecifier === node;
@@ -93,15 +95,18 @@ function moduleSpecifierNodes(sourceFile: ts.SourceFile): ts.StringLiteral[] {
         parent.expression.name.text,
       );
     if (isImport || isExport || isImportType || isDynamic || isMockPath) literals.push(node);
+
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(sourceFile, visit);
+
   return literals;
 }
 
 /** The file a relative specifier names, if one exists on disk. */
 function relativeModuleTarget(file: string, specifier: string): string | undefined {
   if (!specifier.startsWith(".")) return void 0;
+
   const base = resolve(dirname(file), specifier);
   const javascriptExtension = specifier.match(/\.(?:m?js|cjs)$/)?.[0];
   const extensionless = javascriptExtension ? base.slice(0, -javascriptExtension.length) : base;
@@ -115,6 +120,7 @@ function relativeModuleTarget(file: string, specifier: string): string | undefin
   for (const candidate of candidates) {
     if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
   }
+
   return void 0;
 }
 
@@ -141,6 +147,7 @@ function selfReferenceTarget(input: {
 }): string | undefined {
   const { specifier, packageName, packageRoot, exportsMap } = input;
   if (specifier !== packageName && !specifier.startsWith(`${packageName}/`)) return void 0;
+
   const subpath = specifier === packageName ? "." : `.${specifier.slice(packageName.length)}`;
 
   const declared = exportsMap?.[subpath];
@@ -165,6 +172,7 @@ function selfReferenceTarget(input: {
   ]) {
     if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
   }
+
   return void 0;
 }
 
@@ -198,6 +206,7 @@ export function chooseSubject(
   imports: readonly string[],
 ): string | undefined {
   if (imports.length === 0) return void 0;
+
   const sorted = [...imports].sort();
 
   const stem = subjectStem(testFile);
@@ -214,6 +223,7 @@ export function chooseSubject(
   for (const target of sorted) {
     byDirectory.set(dirname(target), (byDirectory.get(dirname(target)) ?? 0) + 1);
   }
+
   let best: string | undefined;
   let bestCount = 0;
   for (const target of sorted) {
@@ -223,6 +233,7 @@ export function chooseSubject(
       bestCount = count;
     }
   }
+
   return best;
 }
 
@@ -253,15 +264,19 @@ export function rewriteRelativeSpecifiers(input: {
   for (const literal of moduleSpecifierNodes(sourceFile)) {
     const target = relativeModuleTarget(from, literal.text);
     if (!target) continue;
+
     const destination = moved.get(target) ?? target;
     let next = relative(dirname(to), destination).split(sep).join("/");
     if (!next.startsWith(".")) next = `./${next}`;
+
     const writtenExtension = literal.text.match(/\.[cm]?[jt]sx?$/)?.[0];
     if (!writtenExtension) next = next.replace(SOURCE_FILE, "");
     else if (/\.(?:m?js|cjs)$/.test(writtenExtension)) {
       next = next.replace(SOURCE_FILE, writtenExtension);
     }
+
     if (next === literal.text) continue;
+
     replacements.push({
       start: literal.getStart(sourceFile) + 1,
       end: literal.getEnd() - 1,
@@ -270,10 +285,12 @@ export function rewriteRelativeSpecifiers(input: {
   }
 
   if (replacements.length === 0) return source;
+
   let output = source;
   for (const replacement of [...replacements].sort((a, b) => b.start - a.start)) {
     output = output.slice(0, replacement.start) + replacement.text + output.slice(replacement.end);
   }
+
   return output;
 }
 
@@ -298,6 +315,7 @@ function sourceImports(input: {
 }): string[] {
   const { file, sourceRoot, packageName, packageRoot, exportsMap, seen } = input;
   if (seen.has(file)) return [];
+
   seen.add(file);
 
   const source = readFileSync(file, "utf8");
@@ -310,15 +328,18 @@ function sourceImports(input: {
       relativeModuleTarget(file, literal.text) ??
       selfReferenceTarget({ specifier: literal.text, packageName, packageRoot, exportsMap });
     if (!target) continue;
+
     const resolved = resolve(target);
     if (resolved.startsWith(`${sourceRoot}${sep}`)) {
       found.push(target);
       continue;
     }
+
     if (resolved.startsWith(`${testsRoot}${sep}`)) {
       found.push(...sourceImports({ ...input, file: target, seen }));
     }
   }
+
   return found;
 }
 
@@ -400,6 +421,7 @@ type MirroredPackage = {
 /** Every strict feature package that still keeps its tests in a mirror tree. */
 function packagesWithMirroredTests(root: string): MirroredPackage[] {
   const { packages } = discoverClassifiedPackages(root);
+
   return packages
     .filter((pkg) => ["contract", "server", "web"].includes(pkg.kind))
     .filter((pkg) => existsSync(`${pkg.root}/tests`))
@@ -428,11 +450,13 @@ export function planTestColocation(rootInput: string): TestColocationPlan {
       for (const literal of moduleSpecifierNodes(sourceFile)) {
         const target = relativeModuleTarget(from, literal.text);
         if (!target || !resolve(target).startsWith(`${testsRoot}${sep}`)) continue;
+
         // The helper lands in the __tests__ of the first test that uses it.
         // Deterministic because `first.moves` is walked in sorted path order.
         if (!helperDestinations.has(target)) helperDestinations.set(target, dirname(to));
       }
     }
+
     const second = planPackage(packageRoot, name, exportsMap, helperDestinations);
     moves.push(...second.moves);
     unresolved.push(...second.unresolved);

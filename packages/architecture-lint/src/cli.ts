@@ -22,6 +22,7 @@ import {
 
 function valueAfter(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
+
   return index === -1 ? void 0 : process.argv[index + 1];
 }
 
@@ -107,6 +108,7 @@ function fullWorkspaceViolations(): ArchitectureViolation[] {
     boundaryEdgesFromViolations(workspaceViolations),
     boundaryEdgeBaselineReference,
   );
+
   return [
     ...filterBaselinedBoundaryEdges(workspaceViolations, boundaryEdges.entries),
     ...commentBlockRoots.violations,
@@ -151,16 +153,19 @@ if (violations.length === 0) {
         "architecture-lint: accepting the one-time service quality baseline bootstrap; future merge-base checks can only shrink it\n",
       );
     }
+
     if (baselineCheck?.strictPorts.bootstrapped) {
       process.stdout.write(
         "architecture-lint: accepting the one-time strict port baseline bootstrap; future merge-base checks can only shrink it\n",
       );
     }
+
     if (baselineCheck?.boundaryEdges.bootstrapped) {
       process.stdout.write(
         "architecture-lint: accepting the one-time boundary edge baseline bootstrap; future merge-base checks can only shrink it\n",
       );
     }
+
     process.stdout.write("architecture-lint: package boundaries are sealed\n");
   }
 } else {

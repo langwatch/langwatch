@@ -23,13 +23,17 @@ function declarationName(node: ts.DeclarationName | undefined): string | null {
   if (node && (ts.isIdentifier(node) || ts.isStringLiteral(node))) {
     return node.text;
   }
+
   return null;
 }
 
 function referencedTypeName(node: ts.EntityName | ts.Expression): string | null {
   if (ts.isIdentifier(node)) return node.text;
+
   if (ts.isQualifiedName(node)) return node.right.text;
+
   if (ts.isPropertyAccessExpression(node)) return node.name.text;
+
   return null;
 }
 
@@ -38,6 +42,7 @@ function importedTypeNames(sourceFile: ts.SourceFile): ReadonlyMap<string, strin
 
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
+
     const bindings = statement.importClause?.namedBindings;
     if (!bindings || !ts.isNamedImports(bindings)) continue;
 
@@ -91,6 +96,7 @@ function memberExposesProjectionWrite(member: ts.TypeElement | ts.ClassElement):
   if (!isCapability) return false;
 
   const name = declarationName(member.name);
+
   return name !== null && PROJECTION_WRITE_METHODS.has(name);
 }
 
@@ -98,6 +104,7 @@ function memberTypeNodes(member: ts.TypeElement | ts.ClassElement): ts.TypeNode[
   if (ts.isPropertySignature(member) || ts.isPropertyDeclaration(member)) {
     return member.type ? [member.type] : [];
   }
+
   if (
     ts.isMethodSignature(member) ||
     ts.isMethodDeclaration(member) ||
@@ -107,8 +114,10 @@ function memberTypeNodes(member: ts.TypeElement | ts.ClassElement): ts.TypeNode[
     const parameterTypes = member.parameters.flatMap((parameter) =>
       parameter.type ? [parameter.type] : [],
     );
+
     return member.type ? [...parameterTypes, member.type] : parameterTypes;
   }
+
   return [];
 }
 
@@ -116,6 +125,7 @@ function isPrivateClassMember(member: ts.ClassElement): boolean {
   if (member.name && ts.isPrivateIdentifier(member.name)) return true;
 
   const modifiers = ts.canHaveModifiers(member) ? ts.getModifiers(member) : void 0;
+
   return Boolean(
     modifiers?.some(
       (modifier) =>
@@ -131,6 +141,7 @@ function declarationExposesProjectionWrite(
   seen: Set<TypeDeclaration>,
 ): boolean {
   if (seen.has(declaration)) return false;
+
   seen.add(declaration);
 
   if (ts.isTypeAliasDeclaration(declaration)) {
@@ -148,6 +159,7 @@ function declarationExposesProjectionWrite(
   if (exposesNestedWrite) return true;
 
   const heritageTypes = declaration.heritageClauses?.flatMap((clause) => clause.types) ?? [];
+
   return heritageTypes.some((type) => typeExposesProjectionWrite(type, types, seen));
 }
 
@@ -172,6 +184,7 @@ function typeExposesProjectionWrite(
   } else if (ts.isExpressionWithTypeArguments(node)) {
     reference = referencedTypeName(node.expression);
   }
+
   if (reference) {
     const importedName = types.importsByFile.get(node.getSourceFile())?.get(reference);
     const canonicalName = importedName ?? reference;
@@ -193,6 +206,7 @@ function typeExposesProjectionWrite(
       exposesWrite = true;
     }
   });
+
   return exposesWrite;
 }
 
@@ -238,6 +252,7 @@ function lintServiceFile(
       const dependencyText = dependency.getText(sourceFile);
       const key = `${statement.name.text}:${dependencyText}`;
       if (seen.has(key)) continue;
+
       seen.add(key);
 
       const line =
@@ -271,6 +286,7 @@ export function lintServiceProjectionBoundaries(
     for (const file of sourceFiles.filter(isDomainServiceFile)) {
       const sourceFile = types.sourceByPath.get(file);
       if (!sourceFile) continue;
+
       violations.push(...lintServiceFile(file, sourceFile, types));
     }
   }

@@ -26,6 +26,11 @@ export function withCommandEnvelope<T extends z.ZodRawShape>(eventDataSchema: z.
  * Used by defineCommand to map command payloads to event data automatically.
  */
 export function stripEnvelope<T extends CommandEnvelope>(data: T): Omit<T, keyof CommandEnvelope> {
-  const { tenantId, occurredAt, idempotencyKey, ...eventData } = data;
+  const {
+    tenantId: _tenantId,
+    occurredAt: _occurredAt,
+    idempotencyKey: _idempotencyKey,
+    ...eventData
+  } = data;
   return eventData as Omit<T, keyof CommandEnvelope>;
 }

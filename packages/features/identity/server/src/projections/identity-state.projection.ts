@@ -1,5 +1,4 @@
 import {
-  ATTACH_IDENTIFIER_COMMAND_TYPE,
   emptyIdentityHeads,
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
@@ -9,25 +8,18 @@ import {
   identifierDeadEndedPayloadSchema,
   identifierDetachedPayloadSchema,
   identifierVerifiedPayloadSchema,
-  type IdentityCommand,
-  type IdentityFactInput,
   type IdentityHeads,
-  IDENTITY_EVENT_VERSION_LATEST,
   LINK_PROPOSED_EVENT_TYPE,
   linkProposedPayloadSchema,
   PRIMARY_CHANGED_EVENT_TYPE,
   primaryChangedPayloadSchema,
   reduceIdentity,
   USER_ERASED_EVENT_TYPE,
-  USER_IDENTITY_AGGREGATE_TYPE,
   userErasedPayloadSchema,
 } from "@langwatch/identity-contract";
 import {
   AbstractFoldProjection,
-  createTenantId,
-  eventIdempotencyKey,
   EventSchema,
-  EventUtils,
   type FoldEventHandlers,
   type StateProjectionStore,
 } from "@langwatch/eventing";

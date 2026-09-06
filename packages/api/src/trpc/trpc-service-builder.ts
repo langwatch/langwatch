@@ -92,7 +92,9 @@ type HandlerInput<TInput extends ChainInput> = TInput extends z.ZodType
   ? z.output<TInput>
   : undefined;
 /** What the CLIENT sends, which is the parser's input side. */
-type ClientInput<TInput extends ChainInput> = TInput extends z.ZodType ? z.input<TInput> : void;
+type ClientInput<TInput extends ChainInput> = TInput extends z.ZodType
+  ? z.input<TInput>
+  : undefined;
 
 type ProcedureDef<TInput extends ChainInput, TOutput> = {
   input: ClientInput<TInput>;

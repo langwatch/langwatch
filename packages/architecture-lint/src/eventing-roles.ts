@@ -55,8 +55,11 @@ function workspacePath(root: string, path: string): string {
 
 function roleOf(file: string): EventingRole | null {
   if (PROJECTION_FILE.test(file)) return "projection";
+
   if (SUBSCRIBER_FILE.test(file)) return "subscriber";
+
   if (PROCESS_MANAGER_FILE.test(file) || PROCESS_SERVICE_MASQUERADE.test(file)) return "process";
+
   return null;
 }
 
@@ -66,9 +69,11 @@ function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
 
 function callName(expression: ts.LeftHandSideExpression): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
+
   if (ts.isPropertyAccessExpression(expression) || ts.isPropertyAccessChain(expression)) {
     return expression.name.text;
   }
+
   return null;
 }
 
@@ -94,6 +99,7 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
     const line = lineOf(sourceFile, node);
     const key = policy;
     if (seen.has(key)) return;
+
     seen.add(key);
     violations.push({ policy, file, line, message, allowed });
   };
@@ -154,6 +160,7 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
             : "Represent delayed or external work as a durable wake or intent.",
         );
       }
+
       if (name && DURABLE_EVENT_CALLS.has(name)) {
         add(
           "eventing-durable-event-path",
@@ -164,6 +171,7 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
             : "Invoke the owning feature command/pipeline; only command handlers append new durable events.",
         );
       }
+
       if (
         node.expression.kind === ts.SyntaxKind.ImportKeyword &&
         (role === "projection" || role === "process")
@@ -180,6 +188,7 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
+
   return violations;
 }
 
@@ -201,12 +210,14 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
  */
 function subscriberRedeliveryTest(file: string): string {
   const subject = basename(file, ".ts");
+
   return join(dirname(file), "__tests__", `${subject}.redelivery.test.ts`);
 }
 
 function lintStrictSubscriberTest(file: string, pkg: ClassifiedPackage): ArchitectureViolation[] {
   const expected = subscriberRedeliveryTest(file);
   if (existsSync(expected)) return [];
+
   return [
     {
       policy: "eventing-subscriber-idempotency",
@@ -239,10 +250,13 @@ export function lintEventingRoles(
   for (const scanRoot of new Set(scanRoots)) {
     for (const file of walkFiles(scanRoot, (candidate) => candidate.endsWith(".ts"))) {
       if (/(?:^|\/)(?:__tests__|tests|fixtures)(?:\/|$)/.test(file)) continue;
+
       const role = roleOf(file);
       if (!role) continue;
+
       violations.push(...lintRoleFile(file, role));
       if (role !== "subscriber") continue;
+
       const pkg = packageByFile.find(
         (candidate) => file === candidate.root || file.startsWith(`${candidate.root}${sep}`),
       );
@@ -251,5 +265,6 @@ export function lintEventingRoles(
       }
     }
   }
+
   return violations;
 }

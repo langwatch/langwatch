@@ -134,6 +134,7 @@ const BROWSER_CAPABILITY_SOURCE: ReadonlyArray<readonly [RegExp, string]> = [
 
 function isWithin(root: string, path: string): boolean {
   const pathFromRoot = relative(root, path);
+
   return !(
     pathFromRoot === ".." ||
     pathFromRoot.startsWith(`..${sep}`) ||
@@ -158,7 +159,9 @@ function resolveUiSourceImport(sourceImport: SourceImport, sourceRoot: string): 
     specifier: sourceImport.specifier,
   });
   if (relativeTarget) return relativeTarget;
+
   if (!/^(?:~|@)\//.test(sourceImport.specifier)) return void 0;
+
   return resolveSourceCandidate({
     candidate: resolve(sourceRoot, sourceImport.specifier.slice(2)),
   });
@@ -213,8 +216,10 @@ function readUiFeatureCatalogue(root: string): {
         message: `Governed web package names must be unique; ${JSON.stringify(packageName)} is repeated.`,
       });
     }
+
     governedWebPackages.add(packageName);
   }
+
   for (const feature of result.data.features) {
     if (identifiers.has(feature.id)) {
       violations.push({
@@ -223,6 +228,7 @@ function readUiFeatureCatalogue(root: string): {
         message: `UI feature identifiers must be unique; ${JSON.stringify(feature.id)} is repeated.`,
       });
     }
+
     if (roots.has(feature.root)) {
       violations.push({
         policy: "ui-feature-catalogue",
@@ -230,26 +236,33 @@ function readUiFeatureCatalogue(root: string): {
         message: `UI feature roots must be unique; ${JSON.stringify(feature.root)} is repeated.`,
       });
     }
+
     identifiers.add(feature.id);
     roots.add(feature.root);
   }
+
   return { catalogue: result.data, violations };
 }
 
 function exportTarget(value: unknown): string | undefined {
   if (typeof value === "string") return value;
+
   if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+
   const record = value as Record<string, unknown>;
   for (const key of ["default", "import", "types", "node"]) {
     const target = exportTarget(record[key]);
     if (target) return target;
   }
+
   return void 0;
 }
 
 function packageExports(pkg: WebPackage): Map<string, string> {
   if (!pkg.manifest.exports || typeof pkg.manifest.exports !== "object") return new Map();
+
   if (Array.isArray(pkg.manifest.exports)) return new Map();
+
   return new Map(
     Object.entries(pkg.manifest.exports as Record<string, unknown>)
       .map(([path, target]) => [path, exportTarget(target)] as const)
@@ -271,9 +284,11 @@ function capabilityForSpecifier(
     )
     .sort((left, right) => right.name.length - left.name.length)[0];
   if (!pkg || specifier === pkg.name) return void 0;
+
   const exportPath = `./${specifier.slice(pkg.name.length + 1)}`;
   const match = exportPath.match(/^\.\/(screens|surfaces)\/([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/);
   if (!match) return void 0;
+
   return {
     packageName: pkg.name,
     exportPath,
@@ -296,6 +311,7 @@ function webPackageForSpecifier(
 function featureForFile(uiFeaturesRoot: string, file: string): string | undefined {
   const path = relative(uiFeaturesRoot, file).split(sep);
   if (path.length < 2 || path[0] === ".." || path[0] === "catalogue.json") return void 0;
+
   return path[0];
 }
 
@@ -318,12 +334,15 @@ function uiFeatureModuleForFile(uiFeaturesRoot: string, file: string): UiFeature
   if (segments.length === 1 && first === "index.ts") {
     return { kind: "entry", feature };
   }
+
   if (first === "model" || first === "behavior") {
     return { kind: "implementation", feature, layer: first };
   }
+
   if (first === "ui" && second !== void 0 && WEB_UI_LAYERS.has(second)) {
     return { kind: "implementation", feature, layer: "ui", uiLayer: second };
   }
+
   return void 0;
 }
 
@@ -337,6 +356,7 @@ function canUiLayerDependOn(sourceLayer: string, targetLayer: string): boolean {
 
 function canUiFeatureDependOn(source: UiFeatureModule, target: UiFeatureModule): boolean {
   if (source.kind === "entry") return target.kind === "implementation";
+
   if (target.kind === "entry") return false;
 
   return canUiLayerDependOn(uiFeatureLayer(source), uiFeatureLayer(target));
@@ -345,7 +365,9 @@ function canUiFeatureDependOn(source: UiFeatureModule, target: UiFeatureModule):
 function uiGlobalLayerForFile(sourceRoot: string, file: string): string | undefined {
   const [first, second] = relative(sourceRoot, file).split(sep);
   if (first === "model" || first === "behavior") return first;
+
   if (first === "ui" && second !== void 0 && WEB_UI_LAYERS.has(second)) return second;
+
   return void 0;
 }
 
@@ -357,6 +379,7 @@ function isForbiddenUiSpecifier(specifier: string): string | undefined {
   if (NODE_BUILTIN_SPECIFIERS.has(specifier)) {
     return "a Node.js builtin";
   }
+
   if (
     /^@langwatch\/(?:[^/]+-server|platform-api|server|worker)(?:\/|$)/.test(specifier) ||
     /^@langwatch\/prisma-client(?:\/|$)/.test(specifier) ||
@@ -364,9 +387,11 @@ function isForbiddenUiSpecifier(specifier: string): string | undefined {
   ) {
     return "server, API, worker, or Prisma implementation";
   }
+
   if (/^(?:@app|@ee)(?:\/|$)/.test(specifier) || /(?:^|\/)platform\/app(?:\/|$)/.test(specifier)) {
     return "legacy platform/app implementation";
   }
+
   if (
     /^(?:~|@)\/(?:server|env)(?:\/|$)/.test(specifier) ||
     /^(?:~|@)\/utils\/env(?:\/|$)/.test(specifier) ||
@@ -374,6 +399,7 @@ function isForbiddenUiSpecifier(specifier: string): string | undefined {
   ) {
     return "environment module";
   }
+
   return void 0;
 }
 
@@ -528,7 +554,9 @@ function collaboratingSurfaceImport({
     /^(@langwatch\/[a-z0-9-]+-web)\/surfaces\/([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/,
   );
   if (!door || door[1] === ownPackageName) return false;
+
   const target = webPackages.find((candidate) => candidate.name === door[1]);
+
   return target === void 0 || packageExports(target).has(`./surfaces/${door[2]!}`);
 }
 
@@ -542,20 +570,27 @@ function forbiddenWebPresentationImport({
   collaboratingSurface?: (specifier: string) => boolean;
 }): string | undefined {
   if (isScreenPortableTransport(specifier)) return void 0;
+
   const forbiddenUiSpecifier = isForbiddenUiSpecifier(specifier);
   if (forbiddenUiSpecifier) return forbiddenUiSpecifier;
+
   const forbiddenCapability = forbiddenBrowserCapabilityImport(specifier);
   if (forbiddenCapability) return forbiddenCapability;
+
   if (/^(?:~|@)\//.test(specifier) || specifier.startsWith("#")) {
     return "an application or package source alias";
   }
+
   if (/^@langwatch\/[^/]+-web(?:\/|$)/.test(specifier)) {
     if (collaboratingSurface?.(specifier)) return void 0;
+
     return "a feature-web public entry";
   }
+
   if (specifier.startsWith("@langwatch/") && !isPortableFirstPartyImport({ specifier, portable })) {
     return "a first-party implementation package instead of a portable module, a contract, or the Design System";
   }
+
   return void 0;
 }
 
@@ -568,6 +603,7 @@ function forbiddenFrontendFeatureImport({
 }): string | undefined {
   const forbiddenCapability = forbiddenBrowserCapabilityImport(specifier);
   if (forbiddenCapability) return forbiddenCapability;
+
   const declaredWebCapability = /^@langwatch\/[^/]+-web(?:\/|$)/.test(specifier);
 
   if (
@@ -577,18 +613,22 @@ function forbiddenFrontendFeatureImport({
   ) {
     return "a first-party implementation package outside platform or a declared web capability";
   }
+
   return void 0;
 }
 
 function isLegacyApplicationRelativeImport(root: string, file: string, specifier: string): boolean {
   if (!specifier.startsWith(".")) return false;
+
   const target = resolve(dirname(file), specifier);
+
   return isWithin(join(root, "platform", "app"), target);
 }
 
 function lintUiRootDirectories(root: string): ArchitectureViolation[] {
   const sourceRoot = join(root, "apps", "ui", "src");
   if (!existsSync(sourceRoot)) return [];
+
   return sourceFiles(sourceRoot).flatMap((file) => {
     const segments = relative(sourceRoot, file).split(sep);
     const isPackageEntry =
@@ -596,6 +636,7 @@ function lintUiRootDirectories(root: string): ArchitectureViolation[] {
     if (isPackageEntry || (segments.length > 1 && UI_SOURCE_DIRECTORIES.has(segments[0]!))) {
       return [];
     }
+
     return [
       {
         policy: "ui-root-catch-all",
@@ -643,6 +684,7 @@ function lintUiFeatureRoots(root: string, catalogue: UiFeatureCatalogue): Archit
       });
     }
   }
+
   for (const file of sourceFiles(featuresRoot)) {
     const owner = featureForFile(featuresRoot, file);
     if (owner && !declaredRoots.has(owner)) {
@@ -653,6 +695,7 @@ function lintUiFeatureRoots(root: string, catalogue: UiFeatureCatalogue): Archit
       });
     }
   }
+
   return violations;
 }
 
@@ -675,15 +718,18 @@ function lintUiFeatureStructure(root: string): ArchitectureViolation[] {
       });
       continue;
     }
+
     if (module.kind === "entry") continue;
 
     for (const sourceImport of moduleImports({ file: file })) {
       if (sourceImport.nonLiteral) continue;
+
       const target = resolveUiSourceImport(sourceImport, sourceRoot);
       if (!target || !isWithin(featuresRoot, target)) continue;
 
       const targetFeature = featureForFile(featuresRoot, target);
       if (targetFeature !== feature) continue;
+
       const targetModule = uiFeatureModuleForFile(featuresRoot, target);
       if (!targetModule || canUiFeatureDependOn(module, targetModule)) continue;
 
@@ -726,6 +772,7 @@ function lintDeclaredCapabilities(
           });
           continue;
         }
+
         if (!governedWebPackages.has(pkg.name)) {
           violations.push({
             policy: "ui-web-package-governance",
@@ -736,6 +783,7 @@ function lintDeclaredCapabilities(
               "Add the package to governedWebPackages before a frontend feature consumes it.",
           });
         }
+
         if (capability.kind !== kind) {
           violations.push({
             policy: "ui-web-capability-declaration",
@@ -744,6 +792,7 @@ function lintDeclaredCapabilities(
             message: `Declared ${kind} capability names a ${capability.kind} export.`,
           });
         }
+
         if (capability.kind === "screen" && capability.id !== feature.id) {
           violations.push({
             policy: "ui-screen-owner",
@@ -755,6 +804,7 @@ function lintDeclaredCapabilities(
       }
     }
   }
+
   return violations;
 }
 
@@ -764,6 +814,7 @@ function lintGovernedWebPackages(
   webPackages: readonly WebPackage[],
 ): ArchitectureViolation[] {
   const knownPackageNames = new Set(webPackages.map((pkg) => pkg.name));
+
   return catalogue.governedWebPackages.flatMap((packageName) =>
     knownPackageNames.has(packageName)
       ? []
@@ -784,6 +835,7 @@ function lintWebPublicExports(webPackages: readonly WebPackage[]): ArchitectureV
     const exports = packageExports(pkg);
     for (const [exportPath, target] of exports) {
       if (isTestOnlyExportTarget(target)) continue;
+
       const capability = capabilityForSpecifier(webPackages, `${pkg.name}/${exportPath.slice(2)}`);
       if (!capability) {
         violations.push({
@@ -797,6 +849,7 @@ function lintWebPublicExports(webPackages: readonly WebPackage[]): ArchitectureV
       }
     }
   }
+
   return violations;
 }
 
@@ -821,6 +874,7 @@ function lintUiSourceBoundaries(
     if (importerFeature) {
       for (const capability of browserCapabilitySourceViolations(source)) {
         if (capability === "AppRouter" || capability === "process.env") continue;
+
         violations.push({
           policy: "ui-browser-capability",
           file,
@@ -839,6 +893,7 @@ function lintUiSourceBoundaries(
           "Browser UI may not reference AppRouter; define portable transport contracts instead.",
       });
     }
+
     if (/\bprocess\.env\b/.test(code)) {
       violations.push({
         policy: "ui-backend-access",
@@ -860,6 +915,7 @@ function lintUiSourceBoundaries(
         });
         continue;
       }
+
       const forbidden =
         isForbiddenUiSpecifier(sourceImport.specifier) ??
         (isLegacyApplicationRelativeImport(root, file, sourceImport.specifier)
@@ -902,6 +958,7 @@ function lintUiSourceBoundaries(
           allowed: "Import a portable workspace package through its public export.",
         });
       }
+
       if (target && isWithin(sourceRoot, target)) {
         const [importerArea = ""] = relative(sourceRoot, file).split(sep);
         const [targetArea = ""] = relative(sourceRoot, target).split(sep);
@@ -923,6 +980,7 @@ function lintUiSourceBoundaries(
               "Global UI layers may not import private frontend features or composition boundaries.",
           });
         }
+
         if (privateFeatureImportsCompositionBoundary) {
           violations.push({
             policy: "ui-dependency-direction",
@@ -932,6 +990,7 @@ function lintUiSourceBoundaries(
             message: "A private frontend feature may not import a composition boundary.",
           });
         }
+
         if (
           importerGlobalLayer !== void 0 &&
           targetGlobalLayer !== void 0 &&
@@ -946,6 +1005,7 @@ function lintUiSourceBoundaries(
             allowed: "Keep dependencies flowing from model to behavior to the allowed UI layers.",
           });
         }
+
         if (importerFeatureRoot) {
           const targetFeatureRoot = featureForFile(featuresRoot, target);
           if (targetFeatureRoot && targetFeatureRoot !== importerFeatureRoot) {
@@ -966,6 +1026,7 @@ function lintUiSourceBoundaries(
 
       const webPackage = webPackageForSpecifier(webPackages, sourceImport.specifier);
       if (!webPackage) continue;
+
       if (!governedWebPackages.has(webPackage.name)) {
         violations.push({
           policy: "ui-web-package-governance",
@@ -977,6 +1038,7 @@ function lintUiSourceBoundaries(
         });
         continue;
       }
+
       const capability = capabilityForSpecifier(webPackages, sourceImport.specifier);
       if (!capability) {
         violations.push({
@@ -988,6 +1050,7 @@ function lintUiSourceBoundaries(
         });
         continue;
       }
+
       const exports = packageExports(webPackage);
       if (!exports.has(capability.exportPath)) {
         violations.push({
@@ -998,6 +1061,7 @@ function lintUiSourceBoundaries(
           message: `Import is not an explicit export of ${webPackage.name}.`,
         });
       }
+
       if (!importerFeature) {
         violations.push({
           policy: "ui-web-capability-owner",
@@ -1008,6 +1072,7 @@ function lintUiSourceBoundaries(
         });
         continue;
       }
+
       const declared = declaredUses(importerFeature);
       if (!declared.has(sourceImport.specifier)) {
         violations.push({
@@ -1020,6 +1085,7 @@ function lintUiSourceBoundaries(
             "Add the exact public import to uses.screens or uses.surfaces in apps/ui/src/features/catalogue.json.",
         });
       }
+
       if (capability.kind === "screen" && capability.id !== importerFeature.id) {
         violations.push({
           policy: "ui-screen-owner",
@@ -1031,6 +1097,7 @@ function lintUiSourceBoundaries(
             "Screens are owner-only. Import a declared surface for cross-feature presentation.",
         });
       }
+
       if (
         capability.kind === "screen" &&
         !importerFeature.uses.screens.includes(sourceImport.specifier)
@@ -1043,6 +1110,7 @@ function lintUiSourceBoundaries(
           message: "A screen must be declared in uses.screens, not uses.surfaces.",
         });
       }
+
       if (
         capability.kind === "surface" &&
         !importerFeature.uses.surfaces.includes(sourceImport.specifier)
@@ -1073,16 +1141,19 @@ function lintUiSourceBoundaries(
     }
   };
   for (const feature of featureEdges.keys()) visit(feature, feature, new Set([feature]));
+
   return violations;
 }
 
 function surfaceIdForPath(packageSourceRoot: string, file: string): string | undefined {
   const segments = relative(packageSourceRoot, file).split(sep);
+
   return segments[0] === "surfaces" ? segments[1] : void 0;
 }
 
 function forbiddenSurfaceDirectory(packageSourceRoot: string, file: string): string | undefined {
   const segments = relative(packageSourceRoot, file).split(sep);
+
   return segments.find((segment) => SURFACE_FORBIDDEN_DIRECTORIES.has(segment));
 }
 
@@ -1096,8 +1167,10 @@ function lintWebScreenClosures(
     const sourceRoot = join(pkg.root, "src");
     for (const [exportPath, target] of packageExports(pkg)) {
       if (isTestOnlyExportTarget(target)) continue;
+
       const capability = capabilityForSpecifier(webPackages, `${pkg.name}/${exportPath.slice(2)}`);
       if (!capability || capability.kind !== "screen") continue;
+
       const entry = resolve(pkg.root, target);
       if (!isWithin(sourceRoot, entry) || !existsSync(entry)) {
         violations.push({
@@ -1108,11 +1181,13 @@ function lintWebScreenClosures(
         });
         continue;
       }
+
       const pending = [entry];
       const visited = new Set<string>();
       while (pending.length > 0) {
         const current = pending.pop()!;
         if (visited.has(current)) continue;
+
         visited.add(current);
         const currentSource = readFileSync(current, "utf8");
         for (const browserCapability of browserCapabilitySourceViolations(currentSource)) {
@@ -1124,6 +1199,7 @@ function lintWebScreenClosures(
             allowed: "Receive browser data and actions from its owning frontend feature.",
           });
         }
+
         for (const sourceImport of moduleImports({ file: current })) {
           if (sourceImport.nonLiteral) {
             violations.push({
@@ -1135,6 +1211,7 @@ function lintWebScreenClosures(
             });
             continue;
           }
+
           const forbiddenImport =
             forbiddenWebPresentationImport({ specifier: sourceImport.specifier, portable }) ??
             (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
@@ -1149,11 +1226,13 @@ function lintWebScreenClosures(
               message: `An owner-only screen may not import ${forbiddenImport}.`,
             });
           }
+
           const targetFile = resolveRelativeModule({
             file: sourceImport.file,
             specifier: sourceImport.specifier,
           });
           if (!targetFile) continue;
+
           if (!isWithin(sourceRoot, targetFile)) {
             violations.push({
               policy: "ui-screen-closure",
@@ -1165,11 +1244,13 @@ function lintWebScreenClosures(
             });
             continue;
           }
+
           pending.push(targetFile);
         }
       }
     }
   }
+
   return violations;
 }
 
@@ -1184,8 +1265,10 @@ function lintWebSurfaceClosures(
     const sourceRoot = join(pkg.root, "src");
     for (const [exportPath, target] of exports) {
       if (isTestOnlyExportTarget(target)) continue;
+
       const capability = capabilityForSpecifier(webPackages, `${pkg.name}/${exportPath.slice(2)}`);
       if (!capability || capability.kind !== "surface") continue;
+
       const entry = resolve(pkg.root, target);
       if (!isWithin(sourceRoot, entry) || !existsSync(entry)) {
         violations.push({
@@ -1196,6 +1279,7 @@ function lintWebSurfaceClosures(
         });
         continue;
       }
+
       const surfaceRoot = join(sourceRoot, "surfaces", capability.id);
       // A surface is the public door onto the package's own implementation, not a
       // second copy of it. The door may reach the package's shared model, behavior
@@ -1213,6 +1297,7 @@ function lintWebSurfaceClosures(
         const currentNode = pending.pop()!;
         const { file: current, chain } = currentNode;
         if (visited.has(current)) continue;
+
         visited.add(current);
         const currentSource = readFileSync(current, "utf8");
         for (const capability of browserCapabilitySourceViolations(currentSource)) {
@@ -1224,6 +1309,7 @@ function lintWebSurfaceClosures(
             allowed: "Receive portable values and controlled actions from the consuming feature.",
           });
         }
+
         const forbidden = forbiddenSurfaceDirectory(sourceRoot, current);
         const surfaceId = surfaceIdForPath(sourceRoot, current);
         const escapedSurface = !implementationRoots.some((root) => isWithin(root, current));
@@ -1245,6 +1331,7 @@ function lintWebSurfaceClosures(
           });
           continue;
         }
+
         for (const sourceImport of moduleImports({ file: current })) {
           if (sourceImport.nonLiteral) {
             violations.push({
@@ -1256,6 +1343,7 @@ function lintWebSurfaceClosures(
             });
             continue;
           }
+
           const forbiddenImport =
             forbiddenWebPresentationImport({
               specifier: sourceImport.specifier,
@@ -1279,11 +1367,13 @@ function lintWebSurfaceClosures(
               message: `A shareable surface may not import ${forbiddenImport}.`,
             });
           }
+
           const targetFile = resolveRelativeModule({
             file: sourceImport.file,
             specifier: sourceImport.specifier,
           });
           if (!targetFile) continue;
+
           if (!isWithin(sourceRoot, targetFile)) {
             violations.push({
               policy: "ui-surface-closure",
@@ -1295,11 +1385,13 @@ function lintWebSurfaceClosures(
             });
             continue;
           }
+
           pending.push({ file: targetFile, chain: [...chain, targetFile] });
         }
       }
     }
   }
+
   return violations;
 }
 
@@ -1320,10 +1412,14 @@ function webPrivateModuleForFile(sourceRoot: string, file: string): WebPrivateMo
   const segments = relative(sourceRoot, file).split(sep);
   const [first, second, third, fourth] = segments;
   if (segments.length === 1 && isWebRootException(file)) return { kind: "package-entry" };
+
   if (first === "screens") return { kind: "screen" };
+
   if (first === "surfaces") return { kind: "surface" };
+
   if (first === "features" && second && WEB_FEATURE_NAME.test(second)) {
     if (third === "index.ts") return { kind: "feature-entry", feature: second };
+
     if (
       (third === "model" || third === "behavior" || third === "ui") &&
       (third !== "ui" || (fourth !== void 0 && WEB_UI_LAYERS.has(fourth)))
@@ -1335,8 +1431,10 @@ function webPrivateModuleForFile(sourceRoot: string, file: string): WebPrivateMo
         uiLayer: third === "ui" ? fourth : void 0,
       };
     }
+
     return void 0;
   }
+
   if (
     (first === "model" || first === "behavior" || first === "ui") &&
     (first !== "ui" || (second !== void 0 && WEB_UI_LAYERS.has(second)))
@@ -1347,11 +1445,13 @@ function webPrivateModuleForFile(sourceRoot: string, file: string): WebPrivateMo
       uiLayer: first === "ui" ? second : void 0,
     };
   }
+
   return void 0;
 }
 
 function isWebRootException(file: string): boolean {
   const name = relative(dirname(file), file);
+
   return (
     /^(?:index|testing)\.[cm]?[jt]sx?$/.test(name) ||
     /^[a-z0-9-]+\.config\.[cm]?[jt]sx?$/.test(name)
@@ -1369,6 +1469,7 @@ function readWebFeatureDeclarations(sourceRoot: string): {
 
   for (const entry of readdirSync(featuresRoot, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
+
     const featureRoot = join(featuresRoot, entry.name);
     const declarationPath = join(featureRoot, "feature.json");
     if (!WEB_FEATURE_NAME.test(entry.name)) {
@@ -1379,6 +1480,7 @@ function readWebFeatureDeclarations(sourceRoot: string): {
       });
       continue;
     }
+
     if (!existsSync(declarationPath)) {
       violations.push({
         policy: "ui-web-feature-declaration",
@@ -1389,6 +1491,7 @@ function readWebFeatureDeclarations(sourceRoot: string): {
       });
       continue;
     }
+
     let parsed: unknown;
     try {
       parsed = JSON.parse(readFileSync(declarationPath, "utf8"));
@@ -1400,6 +1503,7 @@ function readWebFeatureDeclarations(sourceRoot: string): {
       });
       continue;
     }
+
     const result = webFeatureDeclarationSchema.safeParse(parsed);
     if (!result.success) {
       violations.push({
@@ -1409,6 +1513,7 @@ function readWebFeatureDeclarations(sourceRoot: string): {
       });
       continue;
     }
+
     if (new Set(result.data.dependencies).size !== result.data.dependencies.length) {
       violations.push({
         policy: "ui-web-feature-declaration",
@@ -1416,6 +1521,7 @@ function readWebFeatureDeclarations(sourceRoot: string): {
         message: "Web feature dependencies must not repeat a feature name.",
       });
     }
+
     if (result.data.dependencies.includes(entry.name)) {
       violations.push({
         policy: "ui-web-feature-declaration",
@@ -1423,8 +1529,10 @@ function readWebFeatureDeclarations(sourceRoot: string): {
         message: `Web feature ${JSON.stringify(entry.name)} may not depend on itself.`,
       });
     }
+
     declarations.set(entry.name, result.data);
   }
+
   for (const [feature, declaration] of declarations) {
     for (const dependency of declaration.dependencies) {
       if (!declarations.has(dependency)) {
@@ -1436,6 +1544,7 @@ function readWebFeatureDeclarations(sourceRoot: string): {
       }
     }
   }
+
   return { declarations, violations };
 }
 
@@ -1452,6 +1561,7 @@ function canPrivateLayerDependOn(
     blocks: ["model", "elements", "blocks"],
     sections: ["model", "behavior", "elements", "blocks", "sections"],
   };
+
   return Boolean(
     sourceLayer !== void 0 && targetLayer !== void 0 && allowed[sourceLayer]?.includes(targetLayer),
   );
@@ -1462,6 +1572,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
   for (const pkg of webPackages) {
     const sourceRoot = join(pkg.root, "src");
     if (!existsSync(sourceRoot)) continue;
+
     const { declarations, violations: declarationViolations } =
       readWebFeatureDeclarations(sourceRoot);
     violations.push(...declarationViolations);
@@ -1485,6 +1596,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
             "Use package-global model, behavior, or ui; a named private feature; or a public screen or surface boundary.",
         });
       }
+
       if (segments[0] === "components") {
         violations.push({
           policy: "ui-web-root-components",
@@ -1493,6 +1605,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
           allowed: "Put UI in package-global ui or in the owning named private feature.",
         });
       }
+
       if (!module) {
         violations.push({
           policy: "ui-web-private-layout",
@@ -1502,12 +1615,15 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
         });
         continue;
       }
+
       if (module.kind === "package-entry") continue;
 
       for (const sourceImport of moduleImports({ file: file })) {
         if (sourceImport.nonLiteral) continue;
+
         const targetFile = resolveUiSourceImport(sourceImport, sourceRoot);
         if (!targetFile || !isWithin(sourceRoot, targetFile)) continue;
+
         const target = webPrivateModuleForFile(sourceRoot, targetFile);
         if (!target) {
           violations.push({
@@ -1520,6 +1636,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
           });
           continue;
         }
+
         if (
           (module.kind === "global" ||
             module.kind === "feature" ||
@@ -1536,6 +1653,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
           });
           continue;
         }
+
         // A door is the package's own front step onto its shared implementation,
         // so it reaches the global model, behavior and ui layers the same way the
         // surface closure walk admits them. What stays out is a package-private
@@ -1550,6 +1668,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
           });
           continue;
         }
+
         if (module.kind === "screen" && target.kind === "screen") {
           const sourceScreen = relative(sourceRoot, file).split(sep)[1];
           const targetScreen = relative(sourceRoot, targetFile).split(sep)[1];
@@ -1565,6 +1684,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
             continue;
           }
         }
+
         if (
           module.kind === "global" &&
           (target.kind === "feature" || target.kind === "feature-entry")
@@ -1579,6 +1699,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
           });
           continue;
         }
+
         if (
           module.kind === "feature-entry" &&
           ((target.kind === "feature" && target.feature !== module.feature) ||
@@ -1595,8 +1716,10 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
           });
           continue;
         }
+
         if (module.kind === "feature" && target.kind === "feature-entry") {
           if (module.feature === target.feature) continue;
+
           if (module.layer !== "ui" || module.uiLayer !== "sections") {
             violations.push({
               policy: "ui-web-feature-layer-dependency",
@@ -1608,6 +1731,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
               allowed: "Promote lower-level reuse to package-global model, behavior, or ui.",
             });
           }
+
           const declaration = declarations.get(module.feature);
           if (!declaration?.dependencies.includes(target.feature)) {
             violations.push({
@@ -1619,11 +1743,13 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
               allowed: `Add ${JSON.stringify(target.feature)} to features/${module.feature}/feature.json dependencies.`,
             });
           }
+
           const edges = featureEdges.get(module.feature) ?? new Set<string>();
           edges.add(target.feature);
           featureEdges.set(module.feature, edges);
           continue;
         }
+
         if (
           module.kind === "feature" &&
           target.kind === "feature" &&
@@ -1642,6 +1768,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
           featureEdges.set(module.feature, edges);
           continue;
         }
+
         if (
           (module.kind === "global" || module.kind === "feature") &&
           (target.kind === "global" || target.kind === "feature") &&
@@ -1688,15 +1815,19 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
       }
 
       if (lowLinks.get(feature) !== indices.get(feature)) return;
+
       const component: string[] = [];
       let member: string | undefined;
       do {
         member = stack.pop();
         if (member === void 0) break;
+
         onStack.delete(member);
         component.push(member);
       } while (member !== feature);
+
       if (component.length < 2) return;
+
       const cycle = component.sort();
       violations.push({
         policy: "ui-web-feature-cycle",
@@ -1709,6 +1840,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
       if (!indices.has(feature)) visit(feature);
     }
   }
+
   return violations;
 }
 
@@ -1718,12 +1850,14 @@ export function lintFrontendUiBoundaries(
 ): ArchitectureViolation[] {
   const { catalogue, violations } = readUiFeatureCatalogue(root);
   if (!catalogue) return violations;
+
   const webPackages = packages.filter(
     (pkg): pkg is WebPackage => pkg.kind === "web" && pkg.feature !== void 0,
   );
   const selectedPackageNames = new Set(catalogue.governedWebPackages);
   const selectedWebPackages = webPackages.filter((pkg) => selectedPackageNames.has(pkg.name));
   const portable = createPortableModuleOracle({ root });
+
   return [
     ...violations,
     ...lintUiRootDirectories(root),

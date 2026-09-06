@@ -72,10 +72,12 @@ function hasOnlyExportedAbstractPortClasses(path: string): boolean {
     if (!named || !statement.name?.text.endsWith("Port")) {
       continue;
     }
+
     const modifiers = statement.modifiers ?? [];
     if (!modifiers.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
       continue;
     }
+
     hasPort = true;
     if (
       !ts.isClassDeclaration(statement) ||
@@ -84,6 +86,7 @@ function hasOnlyExportedAbstractPortClasses(path: string): boolean {
       return false;
     }
   }
+
   return hasPort;
 }
 
@@ -153,6 +156,7 @@ export function lintStrictPortBaseline(
         "Commit the reviewed baseline once, then future merge-base checks may only shrink it.",
     });
   }
+
   if (!baselineReference) {
     return { violations, bootstrapped: false };
   }
@@ -162,6 +166,7 @@ export function lintStrictPortBaseline(
   if (!reference.exists) {
     return { violations, bootstrapped: current.exists };
   }
+
   const referencePorts = new Set(reference.ports);
   for (const port of current.ports) {
     if (!referencePorts.has(port)) {
@@ -173,6 +178,7 @@ export function lintStrictPortBaseline(
       });
     }
   }
+
   return { violations, bootstrapped: false };
 }
 
@@ -193,6 +199,7 @@ export function lintStrictPortModules(
     if (pkg.kind !== "server" || pkg.layoutVersion !== 0) {
       continue;
     }
+
     for (const file of walkFiles(pkg.root, isStrictPort)) {
       const filePath = relative(root, file).replaceAll("\\", "/");
       seen.add(filePath);
@@ -206,8 +213,10 @@ export function lintStrictPortModules(
             allowed: "Delete the entry after converting the port to an abstract Port class.",
           });
         }
+
         continue;
       }
+
       if (!valid) {
         violations.push({
           policy: "strict-port-module",
@@ -231,6 +240,7 @@ export function lintStrictPortModules(
       });
     }
   }
+
   return violations;
 }
 

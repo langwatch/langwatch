@@ -48,6 +48,7 @@ function normalise(value: string): string {
 
 function subjectForms(subject: string): readonly string[] {
   const singular = normalise(subject);
+
   return [
     singular,
     `${singular}s`,
@@ -65,6 +66,7 @@ function sourceSegments(path: string): readonly string[] {
 
 function remnantKind(file: string): LegacyFeatureFragmentKind {
   if (file.includes("/runtime/")) return "composition";
+
   if (
     file.includes("/app/api/") ||
     file.includes("/server/api/routers/") ||
@@ -72,12 +74,15 @@ function remnantKind(file: string): LegacyFeatureFragmentKind {
   ) {
     return "transport";
   }
+
   if (file.includes("/components/") || file.includes("/hooks/") || file.includes("/pages/")) {
     return "page-shell";
   }
+
   if (/\.(?:adapter|client)\.[cm]?[jt]sx?$/.test(file)) {
     return "infrastructure-adapter";
   }
+
   return "legacy-implementation";
 }
 
@@ -124,6 +129,7 @@ export function collectLegacyFeatureFragments(
     const isProductionSource = SOURCE_FILE.test(path) && !TEST_SOURCE.test(path);
     const isNotTestDirectory =
       !path.includes(`${sep}__tests__${sep}`) && !path.includes(`${sep}__mocks__${sep}`);
+
     return isProductionSource && isNotTestDirectory;
   })) {
     const workspaceFile = workspacePath(root, file);
@@ -131,8 +137,10 @@ export function collectLegacyFeatureFragments(
     const matchingFeatures = new Set<string>();
     for (const owner of subjectOwners) {
       if (!segments.some((segment) => owner.forms.has(segment))) continue;
+
       matchingFeatures.add(owner.feature);
     }
+
     for (const feature of matchingFeatures) {
       fragments.push({
         feature,
@@ -153,7 +161,9 @@ export function formatLegacyFeatureFragmentBaseline(
   for (const [index, fragment] of sorted.entries()) {
     lines.push(`    ${JSON.stringify(fragment)}${index + 1 === sorted.length ? "" : ","}`);
   }
+
   lines.push("  ]", "}");
+
   return `${lines.join("\n")}\n`;
 }
 
@@ -163,6 +173,7 @@ function readBaseline(root: string): {
 } {
   const path = join(root, BASELINE_PATH);
   if (!existsSync(path)) return { baseline: [], violations: [] };
+
   let value: unknown;
   try {
     value = JSON.parse(readFileSync(path, "utf8"));
@@ -212,6 +223,7 @@ function readBaseline(root: string): {
       });
       continue;
     }
+
     baseline.push(entryResult.data);
   }
 
@@ -225,6 +237,7 @@ function readBaseline(root: string): {
         "Legacy feature fragment baseline entries must be sorted by feature, file, and kind.",
     });
   }
+
   const keys = baseline.map(fragmentFileKey);
   if (new Set(keys).size !== keys.length) {
     violations.push({
@@ -233,6 +246,7 @@ function readBaseline(root: string): {
       message: "Legacy feature fragment baseline contains duplicate feature/file entries.",
     });
   }
+
   return { baseline, violations };
 }
 
@@ -257,6 +271,7 @@ export function lintLegacyFeatureFragments(
   const baselineByKey = new Map(baseline.map((fragment) => [fragmentKey(fragment), fragment]));
   for (const fragment of actual) {
     if (baselineByKey.has(fragmentKey(fragment))) continue;
+
     violations.push({
       policy: "legacy-feature-fragment",
       file: join(root, fragment.file),
@@ -265,8 +280,10 @@ export function lintLegacyFeatureFragments(
         "Move the behaviour to the canonical feature package. A deliberate transport, composition module, page shell, or infrastructure adapter must be recorded explicitly while its inventory only shrinks.",
     });
   }
+
   for (const fragment of baseline) {
     if (actualByKey.has(fragmentKey(fragment))) continue;
+
     violations.push({
       policy: "legacy-feature-fragment-baseline",
       file: path,
@@ -274,5 +291,6 @@ export function lintLegacyFeatureFragments(
       allowed: "Delete the stale entry so the checked-in inventory only shrinks.",
     });
   }
+
   return violations;
 }

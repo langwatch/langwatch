@@ -5,8 +5,6 @@ import {
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
   SCIM_APPLY_RETIRED_EVENT_TYPE,
   SCIM_GROUP_MAPPED_EVENT_TYPE,
-  SCIM_SYNC_AGGREGATE_TYPE,
-  SCIM_SYNC_EVENT_VERSION_LATEST,
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
   SCIM_TOKEN_REVOKED_EVENT_TYPE,
   SCIM_USER_PUSHED_EVENT_TYPE,
@@ -14,8 +12,6 @@ import {
   scimApplyRecoveredPayloadSchema,
   scimApplyRetiredPayloadSchema,
   scimGroupMappedPayloadSchema,
-  type ScimSyncCommand,
-  type ScimSyncFactInput,
   type ScimSyncState,
   scimTokenIssuedPayloadSchema,
   scimTokenRevokedPayloadSchema,
@@ -23,10 +19,7 @@ import {
 } from "@langwatch/identity-contract";
 import {
   AbstractFoldProjection,
-  createTenantId,
-  eventIdempotencyKey,
   EventSchema,
-  EventUtils,
   type FoldEventHandlers,
   type StateProjectionStore,
 } from "@langwatch/eventing";

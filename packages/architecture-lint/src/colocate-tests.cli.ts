@@ -43,6 +43,7 @@ if (!write) {
   for (const move of plan.moves) {
     process.stdout.write(`would move  ${show(move.from)}\n         -> ${show(move.to)}\n`);
   }
+
   process.stdout.write(
     `\n${plan.moves.length} file(s) would move, ${plan.unresolved.length} left alone.\n`,
   );

@@ -17,11 +17,13 @@ const REQUIRED_SECTIONS = [
 
 function architectureRoot(pkg: ClassifiedPackage): string {
   if (pkg.feature) return dirname(pkg.root);
+
   return pkg.root;
 }
 
 function markdownFiles(path: string): string[] {
   if (!existsSync(path)) return [];
+
   return readdirSync(path)
     .filter((file) => file.endsWith(".md") && file !== "README.md")
     .sort();
@@ -32,6 +34,7 @@ function sectionBody(content: string, section: string): string | undefined {
   const match = content.match(
     new RegExp(`^#{2,3} ${escaped}\\s*$([\\s\\S]*?)(?=^#{2,3} |(?![\\s\\S]))`, "m"),
   );
+
   return match?.[1];
 }
 
@@ -43,6 +46,7 @@ export function lintArchitectureRecords(packages: ClassifiedPackage[]): Architec
   const roots = new Map<string, string | undefined>();
   for (const pkg of packages) {
     if (pkg.kind === "application") continue;
+
     const root = architectureRoot(pkg);
     if (!roots.has(root)) roots.set(root, pkg.feature);
   }
@@ -63,6 +67,7 @@ export function lintArchitectureRecords(packages: ClassifiedPackage[]): Architec
         message: "Every governed package ownership root must have an ADR index.",
       });
     }
+
     if (records.length === 0) {
       violations.push({
         policy: "architecture-record",
@@ -71,6 +76,7 @@ export function lintArchitectureRecords(packages: ClassifiedPackage[]): Architec
       });
       continue;
     }
+
     if (featureSpecs.length === 0) {
       violations.push({
         policy: "architecture-record",
@@ -81,6 +87,7 @@ export function lintArchitectureRecords(packages: ClassifiedPackage[]): Architec
 
     const boundaryName = records[0];
     if (!boundaryName) continue;
+
     const boundaryRecord = join(adrs, boundaryName);
     const content = readFileSync(boundaryRecord, "utf8");
     for (const section of REQUIRED_SECTIONS) {
@@ -93,6 +100,7 @@ export function lintArchitectureRecords(packages: ClassifiedPackage[]): Architec
         });
       }
     }
+
     if (!/\*\*Status:\*\*\s+\S+/.test(content)) {
       violations.push({
         policy: "architecture-record",
@@ -100,6 +108,7 @@ export function lintArchitectureRecords(packages: ClassifiedPackage[]): Architec
         message: "Boundary ADR must declare its status.",
       });
     }
+
     if (!/\.feature(?:\)|\s|$)/.test(content)) {
       violations.push({
         policy: "architecture-record",
@@ -107,6 +116,7 @@ export function lintArchitectureRecords(packages: ClassifiedPackage[]): Architec
         message: "Boundary ADR must link to its executable .feature contract.",
       });
     }
+
     if (existsSync(index)) {
       const indexContent = readFileSync(index, "utf8");
       if (!indexContent.includes(boundaryName)) {

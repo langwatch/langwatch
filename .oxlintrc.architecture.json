@@ -44,6 +44,34 @@
     },
 
     // ------------------------------------------------------------------
+    // DEBT REGISTER, langwatch/boolean-wall, packages/architecture-lint/src
+    // only. logical-statement-spacing (the sibling rule in the override
+    // above) auto-fixes cleanly and carries no register.
+    //
+    // Measured 2026-09-06: 48 boolean walls over 9 files, mostly TS-AST
+    // predicate helpers (isPropertyName, isBindingName, unwrap, and
+    // similar) that return one long && / || chain directly. Splitting
+    // each into named intermediate predicates is real refactoring, not a
+    // rename, so the 9 files are held here rather than switched off
+    // package-wide. The register can only shrink: name a predicate and
+    // delete the file's line.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "packages/architecture-lint/src/api-transport-boundaries.ts",
+        "packages/architecture-lint/src/global-app-access.ts",
+        "packages/architecture-lint/src/frontend-ui-boundaries.ts",
+        "packages/architecture-lint/src/service-projection-boundaries.ts",
+        "packages/architecture-lint/src/check-feature-parity.ts",
+        "packages/architecture-lint/src/test-colocation.ts",
+        "packages/architecture-lint/src/test-quality.ts",
+        "packages/architecture-lint/src/feature-layout.ts",
+        "packages/architecture-lint/src/api-transport-framework.ts"
+      ],
+      "rules": { "langwatch/boolean-wall": "off" }
+    },
+
+    // ------------------------------------------------------------------
     // CODE QUALITY, packages/** only.
     //
     // These arrived when packages/** had no general-purpose linter at all:
@@ -224,6 +252,12 @@
     //
     // Measured at the time of writing: 35 violations at max 4, 6 at
     // max 5, 0 at max 6.
+    //
+    // +2 files at 6 on 2026-09-06, from the paths widened into lint:oxlint
+    // the same day (see the tier-5 register below for the full path list) --
+    // 17 files total now. That widening also surfaced 5 files that nest to
+    // exactly 5, registered separately below rather than folded into this
+    // block, since 6 would over-grant them a level they don't need.
     // ------------------------------------------------------------------
     {
       "files": [
@@ -241,10 +275,34 @@
         "packages/features/trace/server/src/services/trace-attribute-cap.service.ts",
         "packages/features/trace/web/src/behavior/transcript/content-parser.ts",
         "packages/features/trace/web/src/model/prompt-attributes.ts",
-        "packages/features/trace/web/src/model/transcript/block-stack-items.ts"
+        "packages/features/trace/web/src/model/transcript/block-stack-items.ts",
+        "packages/architecture-lint/src/feature-layout.ts",
+        "packages/eventing/src/projections/projectionRouter.ts"
       ],
       "rules": {
         "max-depth": ["error", { "max": 6 }]
+      }
+    },
+
+    // DEBT REGISTER, max-depth, tier 5. Measured 2026-09-06 over the paths
+    // widened into lint:oxlint this change (packages/api/src,
+    // packages/eventing/src, packages/observability/src, packages/mail/src,
+    // packages/group-queue/src, packages/test-harness/src,
+    // packages/architecture-lint/src, sdks/typescript/src,
+    // mcp/typescript/src): 4 files nest to exactly 5 -- one level past the
+    // default 4 but not deep enough to need the 6 tier above. Same doctrine:
+    // unnest and delete the line. (A 5th file, packages/eventing/src/queues/memory.ts,
+    // was fixed directly instead of registered: its nesting came from a
+    // no-lonely-if violation collapsed in the same change.)
+    {
+      "files": [
+        "packages/architecture-lint/src/api-transport-boundaries.ts",
+        "packages/architecture-lint/src/check-feature-parity.ts",
+        "packages/architecture-lint/src/frontend-ui-boundaries.ts",
+        "packages/group-queue/src/groupQueue.ts"
+      ],
+      "rules": {
+        "max-depth": ["error", { "max": 5 }]
       }
     },
 
@@ -270,6 +328,13 @@
     // Web packages dominate the register (160 of the 213 are .tsx or
     // */web/*); they are burned down after the visual diff, server code
     // first.
+    //
+    // +36 functions in 32 files on 2026-09-06, from the paths widened into
+    // lint:oxlint the same day (packages/api/src, packages/eventing/src,
+    // packages/observability/src, packages/mail/src, packages/group-queue/src,
+    // packages/test-harness/src, packages/architecture-lint/src,
+    // sdks/typescript/src, mcp/typescript/src) -- 222 files, 249 functions
+    // total now.
     // ------------------------------------------------------------------
     {
       "files": [
@@ -393,7 +458,29 @@
         "packages/features/workflow/web/src/ui/sections/optimization_studio/publish.tsx",
         "packages/features/workflow/web/src/ui/sections/optimization_studio/use-post-event.tsx",
         "packages/features/workflow/web/src/ui/sections/workflow-base-properties-panel.tsx",
-        "packages/features/workflow/web/src/ui/sections/workflow-list-card.tsx"
+        "packages/features/workflow/web/src/ui/sections/workflow-list-card.tsx",
+        "packages/architecture-lint/src/check-feature-parity.ts",
+        "packages/architecture-lint/src/eventing-roles.ts",
+        "packages/architecture-lint/src/feature-layout.ts",
+        "packages/architecture-lint/src/global-app-access.ts",
+        "packages/eventing/src/projections/foldProjectionExecutor.ts",
+        "packages/eventing/src/projections/projectionRouter.ts",
+        "packages/group-queue/src/groupQueue.ts",
+        "sdks/typescript/src/agent/local-control-protocol.ts",
+        "sdks/typescript/src/cli/commands/agents/tunnel.ts",
+        "sdks/typescript/src/cli/commands/instrument.ts",
+        "sdks/typescript/src/cli/commands/langy/policy.ts",
+        "sdks/typescript/src/cli/commands/login.ts",
+        "sdks/typescript/src/cli/commands/push.ts",
+        "sdks/typescript/src/cli/commands/report.ts",
+        "sdks/typescript/src/cli/commands/simulation-runs/get.ts",
+        "sdks/typescript/src/cli/commands/status.ts",
+        "sdks/typescript/src/cli/commands/traces/export.ts",
+        "sdks/typescript/src/cli/utils/governance/login-flow.ts",
+        "sdks/typescript/src/cli/utils/governance/wrapper-path-choice.ts",
+        "sdks/typescript/src/client-sdk/services/evaluations/evaluations.facade.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/experiment.ts",
+        "sdks/typescript/src/observability-sdk/setup/node/setup.ts"
       ],
       "rules": {
         "complexity": ["error", { "max": 40 }]
@@ -444,7 +531,15 @@
         "packages/features/trace/web/src/ui/sections/traces/span-details.tsx",
         "packages/features/workflow/web/src/model/code/python-provider.validator.ts",
         "packages/features/workflow/web/src/ui/sections/optimization_studio/results-panel.tsx",
-        "packages/features/workflow/web/src/ui/sections/workflow-node-execution.tsx"
+        "packages/features/workflow/web/src/ui/sections/workflow-node-execution.tsx",
+        "mcp/typescript/src/tools/get-experiment-results.ts",
+        "packages/architecture-lint/src/frontend-ui-boundaries.ts",
+        "packages/architecture-lint/src/manifests.ts",
+        "packages/architecture-lint/src/workspace.ts",
+        "packages/eventing/src/services/eventSourcingService.ts",
+        "sdks/typescript/src/cli/utils/governance/wrapper-mode.ts",
+        "sdks/typescript/src/client-sdk/services/_shared/format-api-error.ts",
+        "sdks/typescript/src/observability-sdk/instrumentation/langchain/index.ts"
       ],
       "rules": {
         "complexity": ["error", { "max": 60 }]
@@ -475,14 +570,17 @@
         "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/tree-row.tsx",
         "packages/features/trace/web/src/ui/sections/flame/flame-block.tsx",
         "packages/features/workflow/web/src/ui/sections/optimization_studio/properties/agent-properties-panel.tsx",
-        "packages/prisma-client/src/multi-tenancy-guard.ts"
+        "packages/prisma-client/src/multi-tenancy-guard.ts",
+        "sdks/typescript/src/cli/utils/governance/wrapper.ts"
       ],
       "rules": {
         "complexity": ["error", { "max": 110 }]
       }
     },
     {
-      "files": ["packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx"],
+      "files": ["packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
+        "mcp/typescript/src/__tests__/all-tools.integration.test.ts"
+      ],
       "rules": {
         "complexity": ["error", { "max": 220 }]
       }
@@ -514,6 +612,13 @@
     // shrink: split a function and delete its line. A file cannot join
     // without a reviewer seeing it appear in this file. The worst function
     // in the tree scores 588.
+    //
+    // +164 files (156 production, 8 test) on 2026-09-06, from the paths
+    // widened into lint:oxlint the same day (packages/api/src,
+    // packages/eventing/src, packages/observability/src, packages/mail/src,
+    // packages/group-queue/src, packages/test-harness/src,
+    // packages/architecture-lint/src, sdks/typescript/src,
+    // mcp/typescript/src) -- 1113 files total now.
     // ------------------------------------------------------------------
     {
       "files": [
@@ -945,7 +1050,85 @@
         "packages/features/workflow/web/src/ui/sections/workflow-nodes.tsx",
         "packages/features/workflow/web/src/ui/sections/workflow-push-to-copies-dialog.tsx",
         "packages/features/workflow/web/src/ui/sections/workflow-undo-redo.tsx",
-        "packages/prisma-client/src/organization-guard.ts"
+        "packages/prisma-client/src/organization-guard.ts",
+        "mcp/typescript/src/langwatch-api.ts",
+        "mcp/typescript/src/tools/discover-evaluator-schema.ts",
+        "mcp/typescript/src/tools/get-agent.ts",
+        "mcp/typescript/src/tools/get-analytics.ts",
+        "mcp/typescript/src/tools/get-simulation-run.ts",
+        "mcp/typescript/src/tools/get-trace.ts",
+        "mcp/typescript/src/tools/list-api-keys.ts",
+        "mcp/typescript/src/tools/list-scenarios.ts",
+        "mcp/typescript/src/tools/list-simulation-runs.ts",
+        "mcp/typescript/src/tools/run-experiment.ts",
+        "mcp/typescript/src/tools/update-prompt.ts",
+        "packages/architecture-lint/src/comment-block-policy.mjs",
+        "packages/architecture-lint/src/comment-blocks.ts",
+        "packages/architecture-lint/src/contract-build-config.ts",
+        "packages/architecture-lint/src/declarations.ts",
+        "packages/architecture-lint/src/filename-migration.ts",
+        "packages/architecture-lint/src/legacy-feature-fragments.ts",
+        "packages/architecture-lint/src/port-modules.ts",
+        "packages/architecture-lint/src/test-colocation.ts",
+        "packages/architecture-lint/src/workspace-package-rename.ts",
+        "packages/eventing/src/eventSourcing.ts",
+        "packages/eventing/src/process-manager/outbox/processOutboxWorker.ts",
+        "packages/eventing/src/process-manager/processRuntime.ts",
+        "packages/eventing/src/projections/foldProjectionExecutor.ts",
+        "packages/eventing/src/projections/mapProjectionExecutor.ts",
+        "packages/eventing/src/queues/memory.ts",
+        "packages/eventing/src/replay/replayStatePath.ts",
+        "packages/eventing/src/server/adapters/clickhouse/event-repository.clickhouse.ts",
+        "packages/eventing/src/stores/repositories/eventRepositoryMemory.ts",
+        "packages/group-queue/src/blobSweeper.ts",
+        "packages/group-queue/src/dispatcher.ts",
+        "packages/group-queue/src/tieredBlobStore.ts",
+        "packages/observability/src/logger.ts",
+        "packages/observability/src/validation/validationMeta.ts",
+        "packages/test-harness/src/nlpgo-subprocess.ts",
+        "sdks/typescript/src/agent/client.ts",
+        "sdks/typescript/src/agent/protocol.ts",
+        "sdks/typescript/src/agent/schema.ts",
+        "sdks/typescript/src/cli/commands/annotations/list.ts",
+        "sdks/typescript/src/cli/commands/api-keys/list.ts",
+        "sdks/typescript/src/cli/commands/dataset/records-list.ts",
+        "sdks/typescript/src/cli/commands/dataset/upload.ts",
+        "sdks/typescript/src/cli/commands/evaluators/get.ts",
+        "sdks/typescript/src/cli/commands/experiment/list-runs.ts",
+        "sdks/typescript/src/cli/commands/experiment/run.ts",
+        "sdks/typescript/src/cli/commands/experiment/versions.ts",
+        "sdks/typescript/src/cli/commands/ingest/codex.ts",
+        "sdks/typescript/src/cli/commands/ingestion/hook.ts",
+        "sdks/typescript/src/cli/commands/langy/approval.ts",
+        "sdks/typescript/src/cli/commands/langy/executor.ts",
+        "sdks/typescript/src/cli/commands/list.ts",
+        "sdks/typescript/src/cli/commands/logout.ts",
+        "sdks/typescript/src/cli/commands/scenarios/update.ts",
+        "sdks/typescript/src/cli/commands/skills/installer.ts",
+        "sdks/typescript/src/cli/commands/spend-events/list.ts",
+        "sdks/typescript/src/cli/commands/traces/search.ts",
+        "sdks/typescript/src/cli/commands/ui/call.ts",
+        "sdks/typescript/src/cli/commands/virtual-keys/update.ts",
+        "sdks/typescript/src/cli/commands/webhooks/list.ts",
+        "sdks/typescript/src/cli/commands/webhooks/update.ts",
+        "sdks/typescript/src/cli/telemetry/events.ts",
+        "sdks/typescript/src/cli/telemetry/sink.ts",
+        "sdks/typescript/src/cli/utils/errorOutput.ts",
+        "sdks/typescript/src/cli/utils/fileManager.ts",
+        "sdks/typescript/src/cli/utils/governance/claude-session-registry.ts",
+        "sdks/typescript/src/cli/utils/governance/codex-ancestor-session.ts",
+        "sdks/typescript/src/cli/utils/governance/codex-live-session.ts",
+        "sdks/typescript/src/cli/utils/governance/codex-session-index.ts",
+        "sdks/typescript/src/cli/utils/governance/copilot-prespawn.ts",
+        "sdks/typescript/src/cli/utils/governance/session-context-spool.ts",
+        "sdks/typescript/src/cli/utils/governance/session-refresh.ts",
+        "sdks/typescript/src/cli/utils/governance/shell-rc.ts",
+        "sdks/typescript/src/cli/utils/responseFormat.ts",
+        "sdks/typescript/src/cli/utils/waitForBatchRun.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/printSummary.ts",
+        "sdks/typescript/src/client-sdk/services/webhooks/verify-signature.ts",
+        "sdks/typescript/src/client-sdk/tracing/create-tracing-proxy.ts",
+        "sdks/typescript/src/observability-sdk/setup/utils.ts"
       ],
       "rules": {
         "langwatch/cognitive-complexity": ["error", { "max": 25 }]
@@ -1217,7 +1400,48 @@
         "packages/features/workflow/web/src/ui/sections/optimization_studio/use-run-evalution.ts",
         "packages/features/workflow/web/src/ui/sections/optimization_studio/version-to-be-used.tsx",
         "packages/features/workflow/web/src/ui/sections/workflow-autosave.tsx",
-        "packages/features/workflow/web/src/ui/sections/workflow-node-execution.tsx"
+        "packages/features/workflow/web/src/ui/sections/workflow-node-execution.tsx",
+        "mcp/typescript/src/http-security.ts",
+        "mcp/typescript/src/tools/run-agent.ts",
+        "mcp/typescript/src/tools/search-traces.ts",
+        "packages/architecture-lint/src/api-transport-boundaries.ts",
+        "packages/architecture-lint/src/api-transport-framework.ts",
+        "packages/architecture-lint/src/application-boundaries.ts",
+        "packages/architecture-lint/src/architecture-records.ts",
+        "packages/architecture-lint/src/feature-catalogue.ts",
+        "packages/architecture-lint/src/overengineering-policy.mjs",
+        "packages/architecture-lint/src/test-quality.ts",
+        "packages/eventing/src/process-manager/outbox/outboxDispatcherService.ts",
+        "packages/eventing/src/process-manager/processManagerService.ts",
+        "packages/eventing/src/replay/replayDrain.ts",
+        "packages/eventing/src/server/adapters/postgres/prisma-process-store.ts",
+        "packages/eventing/src/services/queues/queueManager.ts",
+        "sdks/typescript/src/agent/transport.ts",
+        "sdks/typescript/src/cli/commands/agents/run.ts",
+        "sdks/typescript/src/cli/commands/analytics/query.ts",
+        "sdks/typescript/src/cli/commands/charts/run.ts",
+        "sdks/typescript/src/cli/commands/ingest/tail.ts",
+        "sdks/typescript/src/cli/commands/ingestion/install.ts",
+        "sdks/typescript/src/cli/commands/instrument.ts",
+        "sdks/typescript/src/cli/commands/langy/fs-ops.ts",
+        "sdks/typescript/src/cli/commands/langy/ui.ts",
+        "sdks/typescript/src/cli/commands/pull.ts",
+        "sdks/typescript/src/cli/commands/remove.ts",
+        "sdks/typescript/src/cli/commands/report.ts",
+        "sdks/typescript/src/cli/commands/sync.ts",
+        "sdks/typescript/src/cli/commands/traces/export.ts",
+        "sdks/typescript/src/cli/commands/webhooks/deliveries.ts",
+        "sdks/typescript/src/cli/daemon/runner.ts",
+        "sdks/typescript/src/cli/utils/codex-config-toml.ts",
+        "sdks/typescript/src/cli/utils/governance/instrument-wiring.ts",
+        "sdks/typescript/src/cli/utils/governance/login-ceremony.ts",
+        "sdks/typescript/src/cli/utils/governance/telemetry-refresh.ts",
+        "sdks/typescript/src/cli/utils/governance/wrapper-path-choice.ts",
+        "sdks/typescript/src/cli/utils/output.ts",
+        "sdks/typescript/src/client-sdk/services/evaluations/evaluations.facade.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/mapResults.ts",
+        "sdks/typescript/src/observability-sdk/setup/node/setup.ts",
+        "sdks/typescript/src/observability-sdk/tracer/implementation.ts"
       ],
       "rules": {
         "langwatch/cognitive-complexity": ["error", { "max": 40 }]
@@ -1393,7 +1617,31 @@
         "packages/features/workflow/web/src/ui/sections/workflow-base-properties-panel.tsx",
         "packages/features/workflow/web/src/ui/sections/workflow-list-card.tsx",
         "packages/features/workflow/web/src/ui/sections/workflow-run-until-here-dialog.tsx",
-        "packages/prisma-client/src/multi-tenancy-guard.ts"
+        "packages/prisma-client/src/multi-tenancy-guard.ts",
+        "mcp/typescript/src/create-mcp-server.ts",
+        "mcp/typescript/src/http-server.ts",
+        "mcp/typescript/src/tools/get-prompt.ts",
+        "packages/architecture-lint/src/check-feature-parity.ts",
+        "packages/architecture-lint/src/eventing-roles.ts",
+        "packages/architecture-lint/src/feature-layout.ts",
+        "packages/architecture-lint/src/manifests.ts",
+        "packages/architecture-lint/src/module-graph.ts",
+        "packages/eventing/src/projections/projectionRouter.ts",
+        "packages/eventing/src/services/eventSourcingService.ts",
+        "sdks/typescript/src/agent/local-control-protocol.ts",
+        "sdks/typescript/src/cli/commands/agents/get.ts",
+        "sdks/typescript/src/cli/commands/agents/tunnel.ts",
+        "sdks/typescript/src/cli/commands/experiment/results.ts",
+        "sdks/typescript/src/cli/commands/experiment/status.ts",
+        "sdks/typescript/src/cli/commands/gateway-budgets/list.ts",
+        "sdks/typescript/src/cli/commands/langy/policy.ts",
+        "sdks/typescript/src/cli/commands/login.ts",
+        "sdks/typescript/src/cli/commands/push.ts",
+        "sdks/typescript/src/cli/commands/simulation-runs/get.ts",
+        "sdks/typescript/src/cli/utils/governance/login-flow.ts",
+        "sdks/typescript/src/cli/utils/governance/wrapper-mode.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/experiment.ts",
+        "sdks/typescript/src/observability-sdk/instrumentation/langchain/index.ts"
       ],
       "rules": {
         "langwatch/cognitive-complexity": ["error", { "max": 80 }]
@@ -1461,7 +1709,20 @@
         "packages/features/trace/web/src/ui/sections/traces/traces-mapping.tsx",
         "packages/features/user/server/src/transport/api-trpc/user.api.ts",
         "packages/features/workflow/server/src/transport/api-trpc/workflow.api.ts",
-        "packages/features/workflow/web/src/model/code/python-provider.validator.ts"
+        "packages/features/workflow/web/src/model/code/python-provider.validator.ts",
+        "mcp/typescript/src/tools/get-experiment-results.ts",
+        "packages/architecture-lint/src/frontend-ui-boundaries.ts",
+        "packages/architecture-lint/src/global-app-access.ts",
+        "packages/architecture-lint/src/workspace.ts",
+        "packages/group-queue/src/groupQueue.ts",
+        "sdks/typescript/src/cli/commands/langy/session.ts",
+        "sdks/typescript/src/cli/commands/simulation-runs/list.ts",
+        "sdks/typescript/src/cli/commands/status.ts",
+        "sdks/typescript/src/cli/daemon/client.ts",
+        "sdks/typescript/src/cli/daemon/server.ts",
+        "sdks/typescript/src/cli/program.ts",
+        "sdks/typescript/src/cli/utils/governance/wrapper.ts",
+        "sdks/typescript/src/client-sdk/services/_shared/format-api-error.ts"
       ],
       "rules": {
         "langwatch/cognitive-complexity": ["error", { "max": 150 }]
@@ -1531,7 +1792,13 @@
         "packages/features/model-provider/contract/src/catalog/__tests__/model-catalog-price-coverage.unit.test.ts",
         "packages/features/trace/contract/src/__tests__/trace-otlp-schemas.unit.test.ts",
         "packages/features/trace/server/src/adapters/__tests__/eventing.trace-projection-lean.replay-state.unit.test.ts",
-        "packages/features/trace/server/src/repositories/clickhouse/__tests__/span-storage.repository.integration.test.ts"
+        "packages/features/trace/server/src/repositories/clickhouse/__tests__/span-storage.repository.integration.test.ts",
+        "mcp/typescript/src/__tests__/datasets.integration.test.ts",
+        "mcp/typescript/src/__tests__/docker.integration.test.ts",
+        "packages/group-queue/src/__tests__/batch-bisection.integration.test.ts",
+        "sdks/typescript/src/cli/daemon/__tests__/daemon-server.integration.test.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.trace.e2e.test.ts",
+        "sdks/typescript/src/observability-sdk/logger/__tests__/integration/logger.integration.test.ts"
       ],
       "rules": {
         "langwatch/cognitive-complexity": ["error", { "max": 80 }]
@@ -1542,7 +1809,9 @@
         "packages/features/analytics/server/src/langwatch-ql/__tests__/lwql-views.integration.test.ts",
         "packages/features/analytics/server/src/repositories/clickhouse/__tests__/result-parsing.test.ts",
         "packages/features/hosted-mcp/server/src/transport/api-mcp/__tests__/hosted-mcp.api.integration.test.ts",
-        "packages/features/langy/server/src/ports/__tests__/langyTurnRelay.unit.test.ts"
+        "packages/features/langy/server/src/ports/__tests__/langyTurnRelay.unit.test.ts",
+        "mcp/typescript/src/__tests__/all-tools.integration.test.ts",
+        "sdks/typescript/src/cli/commands/langy/__tests__/policy.unit.test.ts"
       ],
       "rules": {
         "langwatch/cognitive-complexity": ["error", { "max": 150 }]
@@ -1568,6 +1837,13 @@
     // files below are the whole of that debt and the rule is off for exactly
     // them, so no new file can nest a ternary: unnest a file and delete its
     // line.
+    //
+    // +97 sites in 64 files on 2026-09-06, from the paths widened into
+    // lint:oxlint the same day (packages/api/src, packages/eventing/src,
+    // packages/observability/src, packages/mail/src, packages/group-queue/src,
+    // packages/test-harness/src, packages/architecture-lint/src,
+    // sdks/typescript/src, mcp/typescript/src) -- 1061 sites in 558 files
+    // total now.
     // ------------------------------------------------------------------
     {
       "files": [
@@ -2064,7 +2340,71 @@
         "packages/features/workflow/web/src/ui/sections/workflow-run-until-here-dialog.tsx",
         "packages/features/workflow/web/src/ui/sections/workflow-running-status.tsx",
         "packages/handled-error/src/presentation.ts",
-        "packages/handled-error/src/read-handled-error.ts"
+        "packages/handled-error/src/read-handled-error.ts",
+        "mcp/typescript/src/langwatch-api.ts",
+        "mcp/typescript/src/tools/create-annotation.ts",
+        "mcp/typescript/src/tools/get-experiment-results.ts",
+        "mcp/typescript/src/tools/list-annotations.ts",
+        "mcp/typescript/src/tools/list-api-keys.ts",
+        "mcp/typescript/src/tools/list-simulation-runs.ts",
+        "mcp/typescript/src/utils/format-evaluations.ts",
+        "packages/architecture-lint/src/api-transport-framework.ts",
+        "packages/architecture-lint/src/cli.ts",
+        "packages/architecture-lint/src/frontend-ui-boundaries.ts",
+        "packages/architecture-lint/src/module-graph.ts",
+        "packages/architecture-lint/src/test-colocation.ts",
+        "packages/eventing/src/pipeline/staticBuilder.ts",
+        "packages/eventing/src/process-manager/processManagerService.ts",
+        "packages/eventing/src/projections/eventTypeTransforms.ts",
+        "packages/eventing/src/projections/foldProjectionExecutor.ts",
+        "packages/eventing/src/projections/projectionRouter.ts",
+        "packages/eventing/src/services/queues/queueManager.ts",
+        "packages/eventing/src/stores/repositories/eventRepositoryMemory.ts",
+        "packages/group-queue/src/groupQueue.ts",
+        "packages/test-harness/src/mock-specifier-scan.ts",
+        "sdks/typescript/src/agent/protocol.ts",
+        "sdks/typescript/src/cli/commands/analytics/query.ts",
+        "sdks/typescript/src/cli/commands/analytics/timeseriesShape.ts",
+        "sdks/typescript/src/cli/commands/annotations/get.ts",
+        "sdks/typescript/src/cli/commands/annotations/list.ts",
+        "sdks/typescript/src/cli/commands/api-keys/list.ts",
+        "sdks/typescript/src/cli/commands/charts/run.ts",
+        "sdks/typescript/src/cli/commands/dataset/get.ts",
+        "sdks/typescript/src/cli/commands/dataset/records-list.ts",
+        "sdks/typescript/src/cli/commands/dataset/upload.ts",
+        "sdks/typescript/src/cli/commands/experiment/results.ts",
+        "sdks/typescript/src/cli/commands/experiment/status.ts",
+        "sdks/typescript/src/cli/commands/gateway-budgets/list.ts",
+        "sdks/typescript/src/cli/commands/ingestion/context.ts",
+        "sdks/typescript/src/cli/commands/ingestion/install.ts",
+        "sdks/typescript/src/cli/commands/langy/__tests__/approval.unit.test.ts",
+        "sdks/typescript/src/cli/commands/langy/__tests__/policy.unit.test.ts",
+        "sdks/typescript/src/cli/commands/push.ts",
+        "sdks/typescript/src/cli/commands/scenarios/update.ts",
+        "sdks/typescript/src/cli/commands/simulation-runs/get.ts",
+        "sdks/typescript/src/cli/commands/simulation-runs/list.ts",
+        "sdks/typescript/src/cli/commands/skills/installer.ts",
+        "sdks/typescript/src/cli/commands/spend-events/list.ts",
+        "sdks/typescript/src/cli/commands/ui/call.ts",
+        "sdks/typescript/src/cli/commands/virtual-keys/_shared.ts",
+        "sdks/typescript/src/cli/commands/virtual-keys/update.ts",
+        "sdks/typescript/src/cli/commands/webhooks/deliveries.ts",
+        "sdks/typescript/src/cli/daemon/execution.ts",
+        "sdks/typescript/src/cli/daemon/server.ts",
+        "sdks/typescript/src/cli/utils/errorSuggestions.ts",
+        "sdks/typescript/src/cli/utils/governance/__tests__/cli-api.unit.test.ts",
+        "sdks/typescript/src/cli/utils/governance/__tests__/session-api.unit.test.ts",
+        "sdks/typescript/src/cli/utils/governance/codex-rollout.ts",
+        "sdks/typescript/src/cli/utils/governance/login-flow.ts",
+        "sdks/typescript/src/cli/utils/governance/wrapper-mode.ts",
+        "sdks/typescript/src/cli/utils/output.ts",
+        "sdks/typescript/src/cli/utils/outputScope.ts",
+        "sdks/typescript/src/client-sdk/services/_shared/format-api-error.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/__tests__/comparison-harness.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.e2e.test.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.origin.integration.test.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.trace.e2e.test.ts",
+        "sdks/typescript/src/observability-sdk/instrumentation/langchain/index.ts"
       ],
       "rules": { "no-nested-ternary": "off" }
     },
@@ -2079,6 +2419,13 @@
     // 1113 of them outside tests (483 web, 630 non-web). The files below are
     // the whole of that debt and the rule is off for exactly them, so new
     // code cannot add an unnameable condition.
+    //
+    // +367 sites in 133 files on 2026-09-06, from the paths widened into
+    // lint:oxlint the same day (packages/api/src, packages/eventing/src,
+    // packages/observability/src, packages/mail/src, packages/group-queue/src,
+    // packages/test-harness/src, packages/architecture-lint/src,
+    // sdks/typescript/src, mcp/typescript/src) -- 1567 sites in 893 files
+    // total now.
     // ------------------------------------------------------------------
     {
       "files": [
@@ -2841,7 +3188,140 @@
         "packages/handled-error/src/read-handled-error.ts",
         "packages/prisma-client/src/mass-delete-guard.ts",
         "packages/prisma-client/src/multi-tenancy-guard.ts",
-        "packages/prisma-client/src/organization-guard.ts"
+        "packages/prisma-client/src/organization-guard.ts",
+        "mcp/typescript/src/__tests__/canonical-v1-paths.unit.test.ts",
+        "mcp/typescript/src/documentation-fetch.ts",
+        "mcp/typescript/src/http-security.ts",
+        "mcp/typescript/src/http-server.ts",
+        "mcp/typescript/src/index.ts",
+        "mcp/typescript/src/langwatch-api.ts",
+        "mcp/typescript/src/public-http-request.ts",
+        "mcp/typescript/src/tools/format-run-plan.ts",
+        "mcp/typescript/src/tools/get-analytics.ts",
+        "mcp/typescript/src/tools/get-experiment-results.ts",
+        "mcp/typescript/src/tools/get-simulation-run.ts",
+        "mcp/typescript/src/tools/list-experiments.ts",
+        "mcp/typescript/src/tools/report-issue.ts",
+        "packages/architecture-lint/src/api-transport-boundaries.ts",
+        "packages/architecture-lint/src/api-transport-framework.ts",
+        "packages/architecture-lint/src/application-boundaries.ts",
+        "packages/architecture-lint/src/boundary-edge-baseline.ts",
+        "packages/architecture-lint/src/check-feature-parity.ts",
+        "packages/architecture-lint/src/colocate-tests.cli.ts",
+        "packages/architecture-lint/src/comment-blocks.ts",
+        "packages/architecture-lint/src/contract-build-config.ts",
+        "packages/architecture-lint/src/declarations.ts",
+        "packages/architecture-lint/src/eventing-roles.ts",
+        "packages/architecture-lint/src/feature-layout-policy.mjs",
+        "packages/architecture-lint/src/feature-layout.ts",
+        "packages/architecture-lint/src/filename-migration.ts",
+        "packages/architecture-lint/src/files.ts",
+        "packages/architecture-lint/src/frontend-ui-boundaries.ts",
+        "packages/architecture-lint/src/global-app-access.ts",
+        "packages/architecture-lint/src/legacy-feature-fragments.ts",
+        "packages/architecture-lint/src/manifests.ts",
+        "packages/architecture-lint/src/module-graph.ts",
+        "packages/architecture-lint/src/overengineering-policy.mjs",
+        "packages/architecture-lint/src/port-modules.ts",
+        "packages/architecture-lint/src/service-projection-boundaries.ts",
+        "packages/architecture-lint/src/service-quality.ts",
+        "packages/architecture-lint/src/test-colocation.ts",
+        "packages/architecture-lint/src/test-quality.ts",
+        "packages/architecture-lint/src/workspace-package-rename.ts",
+        "packages/architecture-lint/src/workspace.ts",
+        "packages/eventing/src/__tests__/eventing-boundary.unit.test.ts",
+        "packages/eventing/src/domain/definitions.ts",
+        "packages/eventing/src/pipeline/processManagerDefinition.ts",
+        "packages/eventing/src/pipeline/staticBuilder.ts",
+        "packages/eventing/src/process-manager/json.ts",
+        "packages/eventing/src/process-manager/processRuntime.ts",
+        "packages/eventing/src/process-manager/stores/inMemoryProcessStore.ts",
+        "packages/eventing/src/projections/foldProjectionExecutor.ts",
+        "packages/eventing/src/projections/projectionRouter.ts",
+        "packages/eventing/src/server/adapters/clickhouse/replay-event-source.clickhouse.ts",
+        "packages/eventing/src/server/schedule/scheduler.service.ts",
+        "packages/eventing/src/services/commands/commandDispatcher.ts",
+        "packages/eventing/src/services/errorHandling.ts",
+        "packages/eventing/src/services/eventSourcingService.ts",
+        "packages/eventing/src/services/queues/queueManager.ts",
+        "packages/eventing/src/stores/abstractEventStore.ts",
+        "packages/eventing/src/stores/repositories/eventRepositoryMemory.ts",
+        "packages/group-queue/src/__tests__/metricsCollector.unit.test.ts",
+        "packages/group-queue/src/groupQueue.ts",
+        "packages/group-queue/src/jobEnvelope.ts",
+        "packages/mail/src/providers/resend.ts",
+        "packages/test-harness/src/__tests__/ts-ast.unit.test.ts",
+        "packages/test-harness/src/cleanup-test-rows.ts",
+        "packages/test-harness/src/mock-specifier-scan.ts",
+        "packages/test-harness/src/teardown-scan.ts",
+        "packages/test-harness/src/vitest-alias-table.ts",
+        "sdks/typescript/src/agent/define.ts",
+        "sdks/typescript/src/agent/identity.ts",
+        "sdks/typescript/src/agent/local-control-protocol.ts",
+        "sdks/typescript/src/agent/protocol.ts",
+        "sdks/typescript/src/agent/schema.ts",
+        "sdks/typescript/src/agent/transport.ts",
+        "sdks/typescript/src/cli/commands/charts/definitionInput.ts",
+        "sdks/typescript/src/cli/commands/dataset/create.ts",
+        "sdks/typescript/src/cli/commands/dataset/download.ts",
+        "sdks/typescript/src/cli/commands/experiment/status.ts",
+        "sdks/typescript/src/cli/commands/ingestion/git-context.ts",
+        "sdks/typescript/src/cli/commands/instrument.ts",
+        "sdks/typescript/src/cli/commands/langy/__tests__/ui.unit.test.ts",
+        "sdks/typescript/src/cli/commands/langy/executor.ts",
+        "sdks/typescript/src/cli/commands/langy/fs-ops.ts",
+        "sdks/typescript/src/cli/commands/langy/policy.ts",
+        "sdks/typescript/src/cli/commands/langy/requests.ts",
+        "sdks/typescript/src/cli/commands/report.ts",
+        "sdks/typescript/src/cli/commands/run-plans/scopeFlags.ts",
+        "sdks/typescript/src/cli/commands/scenarios/versions/get.ts",
+        "sdks/typescript/src/cli/commands/simulation-runs/get.ts",
+        "sdks/typescript/src/cli/commands/simulation-runs/list.ts",
+        "sdks/typescript/src/cli/commands/skills/installer.ts",
+        "sdks/typescript/src/cli/commands/status.ts",
+        "sdks/typescript/src/cli/commands/traces/export.ts",
+        "sdks/typescript/src/cli/commands/webhooks/update.ts",
+        "sdks/typescript/src/cli/daemon/dispatch.ts",
+        "sdks/typescript/src/cli/daemon/eligibility.ts",
+        "sdks/typescript/src/cli/daemon/execution.ts",
+        "sdks/typescript/src/cli/program.ts",
+        "sdks/typescript/src/cli/utils/fileManager.ts",
+        "sdks/typescript/src/cli/utils/formatting.ts",
+        "sdks/typescript/src/cli/utils/governance/__tests__/claude-plugin-update.unit.test.ts",
+        "sdks/typescript/src/cli/utils/governance/__tests__/codex-persist-seams.unit.test.ts",
+        "sdks/typescript/src/cli/utils/governance/__tests__/codex-turn-harvest.unit.test.ts",
+        "sdks/typescript/src/cli/utils/governance/__tests__/telemetry-targets.unit.test.ts",
+        "sdks/typescript/src/cli/utils/governance/claude-plugin.ts",
+        "sdks/typescript/src/cli/utils/governance/codex-rollout-otlp.ts",
+        "sdks/typescript/src/cli/utils/governance/config.ts",
+        "sdks/typescript/src/cli/utils/governance/copilot-app-agent.ts",
+        "sdks/typescript/src/cli/utils/governance/hook-state.ts",
+        "sdks/typescript/src/cli/utils/governance/ingest-key-heal.ts",
+        "sdks/typescript/src/cli/utils/governance/login-ceremony.ts",
+        "sdks/typescript/src/cli/utils/governance/session-context-hooks.ts",
+        "sdks/typescript/src/cli/utils/governance/session-context-spool.ts",
+        "sdks/typescript/src/cli/utils/governance/session-context.ts",
+        "sdks/typescript/src/cli/utils/governance/shell-rc.ts",
+        "sdks/typescript/src/cli/utils/governance/telemetry-refresh.ts",
+        "sdks/typescript/src/cli/utils/governance/wrapper-path-choice.ts",
+        "sdks/typescript/src/cli/utils/governance/wrapper.ts",
+        "sdks/typescript/src/cli/utils/keyValueFlags.ts",
+        "sdks/typescript/src/cli/utils/managementFlags.ts",
+        "sdks/typescript/src/cli/utils/managementInvites.ts",
+        "sdks/typescript/src/cli/utils/output.ts",
+        "sdks/typescript/src/cli/utils/responseFormat.ts",
+        "sdks/typescript/src/client-sdk/services/__tests__/canonical-v1-paths.unit.test.ts",
+        "sdks/typescript/src/client-sdk/services/_shared/format-api-error.ts",
+        "sdks/typescript/src/client-sdk/services/datasets/datasets.facade.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/experiment.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/experiments.facade.ts",
+        "sdks/typescript/src/client-sdk/tracing/create-tracing-proxy.ts",
+        "sdks/typescript/src/internal/api/errors.ts",
+        "sdks/typescript/src/internal/runtime.ts",
+        "sdks/typescript/src/observability-sdk/__tests__/e2e/e2e-utils.ts",
+        "sdks/typescript/src/observability-sdk/exporters/trace-filters.ts",
+        "sdks/typescript/src/observability-sdk/instrumentation/langchain/index.ts",
+        "sdks/typescript/src/observability-sdk/span/input-output.ts"
       ],
       "rules": { "langwatch/condition-shape": "off" }
     },

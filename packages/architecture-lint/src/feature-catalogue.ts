@@ -65,6 +65,7 @@ export function readFeatureCatalogue(
         "Add packages/features/catalogue.json with version 0 and its core and Enterprise feature entries.",
       ),
     );
+
     return [];
   }
 
@@ -78,12 +79,14 @@ export function readFeatureCatalogue(
         `Feature catalogue must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
       ),
     );
+
     return [];
   }
 
   const catalogueResult = featureCatalogueSchema.safeParse(rawCatalogue);
   if (!catalogueResult.success) {
     violations.push(issue(path, "Feature catalogue must contain version 0 and a features array."));
+
     return [];
   }
 
@@ -130,14 +133,17 @@ export function readFeatureCatalogue(
         ),
       );
     }
+
     if (ids.has(id)) {
       violations.push(issue(path, `Feature id ${JSON.stringify(id)} is declared more than once.`));
     }
+
     if (roots.has(root)) {
       violations.push(
         issue(path, `Feature root ${JSON.stringify(root)} is declared more than once.`),
       );
     }
+
     ids.add(id);
     roots.add(root);
 
@@ -166,6 +172,7 @@ export function readFeatureCatalogue(
   const sorted = [...entries].sort((left, right) => {
     const classificationOrder =
       Number(left.classification === "enterprise") - Number(right.classification === "enterprise");
+
     return classificationOrder || left.id.localeCompare(right.id);
   });
   if (!sorted.every((entry, index) => entry.id === entries[index]?.id)) {

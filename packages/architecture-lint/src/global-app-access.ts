@@ -58,8 +58,11 @@ function isProductionSource(file: string): boolean {
 
 function scriptKind(file: string): ts.ScriptKind {
   if (file.endsWith(".tsx")) return ts.ScriptKind.TSX;
+
   if (file.endsWith(".jsx")) return ts.ScriptKind.JSX;
+
   if (file.endsWith(".mjs") || file.endsWith(".cjs")) return ts.ScriptKind.JS;
+
   return ts.ScriptKind.TS;
 }
 
@@ -69,10 +72,12 @@ function symbolNamed(name: string): ForbiddenSymbol | undefined {
 
 function bindingNames(name: ts.BindingName): readonly ts.Identifier[] {
   if (ts.isIdentifier(name)) return [name];
+
   const identifiers: ts.Identifier[] = [];
   for (const element of name.elements) {
     if (ts.isBindingElement(element)) identifiers.push(...bindingNames(element.name));
   }
+
   return identifiers;
 }
 
@@ -114,6 +119,7 @@ function unwrap(node: ts.Expression): ts.Expression {
     ts.isAwaitExpression(node)
   )
     return unwrap(node.expression);
+
   return node;
 }
 
@@ -128,7 +134,9 @@ function moduleSpecifier(node: ts.Expression): string | undefined {
     !ts.isStringLiteral(argument)
   )
     return;
+
   if (expression.expression.kind === ts.SyntaxKind.ImportKeyword) return argument.text;
+
   return ts.isIdentifier(expression.expression) && expression.expression.text === "require"
     ? argument.text
     : void 0;
@@ -136,8 +144,11 @@ function moduleSpecifier(node: ts.Expression): string | undefined {
 
 function isAccessorModule(root: string, file: string, specifier: string): boolean {
   if (specifier === ACCESSOR_ALIAS) return true;
+
   if (!specifier.startsWith(".")) return false;
+
   const candidate = resolve(dirname(file), specifier);
+
   return [candidate, `${candidate}.ts`, join(candidate, "index.ts")].some(
     (path) => workspacePath(root, path) === ACCESSOR_FILE,
   );
@@ -147,6 +158,7 @@ function propertySymbol(
   node: ts.PropertyAccessExpression | ts.ElementAccessExpression,
 ): ForbiddenSymbol | undefined {
   if (ts.isPropertyAccessExpression(node)) return symbolNamed(node.name.text);
+
   return node.argumentExpression && ts.isStringLiteral(node.argumentExpression)
     ? symbolNamed(node.argumentExpression.text)
     : void 0;
@@ -165,13 +177,16 @@ function accessFingerprint(
     !ts.isImportDeclaration(context.parent)
   )
     context = context.parent;
+
   if (context.parent && (ts.isStatement(context.parent) || ts.isImportDeclaration(context.parent)))
     context = context.parent;
+
   const normalized = context.getText(source).replace(/\s+/g, " ").trim();
   const prefix = source.text
     .slice(context.getStart(source), node.getStart(source))
     .replace(/\s+/g, " ")
     .trim();
+
   return createHash("sha256")
     .update(`${kind}\0${symbol}\0${normalized}\0${prefix}`)
     .digest("hex")
@@ -185,11 +200,13 @@ function occurrenceFingerprint(base: string, ordinal: number): string {
 function statementDeclares(node: ts.Node, name: string): boolean {
   const visit = (item: ts.Node): boolean => {
     if (item !== node && ts.isFunctionLike(item)) return false;
+
     if (
       ts.isVariableDeclaration(item) &&
       bindingNames(item.name).some((identifier) => identifier.text === name)
     )
       return true;
+
     if (
       (ts.isFunctionDeclaration(item) ||
         ts.isClassDeclaration(item) ||
@@ -197,12 +214,15 @@ function statementDeclares(node: ts.Node, name: string): boolean {
       item.name?.text === name
     )
       return true;
+
     let found = false;
     ts.forEachChild(item, (child) => {
       found ||= visit(child);
     });
+
     return found;
   };
+
   return visit(node);
 }
 
@@ -217,6 +237,7 @@ function isShadowed(node: ts.Identifier, binding: Binding): boolean {
       )
     )
       return true;
+
     if (
       ts.isCatchClause(parent) &&
       parent.variableDeclaration &&
@@ -225,9 +246,11 @@ function isShadowed(node: ts.Identifier, binding: Binding): boolean {
       )
     )
       return true;
+
     if (ts.isBlock(parent) || ts.isSourceFile(parent)) {
       for (const statement of parent.statements) {
         if (statement.getStart() > node.getStart()) continue;
+
         const containsImportedBinding =
           binding.declaration.getStart() >= statement.getStart() &&
           binding.declaration.getEnd() <= statement.getEnd();
@@ -236,8 +259,10 @@ function isShadowed(node: ts.Identifier, binding: Binding): boolean {
         }
       }
     }
+
     child = parent;
   }
+
   return false;
 }
 
@@ -264,6 +289,7 @@ function sourceFiles(root: string): string[] {
     return SOURCE_ROOTS.flatMap((sourceRoot) =>
       walkFiles(join(root, sourceRoot), isProductionSource).filter((file) => {
         const text = readFileSync(file, "utf8");
+
         return SYMBOLS.some((symbol) => text.includes(symbol));
       }),
     );
@@ -272,6 +298,7 @@ function sourceFiles(root: string): string[] {
 
 function collectFileAccesses(root: string, file: string, sourceText: string): GlobalAppAccess[] {
   if (workspacePath(root, file) === ACCESSOR_FILE) return [];
+
   const source = ts.createSourceFile(
     file,
     sourceText,
@@ -309,13 +336,18 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
       (specifier !== void 0 && isAccessorModule(root, file, specifier)) ||
       (ts.isIdentifier(expression) && namespace !== void 0 && !isShadowed(expression, namespace));
     if (!fromAccessor) return;
+
     if (ts.isIdentifier(name)) {
       namespaces.set(name.text, { symbol: "getApp", declaration: name });
+
       return;
     }
+
     for (const element of name.elements) {
       if (!ts.isBindingElement(element)) continue;
+
       if (element.dotDotDotToken || !ts.isIdentifier(element.name)) continue;
+
       const property = element.propertyName;
       const symbol = symbolNamed(
         property && (ts.isIdentifier(property) || ts.isStringLiteral(property))
@@ -323,6 +355,7 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
           : element.name.text,
       );
       if (!symbol) continue;
+
       direct.set(element.name.text, { symbol, declaration: element.name });
       add(element.name, symbol, "import", element.name.text);
     }
@@ -339,6 +372,7 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
         !clause.namedBindings
       )
         continue;
+
       if (ts.isNamespaceImport(clause.namedBindings)) {
         namespaces.set(clause.namedBindings.name.text, {
           symbol: "getApp",
@@ -346,14 +380,18 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
         });
         continue;
       }
+
       for (const element of clause.namedBindings.elements) {
         if (element.isTypeOnly) continue;
+
         const symbol = symbolNamed(element.propertyName?.text ?? element.name.text);
         if (!symbol) continue;
+
         direct.set(element.name.text, { symbol, declaration: element.name });
         add(element.name, symbol, "import", element.name.text);
       }
     }
+
     if (ts.isExportDeclaration(statement) && !statement.isTypeOnly) {
       const module = statement.moduleSpecifier;
       const clause = statement.exportClause;
@@ -365,8 +403,10 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
         !isAccessorModule(root, file, module.text)
       )
         continue;
+
       for (const element of clause.elements) {
         if (element.isTypeOnly) continue;
+
         const symbol = symbolNamed(element.propertyName?.text ?? element.name.text);
         if (symbol) add(element.name, symbol, "import", element.name.text);
       }
@@ -375,10 +415,12 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
 
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
+
     if (ts.isVariableDeclaration(node)) {
       const initializer = node.initializer;
       if (initializer) addDestructuredBindings(node.name, initializer);
     }
+
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const symbol = propertySymbol(node);
       const expression = unwrap(node.expression);
@@ -389,15 +431,18 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
       if (symbol && ((specifier && isAccessorModule(root, file, specifier)) || isNamespaceAccess))
         add(node, symbol, "reference", node.getText(source));
     }
+
     if (ts.isIdentifier(node) && !isPropertyName(node) && !isBindingName(node)) {
       const binding = direct.get(node.text);
       if (binding && !isShadowed(node, binding)) {
         add(node, binding.symbol, "reference", node.text);
       }
     }
+
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(source, visit);
+
   return accesses.sort(
     (left, right) =>
       left.line - right.line ||
@@ -423,6 +468,7 @@ function key(entry: BaselineEntry): string {
 
 export function formatGlobalAppAccessBaseline(accesses: readonly GlobalAppAccess[]): string {
   const entries = accesses.map(entry).sort((left, right) => key(left).localeCompare(key(right)));
+
   return `${JSON.stringify({ version: 1, accesses: entries }, null, 2)}\n`;
 }
 
@@ -432,6 +478,7 @@ function readBaseline(root: string): {
 } {
   const file = join(root, BASELINE_PATH);
   if (!existsSync(file)) return { entries: [], violations: [] };
+
   let value: unknown;
   try {
     value = JSON.parse(readFileSync(file, "utf8"));
@@ -447,6 +494,7 @@ function readBaseline(root: string): {
       ],
     };
   }
+
   const document = baselineSchema.safeParse(value);
   if (!document.success)
     return {
@@ -459,6 +507,7 @@ function readBaseline(root: string): {
         },
       ],
     };
+
   const entries: BaselineEntry[] = [];
   const violations: ArchitectureViolation[] = [];
   for (const [index, value] of document.data.accesses.entries()) {
@@ -471,6 +520,7 @@ function readBaseline(root: string): {
         message: `Global app access baseline entry ${index} is malformed.`,
       });
   }
+
   const sorted = [...entries].sort((left, right) => key(left).localeCompare(key(right)));
   if (entries.some((item, index) => key(item) !== key(sorted[index]!)))
     violations.push({
@@ -478,12 +528,14 @@ function readBaseline(root: string): {
       file,
       message: "Global app access baseline entries must be sorted.",
     });
+
   if (new Set(entries.map(key)).size !== entries.length)
     violations.push({
       policy: "global-app-access-baseline",
       file,
       message: "Global app access baseline entries must be unique.",
     });
+
   return { entries, violations };
 }
 
@@ -494,6 +546,7 @@ export function lintGlobalAppAccess(root: string): ArchitectureViolation[] {
   const currentKeys = new Set(current.map((access) => key(entry(access))));
   for (const access of current) {
     if (baseline.has(key(entry(access)))) continue;
+
     violations.push({
       policy: "global-app-access",
       file: join(root, access.file),
@@ -504,8 +557,10 @@ export function lintGlobalAppAccess(root: string): ArchitectureViolation[] {
         "Receive the composed service through context or an explicit service constructor dependency; keep getApp/tryGetApp only in the legacy composition accessor while it is being removed.",
     });
   }
+
   for (const item of entries) {
     if (currentKeys.has(key(item))) continue;
+
     violations.push({
       policy: "global-app-access-baseline",
       file: join(root, item[0]),
@@ -514,5 +569,6 @@ export function lintGlobalAppAccess(root: string): ArchitectureViolation[] {
       allowed: "Remove the stale baseline entry after the legacy access is removed.",
     });
   }
+
   return violations;
 }

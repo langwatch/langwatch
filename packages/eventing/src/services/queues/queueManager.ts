@@ -510,7 +510,7 @@ export class QueueManager<EventType extends Event = Event> {
       options?: CommandHandlerOptions<Payload>;
     }>,
     storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
-    pipelineName: string,
+    _pipelineName: string,
   ): void {
     if (!this.globalQueue) {
       return;

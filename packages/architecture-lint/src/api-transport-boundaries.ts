@@ -45,8 +45,11 @@ function isProductionSource(file: string): boolean {
 
 function scriptKind(file: string): ts.ScriptKind {
   if (file.endsWith(".tsx")) return ts.ScriptKind.TSX;
+
   if (file.endsWith(".jsx")) return ts.ScriptKind.JSX;
+
   if (file.endsWith(".mjs") || file.endsWith(".cjs")) return ts.ScriptKind.JS;
+
   return ts.ScriptKind.TS;
 }
 
@@ -95,15 +98,21 @@ function importedNames(statement: ts.ImportDeclaration): string[] {
   const names: string[] = [];
   const clause = statement.importClause;
   if (!clause) return names;
+
   if (clause.name) names.push(clause.name.text);
+
   if (!clause.namedBindings) return names;
+
   if (ts.isNamespaceImport(clause.namedBindings)) {
     names.push(clause.namedBindings.name.text);
+
     return names;
   }
+
   for (const element of clause.namedBindings.elements) {
     names.push(element.propertyName?.text ?? element.name.text);
   }
+
   return names;
 }
 
@@ -117,16 +126,20 @@ function importReferences(source: ts.SourceFile): ImportReference[] {
         specifier: node.moduleSpecifier.text,
         importedNames: importedNames(node),
       });
+
       return;
     }
+
     if (
       ts.isExportDeclaration(node) &&
       node.moduleSpecifier &&
       ts.isStringLiteral(node.moduleSpecifier)
     ) {
       references.push({ node, specifier: node.moduleSpecifier.text, importedNames: [] });
+
       return;
     }
+
     if (
       ts.isImportEqualsDeclaration(node) &&
       ts.isExternalModuleReference(node.moduleReference) &&
@@ -138,8 +151,10 @@ function importReferences(source: ts.SourceFile): ImportReference[] {
         specifier: node.moduleReference.expression.text,
         importedNames: [node.name.text],
       });
+
       return;
     }
+
     if (ts.isCallExpression(node)) {
       const dynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
       const requireCall = ts.isIdentifier(node.expression) && node.expression.text === "require";
@@ -148,10 +163,12 @@ function importReferences(source: ts.SourceFile): ImportReference[] {
         references.push({ node, specifier: firstArgument.text, importedNames: [] });
       }
     }
+
     ts.forEachChild(node, visit);
   };
 
   ts.forEachChild(source, visit);
+
   return references;
 }
 
@@ -189,24 +206,30 @@ function forbiddenImportReason(
     (strictFeatureApi &&
       (specifier === "@langwatch/platform-api/runtime" ||
         specifier === "@langwatch/worker/runtime"));
+
   return appImplementation ? "process or application implementation" : null;
 }
 
 function declarationName(node: ts.NamedDeclaration): string | null {
   const name = node.name;
+
   return name && (ts.isIdentifier(name) || ts.isStringLiteral(name)) ? name.text : null;
 }
 
 function typeName(node: ts.TypeNode | undefined): string | null {
   if (!node || !ts.isTypeReferenceNode(node)) return null;
+
   const name = node.typeName;
   if (ts.isIdentifier(name)) return name.text;
+
   return name.right.text;
 }
 
 function expressionName(node: ts.Expression): string | null {
   if (ts.isIdentifier(node)) return node.text;
+
   if (ts.isPropertyAccessExpression(node)) return node.name.text;
+
   return null;
 }
 
@@ -227,6 +250,7 @@ function localFunctions(source: ts.SourceFile): ReadonlyMap<string, ts.FunctionL
       add(statement.name.text, statement);
       continue;
     }
+
     if (ts.isVariableStatement(statement)) {
       for (const declaration of statement.declarationList.declarations) {
         if (
@@ -238,8 +262,10 @@ function localFunctions(source: ts.SourceFile): ReadonlyMap<string, ts.FunctionL
           add(declaration.name.text, declaration.initializer);
         }
       }
+
       continue;
     }
+
     if (ts.isClassDeclaration(statement)) {
       for (const member of statement.members) {
         if (ts.isMethodDeclaration(member) && member.body) {
@@ -249,6 +275,7 @@ function localFunctions(source: ts.SourceFile): ReadonlyMap<string, ts.FunctionL
       }
     }
   }
+
   return functions;
 }
 
@@ -259,11 +286,14 @@ function handlerForEndpoint(
   if (ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === "handle") {
     const registration = enclosingRestRegistration(call);
     if (!registration) return null;
+
     return resolveHandler(call.arguments[0], functions);
   }
+
   if (!ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "register") {
     return null;
   }
+
   return resolveHandler(call.arguments[2], functions);
 }
 
@@ -272,6 +302,7 @@ function enclosingRestRegistration(call: ts.CallExpression): ts.CallExpression |
   while (current.parent) {
     current = current.parent;
     if (!ts.isArrowFunction(current) && !ts.isFunctionExpression(current)) continue;
+
     const parent = current.parent;
     if (
       ts.isCallExpression(parent) &&
@@ -282,8 +313,10 @@ function enclosingRestRegistration(call: ts.CallExpression): ts.CallExpression |
     ) {
       return parent;
     }
+
     return null;
   }
+
   return null;
 }
 
@@ -292,11 +325,15 @@ function resolveHandler(
   functions: ReadonlyMap<string, ts.FunctionLikeDeclaration>,
 ): ts.FunctionLikeDeclaration | null {
   if (!candidate) return null;
+
   if (ts.isArrowFunction(candidate) || ts.isFunctionExpression(candidate)) return candidate;
+
   if (ts.isIdentifier(candidate)) return functions.get(candidate.text) ?? null;
+
   if (ts.isPropertyAccessExpression(candidate)) {
     return functions.get(candidate.name.text) ?? null;
   }
+
   if (
     ts.isCallExpression(candidate) &&
     ts.isPropertyAccessExpression(candidate.expression) &&
@@ -305,6 +342,7 @@ function resolveHandler(
   ) {
     return functions.get(candidate.expression.expression.name.text) ?? null;
   }
+
   return null;
 }
 
@@ -315,19 +353,25 @@ function serviceOrRepositoryConstruction(
   if (ts.isNewExpression(node)) {
     const localName = expressionName(node.expression);
     const canonicalName = localName ? (importedCanonicalNames.get(localName) ?? localName) : null;
+
     return canonicalName && SERVICE_OR_REPOSITORY.test(canonicalName) ? canonicalName : null;
   }
+
   if (!ts.isCallExpression(node)) return null;
 
   if (ts.isIdentifier(node.expression)) {
     const canonicalName = importedCanonicalNames.get(node.expression.text) ?? node.expression.text;
+
     return SERVICE_OR_REPOSITORY_FACTORY.test(canonicalName) ? canonicalName : null;
   }
+
   if (!ts.isPropertyAccessExpression(node.expression) || node.expression.name.text !== "create") {
     return null;
   }
+
   const localName = expressionName(node.expression.expression);
   const canonicalName = localName ? (importedCanonicalNames.get(localName) ?? localName) : null;
+
   return canonicalName && SERVICE_OR_REPOSITORY.test(canonicalName) ? canonicalName : null;
 }
 
@@ -335,12 +379,15 @@ function importedCanonicalNames(source: ts.SourceFile): ReadonlyMap<string, stri
   const names = new Map<string, string>();
   for (const statement of source.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
+
     const bindings = statement.importClause?.namedBindings;
     if (!bindings || !ts.isNamedImports(bindings)) continue;
+
     for (const element of bindings.elements) {
       names.set(element.name.text, element.propertyName?.text ?? element.name.text);
     }
   }
+
   return names;
 }
 
@@ -354,6 +401,7 @@ function handlerConstructionViolations(
   const visitedHandlers = new Set<ts.FunctionLikeDeclaration>();
   const visitHandler = (handler: ts.FunctionLikeDeclaration): void => {
     if (visitedHandlers.has(handler) || !handler.body) return;
+
     visitedHandlers.add(handler);
     const visit = (node: ts.Node): void => {
       const construction = serviceOrRepositoryConstruction(node, canonicalNames);
@@ -367,6 +415,7 @@ function handlerConstructionViolations(
             "Construct the process-owned service graph at boot and call the composed service through context.app or the transport context.",
         });
       }
+
       ts.forEachChild(node, visit);
     };
     visit(handler.body);
@@ -376,22 +425,28 @@ function handlerConstructionViolations(
       const handler = handlerForEndpoint(node, functions);
       if (handler) visitHandler(handler);
     }
+
     ts.forEachChild(node, visitRegistration);
   };
   ts.forEachChild(source, visitRegistration);
+
   return violations;
 }
 
 function propertyPath(node: ts.Expression): string[] | null {
   if (ts.isIdentifier(node)) return [node.text];
+
   if (!ts.isPropertyAccessExpression(node)) return null;
+
   const parent = propertyPath(node.expression);
+
   return parent ? [...parent, node.name.text] : null;
 }
 
 function serviceAliases(handler: ts.FunctionLikeDeclaration): ReadonlySet<string> {
   const aliases = new Set<string>();
   if (!handler.body) return aliases;
+
   const contextNames = new Set(
     handler.parameters
       .map((parameter) => (ts.isIdentifier(parameter.name) ? parameter.name.text : null))
@@ -404,9 +459,11 @@ function serviceAliases(handler: ts.FunctionLikeDeclaration): ReadonlySet<string
         aliases.add(node.name.text);
       }
     }
+
     ts.forEachChild(node, visit);
   };
   visit(handler.body);
+
   return aliases;
 }
 
@@ -416,9 +473,12 @@ function isCanonicalServiceCall(
   aliases: ReadonlySet<string>,
 ): boolean {
   if (!ts.isPropertyAccessExpression(node.expression)) return false;
+
   const receiver = node.expression.expression;
   if (ts.isIdentifier(receiver) && aliases.has(receiver.text)) return true;
+
   const path = propertyPath(receiver);
+
   return Boolean(path && path.length === 3 && contextNames.has(path[0]!) && path[1] === "app");
 }
 
@@ -441,6 +501,7 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
   const visitedHandlers = new Set<ts.FunctionLikeDeclaration>();
   const inspect = (handler: ts.FunctionLikeDeclaration): void => {
     if (visitedHandlers.has(handler) || !handler.body) return;
+
     visitedHandlers.add(handler);
     const contextNames = new Set(
       handler.parameters
@@ -455,10 +516,12 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
       const entersNestedFunction = node !== handler.body && ts.isFunctionLike(node);
       const nested = nestedFunction || entersNestedFunction;
       if (!nested && isDomainControlFlow(node)) controlFlow.push(node);
+
       if (ts.isCallExpression(node) && isCanonicalServiceCall(node, contextNames, aliases)) {
         serviceCalls.push(node);
         if (nested) nestedServiceCalls.push(node);
       }
+
       ts.forEachChild(node, (child) => visit(child, nested));
     };
     visit(handler.body, false);
@@ -515,9 +578,11 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
       const handler = handlerForEndpoint(node, functions);
       if (handler) inspect(handler);
     }
+
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(source, visit);
+
   return violations;
 }
 
@@ -531,22 +596,27 @@ function honoBindings(source: ts.SourceFile): ReadonlySet<string> {
     ) {
       continue;
     }
+
     const clause = statement.importClause;
     if (clause?.name) bindings.add(clause.name.text);
+
     const named = clause?.namedBindings;
     if (!named || !ts.isNamedImports(named)) continue;
+
     for (const element of named.elements) {
       if ((element.propertyName?.text ?? element.name.text) === "Hono") {
         bindings.add(element.name.text);
       }
     }
   }
+
   return bindings;
 }
 
 function rawHonoViolations(file: string, source: ts.SourceFile): ArchitectureViolation[] {
   const honoTypes = honoBindings(source);
   if (honoTypes.size === 0) return [];
+
   const receivers = new Set<string>();
   const collect = (node: ts.Node): void => {
     if (
@@ -559,6 +629,7 @@ function rawHonoViolations(file: string, source: ts.SourceFile): ArchitectureVio
     ) {
       receivers.add(node.name.text);
     }
+
     if (
       ts.isParameter(node) &&
       ts.isIdentifier(node.name) &&
@@ -566,6 +637,7 @@ function rawHonoViolations(file: string, source: ts.SourceFile): ArchitectureVio
     ) {
       receivers.add(node.name.text);
     }
+
     ts.forEachChild(node, collect);
   };
   ts.forEachChild(source, collect);
@@ -588,9 +660,11 @@ function rawHonoViolations(file: string, source: ts.SourceFile): ArchitectureVio
           "Define the endpoint with @langwatch/api and leave Hono mounting to application composition.",
       });
     }
+
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(source, visit);
+
   return violations;
 }
 
@@ -605,6 +679,7 @@ function parameterIsString(parameter: ts.ParameterDeclaration | undefined): bool
  */
 function returnsPromise(type: ts.TypeNode | undefined): boolean {
   if (!type) return true;
+
   return (
     ts.isTypeReferenceNode(type) &&
     ts.isIdentifier(type.typeName) &&
@@ -616,6 +691,7 @@ function stringDispatchMember(node: ts.Expression): "query" | "mutate" | null {
   if (ts.isPropertyAccessExpression(node)) {
     return node.name.text === "query" || node.name.text === "mutate" ? node.name.text : null;
   }
+
   if (
     ts.isElementAccessExpression(node) &&
     node.argumentExpression &&
@@ -624,6 +700,7 @@ function stringDispatchMember(node: ts.Expression): "query" | "mutate" | null {
   ) {
     return node.argumentExpression.text;
   }
+
   return null;
 }
 
@@ -657,6 +734,7 @@ function stringLocatorViolations(file: string, source: ts.SourceFile): Architect
           "Expose semantic service methods or a typed generated transport client; procedure paths must be compiler-checked.",
       });
     }
+
     if (
       ts.isCallExpression(node) &&
       stringDispatchMember(node.expression) !== null &&
@@ -673,9 +751,11 @@ function stringLocatorViolations(file: string, source: ts.SourceFile): Architect
           "Call a semantic service method or a typed generated transport procedure directly.",
       });
     }
+
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(source, visit);
+
   return violations;
 }
 
@@ -692,6 +772,7 @@ function lintSource(root: string, transport: TransportSource): ArchitectureViola
   for (const reference of importReferences(source)) {
     const reason = forbiddenImportReason(reference, transport.strictFeatureApi);
     if (!reason) continue;
+
     violations.push({
       policy: "api-transport-import-boundary",
       file: transport.file,

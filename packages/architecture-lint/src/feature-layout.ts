@@ -51,6 +51,7 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
   const services = files.filter((file) => {
     const path = workspacePath(`${pkg.root}/src`, file);
     if (TEST_DIRECTORY.test(path)) return false;
+
     return CONTRACT_ARTIFACT.test(path.slice(path.lastIndexOf("/") + 1));
   });
   if (services.length > 0) return [];
@@ -67,6 +68,7 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
 /** The implementation directory a resolved file lives under, package-relative. */
 function rulesImplementationKind(relativePath: string): string | undefined {
   const match = relativePath.match(RULES_IMPLEMENTATION_PATH)?.[0]?.replace(/\//g, "");
+
   return match ? RULES_IMPLEMENTATION_KIND[match] : void 0;
 }
 
@@ -97,12 +99,16 @@ function isRulesFrameworkFree({
       forbidden: ({ specifier, target }) => {
         const named = namedForbiddenSpecifier(specifier);
         if (named) return named;
+
         if (!target) return void 0;
+
         const owner = resolver.owningPackage({ file: target });
         if (!owner) return void 0;
+
         const kind = rulesImplementationKind(
           relative(owner.directory, target).split(sep).join("/"),
         );
+
         return kind ? withArticle(kind) : void 0;
       },
     }).seeds.size === 0
@@ -125,6 +131,7 @@ function lintRulesImports(
       const target = resolveRelativeModule({ file, specifier });
       const relativeTarget = target ? workspacePath(`${pkg.root}/src`, target) : void 0;
       if (relativeTarget?.startsWith("rules/")) continue;
+
       const kind = relativeTarget ? rulesImplementationKind(relativeTarget) : void 0;
       violations.push(
         violation(
@@ -150,13 +157,17 @@ function lintRulesImports(
 
     const target = resolver.resolve({ specifier, file });
     if (!target) continue;
+
     const owner = resolver.owningPackage({ file: target });
     if (owner?.name.endsWith("-contract")) continue;
+
     if (isRulesFrameworkFree({ entry: target, resolver })) continue;
+
     violations.push(
       violation(file, `Rules module cannot import ${JSON.stringify(specifier)}.`, allowed),
     );
   }
+
   return violations;
 }
 
@@ -171,11 +182,14 @@ function lintServer(
   for (const file of files) {
     const path = workspacePath(`${pkg.root}/src`, file);
     if (TEST_DIRECTORY.test(path)) continue;
+
     if (PROCESS_MANAGER_SERVICE_PATTERN.test(path)) continue;
+
     if (RULES_PATTERN.test(path)) {
       violations.push(...lintRulesImports(pkg, file, getResolver()));
       continue;
     }
+
     if (SERVICE_MODULE_PATTERN.test(path)) serviceCount += 1;
   }
 
@@ -188,6 +202,7 @@ function lintServer(
       ),
     );
   }
+
   return violations;
 }
 
@@ -209,17 +224,22 @@ const SOURCE_FILE_EXTENSIONS = [".ts", ".tsx"] as const;
  */
 function firstManifestTarget(value: unknown): string | undefined {
   if (typeof value === "string") return value;
+
   if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+
   for (const nested of Object.values(value as Record<string, unknown>)) {
     const found = firstManifestTarget(nested);
     if (found) return found;
   }
+
   return void 0;
 }
 
 function manifestTargets(value: unknown): string[] {
   if (typeof value === "string") return [value];
+
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+
   return Object.values(value as Record<string, unknown>).flatMap(manifestTargets);
 }
 
@@ -231,6 +251,7 @@ function packageEntrypoints(pkg: ClassifiedPackage): string[] {
       targets.add(target.replace(/^\.\//, ""));
     }
   }
+
   return [...targets].map((target) => `${pkg.root}/${target}`);
 }
 
@@ -239,6 +260,7 @@ const packageImportsCache = new Map<string, Record<string, unknown> | undefined>
 /** The package's `imports` field (self-referencing aliases such as `#app/*`), read once per package. */
 function packageImportsMap(pkg: ClassifiedPackage): Record<string, unknown> | undefined {
   if (packageImportsCache.has(pkg.manifestPath)) return packageImportsCache.get(pkg.manifestPath);
+
   let map: Record<string, unknown> | undefined;
   try {
     const raw = JSON.parse(readFileSync(pkg.manifestPath, "utf8")) as { imports?: unknown };
@@ -248,24 +270,32 @@ function packageImportsMap(pkg: ClassifiedPackage): Record<string, unknown> | un
   } catch {
     map = void 0;
   }
+
   packageImportsCache.set(pkg.manifestPath, map);
+
   return map;
 }
 
 function resolveImportsAlias(specifier: string, pkg: ClassifiedPackage): string | undefined {
   const importsMap = packageImportsMap(pkg);
   if (!importsMap) return void 0;
+
   for (const [key, value] of Object.entries(importsMap)) {
     const targetPattern = firstManifestTarget(value);
     if (!targetPattern) continue;
+
     if (key.endsWith("*")) {
       const prefix = key.slice(0, -1);
       if (!specifier.startsWith(prefix)) continue;
+
       const captured = specifier.slice(prefix.length);
+
       return join(pkg.root, targetPattern.replace("*", captured));
     }
+
     if (key === specifier) return join(pkg.root, targetPattern);
   }
+
   return void 0;
 }
 
@@ -281,7 +311,9 @@ function resolveSpecifier(
   } else if (specifier.startsWith("#")) {
     base = resolveImportsAlias(specifier, pkg);
   }
+
   if (!base) return void 0;
+
   for (const candidate of [
     base,
     ...SOURCE_FILE_EXTENSIONS.map((ext) => `${base}${ext}`),
@@ -289,6 +321,7 @@ function resolveSpecifier(
   ]) {
     if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
   }
+
   return void 0;
 }
 
@@ -299,7 +332,9 @@ function isPrivateServerPath(
 ): boolean {
   const relativePath = workspacePath(`${pkg.root}/src`, file);
   if (!PRIVATE_SERVER_EXPORT.test(relativePath)) return false;
+
   if (allowTestingDoubles && TESTING_ENTRY_DOUBLE.test(relativePath)) return false;
+
   return true;
 }
 
@@ -309,13 +344,17 @@ function exportName(element: ts.ExportSpecifier): string {
 
 function declaresValue(statement: ts.Statement, name: string): boolean {
   if (ts.isClassDeclaration(statement) && statement.name?.text === name) return true;
+
   if (ts.isFunctionDeclaration(statement) && statement.name?.text === name) return true;
+
   if (ts.isEnumDeclaration(statement) && statement.name.text === name) return true;
+
   if (ts.isVariableStatement(statement)) {
     return statement.declarationList.declarations.some(
       (declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name,
     );
   }
+
   return false;
 }
 
@@ -328,6 +367,7 @@ function isExportedValueDeclaration(statement: ts.Statement): boolean {
   ) {
     return false;
   }
+
   return (
     ts.canHaveModifiers(statement) &&
     (ts
@@ -363,8 +403,10 @@ function resolveBindingOrigin(
 ): boolean {
   const key = `${file}::${name}`;
   if (visited.has(key)) return false;
+
   visited.add(key);
   if (!existsSync(file)) return false;
+
   const sourceFile = parseModule(file);
 
   for (const statement of sourceFile.statements) {
@@ -375,18 +417,24 @@ function resolveBindingOrigin(
 
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
+
     if (statement.importClause?.isTypeOnly) continue;
+
     if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+
     const clause = statement.importClause;
     if (!clause) continue;
+
     if (clause.name?.text === name) {
       const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
       if (target && resolveBindingOrigin(target, "default", pkg, visited, allowTestingDoubles))
         return true;
     }
+
     if (clause.namedBindings && !ts.isNamespaceImport(clause.namedBindings)) {
       for (const element of clause.namedBindings.elements) {
         if (element.isTypeOnly || element.name.text !== name) continue;
+
         const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
         const imported = element.propertyName?.text ?? element.name.text;
         if (target && resolveBindingOrigin(target, imported, pkg, visited, allowTestingDoubles))
@@ -397,18 +445,25 @@ function resolveBindingOrigin(
 
   for (const statement of sourceFile.statements) {
     if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
+
     if (!statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+
     const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
     if (!target) continue;
+
     if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
       for (const element of statement.exportClause.elements) {
         if (element.isTypeOnly || element.name.text !== name) continue;
+
         if (resolveBindingOrigin(target, exportName(element), pkg, visited, allowTestingDoubles))
           return true;
       }
-    } else if (!statement.exportClause) {
       // `export * from "./elsewhere"` may forward the name; best-effort probe.
-      if (resolveBindingOrigin(target, name, pkg, visited, allowTestingDoubles)) return true;
+    } else if (
+      !statement.exportClause &&
+      resolveBindingOrigin(target, name, pkg, visited, allowTestingDoubles)
+    ) {
+      return true;
     }
   }
 
@@ -427,21 +482,26 @@ function fileExposesPrivateValue(
   allowTestingDoubles = false,
 ): boolean {
   if (visited.has(file)) return false;
+
   visited.add(file);
   if (!existsSync(file)) return false;
+
   const sourceFile = parseModule(file);
 
   for (const statement of sourceFile.statements) {
     if (ts.isExportDeclaration(statement)) {
       if (statement.isTypeOnly) continue;
+
       if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
         const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
         if (!target) continue;
+
         if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
           if (fileExposesPrivateValue(target, pkg, visited, allowTestingDoubles)) return true;
         } else if (ts.isNamedExports(statement.exportClause)) {
           for (const element of statement.exportClause.elements) {
             if (element.isTypeOnly) continue;
+
             if (
               resolveBindingOrigin(target, exportName(element), pkg, new Set(), allowTestingDoubles)
             )
@@ -451,6 +511,7 @@ function fileExposesPrivateValue(
       } else if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
         for (const element of statement.exportClause.elements) {
           if (element.isTypeOnly) continue;
+
           if (resolveBindingOrigin(file, exportName(element), pkg, new Set(), allowTestingDoubles))
             return true;
         }
@@ -462,6 +523,7 @@ function fileExposesPrivateValue(
       return true;
     }
   }
+
   return false;
 }
 
@@ -470,6 +532,7 @@ function lintPrivateServerExportsForEntry(
   file: string,
 ): ArchitectureViolation[] {
   if (!existsSync(file)) return [];
+
   // R6: `src/testing.ts` is a test-only entrypoint. It may still export a
   // double (a memory/null/stub/fake repository or store, or a
   // `*.test-fakes.ts` module) — never a real repository, store, or
@@ -509,7 +572,9 @@ function lintPrivateServerExportsForEntry(
         add(statement, specifierText);
         continue;
       }
+
       if (!target) continue;
+
       if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
         if (fileExposesPrivateValue(target, pkg, new Set(), allowTestingDoubles)) {
           add(statement, specifierText);
@@ -517,6 +582,7 @@ function lintPrivateServerExportsForEntry(
       } else if (ts.isNamedExports(statement.exportClause)) {
         for (const element of statement.exportClause.elements) {
           if (element.isTypeOnly) continue;
+
           if (
             resolveBindingOrigin(target, exportName(element), pkg, new Set(), allowTestingDoubles)
           ) {
@@ -524,17 +590,20 @@ function lintPrivateServerExportsForEntry(
           }
         }
       }
+
       continue;
     }
 
     if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
       for (const element of statement.exportClause.elements) {
         if (element.isTypeOnly) continue;
+
         if (resolveBindingOrigin(file, exportName(element), pkg, new Set(), allowTestingDoubles))
           add(element);
       }
     }
   }
+
   return violations;
 }
 
@@ -543,6 +612,7 @@ function lintPrivateServerExports(pkg: ClassifiedPackage): ArchitectureViolation
   for (const file of packageEntrypoints(pkg)) {
     violations.push(...lintPrivateServerExportsForEntry(pkg, file));
   }
+
   return violations;
 }
 
@@ -554,15 +624,21 @@ export function lintFeatureLayouts(
   // Built at most once, and only when a rules/ file is actually found — most
   // lint runs never need the workspace-wide resolver this walk requires.
   let resolver: WorkspaceModuleResolver | undefined;
-  const getResolver = (): WorkspaceModuleResolver =>
-    (resolver ??= createWorkspaceModuleResolver({ root }));
+  const getResolver = (): WorkspaceModuleResolver => {
+    resolver ??= createWorkspaceModuleResolver({ root });
+
+    return resolver;
+  };
   for (const pkg of packages) {
     if (pkg.layoutVersion !== 0) continue;
+
     if (pkg.kind === "contract") violations.push(...lintContract(pkg));
+
     if (pkg.kind === "server") {
       violations.push(...lintServer(pkg, getResolver));
       violations.push(...lintPrivateServerExports(pkg));
     }
   }
+
   return violations;
 }

@@ -39,7 +39,7 @@ describe("CommandHandlerClass", () => {
           return payload.id;
         }
 
-        async handle(command: Command<TestPayload>): Promise<TestEvent[]> {
+        async handle(_command: Command<TestPayload>): Promise<TestEvent[]> {
           return [];
         }
       }
@@ -113,7 +113,7 @@ describe("CommandHandlerClass", () => {
           };
         }
 
-        async handle(command: Command<TestPayload>): Promise<TestEvent[]> {
+        async handle(_command: Command<TestPayload>): Promise<TestEvent[]> {
           return [];
         }
       }
@@ -142,7 +142,7 @@ describe("CommandHandlerClass", () => {
           return `job-${payload.id}-${payload.value}`;
         }
 
-        async handle(command: Command<TestPayload>): Promise<TestEvent[]> {
+        async handle(_command: Command<TestPayload>): Promise<TestEvent[]> {
           return [];
         }
       }
@@ -167,7 +167,7 @@ describe("CommandHandlerClass", () => {
           return payload.id;
         }
 
-        async handle(command: Command<TestPayload>): Promise<TestEvent[]> {
+        async handle(_command: Command<TestPayload>): Promise<TestEvent[]> {
           return [];
         }
       }
@@ -187,7 +187,7 @@ describe("CommandHandlerClass", () => {
           return payload.id;
         }
 
-        async handle(command: Command<TestPayload>): Promise<TestEvent[]> {
+        async handle(_command: Command<TestPayload>): Promise<TestEvent[]> {
           return [];
         }
       }

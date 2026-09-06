@@ -4,7 +4,7 @@ import { lintApiTransportBoundaries } from "./api-transport-boundaries";
 import { lintApiTransportFramework } from "./api-transport-framework";
 import { lintArchitectureRecords } from "./architecture-records";
 import { lintCycles } from "./cycles";
-import { changedSourceFiles, lintCommentBlocks } from "./comment-blocks";
+import { changedSourceFiles } from "./comment-blocks";
 import { lintStrictContractBuildConfigs } from "./contract-build-config";
 import { lintDeclarations } from "./declarations";
 import { lintEventingRoles } from "./eventing-roles";
@@ -160,6 +160,7 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
     ...lintTestQuality(root, { files: changedFiles }),
     ...(options.declarations === false ? [] : lintDeclarations(discovery.packages)),
   ];
+
   return violations
     .map((violation) => ({
       ...violation,
@@ -174,5 +175,6 @@ export function formatViolation(violation: ArchitectureViolation): string {
   const location = `${violation.file}${violation.line ? `:${violation.line}` : ""}`;
   const importText = violation.specifier ? ` (${violation.specifier})` : "";
   const allowed = violation.allowed ? `\n  allowed: ${violation.allowed}` : "";
+
   return `[${violation.policy}] ${location}${importText}\n  ${violation.message}${allowed}`;
 }

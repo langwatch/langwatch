@@ -77,6 +77,7 @@ function isWithin(root: string, path: string): boolean {
   const pathFromRoot = relative(root, path);
   const escapesRoot =
     pathFromRoot.startsWith(`..${sep}`) || pathFromRoot === ".." || isAbsolute(pathFromRoot);
+
   return pathFromRoot === "" || !escapesRoot;
 }
 
@@ -85,6 +86,7 @@ function sourceLineStarts(source: string): number[] {
   for (let index = 0; index < source.length; index += 1) {
     if (source.charCodeAt(index) === 10) starts.push(index + 1);
   }
+
   return starts;
 }
 
@@ -96,6 +98,7 @@ function sourceLine(starts: readonly number[], offset: number): number {
     if (starts[middle]! <= offset) low = middle + 1;
     else high = middle;
   }
+
   return low;
 }
 
@@ -118,20 +121,24 @@ function importsIn(file: string): SourceImport[] {
       acceptsString = true;
       continue;
     }
+
     if (token === ts.SyntaxKind.ExportKeyword) {
       mode = "export";
       acceptsString = false;
       continue;
     }
+
     if (token === ts.SyntaxKind.Identifier && scanner.getTokenText() === "require") {
       mode = "require";
       acceptsString = true;
       continue;
     }
+
     if (token === ts.SyntaxKind.FromKeyword && mode !== null) {
       acceptsString = true;
       continue;
     }
+
     if (token === ts.SyntaxKind.StringLiteral && mode && acceptsString) {
       found.push({
         file,
@@ -142,6 +149,7 @@ function importsIn(file: string): SourceImport[] {
       acceptsString = false;
       continue;
     }
+
     if (
       mode === "import" &&
       token !== ts.SyntaxKind.OpenParenToken &&
@@ -149,6 +157,7 @@ function importsIn(file: string): SourceImport[] {
     ) {
       acceptsString = false;
     }
+
     if (
       token === ts.SyntaxKind.SemicolonToken ||
       token === ts.SyntaxKind.FunctionKeyword ||
@@ -158,6 +167,7 @@ function importsIn(file: string): SourceImport[] {
       acceptsString = false;
     }
   }
+
   return found.sort(
     (left, right) => left.line - right.line || left.specifier.localeCompare(right.specifier),
   );
@@ -169,6 +179,7 @@ function sourceImports(root: string): SourceImport[] {
       SOURCE_FILE.test(file) && !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
     const isNotTestDirectory =
       !file.includes(`${sep}__tests__${sep}`) && !file.includes(`${sep}__mocks__${sep}`);
+
     return isProductionSource && isNotTestDirectory;
   }).flatMap(importsIn);
 }
@@ -187,7 +198,9 @@ function packageForRelativeImport(
   sourceImport: SourceImport,
 ): ClassifiedPackage | undefined {
   if (!sourceImport.specifier.startsWith(".")) return void 0;
+
   const target = resolve(dirname(sourceImport.file), sourceImport.specifier);
+
   return packages.find((pkg) => isWithin(pkg.root, target));
 }
 
@@ -197,6 +210,7 @@ function packageForPhysicalApplicationSpecifier(
 ): ClassifiedPackage | undefined {
   const match = specifier.match(/^(?:\.\/|\.\.\/)*apps\/(ui|api|worker|server)(?:\/|$)/);
   if (!match) return void 0;
+
   return packages.find((pkg) => pkg.kind === "application" && pkg.applicationRole === match[1]);
 }
 
@@ -213,6 +227,7 @@ function targetPackage(
 
 function compatibleEnterpriseTarget(target: ClassifiedPackage): boolean {
   if (target.kind === "contract") return true;
+
   return Boolean(target.enterprise && target.feature && target.kind === "server");
 }
 
@@ -221,7 +236,9 @@ function matchingEnterpriseComposition(
   target: ClassifiedPackage,
 ): boolean {
   if (target.kind !== "enterprise-composition") return true;
+
   if (importer.kind !== "application") return false;
+
   return importer.applicationRole === target.enterpriseCompositionRole;
 }
 
@@ -306,6 +323,7 @@ function lintClassifiedSourceImports(packages: ClassifiedPackage[]): Architectur
       }
     }
   }
+
   return violations;
 }
 
@@ -319,10 +337,12 @@ function lintCompositionSourceShape(packages: ClassifiedPackage[]): Architecture
     ) {
       continue;
     }
+
     const files = walkFiles(join(pkg.root, "src"), (file) => SOURCE_FILE.test(file));
     for (const file of files) {
       const relativeFile = workspacePath(join(pkg.root, "src"), file);
       if (!PRODUCT_IMPLEMENTATION_PATH.test(relativeFile)) continue;
+
       violations.push({
         policy: "composition-source",
         file,
@@ -335,6 +355,7 @@ function lintCompositionSourceShape(packages: ClassifiedPackage[]): Architecture
     }
 
     if (pkg.kind !== "enterprise-composition") continue;
+
     const source = files.map((file) => readFileSync(file, "utf8")).join("\n");
     if (
       !/export\s+(?:default\s+)?class\s+[A-Za-z_$][\w$]*/.test(source) ||
@@ -348,6 +369,7 @@ function lintCompositionSourceShape(packages: ClassifiedPackage[]): Architecture
       });
     }
   }
+
   return violations;
 }
 
@@ -362,9 +384,11 @@ function lintRuntimeConstructionImports(
     if (sourceImport.specifier !== API_RUNTIME && sourceImport.specifier !== WORKER_RUNTIME) {
       continue;
     }
+
     const file = workspacePath(root, sourceImport.file);
     const match = file.match(/^(apps|tools)\/([^/]+)\//);
     if (!match) continue;
+
     const packageRoot = `${match[1]}/${match[2]}`;
     const known = groups.get(packageRoot) ?? new Set<string>();
     known.add(sourceImport.specifier);
@@ -389,9 +413,11 @@ function lintRuntimeConstructionImports(
 
   const devRuntime = packages.find((pkg) => pkg.kind === "dev-runtime");
   if (!devRuntime) return violations;
+
   const devImports = groups.get("tools/dev-runtime") ?? new Set<string>();
   for (const required of [API_RUNTIME, WORKER_RUNTIME]) {
     if (devImports.has(required)) continue;
+
     violations.push({
       policy: "application-boundary",
       file: join(devRuntime.root, "src"),
@@ -407,6 +433,7 @@ function lintRuntimeConstructionImports(
     if (!application || exportedSubpaths(application).has("./runtime")) {
       continue;
     }
+
     violations.push({
       policy: "application-boundary",
       file: application.manifestPath,
@@ -414,6 +441,7 @@ function lintRuntimeConstructionImports(
       message: `${application.name} must deliberately export its runtime construction entry point for tools/dev-runtime.`,
     });
   }
+
   return violations;
 }
 
@@ -422,7 +450,9 @@ type LegacyArea = "browser" | "backend" | "enterprise" | "unknown";
 function legacyArea(legacyRoot: string, file: string): LegacyArea {
   const path = workspacePath(legacyRoot, file);
   if (path.startsWith("ee/")) return "enterprise";
+
   if (!path.startsWith("src/")) return "unknown";
+
   const sourcePath = path.slice("src/".length);
   if (
     /^(?:server|app\/api|pages\/api|mcp|tasks|runtime\/(?:app|worker|combined|testing))(?:\/|$)/.test(
@@ -432,9 +462,11 @@ function legacyArea(legacyRoot: string, file: string): LegacyArea {
   ) {
     return "backend";
   }
+
   if (/^(?:generated|factories|test-utils|types|utils)(?:\/|$)/.test(sourcePath)) {
     return "unknown";
   }
+
   return "browser";
 }
 
@@ -445,9 +477,11 @@ function resolveLegacySpecifier(
   if (sourceImport.specifier.startsWith("@ee/")) {
     return join(legacyRoot, "ee", sourceImport.specifier.slice("@ee/".length));
   }
+
   if (sourceImport.specifier.startsWith("~/")) {
     return join(legacyRoot, "src", sourceImport.specifier.slice(2));
   }
+
   if (sourceImport.specifier.startsWith("@app/")) {
     return join(
       legacyRoot,
@@ -457,9 +491,11 @@ function resolveLegacySpecifier(
       sourceImport.specifier.slice("@app/".length),
     );
   }
+
   if (sourceImport.specifier.startsWith(".")) {
     return resolve(dirname(sourceImport.file), sourceImport.specifier);
   }
+
   return void 0;
 }
 
@@ -473,15 +509,19 @@ function legacyKind(
   specifier: string,
 ): LegacyApplicationBoundaryKind | undefined {
   if (specifier.startsWith("@ee/")) return "ee-alias";
+
   if (importer === "browser" && target === "backend") {
     return "browser-to-backend";
   }
+
   if (importer === "backend" && target === "browser") {
     return "backend-to-browser";
   }
+
   if (importer === "enterprise" && target !== "enterprise" && target !== "unknown") {
     return "enterprise-to-application";
   }
+
   return void 0;
 }
 
@@ -502,6 +542,7 @@ export function collectLegacyApplicationBoundaryEdges(
       sourceImport.specifier,
     );
     if (!kind) continue;
+
     const edge = {
       importer: workspacePath(root, sourceImport.file),
       specifier: sourceImport.specifier,
@@ -509,6 +550,7 @@ export function collectLegacyApplicationBoundaryEdges(
     };
     edges.set(legacyEdgeKey(edge), edge);
   }
+
   return [...edges.values()].sort((left, right) =>
     legacyEdgeKey(left).localeCompare(legacyEdgeKey(right)),
   );
@@ -541,9 +583,12 @@ export function formatLegacyApplicationBoundaryBaseline(
         `      ${JSON.stringify(importer)}: ${JSON.stringify(sortedSpecifiers)}${importerIndex + 1 === importers.length ? "" : ","}`,
       );
     }
+
     lines.push(`    }${kindIndex + 1 === populatedKinds.length ? "" : ","}`);
   }
+
   lines.push("  }", "}");
+
   return `${lines.join("\n")}\n`;
 }
 
@@ -553,6 +598,7 @@ function readLegacyBaseline(root: string): {
 } {
   const path = join(root, LEGACY_BASELINE_PATH);
   if (!existsSync(path)) return { baseline: [], violations: [] };
+
   const violations: ArchitectureViolation[] = [];
   let value: unknown;
   try {
@@ -569,6 +615,7 @@ function readLegacyBaseline(root: string): {
       ],
     };
   }
+
   const documentResult = legacyBaselineSchema.safeParse(value);
   if (!documentResult.success) {
     return {
@@ -596,6 +643,7 @@ function readLegacyBaseline(root: string): {
       message: "Legacy application boundary baseline kinds are invalid or unsorted.",
     });
   }
+
   for (const kind of canonicalKinds) {
     const importers = edges[kind];
     if (typeof importers !== "object" || importers === null || Array.isArray(importers)) {
@@ -606,6 +654,7 @@ function readLegacyBaseline(root: string): {
       });
       continue;
     }
+
     const importerKeys = Object.keys(importers);
     if (
       importerKeys.some(
@@ -619,6 +668,7 @@ function readLegacyBaseline(root: string): {
         message: `Legacy application boundary baseline group ${kind} must sort importers.`,
       });
     }
+
     for (const importer of importerKeys) {
       const specifiers = importers[importer];
       if (
@@ -633,6 +683,7 @@ function readLegacyBaseline(root: string): {
         });
         continue;
       }
+
       const sortedSpecifiers = [...specifiers].sort();
       if (
         new Set(specifiers).size !== specifiers.length ||
@@ -644,11 +695,13 @@ function readLegacyBaseline(root: string): {
           message: `Legacy application boundary baseline importer ${importer} must have unique sorted specifiers.`,
         });
       }
+
       for (const specifier of specifiers) {
         baseline.push({ kind, importer, specifier });
       }
     }
   }
+
   const keys = baseline.map(legacyEdgeKey);
   if (new Set(keys).size !== keys.length) {
     violations.push({
@@ -657,6 +710,7 @@ function readLegacyBaseline(root: string): {
       message: "Legacy application boundary baseline contains duplicate edges.",
     });
   }
+
   return { baseline, violations };
 }
 
@@ -672,11 +726,13 @@ function lintLegacyApplicationBoundaries(root: string): ArchitectureViolation[] 
         "An empty legacy application boundary baseline must be deleted rather than retained as an exception surface.",
     });
   }
+
   const actualByKey = new Map(actual.map((edge) => [legacyEdgeKey(edge), edge]));
   const baselineByKey = new Map(baseline.map((edge) => [legacyEdgeKey(edge), edge]));
 
   for (const edge of actual) {
     if (baselineByKey.has(legacyEdgeKey(edge))) continue;
+
     violations.push({
       policy: "application-migration",
       file: join(root, edge.importer),
@@ -686,8 +742,10 @@ function lintLegacyApplicationBoundaries(root: string): ArchitectureViolation[] 
         "Move the dependency behind a portable feature/package boundary; the migration baseline may not grow.",
     });
   }
+
   for (const edge of baseline) {
     if (actualByKey.has(legacyEdgeKey(edge))) continue;
+
     violations.push({
       policy: "application-migration-baseline",
       file: path,
@@ -696,6 +754,7 @@ function lintLegacyApplicationBoundaries(root: string): ArchitectureViolation[] 
       allowed: "Delete the stale entry so the checked-in baseline only shrinks.",
     });
   }
+
   return violations;
 }
 
@@ -704,6 +763,7 @@ function lintNewEnterpriseAliases(root: string): ArchitectureViolation[] {
   for (const directory of ["apps", "packages", "tools"] as const) {
     for (const sourceImport of sourceImports(join(root, directory))) {
       if (!sourceImport.specifier.startsWith("@ee/")) continue;
+
       violations.push({
         policy: "application-migration",
         file: sourceImport.file,
@@ -714,6 +774,7 @@ function lintNewEnterpriseAliases(root: string): ArchitectureViolation[] {
       });
     }
   }
+
   return violations;
 }
 

@@ -25,6 +25,7 @@ export function walkFiles(
       ) {
         continue;
       }
+
       const path = join(directory, entry.name);
       if (entry.isDirectory()) {
         visit(path);
@@ -35,5 +36,6 @@ export function walkFiles(
   };
 
   if (existsSync(root) && statSync(root).isDirectory()) visit(root);
+
   return found.sort();
 }

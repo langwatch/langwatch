@@ -937,7 +937,7 @@ export class ProjectionRouter<
 
   private async dispatchToMapProjections(
     events: readonly EventType[],
-    context: EventStoreReadContext<EventType>,
+    _context: EventStoreReadContext<EventType>,
   ): Promise<void> {
     const hasHandlerQueues = this.queueManager.hasHandlerQueues();
     const errors: Error[] = [];

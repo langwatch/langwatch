@@ -41,7 +41,9 @@ function parseArguments(argv: string[]): {
       files.push(value);
     }
   }
+
   if (!from || !to || files.length === 0) throw new Error(USAGE);
+
   return { from, to, write, root, allStringLiterals, files };
 }
 
@@ -59,12 +61,14 @@ try {
       allStringLiterals: options.allStringLiterals,
     });
     if (output === source) continue;
+
     changed += 1;
     process.stdout.write(
       `${options.write ? "updated" : "would update"} ${relative(options.root, file)}\n`,
     );
     if (options.write) writeFileSync(file, output, "utf8");
   }
+
   process.stdout.write(
     `${changed} file${changed === 1 ? "" : "s"} ${options.write ? "updated" : "would change"}\n`,
   );

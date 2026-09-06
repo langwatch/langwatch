@@ -281,14 +281,10 @@ export class EventSourcedQueueProcessorMemory<
         const attributes = this.spanAttributes(job.payload);
         // Filter out undefined values and convert to the expected type
         for (const [key, value] of Object.entries(attributes)) {
-          if (value !== undefined) {
-            if (
-              typeof value === "string" ||
-              typeof value === "number" ||
-              typeof value === "boolean"
-            ) {
-              customAttributes[key] = value;
-            }
+          const isSerialisable =
+            typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+          if (value !== undefined && isSerialisable) {
+            customAttributes[key] = value;
           }
         }
       } catch (error) {

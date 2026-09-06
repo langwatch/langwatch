@@ -1,17 +1,13 @@
 import {
   emptyJoinRequest,
-  JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_APPROVED_EVENT_TYPE,
   joinApprovedPayloadSchema,
   JOIN_EXPIRED_EVENT_TYPE,
   joinExpiredPayloadSchema,
   JOIN_REJECTED_EVENT_TYPE,
   joinRejectedPayloadSchema,
-  JOIN_REQUEST_EVENT_VERSION_LATEST,
   JOIN_REQUESTED_EVENT_TYPE,
   type JoinRequestAggregateState,
-  type JoinRequestCommand,
-  type JoinRequestFactInput,
   joinRequestedPayloadSchema,
   JOIN_WITHDRAWN_EVENT_TYPE,
   joinWithdrawnPayloadSchema,
@@ -19,10 +15,7 @@ import {
 } from "@langwatch/identity-contract";
 import {
   AbstractFoldProjection,
-  createTenantId,
-  eventIdempotencyKey,
   EventSchema,
-  EventUtils,
   type FoldEventHandlers,
   type StateProjectionStore,
 } from "@langwatch/eventing";

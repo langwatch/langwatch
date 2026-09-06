@@ -21,7 +21,6 @@ import {
   attributionFrom,
   attributionFromOutcome,
   confirmedDeliverPayload,
-  deliverPayloadFor,
   deliveryEventType,
   failedDeliverPayload,
   resolvedModel,

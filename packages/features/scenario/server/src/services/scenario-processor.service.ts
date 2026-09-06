@@ -172,7 +172,10 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
     jobLogger.info("Processing scenario job");
 
     const prepared = await this.prepareRun({ jobData, jobLogger });
-    if (!prepared) return;
+    if (!prepared) {
+      return;
+    }
+
     const { prefetch } = prepared;
     let { childSession, childStartedAt } = prepared;
 

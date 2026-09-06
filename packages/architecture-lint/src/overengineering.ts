@@ -23,11 +23,13 @@ const BASELINE_FILE = "overengineering-baseline.json";
 function baselineKeys(root: string): Set<string> {
   const path = join(root, "packages/architecture-lint/src", BASELINE_FILE);
   if (!existsSync(path)) return new Set();
+
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
   const sites =
     typeof parsed === "object" && parsed !== null && "sites" in parsed
       ? (parsed as { sites?: unknown }).sites
       : undefined;
+
   return new Set(
     Array.isArray(sites) ? sites.filter((s): s is string => typeof s === "string") : [],
   );
@@ -44,8 +46,10 @@ export function collectOverengineering(
   const linted = new Set<string>();
   for (const pkg of packages) {
     if (pkg.kind === "tooling" || pkg.kind === "dev-runtime") continue;
+
     for (const file of walkFiles(pkg.root, isOverengineeringSource)) {
       if (linted.has(file)) continue;
+
       linted.add(file);
       for (const finding of overengineeringFindings({
         path: file,
@@ -55,11 +59,13 @@ export function collectOverengineering(
       }
     }
   }
+
   return violations;
 }
 
 function siteKey(root: string, violation: ArchitectureViolation): string {
   const file = relative(root, violation.file).split("\\").join("/");
+
   return `${violation.policy}|${file}`;
 }
 
@@ -69,6 +75,7 @@ export function formatOverengineeringBaseline(
   packages: readonly ClassifiedPackage[],
 ): string {
   const sites = [...new Set(collectOverengineering(root, packages).map((v) => siteKey(root, v)))];
+
   return `${JSON.stringify({ version: 0, sites: sites.sort() }, null, 2)}\n`;
 }
 
@@ -85,11 +92,13 @@ export function lintOverengineeringBaseline(
   if (baseline.size === 0) return [];
 
   const seen = new Set(collectOverengineering(root, packages).map((v) => siteKey(root, v)));
+
   return [...baseline]
     .filter((key) => !seen.has(key))
     .sort()
     .map((stale) => {
       const [policy, file] = stale.split("|");
+
       return {
         policy: "overengineering-baseline",
         file: join(root, file ?? ""),

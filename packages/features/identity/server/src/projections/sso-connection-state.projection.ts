@@ -1,9 +1,5 @@
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
-  SSO_CONNECTION_AGGREGATE_TYPE,
-  SSO_CONNECTION_EVENT_VERSION_LATEST,
-  type SsoConnectionCommand,
-  type SsoConnectionFactInput,
   CONNECTION_DISCARDED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
@@ -35,10 +31,7 @@ import {
 } from "@langwatch/identity-contract";
 import {
   AbstractFoldProjection,
-  createTenantId,
-  eventIdempotencyKey,
   EventSchema,
-  EventUtils,
   type FoldEventHandlers,
   type StateProjectionStore,
 } from "@langwatch/eventing";

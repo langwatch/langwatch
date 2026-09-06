@@ -127,9 +127,11 @@ function readCommentBlockRootsFile(file: string): {
       });
       continue;
     }
+
     seenRoots.add(entry.root);
     entries.push(entry);
   }
+
   return { exists: true, entries, violations };
 }
 
@@ -151,6 +153,7 @@ export function compareCommentBlockRoots(
       });
       continue;
     }
+
     if (entry.blocks > previous.blocks) {
       violations.push({
         policy: "comment-block-root-baseline-growth",
@@ -159,6 +162,7 @@ export function compareCommentBlockRoots(
         allowed: "Keep the prior count, or lower it with the burn-down.",
       });
     }
+
     if (entry.expires > previous.expires) {
       violations.push({
         policy: "comment-block-root-baseline-growth",
@@ -168,6 +172,7 @@ export function compareCommentBlockRoots(
       });
     }
   }
+
   return violations;
 }
 
@@ -210,6 +215,7 @@ export function lintCommentBlockRoots(
       allowed: "Commit the reviewed allowlist once; future merge-base checks may only shrink it.",
     });
   }
+
   if (!baselineReference) {
     return { violations, entries: current.entries, bootstrapped: false };
   }
@@ -219,14 +225,18 @@ export function lintCommentBlockRoots(
   if (!reference.exists) {
     return { violations, entries: current.entries, bootstrapped: current.exists };
   }
+
   violations.push(...compareCommentBlockRoots(reference.entries, current.entries, file));
+
   return { violations, entries: current.entries, bootstrapped: false };
 }
 
 function isSourceFile(path: string): boolean {
   if (!SOURCE_EXTENSIONS.has(extname(path))) return false;
+
   const segments = path.split(sep);
   if (segments.some((segment) => EXCLUDED_DIRECTORIES.has(segment))) return false;
+
   return !/\.(?:generated|gen)\.[cm]?[jt]sx?$/.test(path);
 }
 
@@ -244,6 +254,7 @@ function trackedSourceFiles(root: string): string[] | undefined {
     stdio: ["ignore", "pipe", "ignore"],
     maxBuffer: 16 * 1024 * 1024,
   });
+
   return paths
     .split("\0")
     .filter((path) => path.length > 0)
@@ -284,6 +295,7 @@ function mergeBase(root: string): string | undefined {
     const base = gitOutput(root, ["merge-base", "HEAD", reference])?.trim();
     if (base) return base;
   }
+
   return gitOutput(root, ["rev-parse", "HEAD^"])?.trim();
 }
 
@@ -313,11 +325,13 @@ export function changedSourceFiles(root: string): string[] {
       paths.add(path);
     }
   }
+
   return [...paths].sort();
 }
 
 function sourceFiles(root: string, files: readonly string[] | undefined): string[] {
   if (!files) return allSourceFiles(root);
+
   return [...new Set(files.map((file) => resolve(root, file)))].filter(isSourceFile).sort();
 }
 
@@ -340,6 +354,7 @@ function commentRanges(source: string, file: ts.SourceFile): Array<{ pos: number
   add(ts.getLeadingCommentRanges(source, 0));
   add(ts.getTrailingCommentRanges(source, source.length));
   visit(file);
+
   return [...ranges.values()].sort((left, right) => left.pos - right.pos || left.end - right.end);
 }
 
@@ -358,9 +373,12 @@ export function lintCommentBlocks(
 
   for (const file of scanFiles) {
     if (!existsSync(file)) continue;
+
     const source = readFileSync(file, "utf8");
     if (marksGeneratedHeader(source) || marksLicenseHeader(source)) continue;
+
     if (!mayContainReviewBlock(source)) continue;
+
     const relativePath = relative(resolvedRoot, file) || file;
     const rawLines = source.split(/\r?\n/);
     const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
@@ -368,8 +386,10 @@ export function lintCommentBlocks(
     for (const block of collectCommentBlocks({ source, ranges })) {
       const blockText = rawLines.slice(block.line - 1, block.line - 1 + block.lines).join("\n");
       if (isExemptBlock(blockText)) continue;
+
       // 4-5 lines only: 6 and above is `langwatch/comment-block-size`.
       if (block.lines < REVIEW_LINE_COUNT || block.lines > MAX_COMMENT_BLOCK_LINES) continue;
+
       reviews.push({
         category: "comment-blocks",
         file: relativePath,

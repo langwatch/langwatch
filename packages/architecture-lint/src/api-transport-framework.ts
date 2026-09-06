@@ -65,26 +65,32 @@ function transportFiles(
   const found: { file: string; surface: Surface }[] = [];
   for (const pkg of packages) {
     if (pkg.kind !== "server") continue;
+
     for (const surface of ["rest", "trpc"] as const) {
       const root = join(pkg.root, "src", "transport", `api-${surface}`);
       if (!existsSync(root)) continue;
+
       for (const file of walkFiles(root, isProductionSource)) found.push({ file, surface });
     }
   }
+
   return found.sort((left, right) => left.file.localeCompare(right.file));
 }
 
 function importedBindings(statement: ts.ImportDeclaration): string[] {
   const clause = statement.importClause;
   if (!clause) return [];
+
   const names: string[] = [];
   if (clause.name) names.push(clause.name.text);
+
   const bindings = clause.namedBindings;
   if (bindings && ts.isNamedImports(bindings)) {
     for (const element of bindings.elements) {
       names.push(element.propertyName?.text ?? element.name.text);
     }
   }
+
   return names;
 }
 
@@ -98,6 +104,7 @@ function importFindings(
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
       continue;
     }
+
     const specifier = statement.moduleSpecifier.text;
     const line = source.getLineAndCharacterOfPosition(statement.getStart(source)).line + 1;
     const names = importedBindings(statement);
@@ -123,6 +130,7 @@ function importFindings(
           });
         }
       }
+
       if (specifier === "@hono/zod-validator") {
         report({
           line,
@@ -165,15 +173,18 @@ function nodeFindings(
       });
     }
 
-    if (surface === "rest" && ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
-      if (RAW_APP_CONSTRUCTORS.has(node.expression.text)) {
-        report({
-          line: lineOf(node),
-          message: `REST transport constructs ${node.expression.text} of its own.`,
-          allowed:
-            "Build the family with createRestService; mounting the Hono app is the process's job.",
-        });
-      }
+    const constructsRawApp =
+      surface === "rest" &&
+      ts.isNewExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      RAW_APP_CONSTRUCTORS.has(node.expression.text);
+    if (constructsRawApp && ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
+      report({
+        line: lineOf(node),
+        message: `REST transport constructs ${node.expression.text} of its own.`,
+        allowed:
+          "Build the family with createRestService; mounting the Hono app is the process's job.",
+      });
     }
 
     if (surface === "trpc" && ts.isCallExpression(node)) {
@@ -191,6 +202,7 @@ function nodeFindings(
             "Register each procedure through createTrpcService, which applies the process policy after the parser and refuses a procedure with no access declaration.",
         });
       }
+
       if (name === "input") {
         report({
           line: lineOf(node),
@@ -225,6 +237,7 @@ export function apiTransportFrameworkFindings(
   };
   importFindings(file, source, surface, report);
   nodeFindings(source, surface, report);
+
   return findings.sort((left, right) => left.line - right.line);
 }
 
@@ -256,6 +269,7 @@ export function readApiTransportFrameworkAllowlist(path: string): {
       ],
     };
   }
+
   const files = (raw as { files?: unknown }).files;
   if (!Array.isArray(files) || files.some((entry) => typeof entry !== "string")) {
     return {
@@ -270,6 +284,7 @@ export function readApiTransportFrameworkAllowlist(path: string): {
       ],
     };
   }
+
   const violations: ArchitectureViolation[] = [];
   const sorted = [...(files as string[])].sort();
   if (sorted.some((entry, index) => entry !== files[index])) {
@@ -280,6 +295,7 @@ export function readApiTransportFrameworkAllowlist(path: string): {
       allowed: "Sort the entries.",
     });
   }
+
   if (new Set(files as string[]).size !== files.length) {
     violations.push({
       policy: POLICY,
@@ -288,6 +304,7 @@ export function readApiTransportFrameworkAllowlist(path: string): {
       allowed: "Remove the duplicate entry.",
     });
   }
+
   return { allowlist: { files: files as string[] }, violations };
 }
 
@@ -304,9 +321,11 @@ export function lintApiTransportFramework(
   for (const { file, surface } of transportFiles(packages)) {
     const findings = apiTransportFrameworkFindings(file, readFileSync(file, "utf8"), surface);
     if (findings.length === 0) continue;
+
     const workspaceFile = relative(root, file);
     offending.add(workspaceFile);
     if (allowed.has(workspaceFile)) continue;
+
     for (const finding of findings) {
       violations.push({
         policy: POLICY,
@@ -323,6 +342,7 @@ export function lintApiTransportFramework(
   // to be converted.
   for (const entry of allowlist.files) {
     if (offending.has(entry)) continue;
+
     violations.push({
       policy: POLICY,
       file: path,

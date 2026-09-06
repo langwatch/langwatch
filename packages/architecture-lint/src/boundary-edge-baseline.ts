@@ -94,9 +94,11 @@ function readBoundaryEdgeBaselineFile(file: string): {
       });
       continue;
     }
+
     seen.add(entryKey);
     entries.push(entry);
   }
+
   return { exists: true, entries, violations };
 }
 
@@ -119,6 +121,7 @@ export function compareBoundaryEdgeBaseline(
       });
       continue;
     }
+
     if (entry.expires > previous.expires) {
       violations.push({
         policy: "boundary-edge-baseline-growth",
@@ -128,6 +131,7 @@ export function compareBoundaryEdgeBaseline(
       });
     }
   }
+
   return violations;
 }
 
@@ -161,6 +165,7 @@ export function lintBoundaryEdgeBaseline(
       });
       continue;
     }
+
     if (!currentKeys.has(key(entry))) {
       violations.push({
         policy: "boundary-edge-baseline-stale",
@@ -179,6 +184,7 @@ export function lintBoundaryEdgeBaseline(
       allowed: "Commit the reviewed baseline once; future merge-base checks may only shrink it.",
     });
   }
+
   if (!baselineReference) {
     return { violations, entries: current.entries, bootstrapped: false };
   }
@@ -188,7 +194,9 @@ export function lintBoundaryEdgeBaseline(
   if (!reference.exists) {
     return { violations, entries: current.entries, bootstrapped: current.exists };
   }
+
   violations.push(...compareBoundaryEdgeBaseline(reference.entries, current.entries, file));
+
   return { violations, entries: current.entries, bootstrapped: false };
 }
 
@@ -217,10 +225,12 @@ export function filterBaselinedBoundaryEdges(
 ): ArchitectureViolation[] {
   const today = now.toISOString().slice(0, 10);
   const allowed = new Set(entries.filter((entry) => entry.expires >= today).map(key));
+
   return violations.filter((violation) => {
     if (violation.policy !== "cross-feature" && violation.policy !== "private-runtime-export") {
       return true;
     }
+
     return !allowed.has(
       key({
         kind: violation.policy as BoundaryEdgeKind,

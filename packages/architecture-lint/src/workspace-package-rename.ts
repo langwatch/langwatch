@@ -8,7 +8,9 @@ type TextEdit = { start: number; end: number; text: string };
 
 function replacement(value: string, from: string, to: string): string | undefined {
   if (value === from) return to;
+
   if (value.startsWith(`${from}/`)) return `${to}${value.slice(from.length)}`;
+
   return undefined;
 }
 
@@ -16,6 +18,7 @@ function quoteLike(source: string, node: ts.Node, value: string): string {
   const original = source.slice(node.getStart(), node.getEnd());
   const quote = original[0] === "'" ? "'" : '"';
   const escaped = value.replaceAll("\\", "\\\\").replaceAll(quote, `\\${quote}`);
+
   return `${quote}${escaped}${quote}`;
 }
 
@@ -33,10 +36,13 @@ function sourceEdits(
   const editedStarts = new Set<number>();
   const add = (node: ts.Node | undefined) => {
     if (!node || !ts.isStringLiteralLike(node)) return;
+
     const next = replacement(node.text, from, to);
     if (next === undefined) return;
+
     const start = node.getStart(sourceFile);
     if (editedStarts.has(start)) return;
+
     editedStarts.add(start);
     edits.push({
       start,
@@ -61,9 +67,11 @@ function sourceEdits(
       const isRequire = ts.isIdentifier(node.expression) && node.expression.text === "require";
       if (isDynamicImport || isRequire) add(node.arguments[0]);
     }
+
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
+
   return edits;
 }
 
@@ -81,9 +89,11 @@ function jsonEdits(file: string, source: string, from: string, to: string): Text
         });
       }
     }
+
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
+
   return edits;
 }
 
@@ -110,8 +120,10 @@ export function renameWorkspaceReference(input: {
       sourceEdits(input.file, input.source, input.from, input.to, input.allStringLiterals ?? false),
     );
   }
+
   if (JSON_EXTENSIONS.has(extension)) {
     return applyEdits(input.source, jsonEdits(input.file, input.source, input.from, input.to));
   }
+
   return input.source.split(input.from).join(input.to);
 }

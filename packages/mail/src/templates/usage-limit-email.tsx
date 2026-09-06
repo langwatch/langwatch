@@ -33,7 +33,7 @@ const UsageLimitEmailTemplate = ({
   logoUrl,
 }: UsageLimitEmailProps) => {
   // Determine progress bar color based on usage
-  let progressBarColor = "#10b981"; // green
+  let progressBarColor: string;
   if (usagePercentage >= 100) {
     progressBarColor = "#dc2626"; // red
   } else if (usagePercentage >= 95) {

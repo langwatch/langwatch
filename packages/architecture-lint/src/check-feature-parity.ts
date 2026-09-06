@@ -42,10 +42,12 @@ const REPO_ROOT = resolve(__dirname, "../../..");
  */
 function discoverPackageSpecRoots(packagesRoot: string): string[] {
   if (!existsSync(packagesRoot)) return [];
+
   const roots: string[] = [];
   const visit = (directory: string) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (!entry.isDirectory() || entry.name === "node_modules") continue;
+
       const path = join(directory, entry.name);
       if (entry.name === "specs") {
         roots.push(path);
@@ -55,6 +57,7 @@ function discoverPackageSpecRoots(packagesRoot: string): string[] {
     }
   };
   visit(packagesRoot);
+
   return roots.sort();
 }
 
@@ -734,8 +737,10 @@ function walkFiles(root: string, predicate: (name: string) => boolean): string[]
   } catch {
     return out;
   }
+
   for (const entry of entries) {
     if (SKIP_DIR.has(entry) || entry.startsWith(".")) continue;
+
     const full = join(root, entry);
     let s;
     try {
@@ -743,12 +748,14 @@ function walkFiles(root: string, predicate: (name: string) => boolean): string[]
     } catch {
       continue;
     }
+
     if (s.isDirectory()) {
       out.push(...walkFiles(full, predicate));
     } else if (predicate(entry)) {
       out.push(full);
     }
   }
+
   return out;
 }
 
@@ -766,14 +773,17 @@ export function discoverFeatureFiles(roots: readonly string[] = SPECS_ROOTS): st
           `a missing root would silently report every scenario under it as bound.`,
       );
     }
+
     if (!statSync(root).isDirectory()) {
       throw new Error(
         `Configured specs root is not a directory: ${root}. ` +
           `Fix SPECS_ROOTS in scripts/check-feature-parity.ts.`,
       );
     }
+
     return walkFiles(root, (n) => FEATURE_FILE_RE.test(n));
   });
+
   return files.map((f) => relative(REPO_ROOT, f)).sort();
 }
 
@@ -808,6 +818,7 @@ const ANNOTATION_RE =
 /** The offset just past `close` after `from`, or the end of `src`. */
 function spanEnd(src: string, from: number, close: string): number {
   const at = src.indexOf(close, from);
+
   return at === -1 ? src.length : at + close.length;
 }
 
@@ -820,7 +831,9 @@ function blockCommentAt(src: string, i: number): number | null {
 function tripleQuoteAt(src: string, i: number): number | null {
   const ch = src[i];
   if (ch !== '"' && ch !== "'") return null;
+
   const quote = ch.repeat(3);
+
   return src.startsWith(quote, i) ? spanEnd(src, i + 3, quote) : null;
 }
 
@@ -833,6 +846,7 @@ function markerlessBindingSpans(src: string): { start: number; end: number }[] {
       i++;
       continue;
     }
+
     spans.push({ start: i, end });
     i = end;
   }
@@ -859,9 +873,8 @@ export function findScenarioAnnotations(
   const found: { title: string; index: number; end: number }[] = [];
   let spans: { start: number; end: number }[] | null = null;
 
-  let m: RegExpExecArray | null;
   ANNOTATION_RE.lastIndex = 0;
-  while ((m = ANNOTATION_RE.exec(src)) !== null) {
+  for (let m = ANNOTATION_RE.exec(src); m !== null; m = ANNOTATION_RE.exec(src)) {
     const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
     if (!title) continue;
 
@@ -877,6 +890,7 @@ export function findScenarioAnnotations(
 
     found.push({ title, index: m.index, end: m.index + m[0].length });
   }
+
   return found;
 }
 
@@ -894,6 +908,7 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
       i++;
       continue;
     }
+
     // The annotation may sit on any line of a JSDoc block, not only its last.
     // What follows it is then the rest of that block: ` *` continuation lines
     // and the ` */` closer. Both are comment, not code, so the scan steps over
@@ -902,28 +917,37 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
       i += 2;
       continue;
     }
+
     if (ch === "*") {
       const nl = src.indexOf("\n", i);
       if (nl === -1) return false;
+
       i = nl + 1;
       continue;
     }
+
     if (ch === "/" && src[i + 1] === "*") {
       const close = src.indexOf("*/", i + 2);
       if (close === -1) return false;
+
       i = close + 2;
       continue;
     }
+
     if (ch === "/" && src[i + 1] === "/") {
       const nl = src.indexOf("\n", i);
       if (nl === -1) return false;
+
       i = nl + 1;
       continue;
     }
+
     const rest = src.slice(i);
     const m = rest.match(/^(?:it|test|tester\.run)(?:\.[a-zA-Z]+)?\s*\(/);
+
     return m !== null;
   }
+
   return false;
 }
 
@@ -938,6 +962,7 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
     const src = readFileSync(file, "utf8");
     for (const a of findScenarioAnnotations(src)) {
       if (!isFollowedByTestCall(src, a.end)) continue;
+
       const line = src.slice(0, a.index).split("\n").length;
       bindings.push({
         title: a.title,
@@ -972,9 +997,12 @@ function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
     const line = lines[i] ?? "";
     const trimmed = line.trim();
     if (trimmed === "") continue;
+
     if (trimmed.startsWith("#")) continue;
+
     return /^@test\b/.test(trimmed);
   }
+
   return false;
 }
 
@@ -994,9 +1022,12 @@ function isNextLineShellTest(lines: string[], startLineIdx: number): boolean {
     const line = lines[i] ?? "";
     const trimmed = line.trim();
     if (trimmed === "") continue;
+
     if (trimmed.startsWith("#")) continue;
+
     return /^test_[A-Za-z0-9_]*[ \t]*\([ \t]*\)[ \t]*\{/.test(trimmed);
   }
+
   return false;
 }
 
@@ -1050,20 +1081,26 @@ function skipGoSpaceAndComments(src: string, start: number, limit: number): numb
       i++;
       continue;
     }
+
     if (ch === "/" && src[i + 1] === "*") {
       const close = src.indexOf("*/", i + 2);
       if (close === -1 || close + 2 > limit) return -1;
+
       i = close + 2;
       continue;
     }
+
     if (ch === "/" && src[i + 1] === "/") {
       const nl = src.indexOf("\n", i);
       if (nl === -1 || nl + 1 > limit) return -1;
+
       i = nl + 1;
       continue;
     }
+
     return i;
   }
+
   return -1;
 }
 
@@ -1094,14 +1131,18 @@ function isGoSubtestDeclaration(rest: string): boolean {
           i += 2;
           continue;
         }
+
         if (c === "\n") return false;
+
         i++;
         if (c === quote) {
           closed = true;
           break;
         }
       }
+
       if (!closed) return false;
+
       continue;
     }
 
@@ -1109,6 +1150,7 @@ function isGoSubtestDeclaration(rest: string): boolean {
       // Raw string literal: no escapes, may span lines.
       const close = rest.indexOf("`", i + 1);
       if (close === -1 || close >= limit) return false;
+
       i = close + 1;
       continue;
     }
@@ -1116,6 +1158,7 @@ function isGoSubtestDeclaration(rest: string): boolean {
     if (ch === "/" && (rest[i + 1] === "/" || rest[i + 1] === "*")) {
       const next = skipGoSpaceAndComments(rest, i, limit);
       if (next === -1) return false;
+
       i = next;
       continue;
     }
@@ -1129,6 +1172,7 @@ function isGoSubtestDeclaration(rest: string): boolean {
     if (ch === ")" || ch === "]" || ch === "}") {
       // The call closed before any top-level comma: `t.Run(name)` is not a subtest.
       if (depth === 0) return false;
+
       depth--;
       i++;
       continue;
@@ -1146,13 +1190,16 @@ function isGoSubtestDeclaration(rest: string): boolean {
 
   const closureAt = skipGoSpaceAndComments(rest, commaAt + 1, limit);
   if (closureAt === -1) return false;
+
   return GO_SUBTEST_CLOSURE_RE.test(rest.slice(closureAt));
 }
 
 function isFollowedByGoTestFunc(src: string, start: number): boolean {
   const i = skipGoSpaceAndComments(src, start, src.length);
   if (i === -1) return false;
+
   const rest = src.slice(i);
+
   return GO_TEST_FUNC_RE.test(rest) || isGoSubtestDeclaration(rest);
 }
 
@@ -1167,6 +1214,7 @@ export function collectGoBindings(testRoots: string[]): CollectedBinding[] {
     const src = readFileSync(file, "utf8");
     for (const a of findScenarioAnnotations(src)) {
       if (!isFollowedByGoTestFunc(src, a.end)) continue;
+
       const line = src.slice(0, a.index).split("\n").length;
       bindings.push({
         title: a.title,
@@ -1200,17 +1248,21 @@ function isFollowedByPythonTestFunc(src: string, start: number): boolean {
       i++;
       continue;
     }
+
     if (ch === "#") {
       const nl = src.indexOf("\n", i);
       if (nl === -1) return false;
+
       i = nl + 1;
       continue;
     }
+
     if (ch === "@") {
       // Skip Python decorators, including parenthesised multi-line forms
       // like @pytest.mark.parametrize("a,b", [...]) that span many lines.
       let j = i + 1;
       while (j < len && src[j] !== "\n" && src[j] !== "(") j++;
+
       if (j < len && src[j] === "(") {
         let depth = 1;
         j++;
@@ -1218,16 +1270,22 @@ function isFollowedByPythonTestFunc(src: string, start: number): boolean {
           const c = src[j];
           if (c === "(") depth++;
           else if (c === ")") depth--;
+
           j++;
         }
       }
+
       while (j < len && src[j] !== "\n") j++;
+
       i = j + 1;
       continue;
     }
+
     const rest = src.slice(i);
+
     return /^(?:async\s+)?def\s+test_[A-Za-z0-9_]*\s*\(/.test(rest);
   }
+
   return false;
 }
 
@@ -1247,6 +1305,7 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
     // Block-comment form (mirrors TS / Go).
     for (const a of findScenarioAnnotations(src)) {
       if (!isFollowedByPythonTestFunc(src, a.end)) continue;
+
       const line = src.slice(0, a.index).split("\n").length;
       bindings.push({
         title: a.title,
@@ -1260,12 +1319,15 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
       const line = lines[i] ?? "";
       const hm = line.match(PYTHON_HASH_ANNOTATION_RE);
       if (!hm) continue;
+
       const title = (hm[1] ?? hm[2] ?? "").trim();
       if (!title) continue;
+
       // Use the same proximity check as the block form. Walk from the
       // start of the next line.
       const lineStartOffset = lines.slice(0, i + 1).reduce((acc, l) => acc + l.length + 1, 0);
       if (!isFollowedByPythonTestFunc(src, lineStartOffset)) continue;
+
       bindings.push({
         title,
         ref: { file: relative(REPO_ROOT, file), line: i + 1 },
@@ -1293,6 +1355,7 @@ function hashCommentBindingsInFile(
     const m = (lines[i] ?? "").match(BATS_ANNOTATION_RE);
     const title = (m?.[1] ?? m?.[2] ?? "").trim();
     if (!title || !isTestLine(lines, i + 1)) continue;
+
     bindings.push({
       title,
       ref: { file: relative(REPO_ROOT, file), line: i + 1 },
@@ -1339,6 +1402,7 @@ function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
     existing.push(b.ref);
     byTitle.set(b.title, existing);
   }
+
   return byTitle;
 }
 
@@ -1353,6 +1417,7 @@ function buildReport(featureRelPath: string, bindingsByTitle: Map<string, Bindin
   const annotated: AnnotatedScenario[] = scenarios.map((s) => {
     const binds = bindingsByTitle.get(s.title) ?? [];
     if (binds.length === 0) unbound.push(s);
+
     return { ...s, bindings: binds };
   });
 
@@ -1401,6 +1466,7 @@ function printEnforcedReport(r: Report): void {
   // stop telling. Say what is actually true: nothing here is measured.
   if (isInert(r)) {
     console.log(`  ${describeInert(toInertReport(r))}`);
+
     return;
   }
 
@@ -1408,11 +1474,13 @@ function printEnforcedReport(r: Report): void {
 
   if (total === 0) {
     console.log(`  · no scenarios declared`);
+
     return;
   }
 
   if (r.unbound.length === 0) {
     console.log(`  ✓ all bound`);
+
     return;
   }
 
@@ -1429,6 +1497,7 @@ function printEnforcedReport(r: Report): void {
 
 function printLegacySummary(reports: LegacyReport[]): void {
   if (reports.length === 0) return;
+
   const totalUnbound = reports.reduce((s, r) => s + r.unbound, 0);
   const totalBound = reports.reduce((s, r) => s + r.bound, 0);
   const totalScenarios = reports.reduce((s, r) => s + r.total, 0);
@@ -1439,6 +1508,7 @@ function printLegacySummary(reports: LegacyReport[]): void {
   for (const r of reports) {
     console.log(`  · ${r.feature}  ${r.bound}/${r.total} bound, ${r.unbound} unbound`);
   }
+
   console.log(
     `\n  Shrink this list by binding scenarios, flagging @unimplemented, or removing stale scenarios. See dev/docs/TESTING_PHILOSOPHY.md.`,
   );
@@ -1450,14 +1520,17 @@ function describeInert(r: InertReport): string {
   if (r.unimplemented === 0) {
     return `${head} — none tagged @unit/@integration/@e2e/@regression`;
   }
+
   if (r.unimplemented === r.totalScenarios) {
     return `${head} — every scenario is @unimplemented`;
   }
+
   return `${head} — ${r.unimplemented} @unimplemented, the rest untagged`;
 }
 
 function printInertSummary(reports: InertReport[]): void {
   if (reports.length === 0) return;
+
   const invisible = reports.reduce((s, r) => s + r.totalScenarios, 0);
   const parked = reports.reduce((s, r) => s + r.unimplemented, 0);
   console.log(`\nInert (no enforced scenarios — tolerated via LEGACY_INERT):`);
@@ -1472,6 +1545,7 @@ function printInertSummary(reports: InertReport[]): void {
 
 function printNewInert(reports: InertReport[]): void {
   if (reports.length === 0) return;
+
   console.log(`\nFeature files that enforce no scenario at all:`);
   for (const r of reports) {
     console.log(`  ✗ ${r.feature}`);
@@ -1487,6 +1561,7 @@ function printNewInert(reports: InertReport[]): void {
  */
 export function formatFailureBanner(reasons: string[]): string[] {
   if (reasons.length === 0) return [];
+
   return [
     `\n✗ THIS RUN FAILS: ${reasons.join(", ")}.`,
     `  A ✓ below means that feature file is fully bound, not that the run passed.`,
@@ -1500,6 +1575,7 @@ export function formatFailureBanner(reasons: string[]): string[] {
  */
 export function formatUnknownAnnotations(unknown: UnknownAnnotation[]): string[] {
   if (unknown.length === 0) return [];
+
   const lines = [
     `\nAnnotations referencing unknown scenarios (typo? renamed scenario? stale binding?):`,
   ];
@@ -1509,6 +1585,7 @@ export function formatUnknownAnnotations(unknown: UnknownAnnotation[]): string[]
     if (list) list.push(a);
     else byFile.set(a.ref.file, [a]);
   }
+
   for (const [file, entries] of [...byFile].sort(([a], [b]) => a.localeCompare(b))) {
     lines.push(`\n  ▸ ${file}`);
     for (const a of entries) {
@@ -1516,6 +1593,7 @@ export function formatUnknownAnnotations(unknown: UnknownAnnotation[]): string[]
       lines.push(`      line ${a.ref.line}`);
     }
   }
+
   return lines;
 }
 
@@ -1539,6 +1617,7 @@ function validateExemptionList({
       errors.push(`${name} contains duplicate entry: ${entry}`);
       continue;
     }
+
     seen.add(entry);
     if (!allFeatures.includes(entry)) {
       const abs = resolve(REPO_ROOT, entry);
@@ -1549,6 +1628,7 @@ function validateExemptionList({
       }
     }
   }
+
   return errors;
 }
 
@@ -1659,6 +1739,7 @@ function printParityReport(a: ParityAnalysis): void {
   for (const line of formatFailureBanner(fatalReasons(a))) console.log(line);
 
   for (const r of a.enforced) printEnforcedReport(r);
+
   printLegacySummary(a.legacy);
   printInertSummary(a.exemptInert);
   printNewInert(a.newInert);
@@ -1677,9 +1758,11 @@ function fatalReasons(a: ParityAnalysis): string[] {
   if (enforcedUnbound > 0) {
     reasons.push(`${enforcedUnbound} unbound scenario(s) in enforced files`);
   }
+
   if (a.unknownAnnotations.length > 0) {
     reasons.push(`${a.unknownAnnotations.length} unknown annotation(s)`);
   }
+
   if (a.staleLegacy.length > 0) {
     reasons.push(
       `${a.staleLegacy.length} fully-bound file(s) still in LEGACY_UNBOUND — remove them from the list: ${a.staleLegacy
@@ -1687,11 +1770,13 @@ function fatalReasons(a: ParityAnalysis): string[] {
         .join(", ")}`,
     );
   }
+
   if (a.newInert.length > 0) {
     reasons.push(
       `${a.newInert.length} file(s) enforce no scenario at all (nothing in them is tagged @unit/@integration/@e2e/@regression)`,
     );
   }
+
   if (a.staleInert.length > 0) {
     reasons.push(
       `${a.staleInert.length} file(s) in LEGACY_INERT now enforce scenarios — remove them from the list: ${a.staleInert.join(
@@ -1699,6 +1784,7 @@ function fatalReasons(a: ParityAnalysis): string[] {
       )}`,
     );
   }
+
   if (a.listErrors.length > 0) {
     reasons.push(`${a.listErrors.length} exemption-list error(s)`);
   }
@@ -1717,6 +1803,7 @@ function printOkSummary(a: ParityAnalysis): void {
       `    ${legacyUnbound} unbound scenario(s) tolerated in ${a.legacy.length} legacy file(s).`,
     );
   }
+
   if (a.exemptInert.length > 0) {
     const invisible = a.exemptInert.reduce((s, r) => s + r.totalScenarios, 0);
     console.log(
@@ -1757,12 +1844,14 @@ function main(): void {
       for (const err of analysis.listErrors) {
         console.error(`Exemption list: ${err}`);
       }
+
       console.error(
         `FAIL: ${reasons.join(
           ", ",
         )}. See spec-binding convention in dev/docs/TESTING_PHILOSOPHY.md.`,
       );
     }
+
     process.exit(1);
   }
 
@@ -1780,6 +1869,7 @@ export function isEntryModule({
   modulePath: string;
 }): boolean {
   if (invokedPath === undefined) return false;
+
   return realPathOrResolved(invokedPath) === realPathOrResolved(modulePath);
 }
 
