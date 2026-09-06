@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { ClickHouseClient } from "@clickhouse/client";
 /**
  * @vitest-environment node
  *
@@ -18,7 +19,6 @@
  */
 import { FREE_PLAN } from "@ee/licensing/constants";
 import type { PlanInfo } from "@ee/licensing/planInfo";
-import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -34,12 +34,11 @@ import { PlanProviderService } from "~/server/app-layer/subscription/plan-provid
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-
-import { DISCOVERED_PERSON_KIND } from "../../repositories/governanceIdentity.repository";
 import {
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
   GOVERNANCE_COST_SOURCE,
 } from "../../projections/governanceCostRollup.constants";
+import { DISCOVERED_PERSON_KIND } from "../../repositories/governanceIdentity.repository";
 import {
   GovernanceCostRollupClickHouseRepository,
   type GovernanceCostRollupRow,
@@ -233,10 +232,7 @@ describe("governanceCost.spenders — router integration", () => {
         "user",
         {
           email: {
-            in: [
-              `gcs-admin-${ns}@example.com`,
-              `gcs-cost-${ns}@example.com`,
-            ],
+            in: [`gcs-admin-${ns}@example.com`, `gcs-cost-${ns}@example.com`],
           },
         },
       ],
@@ -266,9 +262,9 @@ describe("governanceCost.spenders — router integration", () => {
       expect(ada?.amountUsd).toBe(7);
       // The gateway cell wrote 50 USD under its own actor on the same day
       // and must be nowhere in this breakdown — not as a row, not in a total.
-      expect(
-        result.rows.some((r) => r.rawActorId === `gw_actor_${ns}`),
-      ).toBe(false);
+      expect(result.rows.some((r) => r.rawActorId === `gw_actor_${ns}`)).toBe(
+        false,
+      );
       expect(result.rows.some((r) => (r.amountUsd ?? 0) >= 50)).toBe(false);
     });
   });
