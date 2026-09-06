@@ -24,6 +24,12 @@ export function createOpsTrpcRouter<
   policy: AppTrpcPolicyKit;
   /** The operations capabilities that are not the operations service's own. */
   ports: TPorts;
+  /**
+   * Check each answer against the output schema its procedure declared.
+   * Off unless the process asks for it: a declared shape documents the answer,
+   * it does not gate it.
+   */
+  validateOutput?: boolean;
 }) {
   const { root, protectedProcedure, policy, ports } = deps;
 
@@ -41,6 +47,7 @@ export function createOpsTrpcRouter<
           throwOnDeny: false,
         }),
       ),
+      validateOutput: deps.validateOutput ?? false,
     },
     ports,
   );

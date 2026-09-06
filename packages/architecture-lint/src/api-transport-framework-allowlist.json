@@ -2,8 +2,6 @@
   "files": [
     "packages/features/experiment/server/src/transport/api-trpc/experiment.api.ts",
     "packages/features/langy/server/src/transport/api-trpc/langy.api.ts",
-    "packages/features/ops/server/src/transport/api-trpc/ops.api.ts",
-    "packages/features/trace/server/src/transport/api-trpc/traces-v2.api.ts",
-    "packages/features/user/server/src/transport/api-trpc/user.api.ts"
+    "packages/features/trace/server/src/transport/api-trpc/traces-v2.api.ts"
   ]
 }

@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "zod": "^4.4.3"
   },

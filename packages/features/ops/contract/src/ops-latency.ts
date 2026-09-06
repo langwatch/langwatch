@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * How many completed jobs each queue keeps in its rolling latency sample
  * (`<queue>:gq:stats:latencies-ms`, written by GroupQueue on every completion
@@ -100,20 +102,22 @@ export function percentileFromHistogram(
   return LATENCY_HISTOGRAM_BOUNDS_MS[LATENCY_HISTOGRAM_BOUNDS_MS.length - 1]!;
 }
 
-export interface LatencyWindowPercentiles {
-  p50Ms: number;
-  p99Ms: number;
+export const latencyWindowPercentilesSchema = z.object({
+  p50Ms: z.number(),
+  p99Ms: z.number(),
   /** Completions the window's percentiles are computed over. */
-  count: number;
-}
+  count: z.number(),
+});
+export type LatencyWindowPercentiles = z.infer<typeof latencyWindowPercentilesSchema>;
 
 /** Per-window percentiles; a window with no completions is null. */
-export interface LatencyWindows {
-  hour: LatencyWindowPercentiles | null;
-  day: LatencyWindowPercentiles | null;
-  week: LatencyWindowPercentiles | null;
-  allTime: LatencyWindowPercentiles | null;
-}
+export const latencyWindowsSchema = z.object({
+  hour: latencyWindowPercentilesSchema.nullable(),
+  day: latencyWindowPercentilesSchema.nullable(),
+  week: latencyWindowPercentilesSchema.nullable(),
+  allTime: latencyWindowPercentilesSchema.nullable(),
+});
+export type LatencyWindows = z.infer<typeof latencyWindowsSchema>;
 
 export function windowPercentiles(counts: Map<string, number>): LatencyWindowPercentiles | null {
   const p50Ms = percentileFromHistogram(counts, 0.5);

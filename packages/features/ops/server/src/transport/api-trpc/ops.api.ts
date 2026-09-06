@@ -17,26 +17,47 @@
  * registry, the event-log tier window, the Grafana deep-link configuration and
  * the system-migrations runner — arrives as a port.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import {
+  aggregateProcessManagerSchema,
+  blobSweepReportSchema,
+  dashboardDataSchema,
+  deadLetterCountSchema,
   deleteBlobOperatorInputSchema,
+  deleteBlobResultSchema,
+  groupInfoSchema,
   getBlobInputSchema,
   listBlobsInputSchema,
   opsAggregateProcessManagersInputSchema,
+  opsAnomalyDismissedSchema,
+  opsAnomalyListingSchema,
+  opsApiGetBadgeCountsOutputSchema,
+  opsAggregateDiscoverySchema,
+  opsAggregateEventsSchema,
+  opsAggregateSearchSchema,
   opsAssertLegacyWritersDrainedInputSchema,
+  opsBlobPageSchema,
+  opsBlobStoreStatsSchema,
+  opsBlobSummarySchema,
+  opsBlockedSummarySchema,
   opsComputeProjectionStateInputSchema,
+  opsDeadLetterPageSchema,
   opsDiscardDeadLettersInputSchema,
   opsDiscoverAggregatesInputSchema,
   opsDismissAnomalyInputSchema,
   opsDrainQueueTenantInputSchema,
+  opsDryRunReplaySchema,
   opsDryRunReplayInputSchema,
   opsEnrollMigrationCohortInputSchema,
   opsEnrollMigrationTenantInputSchema,
+  opsEventLogSearchWindowSchema,
   opsFeatureFlagKeyInputSchema,
   opsGetReplayRunInputSchema,
   opsListDeadLettersInputSchema,
   opsListOutboxAttemptsInputSchema,
   opsListParkedQueueGroupsInputSchema,
   opsListPausedSchedulesInputSchema,
+  opsParkedGroupsPageSchema,
   opsListProcessActionsInputSchema,
   opsListProcessInstancesInputSchema,
   opsListProcessOutboxInputSchema,
@@ -44,38 +65,95 @@ import {
   opsListQueueGroupsInputSchema,
   opsListScheduledJobsInputSchema,
   opsListSchedulerActionsInputSchema,
+  opsGrafanaLinkConfigSchema,
   opsListUpcomingWakesInputSchema,
   opsLoadAggregateEventsInputSchema,
+  opsMigrationCohortResultSchema,
+  opsMigrationDrainAssertedSchema,
+  opsMigrationEnrolledSchema,
+  opsMigrationEnrollmentListingSchema,
+  opsMigrationOrganizationMatchSchema,
+  opsMigrationOverviewSchema,
+  opsMigrationPassStartedSchema,
+  opsMigrationRolledBackSchema,
+  opsMigrationTargetedRunResultSchema,
   opsMigrationTenantInputSchema,
+  opsMigrationWithdrawnSchema,
   opsOkOutputSchema,
+  opsPausedSchedulesPageSchema,
+  opsPipelineRegistrationsSchema,
+  opsProcessDiscardedDeadLettersSchema,
+  opsProcessDiscardedMessageSchema,
+  opsProcessInstancePageSchema,
   opsProcessMessageInputSchema,
+  opsProcessOutboxPageSchema,
+  opsProcessRedrivenDeadLettersSchema,
+  opsProcessRedrivenMessageSchema,
   opsProcessRefInputSchema,
+  opsProcessReleasedLeaseSchema,
+  opsProcessRequeuedSchema,
+  opsProcessWokeSchema,
+  opsProjectionStateSchema,
   opsQueueCanaryInputSchema,
+  opsQueueCanaryRedrivenSchema,
+  opsQueueCanaryUnblockedSchema,
   opsQueueFilterInputSchema,
+  opsQueueDiscardedDlqGroupsSchema,
+  opsQueueDlqGroupSchema,
+  opsQueueDlqGroupWithQueueSchema,
+  opsQueueDrainedGroupSchema,
+  opsQueueDrainedTenantSchema,
+  opsQueueDrainPreviewSchema,
   opsQueueGroupIdsInputSchema,
   opsQueueGroupInputSchema,
+  opsQueueGroupsPageSchema,
+  opsQueueJobsPageSchema,
+  opsQueueMovedAllToDlqSchema,
+  opsQueueMovedToDlqSchema,
   opsQueueNameInputSchema,
+  opsQueueNameListSchema,
   opsQueuePipelineInputSchema,
   opsQueueTenantInputSchema,
   opsRedriveDeadLettersInputSchema,
+  opsQueueRedrivenDlqGroupsSchema,
+  opsQueueReplayedAllFromDlqSchema,
+  opsQueueReplayedFromDlqSchema,
   opsRequeueDeadOutboxMessagesInputSchema,
   opsRetryBlockedQueueJobInputSchema,
+  opsQueueUnblockedAllSchema,
+  opsQueueUnblockedGroupSchema,
+  opsReplayCancelledSchema,
+  opsReplayStartedSchema,
   opsRollBackSystemMigrationTenantInputSchema,
   opsRunSystemMigrationForOrganizationInputSchema,
   opsScheduleIdInputSchema,
+  opsScheduledJobSchema,
+  opsScopeProbeSchema,
   opsSearchAggregatesInputSchema,
+  type OpsEventSubscriberRegistration,
   type OpsMigrationCohortResult,
   type OpsMigrationEnrollmentListing,
   type OpsMigrationOrganizationMatch,
-  type OpsApiGetBadgeCountsOutput,
   type OpsMigrationOverview,
   type OpsMigrationTargetedRunResult,
+  type OpsProjectionRegistration,
+  type OpsScope,
   opsSearchMigrationOrganizationsInputSchema,
   opsSearchTenantsInputSchema,
+  opsTenantSearchSchema,
   opsSetFeatureFlagInputSchema,
   opsSetScheduleActiveInputSchema,
   opsStartReplayInputSchema,
+  outboxAttemptViewSchema,
+  processAuditEntryViewSchema,
+  processFleetSummarySchema,
+  processInstanceDetailSchema,
+  processWakeRowSchema,
+  queueSummaryInfoSchema,
+  replayHistoryEntrySchema,
+  replayStatusSchema,
   runBlobCleanupOperatorInputSchema,
+  schedulerAuditEntryViewSchema,
 } from "@langwatch/ops-contract";
 import {
   featureFlagRulesWriteSchema,
@@ -87,13 +165,8 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
+import { z } from "zod";
 import type { OpsApp, OpsOperator } from "#app/ops.app";
-
-/**
- * The operator's reach, as the process resolved it. `none` is an answer rather
- * than a refusal so the global menu can poll without spamming the console.
- */
-export type OpsScope = { kind: "none" } | { kind: "platform" };
 
 /**
  * The process supplies authentication and the resolved operator scope.
@@ -134,36 +207,12 @@ type OpsTrpcProcedures<
    * and answers `{ kind: "none" }` for a non-operator rather than refusing, so
    * the global menu can poll it on every page load.
    */
-  probePolicy<TProcedure>(procedure: TProcedure): TProcedure;
-}>;
-
-/**
- * One registered projection, as the process's pipeline registry knows it.
- *
- * Structural rather than imported: the registry is the process's, and this
- * transport only publishes what it answers. Named fields, not `unknown` — a
- * tRPC procedure publishes what its handler returns, so an `unknown` here is
- * what the browser gets, and every ops surface reading a projection row was
- * reading `kind`, `pipelineName` and `projectionName` off `{}`.
- */
-export type OpsProjectionRegistration = Readonly<{
-  projectionName: string;
-  pipelineName: string;
-  aggregateType: string;
-  /** Whether the projection is declared on a pipeline or registered globally. */
-  source: "pipeline" | "global";
-  /** The queue path a pause targets. */
-  pauseKey: string;
-  kind: "fold" | "map" | "state";
-}>;
-
-/** One registered event subscriber, and the event types it reacts to. */
-export type OpsEventSubscriberRegistration = Readonly<{
-  subscriberName: string;
-  pipelineName: string;
-  aggregateType: string;
-  /** The event types this subscriber reacts to — its transition triggers. */
-  eventTypes: readonly string[];
+  probePolicy: TrpcPolicyDecorator;
+  /**
+   * @see the mount field of the same name. Optional because the process's
+   * mount predates it and leaves output validation off in production.
+   */
+  validateOutput?: boolean;
 }>;
 
 /** The process capabilities this transport needs that are not operations' own. */
@@ -261,10 +310,13 @@ export class OpsTrpcApi {
     ports: TPorts,
   ) {
     const { protected: procedure, policy, probePolicy } = procedures;
-    const view = policy("ops:view");
-    const manage = policy("ops:manage");
+    const validateOutput = procedures.validateOutput ?? false;
 
-    return trpc.router({
+    const dashboard = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
       /**
        * Status probe — returns the calling user's ops scope. Always succeeds for
        * any authenticated user; non-ops users get `{ scope: { kind: "none" } }`
@@ -276,22 +328,33 @@ export class OpsTrpcApi {
        * The mutating ops endpoints below still go through the throw-on-deny
        * variant of the operator check — only this status probe relaxes it.
        */
-      getScope: probePolicy(procedure).query(({ ctx }) => {
-        // A plain Error on purpose: the scope missing means the process's
-        // operator middleware never ran, which is a wiring fault with no
-        // action for the caller. It degrades to the generic unknown failure
-        // plus a trace id, which is the honest answer, and keeps the
-        // INTERNAL_SERVER_ERROR this always returned.
-        if (!ctx.opsScope) {
-          throw new Error("opsScope not populated by middleware (probable bug)");
-        }
-        return { scope: ctx.opsScope };
-      }),
-
-      getDashboardSnapshot: view(procedure).query(({ ctx }) => {
-        return ctx.app.ops.tryGetDashboardData();
-      }),
-
+      .query("getScope", (p) =>
+        p
+          .withoutInput("the probe reads the caller's own resolved scope, nothing else")
+          .withOutput(opsScopeProbeSchema)
+          .withCustomPermission(
+            probePolicy,
+            "the ops:view check in its answer-rather-than-refuse variant, so the global menu can poll it",
+          )
+          .handle(({ ctx }) => {
+            // A plain Error on purpose: the scope missing means the process's
+            // operator middleware never ran, which is a wiring fault with no
+            // action for the caller. It degrades to the generic unknown failure
+            // plus a trace id, which is the honest answer, and keeps the
+            // INTERNAL_SERVER_ERROR this always returned.
+            if (!ctx.opsScope) {
+              throw new Error("opsScope not populated by middleware (probable bug)");
+            }
+            return { scope: ctx.opsScope };
+          }),
+      )
+      .query("getDashboardSnapshot", (p) =>
+        p
+          .withoutInput("the dashboard is the whole fleet; there is nothing to narrow it by")
+          .withOutput(dashboardDataSchema.nullable())
+          .withPermission("ops:view")
+          .handle(({ ctx }) => ctx.app.ops.tryGetDashboardData()),
+      )
       /**
        * Cheap counts-only query for the global ops badge in the main menu.
        * Returns just the two integers the badge renders (blocked groups +
@@ -299,14 +362,22 @@ export class OpsTrpcApi {
        * always-on polling; reach for `getDashboardSnapshot` only on the
        * ops route itself.
        */
-      getBadgeCounts: view(procedure).query(({ ctx }): OpsApiGetBadgeCountsOutput =>
-        ctx.app.ops.badgeCounts(),
-      ),
-
-      dashboardStream: view(procedure).subscription(async function* ({ signal, ctx }) {
-        yield* ctx.app.ops.streamDashboard({ signal });
-      }),
-
+      .query("getBadgeCounts", (p) =>
+        p
+          .withoutInput("one fleet-wide reading; the badge has nothing to scope it to")
+          .withOutput(opsApiGetBadgeCountsOutputSchema)
+          .withPermission("ops:view")
+          .handle(({ ctx }) => ctx.app.ops.badgeCounts()),
+      )
+      .subscription("dashboardStream", (p) =>
+        p
+          .withoutInput("the stream carries the same fleet-wide dashboard the snapshot does")
+          .withOutput(dashboardDataSchema)
+          .withPermission("ops:view")
+          .handle(async function* ({ signal, ctx }) {
+            yield* ctx.app.ops.streamDashboard({ signal });
+          }),
+      )
       /**
        * One parked tenant's groups, read live rather than from the snapshot.
        *
@@ -314,92 +385,138 @@ export class OpsTrpcApi {
        * in a snapshot every pod reads would recreate the size problem ADR-090
        * removes. The tenant ROWS ship in the snapshot, their members do not.
        */
-      listParkedGroups: view(procedure.input(opsListParkedQueueGroupsInputSchema)).query(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.listParkedQueueGroups(input);
-        },
-      ),
+      .query("listParkedGroups", (p) =>
+        p
+          .withInput(opsListParkedQueueGroupsInputSchema)
+          .withOutput(opsParkedGroupsPageSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.listParkedQueueGroups(input);
+          }),
+      )
+      .query("listQueues", (p) =>
+        p
+          .withoutInput("every queue the process knows; there is nothing to filter by")
+          .withOutput(queueSummaryInfoSchema.array())
+          .withPermission("ops:view")
+          .handle(async ({ ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.listQueues();
+          }),
+      )
+      .build();
 
-      listQueues: view(procedure).query(async ({ ctx }) => {
-        const ops = ctx.app.ops.operations;
-        return ops.listQueues();
-      }),
-
-      listScheduledJobs: view(procedure.input(opsListScheduledJobsInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.operations.listScheduledJobs({ limit: input.limit });
-        },
-      ),
-
+    const scheduler = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("listScheduledJobs", (p) =>
+        p
+          .withInput(opsListScheduledJobsInputSchema)
+          .withOutput(opsScheduledJobSchema.array())
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) =>
+            ctx.app.ops.operations.listScheduledJobs({ limit: input.limit }),
+          ),
+      )
       /**
        * Only the switched-off schedules, for the dashboard's "Switched off"
        * panel. Its own read because `listScheduledJobs` sorts active first, so a
        * client filtering that page would miss every paused row on a large fleet.
        */
-      listPausedSchedules: view(procedure.input(opsListPausedSchedulesInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.operations.listPausedSchedules({ limit: input.limit });
-        },
-      ),
-
+      .query("listPausedSchedules", (p) =>
+        p
+          .withInput(opsListPausedSchedulesInputSchema)
+          .withOutput(opsPausedSchedulesPageSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) =>
+            ctx.app.ops.operations.listPausedSchedules({ limit: input.limit }),
+          ),
+      )
       /** Recent scheduler operator actions, so the page explains its own history. */
-      listSchedulerActions: view(procedure.input(opsListSchedulerActionsInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.operations.listSchedulerActions({ limit: input.limit });
-        },
-      ),
-
+      .query("listSchedulerActions", (p) =>
+        p
+          .withInput(opsListSchedulerActionsInputSchema)
+          .withOutput(schedulerAuditEntryViewSchema.array())
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) =>
+            ctx.app.ops.operations.listSchedulerActions({ limit: input.limit }),
+          ),
+      )
       /**
        * Pause or resume a schedule (ADR-091). Never touches an in-flight slot —
        * the confirmation copy says so, because a pause that silently killed a
        * live run would be a much larger promise than the one being made.
        */
-      setScheduleActive: manage(procedure.input(opsSetScheduleActiveInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.operations.setScheduleActive({
-            scheduleId: input.scheduleId,
-            active: input.active,
-            actorUserId: ctx.actor().id,
-          });
-        },
-      ),
-
+      .mutation("setScheduleActive", (p) =>
+        p
+          .withInput(opsSetScheduleActiveInputSchema)
+          .withOutput(opsScheduledJobSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) =>
+            ctx.app.ops.operations.setScheduleActive({
+              scheduleId: input.scheduleId,
+              active: input.active,
+              actorUserId: ctx.actor().id,
+            }),
+          ),
+      )
       /** Release a slot whose worker stopped responding, so it can be claimed again. */
-      clearScheduleSlot: manage(procedure.input(opsScheduleIdInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.operations.clearStuckScheduleSlot({
-            scheduleId: input.scheduleId,
-            actorUserId: ctx.actor().id,
-          });
-        },
-      ),
-
+      .mutation("clearScheduleSlot", (p) =>
+        p
+          .withInput(opsScheduleIdInputSchema)
+          .withOutput(opsScheduledJobSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) =>
+            ctx.app.ops.operations.clearStuckScheduleSlot({
+              scheduleId: input.scheduleId,
+              actorUserId: ctx.actor().id,
+            }),
+          ),
+      )
       /**
        * Make a schedule due immediately. The loop claims and runs it through the
        * ordinary path, so this inherits its exactly-once lease rather than
        * bypassing it.
        */
-      runScheduleNow: manage(procedure.input(opsScheduleIdInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.operations.runScheduleNow({
-            scheduleId: input.scheduleId,
-            actorUserId: ctx.actor().id,
-          });
-        },
-      ),
+      .mutation("runScheduleNow", (p) =>
+        p
+          .withInput(opsScheduleIdInputSchema)
+          .withOutput(opsScheduledJobSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) =>
+            ctx.app.ops.operations.runScheduleNow({
+              scheduleId: input.scheduleId,
+              actorUserId: ctx.actor().id,
+            }),
+          ),
+      )
+      .build();
 
-      listGroups: view(procedure.input(opsListQueueGroupsInputSchema)).query(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.listQueueGroups(input);
-        },
-      ),
-
-      getGroupDetail: view(procedure.input(opsQueueGroupInputSchema)).query(
-        async ({ input, ctx }) => ctx.app.ops.getQueueGroup(input),
-      ),
-
+    const queues = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("listGroups", (p) =>
+        p
+          .withInput(opsListQueueGroupsInputSchema)
+          .withOutput(opsQueueGroupsPageSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.listQueueGroups(input);
+          }),
+      )
+      .query("getGroupDetail", (p) =>
+        p
+          .withInput(opsQueueGroupInputSchema)
+          .withOutput(groupInfoSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => ctx.app.ops.getQueueGroup(input)),
+      )
       /**
        * The Grafana deep-link config, so ops surfaces can build per-row Explore
        * links client-side with pure builders. Null when no Grafana is
@@ -407,252 +524,341 @@ export class OpsTrpcApi {
        * every other ops read; Grafana itself is access-controlled, so the base
        * URL is not a secret to an operator.
        */
-      getGrafanaLinkConfig: view(procedure).query(() => {
-        return ports.tryGetGrafanaLinkConfig();
-      }),
+      .query("getGrafanaLinkConfig", (p) =>
+        p
+          .withoutInput("one deployment-wide configuration reading")
+          .withOutput(opsGrafanaLinkConfigSchema)
+          .withPermission("ops:view")
+          .handle(() => ports.tryGetGrafanaLinkConfig()),
+      )
+      .query("getBlockedSummary", (p) =>
+        p
+          .withoutInput("the blocked set across every queue")
+          .withOutput(opsBlockedSummarySchema)
+          .withPermission("ops:view")
+          .handle(async ({ ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.getBlockedQueueSummary();
+          }),
+      )
+      .query("getGroupJobs", (p) =>
+        p
+          .withInput(opsListQueueGroupJobsInputSchema)
+          .withOutput(opsQueueJobsPageSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.listQueueGroupJobs(input);
+          }),
+      )
+      .mutation("unblockGroup", (p) =>
+        p
+          .withInput(opsQueueGroupInputSchema)
+          .withOutput(opsQueueUnblockedGroupSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.unblockQueueGroup({
+              ...input,
+              requestedBy: ctx.actor().id,
+            });
+          }),
+      )
+      .mutation("unblockAll", (p) =>
+        p
+          .withInput(opsQueueNameInputSchema)
+          .withOutput(opsQueueUnblockedAllSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.unblockAllQueueGroups({
+              ...input,
+              requestedBy: ctx.actor().id,
+            });
+          }),
+      )
+      .mutation("drainGroup", (p) =>
+        p
+          .withInput(opsQueueGroupInputSchema)
+          .withOutput(opsQueueDrainedGroupSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.drainQueueGroup({
+              ...input,
+              requestedBy: ctx.actor().id,
+            });
+          }),
+      )
+      .mutation("pausePipeline", (p) =>
+        p
+          .withInput(opsQueuePipelineInputSchema)
+          .withOutput(z.void())
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.pauseQueuePipeline(input);
+          }),
+      )
+      .mutation("unpausePipeline", (p) =>
+        p
+          .withInput(opsQueuePipelineInputSchema)
+          .withOutput(z.void())
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.unpauseQueuePipeline(input);
+          }),
+      )
+      .mutation("pauseTenant", (p) =>
+        p
+          .withInput(opsQueueTenantInputSchema)
+          .withOutput(z.void())
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.pauseQueueTenant(input);
+          }),
+      )
+      .mutation("unpauseTenant", (p) =>
+        p
+          .withInput(opsQueueTenantInputSchema)
+          .withOutput(z.void())
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.unpauseQueueTenant(input);
+          }),
+      )
+      .query("listPausedTenants", (p) =>
+        p
+          .withInput(opsQueueNameInputSchema)
+          .withOutput(opsQueueNameListSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.listPausedQueueTenants(input);
+          }),
+      )
+      .mutation("drainTenant", (p) =>
+        p
+          .withInput(opsDrainQueueTenantInputSchema)
+          .withOutput(opsQueueDrainedTenantSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.drainQueueTenant({
+              ...input,
+              requestedBy: ctx.actor().id,
+            });
+          }),
+      )
+      .mutation("retryBlocked", (p) =>
+        p
+          .withInput(opsRetryBlockedQueueJobInputSchema)
+          .withOutput(opsQueueUnblockedGroupSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.retryBlockedQueueJob(input);
+          }),
+      )
+      .query("listProjections", (p) =>
+        p
+          .withoutInput("the whole registry; a projection is not addressed by a scope")
+          .withOutput(opsPipelineRegistrationsSchema)
+          .withPermission("ops:view")
+          .handle(() => ports.listPipelineRegistrations()),
+      )
+      .build();
 
-      getBlockedSummary: view(procedure).query(async ({ ctx }) => {
-        const ops = ctx.app.ops.operations;
-        return ops.getBlockedQueueSummary();
-      }),
-
-      getGroupJobs: view(procedure.input(opsListQueueGroupJobsInputSchema)).query(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.listQueueGroupJobs(input);
-        },
-      ),
-
-      unblockGroup: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.unblockQueueGroup({
-            ...input,
-            requestedBy: ctx.actor().id,
-          });
-        },
-      ),
-
-      unblockAll: manage(procedure.input(opsQueueNameInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.unblockAllQueueGroups({
-            ...input,
-            requestedBy: ctx.actor().id,
-          });
-        },
-      ),
-
-      drainGroup: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.drainQueueGroup({
-            ...input,
-            requestedBy: ctx.actor().id,
-          });
-        },
-      ),
-
-      pausePipeline: manage(procedure.input(opsQueuePipelineInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.pauseQueuePipeline(input);
-        },
-      ),
-
-      unpausePipeline: manage(procedure.input(opsQueuePipelineInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.unpauseQueuePipeline(input);
-        },
-      ),
-
-      pauseTenant: manage(procedure.input(opsQueueTenantInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.pauseQueueTenant(input);
-        },
-      ),
-
-      unpauseTenant: manage(procedure.input(opsQueueTenantInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.unpauseQueueTenant(input);
-        },
-      ),
-
-      listPausedTenants: view(procedure.input(opsQueueNameInputSchema)).query(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.listPausedQueueTenants(input);
-        },
-      ),
-
-      drainTenant: manage(procedure.input(opsDrainQueueTenantInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.drainQueueTenant({
-            ...input,
-            requestedBy: ctx.actor().id,
-          });
-        },
-      ),
-
-      retryBlocked: manage(procedure.input(opsRetryBlockedQueueJobInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.retryBlockedQueueJob(input);
-        },
-      ),
-
-      listProjections: view(procedure).query(() => {
-        return ports.listPipelineRegistrations();
-      }),
-
+    const processes = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
       /**
        * The per-aggregate process-manager state machines for one aggregate: each
        * machine's definition (triggers, intents, wake) joined to this aggregate's
        * current instance state and the intents it has emitted. Scheduled
        * singletons are excluded — they are not keyed by aggregate id.
        */
-      getAggregateProcessManagers: view(
-        procedure.input(opsAggregateProcessManagersInputSchema),
-      ).query(async ({ input, ctx }) => {
-        return ctx.app.ops.processes.getForAggregate({
-          aggregateType: input.aggregateType,
-          projectId: input.tenantId,
-          aggregateId: input.aggregateId,
-        });
-      }),
-
+      .query("getAggregateProcessManagers", (p) =>
+        p
+          .withInput(opsAggregateProcessManagersInputSchema)
+          .withOutput(aggregateProcessManagerSchema.array())
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) =>
+            ctx.app.ops.processes.getForAggregate({
+              aggregateType: input.aggregateType,
+              projectId: input.tenantId,
+              aggregateId: input.aggregateId,
+            }),
+          ),
+      )
       /**
        * Dead-letter recovery: requeue one process instance's DEAD outbox rows
        * (optionally narrowed by message-key prefix) as pending, due now, with a
        * fresh attempt budget. The webhook platform's re-enable flow points here
        * for batches that exhausted the retry ladder.
        */
-      requeueDeadOutboxMessages: manage(
-        procedure.input(opsRequeueDeadOutboxMessagesInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        return ctx.app.ops.processes.requeueDeadMessages({
-          processName: input.processName,
-          projectId: input.tenantId,
-          processKey: input.processKey,
-          messageKeyPrefix: input.messageKeyPrefix,
-          requestedBy: ctx.actor().id,
-        });
-      }),
+      .mutation("requeueDeadOutboxMessages", (p) =>
+        p
+          .withInput(opsRequeueDeadOutboxMessagesInputSchema)
+          .withOutput(opsProcessRequeuedSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.ops.processes.requeueDeadMessages({
+              processName: input.processName,
+              projectId: input.tenantId,
+              processKey: input.processKey,
+              messageKeyPrefix: input.messageKeyPrefix,
+              requestedBy: ctx.actor().id,
+            }),
+          ),
+      )
 
       // ── Process-manager fleet (specs/ops/process-manager-visibility.feature) ──
 
       /** One row per process name: registry identity + live trouble counts. */
-      listProcessFleet: view(procedure).query(({ ctx }) => {
-        return ctx.app.ops.processes.getFleetSummary();
-      }),
-
+      .query("listProcessFleet", (p) =>
+        p
+          .withoutInput("every registered process manager")
+          .withOutput(processFleetSummarySchema.array())
+          .withPermission("ops:view")
+          .handle(({ ctx }) => ctx.app.ops.processes.getFleetSummary()),
+      )
       /**
        * Retired messages across every process. Answers "what has permanently
        * stopped", which `getProcessOutbox` could not: that one needs a full
        * process ref, so it can only be reached by an operator who already knows
        * where the failure is.
        */
-      listDeadLetters: view(procedure.input(opsListDeadLettersInputSchema)).query(
-        ({ input, ctx }) => {
-          return ctx.app.ops.processes.getDeadLetters(input);
-        },
-      ),
-
+      .query("listDeadLetters", (p) =>
+        p
+          .withInput(opsListDeadLettersInputSchema)
+          .withOutput(opsDeadLetterPageSchema)
+          .withPermission("ops:view")
+          .handle(({ input, ctx }) => ctx.app.ops.processes.getDeadLetters(input)),
+      )
       /** Dead totals per process, for the navigation badge and dashboard card. */
-      listDeadLetterCounts: view(procedure).query(({ ctx }) => {
-        return ctx.app.ops.processes.getDeadLetterCounts();
-      }),
-
-      listProcessInstances: view(procedure.input(opsListProcessInstancesInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.processes.getInstances(input);
-        },
-      ),
-
+      .query("listDeadLetterCounts", (p) =>
+        p
+          .withoutInput("the fleet-wide totals; a per-process read is its own procedure")
+          .withOutput(deadLetterCountSchema.array())
+          .withPermission("ops:view")
+          .handle(({ ctx }) => ctx.app.ops.processes.getDeadLetterCounts()),
+      )
+      .query("listProcessInstances", (p) =>
+        p
+          .withInput(opsListProcessInstancesInputSchema)
+          .withOutput(opsProcessInstancePageSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => ctx.app.ops.processes.getInstances(input)),
+      )
       /** The soonest-due process wakes, for the dashboard's timed-work table. */
-      listUpcomingWakes: view(procedure.input(opsListUpcomingWakesInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.processes.getUpcomingWakes(input);
-        },
-      ),
-
-      getProcessInstance: view(procedure.input(opsProcessRefInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.processes.tryGetInstanceDetail({ ref: input });
-        },
-      ),
-
-      listProcessOutbox: view(procedure.input(opsListProcessOutboxInputSchema)).query(
-        async ({ input, ctx }) => {
-          const { page, pageSize, ...ref } = input;
-          return ctx.app.ops.processes.getOutbox({ ref, page, pageSize });
-        },
-      ),
-
-      listProcessActions: view(procedure.input(opsListProcessActionsInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.processes.listRecentActions(input);
-        },
-      ),
-
-      processWakeNow: manage(procedure.input(opsProcessRefInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return ctx.app.ops.processes.wakeNow({
-            ref: input,
-            actorUserId: ctx.actor().id,
-          });
-        },
-      ),
-
-      processRedriveDeadInstance: manage(procedure.input(opsProcessRefInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return ctx.app.ops.processes.redriveDeadInstance({
-            ref: input,
-            actorUserId: ctx.actor().id,
-          });
-        },
-      ),
-
-      processRedriveDeadMessage: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const { messageId, ...ref } = input;
-          return ctx.app.ops.processes.redriveDeadMessage({
-            ref,
-            messageId,
-            actorUserId: ctx.actor().id,
-          });
-        },
-      ),
-
+      .query("listUpcomingWakes", (p) =>
+        p
+          .withInput(opsListUpcomingWakesInputSchema)
+          .withOutput(processWakeRowSchema.array())
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => ctx.app.ops.processes.getUpcomingWakes(input)),
+      )
+      .query("getProcessInstance", (p) =>
+        p
+          .withInput(opsProcessRefInputSchema)
+          .withOutput(processInstanceDetailSchema.nullable())
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) =>
+            ctx.app.ops.processes.tryGetInstanceDetail({ ref: input }),
+          ),
+      )
+      .query("listProcessOutbox", (p) =>
+        p
+          .withInput(opsListProcessOutboxInputSchema)
+          .withOutput(opsProcessOutboxPageSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => {
+            const { page, pageSize, ...ref } = input;
+            return ctx.app.ops.processes.getOutbox({ ref, page, pageSize });
+          }),
+      )
+      .query("listProcessActions", (p) =>
+        p
+          .withInput(opsListProcessActionsInputSchema)
+          .withOutput(processAuditEntryViewSchema.array())
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => ctx.app.ops.processes.listRecentActions(input)),
+      )
+      .mutation("processWakeNow", (p) =>
+        p
+          .withInput(opsProcessRefInputSchema)
+          .withOutput(opsProcessWokeSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.ops.processes.wakeNow({
+              ref: input,
+              actorUserId: ctx.actor().id,
+            }),
+          ),
+      )
+      .mutation("processRedriveDeadInstance", (p) =>
+        p
+          .withInput(opsProcessRefInputSchema)
+          .withOutput(opsProcessRequeuedSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.ops.processes.redriveDeadInstance({
+              ref: input,
+              actorUserId: ctx.actor().id,
+            }),
+          ),
+      )
+      .mutation("processRedriveDeadMessage", (p) =>
+        p
+          .withInput(opsProcessMessageInputSchema)
+          .withOutput(opsProcessRedrivenMessageSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            const { messageId, ...ref } = input;
+            return ctx.app.ops.processes.redriveDeadMessage({
+              ref,
+              messageId,
+              actorUserId: ctx.actor().id,
+            });
+          }),
+      )
       /** Mark one dead message never-to-be-sent — a mark, not a delete. */
-      processDiscardDeadMessage: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const { messageId, ...ref } = input;
-          return ctx.app.ops.processes.discardDeadMessage({
-            ref,
-            messageId,
-            actorUserId: ctx.actor().id,
-          });
-        },
-      ),
-
+      .mutation("processDiscardDeadMessage", (p) =>
+        p
+          .withInput(opsProcessMessageInputSchema)
+          .withOutput(opsProcessDiscardedMessageSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            const { messageId, ...ref } = input;
+            return ctx.app.ops.processes.discardDeadMessage({
+              ref,
+              messageId,
+              actorUserId: ctx.actor().id,
+            });
+          }),
+      )
       /**
        * Every dead letter back to pending — one process, or the fleet when
        * `processName` is omitted (specs/ops/dead-letter-recovery.feature).
        */
-      redriveDeadLetters: manage(procedure.input(opsRedriveDeadLettersInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return ctx.app.ops.processes.redriveDeadLetters({
-            ...input,
-            actorUserId: ctx.actor().id,
-          });
-        },
-      ),
-
+      .mutation("redriveDeadLetters", (p) =>
+        p
+          .withInput(opsRedriveDeadLettersInputSchema)
+          .withOutput(opsProcessRedrivenDeadLettersSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.ops.processes.redriveDeadLetters({
+              ...input,
+              actorUserId: ctx.actor().id,
+            }),
+          ),
+      )
       /**
        * Every dead letter marked discarded; same scoping as the redrive.
        *
@@ -662,246 +868,343 @@ export class OpsTrpcApi {
        * the destructive breadth has to be reached deliberately, not by omitting
        * a field (best_practices/ops-dashboard.md).
        */
-      discardDeadLetters: manage(procedure.input(opsDiscardDeadLettersInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return ctx.app.ops.processes.discardDeadLetters({
-            ...(input.processName ? { processName: input.processName } : {}),
-            actorUserId: ctx.actor().id,
-          });
-        },
-      ),
-
+      .mutation("discardDeadLetters", (p) =>
+        p
+          .withInput(opsDiscardDeadLettersInputSchema)
+          .withOutput(opsProcessDiscardedDeadLettersSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.ops.processes.discardDeadLetters({
+              ...(input.processName ? { processName: input.processName } : {}),
+              actorUserId: ctx.actor().id,
+            }),
+          ),
+      )
       /** The message's failed attempts, oldest first — why a dead letter died. */
-      listOutboxAttempts: view(procedure.input(opsListOutboxAttemptsInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.processes.getOutboxAttempts(input);
-        },
-      ),
+      .query("listOutboxAttempts", (p) =>
+        p
+          .withInput(opsListOutboxAttemptsInputSchema)
+          .withOutput(outboxAttemptViewSchema.array())
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => ctx.app.ops.processes.getOutboxAttempts(input)),
+      )
+      .mutation("processReleaseLapsedLease", (p) =>
+        p
+          .withInput(opsProcessMessageInputSchema)
+          .withOutput(opsProcessReleasedLeaseSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            const { messageId, ...ref } = input;
+            return ctx.app.ops.processes.releaseLapsedLease({
+              ref,
+              messageId,
+              actorUserId: ctx.actor().id,
+            });
+          }),
+      )
+      .build();
 
-      processReleaseLapsedLease: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const { messageId, ...ref } = input;
-          return ctx.app.ops.processes.releaseLapsedLease({
-            ref,
-            messageId,
-            actorUserId: ctx.actor().id,
-          });
-        },
-      ),
-
-      discoverAggregates: view(procedure.input(opsDiscoverAggregatesInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.events.discoverAggregates({
-            projectionNames: input.projectionNames,
-            since: input.since,
-            tenantIds: input.tenantIds ?? [],
-          });
-        },
-      ),
-
-      searchTenants: view(procedure.input(opsSearchTenantsInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.searchProjects({ query: input.query });
-        },
-      ),
-
-      dryRunReplay: manage(procedure.input(opsDryRunReplayInputSchema)).mutation(
-        async ({ input }) => {
-          return {
+    const replay = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("discoverAggregates", (p) =>
+        p
+          .withInput(opsDiscoverAggregatesInputSchema)
+          .withOutput(opsAggregateDiscoverySchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) =>
+            ctx.app.ops.events.discoverAggregates({
+              projectionNames: input.projectionNames,
+              since: input.since,
+              tenantIds: input.tenantIds ?? [],
+            }),
+          ),
+      )
+      .query("searchTenants", (p) =>
+        p
+          .withInput(opsSearchTenantsInputSchema)
+          .withOutput(opsTenantSearchSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => ctx.app.ops.searchProjects({ query: input.query })),
+      )
+      .mutation("dryRunReplay", (p) =>
+        p
+          .withInput(opsDryRunReplayInputSchema)
+          .withOutput(opsDryRunReplaySchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input }) => ({
             status: "coming_soon" as const,
             message: "Dry run is not yet implemented. Full replay will process all aggregates.",
             projectionNames: input.projectionNames,
             sampleSize: input.sampleSize,
-          };
-        },
-      ),
+          })),
+      )
+      .query("getReplayHistory", (p) =>
+        p
+          .withoutInput("every run this deployment has recorded")
+          .withOutput(replayHistoryEntrySchema.array())
+          .withPermission("ops:view")
+          .handle(async ({ ctx }) => ctx.app.ops.replay.getHistory()),
+      )
+      .query("getReplayRun", (p) =>
+        p
+          .withInput(opsGetReplayRunInputSchema)
+          .withOutput(replayHistoryEntrySchema.nullable())
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) =>
+            ctx.app.ops.replay.tryFindHistoryEntry({ runId: input.runId }),
+          ),
+      )
+      .mutation("startReplay", (p) =>
+        p
+          .withInput(opsStartReplayInputSchema)
+          .withOutput(opsReplayStartedSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const user = ctx.session?.user;
+            const userName = user?.name ?? user?.email ?? "unknown";
 
-      getReplayHistory: view(procedure).query(async ({ ctx }) => {
-        return ctx.app.ops.replay.getHistory();
-      }),
+            try {
+              return await ctx.app.ops.replay.startReplay({
+                projectionNames: input.projectionNames,
+                since: input.since,
+                tenantIds: input.tenantIds ?? [],
+                aggregateIds: input.aggregateIds,
+                fullRebuild: input.fullRebuild,
+                description: input.description,
+                userName,
+              });
+            } catch (err) {
+              // Left as a raw TRPCError deliberately, and it is the one refusal
+              // on this surface that is. The branch answers CONFLICT for EVERY
+              // failure, including infrastructure ones: "already running" is a
+              // nameable cause a caller can act on, and everything else is not.
+              // Splitting it — a handled conflict for the first, the original
+              // error for the rest — is the correct shape, and it changes what
+              // an infrastructure failure puts on the wire from CONFLICT to a
+              // 500. That is a behaviour change, so it is reported rather than
+              // taken here.
+              const rawMessage = err instanceof Error ? err.message : String(err);
+              const safeMessage = rawMessage.includes("already running")
+                ? rawMessage
+                : "Replay could not be started";
+              throw new TRPCError({
+                code: "CONFLICT",
+                message: safeMessage,
+              });
+            }
+          }),
+      )
+      .query("getReplayStatus", (p) =>
+        p
+          .withoutInput("there is at most one run at a time")
+          .withOutput(replayStatusSchema)
+          .withPermission("ops:view")
+          .handle(async ({ ctx }) => ctx.app.ops.replay.getStatus()),
+      )
+      .mutation("cancelReplay", (p) =>
+        p
+          .withoutInput("cancels the one run that can be in flight")
+          .withOutput(opsReplayCancelledSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx }) => ctx.app.ops.replay.cancelReplay()),
+      )
+      .build();
 
-      getReplayRun: view(procedure.input(opsGetReplayRunInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.replay.tryFindHistoryEntry({ runId: input.runId });
-        },
-      ),
-
-      startReplay: manage(procedure.input(opsStartReplayInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const user = ctx.session?.user;
-          const userName = user?.name ?? user?.email ?? "unknown";
-
-          try {
-            return await ctx.app.ops.replay.startReplay({
-              projectionNames: input.projectionNames,
-              since: input.since,
-              tenantIds: input.tenantIds ?? [],
-              aggregateIds: input.aggregateIds,
-              fullRebuild: input.fullRebuild,
-              description: input.description,
-              userName,
+    const deadLetters = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("listDlqGroups", (p) =>
+        p
+          .withInput(opsQueueNameInputSchema)
+          .withOutput(opsQueueDlqGroupSchema.array())
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.listQueueDlqGroups(input);
+          }),
+      )
+      .query("listAllDlqGroups", (p) =>
+        p
+          .withoutInput("the dead-letter set across every queue")
+          .withOutput(opsQueueDlqGroupWithQueueSchema.array())
+          .withPermission("ops:view")
+          .handle(async ({ ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.listAllQueueDlqGroups();
+          }),
+      )
+      .query("listPausedKeys", (p) =>
+        p
+          .withInput(opsQueueNameInputSchema)
+          .withOutput(opsQueueNameListSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.listPausedQueueKeys(input);
+          }),
+      )
+      .query("drainAllBlockedPreview", (p) =>
+        p
+          .withInput(opsQueueFilterInputSchema)
+          .withOutput(opsQueueDrainPreviewSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.getQueueDrainPreview(input);
+          }),
+      )
+      .mutation("moveToDlq", (p) =>
+        p
+          .withInput(opsQueueGroupInputSchema)
+          .withOutput(opsQueueMovedToDlqSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.moveQueueGroupToDlq({
+              ...input,
+              requestedBy: ctx.actor().id,
             });
-          } catch (err) {
-            // Left as a raw TRPCError deliberately, and it is the one refusal
-            // on this surface that is. The branch answers CONFLICT for EVERY
-            // failure, including infrastructure ones: "already running" is a
-            // nameable cause a caller can act on, and everything else is not.
-            // Splitting it — a handled conflict for the first, the original
-            // error for the rest — is the correct shape, and it changes what
-            // an infrastructure failure puts on the wire from CONFLICT to a
-            // 500. That is a behaviour change, so it is reported rather than
-            // taken here.
-            const rawMessage = err instanceof Error ? err.message : String(err);
-            const safeMessage = rawMessage.includes("already running")
-              ? rawMessage
-              : "Replay could not be started";
-            throw new TRPCError({
-              code: "CONFLICT",
-              message: safeMessage,
+          }),
+      )
+      .mutation("moveAllBlockedToDlq", (p) =>
+        p
+          .withInput(opsQueueFilterInputSchema)
+          .withOutput(opsQueueMovedAllToDlqSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.moveAllBlockedQueueGroupsToDlq({
+              ...input,
+              requestedBy: ctx.actor().id,
             });
-          }
-        },
-      ),
-
-      getReplayStatus: view(procedure).query(async ({ ctx }) => {
-        return ctx.app.ops.replay.getStatus();
-      }),
-
-      cancelReplay: manage(procedure).mutation(async ({ ctx }) => {
-        return ctx.app.ops.replay.cancelReplay();
-      }),
-
-      listDlqGroups: view(procedure.input(opsQueueNameInputSchema)).query(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.listQueueDlqGroups(input);
-        },
-      ),
-
-      listAllDlqGroups: view(procedure).query(async ({ ctx }) => {
-        const ops = ctx.app.ops.operations;
-        return ops.listAllQueueDlqGroups();
-      }),
-
-      listPausedKeys: view(procedure.input(opsQueueNameInputSchema)).query(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.listPausedQueueKeys(input);
-        },
-      ),
-
-      drainAllBlockedPreview: view(procedure.input(opsQueueFilterInputSchema)).query(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.getQueueDrainPreview(input);
-        },
-      ),
-
-      moveToDlq: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.moveQueueGroupToDlq({
-            ...input,
-            requestedBy: ctx.actor().id,
-          });
-        },
-      ),
-
-      moveAllBlockedToDlq: manage(procedure.input(opsQueueFilterInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.moveAllBlockedQueueGroupsToDlq({
-            ...input,
-            requestedBy: ctx.actor().id,
-          });
-        },
-      ),
-
-      replayFromDlq: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.replayQueueGroupFromDlq(input);
-        },
-      ),
-
-      replayAllFromDlq: manage(procedure.input(opsQueueFilterInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.replayAllQueueGroupsFromDlq(input);
-        },
-      ),
-
+          }),
+      )
+      .mutation("replayFromDlq", (p) =>
+        p
+          .withInput(opsQueueGroupInputSchema)
+          .withOutput(opsQueueReplayedFromDlqSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.replayQueueGroupFromDlq(input);
+          }),
+      )
+      .mutation("replayAllFromDlq", (p) =>
+        p
+          .withInput(opsQueueFilterInputSchema)
+          .withOutput(opsQueueReplayedAllFromDlqSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.replayAllQueueGroupsFromDlq(input);
+          }),
+      )
       /**
        * Redrive exactly the DLQ groups the operator's filter showed
        * (specs/ops/dead-letter-recovery.feature) — explicit ids, so the
        * confirmation and the act cover the same groups.
        */
-      redriveManyFromDlq: manage(procedure.input(opsQueueGroupIdsInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return ctx.app.ops.operations.redriveQueueDlqGroups({
-            ...input,
-            requestedBy: ctx.actor().id,
-          });
-        },
-      ),
-
+      .mutation("redriveManyFromDlq", (p) =>
+        p
+          .withInput(opsQueueGroupIdsInputSchema)
+          .withOutput(opsQueueRedrivenDlqGroupsSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.ops.operations.redriveQueueDlqGroups({
+              ...input,
+              requestedBy: ctx.actor().id,
+            }),
+          ),
+      )
       /**
        * Discard exactly the shown DLQ groups: their jobs never run again. The
        * audit row is the retained mark — the Redis entries expire regardless.
        */
-      discardManyFromDlq: manage(procedure.input(opsQueueGroupIdsInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return ctx.app.ops.operations.discardQueueDlqGroups({
-            ...input,
-            requestedBy: ctx.actor().id,
-          });
-        },
-      ),
+      .mutation("discardManyFromDlq", (p) =>
+        p
+          .withInput(opsQueueGroupIdsInputSchema)
+          .withOutput(opsQueueDiscardedDlqGroupsSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.ops.operations.discardQueueDlqGroups({
+              ...input,
+              requestedBy: ctx.actor().id,
+            }),
+          ),
+      )
+      .mutation("canaryRedrive", (p) =>
+        p
+          .withInput(opsQueueCanaryInputSchema)
+          .withOutput(opsQueueCanaryRedrivenSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.canaryRedriveQueueDlq(input);
+          }),
+      )
+      .mutation("canaryUnblock", (p) =>
+        p
+          .withInput(opsQueueCanaryInputSchema)
+          .withOutput(opsQueueCanaryUnblockedSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const ops = ctx.app.ops.operations;
+            return ops.canaryUnblockQueueGroups(input);
+          }),
+      )
+      .build();
 
-      canaryRedrive: manage(procedure.input(opsQueueCanaryInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.canaryRedriveQueueDlq(input);
-        },
-      ),
+    const eventLog = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("searchAggregates", (p) =>
+        p
+          .withInput(opsSearchAggregatesInputSchema)
+          .withOutput(opsAggregateSearchSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => {
+            const DEFAULT_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
+            const sinceMs = input.sinceMs ?? Date.now() - DEFAULT_LOOKBACK_MS;
 
-      canaryUnblock: manage(procedure.input(opsQueueCanaryInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops.operations;
-          return ops.canaryUnblockQueueGroups(input);
-        },
-      ),
-
-      searchAggregates: view(procedure.input(opsSearchAggregatesInputSchema)).query(
-        async ({ input, ctx }) => {
-          const DEFAULT_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
-          const sinceMs = input.sinceMs ?? Date.now() - DEFAULT_LOOKBACK_MS;
-
-          return ctx.app.ops.events.searchAggregates({
-            query: input.query,
-            tenantIds: input.tenantId ? [input.tenantId] : [],
-            sinceMs,
-          });
-        },
-      ),
-
+            return ctx.app.ops.events.searchAggregates({
+              query: input.query,
+              tenantIds: input.tenantId ? [input.tenantId] : [],
+              sinceMs,
+            });
+          }),
+      )
       // Exposes (a) the 1-year DejaView search default and (b) the env-var-
       // derived hot-tier window for event_log so the DejaView UI can render
       // the banner under the search box. Cold-tier reads still work but get
       // quite some slower; the banner makes the bound visible up front.
-      getEventLogSearchWindow: view(procedure).query(() => {
-        return ports.getEventLogSearchWindow();
-      }),
-
-      loadAggregateEvents: view(procedure.input(opsLoadAggregateEventsInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.ops.events.getAggregateEvents(input);
-        },
-      ),
-
-      computeProjectionState: view(procedure.input(opsComputeProjectionStateInputSchema)).query(
-        async ({ input, ctx }) => ctx.app.ops.computeProjectionState(input),
-      ),
+      .query("getEventLogSearchWindow", (p) =>
+        p
+          .withoutInput("one deployment-wide bound on every event-log search")
+          .withOutput(opsEventLogSearchWindowSchema)
+          .withPermission("ops:view")
+          .handle(() => ports.getEventLogSearchWindow()),
+      )
+      .query("loadAggregateEvents", (p) =>
+        p
+          .withInput(opsLoadAggregateEventsInputSchema)
+          .withOutput(opsAggregateEventsSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => ctx.app.ops.events.getAggregateEvents(input)),
+      )
+      .query("computeProjectionState", (p) =>
+        p
+          .withInput(opsComputeProjectionStateInputSchema)
+          .withOutput(opsProjectionStateSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => ctx.app.ops.computeProjectionState(input)),
+      )
 
       // ─────────────────────────────────────────────────────────────────────
       // Tenant anomalies (post-2026-05-11 incident follow-up).
@@ -911,23 +1214,38 @@ export class OpsTrpcApi {
        * List currently-active tenant anomalies (rate breaker + structural
        * fingerprint loops). Sorted with hard-tier first.
        */
-      listAnomalies: view(procedure).query(async ({ ctx }) => {
-        const anomalies = await ctx.app.ops.listAnomalies();
-        return { anomalies };
-      }),
-
+      .query("listAnomalies", (p) =>
+        p
+          .withoutInput("every active anomaly, across every tenant")
+          .withOutput(opsAnomalyListingSchema)
+          .withPermission("ops:view")
+          .handle(async ({ ctx }) => {
+            const anomalies = await ctx.app.ops.listAnomalies();
+            return { anomalies };
+          }),
+      )
       /**
        * Dismiss an active anomaly manually. The next detector tick may
        * resurface it if conditions are still met — this is just an operator
        * ack to stop the badge from blinking.
        */
-      dismissAnomaly: manage(procedure.input(opsDismissAnomalyInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const dismissed = await ctx.app.ops.dismissAnomaly(input);
-          return { dismissed };
-        },
-      ),
+      .mutation("dismissAnomaly", (p) =>
+        p
+          .withInput(opsDismissAnomalyInputSchema)
+          .withOutput(opsAnomalyDismissedSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ input, ctx }) => {
+            const dismissed = await ctx.app.ops.dismissAnomaly(input);
+            return { dismissed };
+          }),
+      )
+      .build();
 
+    const blobStore = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
       /**
        * Lists every registered feature flag plus any orphaned postgres
        * rows. Operators use this to see the source of truth for each flag
@@ -937,52 +1255,63 @@ export class OpsTrpcApi {
        * Read-only: no PostHog calls happen on this path either, so opening
        * the page does not cost a flag call.
        */
-      listFeatureFlags: view(procedure)
-        .output(operatorFeatureFlagCatalogueSchema)
-        .query(async ({ ctx }) => ctx.app.ops.featureFlagCatalogue()),
-
-      setFeatureFlag: manage(procedure.input(opsSetFeatureFlagInputSchema))
-        .output(opsOkOutputSchema)
-        .mutation(async ({ ctx, input }) => {
-          await ctx.app.ops.setFeatureFlagEnabled({
-            key: input.key,
-            enabled: input.enabled,
-            lastEditedBy: ctx.actor().id,
-          });
-          return { ok: true };
-        }),
-
-      setFeatureFlagRules: manage(
-        procedure.input(
-          opsFeatureFlagKeyInputSchema.extend({
-            // Write-time only — the read path's `parseRules` must keep accepting
-            // whatever is already stored, so the refinements live on their own
-            // schema. What they catch is a rule that cannot match anything and
-            // therefore silently does nothing: a blank or padded id, and a
-            // new-organizations date that cannot be read.
-            rules: featureFlagRulesWriteSchema,
-          }),
-        ),
+      .query("listFeatureFlags", (p) =>
+        p
+          .withoutInput("the whole registry; a flag is not addressed by a scope")
+          .withOutput(operatorFeatureFlagCatalogueSchema)
+          .withPermission("ops:view")
+          .handle(async ({ ctx }) => ctx.app.ops.featureFlagCatalogue()),
       )
-        .output(opsOkOutputSchema)
-        .mutation(async ({ ctx, input }) => {
-          await ctx.app.ops.setFeatureFlagRules({
-            key: input.key,
-            rules: input.rules,
-            lastEditedBy: ctx.actor().id,
-          });
-          return { ok: true };
-        }),
-
-      clearFeatureFlag: manage(procedure.input(opsFeatureFlagKeyInputSchema))
-        .output(opsOkOutputSchema)
-        .mutation(async ({ ctx, input }) => {
-          await ctx.app.ops.clearFeatureFlag({
-            key: input.key,
-            lastEditedBy: ctx.actor().id,
-          });
-          return { ok: true };
-        }),
+      .mutation("setFeatureFlag", (p) =>
+        p
+          .withInput(opsSetFeatureFlagInputSchema)
+          .withOutput(opsOkOutputSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.ops.setFeatureFlagEnabled({
+              key: input.key,
+              enabled: input.enabled,
+              lastEditedBy: ctx.actor().id,
+            });
+            return { ok: true as const };
+          }),
+      )
+      .mutation("setFeatureFlagRules", (p) =>
+        p
+          .withInput(
+            opsFeatureFlagKeyInputSchema.extend({
+              // Write-time only — the read path's `parseRules` must keep accepting
+              // whatever is already stored, so the refinements live on their own
+              // schema. What they catch is a rule that cannot match anything and
+              // therefore silently does nothing: a blank or padded id, and a
+              // new-organizations date that cannot be read.
+              rules: featureFlagRulesWriteSchema,
+            }),
+          )
+          .withOutput(opsOkOutputSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.ops.setFeatureFlagRules({
+              key: input.key,
+              rules: input.rules,
+              lastEditedBy: ctx.actor().id,
+            });
+            return { ok: true as const };
+          }),
+      )
+      .mutation("clearFeatureFlag", (p) =>
+        p
+          .withInput(opsFeatureFlagKeyInputSchema)
+          .withOutput(opsOkOutputSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.ops.clearFeatureFlag({
+              key: input.key,
+              lastEditedBy: ctx.actor().id,
+            });
+            return { ok: true as const };
+          }),
+      )
 
       // ─────────────────────────────────────────────────────────────────────
       // Blob store (group queue content-addressed payloads)
@@ -992,76 +1321,116 @@ export class OpsTrpcApi {
       // `requireDestructiveOpsAuth`.
       // ─────────────────────────────────────────────────────────────────────
 
-      listBlobQueues: view(procedure).query(async ({ ctx }) => {
-        return ctx.app.ops.operations.listBlobQueues();
-      }),
-
-      getBlobStoreStats: view(procedure).query(async ({ ctx }) => {
-        return ctx.app.ops.operations.getBlobStoreStats();
-      }),
-
-      listBlobs: view(procedure.input(listBlobsInputSchema)).query(async ({ input, ctx }) => {
-        return ctx.app.ops.operations.listBlobs(input);
-      }),
-
-      getBlob: view(procedure.input(getBlobInputSchema)).query(async ({ input, ctx }) => {
-        return ctx.app.ops.operations.tryGetBlob(input);
-      }),
-
-      runBlobCleanup: manage(procedure.input(runBlobCleanupOperatorInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          if (!input.dryRun) {
+      .query("listBlobQueues", (p) =>
+        p
+          .withoutInput("every queue holding blobs")
+          .withOutput(opsQueueNameListSchema)
+          .withPermission("ops:view")
+          .handle(async ({ ctx }) => ctx.app.ops.operations.listBlobQueues()),
+      )
+      .query("getBlobStoreStats", (p) =>
+        p
+          .withoutInput("one store-wide reading")
+          .withOutput(opsBlobStoreStatsSchema)
+          .withPermission("ops:view")
+          .handle(async ({ ctx }) => ctx.app.ops.operations.getBlobStoreStats()),
+      )
+      .query("listBlobs", (p) =>
+        p
+          .withInput(listBlobsInputSchema)
+          .withOutput(opsBlobPageSchema)
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => ctx.app.ops.operations.listBlobs(input)),
+      )
+      .query("getBlob", (p) =>
+        p
+          .withInput(getBlobInputSchema)
+          .withOutput(opsBlobSummarySchema.nullable())
+          .withPermission("ops:view")
+          .handle(async ({ input, ctx }) => ctx.app.ops.operations.tryGetBlob(input)),
+      )
+      .mutation("runBlobCleanup", (p) =>
+        p
+          .withInput(runBlobCleanupOperatorInputSchema)
+          .withOutput(blobSweepReportSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            if (!input.dryRun) {
+              requireDestructiveOpsAuth(ctx, input.confirm);
+            }
+            return ctx.app.ops.operations.runBlobCleanup({
+              dryRun: input.dryRun,
+              // Opaque id, not email: the audit trail must trace the actor without
+              // carrying PII into the log stream.
+              requestedBy: ctx.actor().id,
+            });
+          }),
+      )
+      .mutation("deleteBlob", (p) =>
+        p
+          .withInput(deleteBlobOperatorInputSchema)
+          .withOutput(deleteBlobResultSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
             requireDestructiveOpsAuth(ctx, input.confirm);
-          }
-          return ctx.app.ops.operations.runBlobCleanup({
-            dryRun: input.dryRun,
-            // Opaque id, not email: the audit trail must trace the actor without
-            // carrying PII into the log stream.
-            requestedBy: ctx.actor().id,
-          });
-        },
-      ),
+            return ctx.app.ops.operations.deleteBlob({
+              queueName: input.queueName,
+              projectId: input.projectId,
+              hash: input.hash,
+              // Opaque id, not email: the audit trail must trace the actor without
+              // carrying PII into the log stream.
+              requestedBy: ctx.actor().id,
+            });
+          }),
+      )
+      .build();
 
-      deleteBlob: manage(procedure.input(deleteBlobOperatorInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          requireDestructiveOpsAuth(ctx, input.confirm);
-          return ctx.app.ops.operations.deleteBlob({
-            queueName: input.queueName,
-            projectId: input.projectId,
-            hash: input.hash,
-            // Opaque id, not email: the audit trail must trace the actor without
-            // carrying PII into the log stream.
-            requestedBy: ctx.actor().id,
-          });
-        },
-      ),
-
+    const migrations = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
       /**
        * The in-place system migrations (@langwatch/system-migrations), per
        * migration: status rollup plus the tenants needing attention - held
        * (`migrated`, parity disagreements in the report) and `parked` (errored,
        * retried next pass). Finalized tenants are a count, not a listing.
        */
-      listSystemMigrations: view(procedure).query(() => ports.systemMigrations.getOverview()),
-
+      .query("listSystemMigrations", (p) =>
+        p
+          .withoutInput("every registered migration")
+          .withOutput(opsMigrationOverviewSchema.array())
+          .withPermission("ops:view")
+          .handle(() => ports.systemMigrations.getOverview()),
+      )
       /**
        * The cloud rollout's enrollment listing: which organizations are enrolled
        * for which migrations, with the names the operator recognizes. Carries
        * `isSaaS` so the page can say honestly that a self-hosted installation
        * has nothing to enroll.
        */
-      listMigrationEnrollments: view(procedure).query(({ ctx }) =>
-        ports.systemMigrations.getEnrollments({ requestedBy: ctx.actor().id }),
-      ),
-
+      .query("listMigrationEnrollments", (p) =>
+        p
+          .withoutInput("every enrollment; the read itself is what is audited")
+          .withOutput(opsMigrationEnrollmentListingSchema)
+          .withPermission("ops:view")
+          .handle(({ ctx }) =>
+            ports.systemMigrations.getEnrollments({ requestedBy: ctx.actor().id }),
+          ),
+      )
       /**
        * The organization lookup behind the page's pickers: enroll, targeted run
        * and rollback all act on an organization found by name or exact id.
        */
-      searchMigrationOrganizations: view(
-        procedure.input(opsSearchMigrationOrganizationsInputSchema),
-      ).query(({ input }) => ports.systemMigrations.searchOrganizations({ query: input.query })),
-
+      .query("searchMigrationOrganizations", (p) =>
+        p
+          .withInput(opsSearchMigrationOrganizationsInputSchema)
+          .withOutput(opsMigrationOrganizationMatchSchema.array())
+          .withPermission("ops:view")
+          .handle(({ input }) =>
+            ports.systemMigrations.searchOrganizations({ query: input.query }),
+          ),
+      )
       /**
        * Enroll one organization for one registered migration. Takes effect on
        * the next pass - enrollment is read fresh each time. The service refuses
@@ -1069,29 +1438,32 @@ export class OpsTrpcApi {
        * admit every organization already, and any enrollment on a self-hosted
        * installation, each with a handled error the page renders.
        */
-      enrollMigrationTenant: manage(procedure.input(opsEnrollMigrationTenantInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          // The preparation migrations are behavior-neutral (backfill and
-          // genesis change nothing about who decides); the cutover has the
-          // rollback's blast radius, so it takes the rollback's guard. Which is
-          // which comes from the migration's own declaration, so this gate and
-          // the page that asks for the confirmation cannot drift apart.
-          if (
-            ports.systemMigrations.requiresOperatorConfirmation({
+      .mutation("enrollMigrationTenant", (p) =>
+        p
+          .withInput(opsEnrollMigrationTenantInputSchema)
+          .withOutput(opsMigrationEnrolledSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            // The preparation migrations are behavior-neutral (backfill and
+            // genesis change nothing about who decides); the cutover has the
+            // rollback's blast radius, so it takes the rollback's guard. Which is
+            // which comes from the migration's own declaration, so this gate and
+            // the page that asks for the confirmation cannot drift apart.
+            if (
+              ports.systemMigrations.requiresOperatorConfirmation({
+                migrationName: input.migrationName,
+              })
+            ) {
+              requireDestructiveOpsAuth(ctx, input.confirm);
+            }
+            await ports.systemMigrations.enroll({
+              organizationId: input.organizationId,
               migrationName: input.migrationName,
-            })
-          ) {
-            requireDestructiveOpsAuth(ctx, input.confirm);
-          }
-          await ports.systemMigrations.enroll({
-            organizationId: input.organizationId,
-            migrationName: input.migrationName,
-            actorUserId: ctx.actor().id,
-          });
-          return { enrolled: true };
-        },
-      ),
-
+              actorUserId: ctx.actor().id,
+            });
+            return { enrolled: true as const };
+          }),
+      )
       /**
        * Enroll a sampled cohort of organizations for one migration in a single
        * action. The service draws the sample from organizations not yet
@@ -1104,25 +1476,28 @@ export class OpsTrpcApi {
        * id at a time. Both default to false here as well as in the service: an
        * older client that sends neither field gets the safe pool.
        */
-      enrollMigrationCohort: manage(procedure.input(opsEnrollMigrationCohortInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          if (
-            ports.systemMigrations.requiresOperatorConfirmation({
+      .mutation("enrollMigrationCohort", (p) =>
+        p
+          .withInput(opsEnrollMigrationCohortInputSchema)
+          .withOutput(opsMigrationCohortResultSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            if (
+              ports.systemMigrations.requiresOperatorConfirmation({
+                migrationName: input.migrationName,
+              })
+            ) {
+              requireDestructiveOpsAuth(ctx, input.confirm);
+            }
+            return ports.systemMigrations.enrollCohort({
               migrationName: input.migrationName,
-            })
-          ) {
-            requireDestructiveOpsAuth(ctx, input.confirm);
-          }
-          return ports.systemMigrations.enrollCohort({
-            migrationName: input.migrationName,
-            sampleSize: input.sampleSize,
-            actorUserId: ctx.actor().id,
-            includeEnterprise: input.includeEnterprise,
-            includePrivateDataplane: input.includePrivateDataplane,
-          });
-        },
-      ),
-
+              sampleSize: input.sampleSize,
+              actorUserId: ctx.actor().id,
+              includeEnterprise: input.includeEnterprise,
+              includePrivateDataplane: input.includePrivateDataplane,
+            });
+          }),
+      )
       /**
        * Withdraw an enrollment: later passes stop processing the organization
        * for that migration. State already recorded stays exactly as it is -
@@ -1130,17 +1505,20 @@ export class OpsTrpcApi {
        * rollback's. Refused for a migration that admits every organization
        * anyway, where the row it deletes pauses nothing.
        */
-      withdrawMigrationTenant: manage(procedure.input(opsMigrationTenantInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ports.systemMigrations.withdraw({
-            organizationId: input.organizationId,
-            migrationName: input.migrationName,
-            actorUserId: ctx.actor().id,
-          });
-          return { withdrawn: true };
-        },
-      ),
-
+      .mutation("withdrawMigrationTenant", (p) =>
+        p
+          .withInput(opsMigrationTenantInputSchema)
+          .withOutput(opsMigrationWithdrawnSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            await ports.systemMigrations.withdraw({
+              organizationId: input.organizationId,
+              migrationName: input.migrationName,
+              actorUserId: ctx.actor().id,
+            });
+            return { withdrawn: true as const };
+          }),
+      )
       /**
        * Run one migration for one organization now. Awaited: the operator asked
        * about one organization and gets the status it ended the run in. The
@@ -1149,23 +1527,26 @@ export class OpsTrpcApi {
        * migration enrollment still paces) and an organization whose claim
        * another pass already holds, each with a handled error the page renders.
        */
-      runSystemMigrationForOrganization: manage(
-        procedure.input(opsRunSystemMigrationForOrganizationInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        if (
-          ports.systemMigrations.requiresOperatorConfirmation({
-            migrationName: input.migrationName,
-          })
-        ) {
-          requireDestructiveOpsAuth(ctx, input.confirm);
-        }
-        return ports.systemMigrations.runForOrganization({
-          organizationId: input.organizationId,
-          migrationName: input.migrationName,
-          actorUserId: ctx.actor().id,
-        });
-      }),
-
+      .mutation("runSystemMigrationForOrganization", (p) =>
+        p
+          .withInput(opsRunSystemMigrationForOrganizationInputSchema)
+          .withOutput(opsMigrationTargetedRunResultSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            if (
+              ports.systemMigrations.requiresOperatorConfirmation({
+                migrationName: input.migrationName,
+              })
+            ) {
+              requireDestructiveOpsAuth(ctx, input.confirm);
+            }
+            return ports.systemMigrations.runForOrganization({
+              organizationId: input.organizationId,
+              migrationName: input.migrationName,
+              actorUserId: ctx.actor().id,
+            });
+          }),
+      )
       /**
        * Kick a migration pass now instead of waiting for the next worker boot -
        * the lever for processing a fresh enrollment right away or re-verifying
@@ -1173,24 +1554,32 @@ export class OpsTrpcApi {
        * already keep two passes off the same organization, so the worst case for
        * a double click is a pass that finds everything claimed and does nothing.
        */
-      runSystemMigrationPass: manage(procedure).mutation(() => {
-        ports.systemMigrations.startPass();
-        return { started: true };
-      }),
-
-      assertSystemMigrationLegacyWritersDrained: manage(
-        procedure.input(opsAssertLegacyWritersDrainedInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        requireDestructiveOpsAuth(ctx, input.confirm);
-        await ports.systemMigrations.assertLegacyWritersDrained({
-          migrationName: input.migrationName,
-          tenantId: input.tenantId,
-          minimumWriterGeneration: input.minimumWriterGeneration,
-          actorUserId: ctx.actor().id,
-        });
-        return { asserted: true };
-      }),
-
+      .mutation("runSystemMigrationPass", (p) =>
+        p
+          .withoutInput("a pass covers whatever is enrolled when it runs")
+          .withOutput(opsMigrationPassStartedSchema)
+          .withPermission("ops:manage")
+          .handle(() => {
+            ports.systemMigrations.startPass();
+            return { started: true as const };
+          }),
+      )
+      .mutation("assertSystemMigrationLegacyWritersDrained", (p) =>
+        p
+          .withInput(opsAssertLegacyWritersDrainedInputSchema)
+          .withOutput(opsMigrationDrainAssertedSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            requireDestructiveOpsAuth(ctx, input.confirm);
+            await ports.systemMigrations.assertLegacyWritersDrained({
+              migrationName: input.migrationName,
+              tenantId: input.tenantId,
+              minimumWriterGeneration: input.minimumWriterGeneration,
+              actorUserId: ctx.actor().id,
+            });
+            return { asserted: true as const };
+          }),
+      )
       /**
        * The operator rollback: pin a migrated or finalized organization back
        * onto its legacy path. Both are already live on the ledger; the service
@@ -1200,20 +1589,40 @@ export class OpsTrpcApi {
        * died halfway is finished. Rolled-back tenants are terminal for the
        * runner — later passes leave them alone.
        */
-      rollBackSystemMigrationTenant: manage(
-        procedure.input(opsRollBackSystemMigrationTenantInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        // Same posture as the blob-store writes: this procedure is callable
-        // without the dialog, and it decides which tables answer every
-        // permission check for an entire organization.
-        requireDestructiveOpsAuth(ctx, input.confirm);
-        await ports.systemMigrations.rollBack({
-          migrationName: input.migrationName,
-          tenantId: input.tenantId,
-          actorUserId: ctx.actor().id,
-        });
-        return { rolledBack: true };
-      }),
-    });
+      .mutation("rollBackSystemMigrationTenant", (p) =>
+        p
+          .withInput(opsRollBackSystemMigrationTenantInputSchema)
+          .withOutput(opsMigrationRolledBackSchema)
+          .withPermission("ops:manage")
+          .handle(async ({ ctx, input }) => {
+            // Same posture as the blob-store writes: this procedure is callable
+            // without the dialog, and it decides which tables answer every
+            // permission check for an entire organization.
+            requireDestructiveOpsAuth(ctx, input.confirm);
+            await ports.systemMigrations.rollBack({
+              migrationName: input.migrationName,
+              tenantId: input.tenantId,
+              actorUserId: ctx.actor().id,
+            });
+            return { rolledBack: true as const };
+          }),
+      )
+      .build();
+
+    // One surface, defined in the groups the dashboard is laid out in.
+    // Several chains rather than one because a single ninety-procedure
+    // chain exceeds TypeScript's instantiation depth, and `mergeRouters`
+    // puts them back on the one `ops.*` name the client has always called.
+    return trpc.mergeRouters(
+      dashboard,
+      scheduler,
+      queues,
+      processes,
+      replay,
+      deadLetters,
+      eventLog,
+      blobStore,
+      migrations,
+    );
   }
 }

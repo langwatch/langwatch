@@ -45,23 +45,39 @@
  * Spec: packages/features/user/specs/user.feature,
  *       specs/settings/user-avatar.feature.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import { passwordProblem } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { ValidationError } from "@langwatch/handled-error";
 import {
+  createdUserSchema,
   EmailAlreadyRegisteredError,
+  userAccountInfoSchema,
+  userApiBudgetIncreaseRequestedSchema,
   userApiChangePasswordInputSchema,
   userApiEmptyInputSchema,
+  userApiHasPasswordSchema,
+  userApiHomePagePickerStateSchema,
+  userApiIsAdminSchema,
+  userApiLinkedAccountsSchema,
+  userApiOkSchema,
   userApiOrganizationInputSchema,
+  userApiPasskeyNudgeSchema,
+  userApiPersonalBudgetSchema,
+  userApiPersonalContextSchema,
   userApiRegisterInputSchema,
   userApiRequestBudgetIncreaseInputSchema,
   userApiSetAvatarInputSchema,
   userApiSetLastHomePathInputSchema,
   userApiSetPasswordInputSchema,
+  userApiSuccessSchema,
   userApiUnlinkAccountInputSchema,
   userApiUserInputSchema,
+  userAvatarResultSchema,
   UserAvatarRateLimitedError,
+  userSsoStatusSchema,
+  userTourPreferenceSchema,
 } from "@langwatch/user-contract";
 import {
   TRPCError,
@@ -69,6 +85,7 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
+import { z } from "zod";
 import type { UserApp } from "#app/user.app";
 
 const logger = createLogger("langwatch:user-router");
@@ -132,6 +149,8 @@ type UserTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** What `changeAuth0Password` can answer, as outcomes rather than exceptions. */
@@ -409,21 +428,115 @@ export class UserTrpcApi {
     procedures: UserTrpcProcedures<TContext, TOptions, TRoot>,
     ports: UserTrpcPorts,
   ) {
-    const { protected: procedure, public: publicProcedure, policy } = procedures;
+    const { protected: procedure, public: publicProcedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      getTraceExplorerTourPreference: policy(OWN_ACCOUNT)(
-        procedure.input(userApiEmptyInputSchema),
-      ).query(async ({ ctx }) =>
-        ctx.app.users.getTraceExplorerTourPreference({ id: operatorOrSelf(ctx).id }),
-      ),
+    /**
+     * `register` predates the account it creates, so it builds on the
+     * process's PUBLIC procedure while every other procedure here builds on
+     * the authenticated one. Two services on the one root, merged back onto
+     * the single `user.*` name the client has always called.
+     */
+    const anonymous = createTrpcService({
+      root: trpc,
+      procedures: { protected: publicProcedure, policy },
+      validateOutput,
+    })
+      .mutation("register", (p) =>
+        p
+          .withInput(userApiRegisterInputSchema)
+          .withOutput(createdUserSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx, input }) => {
+            const { name, password } = input;
 
-      dismissTraceExplorerTour: policy(OWN_ACCOUNT)(
-        procedure.input(userApiEmptyInputSchema),
-      ).mutation(async ({ ctx }) =>
-        ctx.app.users.dismissTraceExplorerTour({ id: operatorOrSelf(ctx).id }),
-      ),
+            // The same rules the form ran, from the same module, so the two
+            // cannot drift into accepting different passwords. Carried as
+            // `fieldErrors` so the refusal lands on the password box rather
+            // than in a banner over it.
+            const problem = passwordProblem(password);
+            if (problem) {
+              throw new ValidationError(problem, {
+                meta: { fieldErrors: { password: [problem] } },
+              });
+            }
+            // BetterAuth lowercases the email on every one of its lookups and
+            // writes, and sign-in goes through BetterAuth. An account stored as
+            // typed, capitals and all, is therefore one that sign-in can never
+            // find again, no matter the password. Store the shape sign-in will
+            // search for. Customer report: onboarding signups that
+            // autocapitalised the address were permanently locked out with
+            // "User already exists".
+            const email = input.email.toLowerCase();
 
+            // Keyed off the RESOLVED provider, not the raw env: on an
+            // SSO-capable deployment with no genuine license the platform gate
+            // coerces the deployment to email mode (ADR-027 Decision 4), and
+            // this tRPC path is the signup form's actual backend — blocking it
+            // would kill the fresh-signup recovery route (Decision 5c).
+            if ((await ports.resolveAuthProvider()) !== "email") {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Direct registration is not available for this auth provider",
+              });
+            }
+
+            // Per-IP rate limit. Mirrors BetterAuth's `/sign-up/email`
+            // 20-per-hour limit so the tRPC path can't be used as a side-channel
+            // for spam signups.
+            const limit = await ports.rateLimit({
+              key: `user.register:${ports.clientIp(ctx)}`,
+              windowSeconds: 60 * 60,
+              max: 20,
+            });
+            if (!limit.allowed) {
+              throw new TRPCError({
+                code: "TOO_MANY_REQUESTS",
+                message: "Too many signup attempts. Please try again later.",
+              });
+            }
+
+            // Case-insensitive on purpose: rows written before the lowercasing
+            // above (or seeded by other means) may carry capitals, and minting a
+            // case-twin beside one would leave two Users answering for one human.
+            if (await ports.emailIsTaken(ctx, { email })) {
+              throw new EmailAlreadyRegisteredError();
+            }
+
+            const newUser = await ctx.app.users.createCredentialUser({
+              name: name ?? null,
+              email,
+              passwordHash: await ports.hashPassword({ password }),
+            });
+            ports.trackServerEvent({ userId: newUser.id, event: "signed_up" });
+
+            return { id: newUser.id };
+          }),
+      )
+      .build();
+
+    const account = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("getTraceExplorerTourPreference", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(userTourPreferenceSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx }) =>
+            ctx.app.users.getTraceExplorerTourPreference({ id: operatorOrSelf(ctx).id }),
+          ),
+      )
+      .mutation("dismissTraceExplorerTour", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(userTourPreferenceSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx }) =>
+            ctx.app.users.dismissTraceExplorerTour({ id: operatorOrSelf(ctx).id }),
+          ),
+      )
       /**
        * Whether the current user is a platform admin (email listed in
        * ADMIN_EMAILS). Exposed so the client can decide whether to render
@@ -431,127 +544,81 @@ export class UserTrpcApi {
        * NOT an authorization gate — server-side admin routes enforce access
        * independently via the same check.
        */
-      isAdmin: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(({ ctx }) => ({
-        isAdmin: ctx.app.users.isAdmin({ email: operatorOrSelf(ctx).email }),
-      })),
+      .query("isAdmin", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(userApiIsAdminSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(({ ctx }) => ({
+            isAdmin: ctx.app.users.isAdmin({ email: operatorOrSelf(ctx).email }),
+          })),
+      )
+      .mutation("updateLastLogin", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(z.void())
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx }) => {
+            // Don't update lastLoginAt for impersonated sessions — an admin
+            // browsing as another user should not overwrite that user's
+            // last-login timestamp with the admin's activity.
+            const user = sessionUserOf(ctx);
+            if (user.impersonator) return;
 
-      register: policy(OWN_ACCOUNT)(publicProcedure.input(userApiRegisterInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const { name, password } = input;
-
-          // The same rules the form ran, from the same module, so the two
-          // cannot drift into accepting different passwords. Carried as
-          // `fieldErrors` so the refusal lands on the password box rather
-          // than in a banner over it.
-          const problem = passwordProblem(password);
-          if (problem) {
-            throw new ValidationError(problem, {
-              meta: { fieldErrors: { password: [problem] } },
+            await ctx.app.users.updateLastLogin({ id: user.id });
+          }),
+      )
+      .query("getSsoStatus", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(userSsoStatusSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx }) => ctx.app.users.getSsoStatus({ id: sessionUserOf(ctx).id })),
+      )
+      .query("getAccountInfo", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(userAccountInfoSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx }) => ctx.app.users.getAccountInfo({ id: sessionUserOf(ctx).id })),
+      )
+      .query("getLinkedAccounts", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(userApiLinkedAccountsSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx }) =>
+            ports.listLinkedAccounts(ctx, { userId: sessionUserOf(ctx).id }),
+          ),
+      )
+      .mutation("unlinkAccount", (p) =>
+        p
+          .withInput(userApiUnlinkAccountInputSchema)
+          .withOutput(userApiSuccessSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx, input }) => {
+            // The count and the delete run in ONE serializable transaction. Done
+            // as separate statements with no isolation, two concurrent unlink
+            // calls (a user double-clicking the X) could both observe two
+            // accounts, both pass the "last account" guard, and both delete —
+            // leaving the user with zero accounts and no way to sign in.
+            const outcome = await ports.unlinkAccount(ctx, {
+              userId: sessionUserOf(ctx).id,
+              accountId: input.accountId,
             });
-          }
-          // BetterAuth lowercases the email on every one of its lookups and
-          // writes, and sign-in goes through BetterAuth. An account stored as
-          // typed, capitals and all, is therefore one that sign-in can never
-          // find again, no matter the password. Store the shape sign-in will
-          // search for. Customer report: onboarding signups that
-          // autocapitalised the address were permanently locked out with
-          // "User already exists".
-          const email = input.email.toLowerCase();
+            if (outcome === "last_account") {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Cannot remove the last authentication method",
+              });
+            }
+            if (outcome === "not_found") {
+              throw new TRPCError({ code: "NOT_FOUND", message: "Account not found" });
+            }
 
-          // Keyed off the RESOLVED provider, not the raw env: on an
-          // SSO-capable deployment with no genuine license the platform gate
-          // coerces the deployment to email mode (ADR-027 Decision 4), and
-          // this tRPC path is the signup form's actual backend — blocking it
-          // would kill the fresh-signup recovery route (Decision 5c).
-          if ((await ports.resolveAuthProvider()) !== "email") {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Direct registration is not available for this auth provider",
-            });
-          }
-
-          // Per-IP rate limit. Mirrors BetterAuth's `/sign-up/email`
-          // 20-per-hour limit so the tRPC path can't be used as a side-channel
-          // for spam signups.
-          const limit = await ports.rateLimit({
-            key: `user.register:${ports.clientIp(ctx)}`,
-            windowSeconds: 60 * 60,
-            max: 20,
-          });
-          if (!limit.allowed) {
-            throw new TRPCError({
-              code: "TOO_MANY_REQUESTS",
-              message: "Too many signup attempts. Please try again later.",
-            });
-          }
-
-          // Case-insensitive on purpose: rows written before the lowercasing
-          // above (or seeded by other means) may carry capitals, and minting a
-          // case-twin beside one would leave two Users answering for one human.
-          if (await ports.emailIsTaken(ctx, { email })) {
-            throw new EmailAlreadyRegisteredError();
-          }
-
-          const newUser = await ctx.app.users.createCredentialUser({
-            name: name ?? null,
-            email,
-            passwordHash: await ports.hashPassword({ password }),
-          });
-          ports.trackServerEvent({ userId: newUser.id, event: "signed_up" });
-
-          return { id: newUser.id };
-        },
-      ),
-
-      updateLastLogin: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).mutation(
-        async ({ ctx }) => {
-          // Don't update lastLoginAt for impersonated sessions — an admin
-          // browsing as another user should not overwrite that user's
-          // last-login timestamp with the admin's activity.
-          const user = sessionUserOf(ctx);
-          if (user.impersonator) return;
-
-          await ctx.app.users.updateLastLogin({ id: user.id });
-        },
-      ),
-
-      getSsoStatus: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(
-        async ({ ctx }) => ctx.app.users.getSsoStatus({ id: sessionUserOf(ctx).id }),
-      ),
-
-      getAccountInfo: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(
-        async ({ ctx }) => ctx.app.users.getAccountInfo({ id: sessionUserOf(ctx).id }),
-      ),
-
-      getLinkedAccounts: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(
-        async ({ ctx }) => ports.listLinkedAccounts(ctx, { userId: sessionUserOf(ctx).id }),
-      ),
-
-      unlinkAccount: policy(OWN_ACCOUNT)(procedure.input(userApiUnlinkAccountInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          // The count and the delete run in ONE serializable transaction. Done
-          // as separate statements with no isolation, two concurrent unlink
-          // calls (a user double-clicking the X) could both observe two
-          // accounts, both pass the "last account" guard, and both delete —
-          // leaving the user with zero accounts and no way to sign in.
-          const outcome = await ports.unlinkAccount(ctx, {
-            userId: sessionUserOf(ctx).id,
-            accountId: input.accountId,
-          });
-          if (outcome === "last_account") {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Cannot remove the last authentication method",
-            });
-          }
-          if (outcome === "not_found") {
-            throw new TRPCError({ code: "NOT_FOUND", message: "Account not found" });
-          }
-
-          return { success: true };
-        },
-      ),
-
+            return { success: true };
+          }),
+      )
       /**
        * Whether to offer this person a passkey right now (ADR-120).
        *
@@ -565,36 +632,42 @@ export class UserTrpcApi {
        * a new device does not restart the count and the 30 days actually mean
        * 30 days.
        */
-      passkeyNudge: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(
-        async ({ ctx }) => {
-          if (!ports.deploymentOffersPasskeys()) return { offer: false };
+      .query("passkeyNudge", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(userApiPasskeyNudgeSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx }) => {
+            if (!ports.deploymentOffersPasskeys()) return { offer: false };
 
-          const nudge = await ctx.app.users.getPasskeyNudgeStatus({
-            id: sessionUserOf(ctx).id,
-          });
-          if (nudge.hasPasskey) return { offer: false };
+            const nudge = await ctx.app.users.getPasskeyNudgeStatus({
+              id: sessionUserOf(ctx).id,
+            });
+            if (nudge.hasPasskey) return { offer: false };
 
-          const dismissedAt = nudge.dismissedAt;
-          if (!dismissedAt) return { offer: true };
+            const dismissedAt = nudge.dismissedAt;
+            if (!dismissedAt) return { offer: true };
 
-          const askAgainAfter =
-            dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000;
-          return { offer: Date.now() >= askAgainAfter };
-        },
-      ),
-
+            const askAgainAfter =
+              dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000;
+            return { offer: Date.now() >= askAgainAfter };
+          }),
+      )
       /**
        * "Not now". Dated rather than flagged, because the offer comes back — a
        * flag would make one dismissal permanent, and somebody who declines on
        * the day they sign up is not somebody who never wants a passkey.
        */
-      dismissPasskeyNudge: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).mutation(
-        async ({ ctx }) => {
-          await ctx.app.users.dismissPasskeyNudge({ id: sessionUserOf(ctx).id });
-          return { success: true };
-        },
-      ),
-
+      .mutation("dismissPasskeyNudge", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(userApiSuccessSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx }) => {
+            await ctx.app.users.dismissPasskeyNudge({ id: sessionUserOf(ctx).id });
+            return { success: true };
+          }),
+      )
       /**
        * Whether the session user can sign in with a password.
        *
@@ -603,12 +676,15 @@ export class UserTrpcApi {
        * both produce accounts with no password at all, and offering "Change
        * password" to somebody who has none is an offer that can only fail.
        */
-      hasPassword: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(
-        async ({ ctx }) => ({
-          hasPassword: await ctx.app.users.hasPassword({ id: sessionUserOf(ctx).id }),
-        }),
-      ),
-
+      .query("hasPassword", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(userApiHasPasswordSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx }) => ({
+            hasPassword: await ctx.app.users.hasPassword({ id: sessionUserOf(ctx).id }),
+          })),
+      )
       /**
        * Set a FIRST password, for an account that has none.
        *
@@ -627,206 +703,220 @@ export class UserTrpcApi {
        * first one still hands it persistence, so the attempt is throttled, and
        * every other session is ended the moment it lands.
        */
-      setPassword: policy(OWN_ACCOUNT)(procedure.input(userApiSetPasswordInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          // The same rules the form ran, from the same module, so the two
-          // cannot drift into accepting different passwords.
-          const problem = passwordProblem(input.password);
-          if (problem) {
-            throw new ValidationError(problem, {
-              meta: { fieldErrors: { password: [problem] } },
+      .mutation("setPassword", (p) =>
+        p
+          .withInput(userApiSetPasswordInputSchema)
+          .withOutput(userApiSuccessSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx, input }) => {
+            // The same rules the form ran, from the same module, so the two
+            // cannot drift into accepting different passwords.
+            const problem = passwordProblem(input.password);
+            if (problem) {
+              throw new ValidationError(problem, {
+                meta: { fieldErrors: { password: [problem] } },
+              });
+            }
+
+            // Email mode only. Under Auth0 the password lives in the Auth0
+            // tenant and this row is not where it would go.
+            if ((await ports.resolveAuthProvider()) !== "email") {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Passwords are not available for this auth provider",
+              });
+            }
+
+            const user = sessionUserOf(ctx);
+            const limit = await ports.rateLimit({
+              key: `user.setPassword:${user.id}`,
+              windowSeconds: 60 * 15,
+              max: 5,
             });
-          }
+            if (!limit.allowed) {
+              throw new TRPCError({
+                code: "TOO_MANY_REQUESTS",
+                message: "Too many attempts. Please try again later.",
+              });
+            }
 
-          // Email mode only. Under Auth0 the password lives in the Auth0
-          // tenant and this row is not where it would go.
-          if ((await ports.resolveAuthProvider()) !== "email") {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Passwords are not available for this auth provider",
+            const result = await ctx.app.users.setFirstPassword({
+              id: user.id,
+              passwordHash: await ports.hashPassword({ password: input.password }),
             });
-          }
+            if (result === "already_set") {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message:
+                  "This account already has a password. Change it instead of setting a new one.",
+              });
+            }
 
-          const user = sessionUserOf(ctx);
-          const limit = await ports.rateLimit({
-            key: `user.setPassword:${user.id}`,
-            windowSeconds: 60 * 15,
-            max: 5,
-          });
-          if (!limit.allowed) {
-            throw new TRPCError({
-              code: "TOO_MANY_REQUESTS",
-              message: "Too many attempts. Please try again later.",
+            // Every other session ends. A password is a credential that outlives
+            // session revocation, so anything else holding a session at the
+            // moment one appears must not keep it.
+            const revoke = otherSessionsToRevoke(ctx);
+            if (revoke) await ctx.app.users.revokeOtherBrowserSessions(revoke);
+
+            return { success: true };
+          }),
+      )
+      .mutation("changePassword", (p) =>
+        p
+          .withInput(userApiChangePasswordInputSchema)
+          .withOutput(userApiSuccessSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx, input }) => {
+            // Resolved provider, not raw env (ADR-027): on a denied SSO
+            // deployment the platform gate coerces to email mode, and a user who
+            // recovered via the v6 password-reset path owns a `credential`
+            // account — they must be able to change it (the coerced UI offers the
+            // button). `changePassword` requires the current password, so this is
+            // not the takeover vector Decision 4's all-states block guards against.
+            const provider = await ports.resolveAuthProvider();
+            if (provider !== "email" && provider !== "auth0") {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Password changes are not available for this auth provider",
+              });
+            }
+
+            const user = sessionUserOf(ctx);
+
+            // Per-user rate limit. BetterAuth's `/change-password` endpoint is
+            // gated by `sensitiveSessionMiddleware` which forces recent
+            // re-authentication; this tRPC mutation does NOT, so without a
+            // throttle a stolen session token could be used to brute-force the
+            // `currentPassword` to recover the user's plaintext (bcrypt is slow
+            // but not infinite). 5 attempts per 15 minutes per user mirrors
+            // `/forget-password`'s budget. Applies to the Auth0 path too — both to
+            // throttle brute-force against the Auth0 Authentication API and to
+            // avoid hammering Auth0 rate limits.
+            const limit = await ports.rateLimit({
+              key: `user.changePassword:${user.id}`,
+              windowSeconds: 60 * 15,
+              max: 5,
             });
-          }
+            if (!limit.allowed) {
+              throw new TRPCError({
+                code: "TOO_MANY_REQUESTS",
+                message: "Too many password change attempts. Please try again later.",
+              });
+            }
 
-          const result = await ctx.app.users.setFirstPassword({
-            id: user.id,
-            passwordHash: await ports.hashPassword({ password: input.password }),
-          });
-          if (result === "already_set") {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message:
-                "This account already has a password. Change it instead of setting a new one.",
+            if (provider === "auth0") {
+              // Only the Auth0 database connection (`auth0|<id>`
+              // providerAccountId) has a password we can update via the
+              // Management API. Social identities linked through Auth0
+              // (google-oauth2|..., github|..., windowslive|...) are managed by
+              // their upstream IdPs.
+              const auth0Account = await ports.tryFindAuth0DatabaseAccount(ctx, {
+                userId: user.id,
+              });
+
+              if (!auth0Account) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message:
+                    "No Auth0 database (Email/Password) account is linked to this user. Password changes are only supported for that sign-in method.",
+                });
+              }
+
+              if (!user.email) {
+                throw new TRPCError({
+                  code: "INTERNAL_SERVER_ERROR",
+                  message: "Authenticated session is missing an email",
+                });
+              }
+
+              const result = await ports.changeAuth0Password({
+                email: user.email,
+                auth0UserId: auth0Account.providerAccountId,
+                currentPassword: input.currentPassword,
+                newPassword: input.newPassword,
+              });
+              if (result.outcome !== "changed") throw auth0Refusal(result);
+
+              // Auth0's OIDC sessions are managed by the Auth0 tenant, but the
+              // LangWatch *app* session is a row in our own store and is NOT
+              // invalidated by the Management API password change. Revoke other
+              // devices' app sessions so a stolen session token cannot outlive a
+              // password rotation. Same impersonation safeguard as the email path.
+              const revokeAuth0 = otherSessionsToRevoke(ctx);
+              if (revokeAuth0) await ctx.app.users.revokeOtherBrowserSessions(revokeAuth0);
+              return { success: true };
+            }
+
+            // Verify-and-replace as ONE call. Split into a read of the stored hash
+            // and a write of its replacement, this transport would be holding the
+            // hash — and the two refusals below would be decisions made a long way
+            // from the rows they are about.
+            const rotation = await ports.rotatePassword(ctx, {
+              userId: user.id,
+              currentPassword: input.currentPassword,
+              newPassword: input.newPassword,
             });
-          }
+            if (rotation === "no_password") {
+              throw new TRPCError({
+                code: "NOT_FOUND",
+                message: "User not found or password not set",
+              });
+            }
+            if (rotation === "wrong_password") {
+              throw new TRPCError({
+                code: "UNAUTHORIZED",
+                message: "Current password is incorrect",
+              });
+            }
 
-          // Every other session ends. A password is a credential that outlives
-          // session revocation, so anything else holding a session at the
-          // moment one appears must not keep it.
-          const revoke = otherSessionsToRevoke(ctx);
-          if (revoke) await ctx.app.users.revokeOtherBrowserSessions(revoke);
+            // Best practice: invalidate all OTHER sessions of this user after a
+            // password change. The current tab stays logged in (the user just
+            // re-authenticated by typing the current password); any other device
+            // or stolen session is force-logged-out.
+            const revoke = otherSessionsToRevoke(ctx);
+            if (revoke) await ctx.app.users.revokeOtherBrowserSessions(revoke);
 
-          return { success: true };
-        },
-      ),
+            return { success: true };
+          }),
+      )
+      .mutation("deactivate", (p) =>
+        p
+          .withInput(userApiUserInputSchema)
+          .withOutput(userApiSuccessSchema)
+          .withPermission(SELF_OR_INSTANCE_ADMIN)
+          .handle(async ({ ctx, input }) => {
+            const user = sessionUserOf(ctx);
+            if (
+              input.userId !== user.id &&
+              !ctx.app.users.isAdmin({ email: operatorOrSelf(ctx).email })
+            ) {
+              throw new TRPCError({ code: "FORBIDDEN" });
+            }
 
-      changePassword: policy(OWN_ACCOUNT)(
-        procedure.input(userApiChangePasswordInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        // Resolved provider, not raw env (ADR-027): on a denied SSO
-        // deployment the platform gate coerces to email mode, and a user who
-        // recovered via the v6 password-reset path owns a `credential`
-        // account — they must be able to change it (the coerced UI offers the
-        // button). `changePassword` requires the current password, so this is
-        // not the takeover vector Decision 4's all-states block guards against.
-        const provider = await ports.resolveAuthProvider();
-        if (provider !== "email" && provider !== "auth0") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Password changes are not available for this auth provider",
-          });
-        }
+            // User owns the durable state transition. The process-level lifecycle
+            // services own the effects that follow it: browser sessions and CLI
+            // credentials must be revoked without injecting Auth or Governance
+            // callback ports into User (which would create a service cycle).
+            await ctx.app.users.deactivate({ id: input.userId });
+            await ctx.app.users.revokeAllBrowserSessions({ userId: input.userId });
+            await ports.revokeCliTokensForUser(ctx, { userId: input.userId });
+            return { success: true };
+          }),
+      )
+      .mutation("reactivate", (p) =>
+        p
+          .withInput(userApiUserInputSchema)
+          .withOutput(userApiSuccessSchema)
+          .withPermission(SELF_OR_INSTANCE_ADMIN)
+          .handle(async ({ ctx, input }) => {
+            if (!ctx.app.users.isAdmin({ email: operatorOrSelf(ctx).email })) {
+              throw new TRPCError({ code: "FORBIDDEN" });
+            }
 
-        const user = sessionUserOf(ctx);
-
-        // Per-user rate limit. BetterAuth's `/change-password` endpoint is
-        // gated by `sensitiveSessionMiddleware` which forces recent
-        // re-authentication; this tRPC mutation does NOT, so without a
-        // throttle a stolen session token could be used to brute-force the
-        // `currentPassword` to recover the user's plaintext (bcrypt is slow
-        // but not infinite). 5 attempts per 15 minutes per user mirrors
-        // `/forget-password`'s budget. Applies to the Auth0 path too — both to
-        // throttle brute-force against the Auth0 Authentication API and to
-        // avoid hammering Auth0 rate limits.
-        const limit = await ports.rateLimit({
-          key: `user.changePassword:${user.id}`,
-          windowSeconds: 60 * 15,
-          max: 5,
-        });
-        if (!limit.allowed) {
-          throw new TRPCError({
-            code: "TOO_MANY_REQUESTS",
-            message: "Too many password change attempts. Please try again later.",
-          });
-        }
-
-        if (provider === "auth0") {
-          // Only the Auth0 database connection (`auth0|<id>`
-          // providerAccountId) has a password we can update via the
-          // Management API. Social identities linked through Auth0
-          // (google-oauth2|..., github|..., windowslive|...) are managed by
-          // their upstream IdPs.
-          const auth0Account = await ports.tryFindAuth0DatabaseAccount(ctx, { userId: user.id });
-
-          if (!auth0Account) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message:
-                "No Auth0 database (Email/Password) account is linked to this user. Password changes are only supported for that sign-in method.",
-            });
-          }
-
-          if (!user.email) {
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: "Authenticated session is missing an email",
-            });
-          }
-
-          const result = await ports.changeAuth0Password({
-            email: user.email,
-            auth0UserId: auth0Account.providerAccountId,
-            currentPassword: input.currentPassword,
-            newPassword: input.newPassword,
-          });
-          if (result.outcome !== "changed") throw auth0Refusal(result);
-
-          // Auth0's OIDC sessions are managed by the Auth0 tenant, but the
-          // LangWatch *app* session is a row in our own store and is NOT
-          // invalidated by the Management API password change. Revoke other
-          // devices' app sessions so a stolen session token cannot outlive a
-          // password rotation. Same impersonation safeguard as the email path.
-          const revokeAuth0 = otherSessionsToRevoke(ctx);
-          if (revokeAuth0) await ctx.app.users.revokeOtherBrowserSessions(revokeAuth0);
-          return { success: true };
-        }
-
-        // Verify-and-replace as ONE call. Split into a read of the stored hash
-        // and a write of its replacement, this transport would be holding the
-        // hash — and the two refusals below would be decisions made a long way
-        // from the rows they are about.
-        const rotation = await ports.rotatePassword(ctx, {
-          userId: user.id,
-          currentPassword: input.currentPassword,
-          newPassword: input.newPassword,
-        });
-        if (rotation === "no_password") {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User not found or password not set",
-          });
-        }
-        if (rotation === "wrong_password") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Current password is incorrect",
-          });
-        }
-
-        // Best practice: invalidate all OTHER sessions of this user after a
-        // password change. The current tab stays logged in (the user just
-        // re-authenticated by typing the current password); any other device
-        // or stolen session is force-logged-out.
-        const revoke = otherSessionsToRevoke(ctx);
-        if (revoke) await ctx.app.users.revokeOtherBrowserSessions(revoke);
-
-        return { success: true };
-      }),
-
-      deactivate: policy(SELF_OR_INSTANCE_ADMIN)(procedure.input(userApiUserInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const user = sessionUserOf(ctx);
-          if (
-            input.userId !== user.id &&
-            !ctx.app.users.isAdmin({ email: operatorOrSelf(ctx).email })
-          ) {
-            throw new TRPCError({ code: "FORBIDDEN" });
-          }
-
-          // User owns the durable state transition. The process-level lifecycle
-          // services own the effects that follow it: browser sessions and CLI
-          // credentials must be revoked without injecting Auth or Governance
-          // callback ports into User (which would create a service cycle).
-          await ctx.app.users.deactivate({ id: input.userId });
-          await ctx.app.users.revokeAllBrowserSessions({ userId: input.userId });
-          await ports.revokeCliTokensForUser(ctx, { userId: input.userId });
-          return { success: true };
-        },
-      ),
-
-      reactivate: policy(SELF_OR_INSTANCE_ADMIN)(procedure.input(userApiUserInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          if (!ctx.app.users.isAdmin({ email: operatorOrSelf(ctx).email })) {
-            throw new TRPCError({ code: "FORBIDDEN" });
-          }
-
-          await ctx.app.users.reactivate({ id: input.userId });
-          return { success: true };
-        },
-      ),
-
+            await ctx.app.users.reactivate({ id: input.userId });
+            return { success: true };
+          }),
+      )
       /**
        * Uploads and sets the caller's own avatar photo. The image is stored in
        * the object store (owned by the user, under their personal workspace)
@@ -836,48 +926,54 @@ export class UserTrpcApi {
        *
        * Spec: specs/settings/user-avatar.feature
        */
-      setAvatar: policy(ORGANIZATION_VIEW)(procedure.input(userApiSetAvatarInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const user = sessionUserOf(ctx);
-          // Throttle uploads per user — each writes bytes to object storage
-          // and updates the row; mirrors the changePassword budget shape.
-          const limit = await ports.rateLimit({
-            key: `user.setAvatar:${user.id}`,
-            windowSeconds: 60,
-            max: 10,
-          });
-          if (!limit.allowed) {
-            throw new UserAvatarRateLimitedError();
-          }
+      .mutation("setAvatar", (p) =>
+        p
+          .withInput(userApiSetAvatarInputSchema)
+          .withOutput(userAvatarResultSchema)
+          .withPermission(ORGANIZATION_VIEW)
+          .handle(async ({ ctx, input }) => {
+            const user = sessionUserOf(ctx);
+            // Throttle uploads per user — each writes bytes to object storage
+            // and updates the row; mirrors the changePassword budget shape.
+            const limit = await ports.rateLimit({
+              key: `user.setAvatar:${user.id}`,
+              windowSeconds: 60,
+              max: 10,
+            });
+            if (!limit.allowed) {
+              throw new UserAvatarRateLimitedError();
+            }
 
-          // `UserAvatarValidationError` is a handled error, so the process's
-          // handled-error middleware carries its code and meta to the client
-          // on its own. Catching it here to rewrap it as a BAD_REQUEST would
-          // only replace the code with the raw message — the thing #5984
-          // closed.
-          return await ctx.app.users.setAvatar({
-            userId: user.id,
-            organizationId: input.organizationId,
-            imageDataUrl: input.imageDataUrl,
-            displayName: user.name,
-            displayEmail: user.email,
-          });
-        },
-      ),
-
+            // `UserAvatarValidationError` is a handled error, so the process's
+            // handled-error middleware carries its code and meta to the client
+            // on its own. Catching it here to rewrap it as a BAD_REQUEST would
+            // only replace the code with the raw message — the thing #5984
+            // closed.
+            return await ctx.app.users.setAvatar({
+              userId: user.id,
+              organizationId: input.organizationId,
+              imageDataUrl: input.imageDataUrl,
+              displayName: user.name,
+              displayEmail: user.email,
+            });
+          }),
+      )
       /**
        * Clears the caller's uploaded avatar so surfaces fall back to their SSO
        * photo (if any) and then their initials.
        *
        * Spec: specs/settings/user-avatar.feature
        */
-      removeAvatar: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).mutation(
-        async ({ ctx }) => {
-          await ctx.app.users.removeAvatar({ userId: sessionUserOf(ctx).id });
-          return { success: true };
-        },
-      ),
-
+      .mutation("removeAvatar", (p) =>
+        p
+          .withInput(userApiEmptyInputSchema)
+          .withOutput(userApiSuccessSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx }) => {
+            await ctx.app.users.removeAvatar({ userId: sessionUserOf(ctx).id });
+            return { success: true };
+          }),
+      )
       /**
        * Personal context for a user inside an organization. Backs the /me
        * dashboard's personal-context hook.
@@ -886,32 +982,37 @@ export class UserTrpcApi {
        * users (who joined the organization before this feature shipped) get
        * one without re-accepting an invite.
        */
-      personalContext: policy(ORGANIZATION_VIEW)(
-        procedure.input(userApiOrganizationInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const user = sessionUserOf(ctx);
+      .query("personalContext", (p) =>
+        p
+          .withInput(userApiOrganizationInputSchema)
+          .withOutput(userApiPersonalContextSchema)
+          .withPermission(ORGANIZATION_VIEW)
+          .handle(async ({ ctx, input }) => {
+            const user = sessionUserOf(ctx);
 
-        // Caller must be a member of the organization.
-        await assertMember(ports, ctx, user.id, input.organizationId);
+            // Caller must be a member of the organization.
+            await assertMember(ports, ctx, user.id, input.organizationId);
 
-        const workspace = await ctx.app.users.ensurePersonalWorkspace({
-          userId: user.id,
-          organizationId: input.organizationId,
-          displayName: user.name,
-          displayEmail: user.email,
-        });
+            const workspace = await ctx.app.users.ensurePersonalWorkspace({
+              userId: user.id,
+              organizationId: input.organizationId,
+              displayName: user.name,
+              displayEmail: user.email,
+            });
 
-        const defaultPolicy = await ports.tryResolveDefaultRoutingPolicy(ctx, {
-          organizationId: input.organizationId,
-          personalTeamId: workspace.team.id,
-        });
+            const defaultPolicy = await ports.tryResolveDefaultRoutingPolicy(ctx, {
+              organizationId: input.organizationId,
+              personalTeamId: workspace.team.id,
+            });
 
-        return {
-          workspace,
-          routingPolicy: defaultPolicy ? { id: defaultPolicy.id, name: defaultPolicy.name } : null,
-        };
-      }),
-
+            return {
+              workspace,
+              routingPolicy: defaultPolicy
+                ? { id: defaultPolicy.id, name: defaultPolicy.name }
+                : null,
+            };
+          }),
+      )
       /**
        * Per-user budget state powering the /me dashboard's budget banner. Same
        * wire shape as the CLI 402 payload so client and CLI render with
@@ -931,94 +1032,97 @@ export class UserTrpcApi {
        * workspace yet, no personal virtual key yet, and a deployment with no
        * analytics store configured.
        */
-      personalBudget: policy(ORGANIZATION_VIEW)(
-        procedure.input(userApiOrganizationInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const user = sessionUserOf(ctx);
+      .query("personalBudget", (p) =>
+        p
+          .withInput(userApiOrganizationInputSchema)
+          .withOutput(userApiPersonalBudgetSchema)
+          .withPermission(ORGANIZATION_VIEW)
+          .handle(async ({ ctx, input }) => {
+            const user = sessionUserOf(ctx);
 
-        const workspace = await ctx.app.users.tryFindPersonalWorkspace({
-          userId: user.id,
-          organizationId: input.organizationId,
-        });
-        if (!workspace) return { status: "ok" as const };
+            const workspace = await ctx.app.users.tryFindPersonalWorkspace({
+              userId: user.id,
+              organizationId: input.organizationId,
+            });
+            if (!workspace) return { status: "ok" as const };
 
-        const vks = await ports.listPersonalVirtualKeys(ctx, {
-          userId: user.id,
-          organizationId: input.organizationId,
-        });
-        const personalVk = vks[0];
-        // OTLP-only users intentionally have no personal virtual key — they
-        // keep their existing provider seat and rely on their agent's OTLP
-        // exporter. They still need budget visibility on the principal scope.
-        // Use a sentinel virtual-key id that won't match any key-scoped
-        // budget; principal-scope budgets resolve via `principalUserId`
-        // regardless. Mirrors the pattern the ingestion-source receiver uses
-        // on ledger writes.
-        const sentinelVk = `_ingestion_:user:${user.id}`;
+            const vks = await ports.listPersonalVirtualKeys(ctx, {
+              userId: user.id,
+              organizationId: input.organizationId,
+            });
+            const personalVk = vks[0];
+            // OTLP-only users intentionally have no personal virtual key — they
+            // keep their existing provider seat and rely on their agent's OTLP
+            // exporter. They still need budget visibility on the principal scope.
+            // Use a sentinel virtual-key id that won't match any key-scoped
+            // budget; principal-scope budgets resolve via `principalUserId`
+            // regardless. Mirrors the pattern the ingestion-source receiver uses
+            // on ledger writes.
+            const sentinelVk = `_ingestion_:user:${user.id}`;
 
-        const decision = await ports.checkBudget(ctx, {
-          organizationId: input.organizationId,
-          teamId: workspace.team.id,
-          projectId: workspace.project.id,
-          virtualKeyId: personalVk?.id ?? sentinelVk,
-          principalUserId: user.id,
-          projectedCostUsd: 0,
-        });
+            const decision = await ports.checkBudget(ctx, {
+              organizationId: input.organizationId,
+              teamId: workspace.team.id,
+              projectId: workspace.project.id,
+              virtualKeyId: personalVk?.id ?? sentinelVk,
+              principalUserId: user.id,
+              projectedCostUsd: 0,
+            });
 
-        // Status mapping: hard_block -> exceeded (red banner), soft_warn ->
-        // warning (yellow banner), allow -> ok (no banner). The chip on /me
-        // however needs always-on snapshot data so it can render a budget name
-        // and "13% spent" even under the 80% banner threshold. Pick the best
-        // applicable budget regardless of decision and pass through
-        // spent/limit — the warning/exceeded banners still gate on `status`,
-        // so "ok" suppresses banners and only the chip data flows through.
-        // Caught when a MEMBER running OTLP-only had a real principal-scope
-        // budget at 13% but the chip read "No budget set" — the early return
-        // on allow threw away the snapshot fields the chip needed.
-        const sortedScopes = decision.scopes
-          .map((scope) => ({ ...scope, pctUsed: percentUsed(scope.spentUsd, scope.limitUsd) }))
-          .sort((a, b) => b.pctUsed - a.pctUsed);
-        // `blockedBy` carries the same scopes without the derived percentage,
-        // so it is mapped the same way rather than tested for the field: a
-        // `"pctUsed" in topScope` guard over the union typed the value
-        // `unknown`, and the comparison below silently never fired for a
-        // blocking scope.
-        const blocking = decision.blockedBy[0];
-        const topScope = blocking
-          ? { ...blocking, pctUsed: percentUsed(blocking.spentUsd, blocking.limitUsd) }
-          : sortedScopes[0];
-        if (!topScope) return { status: "ok" as const };
+            // Status mapping: hard_block -> exceeded (red banner), soft_warn ->
+            // warning (yellow banner), allow -> ok (no banner). The chip on /me
+            // however needs always-on snapshot data so it can render a budget name
+            // and "13% spent" even under the 80% banner threshold. Pick the best
+            // applicable budget regardless of decision and pass through
+            // spent/limit — the warning/exceeded banners still gate on `status`,
+            // so "ok" suppresses banners and only the chip data flows through.
+            // Caught when a MEMBER running OTLP-only had a real principal-scope
+            // budget at 13% but the chip read "No budget set" — the early return
+            // on allow threw away the snapshot fields the chip needed.
+            const sortedScopes = decision.scopes
+              .map((scope) => ({ ...scope, pctUsed: percentUsed(scope.spentUsd, scope.limitUsd) }))
+              .sort((a, b) => b.pctUsed - a.pctUsed);
+            // `blockedBy` carries the same scopes without the derived percentage,
+            // so it is mapped the same way rather than tested for the field: a
+            // `"pctUsed" in topScope` guard over the union typed the value
+            // `unknown`, and the comparison below silently never fired for a
+            // blocking scope.
+            const blocking = decision.blockedBy[0];
+            const topScope = blocking
+              ? { ...blocking, pctUsed: percentUsed(blocking.spentUsd, blocking.limitUsd) }
+              : sortedScopes[0];
+            if (!topScope) return { status: "ok" as const };
 
-        const baseStatus =
-          decision.decision === "hard_block"
-            ? ("exceeded" as const)
-            : decision.decision === "soft_warn" || topScope.pctUsed >= 80
-              ? ("warning" as const)
-              : ("ok" as const);
+            const baseStatus =
+              decision.decision === "hard_block"
+                ? ("exceeded" as const)
+                : decision.decision === "soft_warn" || topScope.pctUsed >= 80
+                  ? ("warning" as const)
+                  : ("ok" as const);
 
-        // Display-facing contact: prefers the admin-configured support
-        // contact (an address, a URL, or a short instruction), and falls back
-        // to the first admin's address.
-        const adminEmail = await ports.tryResolveSupportContact(ctx, {
-          organizationId: input.organizationId,
-        });
-        return {
-          status: baseStatus,
-          scope: normalizeScope(topScope.scope),
-          spentUsd: topScope.spentUsd,
-          limitUsd: topScope.limitUsd,
-          period: topScope.window.toLowerCase(),
-          requestIncreaseUrl: requestIncreaseUrl({
-            baseUrl: ports.appBaseUrl(),
-            scope: normalizeScope(topScope.scope),
-            scopeId: topScope.scopeId,
-            limitUsd: topScope.limitUsd,
-            spentUsd: topScope.spentUsd,
+            // Display-facing contact: prefers the admin-configured support
+            // contact (an address, a URL, or a short instruction), and falls back
+            // to the first admin's address.
+            const adminEmail = await ports.tryResolveSupportContact(ctx, {
+              organizationId: input.organizationId,
+            });
+            return {
+              status: baseStatus,
+              scope: normalizeScope(topScope.scope),
+              spentUsd: topScope.spentUsd,
+              limitUsd: topScope.limitUsd,
+              period: topScope.window.toLowerCase(),
+              requestIncreaseUrl: requestIncreaseUrl({
+                baseUrl: ports.appBaseUrl(),
+                scope: normalizeScope(topScope.scope),
+                scopeId: topScope.scopeId,
+                limitUsd: topScope.limitUsd,
+                spentUsd: topScope.spentUsd,
+              }),
+              adminEmail,
+            };
           }),
-          adminEmail,
-        };
-      }),
-
+      )
       /**
        * Submit a budget-increase request to the organization's admin.
        * Triggered from the budget-request page (linked from the gateway's 402
@@ -1026,43 +1130,46 @@ export class UserTrpcApi {
        * Resolves the recipient, then mails them the user, scope, limit, spent,
        * and optional free-form message.
        */
-      requestBudgetIncrease: policy(ORGANIZATION_VIEW)(
-        procedure.input(userApiRequestBudgetIncreaseInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const user = sessionUserOf(ctx);
-        const adminEmail = await ports.resolveBudgetIncreaseRecipient(ctx, {
-          organizationId: input.organizationId,
-        });
-        const [organizationName, requester] = await Promise.all([
-          ports.tryGetOrganizationName(ctx, { organizationId: input.organizationId }),
-          ports.tryGetUserContact(ctx, { userId: user.id }),
-        ]);
-        try {
-          await ports.sendBudgetIncreaseRequest(ctx, {
-            to: adminEmail,
-            requesterEmail: requester?.email ?? user.email ?? "",
-            requesterName: requester?.name ?? undefined,
-            organizationName: organizationName ?? "",
-            scope: input.scope,
-            scopeId: input.scopeId,
-            limitUsd: input.limitUsd,
-            spentUsd: input.spentUsd,
-            period: input.period,
-            message: input.message,
-          });
-        } catch (err) {
-          logger.error(
-            { err, organizationId: input.organizationId },
-            "failed to send budget increase request email",
-          );
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "email_send_failed",
-          });
-        }
-        return { ok: true as const, sentTo: adminEmail };
-      }),
-
+      .mutation("requestBudgetIncrease", (p) =>
+        p
+          .withInput(userApiRequestBudgetIncreaseInputSchema)
+          .withOutput(userApiBudgetIncreaseRequestedSchema)
+          .withPermission(ORGANIZATION_VIEW)
+          .handle(async ({ ctx, input }) => {
+            const user = sessionUserOf(ctx);
+            const adminEmail = await ports.resolveBudgetIncreaseRecipient(ctx, {
+              organizationId: input.organizationId,
+            });
+            const [organizationName, requester] = await Promise.all([
+              ports.tryGetOrganizationName(ctx, { organizationId: input.organizationId }),
+              ports.tryGetUserContact(ctx, { userId: user.id }),
+            ]);
+            try {
+              await ports.sendBudgetIncreaseRequest(ctx, {
+                to: adminEmail,
+                requesterEmail: requester?.email ?? user.email ?? "",
+                requesterName: requester?.name ?? undefined,
+                organizationName: organizationName ?? "",
+                scope: input.scope,
+                scopeId: input.scopeId,
+                limitUsd: input.limitUsd,
+                spentUsd: input.spentUsd,
+                period: input.period,
+                message: input.message,
+              });
+            } catch (err) {
+              logger.error(
+                { err, organizationId: input.organizationId },
+                "failed to send budget increase request email",
+              );
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: "email_send_failed",
+              });
+            }
+            return { ok: true as const, sentTo: adminEmail };
+          }),
+      )
       /**
        * Persist (or clear) the user's pinned home destination. Null clears the
        * pin and reverts to auto-detection. The picker calls this when the user
@@ -1071,16 +1178,19 @@ export class UserTrpcApi {
        * Spec: specs/ai-gateway/governance/persona-home-content.feature
        *       (user pin > organization pin > auto-detection priority)
        */
-      setLastHomePath: policy(OWN_ACCOUNT)(
-        procedure.input(userApiSetLastHomePathInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ctx.app.users.setLastHomePath({
-          id: sessionUserOf(ctx).id,
-          path: input.path,
-        });
-        return { ok: true as const };
-      }),
-
+      .mutation("setLastHomePath", (p) =>
+        p
+          .withInput(userApiSetLastHomePathInputSchema)
+          .withOutput(userApiOkSchema)
+          .withPermission(OWN_ACCOUNT)
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.users.setLastHomePath({
+              id: sessionUserOf(ctx).id,
+              path: input.path,
+            });
+            return { ok: true as const };
+          }),
+      )
       /**
        * Snapshot of the user's home-page picker state: the currently-pinned
        * path (if any) plus the first project the auto-detected default would
@@ -1091,20 +1201,26 @@ export class UserTrpcApi {
        * land there via auto-detection — the picker asks the home resolver for
        * the auto-detected destination rather than duplicating that logic here.
        */
-      homePagePickerState: policy(ORGANIZATION_VIEW)(
-        procedure.input(userApiOrganizationInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const userId = sessionUserOf(ctx).id;
-        const [lastHomePath, firstProjectSlug] = await Promise.all([
-          ctx.app.users.tryGetLastHomePath({ id: userId }),
-          ports.tryFindFirstProjectSlug(ctx, {
-            organizationId: input.organizationId,
-            userId,
+      .query("homePagePickerState", (p) =>
+        p
+          .withInput(userApiOrganizationInputSchema)
+          .withOutput(userApiHomePagePickerStateSchema)
+          .withPermission(ORGANIZATION_VIEW)
+          .handle(async ({ ctx, input }) => {
+            const userId = sessionUserOf(ctx).id;
+            const [lastHomePath, firstProjectSlug] = await Promise.all([
+              ctx.app.users.tryGetLastHomePath({ id: userId }),
+              ports.tryFindFirstProjectSlug(ctx, {
+                organizationId: input.organizationId,
+                userId,
+              }),
+            ]);
+            return { lastHomePath, firstProjectSlug };
           }),
-        ]);
-        return { lastHomePath, firstProjectSlug };
-      }),
-    });
+      )
+      .build();
+
+    return trpc.mergeRouters(anonymous, account);
   }
 }
 

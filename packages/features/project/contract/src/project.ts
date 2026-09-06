@@ -162,11 +162,12 @@ export interface ActiveProjectsByScopes {
   hasMore: boolean;
 }
 
-export interface SearchProjectsResult {
-  id: string;
-  name: string;
-  slug: string;
-}
+export const searchProjectsResultSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+});
+export type SearchProjectsResult = z.infer<typeof searchProjectsResultSchema>;
 
 /**
  * Who a project is, and nothing about how it is configured.

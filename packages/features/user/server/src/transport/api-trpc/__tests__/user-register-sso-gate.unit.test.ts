@@ -33,6 +33,7 @@ function harness({ resolvedProvider }: { resolvedProvider: string }) {
       protected: trpc.procedure,
       public: trpc.procedure,
       policy: () => (procedure: unknown) => procedure,
+      validateOutput: true,
     } as never,
     ports,
   );

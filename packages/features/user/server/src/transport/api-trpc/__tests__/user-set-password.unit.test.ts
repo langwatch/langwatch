@@ -50,6 +50,7 @@ function harness({
       protected: trpc.procedure,
       public: trpc.procedure,
       policy: () => (procedure: unknown) => procedure,
+      validateOutput: true,
     } as never,
     {
       resolveAuthProvider,

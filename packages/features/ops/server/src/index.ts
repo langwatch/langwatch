@@ -22,11 +22,7 @@ export {
 export { BugReportRepositoryPort } from "./ports/bug-report.port";
 export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-report.repository";
 export { BugReportInboxService, type BugReportListing } from "./services/bug-report-inbox.service";
-export {
-  OpsTrpcApi,
-  type OpsTrpcContext,
-  type OpsTrpcPorts,
-} from "./transport/api-trpc/ops.api";
+export { OpsTrpcApi, type OpsTrpcContext, type OpsTrpcPorts } from "./transport/api-trpc/ops.api";
 export {
   PostgresOpsAdapter,
   type PostgresOpsAdapterOptions,

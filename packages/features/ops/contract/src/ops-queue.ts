@@ -1,85 +1,101 @@
 import { z } from "zod";
-import type {
+import {
+  errorClusterSchema,
+  groupInfoSchema,
+  parkedGroupInfoSchema,
+  parkedTenantSchema,
+} from "./ops-dashboard";
+
+export type {
   ErrorCluster,
   GroupInfo,
   ParkedGroupInfo,
   QueueInfo,
   QueueSummaryInfo,
 } from "./ops-dashboard";
-import type { ParkedTenant } from "./ops-snapshot";
 
-export interface OpsQueueJobsPage {
-  jobs: OpsQueueJob[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+/** One page of a group's jobs. */
+export const opsQueueJobEnvelopeSchema = z.object({
+  format: z.string().nullable(),
+  version: z.number().nullable(),
+  blobId: z.string().nullable(),
+});
+export type OpsQueueJobEnvelope = z.infer<typeof opsQueueJobEnvelopeSchema>;
 
-export interface OpsQueueGroupsPage {
-  groups: GroupInfo[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+export const opsQueueJobSchema = z.object({
+  jobId: z.string(),
+  score: z.number(),
+  data: z.record(z.string(), z.unknown()).nullable(),
+  payloadBytes: z.number().nullable(),
+  envelope: opsQueueJobEnvelopeSchema.nullable(),
+});
+export type OpsQueueJob = z.infer<typeof opsQueueJobSchema>;
 
-export interface OpsParkedGroupsPage {
-  groups: ParkedGroupInfo[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+export const opsQueueJobsPageSchema = z.object({
+  jobs: z.array(opsQueueJobSchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+});
+export type OpsQueueJobsPage = z.infer<typeof opsQueueJobsPageSchema>;
 
-export interface OpsParkedTenantsPage {
-  tenants: ParkedTenant[];
-  total: number;
-}
+export const opsQueueGroupsPageSchema = z.object({
+  groups: z.array(groupInfoSchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+});
+export type OpsQueueGroupsPage = z.infer<typeof opsQueueGroupsPageSchema>;
 
-export interface OpsBlockedSummary {
-  totalBlocked: number;
-  clusters: ErrorCluster[];
-}
+export const opsParkedGroupsPageSchema = z.object({
+  groups: z.array(parkedGroupInfoSchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+});
+export type OpsParkedGroupsPage = z.infer<typeof opsParkedGroupsPageSchema>;
 
-export interface OpsQueueDlqGroup {
-  groupId: string;
-  error: string | null;
-  errorStack: string | null;
-  pipelineName: string | null;
-  jobCount: number;
-  movedAt: number | null;
-}
+export const opsParkedTenantsPageSchema = z.object({
+  tenants: z.array(parkedTenantSchema),
+  total: z.number(),
+});
+export type OpsParkedTenantsPage = z.infer<typeof opsParkedTenantsPageSchema>;
 
-export interface OpsQueueDrainPreview {
-  totalAffected: number;
-  byPipeline: Array<{ name: string; count: number }>;
-  byError: Array<{ message: string; count: number }>;
-}
+export const opsBlockedSummarySchema = z.object({
+  totalBlocked: z.number(),
+  clusters: z.array(errorClusterSchema),
+});
+export type OpsBlockedSummary = z.infer<typeof opsBlockedSummarySchema>;
 
-export interface OpsQueueJobEnvelope {
-  format: string | null;
-  version: number | null;
-  blobId: string | null;
-}
+export const opsQueueDlqGroupSchema = z.object({
+  groupId: z.string(),
+  error: z.string().nullable(),
+  errorStack: z.string().nullable(),
+  pipelineName: z.string().nullable(),
+  jobCount: z.number(),
+  movedAt: z.number().nullable(),
+});
+export type OpsQueueDlqGroup = z.infer<typeof opsQueueDlqGroupSchema>;
 
-export interface OpsQueueJob {
-  jobId: string;
-  score: number;
-  data: Record<string, unknown> | null;
-  payloadBytes: number | null;
-  envelope: OpsQueueJobEnvelope | null;
-}
+export const opsQueueDlqGroupWithQueueSchema = opsQueueDlqGroupSchema.extend({
+  queueName: z.string(),
+  queueDisplayName: z.string(),
+});
+export type OpsQueueDlqGroupWithQueue = z.infer<typeof opsQueueDlqGroupWithQueueSchema>;
 
-export interface OpsQueueReconcileResult {
-  counter: number;
-  groundTruth: number;
-  drift: number;
-}
+export const opsQueueDrainPreviewSchema = z.object({
+  totalAffected: z.number(),
+  byPipeline: z.array(z.object({ name: z.string(), count: z.number() })),
+  byError: z.array(z.object({ message: z.string(), count: z.number() })),
+});
+export type OpsQueueDrainPreview = z.infer<typeof opsQueueDrainPreviewSchema>;
 
-export interface OpsQueueDlqGroupWithQueue extends OpsQueueDlqGroup {
-  queueName: string;
-  queueDisplayName: string;
-}
-
-export type { ErrorCluster, GroupInfo, ParkedGroupInfo, QueueInfo, QueueSummaryInfo };
+export const opsQueueReconcileResultSchema = z.object({
+  counter: z.number(),
+  groundTruth: z.number(),
+  drift: z.number(),
+});
+export type OpsQueueReconcileResult = z.infer<typeof opsQueueReconcileResultSchema>;
 
 /**
  * The input shapes the operator queue surface parses.

@@ -62,35 +62,41 @@ export const opsStartReplayInputSchema = z.object({
 // ---------------------------------------------------------------------------
 
 /** How many aggregates one projection would replay, and for whom. */
-export interface AggregateDiscovery {
-  projections: Array<{
-    projectionName: string;
-    aggregateCount: number;
-    tenantBreakdown: Array<{ tenantId: string; aggregateCount: number }>;
-  }>;
-}
+export const aggregateDiscoverySchema = z.object({
+  projections: z.array(
+    z.object({
+      projectionName: z.string(),
+      aggregateCount: z.number(),
+      tenantBreakdown: z.array(z.object({ tenantId: z.string(), aggregateCount: z.number() })),
+    }),
+  ),
+});
+export type AggregateDiscovery = z.infer<typeof aggregateDiscoverySchema>;
 
 /** One aggregate the operator's search matched. */
-export interface AggregateSearchResult {
-  aggregateId: string;
-  aggregateType: string;
-  tenantId: string;
-  eventCount: number;
-  lastEventTime: string;
-}
+export const aggregateSearchResultSchema = z.object({
+  aggregateId: z.string(),
+  aggregateType: z.string(),
+  tenantId: z.string(),
+  eventCount: z.number(),
+  lastEventTime: z.string(),
+});
+export type AggregateSearchResult = z.infer<typeof aggregateSearchResultSchema>;
 
 /** One stored event, with its payload parsed when it parses. */
-export interface AggregateEventView {
-  eventId: string;
-  eventType: string;
-  eventTimestamp: string;
-  payload: unknown;
-}
+export const aggregateEventViewSchema = z.object({
+  eventId: z.string(),
+  eventType: z.string(),
+  eventTimestamp: z.string(),
+  payload: z.unknown(),
+});
+export type AggregateEventView = z.infer<typeof aggregateEventViewSchema>;
 
 /** A projection folded up to a chosen event, for the state viewer. */
-export interface ProjectionStateAtEvent {
-  state: unknown;
-  appliedEventCount: number;
-  projectionName: string;
-  aggregateType: string;
-}
+export const projectionStateAtEventSchema = z.object({
+  state: z.unknown(),
+  appliedEventCount: z.number(),
+  projectionName: z.string(),
+  aggregateType: z.string(),
+});
+export type ProjectionStateAtEvent = z.infer<typeof projectionStateAtEventSchema>;

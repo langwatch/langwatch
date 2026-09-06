@@ -3,23 +3,24 @@ import { z } from "zod";
 /** A claimed slot must be untouched this long before an operator may clear it. */
 export const SLOT_STALE_AFTER_MS = 15 * 60_000;
 
-export interface OpsScheduledJob {
-  id: string;
-  projectId: string;
-  targetType: string;
-  targetId: string;
-  cron: string;
-  timezone: string;
-  nextRunAt: string;
-  lastSlot: string | null;
-  active: boolean;
-  projectName: string | null;
-  createdAt: string;
-  currentSlot: string | null;
-  attempts: number;
-  lastError: string | null;
-  updatedAt: string;
-}
+export const opsScheduledJobSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  targetType: z.string(),
+  targetId: z.string(),
+  cron: z.string(),
+  timezone: z.string(),
+  nextRunAt: z.string(),
+  lastSlot: z.string().nullable(),
+  active: z.boolean(),
+  projectName: z.string().nullable(),
+  createdAt: z.string(),
+  currentSlot: z.string().nullable(),
+  attempts: z.number(),
+  lastError: z.string().nullable(),
+  updatedAt: z.string(),
+});
+export type OpsScheduledJob = z.infer<typeof opsScheduledJobSchema>;
 
 export type SchedulerControlAction =
   | "ops.scheduler.pause"
@@ -27,14 +28,15 @@ export type SchedulerControlAction =
   | "ops.scheduler.clear_slot"
   | "ops.scheduler.run_now";
 
-export interface SchedulerAuditEntryView {
-  id: string;
-  at: string;
-  action: string;
-  scheduleId: string;
-  projectId: string | null;
-  actor: string | null;
-}
+export const schedulerAuditEntryViewSchema = z.object({
+  id: z.string(),
+  at: z.string(),
+  action: z.string(),
+  scheduleId: z.string(),
+  projectId: z.string().nullable(),
+  actor: z.string().nullable(),
+});
+export type SchedulerAuditEntryView = z.infer<typeof schedulerAuditEntryViewSchema>;
 
 export interface ListScheduledJobsInput {
   limit?: number;
