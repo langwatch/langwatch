@@ -423,8 +423,9 @@ export class GrantsLedgerWriter {
      * most callers the append is the write and the fold converging later is
      * the normal, correct outcome. A caller that is about to hand out access
      * these very rows decide — minting an API key — turns it on, and gets an
-     * {@link AuthzGrantNotConfirmedError} instead of a silent pass. Needs
-     * `awaitProjection`, since there is nothing to require without the wait.
+     * {@link AuthzGrantNotConfirmedError} instead of a silent pass. It implies
+     * the wait: there is nothing to require without one, so asking for the
+     * error with `awaitProjection: false` waits anyway rather than passing.
      */
     requireProjection?: boolean;
   }): Promise<AttachOutcome> {
@@ -473,7 +474,7 @@ export class GrantsLedgerWriter {
     );
 
     const wanted = fresh.map((binding) => binding.bindingId);
-    if (awaitProjection) {
+    if (awaitProjection || requireProjection) {
       const landed = await this.awaitProjection({
         what: `attach of ${wanted.length} binding(s)`,
         organizationId,

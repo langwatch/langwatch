@@ -270,6 +270,29 @@ describe("ApiKeyService — the crash windows around a grant write", () => {
       expect((failure as HandledError).code).toBe("authz_grant_not_confirmed");
       expect(ledger.revokeBindingsWhere).not.toHaveBeenCalled();
     });
+
+    /** @scenario "Replacing a key's grants leaves its metadata alone when the new ones do not land" */
+    it("leaves the key's own row alone when a replace cannot confirm", async () => {
+      ledger.attachBindings.mockRejectedValueOnce(
+        new AuthzGrantNotConfirmedError(),
+      );
+
+      await service
+        .update({
+          id: "ak_existing",
+          callerUserId: USER_ID,
+          callerIsAdmin: true,
+          organizationId: ORG_ID,
+          permissionMode: "restricted",
+          permissions: ["langy:view"],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
+        })
+        .catch(() => null);
+
+      expect(prisma.apiKey.update).not.toHaveBeenCalled();
+    });
   });
 
   describe("when the ledger refuses the new key's grants", () => {

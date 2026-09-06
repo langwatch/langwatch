@@ -337,6 +337,12 @@ Feature: Authorization grants
     When the rows become readable inside the window
     Then the write is reported as done
 
+  @unit
+  Scenario: Requiring the projection waits for it even when the wait is switched off
+    Given an attach whose caller requires the projection and asks not to wait
+    When the read-your-writes window passes with the rows not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
   # ═══ The projection ═══════════════════════════════════════════════════
 
   @unit @unimplemented

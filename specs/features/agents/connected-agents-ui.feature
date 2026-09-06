@@ -72,6 +72,7 @@ Feature: Connected agents in the product
     When the card is drawn
     Then it carries a chip with the owner's name
     And the chip says only that person can run the agent
+    And the chip takes the tab order, so the reason is reachable by keyboard
 
   @integration
   Scenario: A card the reader can choose carries no refusal
@@ -79,6 +80,7 @@ Feature: Connected agents in the product
     When the card is drawn
     Then it carries a chip with the owner's name
     And the chip says nothing about who can run the agent
+    And the chip stays out of the tab order
 
   @integration
   Scenario: A shared development agent reads the machine that holds it

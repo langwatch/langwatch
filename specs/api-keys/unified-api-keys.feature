@@ -427,3 +427,11 @@ Feature: Unified API Keys
     When I replace its grants
     Then the update fails with "authz_grant_not_confirmed"
     And nothing the key already held is revoked
+
+  @unit
+  Scenario: Replacing a key's grants leaves its metadata alone when the new ones do not land
+    Given an API key with grants
+    And the grant write is durable but its projection has not landed
+    When I replace its grants and its permission mode in one edit
+    Then the update fails with "authz_grant_not_confirmed"
+    And the key still reads with the name and permission mode it had

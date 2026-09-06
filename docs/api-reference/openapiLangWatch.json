@@ -2590,8 +2590,7 @@
                       },
                       "maxConcurrency": {
                         "type": "integer",
-                        "exclusiveMinimum": true,
-                        "minimum": 0,
+                        "exclusiveMinimum": 0,
                         "maximum": 1000
                       }
                     },
@@ -2626,14 +2625,12 @@
                         },
                         "concurrency": {
                           "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0,
+                          "exclusiveMinimum": 0,
                           "maximum": 1000
                         },
                         "timeoutMs": {
                           "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                          "exclusiveMinimum": 0
                         },
                         "sticky": {
                           "type": "boolean"
@@ -18430,13 +18427,11 @@
                 "properties": {
                   "startDate": {
                     "type": "number",
-                    "exclusiveMinimum": true,
-                    "minimum": 0
+                    "exclusiveMinimum": 0
                   },
                   "endDate": {
                     "type": "number",
-                    "exclusiveMinimum": true,
-                    "minimum": 0
+                    "exclusiveMinimum": 0
                   },
                   "query": {
                     "type": "string"
@@ -36022,8 +36017,7 @@
                                 },
                                 "pid": {
                                   "type": "integer",
-                                  "exclusiveMinimum": true,
-                                  "minimum": 0
+                                  "exclusiveMinimum": 0
                                 },
                                 "durationMs": {
                                   "type": "integer",
@@ -36136,8 +36130,7 @@
                             },
                             "timeoutSeconds": {
                               "type": "integer",
-                              "exclusiveMinimum": true,
-                              "minimum": 0,
+                              "exclusiveMinimum": 0,
                               "maximum": 3600
                             }
                           },

@@ -66,6 +66,24 @@ describe("given an attach whose projection does not land inside the window", () 
       ).toBe("authz_grant_not_confirmed");
     });
 
+    /** @scenario "Requiring the projection waits for it even when the wait is switched off" */
+    it("waits and refuses even when the caller switched the wait off", async () => {
+      const { writer } = harness({ onLedger: true });
+
+      expect(
+        await codeOf(() =>
+          writer.attachBindings({
+            organizationId: ORG_ID,
+            bindings: [binding],
+            actor: ACTOR,
+            onDuplicate: "skip",
+            awaitProjection: false,
+            requireProjection: true,
+          }),
+        ),
+      ).toBe("authz_grant_not_confirmed");
+    });
+
     it("reports the failure as ours, not the caller's", async () => {
       const { writer } = harness({ onLedger: true });
 

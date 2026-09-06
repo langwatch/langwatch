@@ -5492,6 +5492,13 @@ export interface operations {
                                 inflight: number;
                                 maxConcurrency: number;
                             }[];
+                            /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                            selectable: boolean;
+                            /**
+                             * @description Why the agent cannot be run by this credential. Null when it can.
+                             * @enum {string|null}
+                             */
+                            notSelectableReason: "owned_by_another_person" | null;
                             createdAt: string;
                             updatedAt: string;
                             /** Format: uri */
@@ -5594,6 +5601,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5677,6 +5691,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5775,6 +5796,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5902,6 +5930,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -18127,6 +18162,21 @@ export interface operations {
                         pattern: string;
                         reason: string;
                         skipOffered: boolean;
+                        segments?: {
+                            command: string;
+                            pattern: string;
+                            readOnly: boolean;
+                        }[];
+                        timeoutSeconds?: number;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "permission_answered";
+                        callId: string;
+                        /** @enum {string} */
+                        decision: "allow_once" | "allow_pattern" | "deny";
+                        patterns?: string[];
                     } | {
                         /** @enum {number} */
                         protocol: 1;

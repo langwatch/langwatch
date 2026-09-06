@@ -198,6 +198,7 @@ describe("<ConnectedAgentsSection />", () => {
       const chip = screen.getByTestId("connected-agent-scope-chip");
       expect(within(chip).getByText("Ana")).toBeInTheDocument();
       expect(chip.getAttribute("aria-label")).toContain("Ana");
+      expect(chip.getAttribute("tabindex")).toBe("0");
     });
   });
 
@@ -214,6 +215,7 @@ describe("<ConnectedAgentsSection />", () => {
       const chip = screen.getByTestId("connected-agent-scope-chip");
       expect(within(chip).getByText("Ana")).toBeInTheDocument();
       expect(chip.getAttribute("aria-label")).toBeNull();
+      expect(chip.getAttribute("tabindex")).toBeNull();
     });
   });
 

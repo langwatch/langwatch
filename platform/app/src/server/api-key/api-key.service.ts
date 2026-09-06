@@ -524,13 +524,12 @@ export class ApiKeyService {
       );
     }
 
-    await this.repo.update({
-      id,
-      name,
-      description,
-      permissionMode,
-    });
-
+    // The grants move first, the metadata after. `replaceRoleBindings` can
+    // refuse with AuthzGrantNotConfirmedError, and a metadata write that had
+    // already landed would leave the key describing permissions it does not
+    // hold — a key marked "restricted" while the old grants are still the
+    // live ones. Writing it last means a refused grant change leaves the key
+    // exactly as it was.
     if (effectiveBindings) {
       await this.repo.replaceRoleBindings({
         apiKeyId: id,
@@ -560,6 +559,13 @@ export class ApiKeyService {
         });
       }
     }
+
+    await this.repo.update({
+      id,
+      name,
+      description,
+      permissionMode,
+    });
 
     const updated = await this.repo.findById({ id });
     if (!updated) throw new ApiKeyNotFoundError(id);

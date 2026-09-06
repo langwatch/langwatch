@@ -144,6 +144,10 @@ function ScopeChip({ agent }: { agent: ConnectedAgentView }) {
         flexShrink={0}
         maxWidth="50%"
         data-testid="connected-agent-scope-chip"
+        // The chip is the only place a card says why it cannot be run, so on
+        // the cards that carry that reason it takes the tab order too: the
+        // tooltip opens on focus, not on hover alone.
+        tabIndex={agent.selectable ? undefined : 0}
         aria-label={
           agent.selectable ? undefined : ownerOnlyCopy(agent.owner?.name)
         }

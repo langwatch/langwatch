@@ -5,6 +5,7 @@
  * @see specs/agents/connected-agents.feature
  */
 import { describe, expect, it } from "vitest";
+import type { AgentIdentityRow } from "~/server/agents/agent.repository";
 import { assertConnectedAgentsRunnable } from "~/server/suites/connected-targets";
 import { agentPresenceView } from "../presence.read";
 import { connectedAgentSelectability } from "../selectable";
@@ -78,7 +79,10 @@ describe("given a host-scoped development agent", () => {
 describe("given the listing mark and the run refusal read the same agents", () => {
   /** @scenario "The listing mark and the run refusal read one rule" */
   it("refuses exactly the agents the listing marks as not selectable", async () => {
-    const agents = [
+    const agents: Pick<
+      AgentIdentityRow,
+      "id" | "name" | "type" | "ownerUserId"
+    >[] = [
       { id: "a_1", name: "shared", type: "connected", ownerUserId: null },
       { id: "a_2", name: "mine", type: "connected", ownerUserId: "u_1" },
       { id: "a_3", name: "theirs", type: "connected", ownerUserId: "u_2" },
