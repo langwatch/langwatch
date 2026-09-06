@@ -6,16 +6,13 @@ import { apiKeyPermission } from "@langwatch/api";
 import {
   apiErrorBody,
   apiErrorSchema,
-  type AppRestProjectVariables,
   type AppRestSecurity,
   canonicalBaseResponses,
   canonicalConflictResponses,
-  IDEMPOTENCY_KEY_HEADER,
   idempotencyKeyParameter,
-  idempotentJson,
   idempotentReplayHeaders,
-  readIdempotencyKey,
   requestTraceIds,
+  type RestErrorHandler,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -26,7 +23,6 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
-import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import {
@@ -526,6 +522,13 @@ const createBudgetSchema = z.object({
 type GatewayContext = ProjectScopedContext<EndpointVariables>;
 
 /**
+ * The context the family's own error handler is handed. Wider than
+ * {@link GatewayContext}: a refusal can arrive before the credential chain has
+ * put a project on it.
+ */
+type GatewayErrorContext = Parameters<RestErrorHandler>[1];
+
+/**
  * Identity this request authorizes as, plus the id audit rows record. Which principal a credential stands for is the process's decision (a scoped API key acts as its owning user; a legacy project key carries none and acts as a synthetic machine principal for its project) — the application answers it, this transport only supplies the two facts it holds.
  */
 function actorForRequest(
@@ -569,7 +572,7 @@ const TRPC_HTTP_STATUS: Record<string, ContentfulStatusCode> = {
  * Answers error as the canonical envelope with this family's status — one helper for every refusal, so a code path can't hand-build a body that drifts from {@link apiErrorSchema}.
  */
 function errorResponse(
-  c: GatewayContext,
+  c: GatewayErrorContext,
   args: {
     status: ContentfulStatusCode;
     code: string;
@@ -583,7 +586,7 @@ function errorResponse(
 /**
  * Maps a service-layer TRPCError onto the canonical error envelope. Service messages follow snake_code: detail, so the machine code survives onto the wire for SDKs to branch on. Anything not a TRPCError is rethrown for the app-level error handler.
  */
-function trpcErrorResponse(c: GatewayContext, error: unknown): Response {
+function trpcErrorResponse(c: GatewayErrorContext, error: unknown): Response {
   // The service layer and the shared preconditions raise HandledErrors
   // (ADR-045). They already carry the two things this envelope needs, a
   // stable code and the status to answer with, so read them directly
@@ -672,12 +675,38 @@ export function createGatewayPlatformRestApp(options: {
     basePath: "/api/gateway/v1",
     staticGeneration: "v1",
     errorEnvelope: "canonical",
+    // Every refusal this surface raises leaves as the control plane's own
+    // published body; anything that mapping does not recognise falls through
+    // to the envelope's boundary handler.
+    errorHandler: (boundary) => (error, c) => {
+      try {
+        return trpcErrorResponse(c, error);
+      } catch (unmapped) {
+        return boundary(unmapped as Error, c);
+      }
+    },
   });
 
   /** Every answer here is the control plane's own published body. */
   const GATEWAY_PLATFORM_ANSWER =
     "the gateway control plane answers its own published bodies, including the " +
     "replayed create the idempotency ledger serves from its stored bytes";
+
+  /**
+   * The organization-wide check a replayable create needs beyond its endpoint
+   * permission, declared as a pre-flight so it runs on a replay too.
+   */
+  const organizationWidePreflight = async (
+    c: Parameters<RestErrorHandler>[1],
+    permission: AuthzPermission,
+  ): Promise<void> => {
+    const app = gateway();
+    const context = c as GatewayContext;
+    await authorizeOrganizationWide(context, app, {
+      organizationId: await app.organizationIdForProject(projectOf(context).id),
+      permission,
+    });
+  };
 
   // ── Virtual keys ────────────────────────────────────────────────────────
 
@@ -694,8 +723,8 @@ export function createGatewayPlatformRestApp(options: {
         if (cursor === null) return invalidCursor(c);
 
         const organizationId = await app.organizationIdForProject(project.id);
-        const service = app.virtualKeys;
-        const rows = await service.getPage({
+        const virtualKeysService = app.virtualKeys;
+        const rows = await virtualKeysService.getPage({
           organizationId,
           limit: page.data.limit,
           cursor: cursor ?? null,
@@ -751,73 +780,60 @@ export function createGatewayPlatformRestApp(options: {
         const app = gateway();
         const project = projectOf(c);
         const body = { data: input };
-        const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
         const organizationId = await app.organizationIdForProject(project.id);
-        const { actor, actorUserId } = actorForRequest(c, app);
+        const { actorUserId } = actorForRequest(c, app);
         const scopes = scopesFromWire(body.data.scopes, project.id);
-        const service = app.virtualKeys;
-        try {
-          // The SAME pre-flight the tRPC create runs — it is one operation on the
-          // application, with the actor swapped for the API credential: manage at
-          // every requested scope, scopes inside the caller's organization, the
-          // destination anchored and manageable, guardrail refs project-local.
-          await app.authorizeVirtualKeyCreate({
-            actor,
-            organizationId,
-            scopes,
-            traceProjectId: body.data.trace_project_id,
-            guardrailAttachments: body.data.config?.guardrailAttachments,
-          });
-          const input = {
-            organizationId,
-            name: body.data.name,
-            description: body.data.description ?? null,
-            principalUserId: body.data.principal_user_id ?? null,
-            scopes,
-            traceProjectId: body.data.trace_project_id ?? null,
-            routingPolicyId: body.data.routing_policy_id ?? null,
-            routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
-            expiresAt: body.data.expires_at ?? null,
-            budget: budgetFromWire(app, body.data.budget),
-            config: body.data.config,
-            externalId: body.data.external_id,
-            metadata: body.data.metadata,
-            actorUserId,
-          };
-          // Only the create is inside the idempotent section. The pre-flight
-          // above is read-only, so leaving it out means a replay still re-checks
-          // the caller's scopes rather than trusting a grant it held yesterday.
-          const outcome = await app.idempotency({
-            operation: "gateway.v1.virtual-keys.create",
-            scopeId: project.id,
-            key: idempotencyKey,
-            validatedBody: body.data,
-            handler: async () => {
-              const { virtualKey, secret } = await service.create(input);
-              logger.info(
-                { projectId: project.id, vkId: virtualKey.id },
-                "Created virtual key via REST",
-              );
-              // Secret is minted once and stored only as a hash, so a caller
-              // losing this response has no second way to read it — the whole
-              // reason this route takes an idempotency key, and the receipt
-              // holding this response is encrypted at rest, since a replay that
-              // withheld the secret would hand back a key nobody can ever use.
-              return {
-                status: 201,
-                body: { virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret },
-              };
-            },
-          });
-          return idempotentJson({ c, outcome });
-        } catch (error) {
-          return trpcErrorResponse(c, error);
-        }
+        const { virtualKey, secret } = await app.virtualKeys.create({
+          organizationId,
+          name: body.data.name,
+          description: body.data.description ?? null,
+          principalUserId: body.data.principal_user_id ?? null,
+          scopes,
+          traceProjectId: body.data.trace_project_id ?? null,
+          routingPolicyId: body.data.routing_policy_id ?? null,
+          routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
+          expiresAt: body.data.expires_at ?? null,
+          budget: budgetFromWire(app, body.data.budget),
+          config: body.data.config,
+          externalId: body.data.external_id,
+          metadata: body.data.metadata,
+          actorUserId,
+        });
+        logger.info({ projectId: project.id, vkId: virtualKey.id }, "Created virtual key via REST");
+        // The secret is minted once and stored only as a hash, so a caller
+        // losing this response has no second way to read it — the whole reason
+        // this route takes an idempotency key, and the receipt holding it is
+        // encrypted at rest, since a replay that withheld the secret would hand
+        // back a key nobody can ever use.
+        return { virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret };
       },
       (b) =>
         policy(apiKeyPermission("virtualKeys:create"))(b)
           .withInput(createVirtualKeySchema)
           .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withStatus(201)
+          .withIdempotency({
+            operation: "gateway.v1.virtual-keys.create",
+            scope: (c) => projectOf(c).id,
+            // The SAME pre-flight the tRPC create runs, with the actor swapped
+            // for the API credential. It is declared here, not in the handler,
+            // because it is read-only and MUST run on a replay too: a receipt
+            // may not answer for a grant the caller has since lost.
+            preflight: async (c, input) => {
+              const app = gateway();
+              const data = input as z.infer<typeof createVirtualKeySchema>;
+              const project = projectOf(c);
+              const organizationId = await app.organizationIdForProject(project.id);
+              const { actor } = actorForRequest(c as GatewayContext, app);
+              await app.authorizeVirtualKeyCreate({
+                actor,
+                organizationId,
+                scopes: scopesFromWire(data.scopes, project.id),
+                traceProjectId: data.trace_project_id,
+                guardrailAttachments: data.config?.guardrailAttachments,
+              });
+            },
+          })
           .withDocs({
             summary: "Create virtual key",
             parameters: [idempotencyKeyParameter],
@@ -1008,7 +1024,7 @@ export function createGatewayPlatformRestApp(options: {
         const body = { data: input };
         const organizationId = await app.organizationIdForProject(project.id);
         const { actor, actorUserId } = actorForRequest(c, app);
-        const service = app.virtualKeys;
+        const virtualKeysService = app.virtualKeys;
         try {
           // Absent `scopes` means "not re-scoping", which is what the
           // application's update pre-flight reads to decide whether the stored
@@ -1028,7 +1044,7 @@ export function createGatewayPlatformRestApp(options: {
             traceProjectId: body.data.trace_project_id,
             guardrailAttachments: body.data.config?.guardrailAttachments,
           });
-          const updated = await service.update({
+          const updated = await virtualKeysService.update({
             id,
             organizationId,
             actorUserId,
@@ -1088,7 +1104,7 @@ export function createGatewayPlatformRestApp(options: {
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
         const { actor, actorUserId } = actorForRequest(c, app);
-        const service = app.virtualKeys;
+        const virtualKeysService = app.virtualKeys;
         try {
           await app.authorizeVirtualKeyOperation({
             actor,
@@ -1096,7 +1112,7 @@ export function createGatewayPlatformRestApp(options: {
             id,
             permission: "virtualKeys:rotate",
           });
-          const { virtualKey, secret } = await service.rotate({
+          const { virtualKey, secret } = await virtualKeysService.rotate({
             id,
             organizationId,
             actorUserId,
@@ -1145,7 +1161,7 @@ export function createGatewayPlatformRestApp(options: {
         if (!body.success) return validationErrorResponse(c, body.error);
         const organizationId = await app.organizationIdForProject(project.id);
         const { actor, actorUserId } = actorForRequest(c, app);
-        const service = app.virtualKeys;
+        const virtualKeysService = app.virtualKeys;
         try {
           await app.authorizeVirtualKeyOperation({
             actor,
@@ -1153,7 +1169,7 @@ export function createGatewayPlatformRestApp(options: {
             id,
             permission: "virtualKeys:update",
           });
-          const updated = await service.disable({
+          const updated = await virtualKeysService.disable({
             id,
             organizationId,
             actorUserId,
@@ -1217,7 +1233,7 @@ export function createGatewayPlatformRestApp(options: {
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
         const { actor, actorUserId } = actorForRequest(c, app);
-        const service = app.virtualKeys;
+        const virtualKeysService = app.virtualKeys;
         try {
           await app.authorizeVirtualKeyOperation({
             actor,
@@ -1225,7 +1241,7 @@ export function createGatewayPlatformRestApp(options: {
             id,
             permission: "virtualKeys:update",
           });
-          const updated = await service.enable({
+          const updated = await virtualKeysService.enable({
             id,
             organizationId,
             actorUserId,
@@ -1267,7 +1283,7 @@ export function createGatewayPlatformRestApp(options: {
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
         const { actor, actorUserId } = actorForRequest(c, app);
-        const service = app.virtualKeys;
+        const virtualKeysService = app.virtualKeys;
         try {
           await app.authorizeVirtualKeyOperation({
             actor,
@@ -1275,7 +1291,7 @@ export function createGatewayPlatformRestApp(options: {
             id,
             permission: "virtualKeys:delete",
           });
-          const updated = await service.revoke({
+          const updated = await virtualKeysService.revoke({
             id,
             organizationId,
             actorUserId,
@@ -1408,13 +1424,13 @@ export function createGatewayPlatformRestApp(options: {
           scopeTypes = new Set(parsed.data);
         }
         const organizationId = await app.organizationIdForProject(project.id);
-        const service = app.budgetDecisions;
+        const budgetDecisionsService = app.budgetDecisions;
         const {
           budgets: rows,
           spendAvailable,
           readAt,
           scopeReach,
-        } = await service.listPageWithHealth({
+        } = await budgetDecisionsService.listPageWithHealth({
           organizationId,
           limit: page.data.limit,
           cursor: cursor ?? null,
@@ -1485,8 +1501,8 @@ export function createGatewayPlatformRestApp(options: {
         const project = projectOf(c);
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
-        const service = app.budgetDecisions;
-        const found = await service.tryGetWithHealth({ id, organizationId });
+        const budgetDecisionsService = app.budgetDecisions;
+        const found = await budgetDecisionsService.tryGetWithHealth({ id, organizationId });
         if (!found) {
           return errorResponse(c, {
             status: 404,
@@ -1549,65 +1565,48 @@ export function createGatewayPlatformRestApp(options: {
         const body = { data: input };
         // Read before the try: a malformed key is a request-validation failure and
         // takes the same route to the wire as one the schema caught, rather than
-        // being reshaped by the service-error mapping below.
-        const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
+        // being reshaped by the budgetDecisionsService-error mapping below.
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const service = app.budgetDecisions;
-        try {
-          await authorizeOrganizationWide(c, app, {
-            organizationId,
-            permission: "gatewayBudgets:create",
-          });
-          const outcome = await app.idempotency({
-            operation: "gateway.v1.budgets.create",
-            scopeId: project.id,
-            key: idempotencyKey,
-            validatedBody: body.data,
-            handler: async () => {
-              const row = await service.create({
-                organizationId,
-                scope: scopeFromWire(body.data.scope),
-                name: body.data.name,
-                description: body.data.description ?? null,
-                window: toStoredEnum(body.data.window),
-                limitUsd: body.data.limit_usd,
-                onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
-                timezone: body.data.timezone ?? null,
-                providerKey: body.data.provider_key ?? null,
-                externalId: body.data.external_id,
-                metadata: body.data.metadata,
-                cycleAnchorAt: body.data.cycle_anchor_at
-                  ? new Date(body.data.cycle_anchor_at)
-                  : null,
-                allowUnreachable: body.data.allow_unreachable,
-                actorUserId,
-              });
-              const [memberCounts, reach] = await Promise.all([
-                app.groupMemberCounts([row]),
-                service.scopeReach({ organizationId, scope: row }),
-              ]);
-              return {
-                status: 201,
-                body: {
-                  budget: budgetDtos.toBudgetDto({
-                    budget: row,
-                    memberCount: memberCounts.get(row.scopeId),
-                    reachable: reach.reachable,
-                  }),
-                },
-              };
-            },
-          });
-          return idempotentJson({ c, outcome });
-        } catch (error) {
-          return trpcErrorResponse(c, error);
-        }
+        const budgetDecisionsService = app.budgetDecisions;
+        const row = await budgetDecisionsService.create({
+          organizationId,
+          scope: scopeFromWire(body.data.scope),
+          name: body.data.name,
+          description: body.data.description ?? null,
+          window: toStoredEnum(body.data.window),
+          limitUsd: body.data.limit_usd,
+          onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
+          timezone: body.data.timezone ?? null,
+          providerKey: body.data.provider_key ?? null,
+          externalId: body.data.external_id,
+          metadata: body.data.metadata,
+          cycleAnchorAt: body.data.cycle_anchor_at ? new Date(body.data.cycle_anchor_at) : null,
+          allowUnreachable: body.data.allow_unreachable,
+          actorUserId,
+        });
+        const [memberCounts, reach] = await Promise.all([
+          app.groupMemberCounts([row]),
+          budgetDecisionsService.scopeReach({ organizationId, scope: row }),
+        ]);
+        return {
+          budget: budgetDtos.toBudgetDto({
+            budget: row,
+            memberCount: memberCounts.get(row.scopeId),
+            reachable: reach.reachable,
+          }),
+        };
       },
       (b) =>
         policy(apiKeyPermission("gatewayBudgets:create"))(b)
           .withInput(createBudgetSchema)
           .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withStatus(201)
+          .withIdempotency({
+            operation: "gateway.v1.budgets.create",
+            scope: (c) => projectOf(c).id,
+            preflight: (c) => organizationWidePreflight(c, "gatewayBudgets:create"),
+          })
           .withDocs({
             summary: "Create budget",
             parameters: [idempotencyKeyParameter],
@@ -1646,13 +1645,13 @@ export function createGatewayPlatformRestApp(options: {
         const body = { data: input };
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const service = app.budgetDecisions;
+        const budgetDecisionsService = app.budgetDecisions;
         try {
           await authorizeOrganizationWide(c, app, {
             organizationId,
             permission: "gatewayBudgets:update",
           });
-          const row = await service.update({
+          const row = await budgetDecisionsService.update({
             id,
             organizationId,
             name: body.data.name,
@@ -1708,13 +1707,13 @@ export function createGatewayPlatformRestApp(options: {
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const service = app.budgetDecisions;
+        const budgetDecisionsService = app.budgetDecisions;
         try {
           await authorizeOrganizationWide(c, app, {
             organizationId,
             permission: "gatewayBudgets:delete",
           });
-          const row = await service.archive({
+          const row = await budgetDecisionsService.archive({
             id,
             organizationId,
             actorUserId,
@@ -1764,13 +1763,13 @@ export function createGatewayPlatformRestApp(options: {
         if (!body.success) return validationErrorResponse(c, body.error);
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const service = app.budgetDecisions;
+        const budgetDecisionsService = app.budgetDecisions;
         try {
           await authorizeOrganizationWide(c, app, {
             organizationId,
             permission: "gatewayBudgets:update",
           });
-          const row = await service.reset({
+          const row = await budgetDecisionsService.reset({
             id,
             organizationId,
             actorUserId,
@@ -1835,7 +1834,7 @@ export function createGatewayPlatformRestApp(options: {
       "patch",
       "/providers/:id",
       MANAGEMENT_API_VERSION,
-      async (c: GatewayContext, input: { id: string }) => {
+      async (c: GatewayContext, _input: { id: string }) => {
         return errorResponse(c, {
           status: 410,
           code: "gateway_provider_bindings_gone",
@@ -1868,7 +1867,7 @@ export function createGatewayPlatformRestApp(options: {
       "delete",
       "/providers/:id",
       MANAGEMENT_API_VERSION,
-      async (c: GatewayContext, input: { id: string }) => {
+      async (c: GatewayContext, _input: { id: string }) => {
         return errorResponse(c, {
           status: 410,
           code: "gateway_provider_bindings_gone",
@@ -1909,8 +1908,8 @@ export function createGatewayPlatformRestApp(options: {
         if (cursor === null) return invalidCursor(c);
 
         const organizationId = await app.organizationIdForProject(project.id);
-        const service = app.budgetDecisions;
-        const rows = await service.cacheRuleListPage({
+        const budgetDecisionsService = app.budgetDecisions;
+        const rows = await budgetDecisionsService.cacheRuleListPage({
           organizationId,
           limit: page.data.limit,
           cursor: cursor ?? null,
@@ -1960,8 +1959,8 @@ export function createGatewayPlatformRestApp(options: {
         const project = projectOf(c);
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
-        const service = app.budgetDecisions;
-        const row = await service.tryCacheRuleGet({ id, organizationId });
+        const budgetDecisionsService = app.budgetDecisions;
+        const row = await budgetDecisionsService.tryCacheRuleGet({ id, organizationId });
         if (!row) {
           return errorResponse(c, {
             status: 404,
@@ -2001,43 +2000,30 @@ export function createGatewayPlatformRestApp(options: {
         const app = gateway();
         const project = projectOf(c);
         const body = { data: input };
-        const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const service = app.budgetDecisions;
-        try {
-          await authorizeOrganizationWide(c, app, {
-            organizationId,
-            permission: "gatewayCacheRules:create",
-          });
-          const outcome = await app.idempotency({
-            operation: "gateway.v1.cache-rules.create",
-            scopeId: project.id,
-            key: idempotencyKey,
-            validatedBody: body.data,
-            handler: async () => {
-              const row = await service.cacheRuleCreate({
-                organizationId,
-                name: body.data.name,
-                description: body.data.description ?? null,
-                priority: body.data.priority,
-                enabled: body.data.enabled,
-                matchers: body.data.matchers,
-                action: body.data.action,
-                actorUserId,
-              });
-              return { status: 201, body: { cache_rule: toCacheRuleDto(row) } };
-            },
-          });
-          return idempotentJson({ c, outcome });
-        } catch (error) {
-          return trpcErrorResponse(c, error);
-        }
+        const row = await app.budgetDecisions.cacheRuleCreate({
+          organizationId,
+          name: body.data.name,
+          description: body.data.description ?? null,
+          priority: body.data.priority,
+          enabled: body.data.enabled,
+          matchers: body.data.matchers,
+          action: body.data.action,
+          actorUserId,
+        });
+        return { cache_rule: toCacheRuleDto(row) };
       },
       (b) =>
         policy(apiKeyPermission("gatewayCacheRules:create"))(b)
           .withInput(createCacheRuleSchema)
           .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withStatus(201)
+          .withIdempotency({
+            operation: "gateway.v1.cache-rules.create",
+            scope: (c) => projectOf(c).id,
+            preflight: (c) => organizationWidePreflight(c, "gatewayCacheRules:create"),
+          })
           .withDocs({
             summary: "Create a cache rule",
             parameters: [idempotencyKeyParameter],
@@ -2076,13 +2062,13 @@ export function createGatewayPlatformRestApp(options: {
         const body = { data: input };
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const service = app.budgetDecisions;
+        const budgetDecisionsService = app.budgetDecisions;
         try {
           await authorizeOrganizationWide(c, app, {
             organizationId,
             permission: "gatewayCacheRules:update",
           });
-          const row = await service.cacheRuleUpdate({
+          const row = await budgetDecisionsService.cacheRuleUpdate({
             id,
             organizationId,
             name: body.data.name,
@@ -2131,13 +2117,13 @@ export function createGatewayPlatformRestApp(options: {
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
         const { actorUserId } = actorForRequest(c, app);
-        const service = app.budgetDecisions;
+        const budgetDecisionsService = app.budgetDecisions;
         try {
           await authorizeOrganizationWide(c, app, {
             organizationId,
             permission: "gatewayCacheRules:delete",
           });
-          const row = await service.cacheRuleArchive({
+          const row = await budgetDecisionsService.cacheRuleArchive({
             id,
             organizationId,
             actorUserId,

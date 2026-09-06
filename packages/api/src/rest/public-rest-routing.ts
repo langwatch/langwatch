@@ -344,6 +344,10 @@ export function mountRoute({
   const register: Record<HttpMethod | "all", () => void> = {
     all: () => void app.all(path, ...handlers),
     get: () => void app.get(path, ...handlers),
+    // Hono exposes no `.head` shortcut, and `.on("HEAD", …)` does not give it
+    // one either: HEAD is answered from the GET route before routing, so this
+    // registration exists for the registry and the document, not to run.
+    head: () => void app.on("HEAD", path, ...handlers),
     post: () => void app.post(path, ...handlers),
     put: () => void app.put(path, ...handlers),
     delete: () => void app.delete(path, ...handlers),

@@ -3,6 +3,30 @@ import type { Context } from "hono";
 import { parseApiSchemaSync } from "../schema.js";
 import { ENDPOINT_ROUTE, type EndpointDef, type EndpointRegistration } from "./types.js";
 
+/**
+ * The answer a handler gives when the request is not its own after all: the
+ * pipeline calls `next()` instead of writing a response, so the namespaces
+ * mounted after this family keep their own routing and their own 404. Only an
+ * any-method route can use it — every other route was matched by method and
+ * path and owns what it matched.
+ */
+const DECLINED = Symbol.for("@langwatch/api/rest/declined");
+
+/** The answer of a handler that is not the one to serve this request. */
+export type Declined = { readonly [DECLINED]: true };
+
+/** @see Declined */
+export function declined(): Declined {
+  return DECLINED_ANSWER;
+}
+
+const DECLINED_ANSWER: Declined = Object.freeze({ [DECLINED]: true as const });
+
+/** True for the value {@link declined} returns. */
+export function isDeclined(result: unknown): result is Declined {
+  return result === DECLINED_ANSWER;
+}
+
 /** Validates and serializes the value returned by a regular endpoint handler. */
 export function serializeEndpointResult({
   c,

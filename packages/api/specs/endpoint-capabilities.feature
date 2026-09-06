@@ -100,6 +100,12 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     And a key too short to be plausibly unique is refused rather than ignored
 
   @unit
+  Scenario: A replayable create re-checks the authorization a replay would otherwise skip
+    Given a replayable create declares a read-only pre-flight check
+    When a retry is answered from the stored bytes
+    Then the pre-flight ran again, because a replay must not trust a grant the caller has since lost
+
+  @unit
   Scenario: A capability declared without its port fails the build
     Given an endpoint declares a capability the service has no port for
     When the family is built
@@ -131,3 +137,9 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     When requests of different methods arrive
     Then the same handler answers each of them
     And the path publishes no operation, because it has none to publish
+
+  @unit
+  Scenario: An any-method route declines a request that is not its own
+    Given an any-method route answers only the paths it recognises
+    When a request it does not recognise arrives
+    Then it declines and the namespace mounted after it answers as it always did

@@ -185,3 +185,10 @@ Feature: Fluent endpoint registration
     Given a family authenticates with a shared secret
     When a route declares a role permission
     Then the family refuses to build it, naming what a service family may declare
+
+  @unit
+  Scenario: A route is registered for HEAD so the document and the registry carry it
+    Given a family registers a HEAD route beside the GET on the same path
+    When a HEAD request arrives
+    Then the GET route answers it with its own status and no body
+    And the route registry carries the HEAD route with the same access declaration

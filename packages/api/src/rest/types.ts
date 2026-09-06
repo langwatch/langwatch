@@ -96,6 +96,13 @@ export type EndpointIdempotency = Readonly<{
   operation: string;
   /** The tenancy the caller's key is unique within, read off the request. */
   scope: (context: Context) => string;
+  /**
+   * A read-only check that runs OUTSIDE the ledger, on every request including
+   * a replay. Authorization a create needs beyond the endpoint's own permission
+   * belongs here: inside the handler it would be skipped on a replay, handing
+   * back the stored answer on a grant the caller no longer holds.
+   */
+  preflight?: (context: Context, input: unknown) => void | Promise<void>;
 }>;
 
 /**

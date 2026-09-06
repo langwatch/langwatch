@@ -89,6 +89,10 @@ function descriptionOnlySecurity(): AppRestSecurity {
     authorizeRouteProjectPermission: () => noopMiddleware,
     authenticateOrganizationThrowing: noopMiddleware,
     authorizeOrganizationPermissionThrowing: () => noopMiddleware,
+    // The document is built with no process behind it, so the ledger is present
+    // only to satisfy the families that declare a replayable create; nothing
+    // here ever dispatches a request through it.
+    idempotency: refuseAtRuntime,
   } as never);
 }
 

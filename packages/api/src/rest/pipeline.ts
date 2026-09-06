@@ -32,7 +32,7 @@ import {
   readIdempotencyKey,
   type IdempotentRunner,
 } from "./idempotency.js";
-import { serializeEndpointResult } from "./response.js";
+import { isDeclined, serializeEndpointResult } from "./response.js";
 import { requestValidationErrorFrom } from "./validation.js";
 import { createSSEResponse } from "./sse.js";
 import { ENDPOINT_INPUT, ENDPOINT_ROUTE, REQUEST_FAMILY } from "./types.js";
@@ -722,7 +722,7 @@ function handlerMiddleware<TProject>({
     };
   }
 
-  return async (c: Context) => {
+  return async (c: Context, next) => {
     const input = c.get(ENDPOINT_INPUT);
     if (ep.kind !== "public-rest") {
       assertAuthorizedProjectInput({
@@ -743,6 +743,10 @@ function handlerMiddleware<TProject>({
       });
     }
     const result = await ep.handler(c, input);
+    // A handler that declined has answered nothing: the request carries on to
+    // whatever is mounted after this family, which is the only way a broad
+    // any-method route can sit in front of namespaces it does not own.
+    if (isDeclined(result)) return next();
     const response = serializeEndpointResult({ c, config, kind: ep.kind, result });
     if (config.cache && config.output && !(result instanceof Response)) {
       await writeCachedResponse({
@@ -778,6 +782,7 @@ async function replayableResponse({
   runner: IdempotentRunner;
   handler: () => unknown;
 }): Promise<Response> {
+  await idempotency.preflight?.(c, input);
   const outcome = await runner({
     operation: idempotency.operation,
     scopeId: idempotency.scope(c),
@@ -794,8 +799,10 @@ async function replayableResponse({
   // be written the same way even on a route that otherwise answers outside the
   // JSON contract — otherwise the retry would not match the original.
   if (config.rawResponse) {
-    return c.json(outcome.body as Record<string, unknown>, (config.status ??
-      200) as ContentfulStatusCode);
+    return c.json(
+      outcome.body as Record<string, unknown>,
+      (config.status ?? 200) as ContentfulStatusCode,
+    );
   }
   // Otherwise the same writer as any other answer, so a first execution is
   // validated against its declared output exactly as it would be without the

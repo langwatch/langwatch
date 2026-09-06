@@ -162,6 +162,9 @@ export {
   type RestErrorHandler,
 } from "./scope-accessors.js";
 
+// The answer of an any-method route that is not the one to serve this request.
+export { declined, type Declined } from "./response.js";
+
 // The wire shapes: the canonical envelope and the flat legacy one.
 export {
   API_ERROR_TYPE_BY_STATUS,

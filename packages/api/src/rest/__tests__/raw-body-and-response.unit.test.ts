@@ -4,10 +4,12 @@
  * answering every method. Spec: packages/api/specs/endpoint-capabilities.feature.
  */
 
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { createTestService as createService } from "./test-service.js";
+import { declined } from "../response.js";
 
 function service() {
   return createService({ name: "toy-raw", logger: false, tracer: false });
@@ -253,5 +255,47 @@ describe("registerAnyMethodRoute", () => {
     expect(wrong.status).toBe(405);
     expect(wrong.headers.get("allow")).toBe("GET");
     expect(methods).toEqual(["GET", "DELETE"]);
+  });
+});
+
+describe("an any-method route that declines", () => {
+  /** @scenario "An any-method route declines a request that is not its own" */
+  it("hands the request to what is mounted after it, which answers as it always did", async () => {
+    const seen: string[] = [];
+    const alias = createService({
+      name: "toy-alias",
+      basePath: "/",
+      bareMount: true,
+      logger: false,
+      tracer: false,
+    })
+      .registerAnyMethodRoute(
+        "/api/aliased/*",
+        "2026-08-07",
+        async (c) => {
+          seen.push(c.req.path);
+          if (!c.req.path.endsWith("/known")) return declined();
+          return new Response("rewritten", { status: 200 });
+        },
+        (b) => b.withoutPermission("the alias terminates nothing; it rewrites and forwards"),
+      )
+      .build();
+
+    const host = new Hono();
+    host.route("/", alias as never);
+    host.get("/api/aliased/its-own", (c) => c.text("the namespace behind the alias", 200));
+
+    const rewritten = await host.request("/api/aliased/known");
+    const passedOn = await host.request("/api/aliased/its-own");
+    const unknown = await host.request("/api/aliased/nobody-owns-this");
+
+    expect(await rewritten.text()).toBe("rewritten");
+    expect(await passedOn.text()).toBe("the namespace behind the alias");
+    expect(unknown.status).toBe(404);
+    expect(seen).toEqual([
+      "/api/aliased/known",
+      "/api/aliased/its-own",
+      "/api/aliased/nobody-owns-this",
+    ]);
   });
 });

@@ -1318,3 +1318,46 @@ describe("service configuration", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// HEAD registers beside its GET
+// ---------------------------------------------------------------------------
+
+describe("a HEAD route registered beside its GET", () => {
+  /** @scenario "A route is registered for HEAD so the document and the registry carry it" */
+  it("is answered by the GET and is carried by the route registry", async () => {
+    const mounted: MountedRoute[] = [];
+    const app = createService({
+      name: "test",
+      basePath: "/api/test",
+      onRouteMounted: (route) => mounted.push(route),
+    })
+      .registerRoute(
+        "get",
+        "/avatar",
+        "2026-08-07",
+        async (c) => c.body(null, 204),
+        (b) => b.withRawResponse("an avatar is bytes, not JSON"),
+      )
+      .registerRoute(
+        "head",
+        "/avatar",
+        "2026-08-07",
+        async (c) => c.body(null, 204),
+        (b) => b.withRawResponse("a HEAD twin answers headers only"),
+      )
+      .build();
+
+    const res = await app.request("/api/test/2026-08-07/avatar", { method: "HEAD" });
+    expect(res.status).toBe(204);
+    expect(await res.text()).toBe("");
+
+    const forPath = mounted.filter(
+      (r) => !r.isNamespaceGuard && r.path === "/api/test/2026-08-07/avatar",
+    );
+    const head = forPath.find((r) => r.method === "head");
+    const get = forPath.find((r) => r.method === "get");
+    expect(head).toBeDefined();
+    expect(head?.config?.noPermission).toEqual(get?.config?.noPermission);
+  });
+});

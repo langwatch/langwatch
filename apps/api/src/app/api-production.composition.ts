@@ -83,6 +83,7 @@ import {
   refusingPromptFeature,
   type ComposedPromptFeature,
 } from "../features/prompt/prompt.composition";
+import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
 import {
   composeFeatureFlagFeature,
   refusingFeatureFlagFeature,
@@ -416,6 +417,7 @@ import {
   refusingLangyFeature,
   type ComposedLangyFeature,
 } from "../features/langy/langy.composition";
+import { ApiLangyNavigateResourceAdapter } from "../features/langy/langy-navigate-resource.adapter";
 import {
   composeDataPrivacyFeature,
   refusingDataPrivacyFeature,
@@ -782,6 +784,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
     const queueInfrastructure = this.composeQueue(options);
     this.composedDatabase = composeApiDatabase(options);
+    // The process's ONE rollout store, composed before every feature that gates on a flag —
+    // Eventing included, since the kill switch each command it produces consults is read from
+    // here.
+    this.composedFeatureFlag = this.composedDatabase?.connection
+      ? composeFeatureFlagFeature({
+          prisma: this.composedDatabase.connection.client,
+          config: options.config.featureFlags,
+        })
+      : refusingFeatureFlagFeature();
     this.composedEventing = this.composeEventing(options, queueInfrastructure);
     const authz = this.resolveAuthz(options, queueInfrastructure);
     const readiness = this.options.readiness ?? queueInfrastructure?.readiness;
@@ -854,17 +865,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       service: () => this.composedScenario?.agentTestService,
       processName: options.config.serviceName,
     });
-    // The charted reads, the workbench and the dashboards, composed over this process's OWN
-    // ClickHouse and the second, restricted identity a member's submitted SQL runs as. Both are
-    // this composition's to open, so the record below can be satisfied without a host handing
-    // them in. The process's ONE rollout store, composed before every feature that gates on a
-    // flag.
-    this.composedFeatureFlag = this.composedDatabase?.connection
-      ? composeFeatureFlagFeature({
-          prisma: this.composedDatabase.connection.client,
-          config: options.config.featureFlags,
-        })
-      : refusingFeatureFlagFeature();
     this.composedAnalytics = this.composeAnalytics(options, authz);
     // The person half of the same record: the two signed-out doors, the signed-in person's
     // account and credentials, their organization's membership and groups, join requests,
@@ -2227,6 +2227,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       resources: options.resources,
       queue: queueInfrastructure,
       processName: options.config.serviceName,
+      killSwitch: EventingKillSwitchAdapter.create(this.composedFeatureFlag.service),
       report: LoggedApiEventingAbsence.create(logger),
     });
   }
@@ -2399,6 +2400,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       redis: this.composedQueueRedis,
       internalSecret: this.composedLangyInternalSecret,
       metrics: apiLangyRestMetrics(),
+      // Resolved at the dispatch rather than passed as a value: the experiment
+      // feature is composed after this one, and an away page is only ever run
+      // for once a request is in flight.
+      workbench: () => {
+        const experiments = this.composedExperiment.experiments;
+        if (!experiments) return null;
+        return {
+          experiments,
+          run: this.composedExperiment.run,
+          trySlugOf: async (projectId) =>
+            (await tenancy.projects.tryGetSummaryById(projectId))?.slug ?? null,
+        };
+      },
     });
   }
 
@@ -3205,6 +3219,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       demoProjectId: options.config.authz.demoProjectId,
       rateLimit: (request) => this.rateLimiter.consume(request),
       processName: options.config.serviceName,
+      // The eight directories a navigate id names, read at the navigate rather
+      // than captured here: Langy is composed before most of them exist, and a
+      // navigate only ever runs once a turn is in flight.
+      navigateResources: ApiLangyNavigateResourceAdapter.create(() => ({
+        prompts: this.composedPrompt.app.promptService,
+        datasets: this.composedDatasets,
+        workflows: this.composedWorkflow.service,
+        experiments: this.composedExperiment.experiments,
+        monitors: this.composedMonitors,
+        evaluators: this.composedEvaluators,
+        agents: this.composedAgents?.agents,
+        simulations: this.composedScenario.simulations,
+      })),
     });
   }
 
@@ -3597,6 +3624,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // and verified through: a run's sandbox key is a narrower key, not a
       // second kind of key.
       apiKeys: tenancy.apiKeys,
+      // The SAME key the process seals stored secrets with: the token a
+      // project's runs share is held under it, and nowhere durable.
+      storedSecretEncryptionKey: options.config.storedSecretEncryptionKey,
+      // The SAME fabric presence and the agent pipelines publish on: a
+      // workbench cell saved on one replica has to reach the editor tab
+      // subscribed on another, which a per-process emitter never does.
+      broadcast: this.composedPresence.emitter,
       runReport: LoggedApiExperimentRunAbsence.create(createLogger(options.config.serviceName)),
     });
   }

@@ -618,9 +618,10 @@ export function assertRouteDef({
   path: string;
   def: RawEndpointDef;
 }): void {
-  if (method === "get" && def.input) {
+  if ((method === "get" || method === "head") && def.input) {
     throw new Error(
-      `REST endpoint GET ${path || "/"} cannot declare a JSON body; use path ` + `or query input`,
+      `REST endpoint ${method.toUpperCase()} ${path || "/"} cannot declare a JSON body; ` +
+        `use path or query input`,
     );
   }
   if (routeHasParams(path) && !def.params) {
@@ -648,8 +649,10 @@ export function assertRouteDef({
         `and a parsed input; the body is read once`,
     );
   }
-  if (method === "get" && def.rawBody) {
-    throw new Error(`REST endpoint GET ${path || "/"} cannot declare a request body`);
+  if ((method === "get" || method === "head") && def.rawBody) {
+    throw new Error(
+      `REST endpoint ${method.toUpperCase()} ${path || "/"} cannot declare a request body`,
+    );
   }
 }
 

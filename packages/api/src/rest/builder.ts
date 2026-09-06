@@ -63,7 +63,7 @@ type RouteHandler<TVariables extends Record<string, unknown>, TApp> = (
 type HasInput<THandler extends (...args: never[]) => unknown> =
   "1" extends keyof Parameters<THandler> ? true : false;
 
-type RouteChainFor<TMethod extends HttpMethod> = TMethod extends "get"
+type RouteChainFor<TMethod extends HttpMethod> = TMethod extends "get" | "head"
   ? RouteChain & { readonly withInput: never }
   : RouteChain;
 type PathNeedsParams<TPath extends string> = TPath extends `${string}:${string}` ? true : false;

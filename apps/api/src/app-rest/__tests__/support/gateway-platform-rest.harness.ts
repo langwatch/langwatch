@@ -137,13 +137,11 @@ export function mountGatewayPlatformRest(): GatewayRestHarness {
     authz: authzBuild.authz,
     organizations: tenancy.organizations,
     observability: ApiRestObservabilityComposition.create(),
+    ...(idempotency ? { idempotency: idempotency.run } : {}),
   });
 
   const hono = new Hono();
-  hono.route(
-    "/",
-    createGatewayPlatformRestApp({ security, gateway: () => gateway.app }) as never,
-  );
+  hono.route("/", createGatewayPlatformRestApp({ security, gateway: () => gateway.app }) as never);
 
   return {
     request: async (path, init) => hono.fetch(new Request(`http://api.test${path}`, init)),

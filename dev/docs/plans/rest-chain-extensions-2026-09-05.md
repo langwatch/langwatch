@@ -161,6 +161,23 @@ EVERY answer carries; `withRawResponse` + a whole `Response` is for an answer th
 JSON at all. Pinned by a test, so the cheapest of the three does not get replaced by a seam
 later.
 
+## HEAD, a pre-flight and a decline — the three late additions
+
+`head` joins `HttpMethod`, so a family registers GET and HEAD on one path and the registry
+and the document carry both. Hono answers HEAD from the GET route BEFORE routing, so the
+HEAD registration cannot run: it exists for the registry and the published document, and
+the framework says so where it registers it.
+
+`withIdempotency({ …, preflight })` names the read-only authorization a create needs beyond
+its endpoint permission. It runs OUTSIDE the ledger, on a replay too, because a receipt must
+not answer for a grant the caller has since lost — the hand-wired creates it replaces made
+exactly that distinction by leaving the pre-flight above the ledger call.
+
+`declined()` is what an any-method route returns when the request is not its own: the
+pipeline calls `next()` instead of writing a response, so namespaces mounted after it keep
+their own routing and their own 404. It is the one thing the OTLP path-alias family needed
+that a chain handler could not express, since a chain handler has no `next`.
+
 ## Still to build
 
 Nothing from the survey's twelve. What a family may still need beyond them: the better-auth

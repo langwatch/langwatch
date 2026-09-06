@@ -184,3 +184,49 @@ describe("withIdempotency", () => {
     });
   });
 });
+
+describe("a replayable create declaring a pre-flight", () => {
+  /** @scenario "A replayable create re-checks the authorization a replay would otherwise skip" */
+  it("runs the pre-flight on the replay too, while the handler runs once", async () => {
+    const { runner } = ledger();
+    const preflights: unknown[] = [];
+    let created = 0;
+    const app = createService({
+      name: "toy-guarded-creates",
+      logger: false,
+      tracer: false,
+      idempotency: runner,
+    })
+      .registerRoute(
+        "post",
+        "/things",
+        "2026-08-07",
+        async (_c, _input: { name: string }) => ({ id: `thing-${++created}` }),
+        (b) =>
+          b
+            .withInput(z.object({ name: z.string() }))
+            .withOutput(output)
+            .withStatus(201)
+            .withIdempotency({
+              operation: "toy.guarded.create",
+              scope: () => "scope-1",
+              preflight: (_c, input) => void preflights.push(input),
+            }),
+      )
+      .build();
+
+    const first = await app.request(
+      "/api/toy-guarded-creates/2026-08-07/things",
+      post("key-abc123"),
+    );
+    const retry = await app.request(
+      "/api/toy-guarded-creates/2026-08-07/things",
+      post("key-abc123"),
+    );
+
+    expect(first.status).toBe(201);
+    expect(retry.status).toBe(201);
+    expect(created).toBe(1);
+    expect(preflights).toEqual([{ name: "a" }, { name: "a" }]);
+  });
+});

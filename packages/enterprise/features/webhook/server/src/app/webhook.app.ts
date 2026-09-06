@@ -31,7 +31,6 @@
  * rest is reached through {@link endpoints} and {@link health}, which is what
  * lets the REST family move into this package as a move rather than a rewrite.
  */
-import type { IdempotentRunner } from "@langwatch/api/rest";
 import type { WebhookEndpointRuntime } from "../adapters/webhook-endpoint.webhook-endpoint.adapter";
 import type { WebhookDispatchResult } from "../services/webhook-delivery.service";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service";
@@ -72,8 +71,6 @@ export interface WebhookAppDependencies {
    * rather than a second HTTP client that only knows about URLs.
    */
   dispatch: WebhookTestDispatch;
-  /** The `Idempotency-Key` ledger the create dispatches through. */
-  runIdempotent: IdempotentRunner;
 }
 
 export class WebhookApp {
@@ -91,11 +88,6 @@ export class WebhookApp {
   /** One endpoint's delivery health. */
   get health(): Pick<WebhookHealthService, "health"> {
     return this.dependencies.health;
-  }
-
-  /** The `Idempotency-Key` ledger a create dispatches through. */
-  get runIdempotent(): IdempotentRunner {
-    return this.dependencies.runIdempotent;
   }
 
   /**
