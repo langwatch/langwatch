@@ -717,11 +717,15 @@ export function createMcpHandler(): McpHandler {
   // -------------------------------------------------------------------------
 
   /** Store session metadata in Redis so other pods can serve it. */
-  async function storeSessionInRedis(
-    sessionId: string,
-    apiKey: string,
-    projectId: string,
-  ): Promise<void> {
+  async function storeSessionInRedis({
+    sessionId,
+    apiKey,
+    projectId,
+  }: {
+    sessionId: string;
+    apiKey: string;
+    projectId: string;
+  }): Promise<void> {
     if (!redis) return;
     try {
       const data = JSON.stringify({
@@ -747,6 +751,28 @@ export function createMcpHandler(): McpHandler {
     } catch (err) {
       logger.error({ error: err }, "Failed to store session in Redis");
     }
+  }
+
+  async function backfillSessionProject({
+    sessionId,
+    apiKey,
+    storedProjectId,
+    resolvedProjectId,
+  }: {
+    sessionId: string;
+    apiKey: string;
+    storedProjectId: string | undefined;
+    resolvedProjectId: string | undefined;
+  }): Promise<void> {
+    if (storedProjectId || !resolvedProjectId) {
+      return;
+    }
+
+    await storeSessionInRedis({
+      sessionId,
+      apiKey,
+      projectId: resolvedProjectId,
+    });
   }
 
   /** Refresh the Redis TTL when a session is active (called on each request). */
@@ -903,11 +929,15 @@ export function createMcpHandler(): McpHandler {
   }
 
   /** Record an SSE session so other replicas can find and reach it. */
-  async function storeSseSessionInRedis(
-    sessionId: string,
-    apiKey: string,
-    projectId: string,
-  ): Promise<void> {
+  async function storeSseSessionInRedis({
+    sessionId,
+    apiKey,
+    projectId,
+  }: {
+    sessionId: string;
+    apiKey: string;
+    projectId: string;
+  }): Promise<void> {
     if (!redis) return;
     const setKey = `${REDIS_SSE_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`;
     await redis.set(
@@ -1364,6 +1394,12 @@ export function createMcpHandler(): McpHandler {
     // Older replicas wrote no tenant. Resolve it once when recovering locally.
     const projectId =
       credential.projectId ?? (await validateApiKey(redisApiKey))?.id;
+    await backfillSessionProject({
+      sessionId,
+      apiKey: redisApiKey,
+      storedProjectId: credential.projectId,
+      resolvedProjectId: projectId,
+    });
 
     // WORKAROUND: The SDK transport starts uninitialized — we patch its
     // inner state so it accepts non-init requests with the existing
@@ -1521,7 +1557,9 @@ export function createMcpHandler(): McpHandler {
             userId,
             lastActivityAt: Date.now(),
           });
-          storeSessionInRedis(id, apiKey, projectId).catch(() => {});
+          storeSessionInRedis({ sessionId: id, apiKey, projectId }).catch(
+            () => {},
+          );
         },
       });
 
@@ -1749,7 +1787,7 @@ export function createMcpHandler(): McpHandler {
     // Published before the stream opens: a client can post its first message
     // to another replica the instant it reads the endpoint event.
     try {
-      await storeSseSessionInRedis(sessionId, apiKey, projectId);
+      await storeSseSessionInRedis({ sessionId, apiKey, projectId });
     } catch (err) {
       logger.error({ error: err }, "Failed to record MCP SSE session in Redis");
     }
@@ -1837,7 +1875,7 @@ export function createMcpHandler(): McpHandler {
       credential.projectId ?? (await validateApiKey(apiKey))?.id;
     noteLogFields(res, { projectId });
     if (!credential.projectId && projectId) {
-      await storeSseSessionInRedis(sessionId, apiKey, projectId).catch(
+      await storeSseSessionInRedis({ sessionId, apiKey, projectId }).catch(
         () => {},
       );
     }

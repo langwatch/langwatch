@@ -72,7 +72,7 @@ export function runWithCredentialHolder<T>(fn: () => T): T {
  */
 export function runWithCliCredentialHolder<T>({ fn }: { fn: () => T }): T {
   return runWithCredentialHolder(() => {
-    setScopedSurface("cli");
+    setScopedSurface({ surface: "cli" });
     return fn();
   });
 }
@@ -120,7 +120,7 @@ export function scopedProjectId(): string | undefined {
  * Mark the current request's holder as a CLI request. Read by
  * the shared request-header builders when attaching the surface header.
  */
-export function setScopedSurface(surface: "cli"): void {
+export function setScopedSurface({ surface }: { surface: "cli" }): void {
   currentHolder().surface = surface;
 }
 

@@ -9,7 +9,7 @@ import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "../surface";
 import { buildAuthHeaders, type LangWatchAuthHeadersInput } from "./auth";
 
 export function buildSdkIdentityHeaders(
-  surface: "cli" | undefined = scopedSurface(),
+  { surface = scopedSurface() }: { surface?: "cli" } = {},
 ): Record<string, string> {
   return {
     "user-agent": `langwatch-sdk-node/${LANGWATCH_SDK_VERSION}`,

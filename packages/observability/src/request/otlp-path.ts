@@ -18,6 +18,27 @@ const SIGNAL_SUFFIX = /\/v1\/(traces|logs|metrics)$/;
 const RECOGNISED_PREFIX =
   /^(?:\/api\/collector)?(?:\/api(?:\/otel(?:\/v1\/(?:traces|logs|metrics))?)?)?$/;
 
+function normalisePathSlashes(pathname: string): string {
+  const characters: string[] = [];
+  let previousWasSlash = false;
+
+  for (const character of pathname) {
+    const isSlash = character === "/";
+    if (isSlash && previousWasSlash) {
+      continue;
+    }
+
+    characters.push(character);
+    previousWasSlash = isSlash;
+  }
+
+  if (characters.length > 1 && characters.at(-1) === "/") {
+    characters.pop();
+  }
+
+  return characters.join("");
+}
+
 /**
  * The canonical ingestion path this URL is trying to reach, or null when the
  * path is not an OTLP ingestion path at all.
@@ -28,13 +49,17 @@ const RECOGNISED_PREFIX =
  * normalising to it.
  */
 export function canonicalOtlpPath(pathname: string): string | null {
-  const normalised = pathname.replace(/\/{2,}/g, "/").replace(/(.)\/+$/, "$1");
+  const normalised = normalisePathSlashes(pathname);
 
   const suffix = SIGNAL_SUFFIX.exec(normalised);
-  if (!suffix) return null;
+  if (!suffix) {
+    return null;
+  }
 
   const prefix = normalised.slice(0, normalised.length - suffix[0].length);
-  if (!RECOGNISED_PREFIX.test(prefix)) return null;
+  if (!RECOGNISED_PREFIX.test(prefix)) {
+    return null;
+  }
 
   return `${CANONICAL_OTLP_BASE_PATH}/${suffix[1]}`;
 }

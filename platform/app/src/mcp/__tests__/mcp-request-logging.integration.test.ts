@@ -92,7 +92,7 @@ vi.mock("~/utils/encryption", () => ({
 
 import { createMcpHandler, type McpHandler } from "../handler";
 
-function initializeBody(id: number) {
+function initializeBody({ id }: { id: number }) {
   return {
     jsonrpc: "2.0",
     id,
@@ -175,7 +175,7 @@ describe("Feature: MCP request logging", () => {
     const response = await fetch(`${baseUrl}/mcp`, {
       method: "POST",
       headers: requestHeaders,
-      body: JSON.stringify(initializeBody(1)),
+      body: JSON.stringify(initializeBody({ id: 1 })),
     });
     await response.text();
     const sessionId = response.headers.get("mcp-session-id");
@@ -273,6 +273,11 @@ describe("Feature: MCP request logging", () => {
       expect((await accessLogFor("/mcp")).fields.projectId).toBe(
         "logging-project",
       );
+      if (legacy && id === 2) {
+        expect(
+          JSON.parse(redisRecords.get(`mcp:session:${sessionId}`) ?? "null"),
+        ).toMatchObject({ projectId: "logging-project" });
+      }
     }
     expect(mockPrisma.project.findUnique).toHaveBeenCalledTimes(legacy ? 1 : 0);
   });
@@ -296,7 +301,7 @@ describe("Feature: MCP request logging", () => {
         baseUrl,
         path: endpoint,
         apiKey: VALID_API_KEY,
-        body: initializeBody(1),
+        body: initializeBody({ id: 1 }),
       });
       expect(posted.status).toBe(202);
       expect((await accessLogFor("/messages")).fields.projectId).toBe(
@@ -327,7 +332,7 @@ describe("Feature: MCP request logging", () => {
         baseUrl,
         path: `/messages?sessionId=${sessionId}`,
         apiKey: VALID_API_KEY,
-        body: initializeBody(id),
+        body: initializeBody({ id }),
       });
       expect(response.status).toBe(202);
       expect((await accessLogFor("/messages")).fields.projectId).toBe(
@@ -337,7 +342,7 @@ describe("Feature: MCP request logging", () => {
     expect(mockPrisma.project.findUnique).toHaveBeenCalledTimes(legacy ? 1 : 0);
     expect(mockRedis.publish).toHaveBeenCalledWith(
       `mcp:sse:relay:${sessionId}`,
-      JSON.stringify(initializeBody(2)),
+      JSON.stringify(initializeBody({ id: 2 })),
     );
   });
 

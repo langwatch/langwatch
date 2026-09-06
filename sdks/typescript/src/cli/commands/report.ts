@@ -191,7 +191,7 @@ export const reportCommand = async (
     response = await langwatchFetch(`${endpoint}/api/bug-reports`, {
       method: "POST",
       headers: {
-        ...buildSdkIdentityHeaders("cli"),
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         "content-type": "application/json",
         ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       },

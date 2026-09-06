@@ -185,7 +185,7 @@ export async function preflightWrapper(
 	const timeoutMs = opts.timeoutMs ?? 3000;
 	try {
 		const res = await f(`${gw}/healthz`, {
-			headers: buildSdkIdentityHeaders("cli"),
+			headers: buildSdkIdentityHeaders({ surface: "cli" }),
 			method: "GET",
 			signal: AbortSignal.timeout(timeoutMs),
 		});

@@ -44,7 +44,7 @@ export interface RequestAttribution extends ClientAttribution {
   endpointClass: EndpointClass;
 }
 
-const under = (path: string, prefix: string): boolean =>
+const under = ({ path, prefix }: { path: string; prefix: string }): boolean =>
   path === prefix || path.startsWith(`${prefix}/`);
 
 /**
@@ -58,28 +58,36 @@ export function endpointClassOf(pathname: string): EndpointClass {
       ? pathname.slice(0, -1)
       : pathname;
 
-  if (under(path, "/api/otel") || canonicalOtlpPath(path) !== null) return "otlp";
+  if (
+    under({ path, prefix: "/api/otel" }) ||
+    canonicalOtlpPath(path) !== null
+  ) {
+    return "otlp";
+  }
   if (path === "/api/collector") return "collector";
-  if (under(path, "/api/rum")) return "rum";
-  if (under(path, "/api/trpc")) return "dashboard";
-  if (under(path, "/api/auth")) return "auth";
-  if (under(path, "/api/langy")) return "langy";
-  if (under(path, "/api/gateway") || under(path, "/api/internal/gateway")) {
+  if (under({ path, prefix: "/api/rum" })) return "rum";
+  if (under({ path, prefix: "/api/trpc" })) return "dashboard";
+  if (under({ path, prefix: "/api/auth" })) return "auth";
+  if (under({ path, prefix: "/api/langy" })) return "langy";
+  if (
+    under({ path, prefix: "/api/gateway" }) ||
+    under({ path, prefix: "/api/internal/gateway" })
+  ) {
     return "gateway";
   }
-  if (under(path, "/api/ingest")) return "ingest";
+  if (under({ path, prefix: "/api/ingest" })) return "ingest";
   if (
-    under(path, "/mcp") ||
+    under({ path, prefix: "/mcp" }) ||
     path === "/sse" ||
     path === "/messages" ||
     path === "/sse/messages" ||
-    under(path, "/oauth") ||
-    under(path, "/.well-known/oauth-protected-resource") ||
-    under(path, "/.well-known/oauth-authorization-server")
+    under({ path, prefix: "/oauth" }) ||
+    under({ path, prefix: "/.well-known/oauth-protected-resource" }) ||
+    under({ path, prefix: "/.well-known/oauth-authorization-server" })
   ) {
     return "mcp";
   }
-  if (under(path, "/api")) return "api";
+  if (under({ path, prefix: "/api" })) return "api";
   return "other";
 }
 

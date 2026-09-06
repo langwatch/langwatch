@@ -134,7 +134,7 @@ async function sessionRequest(
     f(normalizeEndpoint(cfg.control_plane_url) + path, {
       method,
       headers: {
-        ...buildSdkIdentityHeaders("cli"),
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         Authorization: `Bearer ${cfg.access_token}`,
         Accept: "application/json",
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),

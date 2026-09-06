@@ -243,7 +243,7 @@ async function drainCodexSpool(args: {
         const response = await doFetch(logsEndpoint, {
           method: "POST",
           headers: {
-            ...buildSdkIdentityHeaders("cli"),
+            ...buildSdkIdentityHeaders({ surface: "cli" }),
             "content-type": "application/json",
             authorization: `Bearer ${token}`,
           },
@@ -400,7 +400,7 @@ async function postCodexTurns(args: {
     response = await doFetch(endpoint, {
       method: "POST",
       headers: {
-        ...buildSdkIdentityHeaders("cli"),
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
       },
@@ -529,7 +529,7 @@ export async function postCodexSessionContext(args: {
     response = await doFetch(logsEndpoint, {
       method: "POST",
       headers: {
-        ...buildSdkIdentityHeaders("cli"),
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
       },

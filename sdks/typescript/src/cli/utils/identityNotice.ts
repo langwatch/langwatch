@@ -132,7 +132,7 @@ async function fetchProjectName(
       `${normalizeEndpoint(endpoint)}/api/me/project`,
       {
         headers: {
-          ...buildSdkIdentityHeaders("cli"),
+          ...buildSdkIdentityHeaders({ surface: "cli" }),
           Authorization: `Bearer ${apiKey}`,
           Accept: "application/json",
         },

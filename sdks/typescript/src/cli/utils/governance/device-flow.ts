@@ -331,7 +331,7 @@ function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<
   return f(url, {
     method: "POST",
     headers: {
-      ...buildSdkIdentityHeaders("cli"),
+      ...buildSdkIdentityHeaders({ surface: "cli" }),
       "Content-Type": "application/json",
       Accept: "application/json",
       // Origin enforcement on the server requires this for non-browser

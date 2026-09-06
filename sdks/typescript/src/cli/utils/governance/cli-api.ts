@@ -217,7 +217,7 @@ async function getJSON<T>(
     (token) => ({
       method: "GET",
       headers: {
-        ...buildSdkIdentityHeaders("cli"),
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
@@ -528,7 +528,7 @@ async function requestREST<T>(
   const url = normalizeEndpoint(cfg.control_plane_url) + path;
   const buildInit = (token: string): RequestInit => {
     const headers: Record<string, string> = {
-      ...buildSdkIdentityHeaders("cli"),
+      ...buildSdkIdentityHeaders({ surface: "cli" }),
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
     };

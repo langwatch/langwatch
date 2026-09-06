@@ -47,7 +47,7 @@ export async function checkBudget(
     res = await f(url, {
       method: "GET",
       headers: {
-        ...buildSdkIdentityHeaders("cli"),
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         Authorization: `Bearer ${cfg.access_token}`,
         Accept: "application/json",
       },

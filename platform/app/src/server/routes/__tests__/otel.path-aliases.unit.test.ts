@@ -193,22 +193,23 @@ describe("OTLP endpoint path canonicalisation", () => {
     });
   });
 
-  describe("when an OTLP alias is logged before its internal rewrite", () => {
-    /** @scenario Telemetry ingestion paths are classed as ingestion surfaces */
-    it.each([
-      "/api/v1/traces",
-      "/api/collector/v1/traces",
-    ])("logs %s once as OTLP traffic with the original URL", async (path) => {
-      const response = await post({ path, payload: tracePayload });
+  describe("given an OTLP alias request", () => {
+    describe("when it is logged before its internal rewrite", () => {
+      it.each([
+        "/api/v1/traces",
+        "/api/collector/v1/traces",
+      ])("logs %s once as OTLP traffic with the original URL", async (path) => {
+        const response = await post({ path, payload: tracePayload });
 
-      expect(response.status).toBe(200);
-      expect(mockInfo).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          endpointClass: "otlp",
-          url: `http://localhost${path}`,
-        }),
-        "request handled",
-      );
+        expect(response.status).toBe(200);
+        expect(mockInfo).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            endpointClass: "otlp",
+            url: `http://localhost${path}`,
+          }),
+          "request handled",
+        );
+      });
     });
   });
 

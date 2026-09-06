@@ -15,6 +15,7 @@
  * (getApp, createStoredObjectsService) are mocked to keep these tests scoped to
  * the storage path.
  */
+import type * as ObservabilityModule from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -133,7 +134,7 @@ const { mockLogInfo, mockLogWarn, mockLogError, mockLogDebug } = vi.hoisted(
 );
 
 vi.mock("@langwatch/observability", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  ...(await importOriginal<typeof ObservabilityModule>()),
   createLogger: () => ({
     info: mockLogInfo,
     warn: mockLogWarn,
