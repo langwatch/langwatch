@@ -1,5 +1,5 @@
 import { setTraceUrlProvider } from "@langwatch/handled-error";
-import { configureLogger, loggerConfigurationFrom } from "@langwatch/observability";
+import { configureLogger, createLogger, loggerConfigurationFrom } from "@langwatch/observability";
 import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
 import {
   createProcessObservability,
@@ -8,7 +8,12 @@ import {
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
 import { GracefulShutdown, ResourceScope } from "@langwatch/runtime-composition";
-import { resolveWorkerConfig, type WorkerConfig } from "./platform/config/worker.config";
+import {
+  SecretEnvironmentService,
+  secretLogRedactPaths,
+  secretResolutionSummary,
+} from "@langwatch/secrets";
+import { resolveWorkerConfig, type WorkerConfig } from "./platform/config/worker.config.ts";
 
 const DRAIN_PHASE_TIMEOUT_MS = 60_000;
 
@@ -61,10 +66,20 @@ export type WorkerBootOptions = {
  */
 export class WorkerProcess {
   static async boot(options: WorkerBootOptions): Promise<WorkerProcess> {
-    const config = resolveWorkerConfig(options.source);
+    // Before the Zod parse, so every feature downstream still sees a plain
+    // string and no service learns that a value came out of a vault.
+    const secrets = await SecretEnvironmentService.create({ source: options.source }).resolve();
+    const config = resolveWorkerConfig(secrets.environment);
     const resources = new ResourceScope();
-    const loggerConfiguration = loggerConfigurationFrom(config);
+    const loggerConfiguration = {
+      ...loggerConfigurationFrom(config),
+      redactPaths: secretLogRedactPaths(),
+    };
     configureLogger(loggerConfiguration);
+    createLogger(config.serviceName).info(
+      { secrets: secretResolutionSummary(secrets) },
+      "resolved secrets",
+    );
     // The Grafana trace link every serialized HandledError carries. The
     // package defaults to a no-op provider, so without this registration a
     // customer-visible error reaches support with no way back to its trace.

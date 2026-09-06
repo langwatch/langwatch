@@ -6,14 +6,19 @@ import {
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { ApiProcessGraphPort } from "./api.process";
+import {
+  SecretEnvironmentService,
+  secretLogRedactPaths,
+  secretResolutionSummary,
+} from "@langwatch/secrets";
+import { ApiProcessGraphPort } from "./api.process.ts";
 import {
   apiObservabilityConfiguration,
   apiLoggerConfiguration,
   resolveApiConfig,
   type ApiConfig,
-} from "./platform/config/api.config";
-import { installApiSignalHandlers, type ApiSignalHandlerOptions } from "./api.signal-handlers";
+} from "./platform/config/api.config.ts";
+import { installApiSignalHandlers, type ApiSignalHandlerOptions } from "./api.signal-handlers.ts";
 
 /** The address a started API process is listening on, when it binds one. */
 export type ApiListenerAddress = Readonly<{ host: string; port: number }>;
@@ -65,8 +70,14 @@ export type ApiRuntimeBootstrapOptions = {
  */
 export class ApiRuntimeBootstrap {
   static async create(options: ApiRuntimeBootstrapOptions): Promise<ApiRuntimeBootstrap> {
-    const config = resolveApiConfig(options.source);
-    const loggerConfiguration = apiLoggerConfiguration(config);
+    // Before the Zod parse, so every feature downstream still sees a plain
+    // string and no service learns that a value came out of a vault.
+    const secrets = await SecretEnvironmentService.create({ source: options.source }).resolve();
+    const config = resolveApiConfig(secrets.environment);
+    const loggerConfiguration = {
+      ...apiLoggerConfiguration(config),
+      redactPaths: secretLogRedactPaths(),
+    };
     const configuredObservability = apiObservabilityConfiguration(config);
     // Metrics are their own provider, installed before anything records into
     // it: the instruments resolve a meter once at module scope, so a counter
@@ -87,6 +98,10 @@ export class ApiRuntimeBootstrap {
     // Registration only stores the function — `serialize()` reads the
     // environment per call, so this is safe before the config phase.
     setTraceUrlProvider(grafanaTraceUrlFromEnv);
+    createLogger(config.serviceName).info(
+      { secrets: secretResolutionSummary(secrets) },
+      "resolved secrets",
+    );
 
     const resources = new ResourceScope();
     const graph = ScopedApiProcessGraph.create(resources);

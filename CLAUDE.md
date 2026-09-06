@@ -61,6 +61,42 @@ run the owning package's own `test:integration` script (only packages whose vite
 What still wants a container: `make observability` (the Grafana LGTM stack) and
 the sandboxed/container langy tiers. Both are opt-in.
 
+### Where secrets come from locally
+
+`packages/secrets/keys.json` classifies every environment variable that carries
+a credential — 29 `secret`, 10 `composite` (a connection string: shape *and*
+password), 1 `pointer`, and everything else `config`. It is the one source of
+truth: `@langwatch/secrets` parses it with Zod and haven reads the same file in
+Go, so a key added once is masked everywhere. See
+[ADR-132](dev/docs/adr/132-secrets-are-not-config.md).
+
+Nothing changes if you do nothing. Each application's boot seam resolves the
+classified keys through an ordered chain **before** its Zod parse — shell
+environment and `.env`, then 1Password when you opt in, then a refusal naming
+what is missing — and hands the runtime a frozen record of plain values, so
+every feature downstream sees exactly what it saw before. Each process prints
+one boot line naming which source answered which secret, by key name, never by
+value.
+
+To keep credentials off disk, set `LANGWATCH_SECRETS_VAULT` to a 1Password
+vault. A `.env` value written as `op://vault/item/field` is resolved through the
+`op` CLI; a key with no value at all is looked up at
+`op://<vault>/langwatch-<profile>/<KEY>`, where the profile is
+`LANGWATCH_SECRETS_PROFILE` (default `dev`) — an explicit profile, **not** the
+worktree name, so a directory rename cannot silently turn a secret into an
+absent one. Add `LANGWATCH_SECRETS_GENERATE=1` and a first launch mints the four
+generate-on-first-run values into the vault instead of into `.env`. Resolution
+is never attempted when `NODE_ENV=production`: a pod reads the environment
+Kubernetes gave it and nothing else.
+
+`haven env` masks every classified key now; `haven env --reveal` prints values,
+so `eval "$(haven env --reveal)"` is the shell form and plain `haven env` is the
+one safe to paste into an issue.
+
+Never read `.env` to find a value and never print one. `langwatch/secrets-through-source`
+refuses `process.env.<SECRET_KEY>` outside the secrets package, a `platform/config/`
+module, a process boot file and a test.
+
 ### Local dev by hostname — thuishaven / portless (recommended)
 
 Stop juggling ports. Opt in with `make haven up` and traffic routes through

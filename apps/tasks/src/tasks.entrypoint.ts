@@ -2,13 +2,18 @@
 import "@langwatch/time/polyfill";
 
 import process from "node:process";
-import { createLogger } from "@langwatch/observability";
+import { configureLogger, createLogger, type Logger } from "@langwatch/observability";
+import {
+  SecretEnvironmentService,
+  secretLogRedactPaths,
+  secretResolutionSummary,
+} from "@langwatch/secrets";
 import { runTask, TaskCatalogue } from "@langwatch/task";
-import { resolveTasksConfig } from "./platform/config/tasks.config";
-import { loadTaskModules, parseTaskModuleSpecifiers } from "./platform/task-modules-loader";
-import { TasksEventingInfrastructure } from "./platform/tasks-eventing.composition";
-import { TasksHost } from "./platform/tasks-host.composition";
-import { buildTasksCatalogue } from "./tasks.catalogue";
+import { resolveTasksConfig } from "./platform/config/tasks.config.ts";
+import { loadTaskModules, parseTaskModuleSpecifiers } from "./platform/task-modules-loader.ts";
+import { TasksEventingInfrastructure } from "./platform/tasks-eventing.composition.ts";
+import { TasksHost } from "./platform/tasks-host.composition.ts";
+import { buildTasksCatalogue } from "./tasks.catalogue.ts";
 
 /**
  * The runnable task process — `pnpm --filter @langwatch/tasks task <name>
@@ -21,10 +26,17 @@ import { buildTasksCatalogue } from "./tasks.catalogue";
  * names as plugins (Part 2 of the launch-interface plan doc) — runs the
  * requested task, and exits. An unknown or failing module fails boot outright.
  */
-const logger = createLogger("langwatch:tasks");
+const bootLogger = (): Logger => createLogger("langwatch:tasks");
 
 async function main(): Promise<number> {
-  const config = resolveTasksConfig(process.env).value;
+  // Before the Zod parse, so every task downstream still sees a plain string.
+  const secrets = await SecretEnvironmentService.create({ source: process.env }).resolve();
+  // Configured before the first logger is built, so a classified field that
+  // reaches a record is masked by name rather than printed.
+  configureLogger({ redactPaths: secretLogRedactPaths() });
+  const logger = bootLogger();
+  const config = resolveTasksConfig(secrets.environment).value;
+  logger.info({ secrets: secretResolutionSummary(secrets) }, "resolved secrets");
   const host = TasksHost.create(config);
   const eventing = TasksEventingInfrastructure.tryCreate({ redis: host.redis });
   const pluginTasks = await loadTaskModules({
@@ -48,6 +60,6 @@ main()
     process.exitCode = code;
   })
   .catch((error: unknown) => {
-    logger.error({ error }, "tasks process failed to boot");
+    bootLogger().error({ error }, "tasks process failed to boot");
     process.exitCode = 1;
   });
