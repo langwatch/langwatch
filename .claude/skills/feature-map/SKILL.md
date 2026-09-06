@@ -1,166 +1,76 @@
 ---
 name: feature-map
-description: "Maintain the canonical LangWatch feature map (/feature-map.json). Use when adding features, APIs, MCP tools, CLI commands, or skills — to update the central registry and keep surfaces in sync."
+description: "Maintain the canonical LangWatch feature map (feature-map.json at the repo root) and its human-readable companion FEATURE_MAP.md. Use when adding or renaming a feature, a REST namespace, a UI route, an MCP tool, a CLI command or a user-facing skill, so the central registry keeps naming what the code actually serves. Every entry is validated against the code that provides it."
 user-invocable: true
 argument-hint: "[what changed, e.g. 'added dataset MCP tools']"
 ---
 
-# Feature Map Maintenance
+# Maintain the feature map
 
-You are maintaining `/feature-map.json` — the **canonical information architecture** for LangWatch. Every platform feature is defined here with its **surfaces** (how it's accessed) and **sync** state (how code and platform relate). All implementations (sidebar, docs, skills, MCP tools) derive from this map.
+`feature-map.json` at the repo root is the product's public information architecture:
+ten top-level categories, each with `children`, each child a feature with its `surfaces`.
+`FEATURE_MAP.md` is the coverage table derived from it — edit both in one change. Use the
+underscore form; never create `FEATURE-MAP.md`.
 
-`/FEATURE_MAP.md` is the human-readable companion — a coverage table derived from the JSON. Keep it in sync when you edit the JSON. Use the **underscore** form (`FEATURE_MAP.md`), matching GitHub's convention for uppercase root files like `CODE_OF_CONDUCT.md` and `PULL_REQUEST_TEMPLATE.md`. Never create a hyphenated `FEATURE-MAP.md` variant.
+## The entry shape
 
-## Information Architecture
-
-The hierarchy represents the product's mental model, not the code structure:
-
+```json
+{
+  "id": "observability.tracing",
+  "name": "Tracing",
+  "description": "Capture LLM calls, spans, inputs/outputs, costs, and latency",
+  "surfaces": {
+    "code": {
+      "sdk": { "python": "…", "typescript": "…", "go": "…" },
+      "cli": ["trace search"],
+      "hints": {},
+      "skill": "tracing",
+      "docs": "https://…"
+    },
+    "platform": { "ui": "/traces", "mcp": ["search_traces"], "skill": null, "docs": null },
+    "api": "/api/collector",
+    "docs": "https://…"
+  },
+  "sync": "code-to-platform",
+  "produces": ["traces"],
+  "consumes": []
+}
 ```
-observability/         — Tracing, Analytics, User Events, Annotations
-evaluations/           — Experiments, Online Evaluation (includes guardrails via code)
-agent-simulations/     — Scenarios, Runs
-prompt-management/     — Prompts, Prompt Playground
-library/               — Agents, Workflows, Evaluators, Datasets
-settings/              — Model Providers
-```
 
-### Key Design Decisions
+- `code` is what a developer writes in their own project; `platform` is the UI and MCP.
+  `api` and `docs` are cross-cutting.
+- Values are namespaces, not methods: `"langwatch.experiment"` means the module.
+- `sync`: `null` (one mode only), `"bidirectional"`, `"code-to-platform"`,
+  `"platform-to-code"`. Future intent goes in `plannedSync`, never in `sync`.
+- `hints` carries a copy-pasteable example per CLI command.
+- No aspirational entries. If the code does not serve it, it is not in the map.
 
-1. **No "integrations" category** — SDKs/frameworks enable features, they aren't features themselves. Each feature declares its own SDK surface.
-2. **Library** contains reusable components (evaluators, datasets, agents, workflows) — NOT "platform" catch-all.
-3. **Annotations** live in Observability (they annotate traces).
-4. **Guardrails** = online-evaluation accessed via code (`as_guardrail=True`), not a separate concept.
-5. **Evaluators** and **Datasets** are in Library, not Evaluations — they're shared components used by experiments, online evaluation, and simulations.
+## Where each surface actually comes from
 
-### The Surfaces Model
+| Field             | Verify against                                                                                                                                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `surfaces.api`    | `packages/features/<f>/server/src/transport/public-rest/` and `transport/api-rest/`, mounted by `apps/api/src/api-<f>-rest.feature.ts` or `apps/api/src/app-rest/app-rest.packaged-families.ts` |
+| tRPC namespaces   | `apps/api/src/app-trpc/app-trpc.features.ts`                                                                                                                                                    |
+| `platform.ui`     | `apps/ui/src/model/ui-route-table.ts` (the `path` of a route descriptor)                                                                                                                        |
+| sidebar placement | `apps/ui/src/features/chrome/`                                                                                                                                                                  |
+| `platform.mcp`    | `mcp/typescript/src/create-mcp-server.ts` (`registerTools`) over `mcp/typescript/src/tools/`                                                                                                    |
+| `code.cli`        | `sdks/typescript/src/cli/commands/` — one directory per command group, `sdks/typescript/src/cli/index.ts` is the entry                                                                          |
+| `code.skill`      | `skills/<name>/SKILL.md` (the user-facing skills, not `.claude/skills`)                                                                                                                         |
+| `code.sdk`        | `sdks/python/src/langwatch/__init__.py`, `sdks/typescript/src/index.ts`, `sdks/go/`                                                                                                             |
 
-Each feature has two main access paths:
+## Updating
 
-- **`code`** — developer writes files in their project (SDK, CLI, skill)
-- **`platform`** — no-code via UI or MCP tools (UI route, MCP tool, platform skill)
+1. Read `feature-map.json`, find the feature by `id` (dotted: `category.feature`).
+2. Add the value to the right surface array or field. A brand-new feature gets a whole
+   entry under the category whose mental model it belongs to — the hierarchy is the
+   product's, not the code's.
+3. Mirror the change in `FEATURE_MAP.md`.
+4. Validate every field you touched against the table above with `ls` / `grep -rn`
+   (ripgrep is unreliable in this repo). An entry that names something the code does not
+   serve is worse than a missing one.
+5. A route rename must update this file: it is a live surface, not documentation.
 
-Plus cross-cutting:
+## Report
 
-- **`api`** — REST/Hono API endpoint namespace (used by both code and platform)
-- **`docs`** — canonical documentation URL
-
-Fields point to **namespaces**, not individual methods. E.g., `"python": "langwatch.experiment"` means the whole experiment module, not just `init()`.
-
-### The Sync Model
-
-How code and platform relate for each feature:
-
-| sync value           | meaning                            | example                     |
-| -------------------- | ---------------------------------- | --------------------------- |
-| `null`               | separate or one-mode only          | annotations (platform only) |
-| `"bidirectional"`    | code ↔ platform, synced            | prompts (via `prompt sync`) |
-| `"code-to-platform"` | code generates, platform displays  | tracing, experiments        |
-| `"platform-to-code"` | platform configures, code consumes | — (none currently)          |
-
-`plannedSync` captures known future intent (e.g., scenarios will become `"bidirectional"`).
-
-## Where to Find Things in the Codebase
-
-### API Endpoints
-
-- **Hono routes** (current): `platform/app/src/app/api/` — each `[[...route]]/app.ts` is a Hono app
-  - traces: `platform/app/src/app/api/traces/[[...route]]/app.ts`
-  - scenarios: `packages/features/scenario/server/src/transport/api-rest/` (packaged, mounted by `createAppRestFeatures`)
-  - prompts: `platform/app/src/app/api/prompts/[[...route]]/app.ts`
-  - evaluators: `platform/app/src/app/api/evaluators/[[...route]]/app.ts`
-  - datasets: `platform/app/src/app/api/dataset/[[...route]]/`
-  - analytics: `platform/app/src/app/api/analytics/`
-  - model-providers: `platform/app/src/app/api/model-providers/[[...route]]/`
-- **Legacy Next.js routes** (being migrated): `platform/app/src/pages/api/`
-- **tRPC routers**: `platform/app/src/server/api/routers/` registered in `platform/app/src/server/api/root.ts`
-
-### Platform UI
-
-- **Route definitions**: `platform/app/src/utils/routes.ts` — `projectRoutes` object has every page route
-- **Sidebar menu**: `platform/app/src/components/MainMenu.tsx` — sections: Observe, Evaluate, Library
-- **Feature icons**: `platform/app/src/utils/featureIcons.ts`
-
-### MCP Tools
-
-- **All tools**: `mcp/typescript/src/index.ts` — every `server.tool()` call
-- **Tool handlers**: `mcp/typescript/src/tools/*.ts`
-- Currently 21 tools: 2 docs, 1 discovery, 3 observability, 4 prompt, 5 scenario, 4 evaluator, 2 model-provider
-
-### CLI Commands
-
-- **Entry point**: `sdks/typescript/src/cli/index.ts`
-- **Command implementations**: `sdks/typescript/src/cli/commands/`
-- Currently: `login` + `prompt` subcommands (init, create, add, remove, list, sync, pull, push)
-
-### SDKs
-
-- **Python**: `sdks/python/src/langwatch/__init__.py` (top-level exports), modules: `experiment`, `evaluation`, `dataset`, `evaluators`, `prompts`, `dspy`
-- **TypeScript**: `sdks/typescript/src/index.ts` — `LangWatch` class with `.prompts`, `.experiments`, `.evaluations`, `.evaluators`, `.datasets`, `.traces`
-- **Scenario SDK** (separate): `@langwatch/scenario` (TS) / `langwatch-scenario` (Python)
-
-### Skills (external, for users)
-
-- **Location**: `skills/*/SKILL.md`
-- **Feature skills**: tracing, evaluations, scenarios, prompts (each handles both code and platform approaches)
-- **Meta skills**: level-up (orchestrates all feature skills)
-- **Cross-cutting**: analytics
-
-### Documentation
-
-- **LangWatch docs**: served via `fetch_langwatch_docs` MCP tool, index at `https://langwatch.ai/docs/llms.txt`
-- **Scenario docs**: served via `fetch_scenario_docs` MCP tool, index at `https://langwatch.ai/scenario/llms.txt`
-
-## How to Update the Feature Map
-
-### When a new API endpoint is added
-
-1. Read `feature-map.json`
-2. Find the feature entry by `id`
-3. Update `surfaces.api` with the route namespace
-4. If it's a new feature, create a new entry under the right category
-
-### When a new MCP tool is added
-
-1. Verify the tool exists in `mcp/typescript/src/index.ts`
-2. Add the tool name to `surfaces.platform.mcp` array
-
-### When a new skill is created
-
-1. Verify the skill exists in `skills/{name}/SKILL.md`
-2. Add to `surfaces.code.skill` (for code-path skills) or `surfaces.platform.skill` (for platform-path skills)
-
-### When a new CLI command is added
-
-1. Verify it exists in `sdks/typescript/src/cli/commands/`
-2. Add to `surfaces.code.cli` array
-
-### When SDK surface changes
-
-1. Update `surfaces.code.sdk` with the namespace
-
-### When sync capability changes
-
-1. Move value from `plannedSync` to `sync`
-2. Or set new `plannedSync` for future plans
-
-### When a completely new feature is added
-
-1. Decide which category it belongs to based on the hierarchy rules above
-2. Create a new entry with all known surfaces
-3. Set `sync` appropriately
-4. Consider: does it need a skill? A docs page? MCP tool?
-
-## Validation
-
-After any change, verify:
-
-- Every `api` value corresponds to a route in `platform/app/src/app/api/` or `platform/app/src/pages/api/`
-- Every `mcp` tool name appears in `mcp/typescript/src/index.ts`
-- Every `skill` name has a `skills/{name}/SKILL.md`
-- Every `cli` command exists in `sdks/typescript/src/cli/`
-- Every `ui` route exists in `platform/app/src/utils/routes.ts`
-- No aspirational entries (use `plannedSync` for future intent)
-
-## Task
-
-$ARGUMENTS
+The entries added or changed, the code path each was validated against, and anything you
+found in the map that the code no longer serves.

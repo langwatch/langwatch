@@ -26,7 +26,8 @@ uvx --from ast-grep-cli==0.42.3 ast-grep scan -c dev/lint/ast-grep/sgconfig.yml 
 
 # layer-class, conditional-type-depth, overload-by-literal, comment-block-size,
 # service-quality, strict-port-module and the rest
-cd packages/architecture-lint && pnpm run lint
+pnpm --filter @langwatch/architecture-lint lint
+pnpm exec oxlint --config .oxlintrc.architecture.json <target>
 ```
 
 Then the shape survey, which no rule covers:
@@ -58,9 +59,10 @@ a `PrismaClient`, `Prisma.TransactionClient` or ClickHouse client. If a service
 opens a transaction or writes raw SQL, that belongs behind the repository, and
 the callback should receive a transactional _repository_, not a client.
 
-**What does the composition root actually pass?** (R5) Find every
-`XApp.create` / `XRuntime.create` call in `platform/app/src/server/app-layer/presets.ts`,
-`platform/app/src/runtime/`, and `apps/`. An optional dependency that is always
+**What does the composition root actually pass?** (R5) Find every `X.create` call in
+`apps/api/src/app/*.composition.ts`, `apps/api/src/features/*/*.composition.ts`,
+`apps/worker/src/app/*.composition.ts` and `apps/tasks/src/platform/*.composition.ts`.
+An optional dependency that is always
 supplied is not optional; the `if (!this.x) throw new Error("… not configured")`
 it forces is unreachable, and the type is lying. Say which arguments are
 genuinely absent in production and which are not.
@@ -88,7 +90,10 @@ Say what stays, and why, in a Keep list. These are correct as they are:
   feature layout requires;
 - a hot correctness path already inside its quality ceiling, where the only
   complaint is method length;
-- anything under `platform/app/` — new files go in `packages/**` or `apps/**`.
+- anything the mechanical half already accepts: `packages/architecture-lint/src/overengineering-policy.mjs`
+  and `packages/architecture-lint/src/port-module-baseline.json` are the rules' own
+  record of what is tolerated. Defer to their output rather than re-litigating it, and
+  keep this skill for the reading questions above.
 
 A rule firing is a question, not a verdict. Check each hit against the source
 before reporting it, and drop the ones that are idioms: `(x) => x` as a no-op

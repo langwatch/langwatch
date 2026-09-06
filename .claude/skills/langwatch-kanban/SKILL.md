@@ -12,11 +12,12 @@ Manage the LangWatch Kanban GitHub project board (project #5, org: langwatch).
 
 ## Project Reference
 
-Read the project board reference from memory before doing anything:
+Every project id, field id and status option id is in the **Constants** section at the
+bottom of this file; read it before issuing a mutation. If a mutation is rejected as an
+unknown field or option, re-read the ids from the API rather than guessing:
+`gh api graphql -f query='{organization(login:"langwatch"){projectV2(number:5){id field(name:"Status"){... on ProjectV2SingleSelectField{id options{id name}}}}}}'`.
 
-- File: `/Users/USER/.claude/projects/-Users-hope-workspace-langwatch-workspace-langwatch-saas-langwatch/memory/reference_gh-project.md`
-
-This contains all project IDs, field IDs, status option IDs, and GraphQL patterns. **Use python3 for all JSON parsing** — issue titles with special characters break jq.
+**Use python3 for all JSON parsing** — issue titles with special characters break jq.
 
 ## Subcommands
 

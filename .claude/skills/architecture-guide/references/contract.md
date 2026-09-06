@@ -10,16 +10,17 @@ so it carries what exists and what can go wrong, never how anything is done.
 index.ts
 <subject>.service.ts     abstract capability, at least one is required
 <subject>.commands.ts    write inputs (zod)
-<subject>.queries.ts     read inputs and outputs (zod)
+<subject>.queries.ts     read inputs and outputs (zod), and the public REST declaration
 <subject>.events.ts      domain events
 <subject>.errors.ts      HandledError subclasses with stable codes
 <domain files or domain directories>   e.g. secret.ts, simulation.ts, visualization/
 ```
 
-Allowed artifact suffixes: `commands | errors | events | queries | service`. A server
-artifact suffix in contract source (`adapter, api, mapper, migration, port, projection,
-repository, store`) fails `feature-source-layout`. A bare `service.ts` with no subject
-fails too: the file is `<subject>.service.ts`.
+Allowed artifact suffixes (`CONTRACT_ARTIFACT_SUFFIX`):
+`commands | errors | events | queries | service`. A server artifact suffix in contract
+source (`adapter, api, mapper, migration, port, projection, repository, store`) fails
+`feature-source-layout`. A bare `service.ts` with no subject fails too: the file is
+`<subject>.service.ts`.
 
 Contract must not import Node runtime APIs, Prisma, Hono, tRPC server code, React,
 Eventing, application aliases, or its own server and web packages. It may import
@@ -38,9 +39,8 @@ export type CreateSecretInput = z.infer<typeof createSecretInputSchema>;
 
 When both validation and a type are needed, the schema is the source. Internal constants
 with no external input use `as const`. Do not `.strict()` a schema that a producer you do
-not control fills (the browser session schema went strict once and every signed-in
-request parsed to null and read as anonymous). Use `z.input<typeof schema>` for wire
-inputs whose fields carry defaults.
+not control fills. Use `z.input<typeof schema>` for wire inputs whose fields carry
+defaults.
 
 ## Errors
 
@@ -78,11 +78,38 @@ injects it wherever another feature declares a dependency on the abstract one. M
 return a value or throw the domain error. Only `try*` methods return `null`; `require*`
 is forbidden. Parameters are named objects.
 
+## The public REST declaration
+
+A public REST surface states its operations here, so the shape of the wire is portable
+and the transport is only a builder over it
+(`packages/features/secret/contract/src/secret.queries.ts`):
+
+```ts
+export const secretPublicRest = {
+  list: {
+    input: secretPublicListInputSchema,
+    output: z.array(secretPublicSchema),
+    permission: "secrets:view",
+  },
+  create: {
+    input: secretPublicCreateInputSchema,
+    output: secretPublicSchema,
+    permission: "secrets:manage",
+  },
+} as const satisfies Record<string, SecretRestOperation<ZodType, ZodType>>;
+```
+
+`permission` is an `AuthzPermission` from `@langwatch/authz-contract`. Output schemas are
+`.strict()` so a field the projection should never carry cannot join an answer by
+accident. See the `api-rest-route` skill.
+
 ## The api-map: router types for the browser without importing the server
 
-The web half never imports `apps/api`. It declares the procedures it calls as a map typed
-from contract inputs and outputs, and `createFeatureApi` turns that into a tRPC React
-client whose cache keys are the same as the application's:
+The web half never imports `apps/api` and never names `AppRouter` (ADR-130: that one type
+import loads the whole API application into the browser typecheck). It declares the
+procedures it calls as a map typed from contract inputs and outputs, and
+`createFeatureApi` turns that into a tRPC React client whose cache keys are the same as
+the application's:
 
 ```ts
 // web/src/behavior/secret-api.ts
@@ -97,8 +124,9 @@ export const secretApi = createFeatureApi<SecretApiMap>();
 
 `createFeatureApi`, `FeatureApiMap`, `RouterFromMap` and the one named cast
 `asFeatureApiClient` live in `packages/platform-api-client/src/feature-api.ts`. The
-nesting is the cache key, so a hook in the package and the shell's proxy share one entry.
-Never type a map slot as `any`; name the contract `*Output` type.
+nesting is the cache key and must match the mounted namespace exactly, so a hook in the
+package and the shell's proxy share one entry. Never type a map slot as `any`; name the
+contract type.
 
 ## Sharing across features
 

@@ -18,18 +18,18 @@ Parse `$ARGUMENTS` for:
 
 If a feature file path is given, **read it now** and extract the scenarios into a concrete checklist. If a plain description is given, use it directly. If neither is provided, use the **default smoke test**: app loads, sign in works, dashboard renders after auth.
 
-### Resolve the port
+### Resolve the base URL
 
-1. Explicit port in `$ARGUMENTS` → use it
-2. Read `.dev-port` file in the repo root → source it for `APP_PORT`
-3. **No port and no `.dev-port`?** → run `dev/scripts/dev-up.sh` and then read the `.dev-port` it creates
+1. Explicit port in `$ARGUMENTS` → `http://localhost:<port>`
+2. A haven stack (the recommended path): `make haven status` names the slug, and the URL
+   is `https://app.<slug>.langwatch.localhost:<port>` with the port from
+   `~/.portless/proxy.port`. See the `haven-setup` skill.
+3. A plain `pnpm dev` stack: the browser application binds `PORT` (default 5560).
+4. A per-worktree isolated compose stack: `dev/scripts/dev-up.sh` writes `.dev-port` at
+   the repo root with `APP_PORT` and `BASE_URL`; source it.
 
-```bash
-# .dev-port format (written by dev-up.sh):
-APP_PORT=5560
-BASE_URL=http://localhost:5560
-COMPOSE_PROJECT_NAME=langwatch-abcd1234
-```
+Never start a stack the user did not ask for, and never leave one running that you
+started without saying so.
 
 ### Resolve the feature
 
@@ -93,18 +93,20 @@ Only create what is listed above. Do not add extra data beyond what is needed.
 - Browser: Chromium (headless) — use Playwright MCP tools
 - Save screenshots to: <absolute artifact path>/screenshots/
 
-## Auth (NextAuth credentials form, NOT Auth0)
+## Auth (email + password credentials form, not a third-party IdP)
 - Navigate to the app → redirects to /auth/signin (Email + Password form)
 - Email: browser-test@langwatch.ai
 - Password: BrowserTest123!
 - If "Register new account" needed, register first with same credentials
 - Org name if onboarding: Browser Test Org
 - After auth: dashboard shows "Hello, Browser" + "Browser Test Org" header
+- Sign-in only works from the origin the app is configured with; a raw 127.0.0.1
+  origin 403s the sign-in even though anonymous pages load
 
 ## How to interact
 - Use browser_snapshot (accessibility tree) for finding elements — it's faster than screenshots
 - Use browser_take_screenshot to capture evidence at each key step
-- Use browser_wait_for with generous timeouts (60-120s for first page loads, dev mode is slow)
+- Use browser_wait_for with generous timeouts (30-60s for the first load in dev)
 - Number screenshots sequentially: 01-sign-in.png, 02-dashboard.png, etc.
 
 ## Guardrails — READ THESE
@@ -147,11 +149,14 @@ When the sub-agent returns:
 <any observations>
 ```
 
-3. If you started the app (no `.dev-port` existed before), tear it down: `dev/scripts/dev-down.sh`
+3. If you started a compose stack yourself, tear it down: `dev/scripts/dev-down.sh`. Leave
+   a stack the user already had running alone.
 
 ## Step 5: Upload screenshots and update the PR
 
-Screenshots are uploaded to **img402.dev** (free, no auth) instead of committed to git. This avoids binary bloat in the repo.
+Screenshots go to an external host rather than into git, so the repo carries no binaries.
+The host below is not maintained by us — check it still answers before relying on it, and
+say so in the report if it does not.
 
 1. **Upload each screenshot** to img402.dev:
 

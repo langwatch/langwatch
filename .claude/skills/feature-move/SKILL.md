@@ -7,8 +7,8 @@ argument-hint: "<what to move> -> <feature>/<contract|server|web>/<layer>"
 
 # Move code into its owner
 
-Read `.claude/skills/architecture-guide/SKILL.md`. The rules here are the ones the
-platform extraction taught the hard way, so follow the order.
+Read `.claude/skills/architecture-guide/SKILL.md`. Follow the order; the sweep in step 4
+is where moves break.
 
 ## Rules that do not bend
 
@@ -22,8 +22,8 @@ platform extraction taught the hard way, so follow the order.
   composition root names the absence; nothing returns fake data.
 - **Delete what becomes unreachable** at the source after the move; do not leave a
   hollow module behind.
-- **Agents never stage, commit, stash, reset or clean.** Edit files; the orchestrator
-  commits path-scoped.
+- **Agents never stage, commit, stash, reset or clean.** Edit and move files; the root
+  session commits path-scoped.
 
 ## 1. Map source to destination
 
@@ -40,8 +40,10 @@ the abstract repository, never into a service.
 ## 2. Move
 
 ```bash
-git mv <from> <to>          # keeps history; plain mv is fine for untracked files
+mv <from> <to>
 ```
+
+Plain `mv` only. A git-level move stages the file, and the root session owns staging.
 
 Then fix the moved file's own imports: relative paths that broke, `~/` or `@ee/`
 aliases to package imports, `#*` self-imports inside a server package.
@@ -66,15 +68,22 @@ Run every item; each has bitten a previous move.
   `grep -rn "vi.mock(" <touched test dirs>` and repoint to the new specifier.
 - **Source-reading guards**: tests that `readFileSync` a path by string (boundary scans,
   parity checkers, comment scanners) die with ENOENT or, worse, pass against nothing.
-  `grep -rn "readFileSync\|existsSync" packages/architecture-lint apps/*/tests | grep <old dir>`.
-- **TS2304 half-reverts**: after moving, `tsc` on every touched package plus `apps/api`,
-  `apps/worker`, `apps/ui`. A `TS2304: Cannot find name` means a use survived and its
-  declaration moved without an import.
+  `grep -rn "readFileSync\|existsSync" packages/architecture-lint/src packages/architecture-lint/tests apps/*/tests | grep <old dir>`.
+  Path lists inside data files count too: `packages/architecture-lint/src/comment-block-roots.json`,
+  `packages/architecture-lint/src/api-transport-framework-allowlist.json` and every
+  `packages/architecture-lint/src/*-baseline.json`.
+- **TS2304 half-reverts**: after moving, `pnpm --filter <pkg> typecheck` on every touched
+  package plus `@langwatch/platform-api`, `@langwatch/worker`, `@langwatch/ui`. A
+  `TS2304: Cannot find name` means a use survived and its declaration moved without an
+  import.
 - **Install registries**: `apps/ui/src/features/installed-ui-features.ts`,
-  `installed-ui-drawers.ts`, `catalogue.json`, `apps/ui/src/model/ui-route-table.ts`,
-  `apps/api/src/app-rest/app-rest.packaged-families.ts`, `apps/worker/src/features/catalogue.json`.
-- **Spec citations**: `.feature` files and `AUDIT_MANIFEST.md` that name the old path;
-  `@scenario` annotations travel with their tests.
+  `apps/ui/src/features/catalogue.json`, `apps/ui/src/model/ui-route-table.ts`,
+  `apps/api/src/app-trpc/app-trpc.features.ts`,
+  `apps/api/src/app-rest/app-rest.packaged-families.ts`,
+  `apps/worker/src/features/catalogue.json`, `apps/tasks/src/tasks.catalogue.ts`,
+  the root `feature-map.json`.
+- **Spec citations**: `.feature` files and ADRs that name the old path; `@scenario`
+  annotations travel with their tests, and a renamed scenario title breaks its binding.
 - **Package manifests**: the destination `package.json` gains the dependencies the moved
   code needs; the source loses the ones nothing uses any more; run `pnpm install` once
   (never hand-link into `node_modules`).
@@ -86,12 +95,13 @@ Run every item; each has bitten a previous move.
 ## 5. Gates, scoped
 
 ```bash
-pnpm --filter <destination pkg> test && pnpm --filter <destination pkg> exec tsc --noEmit -p tsconfig.json
-pnpm --filter <each consumer pkg> exec tsc --noEmit -p tsconfig.json
-pnpm --filter @langwatch/architecture-lint lint
-pnpm --filter @langwatch/architecture-lint exec tsx src/check-feature-parity.ts
-pnpm exec oxlint <touched> && pnpm exec oxfmt <touched>
+pnpm --filter <destination pkg> test && pnpm --filter <destination pkg> typecheck
+pnpm --filter <each consumer pkg> typecheck
 ```
+
+then the rest of `.claude/skills/architecture-guide/references/gates.md`. Diff the lint
+violation LIST before and after, not just the total: a wrong placement trades one
+violation for another.
 
 ## Report
 

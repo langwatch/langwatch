@@ -87,4 +87,4 @@ Run TaskList. If any task is not `completed`, go back and finish it now.
 - Keep reports concise — the user can see the browser, they don't need a full description
 - Don't take autonomous actions — wait for the user between steps
 - When making code edits, describe the change briefly so the user knows what to look for
-- If the app isn't running, tell the user and suggest `make dev` or the relevant start command
+- If the app isn't running, tell the user and suggest `make haven up`, `make quickstart`, or `pnpm dev`
