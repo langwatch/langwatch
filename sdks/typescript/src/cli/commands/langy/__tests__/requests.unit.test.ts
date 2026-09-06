@@ -108,6 +108,7 @@ describe("given the share-control command", () => {
 
   describe("when the machine has a device session and the folder has a project key", () => {
     /** @scenario "The login answers before a project key found in the folder" */
+    /** @scenario "The command names the login it uses" */
     it("resolves the login's key on the personal project, never the folder's key", async () => {
       const login = vi.fn(async () => undefined);
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), "langy-login-"));
@@ -157,7 +158,6 @@ describe("given the share-control command", () => {
         else process.env.LANGWATCH_API_KEY = before.key;
         fs.rmSync(dir, { recursive: true, force: true });
       }
-      /** @scenario "The command names the login it uses" */
       expect(printed.map(stripAnsi)).toContain(
         "Using your login as Riley at ACME.",
       );
