@@ -11,27 +11,39 @@
  * are emptied in the output — matching CPython's textwrap.dedent. Already-flush
  * code is returned unchanged.
  */
-export function dedentPythonCode(code: string): string {
-  const lines = code.split("\n");
+// Only spaces and tabs count as indentation, matching CPython's
+// `([ \t]*)(?=[^ \t\n])` — `trimStart()` would also eat exotic whitespace
+// (a non-breaking space from a browser paste) and diverge from it.
+function leadingWhitespace(line: string): string {
+  return /^[ \t]*/.exec(line)?.[0] ?? "";
+}
+
+/** The longest leading substring shared by `a` and `b`. */
+function commonPrefix(a: string, b: string): string {
+  let i = 0;
+  const max = Math.min(a.length, b.length);
+  while (i < max && a[i] === b[i]) i++;
+  return a.slice(0, i);
+}
+
+/**
+ * The leading-whitespace prefix shared by every non-blank line in `lines`,
+ * or "" when there is none (or every line is blank).
+ */
+function computeCommonIndent(lines: string[]): string {
   let common: string | null = null;
   for (const line of lines) {
     if (line.trim() === "") continue; // ignore whitespace-only lines
-    // Only spaces and tabs count as indentation, matching CPython's
-    // `([ \t]*)(?=[^ \t\n])` — `trimStart()` would also eat exotic whitespace
-    // (a non-breaking space from a browser paste) and diverge from it.
-    const indent = /^[ \t]*/.exec(line)?.[0] ?? "";
-    if (common === null) {
-      common = indent;
-      continue;
-    }
-    // shrink `common` to the longest shared leading-whitespace prefix
-    let i = 0;
-    const max = Math.min(common.length, indent.length);
-    while (i < max && common[i] === indent[i]) i++;
-    common = common.slice(0, i);
+    const indent = leadingWhitespace(line);
+    common = common === null ? indent : commonPrefix(common, indent);
     if (common === "") break;
   }
-  const prefix = common ?? "";
+  return common ?? "";
+}
+
+export function dedentPythonCode(code: string): string {
+  const lines = code.split("\n");
+  const prefix = computeCommonIndent(lines);
   return lines
     .map((line) =>
       line.trim() === ""
