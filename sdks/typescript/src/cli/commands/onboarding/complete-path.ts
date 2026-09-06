@@ -1,6 +1,7 @@
 import { OnboardingApiService } from "@/client-sdk/services/onboarding/onboarding-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
+import { guidedStateCard } from "./card";
 
 /**
  * Mark one guided onboarding path as done for the organization this project
@@ -15,7 +16,7 @@ export const onboardingCompletePathCommand = async (
   path: string,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
-  const state = await new OnboardingApiService().completePath(path);
+  const state = guidedStateCard(await new OnboardingApiService().completePath(path));
   return {
     data: state,
     table: () => {

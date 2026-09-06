@@ -1,6 +1,7 @@
 import { OnboardingApiService } from "@/client-sdk/services/onboarding/onboarding-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
+import { guidedStateCard } from "./card";
 
 /**
  * Print the guided onboarding state of the organization this project belongs
@@ -12,7 +13,7 @@ import type { CommandResult } from "../../utils/output";
  */
 export const onboardingStateCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
-  const state = await new OnboardingApiService().getGuidedState();
+  const state = guidedStateCard(await new OnboardingApiService().getGuidedState());
   return {
     data: state,
     table: () => {

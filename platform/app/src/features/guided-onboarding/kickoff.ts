@@ -42,6 +42,8 @@ export const guidedKickoffInputSchema = z.object({
   orgName: z.string().optional(),
   firstName: z.string().optional(),
   tourStatus: guidedKickoffTourStatusSchema,
+  /** The gateway URL an app on this instance points at, with its /v1. */
+  gatewayUrl: z.string().optional(),
 });
 export type GuidedKickoffInput = z.infer<typeof guidedKickoffInputSchema>;
 
@@ -124,6 +126,11 @@ export function buildGuidedKickoffBrief({
     `Organization: ${input.orgName ?? "unknown"}. First name: ${input.firstName ?? "unknown"}.`,
   );
   lines.push(`Tour: ${input.tourStatus}.`);
+  lines.push(
+    input.gatewayUrl
+      ? `Gateway: ${input.gatewayUrl}.`
+      : "Gateway: none configured on this instance.",
+  );
   return lines.join("\n");
 }
 

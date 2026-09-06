@@ -115,6 +115,7 @@ describe("the local workspace tools", () => {
       ]);
       expect(parameterNames("local_find")).toEqual(["limit", "path", "pattern"]);
       expect(parameterNames("local_ls")).toEqual(["limit", "path"]);
+      expect(parameterNames("local_langwatch_env")).toEqual(["path"]);
       // The quiet third way out is opt-in: a skill with a fallback for it
       // passes `offer_describe`, an ordinary ask leaves it off.
       expect(parameterNames(CODE_ACCESS_TOOL_NAME)).toEqual([
@@ -303,6 +304,51 @@ describe("the local workspace tools", () => {
         ),
       ).toBe(true);
     }, 15_000);
+  });
+
+  describe("when the app refuses the call before it reaches the machine", () => {
+    /** @scenario "A validation refusal reaches Langy as the issues, not as a lost call" */
+    it("returns the issues so the model fixes the parameters", async () => {
+      const fetchMock = vi.fn(async (url: string) => {
+        const path = new URL(url).pathname;
+        if (path === "/api/langy/local/calls") {
+          return {
+            ok: false,
+            status: 400,
+            json: async () => ({
+              error: {
+                type: "bad_request",
+                code: "langy_api_request_invalid",
+                message: "Invalid request body.",
+                meta: {
+                  issues: [
+                    {
+                      path: ["params", "edits", 0, "oldText"],
+                      message: "String must contain at least 1 character(s)",
+                    },
+                  ],
+                },
+              },
+            }),
+          };
+        }
+        throw new Error(`unexpected request to ${path}`);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const text = textOf(
+        await registeredTools()
+          .get("local_edit")!
+          .execute("t_refused", { path: ".env", edits: [{ oldText: "", newText: "X=1" }] }),
+      );
+
+      expect(text).toContain("params.edits.0.oldText");
+      expect(text).toContain("at least 1 character");
+      expect(text).toContain("call the tool again");
+      expect(text).not.toContain(CALL_LOST_PUSHBACK);
+      expect(text).not.toContain("not connected any more");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("when the turn is stopped", () => {

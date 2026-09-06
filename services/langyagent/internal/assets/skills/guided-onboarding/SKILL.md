@@ -15,11 +15,12 @@ metadata:
 
 ## Read the brief
 
-The brief is the whole context. Do not run `langwatch onboarding state` to learn what it already says; run it only when a line you need is missing. It prints the same shape as the brief: `paths`, `currentPath`, `donePaths`, `provider`, `providerModel`, `tourCompletedAt`, `tourSkippedAt`.
+The brief is the whole input. Never run `langwatch onboarding state` during a guided path: everything the script needs is in the brief, and a later kickoff ("Let's set up {path} then.") carries its own brief too.
 
 - **Path to set up now** picks the script below: `llmops`, `coding`, `gateway` or `governance`.
 - **Everything picked** is the order the user chose; the Home page offers the rest later, so set up only the current path.
 - **Provider** is already connected when the brief names one. Never ask for a key.
+- **Gateway** is the address an app on this instance points at; the gateway path prints it.
 - **Tour: skipped** adds one line before the path's own opener, exactly:
 
   No worries! Everything the tour covers is in the menu on the left. I'll be right here when you need me.
@@ -38,7 +39,7 @@ Say nothing about the brief itself: the panel draws it as a card, and the user n
   langwatch onboarding complete-path <path>
   ```
 
-  with `<path>` one of `llmops`, `coding`, `gateway`, `governance`. It is idempotent. It runs last: in the same step as the closing line, right after it, with no other tool call beside it, and never before the path's work is done. On the llmops path that is after the suite run is open and the closing line is said; on the coding and gateway paths after the snippet and the closer; on the governance path after the sources page is open and its one line is said. When it returns, the turn is over: say nothing more, and never repeat the closing line. Whatever it printed is the panel's to show, not yours.
+  with `<path>` one of `llmops`, `coding`, `gateway`, `governance`. It is idempotent. It runs last: in the same step as the closing line, right after it, with no other tool call beside it, and never before the path's work is done. It closes a path that ended as written, never one that stopped at a failed step (see "When a step fails"). On the llmops path that is after the suite run is open and the closing line is said; on the coding and gateway paths after the snippet and the closer; on the governance path after the sources page is open and its one line is said. When it returns, the turn is over: say nothing more, and never repeat the closing line. Whatever it printed is the panel's to show, not yours.
 
 ## llmops: Evals & LLM Ops
 
@@ -68,12 +69,16 @@ and call `code_access` again, this time without `offer_describe`. Keep their des
 
 With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language.
 
-Then, still through `code-changes`, apply two skills to the code:
+Then, still through `code-changes`, work on a branch of your own, never on the branch the user has checked out: pick the name from both lists and `git checkout -b langy/<slug> origin/<default>` (a worktree when the tree is dirty), exactly as step 2 of `code-changes` says. On that branch apply two skills to the code:
 
-1. `tracing` for the detected framework (`langwatch docs integration/<framework>`), so every call is traced.
+1. `tracing` for the detected framework, so every call is traced. The docs page is `langwatch docs integration/<python|typescript>/integrations/<framework>`, for example `integration/python/integrations/langgraph`.
 2. `connect-agent`, so the platform can run scenarios against the agent: the connect call with a stable agent name and the environment the process runs in.
 
-Start the agent the way the repo starts it (the `local_*` tools run the process; the connect-agent skill says how to keep it up), then read it back with `langwatch agent list --format json` until the row is `Online`. Note the agent name: every `--target` below is `connected:<that name>`.
+Then call `local_langwatch_env` once, with the env file the app loads (`.env` next to the manifest unless the code loads another). The command line writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT there with the user's own login. The key never reaches you: never ask for it, never write it yourself and never read the file back for it.
+
+Start the agent from that branch the way the repo starts it (the `local_*` tools run the process; the connect-agent skill says how to keep it up), then read `langwatch agent list --format json` every few seconds until the row's `status` is `online`, for up to two minutes. Nothing runs against an agent that is not online: no scenario, no suite. Note the agent name: every `--target` below is `connected:<that name>`.
+
+Keep that branch checked out while the agent you started runs; the commit and the pull request come at the end of step 5.
 
 ### 3. Propose the first scenario, and stop
 
@@ -95,6 +100,8 @@ Of course. Tell me what the scenario should cover and I'll write it with you.
 Write the scenario with them from their next message, and only then continue at step 4 with what they agreed.
 
 ### 4. Create, explain, run
+
+Steps 4 and 5 run in one fixed order, and nothing in it is skipped or moved: create the scenario, open it, the why-a-scenario line, run it, the two-things line, the suite with its scenarios, the suite run, open the run, the commit and the pull request, the closing line, and `complete-path` last.
 
 On "Sure, go ahead!":
 
@@ -133,7 +140,9 @@ langwatch test-suite run <suite_id> --target connected:<agent name> --wait --for
 langwatch navigate open <the scenariorun_ id the suite run printed>
 ```
 
-**If the run failed**, explain in plain words what the judge saw and why the agent did not meet the criteria, keep going with the suite exactly as above, and point at the run so they can replay the conversation. A failing first scenario is a finding, not a blocker.
+**If the run failed**, explain in plain words what the judge saw and why the agent did not meet the criteria, keep going with the suite exactly as above, and point at the run so they can replay the conversation. A failing first scenario is a finding, not a blocker. A run that answers an error instead of a verdict is not a failed run: see "When a step fails".
+
+With the suite run open, commit and open the pull request as steps 4 to 6 of `code-changes` say, and report the address. Leave the branch checked out: the agent you started runs on it, and say so in one line.
 
 Say, verbatim, as the last line:
 
@@ -144,6 +153,10 @@ Then, in the same step, close the path and stop:
 ```bash
 langwatch onboarding complete-path llmops
 ```
+
+### When a step fails
+
+The credentials call answers that the key was refused, the tracing edit cannot be applied, the agent is not online after two minutes, or a scenario or suite run answers an error instead of a verdict (a 422, a target it cannot find, a run that never starts): stop there. Say in one line what is not done and what it needs, and end the turn. Nothing later in the script happens: no scenario or suite runs against an agent that is not online, the why-a-scenario line and the closing line are not said, and `langwatch onboarding complete-path` does not run. When the credentials call was refused, the line says that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT go into the env file by hand, from the project's settings page.
 
 ## coding: Coding agents
 
@@ -177,14 +190,16 @@ If no row is named `production-app`:
 langwatch virtual-keys create --name production-app --format json
 ```
 
-Take the secret from the create output. When the key already existed, its secret was shown once at minting and is not readable again: say so in one line and print the snippet with `<your production-app key>` in its place.
+Take the secret from the create output. When the key already existed, the tour minted it and showed its secret in the dialog, and it is not readable again: say nothing about that, open with the line below as if the key were just made, and print the snippet with `<the production-app key the dialog showed>` where the secret goes.
+
+The gateway address is the `Gateway:` line of the brief, never a host you remember: an instance serves its own. When the brief says none is configured, print the snippet with `<your gateway URL>` in its place and say in one line that the gateway is not set up on this instance yet.
 
 Say, verbatim, then the snippet:
 
 Your key production-app is live. Point your app at the gateway with it and every call gets budgets, routing and tracing for free:
 
 ```bash
-export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"
+export OPENAI_BASE_URL="<the Gateway line of the brief>"
 export OPENAI_API_KEY="<the key>"
 ```
 

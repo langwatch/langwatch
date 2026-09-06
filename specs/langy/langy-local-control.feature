@@ -299,6 +299,38 @@ Feature: Langy works in a folder shared from the developer's machine
       Then Langy reads that the call was lost and to run the command one more time
       And Langy does not read that the shared folder is gone
 
+    @unit
+    Scenario: A validation refusal reaches Langy as the issues, not as a lost call
+      Given the app refuses a local call with the parameters it found invalid
+      When the worker reads the refusal
+      Then Langy reads each issue with the parameter it names and that it can call the tool again
+      And Langy does not read that the call was lost or that the folder is gone
+      And the call is posted once
+
+    @unit
+    Scenario: An edit can append to the end of a file
+      Given an edit whose entry carries text to append instead of old text
+      When the command line applies it
+      Then the text is added as the last line of the file, which is created when absent
+      And a replacement in a file that is not there is still refused
+
+  Rule: The app gets its LangWatch key from the developer's login, never from Langy
+
+    @unit
+    Scenario: The app gets the project's key through the developer's own login
+      Given a folder shared by a developer whose login may update the project
+      When Langy asks for the project's credentials in the app's env file
+      Then the command line fetches the project's key with the developer's own login
+      And writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT into the file, keeping every other line
+      And the key appears in no frame, no result and no terminal line
+
+    @unit
+    Scenario: The key is refused when the login lacks the permission
+      Given a folder shared by a developer whose login may not update the project
+      When Langy asks for the project's credentials
+      Then the answer is the refusal code, naming the permission, the project and the file
+      And the env file is left as it was
+
   Rule: The session key is the only credential and it ends with the conversation
 
     @integration

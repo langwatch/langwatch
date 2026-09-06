@@ -17,12 +17,13 @@
  */
 
 import chalk from "chalk";
-import type {
-  BashOutput,
-  LocalCall,
-  LocalEditReplace,
-  LocalToolName,
-  PermissionDecision,
+import {
+  isAppendEdit,
+  type BashOutput,
+  type LocalCall,
+  type LocalEditReplace,
+  type LocalToolName,
+  type PermissionDecision,
 } from "../../../agent/local-control-protocol";
 
 /**
@@ -289,6 +290,7 @@ export const TOOL_LABELS: Record<LocalToolName, string> = {
   local_grep: "Grep",
   local_find: "Find",
   local_ls: "List",
+  local_langwatch_env: "Env",
 };
 
 /** What one call reads as inside the parentheses. */
@@ -298,6 +300,8 @@ export function callArgument(call: LocalCall): string {
     case "local_write":
     case "local_edit":
       return call.params.path;
+    case "local_langwatch_env":
+      return call.params.path ?? ".env";
     case "local_bash":
       return call.params.command;
     case "local_grep":
@@ -344,6 +348,10 @@ export function editCounts(edits: LocalEditReplace[]): {
   let added = 0;
   let removed = 0;
   for (const edit of edits) {
+    if (isAppendEdit(edit)) {
+      added += edit.append.replace(/\n$/, "").split("\n").length;
+      continue;
+    }
     const before = edit.oldText.split("\n");
     const after = edit.newText.split("\n");
     let head = 0;
@@ -417,6 +425,8 @@ export function fileOutcome({
       const entries = Math.max(0, contentLines(text).length - 1);
       return `${entries} ${entries === 1 ? "entry" : "entries"}`;
     }
+    case "local_langwatch_env":
+      return "Set 2 variables";
     case "local_bash":
       return "";
   }

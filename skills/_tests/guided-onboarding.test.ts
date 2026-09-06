@@ -39,7 +39,7 @@ const VERBATIM_LINES = {
     "Then I can show you around once your first traces are flying through.",
   "the gateway opener":
     "Your key production-app is live. Point your app at the gateway with it and every call gets budgets, routing and tracing for free:",
-  "the gateway base url": 'OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"',
+  "the gateway base url": 'OPENAI_BASE_URL="<the Gateway line of the brief>"',
   "the gateway closer":
     "That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.",
   "the governance opener":
@@ -106,6 +106,19 @@ describe("the guided-onboarding skill", () => {
       }
     });
 
+    /** @scenario "The gateway snippet points at the instance's own gateway" */
+    it("takes the gateway address from the brief and never from a remembered host", () => {
+      expect(rendered).not.toContain("gateway.langwatch.ai");
+      expect(rendered).toContain("The gateway address is the `Gateway:` line of the brief");
+    });
+
+    /** @scenario "A key the tour minted gets the live line, not an apology" */
+    it("opens on the live line when the tour already minted the key", () => {
+      expect(rendered).toContain("say nothing about that, open with the line below as if the key were just made");
+      expect(rendered).toContain("<the production-app key the dialog showed>");
+      expect(rendered).not.toContain("<your production-app key>");
+    });
+
     it("checks for the production-app key before minting one", () => {
       const list = rendered.indexOf("langwatch virtual-keys list --format json");
       const create = rendered.indexOf(
@@ -113,6 +126,98 @@ describe("the guided-onboarding skill", () => {
       );
       expect(list).toBeGreaterThan(-1);
       expect(create).toBeGreaterThan(list);
+    });
+
+    /** @scenario "The brief is the whole input" */
+    it("never reads the onboarding state during a guided path", () => {
+      expect(rendered).toContain(
+        "Never run `langwatch onboarding state` during a guided path",
+      );
+      expect(rendered).not.toContain("run it only when a line you need is missing");
+    });
+
+    /** @scenario "The work happens on a Langy branch" */
+    it("works on a langy branch, never on the user's checked-out branch", () => {
+      expect(rendered).toContain(
+        "never on the branch the user has checked out",
+      );
+      expect(rendered).toContain("`git checkout -b langy/<slug> origin/<default>`");
+      expect(rendered).toContain("Leave the branch checked out");
+    });
+
+    it("names the docs page by language and framework", () => {
+      expect(rendered).toContain(
+        "`langwatch docs integration/<python|typescript>/integrations/<framework>`",
+      );
+      expect(rendered).not.toContain("integration/<framework>`)");
+    });
+
+    /** @scenario "The credentials are written after the tracing edit" */
+    it("has the command line write the credentials after the tracing edit", () => {
+      const tracing = rendered.indexOf("`tracing` for the detected framework");
+      const credentials = rendered.indexOf("call `local_langwatch_env` once");
+      const start = rendered.indexOf("Start the agent from that branch");
+      expect(tracing).toBeGreaterThan(-1);
+      expect(credentials).toBeGreaterThan(tracing);
+      expect(start).toBeGreaterThan(credentials);
+      expect(rendered).toContain("The key never reaches you");
+    });
+
+    /** @scenario "Nothing runs against an agent that is not online" */
+    it("waits for the agent row to be online before any run", () => {
+      expect(rendered).toContain(
+        "until the row's `status` is `online`, for up to two minutes",
+      );
+      expect(rendered).toContain(
+        "Nothing runs against an agent that is not online: no scenario, no suite.",
+      );
+    });
+
+    /** @scenario "The path ends in a fixed order" */
+    it("states the end of the path as one fixed order", () => {
+      expect(rendered).toContain(
+        "create the scenario, open it, the why-a-scenario line, run it, the two-things line, the suite with its scenarios, the suite run, open the run, the commit and the pull request, the closing line, and `complete-path` last",
+      );
+      const order = [
+        'langwatch scenario create "<title>"',
+        "langwatch navigate open <scenario_id>",
+        VERBATIM_LINES["the why-a-scenario line"],
+        "langwatch scenario run <scenario_id>",
+        VERBATIM_LINES["the two-things line"],
+        'langwatch test-suite create "Full regression"',
+        "langwatch test-suite run <suite_id>",
+        "langwatch navigate open <the scenariorun_ id the suite run printed>",
+        "commit and open the pull request",
+        VERBATIM_LINES["the closing line"],
+        "langwatch onboarding complete-path llmops",
+      ];
+      const positions = order.map((line) => rendered.indexOf(line));
+      for (const [index, position] of positions.entries()) {
+        expect(position, order[index]).toBeGreaterThan(index === 0 ? -1 : positions[index - 1]!);
+      }
+    });
+
+    /** @scenario "A failed step stops with one line and no completion" */
+    it("stops on a failed step with one line and no completion", () => {
+      const failed = rendered.indexOf("### When a step fails");
+      expect(failed).toBeGreaterThan(-1);
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      expect(section).toContain("Say in one line what is not done and what it needs, and end the turn.");
+      expect(section).toContain("`langwatch onboarding complete-path` does not run");
+      expect(section).toContain("the why-a-scenario line and the closing line are not said");
+      expect(section).toContain("a scenario or suite run answers an error instead of a verdict");
+      expect(rendered).toContain(
+        "never one that stopped at a failed step",
+      );
+    });
+
+    /** @scenario "The instrumentation that cannot be applied stops the path" */
+    it("names the refused key and the failed tracing edit among the stops", () => {
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      expect(section).toContain("The credentials call answers that the key was refused");
+      expect(section).toContain("the tracing edit cannot be applied");
+      expect(section).toContain("from the project's settings page");
     });
 
     it("uses no em dash", () => {

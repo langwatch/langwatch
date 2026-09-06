@@ -27,6 +27,7 @@ export const LOCAL_TOOL_NAMES = [
   "local_grep",
   "local_find",
   "local_ls",
+  "local_langwatch_env",
 ] as const;
 export type LocalToolName = (typeof LOCAL_TOOL_NAMES)[number];
 
@@ -64,10 +65,18 @@ export interface LocalWriteParams {
   content: string;
 }
 
-export interface LocalEditReplace {
-  oldText: string;
-  newText: string;
-}
+/**
+ * One edit: a replacement of text the file already holds, or text appended
+ * at the end of the file.
+ */
+export type LocalEditReplace =
+  | { oldText: string; newText: string }
+  | { append: string };
+
+/** True for the form of an edit that adds text at the end of the file. */
+export const isAppendEdit = (
+  edit: LocalEditReplace,
+): edit is { append: string } => "append" in edit;
 
 export interface LocalEditParams {
   path: string;
@@ -103,6 +112,15 @@ export interface LocalLsParams {
   limit?: number;
 }
 
+/**
+ * The env file the CLI writes the project's LangWatch credentials into, with
+ * the developer's own login. The key itself never travels in a frame.
+ */
+export interface LocalLangwatchEnvParams {
+  /** Relative to the shared folder; the app's `.env` when omitted. */
+  path?: string;
+}
+
 export type LocalToolCall =
   | { tool: "local_read"; params: LocalReadParams }
   | { tool: "local_write"; params: LocalWriteParams }
@@ -110,7 +128,8 @@ export type LocalToolCall =
   | { tool: "local_bash"; params: LocalBashParams }
   | { tool: "local_grep"; params: LocalGrepParams }
   | { tool: "local_find"; params: LocalFindParams }
-  | { tool: "local_ls"; params: LocalLsParams };
+  | { tool: "local_ls"; params: LocalLsParams }
+  | { tool: "local_langwatch_env"; params: LocalLangwatchEnvParams };
 
 // ---------------------------------------------------------------------------
 // Frames the CLI sends
@@ -172,6 +191,7 @@ export const LOCAL_CALL_ERROR_CODES = [
   "timeout",
   "exec_failed",
   "not_found",
+  "key_refused",
 ] as const;
 export type LocalCallErrorCode = (typeof LOCAL_CALL_ERROR_CODES)[number];
 
@@ -442,7 +462,12 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
       if (!isString(params.path) || !Array.isArray(params.edits)) return null;
       const edits: LocalEditReplace[] = [];
       for (const entry of params.edits) {
-        if (!isRecord(entry) || !isString(entry.oldText)) return null;
+        if (!isRecord(entry)) return null;
+        if (isString(entry.append)) {
+          edits.push({ append: entry.append });
+          continue;
+        }
+        if (!isString(entry.oldText)) return null;
         edits.push({
           oldText: entry.oldText,
           newText: readString(entry.newText, ""),
@@ -490,6 +515,13 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
         params: {
           ...(isString(params.path) ? { path: params.path } : {}),
           ...(isNumber(params.limit) ? { limit: params.limit } : {}),
+        },
+      };
+    case "local_langwatch_env":
+      return {
+        tool: "local_langwatch_env",
+        params: {
+          ...(isString(params.path) ? { path: params.path } : {}),
         },
       };
     default:

@@ -71,6 +71,26 @@ Feature: Langy guides the first setup after sign-up
       And the brief opens with the kickoff line and names no skill and no command
 
     @unit
+    Scenario: The brief names the instance's gateway
+      When the panel builds the kickoff brief on an instance that serves a gateway
+      Then the brief carries that gateway's address with its version path
+      And on an instance without one the brief says none is configured
+      And no brief names the hosted gateway by name
+
+    @unit
+    Scenario: The gateway snippet points at the instance's own gateway
+      When the compiled guided-onboarding skill is read
+      Then the snippet's base URL is the Gateway line of the brief
+      And the skill names no gateway host of its own
+
+    @unit
+    Scenario: A key the tour minted gets the live line, not an apology
+      Given the tour already minted the production-app key
+      When the compiled guided-onboarding skill is read
+      Then the gateway path opens on the live line as if the key were just made
+      And the snippet's secret placeholder reads as the one the dialog showed
+
+    @unit
     Scenario: The panel sends the kickoff exactly once
       Given a queued kickoff
       When the panel is idle on the project
@@ -290,6 +310,61 @@ Feature: Langy guides the first setup after sign-up
     Scenario: The opener is followed by the card and nothing else
       When the compiled guided-onboarding skill is read
       Then it says nothing goes between the opener and the code access card
+
+  # ===========================================================================
+  # The llmops path: the branch, the credentials, the order and the stops
+  # ===========================================================================
+
+  Rule: The brief is the script's only input
+
+    @unit
+    Scenario: The brief is the whole input
+      When the compiled guided-onboarding skill is read
+      Then it says never to run the onboarding state command during a guided path
+      And a later kickoff carries its own brief
+
+  Rule: The setup happens on Langy's branch with the project's own credentials
+
+    @unit
+    Scenario: The work happens on a Langy branch
+      When the compiled guided-onboarding skill is read
+      Then the edits go on a langy/ branch created from the default branch
+      And never on the branch the user has checked out
+      And the branch stays checked out while the agent Langy started runs on it
+
+    @unit
+    Scenario: The credentials are written after the tracing edit
+      When the compiled guided-onboarding skill is read
+      Then the credentials call comes after the tracing edit and before the agent starts
+      And the key never reaches the model
+
+  Rule: A step that fails stops the path
+
+    @unit
+    Scenario: Nothing runs against an agent that is not online
+      When the compiled guided-onboarding skill is read
+      Then it waits up to two minutes for the agent row to read online
+      And no scenario or suite runs against an agent that is not online
+
+    @unit
+    Scenario: The path ends in a fixed order
+      When the compiled guided-onboarding skill is read
+      Then the scenario is created and opened, the why-a-scenario line is said, the run happens
+      And the two-things line, the suite, its run, the open run, the commit and pull request follow
+      And the closing line comes before complete-path, which is last
+
+    @unit
+    Scenario: A failed step stops with one line and no completion
+      When the compiled guided-onboarding skill is read
+      Then a run that answers an error instead of a verdict stops the path
+      And Langy says in one line what is not done and what it needs, and ends the turn
+      And neither the why-a-scenario line, the closing line nor complete-path follow
+
+    @unit
+    Scenario: The instrumentation that cannot be applied stops the path
+      When the compiled guided-onboarding skill is read
+      Then a refused key and a tracing edit that cannot be applied are among the stops
+      And a refused key sends the user to the project's settings page for the variables
 
   # ===========================================================================
   # The skill and its routing

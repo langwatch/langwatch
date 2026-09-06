@@ -9,7 +9,7 @@
  */
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { GuidedOnboardingState } from "~/server/schemas/sign-up-data.schema";
+import type { GuidedOnboardingStateView } from "~/server/api/routers/onboarding/guided";
 import { api } from "~/utils/api";
 
 export const GUIDED_ONBOARDING_FLAG = "experiment_onboarding_langy_guided";
@@ -38,7 +38,7 @@ export function useGuidedOnboardingFlag(): GuidedOnboardingFlagView {
 export interface GuidedOnboardingView {
   /** The organization is in the guided variant and its state has loaded. */
   guided: boolean;
-  state: GuidedOnboardingState | null;
+  state: GuidedOnboardingStateView | null;
   organizationId: string | null;
   isLoading: boolean;
 }

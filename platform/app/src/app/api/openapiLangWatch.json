@@ -6649,6 +6649,12 @@
                   "negateFilters": {
                     "type": "boolean"
                   },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "series": {
                     "type": "array",
                     "items": {
@@ -19269,6 +19275,12 @@
                   },
                   "negateFilters": {
                     "type": "boolean"
+                  },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   },
                   "series": {
                     "type": "array",
@@ -35375,19 +35387,35 @@
                                               "edits": {
                                                 "type": "array",
                                                 "items": {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "oldText": {
-                                                      "type": "string",
-                                                      "minLength": 1
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "oldText": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        },
+                                                        "newText": {
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "oldText",
+                                                        "newText"
+                                                      ]
                                                     },
-                                                    "newText": {
-                                                      "type": "string"
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "append": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "append"
+                                                      ]
                                                     }
-                                                  },
-                                                  "required": [
-                                                    "oldText",
-                                                    "newText"
                                                   ]
                                                 },
                                                 "minItems": 1,
@@ -35541,6 +35569,29 @@
                                                 "type": "integer",
                                                 "exclusiveMinimum": 0,
                                                 "maximum": 20000
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_langwatch_env"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "path": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 4096
                                               }
                                             }
                                           }
@@ -35967,7 +36018,8 @@
                                     "cancelled",
                                     "timeout",
                                     "exec_failed",
-                                    "not_found"
+                                    "not_found",
+                                    "key_refused"
                                   ]
                                 },
                                 "message": {
@@ -36022,6 +36074,38 @@
                             },
                             "skipOffered": {
                               "type": "boolean"
+                            },
+                            "segments": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "command": {
+                                    "type": "string",
+                                    "maxLength": 4000
+                                  },
+                                  "pattern": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  "readOnly": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "command",
+                                  "pattern",
+                                  "readOnly"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "maxItems": 50
+                            },
+                            "timeoutSeconds": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0,
+                              "maximum": 3600
                             }
                           },
                           "required": [
@@ -36032,6 +36116,49 @@
                             "pattern",
                             "reason",
                             "skipOffered"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "permission_answered"
+                              ]
+                            },
+                            "callId": {
+                              "type": "string"
+                            },
+                            "decision": {
+                              "type": "string",
+                              "enum": [
+                                "allow_once",
+                                "allow_pattern",
+                                "deny"
+                              ]
+                            },
+                            "patterns": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 500
+                              },
+                              "maxItems": 50
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "callId",
+                            "decision"
                           ],
                           "additionalProperties": false
                         },
@@ -64152,6 +64279,12 @@
                   },
                   "negateFilters": {
                     "type": "boolean"
+                  },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   },
                   "pageOffset": {
                     "type": "number",

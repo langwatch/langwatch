@@ -154,7 +154,11 @@ describe("given a folder connected to a Langy conversation", () => {
   const writer: UiWriter = { line: (text) => lines.push(text) };
 
   const start = (
-    options: { withoutGit?: boolean; approvals?: ApprovalPrompt } = {},
+    options: {
+      withoutGit?: boolean;
+      approvals?: ApprovalPrompt;
+      readProjectApiKey?: (projectId: string) => Promise<string>;
+    } = {},
   ) => {
     socket = new FakeSocket();
     lines = [];
@@ -173,6 +177,12 @@ describe("given a folder connected to a Langy conversation", () => {
       backoff: { baseMs: 10, maxMs: 10 },
       approvals: options.approvals ?? null,
       ...(options.withoutGit === true ? { withoutGit: true } : {}),
+      ...(options.readProjectApiKey
+        ? {
+            project: { id: "project_acme", name: "Acme Shop" },
+            readProjectApiKey: options.readProjectApiKey,
+          }
+        : {}),
     });
     return session;
   };
@@ -720,6 +730,104 @@ describe("given a folder connected to a Langy conversation", () => {
         what: "the command to run with no card",
       });
       expect(socket.sentOf("permission_required")).toHaveLength(0);
+    });
+  });
+
+  describe("when Langy writes the project's credentials", () => {
+    const envFile = () => fs.readFileSync(path.join(root, ".env"), "utf8");
+
+    /** @scenario "The app gets the project's key through the developer's own login" */
+    it("fetches the key with the login, writes the file and never repeats the key", async () => {
+      const asked: string[] = [];
+      start({
+        readProjectApiKey: async (projectId) => {
+          asked.push(projectId);
+          return "sk-lw-proj-key";
+        },
+      });
+      await settle();
+      register();
+      socket.deliver({ type: "policy", skipPermissions: true });
+      lines.length = 0;
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the credentials to be written",
+      });
+
+      expect(asked).toEqual(["project_acme"]);
+      expect(envFile()).toBe(
+        "LANGWATCH_API_KEY=sk-lw-proj-key\nLANGWATCH_ENDPOINT=http://localhost:5560\n",
+      );
+      const [result] = socket.sentOf("result");
+      expect(result!.ok).toBe(true);
+      expect(String(result!.text)).toBe(
+        "Set LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in .env for project Acme Shop.",
+      );
+      expect(JSON.stringify(socket.sent)).not.toContain("sk-lw-proj");
+      const printed = lines.join("\n");
+      expect(printed).toContain("Env(.env)");
+      expect(printed).toContain("Set 2 variables");
+      expect(printed).not.toContain("sk-lw-proj");
+    });
+
+    it("replaces the values a second call finds", async () => {
+      fs.writeFileSync(
+        path.join(root, ".env"),
+        "OPENAI_API_KEY=sk-openai\nLANGWATCH_API_KEY=stale\nLANGWATCH_ENDPOINT=http://old\n",
+      );
+      start({ readProjectApiKey: async () => "sk-lw-proj-key" });
+      await settle();
+      register();
+      socket.deliver({ type: "policy", skipPermissions: true });
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the credentials to be written",
+      });
+
+      expect(envFile()).toBe(
+        "OPENAI_API_KEY=sk-openai\nLANGWATCH_API_KEY=sk-lw-proj-key\nLANGWATCH_ENDPOINT=http://localhost:5560\n",
+      );
+    });
+
+    /** @scenario "The key is refused when the login lacks the permission" */
+    it("reports the refusal by its code, names the permission and leaves the file alone", async () => {
+      fs.writeFileSync(path.join(root, ".env"), "OPENAI_API_KEY=sk-openai\n");
+      start({
+        readProjectApiKey: async () => {
+          throw Object.assign(new Error("Forbidden"), { status: 403 });
+        },
+      });
+      await settle();
+      register();
+      socket.deliver({ type: "policy", skipPermissions: true });
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the refusal to be reported",
+      });
+
+      const [result] = socket.sentOf("result");
+      expect(result!.ok).toBe(false);
+      const error = result!.error as { code: string; message: string };
+      expect(error.code).toBe("key_refused");
+      expect(error.message).toContain("project:update");
+      expect(error.message).toContain("Acme Shop");
+      expect(error.message).toContain(".env");
+      expect(envFile()).toBe("OPENAI_API_KEY=sk-openai\n");
+    });
+
+    it("asks before it writes, because the env file may hold secrets", async () => {
+      start({ readProjectApiKey: async () => "sk-lw-proj-key" });
+      await settle();
+      register();
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("permission_required").length === 1, {
+        what: "the permission ask",
+      });
+      expect(fs.existsSync(path.join(root, ".env"))).toBe(false);
     });
   });
 

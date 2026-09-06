@@ -1,6 +1,6 @@
 /**
- * The local workspace tools: `code_access` and the seven `local_*` mirrors of
- * pi's built-ins (ADR-129).
+ * The local workspace tools: `code_access`, the seven `local_*` mirrors of
+ * pi's built-ins and the credentials call (ADR-129).
  *
  * A `local_*` call does not run in the worker. It is posted to the app, which
  * hands it to `langwatch langy --share-control` on the developer's machine and
@@ -26,6 +26,7 @@ export const LOCAL_TOOL_NAMES = [
   "local_grep",
   "local_find",
   "local_ls",
+  "local_langwatch_env",
 ] as const;
 export type LocalToolName = (typeof LOCAL_TOOL_NAMES)[number];
 
@@ -141,6 +142,31 @@ export class CallLostError extends AppUnreachableError {}
 /** The turn was stopped while the call was on the machine. */
 export class CallCancelledError extends Error {}
 
+/**
+ * The app refused the call before it reached the machine, naming what was
+ * wrong with the parameters. The message is the tool result: the model fixes
+ * the call, nothing was lost and nothing is retried as it was.
+ */
+export class CallRejectedError extends Error {}
+
+type ApiErrorBody = {
+  error?: {
+    code?: string;
+    message?: string;
+    meta?: { issues?: { path?: (string | number)[]; message?: string }[] };
+  };
+};
+
+/** The refusal's issues, one line each, so the model can see the parameter. */
+function rejectionText(body: ApiErrorBody): string {
+  const issues = body.error?.meta?.issues ?? [];
+  const lines = issues.map(
+    (issue) => `${(issue.path ?? []).join(".")}: ${issue.message ?? "invalid"}`,
+  );
+  const detail = lines.length > 0 ? lines.join("; ") : (body.error?.message ?? "invalid request");
+  return `LangWatch refused this call before it reached the machine: ${detail}. Fix the parameters and call the tool again.`;
+}
+
 function endpoint(): string {
   return (process.env.LANGWATCH_ENDPOINT ?? "").replace(/\/+$/, "");
 }
@@ -185,6 +211,18 @@ export async function callApp<T>({
   }
   if (response.status === 404) {
     throw new CallLostError("the LangWatch app does not hold this call any more");
+  }
+  if (response.status === 400) {
+    let body: ApiErrorBody = {};
+    try {
+      body = (await response.json()) as ApiErrorBody;
+    } catch {
+      body = {};
+    }
+    if (body.error?.code === "langy_api_request_invalid") {
+      throw new CallRejectedError(rejectionText(body));
+    }
+    throw new AppUnreachableError("the LangWatch app did not answer");
   }
   if (!response.ok) throw new AppUnreachableError("the LangWatch app did not answer");
   try {
@@ -459,11 +497,21 @@ const localWriteParams = Type.Object({
 const localEditParams = Type.Object({
   path: Type.String({ description: "File path in the shared folder." }),
   edits: Type.Array(
-    Type.Object({
-      oldText: Type.String({ description: "The text to replace. It must be unique in the file." }),
-      newText: Type.String({ description: "The new text." }),
-    }),
-    { description: "The replacements to make, in order." },
+    Type.Union([
+      Type.Object({
+        oldText: Type.String({
+          description: "The text to replace. It must be unique in the file and cannot be empty.",
+        }),
+        newText: Type.String({ description: "The new text." }),
+      }),
+      Type.Object({
+        append: Type.String({
+          description:
+            "Text added at the end of the file, on its own line. Use it to add a line at the end instead of an empty oldText. Creates the file when there is none.",
+        }),
+      }),
+    ]),
+    { description: "The edits to make, in order: a replacement or an append." },
   ),
 });
 
@@ -498,6 +546,14 @@ const localLsParams = Type.Object({
   limit: Type.Optional(Type.Number({ description: "The largest number of entries to return." })),
 });
 
+const localLangwatchEnvParams = Type.Object({
+  path: Type.Optional(
+    Type.String({
+      description: "The env file the app loads, relative to the shared folder. Default is .env.",
+    }),
+  ),
+});
+
 const localToolDescriptions: Record<LocalToolName, string> = {
   local_read: `Read a file on the user's machine. ${MACHINE_NOTE}`,
   local_write: `Write a file on the user's machine. It replaces the whole file. ${MACHINE_NOTE}`,
@@ -506,6 +562,7 @@ const localToolDescriptions: Record<LocalToolName, string> = {
   local_grep: `Search file contents on the user's machine. ${MACHINE_NOTE}`,
   local_find: `Find files by name on the user's machine. ${MACHINE_NOTE}`,
   local_ls: `List a directory on the user's machine. ${MACHINE_NOTE}`,
+  local_langwatch_env: `Write this project's LangWatch credentials into the app's env file on the user's machine: LANGWATCH_API_KEY and LANGWATCH_ENDPOINT. The command line fetches the key with the user's own login and writes it there; the key never reaches you. Call it once, after the tracing edit, with the env file the app loads (default .env next to the manifest). ${MACHINE_NOTE}`,
 };
 
 const localToolLabels: Record<LocalToolName, string> = {
@@ -516,6 +573,7 @@ const localToolLabels: Record<LocalToolName, string> = {
   local_grep: "Search on your machine",
   local_find: "Find on your machine",
   local_ls: "List on your machine",
+  local_langwatch_env: "LangWatch credentials on your machine",
 };
 
 const localToolParams = {
@@ -526,6 +584,7 @@ const localToolParams = {
   local_grep: localGrepParams,
   local_find: localFindParams,
   local_ls: localLsParams,
+  local_langwatch_env: localLangwatchEnvParams,
 } as const;
 
 /** Text result in the shape pi expects. */
@@ -580,6 +639,10 @@ export function createLocalWorkspaceExtension({
               // gone is offered the two ways on.
               if (error instanceof AppUnreachableError) {
                 return textResult(await localCallPushback({ signal }));
+              }
+              // A refusal names the parameter, so the model corrects the call.
+              if (error instanceof CallRejectedError) {
+                return textResult(error.message);
               }
               throw error;
             }

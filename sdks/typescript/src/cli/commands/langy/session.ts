@@ -25,7 +25,7 @@ import {
   type ApprovalPrompt,
   type TerminalApproval,
 } from "./approval";
-import { failureCode, failureMessage } from "./errors";
+import { failureCode, failureMessage, LocalCallFailure } from "./errors";
 import {
   startCommand,
   timeoutSecondsFor,
@@ -38,6 +38,7 @@ import {
   listDirectory,
   readFile,
   writeFile,
+  writeLangwatchEnv,
 } from "./fs-ops";
 import { decide } from "./policy";
 import { RelayClient } from "./relay-client";
@@ -63,6 +64,14 @@ export interface LangySessionOptions {
    * answer. Left out, it is built from the terminal the UI writes on.
    */
   approvals?: ApprovalPrompt | null;
+  /** The project the conversation belongs to, named in the credentials call. */
+  project?: { id: string; name: string };
+  /**
+   * Fetches the project's ingest key with the developer's own login, so the
+   * write is gated on what this person may do, never on what Langy may. A
+   * rejection carrying a 401 or 403 status is reported as `key_refused`.
+   */
+  readProjectApiKey?: (projectId: string) => Promise<string>;
 }
 
 export interface LangySession {
@@ -174,7 +183,10 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       return;
     }
     try {
-      const text = runFileTool({ call, root });
+      const text =
+        call.tool === "local_langwatch_env"
+          ? await writeCredentials(call)
+          : runFileTool({ call, root });
       ui.callResult({ call, text });
       sendResult({ callId: call.callId, text });
     } catch (error) {
@@ -185,6 +197,46 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         message: failureMessage(error),
       });
     }
+  };
+
+  /**
+   * The project's key, fetched here and written here. It goes into the file
+   * and nowhere else: not the result, not the terminal, not the panel.
+   */
+  const writeCredentials = async (call: LocalCall): Promise<string> => {
+    if (call.tool !== "local_langwatch_env") return "";
+    const project = options.project;
+    const readProjectApiKey = options.readProjectApiKey;
+    const file = call.params.path ?? ".env";
+    if (!project || !readProjectApiKey) {
+      throw new LocalCallFailure({
+        code: "exec_failed",
+        message: `This terminal cannot fetch the project's key. Tell the user in one line that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT must be added to ${file} by hand, from the project's settings page, and end your turn.`,
+      });
+    }
+    let apiKey: string;
+    try {
+      apiKey = await readProjectApiKey(project.id);
+    } catch (error) {
+      const status = refusalStatus(error);
+      if (status === 401 || status === 403) {
+        throw new LocalCallFailure({
+          code: "key_refused",
+          message: `LangWatch did not hand out the project's key to this login: it needs project:update on ${project.name}. Tell the user in one line that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT must be added to ${file} by hand, from the project's settings page, and end your turn.`,
+        });
+      }
+      throw new LocalCallFailure({
+        code: "exec_failed",
+        message: `LangWatch did not answer the request for the project's key. Tell the user in one line that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT must be added to ${file} by hand, from the project's settings page, and end your turn.`,
+      });
+    }
+    return writeLangwatchEnv({
+      params: call.params,
+      root,
+      apiKey,
+      endpoint: options.endpoint ?? "https://app.langwatch.ai",
+      projectName: project.name,
+    });
   };
 
   const executeCommand = async (call: LocalCall): Promise<void> => {
@@ -595,7 +647,21 @@ function runFileTool({
       return findFiles({ params: call.params, root });
     case "local_ls":
       return listDirectory({ params: call.params, root });
+    case "local_langwatch_env":
+      throw new Error("the credentials call is not a file tool");
     case "local_bash":
       throw new Error("a command is not a file tool");
   }
+}
+
+/** The HTTP status a rejected key request carries, whichever client threw it. */
+function refusalStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const { status, httpStatus } = error as {
+    status?: unknown;
+    httpStatus?: unknown;
+  };
+  if (typeof status === "number") return status;
+  if (typeof httpStatus === "number") return httpStatus;
+  return undefined;
 }

@@ -231,6 +231,13 @@ Feature: Guided onboarding variant
     Then it asks the platform to complete the llmops path and prints the updated state
 
   @unit
+  Scenario: the onboarding card carries what the person reads and nothing else
+    Given Langy runs an onboarding command inside the panel, where the output is a card
+    When "langwatch onboarding state" or "langwatch onboarding complete-path" prints
+    Then the card carries the picks, the current and done paths, the provider and where the tour stands
+    And no conversation id, timestamp or replay count is on it
+
+  @unit
   Scenario: the CLI boot graph does not change for the onboarding commands
     When the CLI starts
     Then the onboarding command modules are not loaded until the command runs

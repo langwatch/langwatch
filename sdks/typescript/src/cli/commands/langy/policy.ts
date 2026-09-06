@@ -1077,6 +1077,7 @@ const TOOL_VERBS: Record<LocalToolCall["tool"], string> = {
   local_grep: "grep",
   local_find: "find",
   local_ls: "ls",
+  local_langwatch_env: "write",
 };
 
 /** The paths one call touches, in the order they were written. */
@@ -1090,6 +1091,8 @@ function pathsOf(call: LocalToolCall): string[] {
     case "local_find":
     case "local_ls":
       return call.params.path === undefined ? [] : [call.params.path];
+    case "local_langwatch_env":
+      return [call.params.path ?? ".env"];
     case "local_bash":
       return [];
   }

@@ -23,6 +23,7 @@ const KICKOFF: GuidedKickoffInput = {
   orgName: "ACME",
   firstName: "Ada",
   tourStatus: "completed",
+  gatewayUrl: "https://gateway.acme.example/v1",
 };
 
 describe("the guided onboarding kickoff", () => {
@@ -53,6 +54,20 @@ describe("the guided onboarding kickoff", () => {
       expect(lines).toContain("Provider: OpenAI, model gpt-5.");
       expect(lines).toContain("Organization: ACME. First name: Ada.");
       expect(lines).toContain("Tour: completed.");
+    });
+
+    /** @scenario "The brief names the instance's gateway" */
+    it("names the gateway URL the instance serves, or that none is configured", () => {
+      expect(buildGuidedKickoffBrief({ input: KICKOFF }).split("\n")).toContain(
+        "Gateway: https://gateway.acme.example/v1.",
+      );
+      const { gatewayUrl: _omitted, ...withoutGateway } = KICKOFF;
+      expect(buildGuidedKickoffBrief({ input: withoutGateway })).toContain(
+        "Gateway: none configured on this instance.",
+      );
+      expect(buildGuidedKickoffBrief({ input: KICKOFF })).not.toContain(
+        "gateway.langwatch.ai",
+      );
     });
 
     it("says when no provider was connected", () => {
