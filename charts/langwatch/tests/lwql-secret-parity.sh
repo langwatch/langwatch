@@ -297,10 +297,48 @@ $(cat "$err")"
   fi
 }
 
+# The value of a key inside the `postgres:` sub-block of clickhouse.lwqlAccessModel
+# in values.yaml. Those value lines are indented 6 spaces (the block sits under
+# `    postgres:` at 4); the same key names appear elsewhere at 4-space indent
+# (lwqlAccessModel.passwordSecretKey, .database), so the 6-space anchor is what
+# disambiguates the bridge default from the top-level one.
+values_postgres_default() {
+  sed -n -E "s/^      $1:[[:space:]]*([^[:space:]#]+).*/\1/p" values.yaml | head -1
+}
+
+# Verifies: the literal defaults hardcoded in the langwatch.validateSecrets bridge
+# guards (_helpers.tpl) still match the values.yaml defaults they mirror. The
+# guards read `$bridge.database | default "langwatch"`, `$bridge.user | default
+# "lwql_ro"` and `$bridge.passwordSecretKey | default "lwql_pg_password"` to detect
+# a partial external-PostgreSQL config and to build the external-host guidance. If
+# a values.yaml default is changed without updating those literals, the guard
+# silently compares against the wrong baseline. This is a regression fence, not a
+# refactor — it does not centralize the literals, only pins the two copies together.
+test_bridge_guard_defaults_parity() {
+  local helpers="templates/_helpers.tpl"
+  local key val
+  # values.yaml key -> the $bridge.<field> the guard reads it as.
+  for pair in "database:database" "user:user" "passwordSecretKey:passwordSecretKey"; do
+    key="${pair%%:*}"
+    local field="${pair##*:}"
+    val="$(values_postgres_default "$key")"
+    if [[ -z "$val" ]]; then
+      fail "guard-defaults-values" \
+        "could not read clickhouse.lwqlAccessModel.postgres.$key from values.yaml (6-space-anchored). Did the block's shape or indentation change?"
+      continue
+    fi
+    if ! grep -qF "\$bridge.$field | default \"$val\"" "$helpers"; then
+      fail "guard-defaults-mismatch-$key" \
+        "values.yaml sets clickhouse.lwqlAccessModel.postgres.$key='$val' but _helpers.tpl's validateSecrets bridge guards do not read \$bridge.$field | default \"$val\". A values default changed without updating the guard literal — the partial-config and external-host guards now compare against a stale baseline."
+    fi
+  done
+}
+
 test_lwql_secret_name_parity
 test_lwql_secret_name_parity_long_release
 test_autogen_off_posture
 test_lwql_connection_defaults_parity
+test_bridge_guard_defaults_parity
 
 if [[ $failures -gt 0 ]]; then
   echo
@@ -308,4 +346,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: LWQL query Secret matches the ClickHouse-mounted Secret, and autogen-off renders no credentials Secret while still naming the operator's"
+echo "PASS: LWQL query Secret matches the ClickHouse-mounted Secret; autogen-off renders no credentials Secret while still naming the operator's; the rendered LWQL identity, tenant setting and bridge reader user match the app constants; and the validateSecrets bridge-guard default literals (database/user/passwordSecretKey) match the values.yaml defaults they mirror"

@@ -114,6 +114,15 @@ delete it once the upgrade is confirmed healthy. Operators who set an explicit
 `clickhouse.auth.existingSecret` are unaffected — the chart honours that name
 verbatim.
 
+Adoption depends on Helm's `lookup` function reading the live cluster, and
+`lookup` returns nil in any render path with no cluster access — an ArgoCD
+repo-server render and a plain `helm template` both fall in this bucket. In those
+paths the chart cannot see the existing Secret, so it does **not** adopt and
+instead regenerates the credentials from the random branch. Reconcile a
+truncating rename through a path that has cluster access (a `helm upgrade`, or an
+ArgoCD sync that renders server-side), or set `clickhouse.auth.existingSecret`
+explicitly so the value never depends on `lookup` at all.
+
 #### Upgrades with local-filesystem stored objects
 
 This is the default mode, where the app and the workers mount one
@@ -250,7 +259,8 @@ repair statement (including `DROP ... IF EXISTS`) with ClickHouse error 495.
   `LWQL_SELF_PROVISION` is off so the subchart stays the only owner of the
   access-model entity names. The `lwql_postgres` bridge works out of the box on
   chart-managed PostgreSQL: `clickhouse.lwqlAccessModel.postgres.host`
-  auto-derives to `<release>-postgresql`, `database` must equal
+  defaults to `<release>-postgresql` (this chart's own default value — the
+  subchart never guesses a host), `database` must equal
   `postgresql.auth.database` (the render fails if they diverge), and the bridge
   connects as a dedicated read-only role `lwql_ro` — never the superuser — that
   the app converges from the reader password at deploy time. An **external
@@ -262,7 +272,10 @@ repair statement (including `DROP ... IF EXISTS`) with ClickHouse error 495.
   annotation on the app Deployment (no shipped LangWatchQL view reads through
   this bridge yet, langwatch-saas#7387). A **partial** override — only
   `.database`, `.user` or `.passwordSecretKey` changed while `host` stays empty
-  — still fails the render as a likely mistake.
+  — still fails the render as a likely mistake. To run the bridge live against an
+  external PostgreSQL, set an explicit `host` and supply the reader password
+  yourself — see [External PostgreSQL with an explicit bridge
+  host](#external-postgresql-with-an-explicit-bridge-host-bring-your-own-reader-role).
 - **`clickhouse.chartManaged: false` (BYO / external ClickHouse):** the chart
   cannot render config into a server it does not run, so the application
   self-provisions the same objects via SQL DDL at startup, and fails closed
@@ -293,6 +306,43 @@ itself reaches the pod as a Kubernetes Secret
 values file or version control. Treat any node or volume snapshot that can
 read `config.d/` as able to read this password, and scope filesystem access
 to the ClickHouse pod accordingly.
+
+#### External PostgreSQL with an explicit bridge host (bring-your-own reader role)
+
+On chart-managed ClickHouse with an **external PostgreSQL**
+(`postgresql.chartManaged: false`), leaving
+`clickhouse.lwqlAccessModel.postgres.host` at `""` disables the bridge (above).
+Setting it to a non-empty host instead turns the `lwql_postgres` bridge **live**
+against your PostgreSQL, dialing as the read-only role `lwql_ro`. The chart never
+provisions that role on a PostgreSQL it does not own — `LWQL_MANAGE_POSTGRES_READER`
+is emitted only for chart-managed PostgreSQL — and it will not autogenerate a
+password nobody set on your server. So this posture **requires** you to create
+the reader yourself and hand the chart its password via
+`clickhouse.lwqlAccessModel.existingSecret`; the render fails otherwise.
+
+Create the reader with the same shape the app converges on a chart-managed
+PostgreSQL (`postgresReaderRoleStatements` in
+`platform/app/src/server/analytics/lwql/provisioning/postgresMapping.ts`) —
+read-only, with `SELECT` granted on the approved `lwql_*` views only, never the
+superuser:
+
+```sql
+CREATE ROLE "lwql_ro" LOGIN;
+ALTER ROLE "lwql_ro" WITH LOGIN PASSWORD '<reader-password>' CONNECTION LIMIT <n>;
+ALTER ROLE "lwql_ro" SET default_transaction_read_only = on;
+ALTER ROLE "lwql_ro" SET statement_timeout = '<timeout>';
+REVOKE ALL ON SCHEMA "public" FROM "lwql_ro";
+REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA "public" FROM "lwql_ro";
+GRANT USAGE ON SCHEMA "public" TO "lwql_ro";
+GRANT SELECT ON "public"."lwql_traces" TO "lwql_ro";
+-- ...one GRANT SELECT per approved lwql_* view
+```
+
+Then create a Secret you own carrying that password under the `lwql_pg_password`
+key (or whatever `clickhouse.lwqlAccessModel.postgres.passwordSecretKey` names)
+and point `clickhouse.lwqlAccessModel.existingSecret` at it. That is the same
+Secret ClickHouse mounts for the named collection, so the bridge dials `lwql_ro`
+with the exact password you set on it.
 
 ### Pod security
 

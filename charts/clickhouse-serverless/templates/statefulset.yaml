@@ -181,8 +181,11 @@ spec:
             {{- $lwqlPgHost := include "clickhouse-serverless.lwqlPgHost" . }}
             {{- if $lwqlPgHost }}
             # lwql_postgres named collection (the ClickHouse -> PostgreSQL
-            # bridge). Host auto-derives to the langwatch chart's own PostgreSQL
-            # Service when unset — see clickhouse-serverless.lwqlPgHost. Set
+            # bridge). This subchart never guesses a host: an empty host means the
+            # bridge is not rendered (see clickhouse-serverless.lwqlPgHost). As the
+            # langwatch chart's dependency, the PARENT chart's own default supplies
+            # the release-derived host so it renders out of the box on the default
+            # chart-managed path; that default lives in the parent, not here. Set
             # lwqlAccessModel.postgres.host to point at an external PostgreSQL.
             - name: CLICKHOUSE_LWQL_PG_PASSWORD_FILE
               value: "/mnt/secrets/lwql/lwql_pg_password"

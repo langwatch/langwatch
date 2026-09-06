@@ -1917,10 +1917,19 @@ clickhouse:
     # derive one subchart value from a parent one and the app converges exactly
     # that reader.
     #
-    # EXTERNAL PostgreSQL (postgresql.chartManaged: false): the chart cannot know
-    # your PostgreSQL address, so you MUST set `host` (the render fails otherwise);
-    # set `database` to your instance's, and keep `user: lwql_ro` unless you
-    # provision a different reader yourself.
+    # EXTERNAL PostgreSQL (postgresql.chartManaged: false): leaving `host` at ""
+    # DISABLES the bridge — a supported, deliberate posture, not a fallback (no
+    # shipped LangWatchQL view reads through it yet, langwatch-saas#7387). NOTES.txt
+    # and a langwatch.io/lwql-postgres-bridge: disabled annotation on the app
+    # Deployment say so loudly. A PARTIAL override (host left "" but
+    # .database/.user/.passwordSecretKey changed) still fails the render as a likely
+    # forgotten host. Setting an explicit non-empty `host` turns the bridge live
+    # against your PostgreSQL and now REQUIRES you to supply the lwql_ro reader
+    # password via clickhouse.lwqlAccessModel.existingSecret — the chart never
+    # provisions a reader on a PostgreSQL it does not own and will not autogenerate
+    # a password nobody set there, so the render fails otherwise. Set `database` to
+    # your instance's, and keep `user: lwql_ro` unless you provision a different
+    # reader yourself.
     postgres:
       ## @param clickhouse.lwqlAccessModel.postgres.host [string, default: "{{ .Release.Name }}-postgresql"] PostgreSQL host the lwql_postgres bridge dials, tpl'd by the clickhouse-serverless subchart. Defaults to the chart-managed PostgreSQL Service so a default install works out of the box. Every external-PostgreSQL example/profile resets this to "" to disable the bridge (no shipped LangWatchQL view reads through it yet, langwatch-saas#7387) instead of failing the render — but a PARTIAL override (only .database/.user/.passwordSecretKey changed while this stays empty) still fails the render as a likely mistake.
       host: '{{ .Release.Name }}-postgresql'

@@ -185,11 +185,14 @@ lwqlAccessModel:
   existingSecret: ""
   # Key holding the langwatch_lwql user password (SHA256-hashed at boot).
   passwordSecretKey: lwql_password
-  # PostgreSQL bridge for the lwql_postgres named collection. host EMPTY
-  # auto-derives to the parent langwatch chart's own PostgreSQL Service
-  # (<release>-postgresql — see clickhouse-serverless.lwqlPgHost), so the
-  # collection renders on the default chart-managed path; set host to point at
-  # an external PostgreSQL. It dials as a dedicated read-only role (lwql_ro),
+  # PostgreSQL bridge for the lwql_postgres named collection. An EMPTY host means
+  # the bridge is NOT rendered — this subchart never guesses a host (see
+  # clickhouse-serverless.lwqlPgHost). When installed as the parent langwatch
+  # chart's dependency, that chart's OWN values.yaml supplies the release-derived
+  # host (<release>-postgresql) as its default for this field, so the collection
+  # still renders on the default chart-managed path; that default lives in the
+  # PARENT, not here. Set host to point at an external PostgreSQL. It dials as a
+  # dedicated read-only role (lwql_ro),
   # never the superuser; the application converges that role from the reader
   # password. The password key must be present in the Secret (the reader
   # password cannot be hashed — ClickHouse dials PostgreSQL with it). The parent

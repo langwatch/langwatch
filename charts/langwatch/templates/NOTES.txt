@@ -372,13 +372,23 @@ keys. The application does NOT issue that DDL (one owner per entity name), and
 still creates the views, engine tables and key-map rows it must.
 {{- if eq (include "langwatch.lwql.postgresBridgeDisabled" .) "true" }}
 
-⚠ LangWatchQL Postgres bridge disabled: postgresql.chartManaged=false and
-clickhouse.lwqlAccessModel.postgres.host is unset, so the lwql_postgres named
-collection has no external PostgreSQL to dial. Postgres-resident LangWatchQL
-datasets stay unavailable until you set clickhouse.lwqlAccessModel.postgres.host
-(and .database/.user if they differ from the lwql_ro reader). Nothing else is
-affected today — no shipped LangWatchQL view reads through this bridge yet
-(langwatch-saas#7387).
+⚠ LangWatchQL Postgres bridge disabled: clickhouse.lwqlAccessModel.postgres.host
+is empty, so the lwql_postgres named collection has no PostgreSQL to dial.
+Postgres-resident LangWatchQL datasets stay unavailable until you set
+clickhouse.lwqlAccessModel.postgres.host (and .database/.user if they differ from
+the lwql_ro reader). Nothing else is affected today — no shipped LangWatchQL view
+reads through this bridge yet (langwatch-saas#7387).
+{{- end }}
+{{- if eq (include "langwatch.lwql.externalPostgresBridgeActive" .) "true" }}
+
+⚠ LangWatchQL Postgres bridge dials your EXTERNAL PostgreSQL as the read-only
+role lwql_ro. The chart does not provision that role on a PostgreSQL it does not
+own, so confirm you have: (1) created lwql_ro on your PostgreSQL — read-only,
+granted SELECT on the approved lwql_* views only, never the superuser; and (2)
+supplied its password via clickhouse.lwqlAccessModel.existingSecret (the
+lwql_pg_password key) — the same Secret ClickHouse mounts for the lwql_postgres
+collection. If the role or its password is missing, the bridge stays dead and
+Postgres-resident LangWatchQL datasets fail to load.
 {{- end }}
 {{- else }}
 Your ClickHouse is external, so the chart cannot render config into it: the app
