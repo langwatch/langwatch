@@ -137,7 +137,7 @@ describe("given a control request Langy opened for me", () => {
       });
 
       expect(response.status).toBe(200);
-      expect(await runtime.requests.read(request.id)).toBeNull();
+      expect(await runtime.requests.tryRead(request.id)).toBeNull();
     });
   });
 });

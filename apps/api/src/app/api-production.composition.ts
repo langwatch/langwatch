@@ -1815,7 +1815,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       projects,
       workflows: workflowService ? this.composedWorkflow.app : undefined,
       studioDispatch: modelProviders
-        ? composeApiWorkflowStudioDispatch({ nlpServiceUrl, modelProviders })
+        ? composeApiWorkflowStudioDispatch({
+            nlpServiceUrl,
+            modelProviders,
+            payloadStaging: DeferredPayloadStagingAdapter.create(
+              () => this.composedStoredObject.payloadStaging,
+            ),
+          })
         : undefined,
       nlpServiceUrl,
       report: LoggedApiAuthoringRestAbsence.create(createLogger(serviceName)),
@@ -3336,6 +3342,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             }
           : {}),
         processName: options.config.serviceName,
+        payloadStaging: DeferredPayloadStagingAdapter.create(
+          () => this.composedStoredObject.payloadStaging,
+        ),
       })
     );
   }
