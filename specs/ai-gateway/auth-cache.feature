@@ -550,6 +550,15 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the rest fall back to the ordinary staleness clock
 
     @unit
+    Scenario: a refresh the control plane never answered leaves the period unresolved
+      Given a cached key whose budget period ended after its config was read
+      And a config refresh that fails to reach the control plane
+      When a later request arrives
+      Then the entry still holds the ended period's spend
+      And the next refresh is unconditional too, so it cannot be confirmed as unchanged
+      And the period counts as resolved only once an answer arrives
+
+    @unit
     Scenario: a bundle with no budgets keeps the ordinary staleness clock
       Given a cached key with no budgets
       When its config passes the staleness TTL

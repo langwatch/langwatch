@@ -5,6 +5,7 @@ package authresolver
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -27,12 +28,20 @@ type budgetConfigFetcher struct {
 	spent      int64
 	validUntil time.Time
 	conds      []string
+	// failures is how many leading fetches answer with a transport error
+	// instead of a config, standing in for a control plane that cannot be
+	// reached at the moment the period rolls.
+	failures int
 }
 
 func (f *budgetConfigFetcher) FetchConfig(_ context.Context, _, ifNoneMatch string) (domain.ConfigFetchResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.conds = append(f.conds, ifNoneMatch)
+	if f.failures > 0 {
+		f.failures--
+		return domain.ConfigFetchResult{}, errors.New("control plane unreachable")
+	}
 	if ifNoneMatch != "" && ifNoneMatch == f.etag {
 		return domain.ConfigFetchResult{ETag: f.etag, NotModified: true}, nil
 	}
@@ -75,6 +84,11 @@ func budgetConfig(spentMicroUSD int64, validUntil time.Time) domain.BundleConfig
 // separates "the period ended after we read it" from "the boundary was already
 // behind us". Never later than now, so a period still running does not leave
 // the entry claiming a fetch in the future.
+//
+// budgetRollAckedFor is cleared for the same reason. storeL1 acks a boundary
+// that had already passed when it built the entry, which is right for a real
+// insert but wrong for the state being staged here: this entry stands for one
+// built while the period was still running, and such an entry starts unacked.
 func seedBudgetEntry(t *testing.T, svc *Service, rawKey string, validUntil time.Time, etag string) *entry {
 	t.Helper()
 	bundle := freshBundle("vk_budget", time.Now().Add(1*time.Hour))
@@ -89,6 +103,7 @@ func seedBudgetEntry(t *testing.T, svc *Service, rawKey string, validUntil time.
 	}
 	e.mu.Lock()
 	e.configFetchedAt = fetchedAt
+	e.budgetRollAckedFor = time.Time{}
 	e.mu.Unlock()
 	return e
 }
@@ -178,6 +193,48 @@ func TestResolve_BudgetBoundaryLongPast_RefreshesOnce(t *testing.T) {
 
 	assert.Equal(t, []string{""}, fetcher.conditionals(),
 		"the first request re-reads the config; after that the entry has been fetched past the boundary and the ordinary clock takes over")
+}
+
+/** @scenario "a refresh the control plane never answered leaves the period unresolved" */
+func TestResolve_BudgetRollFetchFails_StaysUnconditional(t *testing.T) {
+	// The refresh stamps configFetchedAt on every outcome, failures included.
+	// If that stamp were what closed out the roll, this entry would go back to
+	// offering its token, be answered 304, and enforce the dead period's spend
+	// for as long as it lived — the deadlock this Rule exists to break, reached
+	// through a transport error instead of the clock.
+	tomorrow := time.Now().Add(24 * time.Hour)
+	fetcher := &budgetConfigFetcher{etag: "42", spent: 0, validUntil: tomorrow, failures: 1}
+	svc := newBudgetService(t, fetcher)
+
+	rawKey := "vk-lw-budget-fetch-failed"
+	e := seedBudgetEntry(t, svc, rawKey, time.Now().Add(-time.Second), "42")
+
+	_, err := svc.Resolve(context.Background(), rawKey)
+	require.NoError(t, err, "a failed config refresh is a background concern; the request still serves from cache")
+	awaitConfigRefresh(t, e)
+
+	live, ok := svc.l1.Peek(hashKey(rawKey))
+	require.True(t, ok)
+	require.Same(t, e, live, "a failed refresh swaps nothing in, so the entry is the one we seeded")
+	assert.Equal(t, int64(5_000_000), live.bundle.Config.Budget.Scopes[0].SpentMicroUSD,
+		"nothing was fetched, so the dead period's spend is still what the entry holds")
+	assert.True(t, live.configStale(0),
+		"with no staleness clock an unanswered roll has to keep asking, or it never retries at all")
+
+	// The ordinary clock paces the retry rather than firing it on every
+	// request, so move past it the way a real entry would.
+	e = backdateConfig(t, svc, rawKey, 2*time.Minute)
+	_, err = svc.Resolve(context.Background(), rawKey)
+	require.NoError(t, err)
+	awaitConfigRefresh(t, e)
+
+	assert.Equal(t, []string{"", ""}, fetcher.conditionals(),
+		"the retry after a failure has to go out unconditional too; offering the token would be answered 304 and pin the dead period's spend")
+
+	live, ok = svc.l1.Peek(hashKey(rawKey))
+	require.True(t, ok)
+	assert.Equal(t, int64(0), live.bundle.Config.Budget.Scopes[0].SpentMicroUSD,
+		"once the control plane answers, the new period's spend replaces the old")
 }
 
 /** @scenario "a bundle with no budgets keeps the ordinary staleness clock" */
