@@ -9,7 +9,8 @@
  *   product's self-retry own retries).
  * - The resource loader discovers nothing (noExtensions/noSkills/
  *   noContextFiles): the system prompt is wholly owned by the wrapper, and
- *   the only extensions are the inline `todowrite` and `skill` factories.
+ *   the only extensions are the inline factories: `todowrite`, `skill`,
+ *   `question` and the local workspace tools.
  */
 
 import { mkdirSync } from "node:fs";
@@ -26,8 +27,15 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { LangyWorkerConfig } from "./config.js";
 import { writeModelsJson } from "./models.js";
+import {
+  CODE_ACCESS_TOOL_NAME,
+  LOCAL_TOOL_NAMES,
+  createLocalWorkspaceExtension,
+} from "./tools/local-workspace.js";
+import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
 import { SKILL_TOOL_NAME, createSkillExtension } from "./tools/skill.js";
 import { TODOWRITE_TOOL_NAME, createTodowriteExtension } from "./tools/todowrite.js";
+import type { TurnContext } from "./tools/turn-context.js";
 
 export const ENABLED_TOOLS = [
   "read",
@@ -39,6 +47,9 @@ export const ENABLED_TOOLS = [
   "ls",
   TODOWRITE_TOOL_NAME,
   SKILL_TOOL_NAME,
+  QUESTION_TOOL_NAME,
+  CODE_ACCESS_TOOL_NAME,
+  ...LOCAL_TOOL_NAMES,
 ] as const;
 
 /**
@@ -64,6 +75,8 @@ export type CreateLangySessionOptions = {
   home: string;
   /** Holder carrying the composed system prompt; recomposed per turn. */
   systemPrompt: SystemPromptHolder;
+  /** Holder carrying the turn in flight; the local tools name it in every call. */
+  turnContext: TurnContext;
 };
 
 export type LangySessionHandle = {
@@ -106,6 +119,7 @@ export async function createLangySession({
   config,
   home,
   systemPrompt,
+  turnContext,
 }: CreateLangySessionOptions): Promise<LangySessionHandle> {
   const agentDir = join(home, ".langy-pi");
   const generated = writeModelsJson({ agentDir, model: config.model, env: process.env });
@@ -145,6 +159,8 @@ export async function createLangySession({
       createSystemPromptExtension(systemPrompt),
       createTodowriteExtension(),
       createSkillExtension(config.skillsDir),
+      createQuestionExtension({ turnContext }),
+      createLocalWorkspaceExtension({ turnContext }),
     ],
   });
   await resourceLoader.reload();

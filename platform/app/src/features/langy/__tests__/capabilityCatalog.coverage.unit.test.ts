@@ -88,6 +88,11 @@ const EXCLUDED_COMMANDS = new Set([
   // Help topics: renders other commands' help or a static topic page — no
   // platform resource a card could deep-link.
   "help",
+  // Shares a folder from the developer's own machine with one Langy
+  // conversation (ADR-129). It holds a session open and prints permission
+  // prompts in the terminal; the panel's own code access card and workspace
+  // chip are what the reader sees, so there is no result document to card.
+  "langy",
 ]);
 
 /**
