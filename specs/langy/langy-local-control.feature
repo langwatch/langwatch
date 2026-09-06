@@ -42,6 +42,25 @@ Feature: Langy works in a folder shared from the developer's machine
       Then my request is not among them
       And approving it with their session is refused
 
+    # A device login signs the command line in as the person's personal
+    # project, and the conversation that asked lives on a team project. The
+    # request is addressed to the person, so the login's project is not what
+    # finds it.
+    @integration
+    Scenario: A login on my personal project lists a request raised on a team project
+      Given a control request I created on a team project
+      When the CLI signed in as my personal project lists the open requests
+      Then my request is among them
+      And approving it mints the session key for the team project
+      And the conversation's address is on the team project
+
+    @integration
+    Scenario: A project key holds no requests
+      Given a control request I created
+      When the team project's own key lists the open requests
+      Then the list is refused, since no person is behind the key
+      And approving the request with that key is refused the same way
+
     @integration
     Scenario: Approving a request mints a session key for the conversation
       Given an open control request

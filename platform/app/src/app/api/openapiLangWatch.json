@@ -36268,7 +36268,7 @@
             }
           }
         },
-        "description": "List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
+        "description": "List the open requests Langy made for a folder of mine, on every project I can read. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
         "tags": [
           "Langy"
         ],

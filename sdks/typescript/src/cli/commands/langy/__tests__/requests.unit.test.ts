@@ -103,20 +103,71 @@ describe("given the share-control command", () => {
     });
   });
 
+  describe("when the machine has a device session and the folder has a project key", () => {
+    /** @scenario "The login answers before a project key found in the folder" */
+    it("resolves the login's key on the personal project, never the folder's key", async () => {
+      const login = vi.fn(async () => undefined);
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "langy-login-"));
+      const configPath = path.join(dir, "config.json");
+      fs.writeFileSync(
+        configPath,
+        JSON.stringify({
+          gateway_url: ENDPOINT,
+          control_plane_url: ENDPOINT,
+          access_token: "session-token",
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          cli_api_key: "sk-lw-login-key",
+          personal_project: {
+            id: "project_personal",
+            slug: "riley-personal",
+            api_key: "sk-lw-personal-key",
+            validated_at: Math.floor(Date.now() / 1000),
+          },
+        }),
+      );
+      const before = {
+        config: process.env.LANGWATCH_CLI_CONFIG,
+        key: process.env.LANGWATCH_API_KEY,
+      };
+      process.env.LANGWATCH_CLI_CONFIG = configPath;
+      process.env.LANGWATCH_API_KEY = "sk-lw-folder-project-key";
+      try {
+        const credentials = await ensureSignedIn({ login });
+        expect(login).not.toHaveBeenCalled();
+        expect(credentials.apiKey).toBe("sk-lw-login-key");
+        expect(credentials.projectId).toBe("project_personal");
+      } finally {
+        if (before.config === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+        else process.env.LANGWATCH_CLI_CONFIG = before.config;
+        if (before.key === undefined) delete process.env.LANGWATCH_API_KEY;
+        else process.env.LANGWATCH_API_KEY = before.key;
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("when the machine has no device session", () => {
     /** @scenario "The command signs in when there is no session" */
     it("runs the login flow first and then resolves the credentials", async () => {
       const login = vi.fn(async () => undefined);
-      const before = process.env.LANGWATCH_API_KEY;
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "langy-nologin-"));
+      const before = {
+        config: process.env.LANGWATCH_CLI_CONFIG,
+        key: process.env.LANGWATCH_API_KEY,
+      };
+      // No config file at this path: the machine has no session, so the key
+      // in the environment is the credential. Never the developer's own login.
+      process.env.LANGWATCH_CLI_CONFIG = path.join(dir, "config.json");
       process.env.LANGWATCH_API_KEY = "sk-lw-test-key";
       try {
-        // With a key in the environment the resolver never reaches the config,
-        // so this proves the order: login first, credentials after.
         const credentials = await ensureSignedIn({ login });
         expect(credentials.apiKey).toBe("sk-lw-test-key");
       } finally {
-        if (before === undefined) delete process.env.LANGWATCH_API_KEY;
-        else process.env.LANGWATCH_API_KEY = before;
+        if (before.config === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+        else process.env.LANGWATCH_CLI_CONFIG = before.config;
+        if (before.key === undefined) delete process.env.LANGWATCH_API_KEY;
+        else process.env.LANGWATCH_API_KEY = before.key;
+        fs.rmSync(dir, { recursive: true, force: true });
       }
     });
   });
@@ -174,6 +225,31 @@ describe("given the share-control command", () => {
       });
       await expect(api.list()).rejects.toThrow(
         "This request was cancelled. Ask Langy again.",
+      );
+    });
+
+    /** @scenario "A refusal with several tips prints as sentences" */
+    it("ends every tip with a stop before joining them", async () => {
+      const { impl } = fakeFetch({
+        "/api/v1/langy/control/requests": {
+          status: 404,
+          body: {
+            code: "langy_local_request_invalid",
+            message: "langy_local_request_invalid",
+            tips: [
+              "Only the person Langy asked can approve a request; ask Langy for the code change again to get your own",
+              "A request is single use, so a second approval of the same one is refused",
+            ],
+          },
+        },
+      });
+      const api = createControlApi({
+        endpoint: ENDPOINT,
+        apiKey: "sk-lw-abc",
+        fetchImpl: impl,
+      });
+      await expect(api.list()).rejects.toThrow(
+        "Only the person Langy asked can approve a request; ask Langy for the code change again to get your own. A request is single use, so a second approval of the same one is refused.",
       );
     });
   });

@@ -19,6 +19,17 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Then the CLI runs the login flow first
       And continues to the request list after the login
 
+    # Langy writes the project's key into the folder's .env during the setup.
+    # That key carries no person, so it can never list or approve a request
+    # addressed to me; the login on this machine is who I am.
+    @unit
+    Scenario: The login answers before a project key found in the folder
+      Given a device session on this machine
+      And the folder's .env carries the project's key
+      When I run "langwatch langy --share-control"
+      Then the request list is read with my login's key
+      And no login flow runs
+
     @unit
     Scenario: An open request is shown with the conversation and the folder
       Given a Langy conversation recorded a control request for me
@@ -43,6 +54,12 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And the second option cancels the request
       When I confirm the first option
       Then the box is erased and one notice says the folder is shared
+
+    @unit
+    Scenario: A refusal with several tips prints as sentences
+      Given the platform refuses a request with two tips
+      When the command prints the refusal
+      Then each tip ends with a full stop before the next one starts
 
     @unit
     Scenario: Cancelling tells the conversation

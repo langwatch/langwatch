@@ -35,6 +35,10 @@ const ns = `control-routes-${nanoid(8)}`;
 let organization: Organization;
 let team: Team;
 let projectId: string;
+/** The developer's personal project, the one a device login signs in as. */
+let personalProjectId: string;
+/** The team project's own key, a credential with no person behind it. */
+let projectKey: string;
 let userId: string;
 let mateId: string;
 /** The developer's own key, the one `langwatch langy` is signed in with. */
@@ -45,9 +49,12 @@ let mateToken: string;
 const conversationId = `conv_${nanoid(10)}`;
 
 /** The Basic credential the command line sends: project id and the key. */
-function basic(token: string): Record<string, string> {
+function basic(
+  token: string,
+  project: string = projectId,
+): Record<string, string> {
   return {
-    Authorization: `Basic ${Buffer.from(`${projectId}:${token}`).toString(
+    Authorization: `Basic ${Buffer.from(`${project}:${token}`).toString(
       "base64",
     )}`,
     "Content-Type": "application/json",
@@ -118,6 +125,19 @@ beforeAll(async () => {
     },
   });
   projectId = project.id;
+  projectKey = project.apiKey;
+  const personal = await prisma.project.create({
+    data: {
+      id: `project_${nanoid()}`,
+      name: "Personal Workspace",
+      slug: `--test-personal-${ns}`,
+      language: "typescript",
+      framework: "other",
+      apiKey: `sk-lw-${nanoid(48)}`,
+      teamId: team.id,
+    },
+  });
+  personalProjectId = personal.id;
 
   const apiKeys = ApiKeyService.create(prisma);
   const orgAdmin = {
@@ -210,6 +230,64 @@ describe("given a control request Langy opened for me", () => {
         message: "langy_local_request_invalid",
         tips: expect.arrayContaining([expect.stringContaining("approve")]),
       });
+    });
+  });
+
+  describe("when the command line is signed in as my personal project", () => {
+    /** @scenario "A login on my personal project lists a request raised on a team project" */
+    it("lists the team project's request and approves it there", async () => {
+      const request = await openRequest();
+      const listed = await app.request("/api/v1/langy/control/requests", {
+        headers: basic(ownToken, personalProjectId),
+      });
+      const body = (await listed.json()) as {
+        requests: { id: string; projectId: string }[];
+      };
+      expect(listed.status).toBe(200);
+      expect(body.requests).toContainEqual(
+        expect.objectContaining({ id: request.id, projectId }),
+      );
+
+      const approved = await app.request(
+        `/api/v1/langy/control/requests/${request.id}/approve`,
+        {
+          method: "POST",
+          headers: basic(ownToken, personalProjectId),
+          body: JSON.stringify({ workspace: workspace() }),
+        },
+      );
+      const answer = (await approved.json()) as {
+        sessionKey: string;
+        conversation: { url: string };
+      };
+      expect(approved.status).toBe(200);
+      expect(answer.sessionKey).toMatch(/^sk-lw-/);
+      // The conversation's address is on the project that asked, not the login's.
+      expect(answer.conversation.url).toContain(`--test-project-${ns}`);
+    });
+  });
+
+  describe("when the credential is the project's own key", () => {
+    /** @scenario "A project key holds no requests" */
+    it("lists none and refuses the approval, since no person is behind it", async () => {
+      const request = await openRequest();
+      const listed = await app.request("/api/v1/langy/control/requests", {
+        headers: basic(projectKey),
+      });
+      expect(listed.status).toBe(404);
+      expect(await refusalOf(listed)).toMatchObject({
+        code: "langy_local_request_invalid",
+      });
+
+      const approved = await app.request(
+        `/api/v1/langy/control/requests/${request.id}/approve`,
+        {
+          method: "POST",
+          headers: basic(projectKey),
+          body: JSON.stringify({ workspace: workspace() }),
+        },
+      );
+      expect(approved.status).toBe(404);
     });
   });
 

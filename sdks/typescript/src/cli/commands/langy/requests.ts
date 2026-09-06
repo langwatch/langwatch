@@ -262,6 +262,12 @@ export function hasDeviceSession(): boolean {
 /**
  * Signs in when the machine has no device session, then resolves the
  * credentials. The login is the standard flow, called rather than repeated.
+ *
+ * The device session comes before a key in the environment or the folder's
+ * .env: a control request is addressed to the person who asked, and the
+ * project key Langy writes into the folder carries no person, so it lists
+ * nothing and can approve nothing. A key in the environment is still the
+ * credential when the machine has no login, which is how a script signs in.
  */
 export async function ensureSignedIn({
   login,
@@ -274,7 +280,7 @@ export async function ensureSignedIn({
     );
     await login({ device: true });
   }
-  const credentials = await resolveCredentials();
+  const credentials = await resolveCredentials({ preferSession: true });
   return {
     apiKey: credentials.apiKey,
     endpoint: credentials.endpoint,
@@ -587,7 +593,10 @@ function refusalText(body: unknown): string | undefined {
     code?: unknown;
   };
   if (Array.isArray(tips)) {
-    const lines = tips.filter((t): t is string => typeof t === "string" && t !== "");
+    const lines = tips
+      .filter((t): t is string => typeof t === "string" && t.trim() !== "")
+      .map((t) => t.trim())
+      .map((t) => (/[.!?]$/.test(t) ? t : `${t}.`));
     if (lines.length > 0) return lines.join(" ");
   }
   if (typeof message === "string" && message !== "" && message !== code) {

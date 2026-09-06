@@ -37,9 +37,14 @@ export function controlRequestClaimKey(requestId: string): string {
   return `${PREFIX}:request_claim:${requestId}`;
 }
 
-/** ZSET of a user's open request ids in one project, scored by creation time. */
-export function userRequestsKey(projectId: string, userId: string): string {
-  return `${PREFIX}:requests:${projectId}:${userId}`;
+/**
+ * ZSET of a user's open request ids across every project, scored by expiry.
+ * A request is addressed to a person: the login that answers it may be on
+ * another project than the conversation that asked, the personal project of
+ * a device login for instance, so the project is never part of the key.
+ */
+export function userRequestsKey(userId: string): string {
+  return `${PREFIX}:requests:${userId}`;
 }
 
 /**
