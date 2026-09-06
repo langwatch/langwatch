@@ -277,7 +277,12 @@ export class CliLoginKeyService {
     organizationId: string;
     deviceLabel: string;
     selection: CliKeySelection;
-  }): Promise<{ token: string; apiKeyId: string; scope: CliKeyScopeSummary }> {
+  }): Promise<{
+    token: string;
+    apiKeyId: string;
+    scope: CliKeyScopeSummary;
+    permissions: string[];
+  }> {
     // Resolved BEFORE the mint, though it only describes it: these are two
     // more reads, and a read that fails after the key row is live would fail
     // the exchange while leaving that key behind, active and unreachable.
@@ -320,7 +325,15 @@ export class CliLoginKeyService {
       throw err;
     }
 
-    return { token: created.token, apiKeyId: created.apiKey.id, scope };
+    return {
+      token: created.token,
+      apiKeyId: created.apiKey.id,
+      scope,
+      // What the key can DO, beside where it reaches. `whoami` prints this so
+      // a refusal (say, minting an API key needs organization:manage) can be
+      // read off the login instead of discovered as a 403.
+      permissions: [...new Set(selection.permissions)].sort(),
+    };
   }
 
   /**

@@ -38,6 +38,11 @@ export function appPermissionsService(): PermissionsService {
           "credential checks are not stubbed by appPermissionsMock",
         );
       },
+      findApiKeyProjectDecisions: () => {
+        throw new Error(
+          "credential checks are not stubbed by appPermissionsMock",
+        );
+      },
       findProjectScope: () => {
         throw new Error(
           "credential checks are not stubbed by appPermissionsMock",

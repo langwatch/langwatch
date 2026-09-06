@@ -1,19 +1,21 @@
 /**
- * The `suite` commands.
+ * The `test-suite` commands.
  *
- * A test suite is a folder of scenarios: a name and the cases filed in it. It
- * holds no targets, so running one sends them with the request and the
+ * A test suite is a group of scenarios: a name and the scenarios filed in it.
+ * It holds no targets, so running one sends them with the request and the
  * platform files the run under a run plan.
  *
- * Spec: specs/features/suite-cli.feature
+ * Spec: specs/features/test-suite-cli.feature
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TestSuitesApiError } from "@/client-sdk/services/test-suites";
+import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const listSpy = vi.hoisted(() => vi.fn());
 const createSpy = vi.hoisted(() => vi.fn());
 const getSpy = vi.hoisted(() => vi.fn());
 const renameSpy = vi.hoisted(() => vi.fn());
+const updateSpy = vi.hoisted(() => vi.fn());
 const archiveSpy = vi.hoisted(() => vi.fn());
 const runSpy = vi.hoisted(() => vi.fn());
 
@@ -23,6 +25,7 @@ vi.mock("../cli-test-suites-service", () => ({
     create: createSpy,
     get: getSpy,
     rename: renameSpy,
+    update: updateSpy,
     archive: archiveSpy,
     run: runSpy,
   })),
@@ -50,6 +53,7 @@ import { listTestSuitesCommand } from "../list";
 import { createTestSuiteCommand } from "../create";
 import { getTestSuiteCommand } from "../get";
 import { renameTestSuiteCommand } from "../rename";
+import { updateTestSuiteCommand } from "../update";
 import { archiveTestSuiteCommand } from "../archive";
 import { runTestSuiteCommand } from "../run";
 
@@ -90,8 +94,29 @@ const makeRunResult = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+/**
+ * The command resolves its output format from the flags AND the agent-mode env
+ * vars, so a test runner living inside a coding agent (CLAUDECODE set) must not
+ * flip the human-path tests into a machine format.
+ */
+let savedAgentEnv: Record<string, string | undefined> = {};
+
+/** Every JSON document the command printed on stdout. */
+const printedDocuments = (): string[] =>
+  vi
+    .mocked(console.log)
+    .mock.calls.map((call) => call[0] as unknown)
+    .filter(
+      (line): line is string =>
+        typeof line === "string" && line.trimStart().startsWith("{"),
+    );
+
 beforeEach(() => {
   vi.clearAllMocks();
+  savedAgentEnv = Object.fromEntries(
+    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
+  );
+  for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   listSpy.mockResolvedValue([makeSuite()]);
   createSpy.mockResolvedValue(makeSuite({ scenarioIds: [], scenarioCount: 0 }));
   getSpy.mockResolvedValue({
@@ -102,6 +127,7 @@ beforeEach(() => {
     ],
   });
   renameSpy.mockResolvedValue(makeSuite({ name: "Refunds and credits" }));
+  updateSpy.mockResolvedValue(makeSuite());
   archiveSpy.mockResolvedValue({ id: "suite_abc", archived: true });
   runSpy.mockResolvedValue(makeRunResult());
   vi.spyOn(console, "log").mockImplementation(noop);
@@ -109,6 +135,17 @@ beforeEach(() => {
   vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
+});
+
+afterEach(() => {
+  for (const name of AGENT_MODE_ENV_VARS) {
+    const value = savedAgentEnv[name];
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  // The wait paths set the exit code; a leftover value would fail the whole
+  // vitest process at the end of the run.
+  process.exitCode = undefined;
 });
 
 describe("listTestSuitesCommand()", () => {
@@ -168,9 +205,236 @@ describe("createTestSuiteCommand()", () => {
     expect(createSpy).toHaveBeenCalledWith({ name: "Refunds" });
     expect(result?.data).toMatchObject({ scenarioCount: 0 });
   });
+
+  describe("when fields are given", () => {
+    /** @scenario "Create a test suite with fields" */
+    it("creates it with those fields, in order", async () => {
+      createSpy.mockResolvedValue(
+        makeSuite({
+          scenarioCount: 0,
+          fields: [
+            { identifier: "golden_sql", type: "text" },
+            { identifier: "row_limit", type: "number" },
+          ],
+        }),
+      );
+
+      const result = await createTestSuiteCommand("Case lookups", {
+        field: ["golden_sql:text", "row_limit:number"],
+      });
+
+      expect(createSpy).toHaveBeenCalledWith({
+        name: "Case lookups",
+        fields: [
+          { identifier: "golden_sql", type: "text" },
+          { identifier: "row_limit", type: "number" },
+        ],
+      });
+      result?.table();
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((call) => String(call[0]))
+        .join("\n");
+      expect(printed).toContain("golden_sql");
+      expect(printed).toContain("(number)");
+    });
+
+    /** @scenario "A field with a type the platform does not have is refused" */
+    it("refuses a type the platform does not have before creating anything", async () => {
+      await expect(
+        createTestSuiteCommand("Case lookups", { field: ["golden_sql:json"] }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the attachment list is given as JSON", () => {
+    /** @scenario "The full attachment list comes from --evaluators-json" */
+    it("creates it with that attachment as written", async () => {
+      await createTestSuiteCommand("Case lookups", {
+        field: ["golden_sql:text"],
+        evaluatorsJson: JSON.stringify([
+          {
+            evaluatorId: "evaluator_sql",
+            required: true,
+            mappings: {
+              output: {
+                type: "source",
+                sourceId: "trace",
+                path: ["tool_calls", "run_sql", "input"],
+              },
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+            },
+          },
+        ]),
+      });
+
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Case lookups",
+          fields: [{ identifier: "golden_sql", type: "text" }],
+          evaluators: [
+            expect.objectContaining({
+              evaluatorId: "evaluator_sql",
+              required: true,
+              mappings: expect.objectContaining({
+                output: {
+                  type: "source",
+                  sourceId: "trace",
+                  path: ["tool_calls", "run_sql", "input"],
+                },
+              }),
+            }),
+          ],
+        }),
+      );
+    });
+
+    /** @scenario "A mapping to a field the suite does not declare is refused" */
+    it("refuses a mapping to a field the suite does not declare", async () => {
+      await expect(
+        createTestSuiteCommand("Case lookups", {
+          evaluatorsJson: JSON.stringify([
+            {
+              evaluatorId: "evaluator_sql",
+              mappings: {
+                expected_output: {
+                  type: "source",
+                  sourceId: "scenario",
+                  path: ["fields", "golden_sql"],
+                },
+              },
+            },
+          ]),
+        }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("updateTestSuiteCommand()", () => {
+  describe("when fields are given", () => {
+    /** @scenario "Update the fields of a test suite" */
+    it("patches the field list and nothing else", async () => {
+      await updateTestSuiteCommand("Refunds", {
+        field: ["golden_sql:text", "table_schema:text"],
+      });
+
+      expect(updateSpy).toHaveBeenCalledWith("suite_abc", {
+        fields: [
+          { identifier: "golden_sql", type: "text" },
+          { identifier: "table_schema", type: "text" },
+        ],
+      });
+    });
+  });
+
+  describe("when a name is given", () => {
+    /** @scenario "Update the name of a test suite" */
+    it("patches the name alone", async () => {
+      await updateTestSuiteCommand("suite_abc", { name: "Case lookups v2" });
+
+      expect(updateSpy).toHaveBeenCalledWith("suite_abc", {
+        name: "Case lookups v2",
+      });
+    });
+  });
+
+  describe("when the attachment list is given as JSON", () => {
+    /** @scenario "Update the evaluators of a test suite against its own fields" */
+    it("checks the mappings against the fields the suite already declares", async () => {
+      listSpy.mockResolvedValue([
+        makeSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }),
+      ]);
+
+      await updateTestSuiteCommand("Refunds", {
+        evaluatorsJson: JSON.stringify([
+          {
+            evaluatorId: "evaluator_sql",
+            mappings: {
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+            },
+          },
+        ]),
+      });
+
+      expect(updateSpy).toHaveBeenCalledWith("suite_abc", {
+        evaluators: [
+          expect.objectContaining({ evaluatorId: "evaluator_sql", required: true }),
+        ],
+      });
+    });
+  });
+
+  describe("when nothing is given", () => {
+    /** @scenario "An update with nothing to change is refused" */
+    it("refuses before sending anything", async () => {
+      await expect(updateTestSuiteCommand("Refunds")).rejects.toThrow(
+        ProcessExitError,
+      );
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the suite does not exist", () => {
+    it("refuses before patching anything", async () => {
+      await expect(
+        updateTestSuiteCommand("Nope", { name: "x" }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("getTestSuiteCommand()", () => {
+  describe("when the suite declares fields and evaluators", () => {
+    /** @scenario "Get a test suite shows its fields and evaluators" */
+    it("shows each field with its type and each evaluator with its mappings", async () => {
+      getSpy.mockResolvedValue({
+        ...makeSuite(),
+        scenarios: [],
+        fields: [{ identifier: "golden_sql", type: "text" }],
+        evaluators: [
+          {
+            id: "att_1",
+            evaluatorId: "evaluator_sql",
+            required: true,
+            mappings: {
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+              output: { type: "value", value: "literal" },
+            },
+          },
+        ],
+      });
+
+      const result = await getTestSuiteCommand("suite_abc");
+      result?.table();
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((call) => String(call[0]))
+        .join("\n");
+      expect(printed).toContain("golden_sql");
+      expect(printed).toContain("evaluator_sql");
+      expect(printed).toContain("required");
+      expect(printed).toContain("scenario.fields.golden_sql");
+      expect(printed).toContain('"literal"');
+    });
+  });
+
   describe("when named by ID", () => {
     /** @scenario "Get a test suite by ID" */
     it("reads it and names the scenarios filed in it", async () => {
@@ -291,6 +555,33 @@ describe("runTestSuiteCommand()", () => {
       const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
       expect(printed).toContain("Refunds against Support Agent");
       expect(printed).toContain("batch_123");
+    });
+  });
+
+  describe("when the same agent is given twice with different parameters", () => {
+    /** @scenario "Run a test suite against one agent on two models" */
+    it("sends two targets, each with its own values", async () => {
+      await runTestSuiteCommand({
+        reference: "suite_abc",
+        options: {
+          target: ["http:agent_abc?model=gpt-5", "http:agent_abc?model=gpt-5-mini"],
+        },
+      });
+
+      expect(runSpy).toHaveBeenCalledWith("suite_abc", {
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            runParameters: { model: "gpt-5" },
+          },
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            runParameters: { model: "gpt-5-mini" },
+          },
+        ],
+      });
     });
   });
 
@@ -427,6 +718,68 @@ describe("runTestSuiteCommand()", () => {
       });
 
       expect(fetchSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("when --wait ends under a machine format", () => {
+    /** @scenario "Wait for a test suite run with machine-readable output" */
+    it("prints exactly one final document with the tallies, the per-run results and the outcome", async () => {
+      runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
+      // A fresh response per call: a `Response` body can be read once, so one
+      // shared object turns the second poll into a poll FAILURE.
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({
+              runs: [
+                {
+                  batchRunId: "batch_123",
+                  scenarioRunId: "run_1",
+                  scenarioId: "scenario_1",
+                  status: "SUCCESS",
+                  results: { verdict: "success" },
+                },
+              ],
+              hasMore: false,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      );
+
+      vi.useFakeTimers();
+      try {
+        const promise = runTestSuiteCommand({
+          reference: "suite_abc",
+          options: {
+            target: ["http:agent_abc"],
+            wait: true,
+            format: "json",
+          },
+        });
+        await vi.advanceTimersByTimeAsync(3000);
+        await promise;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.outcome).toBe("passed");
+      expect(document.tallies).toEqual({
+        total: 1,
+        completed: 1,
+        passed: 1,
+        failed: 0,
+      });
+      expect(document.results).toEqual([
+        {
+          scenarioRunId: "run_1",
+          scenarioId: "scenario_1",
+          status: "SUCCESS",
+          verdict: "success",
+        },
+      ]);
     });
   });
 

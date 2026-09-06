@@ -19,7 +19,7 @@ export type OpenLiveRunParams = {
   scenarioSetId: string;
   /** The run itself, when the caller already knows it. */
   scenarioRunId?: string;
-  /** The case whose run to open, when the batch holds several. */
+  /** The scenario whose run to open, when the batch holds several. */
   scenarioId?: string;
   /** The agent the run went against, named while the run is still queued. */
   targetId?: string;

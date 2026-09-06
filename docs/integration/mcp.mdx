@@ -383,10 +383,32 @@ The MCP server provides tools organized into categories. Your AI assistant autom
 
 | Tool | Description |
 |------|-------------|
-| `list_prompts` | List all prompts in the project |
-| `get_prompt` | Get a prompt with messages, model config, and version history |
-| `create_prompt` | Create a new prompt with messages and model configuration |
-| `update_prompt` | Update a prompt or create a new version |
+| `platform_list_prompts` | List all prompts in the project |
+| `platform_get_prompt` | Get a prompt with messages, model config, and version history |
+| `platform_create_prompt` | Create a new prompt with messages and model configuration |
+| `platform_update_prompt` | Update a prompt or create a new version |
+
+### Evaluations (requires API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_evaluators` | List the saved evaluators in the project |
+| `platform_get_evaluator` | Get a saved evaluator with its type, settings and input mappings |
+| `platform_create_evaluator` | Create a saved evaluator |
+| `platform_update_evaluator` | Update a saved evaluator's settings or mappings |
+| `platform_delete_evaluator` | Delete a saved evaluator |
+| `platform_list_monitors` | List the online evaluations |
+| `platform_get_monitor` | Get an online evaluation with its evaluator, preconditions and sampling |
+| `platform_create_monitor` | Create an online evaluation |
+| `platform_update_monitor` | Update, enable or disable an online evaluation |
+| `platform_delete_monitor` | Delete an online evaluation |
+| `platform_experiment_list` | List the experiments in the project |
+| `platform_run_experiment` | Start an experiment run |
+| `platform_experiment_status` | Get the progress of a run |
+| `platform_experiment_list_runs` | List the runs of an experiment |
+| `platform_experiment_results` | Get the per-row results of a run |
+
+Dataset tools are listed on the [datasets page](/datasets/programmatic-access#mcp-tools-ai-coding-agents). Annotation tools are `platform_list_annotations`, `platform_get_annotation`, `platform_create_annotation` and `platform_delete_annotation`.
 
 ### Organization Management (requires org-level API key)
 
@@ -448,11 +470,11 @@ Query analytics timeseries from LangWatch. Metrics use `"category.name"` format 
 - `filters` (optional): Filters to apply
 - `timeZone` (optional): Timezone. Default: UTC
 
-#### `list_prompts`
+#### `platform_list_prompts`
 
 List all prompts configured in the LangWatch project. No parameters required.
 
-#### `get_prompt`
+#### `platform_get_prompt`
 
 Get a specific prompt by ID or handle, including messages, model config, and version history.
 
@@ -460,7 +482,7 @@ Get a specific prompt by ID or handle, including messages, model config, and ver
 - `idOrHandle` (required): Prompt ID or handle
 - `version` (optional): Specific version number (default: latest)
 
-#### `create_prompt`
+#### `platform_create_prompt`
 
 Create a new prompt in the LangWatch project.
 
@@ -472,7 +494,7 @@ Create a new prompt in the LangWatch project.
 - `handle` (optional): URL-friendly handle
 - `description` (optional): Prompt description
 
-#### `update_prompt`
+#### `platform_update_prompt`
 
 Update an existing prompt or create a new version.
 

@@ -1,10 +1,10 @@
 @integration
 Feature: The test suites REST API
   As a developer organising agent tests over HTTP
-  I want a test suite family that holds a folder of scenarios
-  So that I can run a whole folder against the targets I choose at run time
+  I want a test suite family that holds a group of scenarios
+  So that I can run a whole test suite against the targets I choose at run time
 
-  # A TEST SUITE is a folder of scenarios. It holds what it collects and
+  # A TEST SUITE is a group of scenarios. It holds what it collects and
   # nothing about how a run of it is executed, so the targets, the repeat count
   # and the models arrive with the run request.
   #
@@ -15,7 +15,7 @@ Feature: The test suites REST API
   #   DELETE /api/v1/test-suites/{id}       archive a test suite and its scenarios
   #   POST   /api/v1/test-suites/{id}/run   run the suite against the targets sent
 
-  Scenario: Listing test suites returns the folders only
+  Scenario: Listing test suites returns the test suites only
     Given the project holds one test suite and one run plan
     When I list the test suites
     Then only the test suite is returned

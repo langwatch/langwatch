@@ -1,5 +1,5 @@
 /**
- * The page-level bridge for the Agent Testing case editor drawer.
+ * The page-level bridge for the Agent Testing scenario editor drawer.
  *
  * The drawer itself is URL routed and lives in `drawerRegistry`. This shell
  * registers the flow callback the drawer calls on save, and mounts the run
@@ -42,8 +42,17 @@ export function AgentTestingCaseEditor() {
     [projectId],
   );
 
+  // The registration belongs to this component, which stands for as long as
+  // the page does. Save & Run opens the run drawer, and closing that drawer
+  // clears the callbacks of the flows that ran through it; without
+  // `keepOnClose` this one would go with them and the next Save & Run would
+  // only save.
   useEffect(() => {
-    setFlowCallbacks(CASE_EDITOR_DRAWER, { onSaved: handleSaved });
+    setFlowCallbacks(
+      CASE_EDITOR_DRAWER,
+      { onSaved: handleSaved },
+      { keepOnClose: true },
+    );
     return () => setFlowCallbacks(CASE_EDITOR_DRAWER, {});
   }, [handleSaved]);
 

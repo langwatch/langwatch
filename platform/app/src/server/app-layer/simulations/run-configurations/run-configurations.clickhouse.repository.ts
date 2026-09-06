@@ -5,6 +5,7 @@ import {
   ATOM_SORT_KEY,
   atomScopeSql,
   buildAtomFilters,
+  TARGET_PARAMETERS_EXPR,
 } from "../result-atoms/atom-sql";
 import {
   HAS_NOTE_EXPR,
@@ -34,13 +35,26 @@ export const MAX_RUN_CONFIGURATIONS = 200;
  */
 export interface RawRunConfigurationRow {
   SetId: string;
-  /** `<type>:<referenceId>` per target, sorted by the database. */
+  /** `<type>:<targetKey>` per target, sorted by the database. */
   TargetPairs: string[];
+  /**
+   * The raw overrides of each target, '' for a target with none, in the same
+   * order as `TargetPairs`.
+   */
+  TargetParameters: string[];
   RepeatCount: string;
   SimulatorModel: string;
   JudgeModel: string;
-  /** The raw parameters object, or '' when the run resolved none. */
+  /**
+   * The raw merged parameters of the first scenario run against a target
+   * with no overrides, or of the first scenario run at all when every target
+   * carries some; '' when the run resolved none. They include the overrides
+   * of the target that run went against, which `FirstTargetParameters` names
+   * so they can be taken out.
+   */
   Parameters: string;
+  /** The raw overrides of the target `Parameters` was read from, or ''. */
+  FirstTargetParameters: string;
   /** "1" when any run of this configuration carried a note, never the note. */
   UsesNote: string;
   LastRunAtMs: string;
@@ -73,9 +87,11 @@ export class RunConfigurationsClickHouseRepository {
    * 1. the atoms in scope, deduped to the latest version of each run;
    * 2. one row per scenario and target of a batch, whose COUNT is the repeat
    *    count the batch was started with;
-   * 3. one row per batch, which is one run of one plan: its targets, the
-   *    largest of those counts, its models, and the FIRST scenario's
-   *    parameters;
+   * 3. one row per batch, which is one run of one plan: its targets with
+   *    their overrides, the largest of those counts, its models, and the
+   *    FIRST scenario run's parameters beside the overrides of its target.
+   *    A run against a target with no overrides is preferred for that read,
+   *    so the run-level values are not hidden under a target's own;
    * 4. one row per distinct configuration, carrying the newest run of it.
    *
    * The last fold is what makes the cap meaningful. The key the dialog
@@ -99,21 +115,28 @@ export class RunConfigurationsClickHouseRepository {
     const result = await client.query({
       query: `SELECT
           SetId,
-          TargetPairs,
+          arrayMap(target -> target.1, Targets) AS TargetPairs,
+          arrayMap(target -> target.2, Targets) AS TargetParameters,
           toString(RepeatCount)     AS RepeatCount,
           SimulatorModel,
           JudgeModel,
           Parameters,
+          FirstTargetParameters,
           toString(max(HasNote))    AS UsesNote,
           toString(max(BatchRunAt)) AS LastRunAtMs
         FROM (
           SELECT
             SetId,
-            arraySort(groupUniqArray(TargetPair))  AS TargetPairs,
+            arraySort(groupUniqArray(tuple(TargetPair, TargetParameters))) AS Targets,
             max(PairRuns)                          AS RepeatCount,
             max(SimulatorModel)                    AS SimulatorModel,
             max(JudgeModel)                        AS JudgeModel,
-            argMin(Parameters, FirstRunId)         AS Parameters,
+            if(countIf(TargetParameters = '') > 0,
+               argMinIf(Parameters, FirstRunId, TargetParameters = ''),
+               argMin(Parameters, FirstRunId))     AS Parameters,
+            if(countIf(TargetParameters = '') > 0,
+               '',
+               argMin(TargetParameters, FirstRunId)) AS FirstTargetParameters,
             max(HasNote)                           AS HasNote,
             max(PairRunAt)                         AS BatchRunAt
           FROM (
@@ -121,6 +144,7 @@ export class RunConfigurationsClickHouseRepository {
               SetId,
               BatchRunId,
               TargetPair,
+              any(TargetParameters)      AS TargetParameters,
               count()                    AS PairRuns,
               max(SimulatorModel)        AS SimulatorModel,
               max(JudgeModel)            AS JudgeModel,
@@ -135,6 +159,7 @@ export class RunConfigurationsClickHouseRepository {
                 ScenarioId,
                 ScenarioRunId,
                 ${TARGET_PAIR_EXPR}        AS TargetPair,
+                ${TARGET_PARAMETERS_EXPR}  AS TargetParameters,
                 ${SIMULATOR_MODEL_EXPR}    AS SimulatorModel,
                 ${JUDGE_MODEL_EXPR}        AS JudgeModel,
                 ${RUN_PARAMETERS_EXPR}     AS Parameters,
@@ -148,7 +173,8 @@ export class RunConfigurationsClickHouseRepository {
           GROUP BY SetId, BatchRunId
         )
         GROUP BY
-          SetId, TargetPairs, RepeatCount, SimulatorModel, JudgeModel, Parameters
+          SetId, Targets, RepeatCount, SimulatorModel, JudgeModel,
+          Parameters, FirstTargetParameters
         ORDER BY max(BatchRunAt) DESC
         LIMIT {configurationLimit:UInt32}`,
       query_params: {

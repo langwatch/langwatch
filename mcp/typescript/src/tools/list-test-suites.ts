@@ -13,7 +13,7 @@ export async function handleListTestSuites(params: {
   }
 
   if (!Array.isArray(suites) || suites.length === 0) {
-    return "No test suites found in this project.\n\n> Tip: Use `platform_create_test_suite` to create one, then file scenarios in it with `folderId`.";
+    return "No test suites found in this project.\n\n> Tip: Use `platform_create_test_suite` to create one, then file scenarios in it with `testSuiteId`.";
   }
 
   const lines: string[] = [];

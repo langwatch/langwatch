@@ -6,7 +6,12 @@
  * tab so the dialog and whatever it was about to run are still here on the
  * way back.
  *
+ * A development agent of another person is one of the cards, drawn disabled
+ * with the reason on hover, so the list reads the same for everyone on the
+ * project.
+ *
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agents/connected-agents-ui.feature
  */
 
 import { chakra, VStack } from "@chakra-ui/react";

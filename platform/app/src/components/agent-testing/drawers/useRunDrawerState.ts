@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useScenarioRunDetail } from "~/components/simulations/ScenarioRunDetailDrawer";
+import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
 import {
   isCancellableStatus,
   useCancelScenarioRun,
@@ -16,9 +17,10 @@ import {
 import { useCan } from "~/hooks/useCan";
 import { useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import {
   isTerminalStatus,
-  type ScenarioRunStatus,
+  ScenarioRunStatus,
 } from "~/server/scenarios/scenario-event.enums";
 import { api } from "~/utils/api";
 
@@ -73,6 +75,33 @@ export function hasCriteria(scenarioState: {
 }
 
 /**
+ * True once the judge has spoken: criteria, a verdict, a reasoning or an error.
+ *
+ * A verdict is a verdict with no criteria under it. A scripted run, such as the
+ * ping an agent test sends, is judged by its script and answers with a verdict
+ * and a reasoning alone. The pending line and the reread both read this, so a
+ * scripted run stops asking for results it already holds.
+ */
+export function hasVerdict(scenarioState: {
+  results?: {
+    metCriteria?: string[] | null;
+    unmetCriteria?: string[] | null;
+    error?: unknown;
+    verdict?: unknown;
+    reasoning?: unknown;
+  } | null;
+}): boolean {
+  const results = scenarioState.results;
+  if (!results) return false;
+  return (
+    hasCriteria(scenarioState) ||
+    Boolean(results.error) ||
+    Boolean(results.verdict) ||
+    Boolean(results.reasoning)
+  );
+}
+
+/**
  * How long to wait before each reread of a settled run. The list also sets
  * how many rereads there are: once it runs out, the drawer stops asking.
  */
@@ -102,7 +131,7 @@ function useRereadOnSettled({
   const isSettledWithoutResults =
     !!scenarioState &&
     isTerminalStatus(scenarioState.status) &&
-    !hasCriteria(scenarioState as Parameters<typeof hasCriteria>[0]);
+    !hasVerdict(scenarioState as Parameters<typeof hasVerdict>[0]);
 
   const [rereadCount, setRereadCount] = useState(0);
 
@@ -161,12 +190,98 @@ function useResolvedScenarioRunId({ open }: { open: boolean }): {
   };
 }
 
+/**
+ * The run the drawer reads before its record exists.
+ *
+ * A run of one scenario opens the drawer the moment it is queued, and the
+ * record lands a moment later. Without a stand-in the drawer would draw a
+ * bare "Queued" line first and the whole layout after it, so the reader
+ * watches the drawer build itself. The stand-in carries what is true at that
+ * moment and nothing more: the run is queued, it holds no message, and it has
+ * no verdict.
+ */
+function queuedRunStandIn({
+  scenarioId,
+  batchRunId,
+}: {
+  scenarioId: string | undefined;
+  batchRunId: string | undefined;
+}): RunScenarioState {
+  return {
+    scenarioId: scenarioId ?? "",
+    batchRunId: batchRunId ?? "",
+    scenarioRunId: "",
+    status: ScenarioRunStatus.QUEUED,
+    messages: [],
+    timestamp: 0,
+    durationInMs: 0,
+  };
+}
+
+/**
+ * The detail the drawer draws: the stored run, or the queued stand-in while
+ * the record is still on its way.
+ *
+ * The scenario is read here rather than through the stream, because the
+ * stream learns the scenario id from the run it does not have yet.
+ */
+function useDrawerDetail({
+  detail,
+  scenarioId,
+  open,
+}: {
+  detail: RunDetail;
+  scenarioId: string | undefined;
+  open: boolean;
+}): RunDetail {
+  const { project } = useOrganizationTeamProject();
+  const params = useDrawerParams();
+  const targetNameMap = useTargetNameMap();
+  // NOT_FOUND is the ordinary answer while a run is queued, since the record
+  // is written after the job goes out. Only a read that truly failed stops
+  // the stand-in.
+  const isQueued =
+    open && !detail.scenarioState && !isHardReadError(detail.runStateError);
+
+  const { data: queuedScenario } =
+    api.scenarios.getByIdIncludingArchived.useQuery(
+      { projectId: project?.id ?? "", id: scenarioId ?? "" },
+      { enabled: isQueued && !!project?.id && !!scenarioId },
+    );
+
+  if (!isQueued) return detail;
+
+  return {
+    ...detail,
+    scenarioState: queuedRunStandIn({
+      scenarioId,
+      batchRunId: params.batchRunId,
+    }),
+    scenarioData: queuedScenario,
+    // The run has recorded no target yet, so the address it was opened from
+    // is what names it. The title then reads the same before and after the
+    // record lands.
+    displayTitle: buildDisplayTitle({
+      scenarioName: queuedScenario?.name ?? "",
+      targetName: params.targetId
+        ? (targetNameMap.get(params.targetId) ?? null)
+        : null,
+      iteration: undefined,
+    }),
+  };
+}
+
 export function useRunDrawerState({ open }: { open: boolean }) {
   const { scenarioRunId, scenarioId: knownScenarioId } =
     useResolvedScenarioRunId({ open });
 
-  const detail = useScenarioRunDetail({ scenarioRunId, open });
-  const { scenarioState } = detail;
+  const storedDetail = useScenarioRunDetail({ scenarioRunId, open });
+  const scenarioState = storedDetail.scenarioState;
+  const detail = useDrawerDetail({
+    detail: storedDetail,
+    scenarioId: knownScenarioId,
+    open,
+  });
   const isSideBySide = useSideBySideLayout();
 
   useRereadOnSettled({ scenarioRunId, scenarioState, open });
@@ -177,11 +292,28 @@ export function useRunDrawerState({ open }: { open: boolean }) {
   return {
     scenarioRunId,
     knownScenarioId,
+    /** The run to draw: the stored one, or the queued stand-in. */
     detail,
+    /** The stored run alone. Absent while the run is only queued. */
     scenarioState,
     scenarioVersion,
     isSideBySide,
+    /** True while the run-state read is still on its way. */
+    isReadingRun: storedDetail.isRunStateLoading && !storedDetail.runStateError,
+    /** True when the run-state read failed for a reason other than a run that does not exist yet. */
+    readFailed: isHardReadError(storedDetail.runStateError),
   };
+}
+
+/**
+ * True when a run-state read failed for a reason the reader must see.
+ *
+ * A run that is not found is the ordinary case while a run is queued: the
+ * record is written after the job goes out, so NOT_FOUND means "not yet".
+ */
+export function isHardReadError(error: unknown): boolean {
+  if (!error) return false;
+  return (error as { data?: { code?: string } }).data?.code !== "NOT_FOUND";
 }
 
 /** Whether this run can be stopped from the drawer, and how. */

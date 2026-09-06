@@ -14,6 +14,7 @@ import {
   type AssignablePullRequest,
   type AssignableSession,
   assignDrivingSessionsToPullRequests,
+  assignDrivingSessionsToPullRequestsPerBranch,
   assignSessionsToPullRequests,
   branchesOf,
 } from "../pull-request-assignment";
@@ -287,7 +288,8 @@ describe("assignDrivingSessionsToPullRequests", () => {
   });
 
   describe("given a session driving two branches that each have a live pull request", () => {
-    /** @scenario "A session that drove two pull requests counts toward only one of them" */
+    // The single-winner rule now prices only what has no finer record: the
+    // unstamped bucket. Stamped tokens split through the per-branch rule below.
     it("counts it toward the one it opened first and toward the other not at all", () => {
       const assignments = assignDrivingSessionsToPullRequests({
         sessions: [
@@ -392,6 +394,73 @@ describe("assignDrivingSessionsToPullRequests", () => {
       });
 
       expect(assignments.size).toBe(0);
+    });
+  });
+});
+
+describe("assignDrivingSessionsToPullRequestsPerBranch", () => {
+  describe("given a session driving two branches that each have a live pull request", () => {
+    it("answers with each branch's own winner", () => {
+      const assignments = assignDrivingSessionsToPullRequestsPerBranch({
+        sessions: [
+          {
+            sessionId: "both",
+            startedAtMs: base,
+            headBranches: ["feat/first", "feat/second"],
+          },
+        ],
+        pullRequests: [
+          pullRequest({ prNumber: 9, headBranch: "feat/first" }),
+          pullRequest({ prNumber: 21, headBranch: "feat/second" }),
+        ],
+      });
+
+      const perBranch = assignments.get("both");
+      expect(perBranch?.get("feat/first")).toBe(9);
+      expect(perBranch?.get("feat/second")).toBe(21);
+    });
+  });
+
+  describe("given a recycled branch with an old and a new pull request", () => {
+    /** @scenario "Two pull requests on one branch split by era, not by double counting" */
+    it("answers with the branch's tenure winner alone", () => {
+      const assignments = assignDrivingSessionsToPullRequestsPerBranch({
+        sessions: [
+          {
+            sessionId: "later-era",
+            startedAtMs: base + 5 * HOUR,
+            headBranches: ["feat/linkage"],
+          },
+        ],
+        pullRequests: [
+          pullRequest({
+            prNumber: 9,
+            prCreatedAtMs: base,
+            prClosedAtMs: base + HOUR,
+            prMergedAtMs: base + HOUR,
+          }),
+          pullRequest({ prNumber: 21, prCreatedAtMs: base + 4 * HOUR }),
+        ],
+      });
+
+      expect(assignments.get("later-era")?.get("feat/linkage")).toBe(21);
+    });
+  });
+
+  describe("given a session whose branches map to no pull request", () => {
+    it("leaves the session out of the answer entirely", () => {
+      const assignments = assignDrivingSessionsToPullRequestsPerBranch({
+        sessions: [
+          {
+            sessionId: "unlinked",
+            startedAtMs: base,
+            headBranches: ["feat/nowhere"],
+          },
+        ],
+        pullRequests: [pullRequest({ prNumber: 7 })],
+      });
+
+      expect(assignments.has("unlinked")).toBe(false);
     });
   });
 });

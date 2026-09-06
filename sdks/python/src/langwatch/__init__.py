@@ -9,6 +9,7 @@ from .state import get_api_key, get_endpoint
 from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
 from .prompts.types import FetchPolicy
+from .agent import AgentCall, AgentReply, Message, Param, connect_agent
 
 # Imported eagerly rather than lazily like the facades: a webhook receiver
 # verifies a delivery inside a request handler and never calls setup(), and
@@ -261,6 +262,12 @@ __all__ = [
     "langchain",
     "dspy",
     "FetchPolicy",
+    "connect_agent",
+    "AgentCall",
+    "AgentReply",
+    "Message",
+    "Param",
+    "agent",
     "agents",
     "scenarios",
     "suites",

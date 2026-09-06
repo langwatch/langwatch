@@ -1,6 +1,6 @@
 """Unit tests for server-side ``langwatch.workflow.run`` with per-row results.
 
-These mock the HTTP boundary (``httpx.Client``) so we assert the SDK posts to
+These mock the HTTP boundary (``create_client``) so we assert the SDK posts to
 ``/api/workflows/{workflow_id}/evaluate`` and that ``result.results`` builds the
 SAME per-row DataFrame shape an experiment run returns.
 
@@ -158,8 +158,8 @@ class TestWorkflowRunWithInlineData:
         _script_full_run()
         rows = [{"input": "hi"}, {"input": "bye"}]
 
-        with patch.object(platform_run.httpx, "Client", _FakeClient), patch.object(
-            workflow_module.httpx, "Client", _FakeClient
+        with patch.object(platform_run, "create_client", _FakeClient), patch.object(
+            workflow_module, "create_client", _FakeClient
         ):
             result = workflow_run("workflow_abc", data=rows, poll_interval=0)
 
@@ -191,8 +191,8 @@ class TestWorkflowRunWithDatasetId:
 
     def test_posts_dataset_id_and_no_inline_data(self):
         _script_full_run()
-        with patch.object(platform_run.httpx, "Client", _FakeClient), patch.object(
-            workflow_module.httpx, "Client", _FakeClient
+        with patch.object(platform_run, "create_client", _FakeClient), patch.object(
+            workflow_module, "create_client", _FakeClient
         ):
             workflow_run("workflow_abc", dataset_id="ds_xyz", poll_interval=0)
 
@@ -207,8 +207,8 @@ class TestWorkflowRunWithParameters:
 
     def test_parameters_and_version_in_body(self):
         _script_full_run()
-        with patch.object(platform_run.httpx, "Client", _FakeClient), patch.object(
-            workflow_module.httpx, "Client", _FakeClient
+        with patch.object(platform_run, "create_client", _FakeClient), patch.object(
+            workflow_module, "create_client", _FakeClient
         ):
             workflow_run(
                 "workflow_abc",
@@ -230,7 +230,7 @@ class TestWorkflowRunValidation:
     """when both inline data and a dataset id are provided"""
 
     def test_raises_value_error_before_any_http_call(self):
-        with patch.object(workflow_module.httpx, "Client", _FakeClient):
+        with patch.object(workflow_module, "create_client", _FakeClient):
             with pytest.raises(ValueError):
                 workflow_run("workflow_abc", data=[{"q": "x"}], dataset_id="ds_xyz")
 
@@ -242,7 +242,7 @@ class TestWorkflowRunErrors:
 
     def test_404_maps_to_workflow_not_found(self):
         _FakeClient.post_responses = {"/evaluate": _FakeResponse(404)}
-        with patch.object(workflow_module.httpx, "Client", _FakeClient):
+        with patch.object(workflow_module, "create_client", _FakeClient):
             with pytest.raises(ValueError) as exc:
                 workflow_run("missing_wf", data=[{"q": "x"}], poll_interval=0)
         assert "missing_wf" in str(exc.value)
@@ -253,7 +253,7 @@ class TestWorkflowRunErrors:
                 400, {"error": "Workflow has no committed version"}
             )
         }
-        with patch.object(workflow_module.httpx, "Client", _FakeClient):
+        with patch.object(workflow_module, "create_client", _FakeClient):
             with pytest.raises(ValueError) as exc:
                 workflow_run("wf_uncommitted", data=[{"q": "x"}], poll_interval=0)
         assert "committed version" in str(exc.value)

@@ -15,7 +15,7 @@
  * The local-git cases below are therefore the important half of this file.
  */
 import { describe, expect, it } from "vitest";
-import { needsGithubAuth } from "../githubCommand";
+import { githubProgressFromToolParts, needsGithubAuth } from "../githubCommand";
 
 describe("needsGithubAuth", () => {
   describe("given the GitHub CLI", () => {
@@ -113,6 +113,111 @@ describe("needsGithubAuth", () => {
       expect(needsGithubAuth("")).toBe(false);
       expect(needsGithubAuth("   ")).toBe(false);
       expect(needsGithubAuth("&&")).toBe(false);
+    });
+  });
+});
+
+/**
+ * The steps card's own recogniser. An agent working in a developer's own folder
+ * runs the whole tail of the flow as one call, so the card is only correct if a
+ * chained command contributes every step it ran.
+ *
+ * @see specs/langy/langy-github-prs.feature
+ */
+describe("githubProgressFromToolParts", () => {
+  const chain =
+    'git add app/agent.py README.md && git commit -m "feat: add LangWatch tracing" && git push -u origin HEAD && gh pr create --base main --title "Add tracing"';
+
+  describe("given one settled command that commits, pushes and opens the PR", () => {
+    /** @scenario "One command that commits, pushes and opens the PR ticks all three steps" */
+    it("reaches the committed, pushed and opened steps", () => {
+      const events = githubProgressFromToolParts([
+        {
+          type: "tool-local_bash",
+          input: { command: chain },
+          state: "output-available",
+        },
+      ]);
+
+      expect(events.map((event) => event.stage)).toEqual([
+        "committed",
+        "pushed",
+        "opened",
+      ]);
+      expect(events[0]?.detail).toBe("feat: add LangWatch tracing");
+    });
+  });
+
+  describe("when that command failed", () => {
+    /** @scenario "A step whose command errored is not reached" */
+    it("reaches no step at all", () => {
+      expect(
+        githubProgressFromToolParts([
+          {
+            type: "tool-local_bash",
+            input: { command: chain },
+            state: "output-error",
+          },
+        ]),
+      ).toEqual([]);
+    });
+  });
+
+  describe("given the chain printed the pull request URL", () => {
+    /** @scenario "The pull request URL printed by the command reaches the opened step" */
+    it("carries the URL on the opened step", () => {
+      const events = githubProgressFromToolParts([
+        {
+          type: "tool-local_bash",
+          input: { command: chain },
+          state: "output-available",
+          output: [
+            "exit code: 0",
+            "",
+            "stdout:",
+            "branch 'langy/add-tracing' set up to track 'origin/langy/add-tracing'.",
+            "Warning: 1 uncommitted change",
+            "https://github.com/acme/support-agent/pull/12",
+          ].join("\n"),
+        },
+      ]);
+
+      expect(events.find((event) => event.stage === "opened")?.url).toBe(
+        "https://github.com/acme/support-agent/pull/12",
+      );
+      expect(
+        events.find((event) => event.stage === "pushed")?.url,
+      ).toBeUndefined();
+    });
+  });
+
+  describe("given a command that printed no pull request URL", () => {
+    /** @scenario "A command that opened no pull request leaves the opened step without a URL" */
+    it("leaves the opened step without a URL", () => {
+      const events = githubProgressFromToolParts([
+        {
+          type: "tool-local_bash",
+          input: { command: 'gh pr create --title "Add tracing" --body b' },
+          state: "output-available",
+          output: "exit code: 0\n\nstdout:\n",
+        },
+      ]);
+
+      expect(events).toEqual([{ stage: "opened" }]);
+    });
+  });
+
+  describe("when the chain is still running", () => {
+    it("shows only the first step as under way", () => {
+      const events = githubProgressFromToolParts([
+        {
+          type: "tool-bash",
+          input: { command: "git clone https://github.com/acme/foo && cd foo" },
+          state: "input-available",
+        },
+      ]);
+
+      expect(events).toEqual([{ stage: "cloning", detail: "acme/foo" }]);
     });
   });
 });

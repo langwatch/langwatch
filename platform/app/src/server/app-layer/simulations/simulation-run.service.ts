@@ -76,6 +76,7 @@ export class SimulationRunService {
     cursor?: string;
     startDate?: number;
     endDate?: number;
+    shouldIncludeMessages?: boolean;
   }): Promise<{
     runs: ScenarioRunData[];
     nextCursor?: string;
@@ -137,6 +138,7 @@ export class SimulationRunService {
     startDate?: number;
     endDate?: number;
     sinceTimestamp?: number;
+    shouldIncludeMessages?: boolean;
   }) {
     return this.repository.getRunDataForAllSuites(params);
   }

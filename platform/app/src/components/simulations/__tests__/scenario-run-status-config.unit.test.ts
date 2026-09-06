@@ -51,7 +51,7 @@ describe("scenario-run-status-config", () => {
 
     describe("when a run has not settled yet", () => {
       // A run still in flight once read in the same warm colour as a
-      // failure, so a list of running cases looked like a broken run.
+      // failure, so a list of running scenarios looked like a broken run.
       /** @scenario "A run that is still going does not read as a failure" */
       it("reads in the colour of a queued run, not of a failed one", () => {
         const queued = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.QUEUED];
@@ -69,6 +69,20 @@ describe("scenario-run-status-config", () => {
           expect(config.colorPalette).not.toBe(failed.colorPalette);
         }
       });
+    });
+  });
+
+  describe("when a run is waiting on its evaluators", () => {
+    /** @scenario "The results page draws a pending run as still going" */
+    it("reads as evaluating and not as a completed run", () => {
+      const config =
+        SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.PENDING_EVALUATION];
+
+      expect(config.label).toBe("evaluating");
+      expect(config.isComplete).toBe(false);
+      expect(
+        SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.PENDING_EVALUATION],
+      ).toBeDefined();
     });
   });
 

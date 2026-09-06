@@ -7,7 +7,7 @@
  *   - a RUN PLAN is what you run. It is identified by its NAME: a run started
  *     under a name joins the plan of that name and replaces its configuration,
  *     or creates the plan when nothing answers.
- *   - a TEST SUITE is a folder of scenarios. It holds what it collects and
+ *   - a TEST SUITE is a group of scenarios. It holds what it collects and
  *     nothing about how a run of it is executed, so the targets, the repeat
  *     count and the models arrive with the run request.
  *
@@ -17,8 +17,20 @@
 
 import { z } from "zod";
 import type { SimulationSuite } from "~/generated/prisma/client";
+import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
+import {
+  evaluatorAttachmentSchema,
+  MAX_EVALUATOR_ATTACHMENTS,
+  parseEvaluatorAttachments,
+  scenarioMappingSchema,
+} from "~/server/scenarios/evaluator-attachments";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runNoteSchema } from "~/server/scenarios/run-note";
+import {
+  MAX_SUITE_FIELDS,
+  parseSuiteFieldDefinitions,
+  suiteFieldDefinitionSchema,
+} from "~/server/scenarios/suite-fields";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import { MAX_PLAN_NAME_LENGTH } from "~/server/suites/plan-name";
 import { parseSuiteScope, suiteScopeSchema } from "~/server/suites/scope";
@@ -26,18 +38,61 @@ import { parseSuiteScope, suiteScopeSchema } from "~/server/suites/scope";
 /**
  * A target on the wire.
  *
- * The two fields that address a target, and no more: the prompt-input bindings
- * and the remembered run values the domain target also carries are written by
- * the platform's own run dialog, never sent by an API caller.
+ * What addresses a target, plus the parameter values that target alone runs
+ * with. The prompt-input bindings the domain target also carries are written
+ * by the platform's own run dialog, never sent by an API caller.
  */
 export const suiteTargetSchema = z.object({
   type: z
-    .enum(["prompt", "http", "code", "workflow"])
-    .describe("What kind of thing the scenarios run against."),
+    .enum(["prompt", "http", "code", "workflow", "connected"])
+    .describe(
+      "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.",
+    ),
   referenceId: z
     .string()
-    .describe("The id of the prompt, agent or workflow to run against."),
+    .describe(
+      "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id.",
+    ),
+  runParameters: runParameterValuesSchema
+    .optional()
+    .describe(
+      "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target.",
+    ),
 });
+
+export const suiteFieldWireSchema = suiteFieldDefinitionSchema.describe(
+  "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it.",
+);
+
+export const suiteFieldsWireSchema = z
+  .array(suiteFieldWireSchema)
+  .max(MAX_SUITE_FIELDS)
+  .describe(
+    `The fields the test suite declares, in the order the platform shows them. Up to ${MAX_SUITE_FIELDS}. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean.`,
+  );
+
+export const scenarioMappingWireSchema = scenarioMappingSchema.describe(
+  "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal.",
+);
+
+export const evaluatorAttachmentWireSchema = evaluatorAttachmentSchema
+  .extend({
+    mappings: z
+      .record(z.string().min(1).max(128), scenarioMappingWireSchema)
+      .describe(
+        "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.",
+      ),
+  })
+  .describe(
+    "One evaluator that runs after every scenario run, with where each of its inputs reads from.",
+  );
+
+export const evaluatorAttachmentsWireSchema = z
+  .array(evaluatorAttachmentWireSchema)
+  .max(MAX_EVALUATOR_ATTACHMENTS)
+  .describe(
+    `The evaluators that run after every scenario run. Up to ${MAX_EVALUATOR_ATTACHMENTS}. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates.`,
+  );
 
 /** What a query string may say for yes and for no. Compared case-folded. */
 const QUERY_BOOLEAN_TRUE = ["true", "1", "yes"];
@@ -71,7 +126,7 @@ export const queryBoolean = z
 
 /** What a run plan covers. */
 export const runPlanScopeSchema = suiteScopeSchema.describe(
-  "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
+  "What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
 );
 
 /** The configuration a run plan holds, as a caller sends it. */
@@ -79,7 +134,9 @@ export const runPlanConfigSchema = z.object({
   scope: runPlanScopeSchema,
   targets: z
     .array(suiteTargetSchema)
-    .describe("The prompts, agents or workflows every scenario runs against."),
+    .describe(
+      "The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run.",
+    ),
   repeatCount: z
     .number()
     .int()
@@ -89,14 +146,12 @@ export const runPlanConfigSchema = z.object({
     .describe(
       `How many times each scenario and target pairing runs. Between 1 and ${MAX_REPEAT_COUNT}; defaults to 1.`,
     ),
-  simulatorModel: z
-    .string()
+  simulatorModel: modelOverrideSchema
     .nullish()
     .describe(
       "The model that plays the user for every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default.",
     ),
-  judgeModel: z
-    .string()
+  judgeModel: modelOverrideSchema
     .nullish()
     .describe(
       "The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default.",
@@ -105,7 +160,12 @@ export const runPlanConfigSchema = z.object({
     .array(z.string())
     .optional()
     .describe(
-      "The scenarios a cases scope covers. Read by that scope alone; a scope that states a rule resolves its own list at run time.",
+      "The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time.",
+    ),
+  evaluators: evaluatorAttachmentsWireSchema
+    .optional()
+    .describe(
+      "The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds.",
     ),
 });
 
@@ -120,7 +180,7 @@ const runValuesShape = {
   parameters: runParameterValuesSchema
     .optional()
     .describe(
-      "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name.",
+      "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target.",
     ),
   note: runNoteSchema.describe(
     "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters.",
@@ -154,7 +214,7 @@ export const testSuiteRunInputSchema = z.object({
   targets: z
     .array(suiteTargetSchema)
     .describe(
-      "The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them.",
+      "The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run.",
     ),
   name: z
     .string()
@@ -174,14 +234,12 @@ export const testSuiteRunInputSchema = z.object({
     .describe(
       `How many times each scenario and target pairing runs. Between 1 and ${MAX_REPEAT_COUNT}; defaults to 1.`,
     ),
-  simulatorModel: z
-    .string()
+  simulatorModel: modelOverrideSchema
     .nullish()
     .describe(
       "The model that plays the user for every scenario in this run. Leave it out for the scenario or project default.",
     ),
-  judgeModel: z
-    .string()
+  judgeModel: modelOverrideSchema
     .nullish()
     .describe(
       "The model that judges every scenario in this run. Leave it out for the scenario or project default.",
@@ -208,7 +266,9 @@ export const runPlanSchema = z.object({
     .describe("The scenarios the last run of this plan covered."),
   targets: z
     .array(suiteTargetSchema)
-    .describe("What the plan runs against, in the order the results show."),
+    .describe(
+      "What the plan runs against, in the order the results show. A target carrying runParameters runs with those values.",
+    ),
   repeatCount: z
     .number()
     .describe("How many times each scenario and target pairing runs."),
@@ -225,6 +285,11 @@ export const runPlanSchema = z.object({
       "The model that judges the run, or null for the scenario or project default.",
     ),
   labels: z.array(z.string()).describe("The labels the plan carries."),
+  evaluators: evaluatorAttachmentsWireSchema
+    .optional()
+    .describe(
+      "The plan's own evaluators. Absent on servers that predate evaluators on this family.",
+    ),
   archivedAt: z
     .string()
     .nullable()
@@ -293,6 +358,16 @@ export const testSuiteSchema = z.object({
     .array(z.string())
     .describe("The scenarios filed in this suite, in the order it shows them."),
   scenarioCount: z.number().describe("How many scenarios are filed in it."),
+  fields: suiteFieldsWireSchema
+    .optional()
+    .describe(
+      "The fields the test suite declares. Absent on servers that predate fields on this family.",
+    ),
+  evaluators: evaluatorAttachmentsWireSchema
+    .optional()
+    .describe(
+      "The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.",
+    ),
   archivedAt: z
     .string()
     .nullable()
@@ -316,6 +391,37 @@ export const testSuiteDetailSchema = testSuiteSchema.extend({
     )
     .describe(
       "The active scenarios filed in this suite. An archived scenario is left out.",
+    ),
+});
+
+export const testSuiteCreateInputSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_PLAN_NAME_LENGTH)
+    .describe("The test suite name, as it reads in the platform."),
+  fields: suiteFieldsWireSchema.optional(),
+  evaluators: evaluatorAttachmentsWireSchema.optional(),
+});
+
+export const testSuiteUpdateInputSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_PLAN_NAME_LENGTH)
+    .optional()
+    .describe("The new name. The slug is kept."),
+  fields: suiteFieldsWireSchema
+    .optional()
+    .describe(
+      "The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use.",
+    ),
+  evaluators: evaluatorAttachmentsWireSchema
+    .optional()
+    .describe(
+      "The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid.",
     ),
 });
 
@@ -396,6 +502,7 @@ export function toRunPlanWire({
     simulatorModel: suite.simulatorModel,
     judgeModel: suite.judgeModel,
     labels: suite.labels,
+    evaluators: parseEvaluatorAttachments(suite.evaluators),
     archivedAt: suite.archivedAt?.toISOString() ?? null,
     createdAt: suite.createdAt.toISOString(),
     updatedAt: suite.updatedAt.toISOString(),
@@ -417,6 +524,8 @@ export function toTestSuiteWire({
     slug: suite.slug,
     scenarioIds: suite.scenarioIds,
     scenarioCount: suite.scenarioIds.length,
+    fields: parseSuiteFieldDefinitions(suite.fields),
+    evaluators: parseEvaluatorAttachments(suite.evaluators),
     archivedAt: suite.archivedAt?.toISOString() ?? null,
     createdAt: suite.createdAt.toISOString(),
     updatedAt: suite.updatedAt.toISOString(),

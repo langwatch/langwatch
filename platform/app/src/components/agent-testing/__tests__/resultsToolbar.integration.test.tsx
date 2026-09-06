@@ -50,6 +50,14 @@ const mockPush = vi.hoisted(() =>
 const codeScenarioState = vi.hoisted(() => ({
   scenarios: [] as { key: string; name: string }[],
 }));
+const codeTargetState = vi.hoisted(() => ({
+  targets: [] as {
+    key: string;
+    name: string;
+    referenceId?: string | null;
+    parameters?: Record<string, string> | null;
+  }[],
+}));
 const overviewState = vi.hoisted(() => ({
   byGroupBy: {} as Record<string, unknown>,
   lastInput: null as Record<string, unknown> | null,
@@ -78,9 +86,9 @@ vi.mock("~/utils/api", () => ({
       getSummaries: { useQuery: () => ({ data: {}, isLoading: false }) },
       getById: { useQuery: () => ({ data: undefined }) },
       // The row menu of a run plan archives it, through the suite call for a
-      // plan and the folder call for a test suite.
+      // plan and the test suite call for a test suite.
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      folders: {
+      testSuites: {
         archive: {
           useMutation: () => ({ mutate: vi.fn(), isPending: false }),
         },
@@ -101,6 +109,9 @@ vi.mock("~/utils/api", () => ({
       },
       getCodeScenarios: {
         useQuery: () => ({ data: codeScenarioState.scenarios }),
+      },
+      getRunTargets: {
+        useQuery: () => ({ data: codeTargetState.targets }),
       },
       getResultsOverview: {
         useQuery: (input: Record<string, unknown>) => {
@@ -134,8 +145,13 @@ vi.mock("~/utils/api", () => ({
       getAll: {
         useQuery: () => ({
           data: [
-            { id: "agent_dev", name: "dev-agent" },
-            { id: "agent_prod", name: "prod-agent" },
+            {
+              id: "agent_dev",
+              name: "dev-agent",
+              type: "connected",
+              environment: "development",
+            },
+            { id: "agent_prod", name: "prod-agent", type: "http" },
           ],
         }),
       },
@@ -226,6 +242,7 @@ function makeAtom(overrides: Record<string, unknown> = {}) {
     scenarioKey: "scen_1",
     scenarioName: null,
     targetKey: "agent_dev",
+    targetName: null,
     status: "SUCCESS",
     outcome: "passed",
     durationMs: 1000,
@@ -322,6 +339,7 @@ describe("the toolbar of the Results tab", () => {
     overviewState.lastInput = null;
     onSelectRun.mockClear();
     codeScenarioState.scenarios = [];
+    codeTargetState.targets = [];
   });
 
   afterEach(() => {
@@ -660,8 +678,8 @@ describe("the toolbar of the Results tab", () => {
       ]);
     });
 
-    /** @scenario "A run from code reads From code for its target and its scope" */
-    it("reads From code as the scope and the target of a set that runs from code", async () => {
+    /** @scenario "A run from code reads default for its target and From code for its scope" */
+    it("reads From code as the scope and default as the target of a set that runs from code", async () => {
       const user = userEvent.setup();
       overviewState.byGroupBy.plan = {
         totals: makeTotals(),
@@ -693,13 +711,129 @@ describe("the toolbar of the Results tab", () => {
       expect(within(row).getByTestId("plan-scope")).toHaveTextContent(
         "From code",
       );
+      expect(within(row).getByTestId("plan-targets")).toHaveTextContent(
+        "default",
+      );
       expect(row).not.toHaveTextContent(/unknown/i);
       expect(row).not.toHaveTextContent(/whatever/i);
 
       await user.click(screen.getByRole("radio", { name: "Target" }));
       const target = await screen.findByTestId("results-group-row-unknown");
-      expect(target).toHaveTextContent("From code");
+      expect(target).toHaveTextContent("default");
+      expect(within(target).getByTestId("from-code-badge")).toHaveTextContent(
+        "from code",
+      );
       expect(target).not.toHaveTextContent(/unknown/i);
+    });
+
+    /** @scenario "A target named by a run from code reads that name with the from code mark" */
+    it("reads a target a run from code named under that name, with the from code mark", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.target = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "code:acmesupportagent",
+            title: "AcmeSupportAgent",
+          }),
+        ],
+      };
+
+      renderList();
+      await user.click(screen.getByRole("radio", { name: "Target" }));
+
+      const row = await screen.findByTestId(
+        "results-group-row-code:acmesupportagent",
+      );
+      expect(row).toHaveTextContent("AcmeSupportAgent");
+      expect(within(row).getByTestId("from-code-badge")).toHaveTextContent(
+        "from code",
+      );
+      expect(row).not.toHaveTextContent(/code:/);
+    });
+
+    /** @scenario "The Targets column reads the agent name a run from code reported" */
+    it("reads the agent a run from code named in the Targets column of its plan", () => {
+      codeTargetState.targets = [
+        { key: "code:acmesupportagent", name: "AcmeSupportAgent" },
+      ];
+      overviewState.byGroupBy.plan = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "default",
+            targetKeys: ["code:acmesupportagent"],
+            lastRunAt: NOW,
+          }),
+        ],
+      };
+
+      renderList({
+        externalSets: [
+          {
+            scenarioSetId: "default",
+            passedCount: 1,
+            failedCount: 0,
+            totalCount: 1,
+            lastRunTimestamp: NOW,
+          },
+        ],
+      });
+
+      const row = screen.getByTestId("run-plan-row-external:default");
+      expect(within(row).getByTestId("plan-targets")).toHaveTextContent(
+        "AcmeSupportAgent",
+      );
+    });
+
+    /** @scenario "The Target filter lists the targets named by runs from code" */
+    it("offers a target a run from code named in the Target filter, by its key", async () => {
+      const user = userEvent.setup();
+      codeTargetState.targets = [
+        { key: "code:acmesupportagent", name: "AcmeSupportAgent" },
+      ];
+      renderList();
+
+      await user.click(screen.getByTestId("results-filter-target"));
+      await user.click(
+        await screen.findByRole("menuitemcheckbox", {
+          name: /acmesupportagent/i,
+        }),
+      );
+
+      expect(overviewState.lastInput?.targetKeys).toEqual([
+        "code:acmesupportagent",
+      ]);
+    });
+
+    /** @scenario "A run line reads the agent name its run reported" */
+    it("names the agent a run reported on the run line behind its target row", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.target = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "code:acmesupportagent",
+            title: "AcmeSupportAgent",
+          }),
+        ],
+      };
+      atomState.atoms = [
+        makeAtom({
+          executionId: "exec_c",
+          targetKey: "code:acmesupportagent",
+          targetName: "AcmeSupportAgent",
+        }),
+      ];
+
+      renderList();
+      await user.click(screen.getByRole("radio", { name: "Target" }));
+      await user.click(
+        await screen.findByTestId("results-group-row-code:acmesupportagent"),
+      );
+
+      const line = await screen.findByTestId("results-run-line-exec_c");
+      expect(line).toHaveTextContent("AcmeSupportAgent");
     });
 
     /** @scenario "Choosing a run inside an opened row lands on its plan at that run" */
@@ -807,6 +941,33 @@ describe("the toolbar of the Results tab", () => {
       );
     });
 
+    /** @scenario "A target row is marked with the kind of agent behind it" */
+    it("marks each target row with the kind of its agent, in no colour", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.target = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({ key: "agent_prod", title: "prod-agent" }),
+          makeGroup({ key: "agent_dev", title: "dev-agent" }),
+        ],
+      };
+
+      renderList();
+
+      await user.click(screen.getByRole("radio", { name: "Target" }));
+
+      const dev = await screen.findByTestId(
+        "results-group-target-mark-agent_dev",
+      );
+      const prod = screen.getByTestId("results-group-target-mark-agent_prod");
+
+      expect(dev.dataset.kind).toBe("connected");
+      expect(prod.dataset.kind).toBe("http");
+      // The colour tells the targets of a comparison apart, and this list
+      // compares nothing.
+      expect(dev.dataset.color).toBeUndefined();
+    });
+
     /** @scenario "Grouping by none reads the flat list" */
     it("lists one row per scenario, target and run", async () => {
       const user = userEvent.setup();
@@ -834,6 +995,84 @@ describe("the toolbar of the Results tab", () => {
       expect(
         within(table).getByTestId("results-flat-row-exec_2"),
       ).toHaveTextContent("prod-agent");
+    });
+  });
+
+  describe("when a target ran with parameter overrides", () => {
+    const VARIANT_KEY = "agent_prod#0123abcd";
+    const variant = {
+      key: VARIANT_KEY,
+      referenceId: "agent_prod",
+      parameters: { model: "gpt-5-mini" },
+      name: VARIANT_KEY,
+    };
+
+    /** @scenario "A target group row names its parameters" */
+    it("reads the bare agent and its variant as two target rows", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.target = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "agent_prod",
+            title: "prod-agent",
+            targetParameters: null,
+          }),
+          makeGroup({
+            key: VARIANT_KEY,
+            title: "prod-agent",
+            targetParameters: { model: "gpt-5-mini" },
+          }),
+        ],
+      };
+
+      renderList();
+
+      await user.click(screen.getByRole("radio", { name: "Target" }));
+
+      const bare = await screen.findByTestId("results-group-row-agent_prod");
+      const withModel = screen.getByTestId(`results-group-row-${VARIANT_KEY}`);
+      expect(bare).toHaveTextContent("prod-agent");
+      expect(bare).not.toHaveTextContent("model=");
+      expect(withModel).toHaveTextContent("prod-agent · model=gpt-5-mini");
+    });
+
+    /** @scenario "The Targets cell of a plan names each variant" */
+    it("names each variant in the Targets cell of the plan", () => {
+      codeTargetState.targets = [variant];
+      overviewState.byGroupBy.plan = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "checkout",
+            targetKeys: ["agent_prod", VARIANT_KEY],
+          }),
+        ],
+      };
+
+      renderList();
+
+      expect(
+        within(screen.getByTestId("run-plan-row-checkout")).getByTestId(
+          "plan-targets",
+        ),
+      ).toHaveTextContent("prod-agent vs prod-agent · model=gpt-5-mini");
+    });
+
+    /** @scenario "The Target filter offers a parameter variant" */
+    it("offers the variant in the Target filter and narrows the read to its key", async () => {
+      const user = userEvent.setup();
+      codeTargetState.targets = [variant];
+      renderList();
+
+      await user.click(screen.getByTestId("results-filter-target"));
+      await user.click(
+        await screen.findByRole("menuitemcheckbox", {
+          name: "prod-agent · model=gpt-5-mini",
+        }),
+      );
+
+      expect(overviewState.lastInput?.targetKeys).toEqual([VARIANT_KEY]);
     });
   });
 });

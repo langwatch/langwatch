@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  *
  * The small pieces every Agent Testing surface shares: what the last run
- * said, what it cost, which version of a case ran, and the row that opens a
- * folder of cases.
+ * said, what it cost, which version of a scenario ran, and the row that opens a
+ * test suite of scenarios.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
@@ -14,9 +14,9 @@ import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { CaseVersionChip } from "../shared/CaseVersionChip";
-import { FolderHeaderRow } from "../shared/FolderHeaderRow";
 import { LastResultLabel } from "../shared/LastResultLabel";
 import { ResultMetricsInline } from "../shared/ResultMetricsInline";
+import { TestSuiteHeaderRow } from "../shared/TestSuiteHeaderRow";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -49,7 +49,7 @@ describe("<LastResultLabel/>", () => {
     expect(screen.getByText("Failed (1/3)")).toBeInTheDocument();
   });
 
-  it("says a case never ran", () => {
+  it("says a scenario never ran", () => {
     render(<LastResultLabel />, { wrapper: Wrapper });
 
     expect(screen.getByText("Not run")).toBeInTheDocument();
@@ -99,21 +99,21 @@ describe("<CaseVersionChip/>", () => {
     expect(screen.getByText("v3")).toBeInTheDocument();
   });
 
-  it("draws nothing while a case carries no version", () => {
+  it("draws nothing while a scenario carries no version", () => {
     const { container } = render(<CaseVersionChip />, { wrapper: Wrapper });
 
     expect(container.textContent).toBe("");
   });
 });
 
-describe("<FolderHeaderRow/>", () => {
+describe("<TestSuiteHeaderRow/>", () => {
   afterEach(cleanup);
 
   const renderRow = (
-    props: Partial<React.ComponentProps<typeof FolderHeaderRow>> = {},
+    props: Partial<React.ComponentProps<typeof TestSuiteHeaderRow>> = {},
   ) =>
     render(
-      <FolderHeaderRow
+      <TestSuiteHeaderRow
         name="Checkout"
         caseCount={4}
         templateColumns="minmax(0,1fr) auto"
@@ -122,14 +122,14 @@ describe("<FolderHeaderRow/>", () => {
       { wrapper: Wrapper },
     );
 
-  it("names the folder and how many cases it holds", () => {
+  it("names the test suite and how many scenarios it holds", () => {
     renderRow();
 
     expect(screen.getByText("Checkout")).toBeInTheDocument();
     expect(screen.getByLabelText("4 scenarios")).toBeInTheDocument();
   });
 
-  it("counts one case as one", () => {
+  it("counts one scenario as one", () => {
     renderRow({ caseCount: 1 });
 
     expect(screen.getByLabelText("1 scenario")).toBeInTheDocument();
@@ -142,7 +142,7 @@ describe("<FolderHeaderRow/>", () => {
     expect(screen.queryByTestId("run-metrics-summary")).not.toBeInTheDocument();
   });
 
-  it("opens the folder when the row is chosen", async () => {
+  it("opens the test suite when the row is chosen", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
     renderRow({ onClick });
@@ -152,7 +152,7 @@ describe("<FolderHeaderRow/>", () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it("opens the folder from the keyboard", async () => {
+  it("opens the test suite from the keyboard", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
     renderRow({ onClick });

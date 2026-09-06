@@ -1,7 +1,8 @@
 /**
  * What the judge decided about one run: a labelled verdict line, then the
  * criteria that passed in one section, the criteria that failed in another,
- * and whatever the judge said about the run as a whole.
+ * the evaluators that ran on the scenario, and whatever the judge said about
+ * the run as a whole.
  *
  * The panel carries no status pill, no success rate, no criteria count and no
  * duration: the chip strip at the top of the drawer already reads all four.
@@ -9,13 +10,31 @@
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { CircleCheck, CircleX, XCircle } from "lucide-react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  CircleMinus,
+  CircleX,
+  TriangleAlert,
+  XCircle,
+} from "lucide-react";
+import { useState } from "react";
+import { formatScore } from "~/components/shared/formatters";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
-import { JsonHighlight } from "~/features/onboarding/components/sections/shared/JsonHighlight";
-import { safePrettyJson } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import {
+  resolveScenarioError,
+  scenarioErrorDetail,
+  scenarioErrorTitle,
+} from "~/server/scenarios/scenario-infra-error";
+import {
+  failedRequiredEvaluatorName,
+  type RunEvaluation,
+} from "../results/evaluation-summaries";
 import { FG_MUTED } from "../shared/design";
+import { PASS_RATE_AMBER_COLOR } from "../shared/pass-rate-color";
 
 /**
  * The colour a passed and a failed verdict read in, taken from the status
@@ -115,8 +134,18 @@ function PanelHeading({
  * as a single word: PASSED in green when the run met every criterion, FAILED
  * in red when the judge missed one. It reads first because it is the answer;
  * the criteria under it are how the judge got there.
+ *
+ * A required evaluator that failed the run is named on the line: "FAILED"
+ * beside a full set of green criteria reads as a contradiction, and the name
+ * says which check failed the scenario instead.
  */
-function VerdictStatusLine({ status }: { status: ScenarioRunStatus }) {
+function VerdictStatusLine({
+  status,
+  failedEvaluatorName,
+}: {
+  status: ScenarioRunStatus;
+  failedEvaluatorName: string | null;
+}) {
   const word =
     status === ScenarioRunStatus.SUCCESS
       ? "PASSED"
@@ -125,6 +154,7 @@ function VerdictStatusLine({ status }: { status: ScenarioRunStatus }) {
         : null;
   if (!word) return null;
   const color = word === "PASSED" ? PASSED_COLOR : FAILED_COLOR;
+  const namedEvaluator = word === "FAILED" ? failedEvaluatorName : null;
   return (
     <HStack
       gap={2}
@@ -138,7 +168,6 @@ function VerdictStatusLine({ status }: { status: ScenarioRunStatus }) {
       <Text
         fontSize="13px"
         fontWeight="bold"
-        textTransform="uppercase"
         letterSpacing="0.03em"
         color={color}
         data-testid={
@@ -148,6 +177,17 @@ function VerdictStatusLine({ status }: { status: ScenarioRunStatus }) {
         }
       >
         {word}
+        {namedEvaluator ? (
+          <Text
+            as="span"
+            fontWeight="semibold"
+            letterSpacing="normal"
+            data-testid="run-verdict-failed-evaluator"
+          >
+            {" · "}
+            {namedEvaluator}
+          </Text>
+        ) : null}
       </Text>
     </HStack>
   );
@@ -213,6 +253,268 @@ function CriteriaSection({
   );
 }
 
+/** How much of one input value a row shows before it is cut short. */
+const INPUT_PREVIEW_LENGTH = 240;
+
+/** The first part of a long value, with a mark that says it goes on. */
+function previewOf(value: string): string {
+  return value.length > INPUT_PREVIEW_LENGTH
+    ? `${value.slice(0, INPUT_PREVIEW_LENGTH)}…`
+    : value;
+}
+
+/**
+ * The values an evaluator read, folded away under its row. An evaluator can
+ * read a tool call or a field of the scenario, so what it compared has to be
+ * readable here too. Each value is cut short and reads in full on hover.
+ */
+function EvaluationInputs({
+  inputs,
+  evaluatorId,
+}: {
+  inputs: Record<string, string>;
+  evaluatorId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const entries = Object.entries(inputs);
+  if (entries.length === 0) return null;
+
+  return (
+    <VStack align="stretch" gap={1} marginTop={1}>
+      <Button
+        alignSelf="flex-start"
+        variant="plain"
+        size="xs"
+        height="auto"
+        paddingX={0}
+        fontSize="11px"
+        color={FG_MUTED}
+        onClick={() => setOpen((isOpen) => !isOpen)}
+        data-testid={`evaluation-inputs-toggle-${evaluatorId}`}
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        Inputs
+        <Text as="span" color="fg.subtle">
+          {entries.length}
+        </Text>
+      </Button>
+      {open ? (
+        <VStack
+          align="stretch"
+          gap={1.5}
+          borderWidth="1px"
+          borderColor="border.muted"
+          borderRadius="md"
+          background="bg.subtle"
+          padding={2}
+          data-testid={`evaluation-inputs-${evaluatorId}`}
+        >
+          {entries.map(([name, value]) => (
+            <Box key={name} minWidth={0}>
+              <Text
+                fontSize="9.5px"
+                fontWeight="semibold"
+                textTransform="uppercase"
+                letterSpacing="0.025em"
+                color={FG_MUTED}
+              >
+                {name}
+              </Text>
+              <Text
+                as="pre"
+                fontFamily="mono"
+                fontSize="10.5px"
+                lineHeight="short"
+                color={FG_MUTED}
+                whiteSpace="pre-wrap"
+                wordBreak="break-word"
+                title={value}
+              >
+                {previewOf(value)}
+              </Text>
+            </Box>
+          ))}
+        </VStack>
+      ) : null}
+    </VStack>
+  );
+}
+
+/** The mark in front of an evaluator row: its verdict, its number, or neither. */
+function EvaluationMarker({ evaluation }: { evaluation: RunEvaluation }) {
+  switch (evaluation.status) {
+    case "passed":
+      return (
+        <Box color="green.fg">
+          <CircleCheck size={14} />
+        </Box>
+      );
+    case "failed":
+      return (
+        <Box color="red.fg">
+          <CircleX size={14} />
+        </Box>
+      );
+    case "scored":
+      return (
+        <Box
+          as="span"
+          paddingX={1}
+          borderRadius="sm"
+          background="bg.muted"
+          fontFamily="mono"
+          fontSize="10px"
+          fontWeight="semibold"
+          fontVariantNumeric="tabular-nums"
+          lineHeight="16px"
+          data-testid="evaluation-score-badge"
+        >
+          {formatScore(evaluation.score ?? null)}
+        </Box>
+      );
+    case "error":
+      return (
+        <Box color={PASS_RATE_AMBER_COLOR}>
+          <TriangleAlert size={14} />
+        </Box>
+      );
+    case "skipped":
+      return (
+        <Box color="fg.subtle">
+          <CircleMinus size={14} />
+        </Box>
+      );
+  }
+}
+
+/** The word a result reads as, and its colour. A score reads no word. */
+function evaluationVerdict(
+  evaluation: RunEvaluation,
+): { word: string; color: string } | null {
+  switch (evaluation.status) {
+    case "passed":
+      return { word: "Passed", color: PASSED_COLOR };
+    case "failed":
+      return { word: "Failed", color: FAILED_COLOR };
+    case "error":
+      return { word: "Error", color: PASS_RATE_AMBER_COLOR };
+    case "skipped":
+      return { word: "Skipped", color: FG_MUTED };
+    case "scored":
+      return null;
+  }
+}
+
+/**
+ * One evaluator's line: what it said, and why.
+ *
+ * A score carries its number in the marker, where the pass and fail icons
+ * sit, so the row states the number once. An evaluator that had nothing to
+ * read is muted end to end: it is not a verdict, and it must not read as one
+ * next to the criteria.
+ */
+function EvaluationRow({ evaluation }: { evaluation: RunEvaluation }) {
+  const isSkipped = evaluation.status === "skipped";
+  const verdict = evaluationVerdict(evaluation);
+
+  return (
+    <HStack
+      align="start"
+      gap={2}
+      opacity={isSkipped ? 0.65 : 1}
+      data-testid={`evaluation-row-${evaluation.evaluatorId}`}
+      data-status={evaluation.status}
+    >
+      <Box marginTop="1px" flexShrink={0}>
+        <EvaluationMarker evaluation={evaluation} />
+      </Box>
+      <Box minWidth={0} flex={1}>
+        <HStack gap={1.5} alignItems="baseline" flexWrap="wrap">
+          <Text
+            fontSize="12px"
+            fontWeight="medium"
+            color={isSkipped ? FG_MUTED : "fg"}
+          >
+            {evaluation.name}
+          </Text>
+          {evaluation.required ? (
+            <Text
+              as="span"
+              paddingX={1}
+              borderRadius="sm"
+              background="bg.muted"
+              fontSize="9px"
+              fontWeight="semibold"
+              textTransform="uppercase"
+              letterSpacing="0.025em"
+              color={FG_MUTED}
+              title="A failing required evaluator fails the scenario"
+              data-testid="evaluation-required-mark"
+            >
+              Required
+            </Text>
+          ) : null}
+        </HStack>
+        {verdict ? (
+          <Text
+            fontSize="11.5px"
+            fontWeight="medium"
+            color={verdict.color}
+            marginTop="1px"
+            data-testid="evaluation-verdict"
+          >
+            {verdict.word}
+          </Text>
+        ) : null}
+        {evaluation.details ? (
+          <Text
+            fontSize="11.5px"
+            color={FG_MUTED}
+            lineHeight="short"
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+            marginTop="1px"
+            data-testid="evaluation-details"
+          >
+            {evaluation.details}
+          </Text>
+        ) : null}
+        {evaluation.inputs ? (
+          <EvaluationInputs
+            inputs={evaluation.inputs}
+            evaluatorId={evaluation.evaluatorId}
+          />
+        ) : null}
+      </Box>
+    </HStack>
+  );
+}
+
+/**
+ * The evaluators that ran on the scenario, under the criteria. The section
+ * draws nothing when the run carries no evaluator result.
+ */
+function EvaluatorsSection({
+  evaluations,
+}: {
+  evaluations: readonly RunEvaluation[];
+}) {
+  if (evaluations.length === 0) return null;
+  return (
+    <VStack align="stretch" gap={2} data-testid="run-verdict-evaluators">
+      <PanelHeading>Evaluators</PanelHeading>
+      <VStack align="stretch" gap={2.5}>
+        {evaluations.map((evaluation, at) => (
+          <EvaluationRow
+            key={`${evaluation.evaluatorId}-${at}`}
+            evaluation={evaluation}
+          />
+        ))}
+      </VStack>
+    </VStack>
+  );
+}
+
 /**
  * True when the reasoning payload is an error object rather than a paragraph.
  *
@@ -221,57 +523,127 @@ function CriteriaSection({
  * `stack`. When the payload parses as one, the drawer must not read it as
  * "the judge's reasoning"; it reads as the failure the run hit.
  */
-function readReasoningError(
-  reasoning: string | null | undefined,
-): { name: string; pretty: string } | null {
-  if (!reasoning) return null;
+function isErrorPayload(reasoning: string | null | undefined): boolean {
+  if (!reasoning) return false;
   const trimmed = reasoning.trim();
-  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+  if (!trimmed.startsWith("{")) return false;
   try {
     const parsed = JSON.parse(trimmed) as unknown;
-    if (
-      parsed &&
+    return (
+      !!parsed &&
       typeof parsed === "object" &&
       "name" in parsed &&
       typeof (parsed as { name?: unknown }).name === "string" &&
       /error$/i.test((parsed as { name: string }).name)
-    ) {
-      return {
-        name: (parsed as { name: string }).name,
-        pretty: JSON.stringify(parsed, null, 2),
-      };
-    }
-    return null;
+    );
   } catch {
-    return null;
+    return false;
   }
 }
 
 /**
- * The judge failure, drawn as a self-contained scrollable panel. The heading
- * carries a red icon so the eye reads "this is the error", not "this is the
- * judge's thought".
+ * The reasoning the scenario runner writes for every run it fails: the raw
+ * failure text with one sentence in front of it. The failure panel already
+ * names that failure, so a drawer that draws both reads it twice, the second
+ * time as the raw text the panel exists to replace.
  */
-function JudgeErrorPanel({ pretty }: { pretty: string }) {
+const RESTATED_FAILURE_PREFIX = /^scenario failed with error:/i;
+
+/** True when the reasoning only restates a failure that is drawn already. */
+function restatesFailure(reasoning: string): boolean {
+  return RESTATED_FAILURE_PREFIX.test(reasoning.trim());
+}
+
+/**
+ * Why a run never reached a verdict, read as a named failure.
+ *
+ * A run stores whatever failed it: an envelope the failure handler wrote, the
+ * scenario SDK's `{ name, message, stack }`, or a plain sentence. All three
+ * resolve to one title, one message the customer can act on, and one hint. The
+ * raw text sits behind More info, because a stack answers "where" for the one
+ * reader who asks for it and says nothing to everybody else.
+ */
+function RunFailurePanel({ raw }: { raw: string }) {
+  const [detailOpen, setDetailOpen] = useState(false);
+  const handled = resolveScenarioError(raw);
+  const detail = scenarioErrorDetail(raw);
+  const hasDetail = !!detail && detail.trim() !== handled.message.trim();
+
   return (
-    <VStack align="stretch" gap={2} marginTop={SPACE_BELOW_CRITERIA}>
+    <VStack align="stretch" gap={2} data-testid="run-verdict-error">
       <PanelHeading
+        color={FAILED_COLOR}
         icon={<XCircle size={13} color="var(--chakra-colors-red-fg)" />}
       >
-        Judge reasoning
+        {scenarioErrorTitle(handled.code)}
       </PanelHeading>
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        background={{ base: "gray.900", _dark: "black" }}
-        color={{ base: "white", _dark: "gray.100" }}
-        maxHeight="320px"
-        overflow="auto"
-        data-testid="run-verdict-reasoning-error"
+      <Text
+        fontSize="12px"
+        fontFamily="mono"
+        color="red.500"
+        lineHeight="short"
+        wordBreak="break-word"
+        data-testid="run-verdict-error-message"
       >
-        <JsonHighlight code={pretty} />
-      </Box>
+        {handled.message}
+      </Text>
+      {handled.hint ? (
+        <Text
+          fontSize="11.5px"
+          color={FG_MUTED}
+          lineHeight="short"
+          wordBreak="break-word"
+          data-testid="run-verdict-error-hint"
+        >
+          {handled.hint}
+        </Text>
+      ) : null}
+      {hasDetail ? (
+        <VStack align="stretch" gap={2}>
+          <Button
+            alignSelf="flex-start"
+            variant="plain"
+            size="xs"
+            height="auto"
+            paddingX={0}
+            fontSize="11px"
+            color={FG_MUTED}
+            onClick={() => setDetailOpen((open) => !open)}
+            data-testid="run-verdict-error-toggle"
+          >
+            {detailOpen ? (
+              <ChevronDown size={12} />
+            ) : (
+              <ChevronRight size={12} />
+            )}
+            {detailOpen ? "Hide details" : "More info"}
+          </Button>
+          {detailOpen ? (
+            <Box
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="md"
+              background="bg.subtle"
+              padding={2}
+              maxHeight="260px"
+              overflow="auto"
+              data-testid="run-verdict-error-detail"
+            >
+              <Text
+                as="pre"
+                fontFamily="mono"
+                fontSize="10.5px"
+                lineHeight="short"
+                color={FG_MUTED}
+                whiteSpace="pre-wrap"
+                wordBreak="break-word"
+              >
+                {detail}
+              </Text>
+            </Box>
+          ) : null}
+        </VStack>
+      ) : null}
     </VStack>
   );
 }
@@ -283,6 +655,7 @@ export function RunVerdictPanel({
   declaredCriteria,
   reasoning,
   error,
+  evaluations = [],
 }: {
   /** The terminal status of the run: pass, fail, or neither. */
   status: ScenarioRunStatus;
@@ -296,11 +669,16 @@ export function RunVerdictPanel({
   reasoning?: string | null;
   /** Why the run never reached a verdict, when that is what happened. */
   error?: string | null;
+  /** One result per evaluator that ran on the scenario, in the order they ran. */
+  evaluations?: readonly RunEvaluation[];
 }) {
-  const reasoningError = readReasoningError(reasoning);
+  const reasoningIsError = isErrorPayload(reasoning);
+  const showsReasoning =
+    !!reasoning && !(!!error && restatesFailure(reasoning));
   const orderedMet = orderCriteria(metCriteria, declaredCriteria);
   const orderedUnmet = orderCriteria(unmetCriteria, declaredCriteria);
   const hasAnyCriteria = orderedMet.length + orderedUnmet.length > 0;
+  const failedEvaluatorName = failedRequiredEvaluatorName(evaluations);
 
   return (
     <VStack
@@ -309,25 +687,13 @@ export function RunVerdictPanel({
       paddingBottom={SPACE_BELOW_REASONING}
       data-testid="run-verdict-panel"
     >
-      <VerdictStatusLine status={status} />
+      <VerdictStatusLine
+        status={status}
+        failedEvaluatorName={failedEvaluatorName}
+      />
       <VStack align="stretch" gap={SPACE_BETWEEN_SECTIONS}>
-        {error ? (
-          <Text
-            fontSize="11.5px"
-            color="red.fg"
-            whiteSpace="pre-wrap"
-            data-testid="run-verdict-error"
-          >
-            {error}
-          </Text>
-        ) : null}
-        <CriteriaSection
-          heading="Passed criteria"
-          headingColor={PASSED_COLOR}
-          criteria={orderedMet}
-          passed={true}
-          testId="run-verdict-passed-criteria"
-        />
+        {error ? <RunFailurePanel raw={error} /> : null}
+        {/* Failed first: they are what the reader opened the run for. */}
         <CriteriaSection
           heading="Failed criteria"
           headingColor={FAILED_COLOR}
@@ -335,15 +701,25 @@ export function RunVerdictPanel({
           passed={false}
           testId="run-verdict-failed-criteria"
         />
+        <CriteriaSection
+          heading="Passed criteria"
+          headingColor={PASSED_COLOR}
+          criteria={orderedMet}
+          passed={true}
+          testId="run-verdict-passed-criteria"
+        />
         {!hasAnyCriteria && !error ? (
           <Text fontSize="12px" color={FG_MUTED}>
             The judge scored no criteria for this run.
           </Text>
         ) : null}
+        <EvaluatorsSection evaluations={evaluations} />
       </VStack>
-      {reasoningError ? (
-        <JudgeErrorPanel pretty={reasoningError.pretty} />
-      ) : reasoning ? (
+      {reasoningIsError && reasoning ? (
+        <Box marginTop={SPACE_BELOW_CRITERIA}>
+          <RunFailurePanel raw={reasoning} />
+        </Box>
+      ) : showsReasoning && reasoning ? (
         <VStack align="stretch" gap={2} marginTop={SPACE_BELOW_CRITERIA}>
           <PanelHeading>Judge reasoning</PanelHeading>
           <Text
@@ -361,10 +737,3 @@ export function RunVerdictPanel({
     </VStack>
   );
 }
-
-/** Re-exported for tests. */
-export const __RUN_VERDICT_INTERNAL = {
-  readReasoningError,
-  safePrettyJson,
-  orderCriteria,
-};

@@ -115,7 +115,7 @@ def sync_detailed(
     | list[GetApiSuitesResponse200Item]
 ]:
     """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the
-    project. By default only custom run plans are returned; pass kind=folder for test suite folders.
+    project. By default only run plans are returned; pass kind=folder for test suites.
 
     Args:
         kind (GetApiSuitesKind | Unset):  Default: GetApiSuitesKind.CUSTOM.
@@ -152,7 +152,7 @@ def sync(
     | None
 ):
     """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the
-    project. By default only custom run plans are returned; pass kind=folder for test suite folders.
+    project. By default only run plans are returned; pass kind=folder for test suites.
 
     Args:
         kind (GetApiSuitesKind | Unset):  Default: GetApiSuitesKind.CUSTOM.
@@ -183,7 +183,7 @@ async def asyncio_detailed(
     | list[GetApiSuitesResponse200Item]
 ]:
     """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the
-    project. By default only custom run plans are returned; pass kind=folder for test suite folders.
+    project. By default only run plans are returned; pass kind=folder for test suites.
 
     Args:
         kind (GetApiSuitesKind | Unset):  Default: GetApiSuitesKind.CUSTOM.
@@ -218,7 +218,7 @@ async def asyncio(
     | None
 ):
     """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the
-    project. By default only custom run plans are returned; pass kind=folder for test suite folders.
+    project. By default only run plans are returned; pass kind=folder for test suites.
 
     Args:
         kind (GetApiSuitesKind | Unset):  Default: GetApiSuitesKind.CUSTOM.

@@ -84,7 +84,7 @@ describe("<AgentTestingHeader/>", () => {
     });
 
     /** @scenario "Each tab name carries how many rows it holds" */
-    it("counts the cases and the run plans beside the tab names", () => {
+    it("counts the scenarios and the run plans beside the tab names", () => {
       renderHeader({ casesCount: 12, plansCount: 3 });
 
       expect(screen.getByRole("tab", { name: /Scenarios/ })).toHaveTextContent(
@@ -157,6 +157,22 @@ describe("<AgentTestingHeader/>", () => {
       expect(
         screen.queryByRole("heading", { name: "Agent Testing" }),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A long run plan name stays on one line" */
+    it("carries the full name on hover and keeps the note whole", () => {
+      const name =
+        "Default support-agent · development (Dogfood) vs support-agent · production";
+      renderHeader({
+        tab: "results",
+        openPlan: { name, note: "Run plan" },
+      });
+
+      const title = screen.getByTestId("agent-testing-title");
+      expect(title).toHaveAttribute("title", name);
+      expect(screen.getByTestId("agent-testing-title-note")).toHaveTextContent(
+        "Run plan",
+      );
     });
 
     /** @scenario "Leaving the run plan gives the page title back" */

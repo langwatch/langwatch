@@ -31,6 +31,7 @@ const { mockCreate, mockGetTracesWithSpans, mockBuildDeps, BLOB_DEPS } =
 const mockAnnotationFindMany = vi.fn().mockResolvedValue([]);
 const mockQueueItemFindMany = vi.fn();
 const mockQueueItemCount = vi.fn().mockResolvedValue(1);
+const mockQueueFindMany = vi.fn().mockResolvedValue([]);
 
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
@@ -90,7 +91,7 @@ function makePrismaStub(): PrismaClient {
       findMany: mockAnnotationFindMany,
     },
     annotationQueue: {
-      findMany: vi.fn().mockResolvedValue([]),
+      findMany: mockQueueFindMany,
     },
     project: {
       findUnique: vi.fn().mockResolvedValue({
@@ -197,6 +198,70 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
           ]),
         }),
       });
+    });
+
+    /** @scenario "A picked queue cannot widen what the reviewer may read" */
+    it("narrows to the picked queues without widening the caller's reach", async () => {
+      await caller.getOptimizedAnnotationQueues({
+        projectId: "project_123",
+        selectedAnnotations: "pending",
+        pageSize: 10,
+        pageOffset: 0,
+        queueIds: ["queue_a", "queue_b"],
+      });
+
+      expect(mockQueueItemCount).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          // Still only this caller's items: the pick is an extra AND clause,
+          // so a queue id from anywhere else can subtract rows, never add one.
+          userId: "test-user-id",
+          AND: expect.arrayContaining([
+            { annotationQueueId: { in: ["queue_a", "queue_b"] } },
+          ]),
+        }),
+      });
+    });
+  });
+
+  describe("when the caller asks which queues it can narrow to", () => {
+    /** @scenario "The queue filter only offers queues the reviewer can read" */
+    it("offers only the queues whose items this caller may already read", async () => {
+      await caller.getQueues({
+        projectId: "project_123",
+        reachableOnly: true,
+      });
+
+      // The same reach the item read applies, so nothing on offer is a queue
+      // the read would narrow straight back out. It is reach, not row count:
+      // a queue the reviewer belongs to that holds nothing pending is still
+      // offered, and picking it still shows an empty list. That empty is the
+      // status filter answering honestly, not the page failing.
+      expect(mockQueueFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            projectId: "project_123",
+            OR: [
+              { members: { some: { userId: "test-user-id" } } },
+              { AnnotationQueueItems: { some: { userId: "test-user-id" } } },
+            ],
+          },
+        }),
+      );
+    });
+
+    /** @scenario "A caller that does not ask to be narrowed is not narrowed" */
+    it("leaves every project queue on offer for callers that do not ask", async () => {
+      // Narrowing is opt-in because the other callers genuinely target any
+      // queue in the project — putting a trace into one, inviting people to
+      // one. This proves the default only; that those two callers leave the
+      // flag off is a fact about their own call sites, not about this read.
+      await caller.getQueues({ projectId: "project_123" });
+
+      expect(mockQueueFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { projectId: "project_123" },
+        }),
+      );
     });
   });
 });

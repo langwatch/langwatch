@@ -580,6 +580,18 @@ export function createEnvConfig() {
       ),
       DISABLE_USAGE_STATS: z.boolean().optional(),
       LANGWATCH_NLP_LAMBDA_CONFIG: z.string().optional(),
+      // Connected agents (ADR-128). The relay payload cap, in mebibytes, for
+      // self-hosted deployments whose turns carry large attachments; and the
+      // app replica count, which decides whether connected agents can run
+      // without Redis (one replica only). Empty strings read as unset.
+      LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().positive().optional(),
+      ),
+      LANGWATCH_APP_REPLICAS: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().int().positive().default(1),
+      ),
 
       // Observability
       OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
@@ -653,6 +665,9 @@ export function createEnvConfig() {
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
       LANGWATCH_ENDPOINT: process.env.LANGWATCH_ENDPOINT,
+      LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB:
+        process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB,
+      LANGWATCH_APP_REPLICAS: process.env.LANGWATCH_APP_REPLICAS,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES:
         process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,

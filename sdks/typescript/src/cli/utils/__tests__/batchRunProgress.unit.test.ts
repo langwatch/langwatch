@@ -192,5 +192,23 @@ describe("batch run progress", () => {
 		it("counts an inconclusive verdict as failed", () => {
 			expect(tallyBatchRuns([run("SUCCESS", "inconclusive")]).failed).toBe(1);
 		});
+
+		/** @scenario "The command line wait does not count a pending run as finished" */
+		it("counts a run waiting on its evaluators as still going", () => {
+			// The judge said success, but a required evaluator can still fail the
+			// run. Counting it as finished is what let `--wait` exit green on a
+			// batch that was about to turn red.
+			const progress = tallyBatchRuns([
+				run("SUCCESS", "success"),
+				run("PENDING_EVALUATION", "success"),
+			]);
+
+			expect(progress).toEqual({
+				total: 2,
+				completed: 1,
+				passed: 1,
+				failed: 0,
+			});
+		});
 	});
 });

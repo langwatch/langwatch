@@ -1,6 +1,14 @@
 import { createLogger } from "@langwatch/observability";
 import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
+import {
+  type GatedVerdict,
+  gatedStatus,
+  gatedVerdict,
+} from "~/server/scenarios/scenario-evaluation-gate";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { runAwaitsEvaluations } from "~/server/scenarios/scenario-run-evaluators";
+import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
 import type { Projection } from "../../../";
 import {
   AbstractFoldProjection,
@@ -10,8 +18,10 @@ import type { FoldProjectionStore } from "../../../projections/foldProjection.ty
 import { SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   SimulationMessageSnapshotEvent,
+  SimulationRunAgentInstanceRecordedEvent,
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
+  SimulationRunEvaluatedEvent,
   SimulationRunFinishedEvent,
   SimulationRunMetricsComputedEvent,
   SimulationRunQueuedEvent,
@@ -21,8 +31,10 @@ import type {
 } from "../schemas/events";
 import {
   SimulationMessageSnapshotEventSchema,
+  SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCancelRequestedEventSchema,
   SimulationRunDeletedEventSchema,
+  SimulationRunEvaluatedEventSchema,
   SimulationRunFinishedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunQueuedEventSchema,
@@ -65,6 +77,46 @@ function storedMetadata(
   if (!metadata) return null;
   const { secretParameters: _secretParameters, ...rest } = metadata;
   return JSON.stringify(rest);
+}
+
+/**
+ * The stored metadata with the served instance written into its reserved
+ * `langwatch` namespace.
+ *
+ * The column holds the metadata as one JSON string, so the instance is
+ * merged into the object and written back. Metadata that does not parse as
+ * an object is replaced by one that holds the instance alone: the run's
+ * other metadata was already unreadable, and the instance is what this
+ * event records.
+ */
+export function withAgentInstance({
+  metadata,
+  agentInstance,
+}: {
+  metadata: string | null;
+  agentInstance: { hostname: string; label: string | null };
+}): string {
+  const current = parseMetadataObject(metadata);
+  const langwatch =
+    typeof current.langwatch === "object" &&
+    current.langwatch !== null &&
+    !Array.isArray(current.langwatch)
+      ? (current.langwatch as Record<string, unknown>)
+      : {};
+  return JSON.stringify({
+    ...current,
+    langwatch: { ...langwatch, agentInstance },
+  });
+}
+
+function parseMetadataObject(metadata: string | null): Record<string, unknown> {
+  if (!metadata) return {};
+  try {
+    const parsed: unknown = JSON.parse(metadata);
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -157,6 +209,11 @@ export interface SimulationRunStateData {
   MetCriteria: string[];
   UnmetCriteria: string[];
   Error: string | null;
+  /**
+   * One result per evaluator that ran on the scenario, in the order they
+   * were recorded. Stored as the `Evaluations.*` parallel arrays.
+   */
+  Evaluations: ScenarioEvaluationResult[];
   DurationMs: number | null;
   TotalCost: number | null;
   RoleCosts: Record<string, number[]>;
@@ -240,6 +297,82 @@ function isTerminalStatus(status: string): boolean {
 }
 
 /**
+ * The status a finished run reads with.
+ *
+ * An explicit TERMINAL status takes priority, otherwise the status derives
+ * from the verdict. The explicit status arrives from the scenario-events
+ * ingest route, whose schema types it as the full ScenarioRunStatus enum,
+ * non-terminal members included. Taking it at face value would write a
+ * non-terminal Status alongside FinishedAt, which is the one state nothing
+ * can recover: the orphan reconciler skips it (FinishedAt IS NULL) and no
+ * read-time status derivation remains to mask it.
+ *
+ * Shared with RecordEvaluationsCommand, which needs the status the run held
+ * after its finished event without reading the fold.
+ */
+export function finishedStatusOf({
+  explicitStatus,
+  verdict,
+}: {
+  explicitStatus: string | undefined;
+  verdict: string | null | undefined;
+}): string {
+  const explicit = explicitStatus?.toUpperCase();
+  if (explicit && isTerminalStatus(explicit)) return explicit;
+  if (verdict === "success") return "SUCCESS";
+  return "FAILURE";
+}
+
+/**
+ * The status and verdict a run is stored with when it finishes.
+ *
+ * A run whose suite or plan attached evaluators, and whose results have not
+ * been recorded, is stored PENDING_EVALUATION with the judge's verdict until
+ * the evaluated event lands and the gate writes the terminal status.
+ *
+ * An evaluated event that folded before the finished one (business time can
+ * land it first) already recorded the results, so the gate runs here on the
+ * judge's verdict, and the stored status and verdict match what the evaluated
+ * handler stores in the other order. A run that sends its own evaluations is
+ * stored as sent: the code that ran it applied its gate.
+ */
+function settledOnFinish({
+  state,
+  judgeStatus,
+  verdict,
+  hasOwnEvaluations,
+  attachmentCount,
+}: {
+  state: SimulationRunStateData;
+  judgeStatus: string;
+  verdict: GatedVerdict | null;
+  hasOwnEvaluations: boolean;
+  attachmentCount: number;
+}): { status: string; verdict: string | null } {
+  if (!hasOwnEvaluations && state.Evaluations.length > 0) {
+    const gated = gatedVerdict({
+      evaluations: state.Evaluations,
+      judgeVerdict: verdict ?? undefined,
+    });
+    return {
+      status: gatedStatus({ status: judgeStatus, verdict: gated }),
+      verdict: gated ?? verdict,
+    };
+  }
+  const awaitsEvaluations = runAwaitsEvaluations({
+    status: judgeStatus,
+    hasOwnEvaluations,
+    attachmentCount,
+  });
+  return {
+    status: awaitsEvaluations
+      ? ScenarioRunStatus.PENDING_EVALUATION
+      : judgeStatus,
+    verdict,
+  };
+}
+
+/**
  * Whether the fold has seen an event that DEFINES the run, and so whether the
  * state is worth a `simulation_runs` row.
  *
@@ -268,8 +401,10 @@ const simulationRunEvents = [
   SimulationTextMessageStartEventSchema,
   SimulationTextMessageEndEventSchema,
   SimulationRunFinishedEventSchema,
+  SimulationRunEvaluatedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunCancelRequestedEventSchema,
+  SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
 
@@ -316,6 +451,7 @@ export class SimulationRunStateFoldProjection
       MetCriteria: [],
       UnmetCriteria: [],
       Error: null,
+      Evaluations: [],
       DurationMs: null,
       TotalCost: null,
       RoleCosts: {},
@@ -565,35 +701,31 @@ export class SimulationRunStateFoldProjection
 
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
-
-    // Derive status: an explicit TERMINAL status takes priority, otherwise
-    // derive from verdict. The explicit status arrives from the scenario-events
-    // ingest route, whose schema types it as the full ScenarioRunStatus enum —
-    // non-terminal members included. Taking it at face value would write a
-    // non-terminal Status alongside FinishedAt below, which is the one state
-    // nothing can recover: the orphan reconciler skips it (FinishedAt IS NULL)
-    // and no read-time status derivation remains to mask it.
-    let status: string;
-    const explicit = event.data.status?.toUpperCase();
-    if (explicit && isTerminalStatus(explicit)) {
-      status = explicit;
-    } else if (verdict === "success") {
-      status = "SUCCESS";
-    } else if (verdict === "failure" || verdict === "inconclusive") {
-      status = "FAILURE";
-    } else {
-      status = "FAILURE";
-    }
+    const judgeStatus = finishedStatusOf({
+      explicitStatus: event.data.status,
+      verdict,
+    });
+    const settled = settledOnFinish({
+      state,
+      judgeStatus,
+      verdict,
+      hasOwnEvaluations: results?.evaluations != null,
+      attachmentCount: event.data.evaluators?.attachments.length ?? 0,
+    });
 
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      Status: status,
-      Verdict: verdict,
+      Status: settled.status,
+      Verdict: settled.verdict,
       Reasoning: results?.reasoning ?? null,
       MetCriteria: results?.metCriteria ?? [],
       UnmetCriteria: results?.unmetCriteria ?? [],
       Error: results?.error ?? null,
+      // A scenario run from code sends its evaluations with the finished
+      // event. An evaluated event that folded before this one (business time
+      // can land it first) already wrote its results, which stay.
+      Evaluations: results?.evaluations ?? state.Evaluations,
       // Derived when the event does not carry it, which is every real run:
       // the SDK ingest path dispatches finishRun with results and status only.
       // Left underived, DurationMs was null for every run a customer actually
@@ -608,6 +740,36 @@ export class SimulationRunStateFoldProjection
           ? event.occurredAt - state.StartedAt
           : null),
       FinishedAt: event.occurredAt,
+    };
+  }
+
+  handleSimulationRunEvaluated(
+    event: SimulationRunEvaluatedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // A second record replaces the first: the evaluators ran again and the
+    // run holds one result per evaluator, never a history of them. The gate
+    // reads the state's own status, so a run that errored or was cancelled
+    // keeps that status whatever the evaluators said, and the judge's
+    // reasoning and criteria stay as the judge wrote them.
+    //
+    // A run stored PENDING_EVALUATION holds the judge's verdict but not the
+    // judge's status, so that status is recomputed from the verdict first.
+    // Only a judged run ever goes pending, so the recomputation is exact.
+    const verdict = event.data.verdict;
+    const judgeStatus =
+      state.Status === ScenarioRunStatus.PENDING_EVALUATION
+        ? finishedStatusOf({
+            explicitStatus: undefined,
+            verdict: state.Verdict,
+          })
+        : state.Status;
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Evaluations: event.data.evaluations,
+      Verdict: verdict ?? state.Verdict,
+      Status: gatedStatus({ status: judgeStatus, verdict }),
     };
   }
 
@@ -664,6 +826,20 @@ export class SimulationRunStateFoldProjection
     return {
       ...state,
       CancellationRequestedAt: _event.occurredAt,
+    };
+  }
+
+  handleSimulationRunAgentInstanceRecorded(
+    event: SimulationRunAgentInstanceRecordedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: withAgentInstance({
+        metadata: state.Metadata,
+        agentInstance: event.data.agentInstance,
+      }),
     };
   }
 

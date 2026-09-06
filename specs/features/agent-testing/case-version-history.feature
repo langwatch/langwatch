@@ -4,13 +4,13 @@ Feature: Scenario history in the interface
   So that I can tell what I changed and go back if I need to
 
   Background: where history is shown.
-    The case editor header carries one control that reads "v4 · History". It is
-    the only way into the history of a case: history belongs to the case, not
+    The scenario editor header carries one control that reads "v4 · History". It is
+    the only way into the history of a scenario: history belongs to the scenario, not
     to any single run of it.
 
     Choosing it opens a popover under the control that lists the versions,
     newest first. Each entry shows its number, who saved it, when, and which
-    fields changed. The case editor stays open under the popover.
+    fields changed. The scenario editor stays open under the popover.
 
     The domain rules are in specs/scenarios/scenario-versioning.feature and
     specs/scenarios/scenario-version-restore.feature.
@@ -18,7 +18,7 @@ Feature: Scenario history in the interface
   # --- The version chip ---
 
   @integration
-  Scenario: The editor shows the current version beside the case name
+  Scenario: The editor shows the current version beside the scenario name
     Given a scenario at version 4
     When its editor is opened
     Then a chip beside the name reads version 4
@@ -26,12 +26,12 @@ Feature: Scenario history in the interface
   @integration
   Scenario: The chip goes up after a save
     Given a scenario at version 4 open in the editor
-    When a field is changed and the case is saved
+    When a field is changed and the scenario is saved
     Then the chip reads version 5
 
   @integration
   Scenario: The run detail drawer shows the version the run used
-    Given a finished run of a case at version 3, while the case is now at version 6
+    Given a finished run of a scenario at version 3, while the scenario is now at version 6
     When the drawer is opened
     Then it reads version 3, the version that ran
     And it does not read version 6
@@ -43,7 +43,7 @@ Feature: Scenario history in the interface
     Given a scenario with three versions open in the editor
     When History is chosen
     Then a popover lists version 3, version 2 and version 1 in that order
-    And the case editor stays open under it
+    And the scenario editor stays open under it
 
   @integration
   Scenario: A history entry names the author, the date and the changed fields
@@ -61,11 +61,11 @@ Feature: Scenario history in the interface
     And the current version is still marked in the list
 
   @integration
-  Scenario: A case that never had a save shows one Created entry
+  Scenario: A scenario that never had a save shows one Created entry
     Given a scenario saved before version history existed
     When History is opened
     Then one entry reads Created at version 1
-    And it carries the date the case was created
+    And it carries the date the scenario was created
 
   @integration
   Scenario: The row menu of a scenario offers no History item
@@ -115,10 +115,10 @@ Feature: Scenario history in the interface
   # --- Failure paths ---
 
   @integration
-  Scenario: A save that lost a race says the case changed
+  Scenario: A save that lost a race says the scenario changed
     Given a scenario open in the editor while somebody else saves it
     When Save is chosen
-    Then the editor says the case changed since it was opened
+    Then the editor says the scenario changed since it was opened
     And it offers to reload the newer version
     And it does not read "unknown error"
 

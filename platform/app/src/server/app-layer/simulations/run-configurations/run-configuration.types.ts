@@ -20,15 +20,15 @@ import type { SuiteTarget } from "~/server/suites/types";
 /**
  * What a configuration covers, with the hand-picked list inside the rule.
  *
- * The stored scope names no cases, because a plan keeps its hand-picked list
+ * The stored scope names no scenarios, because a plan keeps its hand-picked list
  * in its own `scenarioIds` column. The dialog needs the list inside the rule,
  * so two hand-picked scopes over different scenarios read as two scopes.
  */
 export type RunConfigurationScope =
   | { mode: "all" }
-  | { mode: "folders"; folderIds: string[] }
+  | { mode: "test_suites"; testSuiteIds: string[] }
   | { mode: "labels"; labels: string[] }
-  | { mode: "cases"; caseIds: string[] };
+  | { mode: "scenarios"; scenarioIds: string[] };
 
 /** Everything a picked entry puts back into the run dialog. */
 export interface RunConfiguration {

@@ -1,6 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { buildFailureResults } from "~/server/scenarios/scenario-failure-results";
+import type { RunEvaluators } from "~/server/scenarios/scenario-run-evaluators";
+import { extractSuiteId } from "~/server/suites/suite-set-id";
 import type { Command, CommandHandler } from "../../../";
 import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
 import type { FinishRunCommandData } from "../schemas/commands";
@@ -20,6 +22,7 @@ import {
   isSimulationRunQueuedEvent,
   isSimulationTextMessageEndEvent,
 } from "../schemas/events";
+import type { SimulationResults } from "../schemas/shared";
 
 const logger = createLogger("langwatch:simulation-processing:finish-run");
 
@@ -33,6 +36,16 @@ export interface FinishRunDeps {
     tenantId: string;
     scenarioRunId: string;
   }) => Promise<readonly SimulationProcessingEvent[]>;
+  /**
+   * The evaluators the scenario's suite and the run's plan attach right now.
+   * Read only for a run whose own events carry none, which is a run driven
+   * from code: it never passed through the queue command that pins them.
+   */
+  loadRunAttachments?: (params: {
+    projectId: string;
+    scenarioId: string;
+    planId: string | null;
+  }) => Promise<RunEvaluators>;
 }
 
 const SCHEMA = defineCommandSchema(
@@ -70,6 +83,72 @@ function collectTraceIds(
 }
 
 /**
+ * Classifies results that carry a failure nobody wrote a reason for.
+ *
+ * A judge's results carry its own reasoning, which is prose about the
+ * conversation and must reach the customer verbatim. A run that failed
+ * before any judging reports the raw failure instead: as the reasoning
+ * itself, or with no reasoning at all. Those two shapes are what this
+ * rewrites, so the drawer renders a named error rather than a Node stack.
+ *
+ * Everything else is returned untouched: a passing verdict, results with no
+ * error, and any result whose reasoning says something the error does not.
+ */
+function classifyUnjudgedResults({
+  results,
+  cancelled,
+}: {
+  results: SimulationResults;
+  cancelled: boolean;
+}): SimulationResults {
+  const { error, reasoning, verdict } = results;
+  if (verdict === "success") return results;
+  if (error === undefined || error.trim().length === 0) return results;
+
+  const reasonIsTheFailure =
+    reasoning === undefined ||
+    reasoning.trim().length === 0 ||
+    reasoning.trim() === error.trim();
+  if (!reasonIsTheFailure) return results;
+
+  const classified = buildFailureResults({ cancelled, error });
+  return {
+    ...results,
+    // A cancelled run never reached a judgement, so a caller-supplied
+    // "failure" is not a verdict anyone decided. The other classifications
+    // keep the caller's verdict, which already says the run did not pass.
+    verdict: cancelled ? classified.verdict : results.verdict,
+    reasoning: classified.reasoning,
+    error: classified.error,
+  };
+}
+
+/**
+ * The results envelope the finished event carries.
+ *
+ * Infrastructure callers (stall watchdog, cancel-grace) supply a bare `error`
+ * and no verdict; they get the same failure-results envelope the in-process
+ * failure path writes, so the reason is recorded on the event. Caller-supplied
+ * results win, but a run that failed before any judging reports its raw
+ * failure as the reasoning, so those are classified on the way in rather than
+ * stored as a stack.
+ */
+function resolveFinishResults({
+  data,
+}: {
+  data: FinishRunCommandData;
+}): SimulationResults | undefined {
+  const cancelled = data.status === ScenarioRunStatus.CANCELLED;
+  if (data.results) {
+    return classifyUnjudgedResults({ results: data.results, cancelled });
+  }
+  if (data.error !== undefined) {
+    return buildFailureResults({ cancelled, error: data.error });
+  }
+  return undefined;
+}
+
+/**
  * Command handler for finishing a simulation run.
  *
  * Emits the RunFinished event with event-carried state (ECST): identity
@@ -100,19 +179,7 @@ export class FinishRunCommand
     const { scenarioRunId } = data;
 
     const ecst = await this.backfillEcstFields(tenantIdStr, data);
-
-    // Infrastructure callers (stall watchdog, cancel-grace) supply a bare
-    // `error` and no verdict; synthesize the same failure-results envelope
-    // the in-process failure path writes, so the reason is recorded on the
-    // event rather than lost. A caller-supplied `results` always wins.
-    const results =
-      data.results ??
-      (data.error !== undefined
-        ? buildFailureResults({
-            cancelled: data.status === ScenarioRunStatus.CANCELLED,
-            error: data.error,
-          })
-        : undefined);
+    const results = resolveFinishResults({ data });
 
     const eventData: SimulationRunFinishedEventData = {
       scenarioRunId,
@@ -125,6 +192,7 @@ export class FinishRunCommand
         scenarioSetId: ecst.scenarioSetId,
       }),
       ...(ecst.traceIds !== undefined && { traceIds: ecst.traceIds }),
+      ...(ecst.evaluators !== undefined && { evaluators: ecst.evaluators }),
     };
 
     const event = EventUtils.createEvent<SimulationRunFinishedEvent>({
@@ -149,7 +217,11 @@ export class FinishRunCommand
   /**
    * Fills ECST gaps from the run's prior events. Caller-supplied fields
    * always win; only missing ones are backfilled (identity from RunQueued,
-   * traceIds from MessageSnapshot/TextMessageEnd).
+   * traceIds from MessageSnapshot/TextMessageEnd, the evaluators the run was
+   * queued with from RunQueued).
+   *
+   * The prior events are always read now: `evaluators` is a gap on every
+   * command, since no caller supplies it.
    */
   private async backfillEcstFields(
     tenantId: string,
@@ -157,23 +229,19 @@ export class FinishRunCommand
   ): Promise<
     Pick<
       SimulationRunFinishedEventData,
-      "scenarioId" | "batchRunId" | "scenarioSetId" | "traceIds"
+      "scenarioId" | "batchRunId" | "scenarioSetId" | "traceIds" | "evaluators"
     >
   > {
     const { scenarioRunId } = data;
-    const result = {
+    const result: Pick<
+      SimulationRunFinishedEventData,
+      "scenarioId" | "batchRunId" | "scenarioSetId" | "traceIds" | "evaluators"
+    > = {
       scenarioId: data.scenarioId,
       batchRunId: data.batchRunId,
       scenarioSetId: data.scenarioSetId,
       traceIds: data.traceIds,
     };
-
-    const hasGaps =
-      !result.scenarioId ||
-      !result.batchRunId ||
-      !result.scenarioSetId ||
-      result.traceIds === undefined;
-    if (!hasGaps) return result;
 
     if (!this.deps?.loadPriorEvents) {
       logger.debug(
@@ -188,8 +256,11 @@ export class FinishRunCommand
       scenarioRunId,
     });
 
+    const queuedEvent = priorEvents.find(isSimulationRunQueuedEvent);
+    result.evaluators = queuedEvent?.data.evaluators;
+
     if (!result.scenarioId || !result.batchRunId || !result.scenarioSetId) {
-      const queued = priorEvents.find(isSimulationRunQueuedEvent);
+      const queued = queuedEvent;
       if (queued) {
         // `||=`, not `??=`, so this fills exactly what the check above counts
         // as a gap. That check is falsy, so an empty-string id sends us here;
@@ -207,8 +278,50 @@ export class FinishRunCommand
     }
 
     result.traceIds ??= collectTraceIds(priorEvents);
+    result.evaluators ??= await this.resolveEvaluators({
+      tenantId,
+      scenarioRunId,
+      scenarioId: result.scenarioId,
+      scenarioSetId: result.scenarioSetId,
+    });
 
     return result;
+  }
+
+  /**
+   * The evaluators of a run that carries none on its own events, which is a
+   * run driven from code: it reported a start and a finish and never passed
+   * through the queue command that pins them. Read here so such a run still
+   * reports that its evaluators are pending, and still gets graded.
+   *
+   * A read that fails leaves the field off: the subscriber falls back to
+   * reading the suite and the plan itself, so the run is graded either way.
+   */
+  private async resolveEvaluators({
+    tenantId,
+    scenarioRunId,
+    scenarioId,
+    scenarioSetId,
+  }: {
+    tenantId: string;
+    scenarioRunId: string;
+    scenarioId: string | undefined;
+    scenarioSetId: string | undefined;
+  }): Promise<RunEvaluators | undefined> {
+    if (!this.deps?.loadRunAttachments || !scenarioId) return undefined;
+    try {
+      return await this.deps.loadRunAttachments({
+        projectId: tenantId,
+        scenarioId,
+        planId: scenarioSetId ? extractSuiteId(scenarioSetId) : null,
+      });
+    } catch (error) {
+      logger.warn(
+        { tenantId, scenarioRunId, error },
+        "Could not read the run's evaluators when it finished",
+      );
+      return undefined;
+    }
   }
 
   static getAggregateId(payload: FinishRunCommandData): string {

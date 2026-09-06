@@ -79,6 +79,14 @@ const AgentWorkflowTargetEditorDrawer = lazyDefault({
   factory: () => import("./agents/AgentWorkflowTargetEditorDrawer"),
   key: "AgentWorkflowTargetEditorDrawer",
 });
+const ConnectedAgentDrawer = lazyDefault({
+  factory: () => import("./agents/connected/ConnectedAgentDrawer"),
+  key: "ConnectedAgentDrawer",
+});
+const ConnectFromCodeDrawer = lazyDefault({
+  factory: () => import("./agents/connected/ConnectFromCodeDrawer"),
+  key: "ConnectFromCodeDrawer",
+});
 const AgentCodeEditorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "AgentCodeEditorDrawerFromUrl",
@@ -240,6 +248,10 @@ const SuiteFormDrawer = lazyDefault({
   factory: () => import("./suites/SuiteFormDrawer"),
   key: "SuiteFormDrawer",
 });
+const AgentTestingSuiteEditorDrawer = lazyDefault({
+  factory: () => import("./agent-testing/suite/SuiteEditorDrawer"),
+  key: "SuiteEditorDrawer",
+});
 const AgentTestingCaseEditorDrawer = lazyDefault({
   factory: () => import("./agent-testing/cases/AgentTestingCaseEditorDrawer"),
   key: "AgentTestingCaseEditorDrawer",
@@ -304,6 +316,8 @@ export const drawers = {
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawerFromUrl,
   agentHttpEditor: AgentHttpEditorDrawerFromUrl,
+  agentConnectedDetail: ConnectedAgentDrawer,
+  agentConnectFromCode: ConnectFromCodeDrawer,
   agentWorkflowEditor: AgentWorkflowEditorDrawer,
   agentWorkflowTargetEditor: AgentWorkflowTargetEditorDrawer,
   workflowSelector: WorkflowSelectorDrawerFromUrl,
@@ -327,6 +341,9 @@ export const drawers = {
   // Agent Testing v2 case editor, opened from the cases table, the run rows
   // and the run drawer.
   agentTestingCaseEditor: AgentTestingCaseEditorDrawer,
+  // Agent Testing v2 suite editor: the name, the fields and the evaluators
+  // of a test suite.
+  agentTestingSuiteEditor: AgentTestingSuiteEditorDrawer,
   // Data privacy
   dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance

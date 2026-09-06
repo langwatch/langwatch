@@ -13,9 +13,11 @@ import { useCan } from "~/hooks/useCan";
 import { useNow } from "~/hooks/useNow";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RunActor } from "~/server/scenarios/run-actor";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
+import { summarizeEvaluations } from "./evaluation-summaries";
 import type { PeriodControls } from "./period-controls";
 import type { RunPlanDetailRun } from "./RunPlanDetailHeader";
 import type { RunPlan } from "./run-plans";
@@ -24,6 +26,11 @@ import {
   readRunSettings,
   runActorName,
 } from "./run-settings";
+import {
+  type BatchTarget,
+  isComparison,
+  useBatchTargets,
+} from "./useBatchTargets";
 import type { RunPlanBatches, RunPlanSelection } from "./useRunPlanBatches";
 import { useRunPlanCancel } from "./useRunPlanCancel";
 import { useRunPlanRunDialog } from "./useRunPlanRunDialog";
@@ -52,7 +59,12 @@ export type RunPlanResultsColumnState = {
   isRunSettingsShown: boolean;
   toggleRunSettings: () => void;
   runDialog: ReturnType<typeof useRunPlanRunDialog>;
+  /** The targets of the selected run, in order and in colour. */
+  targets: BatchTarget[];
 };
+
+/** One stable empty list, so a plan with no run selected keeps its identity. */
+const NO_RUNS: ScenarioRunData[] = [];
 
 /**
  * What the settings row calls whoever started a run.
@@ -117,9 +129,15 @@ export function useRunPlanResultsColumn({
     [],
   );
 
+  const selectedRuns = selection.selectedBatch?.scenarioRuns ?? NO_RUNS;
   const runSettings = useMemo(
-    () => readRunSettings(selection.selectedBatch?.scenarioRuns ?? []),
-    [selection.selectedBatch],
+    () => readRunSettings(selectedRuns),
+    [selectedRuns],
+  );
+  const targets = useBatchTargets(selectedRuns);
+  const evaluatorSummaries = useMemo(
+    () => summarizeEvaluations({ runs: selectedRuns }),
+    [selectedRuns],
   );
 
   // The date as well as the age: the runs rail already says "2h ago", and a
@@ -159,7 +177,11 @@ export function useRunPlanResultsColumn({
       ? {
           title: selection.title ?? "",
           note: selection.note,
-          summary: selection.summary,
+          // A comparison carries no summary of the whole run: one number over
+          // two targets says nothing about either, and each column carries
+          // its own.
+          summary: isComparison(targets) ? null : selection.summary,
+          evaluators: evaluatorSummaries,
         }
       : null,
     runSettings,
@@ -168,5 +190,6 @@ export function useRunPlanResultsColumn({
     isRunSettingsShown,
     toggleRunSettings,
     runDialog,
+    targets,
   };
 }

@@ -10,7 +10,7 @@ import { createCliTestSuitesService } from "./cli-test-suites-service";
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  *
- * @see specs/features/suite-cli.feature
+ * @see specs/features/test-suite-cli.feature
  */
 export const listTestSuitesCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -32,7 +32,7 @@ export const listTestSuitesCommand = async (): Promise<CommandResult | void> => 
           console.log();
           console.log(chalk.gray("No test suites found in this project."));
           console.log(chalk.gray("Create your first one with:"));
-          console.log(chalk.cyan('  langwatch suite create "Refunds"'));
+          console.log(chalk.cyan('  langwatch test-suite create "Refunds"'));
           return;
         }
 
@@ -56,7 +56,7 @@ export const listTestSuitesCommand = async (): Promise<CommandResult | void> => 
         console.log();
         console.log(
           chalk.gray(
-            `Run one with ${chalk.cyan("langwatch suite run <id> --target http:<agentId>")}`,
+            `Run one with ${chalk.cyan("langwatch test-suite run <id> --target http:<agentId>")}`,
           ),
         );
       },

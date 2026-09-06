@@ -46,23 +46,23 @@ export function formatRunPlanRun(result: RunPlanRunResult): string {
 
 /**
  * One line saying what a plan covers. A plan stored before scopes existed
- * carries none, and runs the case list it already held.
+ * carries none, and runs the scenario list it already held.
  */
 export function describeRunPlanScope(
   scope: RunPlanScope | null,
   scenarioIds: string[],
 ): string {
   if (scope === null) {
-    return `hand-picked cases (${scenarioIds.length})`;
+    return `hand-picked scenarios (${scenarioIds.length})`;
   }
   switch (scope.mode) {
     case "all":
-      return "every case in the project";
-    case "folders":
-      return `test suites: ${scope.folderIds.join(", ")}`;
+      return "every scenario in the project";
+    case "test_suites":
+      return `test suites: ${scope.testSuiteIds.join(", ")}`;
     case "labels":
       return `labels: ${scope.labels.join(", ")}`;
-    case "cases":
-      return `hand-picked cases (${scenarioIds.length})`;
+    case "scenarios":
+      return `hand-picked scenarios (${scenarioIds.length})`;
   }
 }

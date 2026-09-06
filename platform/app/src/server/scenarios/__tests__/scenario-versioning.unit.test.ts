@@ -32,6 +32,7 @@ function fields(
     judgeModel: null,
     maxTurns: null,
     minTurns: null,
+    fields: null,
     ...overrides,
   };
 }
@@ -83,9 +84,9 @@ describe("touchesVersionedFields", () => {
     expect(touchesVersionedFields({ situation: "New text" })).toBe(true);
   });
 
-  it("is false for a folder move", () => {
-    expect(touchesVersionedFields({ folderId: "suite_1" })).toBe(false);
-    expect(touchesVersionedFields({ folderId: null })).toBe(false);
+  it("is false for a test suite move", () => {
+    expect(touchesVersionedFields({ testSuiteId: "suite_1" })).toBe(false);
+    expect(touchesVersionedFields({ testSuiteId: null })).toBe(false);
   });
 
   it("is false for an author stamp alone", () => {
@@ -96,9 +97,9 @@ describe("touchesVersionedFields", () => {
 describe("the snapshot envelope", () => {
   /** @scenario "A restore brings back the editable content and nothing else" */
   it("holds the editable content and nothing else", () => {
-    // The versioned field list is the restore's write set: no folder, no
+    // The versioned field list is the restore's write set: no test suite, no
     // archive state, no run history.
-    expect(SCENARIO_VERSIONED_FIELDS).not.toContain("folderId");
+    expect(SCENARIO_VERSIONED_FIELDS).not.toContain("testSuiteId");
     expect(SCENARIO_VERSIONED_FIELDS).not.toContain("archivedAt");
     expect(SCENARIO_VERSIONED_FIELDS).toEqual([
       "name",
@@ -110,6 +111,7 @@ describe("the snapshot envelope", () => {
       "judgeModel",
       "maxTurns",
       "minTurns",
+      "fields",
     ]);
 
     const scenarioRow = {
@@ -117,7 +119,7 @@ describe("the snapshot envelope", () => {
       // Columns a stored row carries beside the editable content.
       id: "scenario_1",
       projectId: "project_1",
-      folderId: "suite_1",
+      testSuiteId: "suite_1",
       version: 4,
     };
     expect(Object.keys(snapshotFieldsOf(scenarioRow)).sort()).toEqual(
@@ -136,5 +138,43 @@ describe("the snapshot envelope", () => {
     expect(parsed.changedFields).toEqual(["parameters"]);
     expect(parsed.fields.name).toBe("Refund flow");
     expect(parsed.fields.parameters).toEqual([{ name: "tier" }]);
+  });
+
+  describe("when a scenario's field values are empty", () => {
+    it("normalizes an empty object to null", () => {
+      const scenarioRow = {
+        ...fields(),
+        id: "scenario_1",
+        projectId: "project_1",
+        testSuiteId: "suite_1",
+        version: 4,
+        fields: {},
+      };
+
+      expect(snapshotFieldsOf(scenarioRow).fields).toBeNull();
+    });
+
+    it("does not diff a cleared scenario against one that never had values", () => {
+      const neverHadValuesRow = {
+        ...fields(),
+        id: "scenario_1",
+        projectId: "project_1",
+        testSuiteId: "suite_1",
+        version: 1,
+        fields: null,
+      };
+      const clearedRow = {
+        ...fields(),
+        id: "scenario_1",
+        projectId: "project_1",
+        testSuiteId: "suite_1",
+        version: 2,
+        fields: {},
+      };
+      const neverHadValues = snapshotFieldsOf(neverHadValuesRow);
+      const cleared = snapshotFieldsOf(clearedRow);
+
+      expect(diffSnapshotFields(neverHadValues, cleared)).toEqual([]);
+    });
   });
 });

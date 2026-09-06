@@ -8,11 +8,16 @@ import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
 import { mapStatus } from "~/server/simulations/simulation-run.mappers";
 import {
   buildAtomFilters,
+  CODE_TARGET_NAME_EXPR,
   DEDUP_WINDOW_SLACK_MS,
   FAILED_STATUS_VALUES,
   groupKeyExpr,
   PASSED_STATUS_VALUES,
   SCENARIO_KEY_EXPR,
+  TARGET_KEY_EXPR,
+  TARGET_PARAMETERS_EXPR,
+  TARGET_REF_EXPR,
+  TARGET_STAMP_KEY_EXPR,
   trendKeyExpr,
 } from "../atom-sql";
 
@@ -88,7 +93,18 @@ describe("buildAtomFilters", () => {
     });
   });
 
-  describe("the dedup subquery window", () => {
+  describe("when the project holds agent test runs", () => {
+    /** @scenario "The results lists leave the agent test batches out" */
+    it("keeps them out of every atom read, inside the dedup scope too", () => {
+      const filters = buildAtomFilters(base);
+
+      expect(filters.stableClause).toContain(
+        "NOT endsWith(ScenarioSetId, '__agent-test')",
+      );
+    });
+  });
+
+  describe("when the query dedups a run to its latest version", () => {
     /**
      * StartedAt moves between versions of one run, so a dedup scope bounded
      * exactly to the window can drop the true latest version out of its own
@@ -202,6 +218,84 @@ describe("the grain of a grouping", () => {
   describe("when grouping by none", () => {
     it("keys each group on one execution", () => {
       expect(groupKeyExpr("none")).toBe("ScenarioRunId");
+    });
+  });
+});
+
+describe("the key a target folds under", () => {
+  describe("when a run carries the key the platform stamped", () => {
+    /**
+     * The stamp is what tells one agent's parameter variants apart, so it is
+     * read before the bare reference id. A run recorded before the stamp
+     * existed carries none and falls through to the reference id, which is
+     * the key it always had.
+     */
+    /** @scenario "A target with parameter overrides is its own target" */
+    /** @scenario "An old run with no target key keeps its reference id as key" */
+    it("reads the stamped key first, then the reference id", () => {
+      const stampAt = TARGET_KEY_EXPR.indexOf(TARGET_STAMP_KEY_EXPR);
+      const refAt = TARGET_KEY_EXPR.indexOf(TARGET_REF_EXPR);
+
+      expect(stampAt).toBeGreaterThanOrEqual(0);
+      expect(refAt).toBeGreaterThan(stampAt);
+      expect(TARGET_STAMP_KEY_EXPR).toContain("'targetKey'");
+      expect(TARGET_STAMP_KEY_EXPR).toContain("'langwatch'");
+    });
+
+    it("reads the target's overrides raw, under the reserved namespace", () => {
+      expect(TARGET_PARAMETERS_EXPR).toContain("JSONExtractRaw(");
+      expect(TARGET_PARAMETERS_EXPR).toContain("'targetParameters'");
+      expect(TARGET_PARAMETERS_EXPR).toContain("'langwatch'");
+    });
+  });
+
+  describe("when a run carries both a platform target and reported agents", () => {
+    /**
+     * The platform runs its own scenarios through the same SDK, so a platform
+     * run can report agents too. Reading the reference id first is what keeps
+     * such a run on the target a person chose for it.
+     */
+    it("reads the platform reference id before anything the run reported", () => {
+      const refAt = TARGET_KEY_EXPR.indexOf(TARGET_REF_EXPR);
+      const nameAt = TARGET_KEY_EXPR.indexOf(CODE_TARGET_NAME_EXPR);
+
+      expect(refAt).toBeGreaterThanOrEqual(0);
+      expect(nameAt).toBeGreaterThan(refAt);
+    });
+  });
+
+  describe("when a run reported no agent", () => {
+    it("falls back to the unknown key", () => {
+      expect(TARGET_KEY_EXPR).toContain("'unknown'");
+    });
+  });
+
+  describe("when a run reports an agent beside a simulator and a judge", () => {
+    /**
+     * A run wires in a user simulator and a judge as well, and neither is what
+     * the run tests, so only the agent role may name the target.
+     */
+    it("keeps only the agents, and joins two of them the way a row reads them", () => {
+      expect(CODE_TARGET_NAME_EXPR).toContain("'role') = 'agent'");
+      expect(CODE_TARGET_NAME_EXPR).toContain("' vs '");
+    });
+  });
+
+  describe("when the query filters on target keys", () => {
+    /**
+     * A run opens with no metadata and gains it when its started event lands,
+     * so the key it folds under can differ between versions of one run and may
+     * only be read after dedup.
+     */
+    it("reads the target key after dedup, never inside it", () => {
+      const filters = buildAtomFilters({
+        projectId: "proj",
+        startDate: 1_000_000,
+        targetKeys: ["code:acmesupportagent"],
+      });
+
+      expect(filters.volatileClause).toContain("atomTargetKeys");
+      expect(filters.stableClause).not.toContain("atomTargetKeys");
     });
   });
 });

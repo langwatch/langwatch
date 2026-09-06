@@ -158,6 +158,24 @@ describe("<MainMenuSections showExpanded /> Agent Testing destination", () => {
     });
   });
 
+  describe("given the flag is on and the previous-screens preference is recorded", () => {
+    beforeEach(() => {
+      state.agentTestingEnabled = true;
+      localStorage.setItem(
+        "langwatch:prefer-legacy-simulations:v1:project-1",
+        "1",
+      );
+    });
+
+    /** @scenario "The previous-screens preference restores the Simulations menu" */
+    it("offers the Simulations group instead of Agent Testing", () => {
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
+
+      expect(linkNamed("Simulations")).toBeInTheDocument();
+      expect(linkNamed("Agent Testing")).toBeNull();
+    });
+  });
+
   describe("given the Agent Testing release flag is off", () => {
     /** @scenario "With the flag off the main menu is unchanged" */
     it("keeps the Simulations group with its two destinations", () => {

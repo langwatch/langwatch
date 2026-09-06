@@ -112,6 +112,9 @@ func New(opts Options) (*Executor, error) {
 		opts.Python = "python3"
 	}
 	if opts.DefaultTimeout == 0 {
+		// Counterpart: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS in
+		// platform/app/src/server/nlpgo/timeouts.ts, which the platform's client
+		// falls back to when the operator names no ceiling. Change both together.
 		opts.DefaultTimeout = 600 * time.Second
 	}
 	// Secure default: a nil allowlist means "the caller didn't opt out of

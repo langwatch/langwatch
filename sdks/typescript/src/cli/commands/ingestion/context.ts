@@ -73,6 +73,7 @@ import {
   type ResolvedSession,
   resolveSession,
 } from "./context-session";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface ContextCommandOptions {
   /** Declare for this session instead of resolving the live one. */
@@ -107,7 +108,7 @@ export async function contextCommand({
   env = process.env,
   cwd = process.cwd(),
   runGit = runGitCommand,
-  fetchImpl = fetch,
+  fetchImpl = langwatchFetch,
   now = Date.now,
   stateDir = defaultStateDir(),
   claudeRegistryDir,
@@ -244,7 +245,7 @@ async function declare({
   });
 
   const posted = await postSessionContext({ target, env, payload, fetchImpl });
-  if (!posted) {
+  if (!posted.ok) {
     // Under codex's default sandbox this shell has no network, so retrying
     // from here would fail exactly the same way every time. The declaration
     // is queued instead, for the session report to deliver: that runs from

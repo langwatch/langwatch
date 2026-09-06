@@ -2,13 +2,17 @@ import { makeRequest } from "./langwatch-api.js";
 import type {
   RunParameters,
   RunPlanRunResult,
-  RunPlanTarget,
 } from "./langwatch-api-run-plans.js";
+import type { RunPlanTargetWire } from "./schemas/run-plan.js";
+import type {
+  EvaluatorAttachmentWire,
+  SuiteField,
+} from "./schemas/suite-fields.js";
 
 /**
  * Client for `/api/v1/test-suites`.
  *
- * A test suite is a folder of scenarios: a name and the cases filed in it.
+ * A test suite groups scenarios: a name and the scenarios filed in it.
  * Running one is sugar over a run plan, so the run returns the same result a
  * run plan does.
  */
@@ -23,6 +27,10 @@ export interface TestSuite {
   createdAt: string;
   updatedAt: string;
   platformUrl: string;
+  /** The fields the suite declares. Absent on servers that predate them. */
+  fields?: SuiteField[];
+  /** The evaluators attached to the suite. Absent on servers that predate them. */
+  evaluators?: EvaluatorAttachmentWire[];
 }
 
 export interface TestSuiteDetail extends TestSuite {
@@ -39,9 +47,11 @@ export async function listTestSuites(): Promise<TestSuite[]> {
   return makeRequest("GET", "/api/v1/test-suites") as Promise<TestSuite[]>;
 }
 
-/** Creates a test suite. */
+/** Creates a test suite, with the fields and the evaluators it declares. */
 export async function createTestSuite(data: {
   name: string;
+  fields?: SuiteField[];
+  evaluators?: EvaluatorAttachmentWire[];
 }): Promise<TestSuite> {
   return makeRequest(
     "POST",
@@ -56,6 +66,24 @@ export async function getTestSuite(id: string): Promise<TestSuiteDetail> {
     "GET",
     `/api/v1/test-suites/${encodeURIComponent(id)}`,
   ) as Promise<TestSuiteDetail>;
+}
+
+/**
+ * Edits a test suite: any of its name, its fields and its evaluators. A list
+ * given here replaces the one the suite holds.
+ */
+export async function updateTestSuite(params: {
+  id: string;
+  name?: string;
+  fields?: SuiteField[];
+  evaluators?: EvaluatorAttachmentWire[];
+}): Promise<TestSuite> {
+  const { id, ...data } = params;
+  return makeRequest(
+    "PATCH",
+    `/api/v1/test-suites/${encodeURIComponent(id)}`,
+    data,
+  ) as Promise<TestSuite>;
 }
 
 /** Renames a test suite. */
@@ -85,19 +113,20 @@ export async function archiveTestSuite(
  * creates or joins the run plan named "<suite name> <target name>" when no
  * name is sent.
  */
-export async function runTestSuite(
-  id: string,
-  data: {
-    targets: RunPlanTarget[];
-    name?: string;
-    repeatCount?: number;
-    simulatorModel?: string | null;
-    judgeModel?: string | null;
-    parameters?: RunParameters;
-    note?: string;
-    idempotencyKey?: string;
-  },
-): Promise<RunPlanRunResult> {
+export async function runTestSuite({
+  id,
+  ...data
+}: {
+  id: string;
+  targets: RunPlanTargetWire[];
+  name?: string;
+  repeatCount?: number;
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
+  parameters?: RunParameters;
+  note?: string;
+  idempotencyKey?: string;
+}): Promise<RunPlanRunResult> {
   return makeRequest(
     "POST",
     `/api/v1/test-suites/${encodeURIComponent(id)}/run`,

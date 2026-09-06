@@ -4,6 +4,11 @@ import {
   type RunPlanScope,
   type RunPlanTarget,
 } from "../langwatch-api-run-plans.js";
+import { toWireTargets } from "../schemas/run-plan.js";
+import {
+  type EvaluatorAttachmentInput,
+  toWireAttachments,
+} from "../schemas/suite-fields.js";
 import { formatRunPlanRun } from "./format-run-plan.js";
 
 /**
@@ -17,6 +22,7 @@ export async function handleRunPlan(params: {
   repeatCount?: number;
   simulatorModel?: string;
   judgeModel?: string;
+  evaluators?: EvaluatorAttachmentInput[];
   parameters?: RunParameters;
   note?: string;
   idempotencyKey?: string;
@@ -25,11 +31,14 @@ export async function handleRunPlan(params: {
     name: params.name,
     config: {
       scope: params.scope,
-      targets: params.targets,
+      targets: toWireTargets(params.targets),
       repeatCount: params.repeatCount,
       simulatorModel: params.simulatorModel,
       judgeModel: params.judgeModel,
       scenarioIds: params.scenarioIds,
+      ...(params.evaluators !== undefined
+        ? { evaluators: toWireAttachments(params.evaluators) }
+        : {}),
     },
     idempotencyKey: params.idempotencyKey,
     parameters: params.parameters,

@@ -6,6 +6,8 @@ from typing import Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="GetApiSimulationRunsBatchesListResponse200BatchesItem")
 
 
@@ -26,8 +28,8 @@ class GetApiSimulationRunsBatchesListResponse200BatchesItem:
         all_completed_at (float | None): Deprecated: read settledCount and isComplete instead. It carries the last
             update time of a batch where no run is running.
         is_complete (bool): True when every run of the batch reached a terminal status.
-        note (None | str): One short line saying why the batch was run, as given when it was queued. Null on a batch run
-            without one.
+        note (None | str | Unset): One short line saying why the batch was run, as given when it was queued. Null on a
+            batch run without one. Absent on servers that predate run notes.
     """
 
     batch_run_id: str
@@ -42,7 +44,7 @@ class GetApiSimulationRunsBatchesListResponse200BatchesItem:
     first_completed_at: float | None
     all_completed_at: float | None
     is_complete: bool
-    note: None | str
+    note: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -72,8 +74,11 @@ class GetApiSimulationRunsBatchesListResponse200BatchesItem:
 
         is_complete = self.is_complete
 
-        note: None | str
-        note = self.note
+        note: None | str | Unset
+        if isinstance(self.note, Unset):
+            note = UNSET
+        else:
+            note = self.note
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -91,9 +96,10 @@ class GetApiSimulationRunsBatchesListResponse200BatchesItem:
                 "firstCompletedAt": first_completed_at,
                 "allCompletedAt": all_completed_at,
                 "isComplete": is_complete,
-                "note": note,
             }
         )
+        if note is not UNSET:
+            field_dict["note"] = note
 
         return field_dict
 
@@ -134,12 +140,14 @@ class GetApiSimulationRunsBatchesListResponse200BatchesItem:
 
         is_complete = d.pop("isComplete")
 
-        def _parse_note(data: object) -> None | str:
+        def _parse_note(data: object) -> None | str | Unset:
             if data is None:
                 return data
-            return cast(None | str, data)
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
 
-        note = _parse_note(d.pop("note"))
+        note = _parse_note(d.pop("note", UNSET))
 
         get_api_simulation_runs_batches_list_response_200_batches_item = cls(
             batch_run_id=batch_run_id,

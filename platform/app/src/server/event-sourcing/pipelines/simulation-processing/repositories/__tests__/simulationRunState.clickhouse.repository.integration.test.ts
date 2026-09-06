@@ -2,6 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
+import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
 import { createTenantId } from "../../../../";
 import {
   startTestContainers,
@@ -91,6 +92,160 @@ afterAll(async () => {
     });
   }
   await stopTestContainers();
+});
+
+/** The state a started event folds to, with the run's identity on it. */
+function makeStartedState(scenarioRunId: string): SimulationRunState["data"] {
+  return {
+    ScenarioRunId: scenarioRunId,
+    ScenarioId: `scenario-${nanoid()}`,
+    BatchRunId: `batch-${nanoid()}`,
+    ScenarioSetId: `set-${nanoid()}`,
+    Status: "IN_PROGRESS",
+    Name: "Started run",
+    Description: null,
+    Metadata: null,
+    Messages: [],
+    TraceIds: [],
+    Verdict: null,
+    Reasoning: null,
+    MetCriteria: [],
+    UnmetCriteria: [],
+    Error: null,
+    Evaluations: [],
+    DurationMs: null,
+    TotalCost: null,
+    RoleCosts: {},
+    RoleLatencies: {},
+    TraceMetrics: {},
+    StartedAt: now,
+    QueuedAt: null,
+    CreatedAt: now,
+    UpdatedAt: now,
+    FinishedAt: null,
+    ArchivedAt: null,
+    CancellationRequestedAt: null,
+    LastSnapshotOccurredAt: 0,
+    LastEventOccurredAt: 0,
+  };
+}
+
+describe("SimulationRunStateRepositoryClickHouse.storeProjection (integration)", () => {
+  const context = { tenantId: createTenantId(tenantId) };
+
+  describe("when the next event folds right after a projection is stored", () => {
+    /** @scenario "A stored projection is readable by the next event's fold" */
+    it("reads the stored projection back without waiting", async () => {
+      // The fold reads a run's state back on a store miss. If the write is not
+      // visible yet, the next event folds from nothing and rewrites the row
+      // without the identity the started event carried, which drops the run
+      // out of every batch and set listing.
+      const scenarioRunId = `run-readback-${nanoid()}`;
+      const data = makeStartedState(scenarioRunId);
+
+      await repo.storeProjection(
+        {
+          id: `proj-${nanoid()}`,
+          aggregateId: scenarioRunId,
+          tenantId: createTenantId(tenantId),
+          version: new Date(now).toISOString().slice(0, 10),
+          data,
+        } as unknown as SimulationRunState,
+        context,
+      );
+
+      const projection = await repo.getProjection(scenarioRunId, context);
+
+      expect(projection).not.toBeNull();
+      expect(projection!.data.ScenarioId).toBe(data.ScenarioId);
+      expect(projection!.data.BatchRunId).toBe(data.BatchRunId);
+      expect(projection!.data.ScenarioSetId).toBe(data.ScenarioSetId);
+    });
+  });
+});
+
+describe("SimulationRunStateRepositoryClickHouse evaluations (integration)", () => {
+  const context = { tenantId: createTenantId(tenantId) };
+
+  const FULL_EVALUATION: ScenarioEvaluationResult = {
+    evaluatorId: "ragas/sql_query_equivalence",
+    name: "SQL Query Equivalence",
+    status: "failed",
+    required: true,
+    passed: false,
+    score: 0.25,
+    label: "different",
+    details: "The generated query filters on the wrong column.",
+    cost: { currency: "USD", amount: 0.125 },
+    inputs: { output: "SELECT 1", expected_output: "SELECT 2" },
+  };
+  const MINIMAL_EVALUATION: ScenarioEvaluationResult = {
+    evaluatorId: "eval_quality",
+    name: "Answer quality",
+    status: "scored",
+    required: false,
+    score: 0.8,
+  };
+
+  function storeRun(data: SimulationRunState["data"]) {
+    return repo.storeProjection(
+      {
+        id: `proj-${nanoid()}`,
+        aggregateId: data.ScenarioRunId,
+        tenantId: createTenantId(tenantId),
+        version: new Date(now).toISOString().slice(0, 10),
+        data,
+      } as unknown as SimulationRunState,
+      context,
+    );
+  }
+
+  describe("when a finished run carries evaluations", () => {
+    /** @scenario "Code-run results with evaluations are stored as sent and read back typed" */
+    it("reads them back with the same fields, in the same order", async () => {
+      const scenarioRunId = `run-evaluated-${nanoid()}`;
+      await storeRun({
+        ...makeStartedState(scenarioRunId),
+        Status: "FAILURE",
+        Verdict: "failure",
+        Reasoning: "The SQL check failed.",
+        FinishedAt: now,
+        Evaluations: [FULL_EVALUATION, MINIMAL_EVALUATION],
+      });
+
+      const projection = await repo.getProjection(scenarioRunId, context);
+
+      expect(projection).not.toBeNull();
+      expect(projection!.data.Evaluations).toEqual([
+        FULL_EVALUATION,
+        MINIMAL_EVALUATION,
+      ]);
+      expect(projection!.data.Verdict).toBe("failure");
+      expect(projection!.data.Reasoning).toBe("The SQL check failed.");
+    });
+  });
+
+  describe("when a run carries no evaluations", () => {
+    it("reads back with none", async () => {
+      const scenarioRunId = `run-unevaluated-${nanoid()}`;
+      await storeRun(makeStartedState(scenarioRunId));
+
+      const projection = await repo.getProjection(scenarioRunId, context);
+
+      expect(projection!.data.Evaluations).toEqual([]);
+    });
+  });
+
+  describe("when a row was written before the evaluation columns existed", () => {
+    it("reads back with none", async () => {
+      const scenarioRunId = `run-legacy-${nanoid()}`;
+      await insertRows(ch, [makeRow({ ScenarioRunId: scenarioRunId })]);
+
+      const projection = await repo.getProjection(scenarioRunId, context);
+
+      expect(projection!.data.Evaluations).toEqual([]);
+    });
+  });
 });
 
 describe("SimulationRunStateRepositoryClickHouse.getProjection (integration)", () => {

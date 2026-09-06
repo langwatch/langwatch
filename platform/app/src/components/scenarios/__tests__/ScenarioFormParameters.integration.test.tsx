@@ -164,7 +164,7 @@ function scenarioDeclaring(parameters: unknown[]) {
 
 function renderDrawer() {
   // Being pointed at a scenario is what makes this an edit, so the id is what
-  // decides that a save updates rather than creates. These cases are all about
+  // decides that a save updates rather than creates. These scenarios are all about
   // a scenario that already exists, so they say so.
   render(
     <ScenarioFormDrawer

@@ -66,8 +66,8 @@ class SuitesFacade:
     """
     Facade for managing LangWatch suites via REST API.
 
-    Deprecated. A suite was two things at once: the folder the scenarios are
-    filed in and the configuration a run executes under. Those are now
+    Deprecated. A suite was two things at once: the test suite the scenarios
+    are filed in and the configuration a run executes under. Those are now
     ``langwatch.test_suites`` and ``langwatch.run_plans``.
 
     Provides list, get, create, update, run, and delete operations.

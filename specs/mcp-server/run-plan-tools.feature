@@ -9,9 +9,23 @@ Feature: MCP Run Plan Tools
   # creates the plan. Configuration is the scope, the targets, the repeat
   # count and the two models. Parameters, the note and the idempotency key
   # belong to one run, not to the plan.
+  #
+  # A target is what to run against plus the parameters that target alone runs
+  # with. Two targets may name the same agent with different parameters, which
+  # is how one run compares one agent on two models.
 
   Background:
     Given the MCP server is configured with a valid API key
+
+  Scenario: Agent runs a plan with its own evaluators
+    When the agent calls platform_run_plan with evaluators
+    Then the attachments travel inside the configuration
+    And every attachment is sent with an id and a gate, generated when the agent left them out
+
+  Scenario: Agent reads a run plan that carries evaluators
+    Given a run plan with one evaluator attached
+    When the agent calls platform_get_run_plan
+    Then the response lists the evaluator with its gate and its mappings
 
   Scenario: Agent runs a name that no plan carries yet
     When the agent calls platform_run_plan with a name no plan carries
@@ -21,6 +35,11 @@ Feature: MCP Run Plan Tools
     Given a run plan exists with the name the agent sends
     When the agent calls platform_run_plan with that name
     Then the response says the plan ran with the configuration of this run
+
+  Scenario: Agent compares one agent on two models in one run
+    When the agent calls platform_run_plan with two targets that name the same agent and different parameters
+    Then the run covers both target variants, each on its own parameters
+    And the parameters of a target override the parameters of the run
 
   Scenario: Agent reads the batch a run started
     When the agent calls platform_run_plan
@@ -48,10 +67,10 @@ Feature: MCP Run Plan Tools
     When the agent calls platform_get_run_plan with id "plan_abc123"
     Then the response includes the scope, the targets, the repeat count and the models
 
-  Scenario: Agent reads a plan that runs the cases of a test suite
+  Scenario: Agent reads a plan that runs the scenarios of a test suite
     Given a run plan whose scope names test suites
     When the agent calls platform_get_run_plan
-    Then the response says the plan covers the cases of those test suites
+    Then the response says the plan covers the scenarios of those test suites
 
   Scenario: Agent reads a plan that names its own models
     Given a run plan with no simulator model and no judge model

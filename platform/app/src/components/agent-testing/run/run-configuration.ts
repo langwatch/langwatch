@@ -12,30 +12,30 @@
  */
 
 import type { RunParameterValues } from "~/server/scenarios/parameters";
-import {
-  configurationKey,
-  scopeKey,
-  sortSuiteTargets,
-} from "~/server/suites/plan-config";
+import { configurationKey, scopeKey } from "~/server/suites/plan-config";
 import type { SuiteScope } from "~/server/suites/scope";
+import {
+  targetLabels as labelTargets,
+  targetSortKey,
+} from "~/server/suites/target-key";
 import type { SuiteTarget } from "~/server/suites/types";
 
 /**
  * What a run covers, as the dialog holds it.
  *
- * The stored scope names no cases, because a plan keeps its hand-picked list
+ * The stored scope names no scenarios, because a plan keeps its hand-picked list
  * in its own `scenarioIds`. The dialog needs the list inside the rule, so two
  * hand-picked scopes over different scenarios are two scopes rather than one.
  */
 export type RunScope =
   | { mode: "all" }
-  | { mode: "folders"; folderIds: string[] }
+  | { mode: "test_suites"; testSuiteIds: string[] }
   | { mode: "labels"; labels: string[] }
-  | { mode: "cases"; caseIds: string[] };
+  | { mode: "scenarios"; scenarioIds: string[] };
 
 /** The scope as the server stores it: the rule, without the hand-picked list. */
 export function toSuiteScope(scope: RunScope): SuiteScope {
-  if (scope.mode === "cases") return { mode: "cases" };
+  if (scope.mode === "scenarios") return { mode: "scenarios" };
   return scope;
 }
 
@@ -47,14 +47,15 @@ export function toSuiteScope(scope: RunScope): SuiteScope {
  */
 export function normaliseRunScope({
   scope,
-  allFolderIds,
+  allTestSuiteIds,
 }: {
   scope: RunScope;
-  allFolderIds: readonly string[];
+  allTestSuiteIds: readonly string[];
 }): RunScope {
-  if (scope.mode !== "folders" || allFolderIds.length === 0) return scope;
-  const chosen = new Set(scope.folderIds);
-  const coversEverything = allFolderIds.every((id) => chosen.has(id));
+  if (scope.mode !== "test_suites" || allTestSuiteIds.length === 0)
+    return scope;
+  const chosen = new Set(scope.testSuiteIds);
+  const coversEverything = allTestSuiteIds.every((id) => chosen.has(id));
   return coversEverything ? { mode: "all" } : scope;
 }
 
@@ -88,21 +89,53 @@ export type RunConfigurationEntry = {
   lastRunAt: Date | null;
 };
 
-/** Targets in a stable order, whichever order they were picked in. */
+/**
+ * Targets in a stable order, whichever order they were picked in.
+ *
+ * The order is the one the run plan stores, so the name, the dropdown rows and
+ * the columns of the run detail read the targets the same way.
+ */
 export function sortTargets(targets: readonly SuiteTarget[]): SuiteTarget[] {
-  return sortSuiteTargets([...targets]);
+  return [...targets].sort((left, right) =>
+    targetSortKey(left).localeCompare(targetSortKey(right)),
+  );
+}
+
+/**
+ * What the targets are called, in sorted order.
+ *
+ * A target is named after its agent. The same agent appearing more than once
+ * is named with the parameters that differ between its targets, so "dev-agent
+ * · model=gpt-5 vs dev-agent · model=gpt-5-mini" tells the two apart and a
+ * value both share stays out of the name.
+ */
+export function sortedTargetLabels({
+  targets,
+  targetLabels,
+  fallbackLabel,
+}: {
+  targets: readonly SuiteTarget[];
+  targetLabels: ReadonlyMap<string, string>;
+  /** What a target the project no longer offers reads as. */
+  fallbackLabel: (target: SuiteTarget) => string;
+}): string[] {
+  return labelTargets({
+    targets: sortTargets(targets),
+    nameOf: (target) =>
+      targetLabels.get(target.referenceId) ?? fallbackLabel(target),
+  });
 }
 
 /** The scenarios a rule names inside itself, which only a hand-picked one does. */
-function caseIdsOf(scope: RunScope): string[] | undefined {
-  return scope.mode === "cases" ? scope.caseIds : undefined;
+function scenarioIdsOf(scope: RunScope): string[] | undefined {
+  return scope.mode === "scenarios" ? scope.scenarioIds : undefined;
 }
 
 /** A scope as one string, so two scopes can be compared. */
 export function scopeKeyOf(scope: RunScope): string {
   return scopeKey({
     scope: toSuiteScope(scope),
-    scenarioIds: caseIdsOf(scope),
+    scenarioIds: scenarioIdsOf(scope),
   });
 }
 
@@ -129,7 +162,7 @@ export function configurationKeyOf({
       simulatorModel: configuration.simulatorModel,
       judgeModel: configuration.judgeModel,
     },
-    scenarioIds: caseIdsOf(configuration.scope),
+    scenarioIds: scenarioIdsOf(configuration.scope),
     parameters: runParameters,
   });
 }
@@ -185,12 +218,11 @@ function factsOf({
     .join(", ");
 
   return {
-    targets: sortTargets(configuration.targets)
-      .map(
-        (target) =>
-          targetLabels.get(target.referenceId) ?? removedLabel(target),
-      )
-      .join(" vs "),
+    targets: sortedTargetLabels({
+      targets: configuration.targets,
+      targetLabels,
+      fallbackLabel: removedLabel,
+    }).join(" vs "),
     parameters: parameterNames
       .map((name) => `${name}=${entry.runParameters[name] ?? ""}`)
       .join(", "),

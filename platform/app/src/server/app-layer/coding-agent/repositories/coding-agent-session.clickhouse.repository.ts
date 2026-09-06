@@ -24,6 +24,33 @@ import type {
 const TABLE_NAME = "coding_agent_sessions" as const;
 
 /**
+ * The columns behind a `CodingAgentBranchSessionRow`: only what the
+ * pull-request rollup adds up, groups by and names, plus the scalar tie-break
+ * keys — never content. Shared by the branch read and the by-id read so the
+ * two can never answer with different shapes.
+ */
+const BRANCH_SESSION_COLUMNS = `
+  SessionId,
+  TenantId,
+  StartedAt,
+  InputTokens,
+  OutputTokens,
+  CacheReadTokens,
+  CacheCreationTokens,
+  CostUsd,
+  Agent,
+  Models,
+  UserId,
+  GitBranch,
+  GitBranches,
+  Title,
+  LastEventOccurredAt,
+  ModelCalls,
+  ToolCalls,
+  Prompts
+`;
+
+/**
  * How much `findManyRecent` over-reads so its TypeScript dedup cannot shorten
  * the page.
  *
@@ -794,25 +821,7 @@ export class CodingAgentSessionClickHouseRepository
   }): Promise<CodingAgentBranchSessionRow[]> {
     const result = await client.query({
       query: `
-        SELECT
-          SessionId,
-          TenantId,
-          StartedAt,
-          InputTokens,
-          OutputTokens,
-          CacheReadTokens,
-          CacheCreationTokens,
-          CostUsd,
-          Agent,
-          Models,
-          UserId,
-          GitBranch,
-          GitBranches,
-          Title,
-          LastEventOccurredAt,
-          ModelCalls,
-          ToolCalls,
-          Prompts
+        SELECT ${BRANCH_SESSION_COLUMNS}
         FROM ${TABLE_NAME}
         WHERE TenantId IN {tenantIds:Array(String)}
           AND lower(RepositoryHost) = {repositoryHost:String}
@@ -866,6 +875,75 @@ export class CodingAgentSessionClickHouseRepository
     return [...byTenant.values()].flatMap((tenantRows) =>
       dedupToLatestPerSession(tenantRows).map(toBranchSessionRow),
     );
+  }
+
+  /**
+   * The same row shape as `listByRepositoryBranch`, anchored on session ids:
+   * the second leg of fact-stamp discovery, fetching the session rows for
+   * sessions whose stamped events named a repository their own row has since
+   * moved away from. Same tenant grouping, same unwindowed dedup, same
+   * per-tenant collapse, for the reasons documented there.
+   */
+  async listBySessionIds({
+    tenantIds,
+    sessionIds,
+    startedAtFromMs,
+  }: {
+    tenantIds: string[];
+    sessionIds: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]> {
+    if (tenantIds.length === 0 || sessionIds.length === 0) return [];
+    for (const tenantId of tenantIds) {
+      EventUtils.validateTenantId(
+        { tenantId },
+        "CodingAgentSessionClickHouseRepository.listBySessionIds",
+      );
+    }
+
+    const groups = await groupTenantsByClient({
+      tenantIds,
+      resolveClient: this.resolveClient,
+    });
+    const collected: CodingAgentBranchSessionRow[] = [];
+    for (const group of groups) {
+      const result = await group.client.query({
+        query: `
+          SELECT ${BRANCH_SESSION_COLUMNS}
+          FROM ${TABLE_NAME}
+          WHERE TenantId IN {tenantIds:Array(String)}
+            AND SessionId IN {sessionIds:Array(String)}
+            AND StartedAt >= fromUnixTimestamp64Milli({from:Int64})
+            AND (TenantId, SessionId, UpdatedAt) IN (
+              SELECT TenantId, SessionId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId IN {tenantIds:Array(String)}
+              GROUP BY TenantId, SessionId
+            )
+          ORDER BY StartedAt ASC
+        `,
+        query_params: {
+          tenantIds: group.tenantIds,
+          sessionIds,
+          from: startedAtFromMs,
+        },
+        format: "JSONEachRow",
+      });
+      const rows = await result.json<Record<string, unknown>>();
+      const byTenant = new Map<string, Record<string, unknown>[]>();
+      for (const row of rows) {
+        const tenantId = String(row.TenantId ?? "");
+        const list = byTenant.get(tenantId) ?? [];
+        list.push(row);
+        byTenant.set(tenantId, list);
+      }
+      collected.push(
+        ...[...byTenant.values()].flatMap((tenantRows) =>
+          dedupToLatestPerSession(tenantRows).map(toBranchSessionRow),
+        ),
+      );
+    }
+    return collected;
   }
 
   async upsertBatch(

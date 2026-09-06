@@ -4,16 +4,17 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import { parseRunNoteFlag } from "../../utils/runNote";
-import { waitForBatchRun } from "../../utils/waitForBatchRun";
+import type { RawOutputFlags } from "../../utils/output";
 import { createCliTestSuitesService } from "./cli-test-suites-service";
 import { resolveSuiteId } from "./resolveSuite";
-import { parseRepeat, parseTargets } from "../run-plans/scopeFlags";
 import {
-  reportScheduledRun,
-  reportSkippedArchived,
-} from "../run-plans/reportRun";
+  parseRepeat,
+  parseTargets,
+  parseWait,
+} from "../run-plans/scopeFlags";
+import { emitRunResult } from "../run-plans/reportRun";
 
-export interface RunTestSuiteOptions {
+export interface RunTestSuiteOptions extends RawOutputFlags {
   target?: string[];
   name?: string;
   repeat?: string;
@@ -22,8 +23,7 @@ export interface RunTestSuiteOptions {
   param?: string[];
   note?: string;
   idempotencyKey?: string;
-  wait?: boolean;
-  format?: string;
+  wait?: boolean | string;
 }
 
 /**
@@ -33,7 +33,7 @@ export interface RunTestSuiteOptions {
  * request. The platform files the run under a run plan named after the suite
  * and its target unless `--name` says otherwise.
  *
- * @see specs/features/suite-cli.feature
+ * @see specs/features/test-suite-cli.feature
  */
 export const runTestSuiteCommand = async ({
   reference,
@@ -48,6 +48,7 @@ export const runTestSuiteCommand = async ({
   const note = parseRunNoteFlag({ note: options.note });
   const targets = parseTargets(options.target);
   const repeatCount = parseRepeat(options.repeat);
+  const wait = parseWait(options.wait);
 
   const service = createCliTestSuitesService();
   const id = await resolveSuiteId({ reference, service });
@@ -75,24 +76,11 @@ export const runTestSuiteCommand = async ({
       `Run scheduled under "${result.planName}": ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId}${note ? `, note: "${note}"` : ""})`,
     );
 
-    // JSON first: the skipped-archived details are already inside the document,
-    // and prose printed before it would corrupt the parser's stdout.
-    if (options.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
-
-    reportSkippedArchived(result);
-
-    if (!options.wait) {
-      reportScheduledRun({ result, note });
-      return;
-    }
-
-    await waitForBatchRun({
-      batchRunId: result.batchRunId,
-      jobCount: result.jobCount,
-      action: "run the test suite",
+    await emitRunResult({
+      result,
+      note,
+      options,
+      wait,
       subject: "test suite run",
     });
   } catch (error) {

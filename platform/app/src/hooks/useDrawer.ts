@@ -72,9 +72,22 @@ export const setComplexProps = (props: Record<string, unknown>): void => {
  * (e.g., onSelectPrompt callback that should work in promptList even when
  * opened from targetTypeSelector).
  *
- * Cleared automatically when closeDrawer() is called.
+ * Cleared automatically when closeDrawer() is called, except for the entries
+ * registered with `keepOnClose`.
  */
 let flowCallbacks: Record<string, Record<string, unknown>> = {};
+
+/**
+ * The drawers whose callbacks belong to a mounted component rather than to one
+ * drawer flow.
+ *
+ * A page-level component that registers a callback for its own drawer holds it
+ * for as long as it is mounted, and takes it back itself on unmount. Closing
+ * an unrelated drawer must not take it away: the component would never know,
+ * because nothing tells it, and the next time the drawer called that callback
+ * there would be nothing there.
+ */
+const keptOnClose = new Set<string>();
 
 /**
  * Set flow callbacks for a specific drawer type.
@@ -91,6 +104,14 @@ let flowCallbacks: Record<string, Record<string, unknown>> = {};
 export const setFlowCallbacks = <T extends DrawerType>(
   drawer: T,
   callbacks: DrawerCallbacks<T>,
+  options?: {
+    /**
+     * True when a mounted component owns the registration, so that closing a
+     * drawer leaves it alone. The owner takes it back on unmount, by
+     * registering an empty set.
+     */
+    keepOnClose?: boolean;
+  },
 ) => {
   // Deliberately does NOT notify. Callers register callbacks BEFORE opening a
   // drawer (the URL change renders it) or, on the re-hydration path, right
@@ -100,6 +121,8 @@ export const setFlowCallbacks = <T extends DrawerType>(
   // CurrentDrawer — and cascade through the open drawer's subtree — every time
   // any unrelated flow registered a callback.
   flowCallbacks[drawer] = callbacks as Record<string, unknown>;
+  if (options?.keepOnClose) keptOnClose.add(drawer);
+  else keptOnClose.delete(drawer);
 };
 
 /**
@@ -113,10 +136,19 @@ export const getFlowCallbacks = <T extends DrawerType>(
 };
 
 /**
- * Clear all flow callbacks. Called automatically by closeDrawer().
+ * Clear the flow callbacks of the drawer flows. Called automatically by
+ * closeDrawer().
+ *
+ * What a mounted component registered with `keepOnClose` stays: it belongs to
+ * that component, which is still there and still expects to be called.
  */
 export const clearFlowCallbacks = () => {
-  flowCallbacks = {};
+  const kept: Record<string, Record<string, unknown>> = {};
+  for (const drawer of keptOnClose) {
+    const callbacks = flowCallbacks[drawer];
+    if (callbacks) kept[drawer] = callbacks;
+  }
+  flowCallbacks = kept;
 };
 
 /**
@@ -228,7 +260,9 @@ export const useUpdateDrawerParams = () => {
       options: { push?: boolean } = {},
     ) => {
       const push = options.push ?? true;
-      const { path, queryString, hash } = splitAsPath(router.asPath);
+      const { path, queryString, hash } = splitAsPath(
+        liveAsPath(router.asPath),
+      );
       const parsed = qs.parse(queryString, URL_QS_PARSE_OPTIONS) as Record<
         string,
         unknown
@@ -307,6 +341,13 @@ export const useDrawerParams = () => {
  * `#h?q` orderings — important for lens routes like `/traces#conversations`
  * where naive concatenation can leave drawer query params parked after the
  * hash, which Next's `router.query` (backed by `location.search`) cannot see.
+ *
+ * A `?` inside the fragment is not automatically a misplaced query, though: the
+ * traces bar keeps its own state there (`#conversations?preset=24h`), and
+ * lifting that into the real query string would both duplicate it and leave a
+ * stale `preset` parked on the URL. So the rescue only fires for a fragment
+ * query that actually carries `drawer.` params — everything else stays in the
+ * fragment, where its owner reads it from.
  */
 function splitAsPath(asPath: string): {
   path: string;
@@ -323,14 +364,88 @@ function splitAsPath(asPath: string): {
   if (rest.startsWith("?")) {
     const h = rest.indexOf("#");
     if (h === -1) return { path, queryString: rest.slice(1), hash: "" };
-    return { path, queryString: rest.slice(1, h), hash: rest.slice(h + 1) };
+    const query = rest.slice(1, h);
+    const rescued = rescueFragmentQuery(rest.slice(h + 1));
+    return {
+      path,
+      queryString: [query, rescued.queryString].filter(Boolean).join("&"),
+      hash: rescued.hash,
+    };
   }
   if (rest.startsWith("#")) {
-    const q = rest.indexOf("?");
-    if (q === -1) return { path, queryString: "", hash: rest.slice(1) };
-    return { path, queryString: rest.slice(q + 1), hash: rest.slice(1, q) };
+    return { path, ...rescueFragmentQuery(rest.slice(1)) };
   }
   return { path, queryString: "", hash: "" };
+}
+
+/**
+ * Pull a fragment apart into the part that belongs in the real query string and
+ * the part that stays a fragment.
+ *
+ * Shared by both orderings on purpose. A URL can reach us as `#h?q` or as
+ * `?q#h`, and only the first used to rescue `drawer.` params — so
+ * `/traces?filter=active#conversations?drawer.open=x` left `drawer.open` parked
+ * after the `#`, where `router.query` cannot see it, purely because a real
+ * query happened to come first.
+ *
+ * The rescue still only fires for a fragment query carrying `drawer.` params;
+ * bar state like `#conversations?preset=24h` is left where its owner reads it.
+ */
+function rescueFragmentQuery(hash: string): {
+  queryString: string;
+  hash: string;
+} {
+  const q = hash.indexOf("?");
+  if (q === -1) return { queryString: "", hash };
+  const fragmentQuery = hash.slice(q + 1);
+  if (!/(^|&)drawer\./.test(fragmentQuery)) return { queryString: "", hash };
+
+  // Only the `drawer.` pairs move. A fragment query can hold both — the bar
+  // sets `preset` and something then parks `drawer.open` alongside it — and
+  // lifting the whole thing would carry `preset` out of the fragment its owner
+  // reads, resetting the time range: the very bug this file is fixing.
+  const lifted: string[] = [];
+  const kept: string[] = [];
+  for (const pair of fragmentQuery.split("&")) {
+    if (!pair) continue;
+    (pair.startsWith("drawer.") ? lifted : kept).push(pair);
+  }
+  const fragment = hash.slice(0, q);
+  return {
+    queryString: lifted.join("&"),
+    hash: kept.length > 0 ? `${fragment}?${kept.join("&")}` : fragment,
+  };
+}
+
+/**
+ * `router.asPath` with its fragment replaced by the one the browser holds right
+ * now.
+ *
+ * The traces page keeps its bar state — active lens, query, time range — in
+ * the fragment, and writes it with a raw `history.replaceState`
+ * (`useURLSync`). React Router never observes that write, so the hash inside
+ * `router.asPath` is whatever the last router navigation left behind. Every
+ * drawer URL below is rebuilt from `asPath` and republished through
+ * `router.push`, which turned a stale hash into a real navigation: pick a
+ * 24-hour window, open a conversation, and the page re-applied the fragment
+ * from before the pick — snapping the table back to the 30-day default.
+ *
+ * Only the fragment is swapped. Path and query move exclusively through the
+ * router, so `asPath` is authoritative for those; the fragment is the one axis
+ * something else writes behind its back (the traces bar state, and the
+ * onboarding spotlight marker).
+ *
+ * The swap happens before `splitAsPath` rather than after it, so that the hash
+ * and the query it may need to give up are always read out of the same string —
+ * splitting the router's fragment and then overwriting the hash with the
+ * browser's would promote a `drawer.` param into the query while leaving a
+ * stale copy of it in the fragment.
+ */
+function liveAsPath(asPath: string): string {
+  if (typeof window === "undefined") return asPath;
+  const hashIdx = asPath.indexOf("#");
+  const withoutHash = hashIdx === -1 ? asPath : asPath.slice(0, hashIdx);
+  return withoutHash + window.location.hash;
 }
 
 function buildUrl(path: string, queryString: string, hash: string): string {
@@ -400,7 +515,9 @@ export const useDrawer = () => {
       // Build query from the actual browser URL (router.asPath), not
       // router.query which may be stale after (url, as) shallow pushes.
       // This preserves filter params that only exist in the asPath URL.
-      const { path, queryString, hash } = splitAsPath(router.asPath);
+      const { path, queryString, hash } = splitAsPath(
+        liveAsPath(router.asPath),
+      );
       const currentQueryOnly = Object.fromEntries(
         Object.entries(qs.parse(queryString, URL_QS_PARSE_OPTIONS)).filter(
           ([key]) => !key.startsWith("drawer"),
@@ -576,7 +693,11 @@ export const useDrawer = () => {
 
     // Build clean URL from asPath (not router.query which may be stale
     // after (url, as) shallow pushes and misses filter params).
-    const { path, queryString: currentQs, hash } = splitAsPath(router.asPath);
+    const {
+      path,
+      queryString: currentQs,
+      hash,
+    } = splitAsPath(liveAsPath(router.asPath));
     const parsedQuery = qs.parse(currentQs, URL_QS_PARSE_OPTIONS);
     const cleanQuery = Object.fromEntries(
       Object.entries(parsedQuery).filter(

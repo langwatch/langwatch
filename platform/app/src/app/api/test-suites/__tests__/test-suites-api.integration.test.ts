@@ -115,6 +115,7 @@ describe("Feature: Test Suites REST API", () => {
       ["simulationSuite", { projectId: testProjectId }],
       ["scenario", { projectId: testProjectId }],
       ["agent", { projectId: testProjectId }],
+      ["evaluator", { projectId: testProjectId }],
     ]);
     await prisma.project.delete({ where: { id: testProjectId } });
     await prisma.team.delete({ where: { id: testTeam.id } });
@@ -152,14 +153,14 @@ describe("Feature: Test Suites REST API", () => {
     });
   }
 
-  async function createFolder(name: string): Promise<SimulationSuite> {
+  async function createTestSuite(name: string): Promise<SimulationSuite> {
     return prisma.simulationSuite.create({
       data: {
         id: `suite_${nanoid()}`,
         projectId: testProjectId,
         name,
         slug: `${name.toLowerCase()}-${nanoid(6)}`,
-        kind: "folder",
+        kind: "test_suite",
         scenarioIds: [],
         targets: [],
         labels: [],
@@ -168,32 +169,32 @@ describe("Feature: Test Suites REST API", () => {
   }
 
   /** A test suite with `count` scenarios filed into it. */
-  async function createFolderWithCases(
+  async function createTestSuiteWithCases(
     name: string,
     count: number,
-  ): Promise<{ folder: SimulationSuite; cases: Scenario[] }> {
-    const folder = await createFolder(name);
+  ): Promise<{ testSuite: SimulationSuite; cases: Scenario[] }> {
+    const testSuite = await createTestSuite(name);
     const cases: Scenario[] = [];
     for (let index = 0; index < count; index++) {
-      const scenario = await createScenario(`${name} case ${index}`);
+      const scenario = await createScenario(`${name} scenario ${index}`);
       await prisma.scenario.updateMany({
         where: { id: scenario.id, projectId: testProjectId },
-        data: { folderId: folder.id },
+        data: { testSuiteId: testSuite.id },
       });
       cases.push(scenario);
     }
     await prisma.simulationSuite.updateMany({
-      where: { id: folder.id, projectId: testProjectId },
+      where: { id: testSuite.id, projectId: testProjectId },
       data: { scenarioIds: cases.map((one) => one.id) },
     });
     const stored = await prisma.simulationSuite.findFirstOrThrow({
-      where: { id: folder.id, projectId: testProjectId },
+      where: { id: testSuite.id, projectId: testProjectId },
     });
-    return { folder: stored, cases };
+    return { testSuite: stored, cases };
   }
 
   async function createPlan(name: string): Promise<SimulationSuite> {
-    const scenario = await createScenario(`${name} case`);
+    const scenario = await createScenario(`${name} scenario`);
     return prisma.simulationSuite.create({
       data: {
         id: `suite_${nanoid()}`,
@@ -211,16 +212,16 @@ describe("Feature: Test Suites REST API", () => {
   // ── list ───────────────────────────────────────────────────────────────────
 
   describe("given the project holds one test suite and one run plan", () => {
-    /** @scenario "Listing test suites returns the folders only" */
+    /** @scenario "Listing test suites returns the test suites only" */
     it("returns the test suite alone", async () => {
-      const folder = await createFolder("Refunds");
+      const testSuite = await createTestSuite("Refunds");
       await createPlan("Nightly");
 
       const res = await api.get(BASE);
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.map((one: { id: string }) => one.id)).toEqual([folder.id]);
+      expect(body.map((one: { id: string }) => one.id)).toEqual([testSuite.id]);
       expect(body[0].scenarioCount).toBe(0);
       // Which page the link opens is decided per project by the Agent
       // Testing flag, and the Simulations interface has no page for one test
@@ -253,9 +254,9 @@ describe("Feature: Test Suites REST API", () => {
   describe("given a test suite holding two scenarios", () => {
     /** @scenario "Reading a test suite names the scenarios filed in it" */
     it("names both scenarios", async () => {
-      const { folder, cases } = await createFolderWithCases("Refunds", 2);
+      const { testSuite, cases } = await createTestSuiteWithCases("Refunds", 2);
 
-      const res = await api.get(`${BASE}/${folder.id}`);
+      const res = await api.get(`${BASE}/${testSuite.id}`);
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -263,7 +264,7 @@ describe("Feature: Test Suites REST API", () => {
       expect(body.scenarios.map((one: { id: string }) => one.id)).toEqual(
         cases.map((one) => one.id),
       );
-      expect(body.scenarios[0].name).toBe("Refunds case 0");
+      expect(body.scenarios[0].name).toBe("Refunds scenario 0");
     });
   });
 
@@ -284,14 +285,137 @@ describe("Feature: Test Suites REST API", () => {
   describe("given a test suite named Refunds", () => {
     /** @scenario "Renaming a test suite keeps its slug" */
     it("takes the new name and keeps the slug", async () => {
-      const folder = await createFolder("Refunds");
+      const testSuite = await createTestSuite("Refunds");
 
-      const res = await api.patch(`${BASE}/${folder.id}`, { name: "Returns" });
+      const res = await api.patch(`${BASE}/${testSuite.id}`, {
+        name: "Returns",
+      });
 
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.name).toBe("Returns");
-      expect(body.slug).toBe(folder.slug);
+      expect(body.slug).toBe(testSuite.slug);
+    });
+  });
+
+  describe("given a test suite that declares fields and attaches an evaluator", () => {
+    async function createExactMatchEvaluator() {
+      return prisma.evaluator.create({
+        data: {
+          projectId: testProjectId,
+          name: "Exact match",
+          slug: `exact-match-${nanoid(6)}`,
+          type: "evaluator",
+          config: { evaluatorType: "langevals/exact_match", settings: {} },
+        },
+      });
+    }
+
+    /** @scenario "A test suite declares fields and reads them back" */
+    it("creates it with its fields and evaluators and returns them on every read", async () => {
+      const evaluator = await createExactMatchEvaluator();
+      const attachment = {
+        id: "att_1",
+        evaluatorId: evaluator.id,
+        required: true,
+        mappings: {
+          output: {
+            type: "source",
+            sourceId: "conversation",
+            path: ["last_agent_message"],
+          },
+          expected_output: {
+            type: "source",
+            sourceId: "scenario",
+            path: ["fields", "golden_sql"],
+          },
+        },
+      };
+
+      const created = await api.post(BASE, {
+        name: "Case lookups",
+        fields: [
+          { identifier: "golden_sql", type: "text" },
+          { identifier: "table_schema", type: "text" },
+        ],
+        evaluators: [attachment],
+      });
+
+      expect(created.status).toBe(201);
+      const body = await created.json();
+      expect(body.fields).toEqual([
+        { identifier: "golden_sql", type: "text" },
+        { identifier: "table_schema", type: "text" },
+      ]);
+      expect(body.evaluators).toEqual([attachment]);
+
+      const read = await api.get(`${BASE}/${body.id}`);
+      expect(read.status).toBe(200);
+      const detail = await read.json();
+      expect(detail.fields).toEqual(body.fields);
+      expect(detail.evaluators).toEqual([attachment]);
+
+      const patched = await api.patch(`${BASE}/${body.id}`, {
+        fields: [
+          { identifier: "golden_sql", type: "text" },
+          { identifier: "table_schema", type: "text" },
+          { identifier: "max_rows", type: "number" },
+        ],
+      });
+      expect(patched.status).toBe(200);
+      expect((await patched.json()).fields).toHaveLength(3);
+    });
+
+    /** @scenario "A field an evaluator reads cannot be removed" */
+    it("answers 422 suite_field_in_use when a mapped field is removed", async () => {
+      const evaluator = await createExactMatchEvaluator();
+      const created = await api.post(BASE, {
+        name: "Case lookups",
+        fields: [{ identifier: "golden_sql", type: "text" }],
+        evaluators: [
+          {
+            id: "att_1",
+            evaluatorId: evaluator.id,
+            required: true,
+            mappings: {
+              output: {
+                type: "source",
+                sourceId: "conversation",
+                path: ["last_agent_message"],
+              },
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+            },
+          },
+        ],
+      });
+      const { id } = await created.json();
+
+      const res = await api.patch(`${BASE}/${id}`, { fields: [] });
+
+      expect(res.status).toBe(422);
+      expect((await res.json()).code).toBe("suite_field_in_use");
+    });
+
+    /** @scenario "An attachment naming an evaluator the project does not have is refused" */
+    it("answers 422 suite_evaluator_not_found for an unknown evaluator id", async () => {
+      const res = await api.post(BASE, {
+        name: "Case lookups",
+        evaluators: [
+          {
+            id: "att_1",
+            evaluatorId: "evaluator_missing",
+            required: true,
+            mappings: {},
+          },
+        ],
+      });
+
+      expect(res.status).toBe(422);
+      expect((await res.json()).code).toBe("suite_evaluator_not_found");
     });
   });
 
@@ -300,17 +424,17 @@ describe("Feature: Test Suites REST API", () => {
   describe("given a test suite holding two scenarios", () => {
     /** @scenario "Archiving a test suite archives the scenarios filed in it" */
     it("archives the suite and every scenario filed in it", async () => {
-      const { folder, cases } = await createFolderWithCases("Refunds", 2);
+      const { testSuite, cases } = await createTestSuiteWithCases("Refunds", 2);
 
-      const res = await api.delete(`${BASE}/${folder.id}`);
+      const res = await api.delete(`${BASE}/${testSuite.id}`);
 
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ id: folder.id, archived: true });
+      expect(await res.json()).toEqual({ id: testSuite.id, archived: true });
 
-      const storedFolder = await prisma.simulationSuite.findFirst({
-        where: { id: folder.id, projectId: testProjectId },
+      const storedTestSuite = await prisma.simulationSuite.findFirst({
+        where: { id: testSuite.id, projectId: testProjectId },
       });
-      expect(storedFolder?.archivedAt).not.toBeNull();
+      expect(storedTestSuite?.archivedAt).not.toBeNull();
 
       const storedCases = await prisma.scenario.findMany({
         where: {
@@ -330,14 +454,14 @@ describe("Feature: Test Suites REST API", () => {
   describe("given a test suite holding one scenario and an agent named dev-agent", () => {
     /** @scenario "Running a test suite names the plan after the suite and its targets" */
     it("creates a run plan named after the suite and the target", async () => {
-      const { folder } = await createFolderWithCases("Refunds", 1);
-      // A scope that names every folder of the project is the whole project,
-      // and normalises to "all" before the name is derived. A second folder
-      // keeps this run a folder run, which is what the name reads from.
-      await createFolder("Checkout");
+      const { testSuite } = await createTestSuiteWithCases("Refunds", 1);
+      // A scope that names every test suite of the project is the whole project,
+      // and normalises to "all" before the name is derived. A second test suite
+      // keeps this run a test suite run, which is what the name reads from.
+      await createTestSuite("Checkout");
       const agent = await createAgent("dev-agent");
 
-      const res = await api.post(`${BASE}/${folder.id}/run`, {
+      const res = await api.post(`${BASE}/${testSuite.id}/run`, {
         targets: [{ type: "http", referenceId: agent.id }],
         idempotencyKey: "test-suite-run-1",
       });
@@ -358,17 +482,17 @@ describe("Feature: Test Suites REST API", () => {
 
     /** @scenario "Running a test suite twice joins the run plan the first run resolved" */
     it("joins the plan the first run resolved", async () => {
-      const { folder } = await createFolderWithCases("Refunds", 1);
+      const { testSuite } = await createTestSuiteWithCases("Refunds", 1);
       const agent = await createAgent("dev-agent");
       const body = {
         targets: [{ type: "http", referenceId: agent.id }],
       };
 
-      const first = await api.post(`${BASE}/${folder.id}/run`, {
+      const first = await api.post(`${BASE}/${testSuite.id}/run`, {
         ...body,
         idempotencyKey: "test-suite-run-2a",
       });
-      const second = await api.post(`${BASE}/${folder.id}/run`, {
+      const second = await api.post(`${BASE}/${testSuite.id}/run`, {
         ...body,
         idempotencyKey: "test-suite-run-2b",
       });
@@ -382,9 +506,9 @@ describe("Feature: Test Suites REST API", () => {
 
     /** @scenario "Running a test suite with no target is refused with suite_targets_required" */
     it("answers 422 suite_targets_required for an empty target list", async () => {
-      const { folder } = await createFolderWithCases("Refunds", 1);
+      const { testSuite } = await createTestSuiteWithCases("Refunds", 1);
 
-      const res = await api.post(`${BASE}/${folder.id}/run`, {
+      const res = await api.post(`${BASE}/${testSuite.id}/run`, {
         targets: [],
         idempotencyKey: "test-suite-run-3",
       });
@@ -415,7 +539,7 @@ describe("Feature: Test Suites REST API", () => {
   describe("given the family's version namespaces", () => {
     /** @scenario "A dated test suites path and the bare alias both answer" */
     it("answers the same on the dated path and the bare alias", async () => {
-      const folder = await createFolder("Refunds");
+      const testSuite = await createTestSuite("Refunds");
 
       const dated = await api.get(`${BASE}/${V1_API_VERSION}/`);
       const bare = await api.get(BASE);
@@ -426,7 +550,7 @@ describe("Feature: Test Suites REST API", () => {
         (one: { id: string }) => one.id,
       );
       const bareIds = (await bare.json()).map((one: { id: string }) => one.id);
-      expect(datedIds).toEqual([folder.id]);
+      expect(datedIds).toEqual([testSuite.id]);
       expect(datedIds).toEqual(bareIds);
     });
 

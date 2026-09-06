@@ -51,16 +51,16 @@ describe("evaluation skill boundaries", () => {
 		expect(source).not.toContain("langwatch monitor create");
 	});
 
-	/** @scenario An ambiguous evaluation request is asked as a choices block */
-	it("asks the experiment-vs-evaluator question as a choices block", () => {
+	/** @scenario An ambiguous evaluation request is asked with the question tool */
+	it("asks the experiment-vs-evaluator question with the question tool", () => {
 		const source = readSkill("evaluations");
 
-		// The agent's own rules make a `choices` block the ONLY sanctioned way to
-		// put a user-owned decision to the user, and "which of these gets tested"
-		// is exactly that decision. While this skill taught prose instead, it was
-		// asking the agent to break rule 3 to follow this skill.
-		expect(source).toContain('"kind": "choices"');
-		expect(source).toContain("langy-card");
+		// The question tool is the one way to put a user-owned decision to the
+		// user in Langy, and "which of these gets tested" is exactly that
+		// decision. A choices fence no longer renders, and prose would ask the
+		// agent to break its own rule.
+		expect(source).toContain("`question` tool");
+		expect(source).not.toContain('"kind": "choices"');
 		expect(source).not.toContain("Send the question as a single line of prose");
 	});
 

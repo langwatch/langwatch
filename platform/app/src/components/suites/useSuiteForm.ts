@@ -17,8 +17,8 @@ import type { FieldMapping } from "~/components/variables/VariableMappingInput";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
-  CASES_SCOPE,
   parseSuiteScope,
+  SCENARIOS_SCOPE,
   type SuiteScope,
   type SuiteScopeMode,
   suiteScopeSchema,
@@ -63,7 +63,7 @@ export type SuiteFormData = z.infer<typeof suiteFormSchema>;
  * The rules the Agent Testing run plan editor holds the same form to.
  *
  * It asks for no target: the run dialog is where an agent or a prompt is
- * chosen. It asks for a case list only from a plan that runs one, and for a
+ * chosen. It asks for a scenario list only from a plan that runs one, and for a
  * suite or label scope it asks that the scope name something.
  */
 export const planFormSchema = suiteFormSchema
@@ -73,8 +73,10 @@ export const planFormSchema = suiteFormSchema
   })
   .superRefine((data, ctx) => {
     const empty =
-      (data.scope.mode === "cases" && data.selectedScenarioIds.length === 0) ||
-      (data.scope.mode === "folders" && data.scope.folderIds.length === 0) ||
+      (data.scope.mode === "scenarios" &&
+        data.selectedScenarioIds.length === 0) ||
+      (data.scope.mode === "test_suites" &&
+        data.scope.testSuiteIds.length === 0) ||
       (data.scope.mode === "labels" && data.scope.labels.length === 0);
     if (empty) {
       ctx.addIssue({
@@ -89,8 +91,8 @@ interface Scenario {
   id: string;
   name: string;
   labels: string[];
-  /** The test suite the case is filed in, when the project uses them. */
-  folderId?: string | null;
+  /** The test suite the scenario is filed in, when the project uses them. */
+  testSuiteId?: string | null;
 }
 
 interface Agent {
@@ -159,11 +161,11 @@ function withTargetMapping({
 
 /** What each dynamic mode of a stored scope holds, both read at once. */
 function rememberedLists(scope: SuiteScope): {
-  folderIds: string[];
+  testSuiteIds: string[];
   labels: string[];
 } {
   return {
-    folderIds: scope.mode === "folders" ? scope.folderIds : [],
+    testSuiteIds: scope.mode === "test_suites" ? scope.testSuiteIds : [],
     labels: scope.mode === "labels" ? scope.labels : [],
   };
 }
@@ -172,7 +174,7 @@ const defaultValues: SuiteFormData = {
   name: "",
   description: "",
   labels: [],
-  scope: CASES_SCOPE,
+  scope: SCENARIOS_SCOPE,
   selectedScenarioIds: [],
   selectedTargets: [],
   repeatCount: 1,
@@ -188,7 +190,7 @@ export function useSuiteForm({
   agents,
   prompts,
   picksTargets = true,
-  defaultScope = CASES_SCOPE,
+  defaultScope = SCENARIOS_SCOPE,
 }: UseSuiteFormParams) {
   const form = useForm<SuiteFormData>({
     defaultValues: { ...defaultValues, scope: defaultScope },
@@ -205,7 +207,9 @@ export function useSuiteForm({
   );
   // What each dynamic mode last held, so switching between modes to compare
   // them does not throw away the ticks just made.
-  const [rememberedFolderIds, setRememberedFolderIds] = useState<string[]>([]);
+  const [rememberedTestSuiteIds, setRememberedTestSuiteIds] = useState<
+    string[]
+  >([]);
   const [rememberedLabels, setRememberedLabels] = useState<string[]>([]);
 
   // -- Watch form values for derived state --
@@ -306,20 +310,21 @@ export function useSuiteForm({
   }, [availableTargets, targetSearch]);
 
   /**
-   * The cases the scope covers, from the lists the form already holds.
+   * The scenarios the scope covers, from the lists the form already holds.
    *
    * The same rule the run resolves against the database, read here against the
-   * project's active cases, so the count under the picker is what the run will
+   * project's active scenarios, so the count under the picker is what the run will
    * cover.
    */
   const scopedScenarioIds = useMemo(() => {
     const active = scenarios ?? [];
     if (scope.mode === "all") return active.map((scenario) => scenario.id);
-    if (scope.mode === "folders") {
+    if (scope.mode === "test_suites") {
       return active
         .filter(
           (scenario) =>
-            !!scenario.folderId && scope.folderIds.includes(scenario.folderId),
+            !!scenario.testSuiteId &&
+            scope.testSuiteIds.includes(scenario.testSuiteId),
         )
         .map((scenario) => scenario.id);
     }
@@ -338,7 +343,7 @@ export function useSuiteForm({
     if (suite && isOpen) {
       const storedScope = parseSuiteScope(suite.scope);
       const remembered = rememberedLists(storedScope);
-      setRememberedFolderIds(remembered.folderIds);
+      setRememberedTestSuiteIds(remembered.testSuiteIds);
       setRememberedLabels(remembered.labels);
       form.reset({
         name: suite.name,
@@ -356,7 +361,7 @@ export function useSuiteForm({
       setScenarioSearch("");
       setTargetSearch("");
       setActiveLabelFilter(null);
-      setRememberedFolderIds([]);
+      setRememberedTestSuiteIds([]);
       setRememberedLabels([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on suite.id to avoid infinite loop from unstable suite reference
@@ -377,19 +382,19 @@ export function useSuiteForm({
    */
   const setScopeMode = (mode: SuiteScopeMode) => {
     if (mode === "all") return writeScope({ mode });
-    if (mode === "cases") return writeScope({ mode });
-    if (mode === "folders")
-      return writeScope({ mode, folderIds: rememberedFolderIds });
+    if (mode === "scenarios") return writeScope({ mode });
+    if (mode === "test_suites")
+      return writeScope({ mode, testSuiteIds: rememberedTestSuiteIds });
     writeScope({ mode, labels: rememberedLabels });
   };
 
-  const toggleScopeFolder = (folderId: string) => {
-    const current = scope.mode === "folders" ? scope.folderIds : [];
-    const next = current.includes(folderId)
-      ? current.filter((id) => id !== folderId)
-      : [...current, folderId];
-    setRememberedFolderIds(next);
-    writeScope({ mode: "folders", folderIds: next });
+  const toggleScopeTestSuite = (testSuiteId: string) => {
+    const current = scope.mode === "test_suites" ? scope.testSuiteIds : [];
+    const next = current.includes(testSuiteId)
+      ? current.filter((id) => id !== testSuiteId)
+      : [...current, testSuiteId];
+    setRememberedTestSuiteIds(next);
+    writeScope({ mode: "test_suites", testSuiteIds: next });
   };
 
   const toggleScopeLabel = (label: string) => {
@@ -536,9 +541,9 @@ export function useSuiteForm({
     labels,
     scope,
     setScopeMode,
-    toggleScopeFolder,
+    toggleScopeTestSuite,
     toggleScopeLabel,
-    /** The cases the scope covers right now, from the loaded lists. */
+    /** The scenarios the scope covers right now, from the loaded lists. */
     scopedScenarioIds,
     selectedScenarioIds,
     selectedTargets,

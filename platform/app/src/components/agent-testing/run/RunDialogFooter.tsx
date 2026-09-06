@@ -17,47 +17,62 @@ import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { RunDialogController } from "./useRunDialogSubmit";
 
-/** What the run control reads, given how many cases the subject covers. */
-export function runButtonLabel(caseCount: number | null): string {
+/**
+ * What the run control reads, given how many scenarios the subject covers
+ * and, in a comparison, how many targets it goes against.
+ */
+export function runButtonLabel({
+  caseCount,
+  targetCount,
+}: {
+  caseCount: number | null;
+  targetCount: number;
+}): string {
   if (caseCount === null) return "Run";
-  return caseCount === 1 ? "Run 1 scenario" : `Run ${caseCount} scenarios`;
+  const scenarios =
+    caseCount === 1 ? "Run 1 scenario" : `Run ${caseCount} scenarios`;
+  return targetCount > 1 ? `${scenarios} × ${targetCount} targets` : scenarios;
 }
 
 export function RunDialogFooter({
   controller,
   isRunBlocked,
   caseCount,
+  targetCount,
   blockedReason,
+  warning,
+  onRun,
   onClose,
 }: {
   controller: RunDialogController;
   isRunBlocked: boolean;
   /** How many scenarios the run covers, or nothing when it is not known. */
   caseCount: number | null;
+  /** How many targets the run goes against. */
+  targetCount: number;
   /** Why the run cannot start, when it cannot. Shown as the button tooltip. */
   blockedReason: string | null;
+  /**
+   * What Run does first instead of running, when something holds it: the
+   * button stays enabled and says so over the pointer.
+   */
+  warning?: string | null;
+  /** What Run does. Defaults to queueing the run. */
+  onRun?: () => void;
   onClose: () => void;
 }) {
   const runButton = (
     <SmallButton
       variant="solid"
       colorPalette="blue"
-      background={undefined}
-      borderColor="transparent"
       disabled={isRunBlocked}
       loading={controller.isBusy}
-      onClick={() => void controller.run()}
-      // A disabled solid button must not brighten on hover: pointer-events
-      // stay off so the hover state cannot fire at all.
-      _disabled={{
-        cursor: "not-allowed",
-        opacity: 0.5,
-        pointerEvents: "none",
-      }}
+      onClick={onRun ?? (() => void controller.run())}
       data-testid="run-dialog-run"
+      data-warning={warning ?? undefined}
     >
       <Play size={13} />
-      {runButtonLabel(caseCount)}
+      {runButtonLabel({ caseCount, targetCount })}
     </SmallButton>
   );
   return (
@@ -91,6 +106,12 @@ export function RunDialogFooter({
           {/* A disabled button never dispatches pointer events, which would
               keep the tooltip from firing; wrap it in a span so the hover
               still lands on something. */}
+          <Box as="span" display="inline-flex">
+            {runButton}
+          </Box>
+        </Tooltip>
+      ) : !isRunBlocked && warning ? (
+        <Tooltip content={warning}>
           <Box as="span" display="inline-flex">
             {runButton}
           </Box>

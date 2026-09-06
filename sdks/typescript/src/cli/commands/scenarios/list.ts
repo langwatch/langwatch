@@ -7,7 +7,7 @@ import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
-/** What the Folder column shows for a scenario filed nowhere. */
+/** What the Test suite column shows for a scenario filed nowhere. */
 const UNFILED = "unfiled";
 
 export const listScenariosCommand = async (): Promise<CommandResult | void> => {
@@ -22,10 +22,10 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
     // The scenario carries a test suite id; the suite carries the name a
     // person reads. A project that files nothing keeps the request it always
     // made.
-    const folderNameById = new Map<string, string>();
-    if (scenarios.some((scenario) => scenario.folderId)) {
+    const testSuiteNameById = new Map<string, string>();
+    if (scenarios.some((scenario) => scenario.testSuiteId)) {
       const suites = await createCliTestSuitesService().list();
-      for (const suite of suites) folderNameById.set(suite.id, suite.name);
+      for (const suite of suites) testSuiteNameById.set(suite.id, suite.name);
     }
 
     spinner.succeed(
@@ -52,8 +52,9 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
         const tableData = scenarios.map((scenario) => ({
           Name: scenario.name,
           ID: scenario.id,
-          Folder: scenario.folderId
-            ? (folderNameById.get(scenario.folderId) ?? scenario.folderId)
+          "Test suite": scenario.testSuiteId
+            ? (testSuiteNameById.get(scenario.testSuiteId) ??
+              scenario.testSuiteId)
             : chalk.gray(UNFILED),
           Labels: scenario.labels.length > 0 ? scenario.labels.join(", ") : chalk.gray("—"),
           Criteria: `${scenario.criteria.length}`,
@@ -61,7 +62,7 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
 
         formatTable({
           data: tableData,
-          headers: ["Name", "ID", "Folder", "Labels", "Criteria"],
+          headers: ["Name", "ID", "Test suite", "Labels", "Criteria"],
           colorMap: {
             Name: chalk.cyan,
             ID: chalk.green,

@@ -3,9 +3,13 @@ Feature: Run plans and test suites on the TypeScript SDK
   I want typed services for run plans and test suites
   So that I can start runs and keep suites from my own code
 
-  The two families are separate: a test suite is a folder of scenarios, a run
+  The two families are separate: a test suite is a group of scenarios, a run
   plan is a named configuration that runs them. `client.suites` stays for the
   frozen `/api/suites` alias and is marked deprecated.
+
+  A run plan scope names one of four modes: "all", "test_suites" with
+  testSuiteIds, "labels" with labels, or "scenarios" with the scenario ids sent
+  beside the configuration.
 
   Background:
     Given a LangWatch client built with an API key
@@ -48,6 +52,21 @@ Feature: Run plans and test suites on the TypeScript SDK
     And the answer carries the run plan ID, the plan name and whether it was created
 
   @unit
+  Scenario: Run a configuration with plan evaluators
+    When I call runPlans.run with evaluators in the configuration
+    Then the SDK posts them inside config.evaluators to /api/v1/run-plans/run
+
+  @unit
+  Scenario: Run a configuration scoped to test suites
+    When I call runPlans.run with a scope of "test_suites" and testSuiteIds
+    Then the SDK posts that scope to /api/v1/run-plans/run
+
+  @unit
+  Scenario: Run a configuration scoped to named scenarios
+    When I call runPlans.run with a scope of "scenarios" and scenarioIds
+    Then the SDK posts that scope and those scenario ids to /api/v1/run-plans/run
+
+  @unit
   Scenario: Run a configuration with a note of only spaces
     When I call runPlans.run with a note of only spaces
     Then no note is sent
@@ -76,6 +95,31 @@ Feature: Run plans and test suites on the TypeScript SDK
   Scenario: Create a test suite
     When I call testSuites.create({ name: "Refunds" })
     Then the SDK posts the name to /api/v1/test-suites
+
+  @unit
+  Scenario: Create a test suite with fields and evaluators
+    When I call testSuites.create with a name, fields and evaluators
+    Then the SDK posts all three to /api/v1/test-suites
+
+  @unit
+  Scenario: Update the fields of a test suite
+    When I call testSuites.update("suite_abc", { fields }) with no name
+    Then the SDK sends PATCH /api/v1/test-suites/suite_abc carrying the fields alone
+
+  @unit
+  Scenario: Update the evaluators of a test suite
+    When I call testSuites.update("suite_abc", { evaluators })
+    Then the SDK sends PATCH /api/v1/test-suites/suite_abc carrying the evaluators alone
+
+  @unit
+  Scenario: Create a scenario with field values
+    When I call scenarios.create with fields
+    Then the SDK posts the values under fields to /api/scenarios
+
+  @unit
+  Scenario: Update a scenario with an empty field map
+    When I call scenarios.update with fields of {}
+    Then the SDK sends fields as an empty object, which clears the values
 
   @unit
   Scenario: Read one test suite

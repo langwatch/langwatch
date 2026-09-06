@@ -6,14 +6,15 @@
  * its list inside that rule, because the stored rule names no scenario.
  *
  * Telling the two apart matters because a run replaces the config of the plan
- * its name resolves onto. A run plan opened as though it were a folder would
- * go out covering "the scenarios filed in the folder with this plan's id",
+ * its name resolves onto. A run plan opened as though it were a test suite would
+ * go out covering "the scenarios filed in the test suite with this plan's id",
  * which is nothing, and would write that empty rule over the plan's real
  * scope.
  *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
+import { parseEvaluatorAttachments } from "~/server/scenarios/evaluator-attachments";
 import { parseSuiteScope } from "~/server/suites/scope";
 import { parseSuiteTargets } from "~/server/suites/types";
 import type { RunScope } from "./run-configuration";
@@ -27,15 +28,17 @@ export type StoredPlanRow = {
   scope: unknown;
   scenarioIds: string[];
   targets: unknown;
+  /** The evaluators the row attaches; a run plan's own extras. */
+  evaluators?: unknown;
 };
 
 export function scopeOfStoredPlan(plan: StoredPlanRow): RunScope {
-  if (plan.kind === "folder") {
-    return { mode: "folders", folderIds: [plan.id] };
+  if (plan.kind === "test_suite") {
+    return { mode: "test_suites", testSuiteIds: [plan.id] };
   }
   const stored = parseSuiteScope(plan.scope);
-  if (stored.mode === "cases") {
-    return { mode: "cases", caseIds: [...plan.scenarioIds] };
+  if (stored.mode === "scenarios") {
+    return { mode: "scenarios", scenarioIds: [...plan.scenarioIds] };
   }
   return stored;
 }
@@ -57,8 +60,15 @@ export function storedPlanSubject(
     name: plan.name,
     scenarioIds: plan.scenarioIds,
     scope: scopeOfStoredPlan(plan),
-    // A folder answers to no run plan name, so a run of it derives one.
-    ...(plan.kind === "folder" ? {} : { planName: plan.name }),
+    // A test suite answers to no run plan name, so a run of it derives one.
+    // A test suite's evaluators are inherited by the run, not carried as the
+    // plan's own; only a run plan opens on extras.
+    ...(plan.kind === "test_suite"
+      ? {}
+      : {
+          planName: plan.name,
+          evaluators: parseEvaluatorAttachments(plan.evaluators),
+        }),
     initialTarget: first ? { type: first.type, id: first.referenceId } : null,
     persistedTarget: first ?? null,
   };

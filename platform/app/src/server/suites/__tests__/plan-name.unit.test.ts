@@ -82,6 +82,10 @@ describe("derivePlanName", () => {
         },
         { scopeLabel: "3 test suites", targetLabels: ["prod-agent"] },
         { scopeLabel: "2 scenarios", targetLabels: ["", "prod-agent"] },
+        {
+          scopeLabel: "Refunds",
+          targetLabels: ["prod-agent", "prod-agent · model=gpt-5-mini"],
+        },
       ];
 
       for (const runCase of cases) {

@@ -26,7 +26,7 @@ export const MENU_ACTION_ICONS = {
   runSuite: Play,
   rename: Pencil,
   edit: Pencil,
-  openLastRun: ListChecks,
+  openRecentRuns: ListChecks,
   duplicate: Copy,
   moveToSuite: FolderInput,
   archive: Archive,

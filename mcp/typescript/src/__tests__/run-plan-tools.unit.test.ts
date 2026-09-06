@@ -49,7 +49,7 @@ const samplePlan: RunPlan = {
   archivedAt: null,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-02T00:00:00Z",
-  platformUrl: "https://app.langwatch.ai/proj/simulations/run-plans/plan_abc123",
+  platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
 const sampleRun: RunPlanRunResult = {
@@ -62,7 +62,7 @@ const sampleRun: RunPlanRunResult = {
   runPlanId: "plan_abc123",
   planName: "Regression Plan",
   created: true,
-  platformUrl: "https://app.langwatch.ai/proj/simulations/batches/batch_123",
+  platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
 const runInput = {
@@ -99,7 +99,7 @@ describe("handleRunPlan()", () => {
 
     it("includes the platform URL of the batch", () => {
       expect(result).toContain(
-        "**View**: https://app.langwatch.ai/proj/simulations/batches/batch_123",
+        "**View**: https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
       );
     });
 
@@ -140,6 +140,88 @@ describe("handleRunPlan()", () => {
 
       expect(result).toContain(
         'Run plan "Regression Plan" started with the configuration of this run.',
+      );
+    });
+  });
+
+  describe("when two targets name the same agent with different parameters", () => {
+    /** @scenario "Agent compares one agent on two models in one run" */
+    it("sends both targets, each carrying its own runParameters", async () => {
+      await handleRunPlan({
+        scope: { mode: "labels", labels: ["auth"] },
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            parameters: { model: "gpt-5" },
+          },
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            parameters: { model: "gpt-5-mini" },
+          },
+        ],
+      });
+
+      expect(mockRunRunPlan).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            targets: [
+              {
+                type: "http",
+                referenceId: "agent_abc",
+                runParameters: { model: "gpt-5" },
+              },
+              {
+                type: "http",
+                referenceId: "agent_abc",
+                runParameters: { model: "gpt-5-mini" },
+              },
+            ],
+          }),
+        }),
+      );
+    });
+
+    /** @scenario "Agent compares one agent on two models in one run" */
+    it("keeps the run-level parameters, which a target overrides for itself", async () => {
+      await handleRunPlan({
+        ...runInput,
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            parameters: { model: "gpt-5" },
+          },
+        ],
+        parameters: { model: "gpt-5-mini", account_tier: "gold" },
+      });
+
+      expect(mockRunRunPlan).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          parameters: { model: "gpt-5-mini", account_tier: "gold" },
+          config: expect.objectContaining({
+            targets: [
+              {
+                type: "http",
+                referenceId: "agent_abc",
+                runParameters: { model: "gpt-5" },
+              },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it("leaves runParameters out of a target that names none", async () => {
+      await handleRunPlan(runInput);
+
+      expect(mockRunRunPlan).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            targets: [{ type: "http", referenceId: "agent_abc" }],
+          }),
+        }),
       );
     });
   });
@@ -256,17 +338,43 @@ describe("handleGetRunPlan()", () => {
     });
   });
 
-  describe("when the scope names test suites", () => {
-    /** @scenario "Agent reads a plan that runs the cases of a test suite" */
-    it("says the plan covers the cases of those test suites", async () => {
+  describe("when a plan compares one agent on two models", () => {
+    /** @scenario "Agent reads the full configuration of a run plan" */
+    it("reads the two targets apart by the parameters each one runs with", async () => {
       mockGetRunPlan.mockResolvedValue({
         ...samplePlan,
-        scope: { mode: "folders", folderIds: ["folder_a", "folder_b"] },
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            runParameters: { model: "gpt-5" },
+          },
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            runParameters: { model: "gpt-5-mini" },
+          },
+        ],
       });
 
       const result = await handleGetRunPlan({ id: "plan_abc123" });
 
-      expect(result).toContain("**Covers**: test suites: folder_a, folder_b");
+      expect(result).toContain("- http:agent_abc (model=gpt-5)");
+      expect(result).toContain("- http:agent_abc (model=gpt-5-mini)");
+    });
+  });
+
+  describe("when the scope names test suites", () => {
+    /** @scenario "Agent reads a plan that runs the scenarios of a test suite" */
+    it("says the plan covers the scenarios of those test suites", async () => {
+      mockGetRunPlan.mockResolvedValue({
+        ...samplePlan,
+        scope: { mode: "test_suites", testSuiteIds: ["suite_a", "suite_b"] },
+      });
+
+      const result = await handleGetRunPlan({ id: "plan_abc123" });
+
+      expect(result).toContain("**Covers**: test suites: suite_a, suite_b");
     });
   });
 
@@ -287,12 +395,12 @@ describe("handleGetRunPlan()", () => {
   });
 
   describe("when the plan carries no scope", () => {
-    it("reads as the hand-picked case list it already held", async () => {
+    it("reads as the hand-picked scenario list it already held", async () => {
       mockGetRunPlan.mockResolvedValue({ ...samplePlan, scope: null });
 
       const result = await handleGetRunPlan({ id: "plan_abc123" });
 
-      expect(result).toContain("**Covers**: hand-picked cases (1)");
+      expect(result).toContain("**Covers**: hand-picked scenarios (1)");
     });
   });
 
@@ -361,6 +469,97 @@ describe("handleArchiveRunPlan()", () => {
 
     it("says the past runs stay readable", () => {
       expect(result).toContain("past runs stay readable");
+    });
+  });
+});
+
+describe("handleRunPlan()", () => {
+  describe("when the plan carries its own evaluators", () => {
+    /** @scenario "Agent runs a plan with its own evaluators" */
+    it("sends the attachments inside the configuration, with an id and a gate settled", async () => {
+      mockRunRunPlan.mockResolvedValue({
+        scheduled: true,
+        batchRunId: "batch_1",
+        setId: "set_1",
+        jobCount: 1,
+        skippedArchived: { scenarios: [], targets: [] },
+        items: [],
+        runPlanId: "plan_1",
+        planName: "Nightly",
+        created: true,
+        platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/nightly",
+      });
+
+      await handleRunPlan({
+        scope: { mode: "all" },
+        targets: [{ type: "http", referenceId: "agent_abc" }],
+        evaluators: [
+          {
+            evaluatorId: "evaluator_pii",
+            required: false,
+            mappings: {
+              input: { type: "source", sourceId: "conversation", path: ["transcript"] },
+            },
+          },
+        ],
+      });
+
+      expect(mockRunRunPlan).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            evaluators: [
+              {
+                id: expect.stringMatching(/^att_/),
+                evaluatorId: "evaluator_pii",
+                required: false,
+                mappings: {
+                  input: { type: "source", sourceId: "conversation", path: ["transcript"] },
+                },
+              },
+            ],
+          }),
+        }),
+      );
+    });
+  });
+});
+
+describe("handleGetRunPlan()", () => {
+  describe("when the plan carries evaluators", () => {
+    /** @scenario "Agent reads a run plan that carries evaluators" */
+    it("lists each evaluator with its gate and its mappings", async () => {
+      mockGetRunPlan.mockResolvedValue({
+        id: "plan_1",
+        name: "Nightly",
+        slug: "nightly",
+        scope: { mode: "all" },
+        scenarioIds: [],
+        targets: [{ type: "http", referenceId: "agent_abc" }],
+        repeatCount: 1,
+        simulatorModel: null,
+        judgeModel: null,
+        labels: [],
+        archivedAt: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-02T00:00:00Z",
+        platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/nightly",
+        evaluators: [
+          {
+            id: "att_pii",
+            evaluatorId: "evaluator_pii",
+            required: false,
+            mappings: {
+              input: { type: "source", sourceId: "conversation", path: ["transcript"] },
+            },
+          },
+        ],
+      });
+
+      const result = await handleGetRunPlan({ id: "plan_1" });
+
+      expect(result).toContain("## Evaluators");
+      expect(result).toContain("evaluator_pii (reports only, attachment att_pii)");
+      expect(result).toContain("input: conversation.transcript");
     });
   });
 });

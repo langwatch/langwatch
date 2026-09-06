@@ -10,10 +10,10 @@ import {
 import { isRecordNotFoundError } from "~/server/utils/prismaErrors";
 import { ensureDefaultSuiteId } from "../suites/default-suite";
 import {
-  assertAssignableFolder,
-  type FolderMembershipClient,
-  reconcileFolderMembership,
-} from "../suites/folder-membership";
+  assertAssignableTestSuite,
+  reconcileTestSuiteMembership,
+  type TestSuiteMembershipClient,
+} from "../suites/test-suite-membership";
 import {
   ScenarioNotFoundError,
   ScenarioStaleVersionError,
@@ -25,6 +25,7 @@ import {
   type ScenarioRunConfig,
   type UpdateScenarioInput,
 } from "./scenario.repository";
+import { readScenarioFieldValues } from "./scenario-field-values";
 import {
   buildSnapshotEnvelope,
   diffSnapshotFields,
@@ -36,6 +37,10 @@ import {
   snapshotFieldsOf,
   touchesVersionedFields,
 } from "./scenario-versioning";
+import {
+  parseScenarioFieldValues,
+  parseSuiteFieldDefinitions,
+} from "./suite-fields";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.service");
 const logger = createLogger("langwatch:scenarios:service");
@@ -91,31 +96,68 @@ function actorFor(lastUpdatedById: string | null | undefined): ScenarioActor {
 }
 
 /**
- * Recomputes the member list of every folder a write touched, once per folder.
- * Nulls and repeats are dropped, so a move between two folders reconciles both
+ * Recomputes the member list of every test suite a write touched, once per test suite.
+ * Nulls and repeats are dropped, so a move between two test suites reconciles both
  * and a move within one reconciles it once.
  *
- * The ids are sorted first. `reconcileFolderMembership` takes a row lock, so
- * two moves between the same pair of folders in opposite directions would
+ * The ids are sorted first. `reconcileTestSuiteMembership` takes a row lock, so
+ * two moves between the same pair of test suites in opposite directions would
  * deadlock if each locked in the order its caller supplied.
  */
-async function reconcileFolders(params: {
+async function reconcileTestSuites(params: {
   projectId: string;
-  folderIds: (string | null | undefined)[];
-  tx: FolderMembershipClient;
+  testSuiteIds: (string | null | undefined)[];
+  tx: TestSuiteMembershipClient;
 }): Promise<void> {
-  const touchedFolderIds = [
+  const touchedTestSuiteIds = [
     ...new Set(
-      params.folderIds.filter((folderId): folderId is string => !!folderId),
+      params.testSuiteIds.filter(
+        (testSuiteId): testSuiteId is string => !!testSuiteId,
+      ),
     ),
   ].sort();
-  for (const folderId of touchedFolderIds) {
-    await reconcileFolderMembership({
+  for (const testSuiteId of touchedTestSuiteIds) {
+    await reconcileTestSuiteMembership({
       projectId: params.projectId,
-      folderId,
+      testSuiteId,
       tx: params.tx,
     });
   }
+}
+
+/**
+ * The client a field check reads the test suite through: the caller's
+ * transaction, so the suite it reads is the one the write files into.
+ */
+type SuiteFieldsClient = Pick<Prisma.TransactionClient, "simulationSuite">;
+
+/**
+ * The stored form of the values a write carries, checked against the fields
+ * the test suite declares. Absent values are absent; an empty record clears
+ * them.
+ *
+ * Read inside the caller's transaction, after the suite is known to be one
+ * the scenario may be filed into.
+ */
+async function resolveFieldValues(params: {
+  projectId: string;
+  testSuiteId: string | null | undefined;
+  fields: UpdateScenarioInput["fields"];
+  tx: SuiteFieldsClient;
+}): Promise<UpdateScenarioInput["fields"]> {
+  if (params.fields === undefined) return undefined;
+  const values = parseScenarioFieldValues(params.fields);
+  const suite = params.testSuiteId
+    ? await params.tx.simulationSuite.findFirst({
+        where: { id: params.testSuiteId, projectId: params.projectId },
+        select: { fields: true },
+      })
+    : null;
+  const stored = readScenarioFieldValues({
+    values,
+    definitions: parseSuiteFieldDefinitions(suite?.fields),
+  });
+  return stored as Prisma.InputJsonValue;
 }
 
 /** A stored version row as one history entry. */
@@ -161,23 +203,33 @@ export class ScenarioService {
         // Resolved before the transaction opens, because the create behind it
         // can lose a race and Postgres aborts a transaction on the unique
         // violation that reports it.
-        const folderId =
-          input.folderId ??
+        const testSuiteId =
+          input.testSuiteId ??
           (await ensureDefaultSuiteId({
             projectId: input.projectId,
             prisma: this.prisma,
           }));
         const actor = options?.actor ?? actorFor(input.lastUpdatedById);
-        // One transaction holds the row, its v1 version and the folder
+        // One transaction holds the row, its v1 version and the test suite
         // membership, so a create that fails part way leaves nothing behind.
         const result = await this.prisma.$transaction(async (tx) => {
-          await assertAssignableFolder({
+          await assertAssignableTestSuite({
             projectId: input.projectId,
-            folderId,
+            testSuiteId,
+            tx,
+          });
+          const fields = await resolveFieldValues({
+            projectId: input.projectId,
+            testSuiteId,
+            fields: input.fields,
             tx,
           });
           const created = await this.repository.create(
-            { ...input, folderId },
+            {
+              ...input,
+              testSuiteId,
+              ...(fields !== undefined && { fields }),
+            },
             tx,
           );
           await this.repository.createVersionRow(
@@ -196,9 +248,9 @@ export class ScenarioService {
             },
             tx,
           );
-          await reconcileFolderMembership({
+          await reconcileTestSuiteMembership({
             projectId: input.projectId,
-            folderId,
+            testSuiteId,
             tx,
           });
           return created;
@@ -322,11 +374,11 @@ export class ScenarioService {
           { projectId: params.projectId, scenarioId: params.id },
           "Updating scenario",
         );
-        const data = await this.withResolvedFolder({
+        const data = await this.withResolvedTestSuite({
           projectId: params.projectId,
           data: params.data,
         });
-        // One transaction holds the row, the version row and both folders'
+        // One transaction holds the row, the version row and both test suites'
         // member lists, so a write that fails part way leaves all of them
         // untouched.
         return await this.prisma.$transaction(async (tx) =>
@@ -339,22 +391,22 @@ export class ScenarioService {
   /**
    * Turns "no suite" into the project's Default suite.
    *
-   * A caller that clears `folderId` is asking to take the scenario out of the
+   * A caller that clears `testSuiteId` is asking to take the scenario out of the
    * suite it is in, not to make it loose: every scenario belongs to exactly
-   * one suite. An update that names no `folderId` at all is left alone, since
+   * one suite. An update that names no `testSuiteId` at all is left alone, since
    * it is not a move.
    *
    * Resolved before the caller's transaction opens, for the reason
    * {@link ensureDefaultSuiteId} documents.
    */
-  private async withResolvedFolder(params: {
+  private async withResolvedTestSuite(params: {
     projectId: string;
     data: UpdateScenarioInput;
   }): Promise<UpdateScenarioInput> {
-    if (params.data.folderId !== null) return params.data;
+    if (params.data.testSuiteId !== null) return params.data;
     return {
       ...params.data,
-      folderId: await ensureDefaultSuiteId({
+      testSuiteId: await ensureDefaultSuiteId({
         projectId: params.projectId,
         prisma: this.prisma,
       }),
@@ -387,21 +439,40 @@ export class ScenarioService {
         currentVersion: existing.version,
       });
     }
-    if (data.folderId !== undefined && data.folderId !== null) {
-      await assertAssignableFolder({ projectId, folderId: data.folderId, tx });
+    if (data.testSuiteId !== undefined && data.testSuiteId !== null) {
+      await assertAssignableTestSuite({
+        projectId,
+        testSuiteId: data.testSuiteId,
+        tx,
+      });
     }
+    // The values are checked against the suite the scenario will be in once
+    // this write lands: the one it moves to, or the one it already has.
+    const fields = await resolveFieldValues({
+      projectId,
+      testSuiteId:
+        data.testSuiteId === undefined
+          ? existing.testSuiteId
+          : data.testSuiteId,
+      fields: data.fields,
+      tx,
+    });
+    const write: UpdateScenarioInput = {
+      ...data,
+      ...(fields !== undefined && { fields }),
+    };
 
     // An update that names an editable field is a save: it bumps the version
-    // and records a version row. One that names none (a folder move, an
+    // and records a version row. One that names none (a test suite move, an
     // author stamp) leaves the history alone.
-    const updated = touchesVersionedFields(data)
-      ? await this.saveNewVersion(tx, { existing, data, options })
-      : await this.repository.update({ id, projectId, data, tx });
+    const updated = touchesVersionedFields(write)
+      ? await this.saveNewVersion(tx, { existing, data: write, options })
+      : await this.repository.update({ id, projectId, data: write, tx });
 
-    if (data.folderId !== undefined) {
-      await reconcileFolders({
+    if (data.testSuiteId !== undefined) {
+      await reconcileTestSuites({
         projectId,
-        folderIds: [existing.folderId, data.folderId],
+        testSuiteIds: [existing.testSuiteId, data.testSuiteId],
         tx,
       });
     }
@@ -583,8 +654,8 @@ export class ScenarioService {
    * is never rewritten: the version restored from is still there, and the
    * restore itself is one more entry in the list.
    *
-   * The snapshot carries the editable content only, so the case's folder,
-   * archive state and run history ride across unchanged. An archived case is
+   * The snapshot carries the editable content only, so the scenario's test suite,
+   * archive state and run history ride across unchanged. An archived scenario is
    * refused: from outside it is gone, and a restore must not resurrect it.
    */
   async restoreVersion(params: {
@@ -634,6 +705,10 @@ export class ScenarioService {
             judgeModel: fields.judgeModel,
             maxTurns: fields.maxTurns,
             minTurns: fields.minTurns,
+            fields:
+              fields.fields === null || fields.fields === undefined
+                ? Prisma.DbNull
+                : (fields.fields as Prisma.InputJsonValue),
             lastUpdatedById: params.actor.userId,
           },
           options: {
@@ -647,17 +722,17 @@ export class ScenarioService {
   }
 
   /**
-   * Files a scenario into a folder. A null folderId files it into the
+   * Files a scenario into a test suite. A null testSuiteId files it into the
    * project's Default suite rather than leaving it in no suite at all.
    * The scenario keeps everything else, run history included.
    */
-  async moveToFolder(params: {
+  async moveToTestSuite(params: {
     scenarioId: string;
     projectId: string;
-    folderId: string | null;
+    testSuiteId: string | null;
   }): Promise<Scenario> {
     return tracer.withActiveSpan(
-      "ScenarioService.moveToFolder",
+      "ScenarioService.moveToTestSuite",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -669,13 +744,13 @@ export class ScenarioService {
         this.update({
           id: params.scenarioId,
           projectId: params.projectId,
-          data: { folderId: params.folderId },
+          data: { testSuiteId: params.testSuiteId },
         }),
     );
   }
 
   /**
-   * Copies a scenario's definition and folder membership into a new scenario
+   * Copies a scenario's definition and test suite membership into a new scenario
    * named "<name> (copy)". Run history stays with the original.
    */
   async duplicate(params: {
@@ -701,7 +776,7 @@ export class ScenarioService {
           throw new ScenarioNotFoundError();
         }
         // Goes through create so everything create does for a new scenario
-        // (folder reconciliation, its own v1 version row) covers duplicates
+        // (test suite reconciliation, its own v1 version row) covers duplicates
         // too: the copy starts a history of its own at version 1.
         const copy = await this.create({
           projectId: original.projectId,
@@ -714,7 +789,8 @@ export class ScenarioService {
           judgeModel: original.judgeModel,
           maxTurns: original.maxTurns,
           minTurns: original.minTurns,
-          folderId: original.folderId,
+          fields: original.fields ?? undefined,
+          testSuiteId: original.testSuiteId,
           lastUpdatedById: params.lastUpdatedById ?? null,
         });
         span.setAttribute("scenario.duplicated_id", copy.id);
@@ -744,12 +820,12 @@ export class ScenarioService {
         );
         const result = await this.prisma.$transaction(async (tx) => {
           const archived = await this.repository.archive({ ...params, tx });
-          if (archived?.folderId) {
-            // An archived scenario keeps its folderId for a later restore,
-            // but leaves the folder's active member list.
-            await reconcileFolderMembership({
+          if (archived?.testSuiteId) {
+            // An archived scenario keeps its testSuiteId for a later restore,
+            // but leaves the test suite's active member list.
+            await reconcileTestSuiteMembership({
               projectId: params.projectId,
-              folderId: archived.folderId,
+              testSuiteId: archived.testSuiteId,
               tx,
             });
           }
@@ -789,7 +865,7 @@ export class ScenarioService {
         // Existence is resolved up front so the transaction below archives
         // only rows that exist: missing ids come back as per-id failures, and
         // the found ones archive together with ONE membership recompute per
-        // touched folder rather than one per scenario.
+        // touched test suite rather than one per scenario.
         const rows = await this.repository.findManyIncludingArchived({
           ids: params.ids,
           projectId: params.projectId,
@@ -809,9 +885,9 @@ export class ScenarioService {
                 tx,
               });
             }
-            await reconcileFolders({
+            await reconcileTestSuites({
               projectId: params.projectId,
-              folderIds: found.map((id) => rowsById.get(id)?.folderId),
+              testSuiteIds: found.map((id) => rowsById.get(id)?.testSuiteId),
               tx,
             });
           });

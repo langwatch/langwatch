@@ -4,6 +4,8 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { guardAgainstGlobalFetch } from "../../../../../test-utils/globalFetchGuard";
+import { closeNlpFetchDispatchers } from "../../../../nlpgo/timeouts";
 import type { CodeAgentData } from "../../types";
 
 // Capture withActiveSpan calls so the timeout/error paths can be verified.
@@ -73,9 +75,32 @@ import {
 
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
-// Mock global fetch
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+// The adapter calls undici's own fetch, so that export is the interception
+// point. Hoisted, because the vi.mock factory below is hoisted above this file.
+const mockFetch = vi.hoisted(() => vi.fn());
+
+// Undici's Agent does not read back the timeouts it was constructed with, so
+// the only way to assert on the dispatcher the adapter passes is to record the
+// constructor's arguments.
+const agentOptions = vi.hoisted(() => [] as Record<string, unknown>[]);
+
+vi.mock("undici", async () => {
+  const actual = await vi.importActual<typeof import("undici")>("undici");
+  return {
+    ...actual,
+    fetch: mockFetch,
+    Agent: class RecordingAgent extends actual.Agent {
+      constructor(opts?: Record<string, unknown>) {
+        agentOptions.push(opts ?? {});
+        super(opts);
+      }
+    },
+  };
+});
+
+// Pointing the global fetch at the same mock would let a regression back to it
+// pass this suite, which is how that bug reached production once already.
+guardAgainstGlobalFetch();
 
 describe("SerializedCodeAgentAdapter", () => {
   const defaultConfig: CodeAgentData = {
@@ -112,9 +137,20 @@ describe("SerializedCodeAgentAdapter", () => {
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     withActiveSpanCalls.length = 0;
+    agentOptions.length = 0;
+    // createNlpFetchDispatcher now memoizes by timeoutMs at module scope
+    // (nlpgo/timeouts.ts). Without clearing the cache here, a dispatcher
+    // built by an earlier test for the same timeoutMs is returned again
+    // without touching the mocked undici.Agent constructor, so agentOptions
+    // stays empty and this test's assertions see stale/undefined values.
+    await closeNlpFetchDispatchers();
+    // Pin the timeout explicitly so the test doesn't rely on ambient env.
+    // Stubbed, not assigned: a raw assignment here outlives the file and
+    // reaches whatever else shares this vitest worker.
+    vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "600");
     // clearAllMocks keeps implementations, so pin the no-active-context
     // default here; tests that need a trace context override it themselves.
     mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
@@ -122,6 +158,10 @@ describe("SerializedCodeAgentAdapter", () => {
       traceId: undefined,
     }));
     mockFetch.mockResolvedValue(nlpResponse({ output: "processed: Hello" }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("has AGENT role", () => {
@@ -380,6 +420,26 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const fetchOptions = mockFetch.mock.calls[0]![1];
       expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    // The abort signal above is not the only deadline in play: undici's own
+    // headersTimeout lives on the dispatcher and defaults to 300s, so without
+    // one sized to this adapter's deadline a longer run dies at 300s no matter
+    // how far out the abort is armed.
+    it("passes a dispatcher whose headers timeout matches the adapter's own fetch timeout", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+      await adapter.call(defaultInput);
+
+      const fetchOptions = mockFetch.mock.calls[0]![1];
+      expect(fetchOptions.dispatcher).toBeDefined();
+      expect(agentOptions.at(-1)?.headersTimeout).toBeGreaterThan(300_000);
+      expect(agentOptions.at(-1)?.headersTimeout).toBe(
+        agentOptions.at(-1)?.bodyTimeout,
+      );
     });
 
     it("sets run_evaluations to false and do_not_trace to true", async () => {
@@ -721,7 +781,7 @@ describe("SerializedCodeAgentAdapter", () => {
           const settled = expect(callPromise).rejects.toBeInstanceOf(
             SerializedCodeAgentAdapterError,
           );
-          await vi.advanceTimersByTimeAsync(120_001);
+          await vi.advanceTimersByTimeAsync(630_001);
           await settled;
         } finally {
           vi.useRealTimers();
@@ -753,13 +813,13 @@ describe("SerializedCodeAgentAdapter", () => {
             .catch((e: SerializedCodeAgentAdapterError) => {
               captured = e;
             });
-          await vi.advanceTimersByTimeAsync(120_001);
+          await vi.advanceTimersByTimeAsync(630_001);
           await callPromise;
         } finally {
           vi.useRealTimers();
         }
         expect(captured?.kind).toBe("timeout");
-        expect(captured?.message).toContain("did not respond within 120000ms");
+        expect(captured?.message).toContain("did not respond within 630000ms");
       });
     });
 
@@ -1153,7 +1213,7 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(armedFetchTimeoutMs()).toBe(200_000);
     });
 
-    it("bounds the default deadline too when set below the 2-minute floor", async () => {
+    it("bounds the default deadline too when set below the floor", async () => {
       vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "45000");
 
       await callWith(defaultConfig);
@@ -1161,10 +1221,10 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(armedFetchTimeoutMs()).toBe(45_000);
     });
 
-    it("leaves the default deadline at 2 minutes under the default ceiling", async () => {
+    it("leaves the default deadline at the engine ceiling + headroom (630s) under the default max", async () => {
       await callWith(defaultConfig);
 
-      expect(armedFetchTimeoutMs()).toBe(120_000);
+      expect(armedFetchTimeoutMs()).toBe(630_000);
     });
 
     it("is read per call, so a change between turns takes effect", async () => {
@@ -1176,6 +1236,127 @@ describe("SerializedCodeAgentAdapter", () => {
       vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "600000");
       await callWith(hugeBudget);
       expect(armedFetchTimeoutMs()).toBe(600_000);
+    });
+  });
+
+  describe("given a code agent with an input mapped to the scenario session", () => {
+    const sessionConfig: CodeAgentData = {
+      ...defaultConfig,
+      inputs: [
+        { identifier: "input", type: "str" },
+        { identifier: "session", type: "dict" },
+      ],
+      scenarioMappings: {
+        input: { type: "source", sourceId: "scenario", path: ["input"] },
+        session: { type: "source", sourceId: "scenario", path: ["session"] },
+      },
+    };
+
+    /** A success reply whose code node returned `outputs` beside the end result. */
+    const replyWith = (codeOutputs: Record<string, unknown>) => ({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        trace_id: "trace_abc123",
+        status: "success",
+        result: { output: codeOutputs.output },
+        nodes: {
+          entry: { id: "entry", status: "success" },
+          code_agent: {
+            id: "code_agent",
+            status: "success",
+            outputs: codeOutputs,
+          },
+          end: { id: "end", status: "success" },
+        },
+      }),
+      text: vi.fn().mockResolvedValue(""),
+    });
+
+    /** The `session` input of the nth request the adapter sent. */
+    const sentSession = (call: number): unknown => {
+      const body = JSON.parse(mockFetch.mock.calls[call]?.[1]?.body as string);
+      return body.payload.inputs[0].session;
+    };
+
+    const turn = (threadId: string, text: string): AgentInput => ({
+      ...defaultInput,
+      threadId,
+      messages: [{ role: "user", content: text }],
+      newMessages: [{ role: "user", content: text }],
+    });
+
+    describe("when the code returns a session beside its reply", () => {
+      /** @scenario "A code agent that returns a session receives it on the next turn" */
+      /** @scenario "A code agent receives no session on the first turn of a thread" */
+      /** @scenario "Two threads of one code agent run do not share a session" */
+      it("sends null on the first turn, the value on the next turn, and nothing to another thread", async () => {
+        mockFetch
+          .mockResolvedValueOnce(
+            replyWith({ output: "one", session: { cursor: 7 } }),
+          )
+          .mockResolvedValueOnce(
+            replyWith({ output: "two", session: { cursor: 8 } }),
+          )
+          .mockResolvedValueOnce(replyWith({ output: "other" }));
+        const adapter = new SerializedCodeAgentAdapter({
+          config: sessionConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+
+        await expect(adapter.call(turn("thread_a", "first"))).resolves.toBe(
+          "one",
+        );
+        await expect(adapter.call(turn("thread_a", "second"))).resolves.toBe(
+          "two",
+        );
+        await expect(adapter.call(turn("thread_b", "hello"))).resolves.toBe(
+          "other",
+        );
+
+        expect(sentSession(0)).toBeNull();
+        expect(sentSession(1)).toEqual({ cursor: 7 });
+        expect(sentSession(2)).toBeNull();
+      });
+
+      it("keeps the held value when a later turn returns no session", async () => {
+        mockFetch
+          .mockResolvedValueOnce(
+            replyWith({ output: "one", session: "conv_1" }),
+          )
+          .mockResolvedValueOnce(replyWith({ output: "two" }))
+          .mockResolvedValueOnce(replyWith({ output: "three" }));
+        const adapter = new SerializedCodeAgentAdapter({
+          config: sessionConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+
+        await adapter.call(turn("thread_a", "first"));
+        await adapter.call(turn("thread_a", "second"));
+        await adapter.call(turn("thread_a", "third"));
+
+        expect(sentSession(2)).toBe("conv_1");
+      });
+    });
+
+    describe("when the code returns a session above the cap", () => {
+      /** @scenario "A code agent session above the cap fails the turn" */
+      it("fails the turn with the payload code", async () => {
+        mockFetch.mockResolvedValueOnce(
+          replyWith({ output: "one", session: "x".repeat(70_000) }),
+        );
+        const adapter = new SerializedCodeAgentAdapter({
+          config: sessionConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+
+        await expect(adapter.call(turn("thread_a", "first"))).rejects.toThrow(
+          /agent_payload_too_large/,
+        );
+      });
     });
   });
 });

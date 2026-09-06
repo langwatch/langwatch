@@ -3,7 +3,7 @@
  * Run button and a row menu at the end of every row.
  *
  * The table is a grid inside one card, not a ruled table: the columns line up
- * without a vertical rule between them, so a long list of cases reads as a
+ * without a vertical rule between them, so a long list of scenarios reads as a
  * list of names rather than as a spreadsheet.
  *
  * The table carries no last result: authoring stays here and results live on
@@ -15,7 +15,7 @@
  * control on every line.
  *
  * @see specs/features/agent-testing/cases-table.feature
- * @see specs/scenarios/scenario-folder-assignment.feature
+ * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 
 import {
@@ -30,19 +30,21 @@ import {
 } from "@chakra-ui/react";
 import { format } from "date-fns";
 import { MoreVertical } from "lucide-react";
+import type { Period } from "~/components/PeriodSelector";
 import { Menu } from "~/components/ui/menu";
 import { TagList } from "~/components/ui/TagList";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
 import { FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
 import { MenuActionLabel } from "./MenuActionLabel";
+import { RecentRunsSubmenu } from "./RecentRunsMenu";
 import { RunCaseButton } from "./RunCaseButton";
 import type { TestCase } from "./test-cases";
 
-/** The last result of a case, as the aggregate answers it. */
+/** The last result of a scenario, as the aggregate answers it. */
 export type CaseLastResult = ScenarioLastResultSummary;
 
 /**
- * The columns of the table: the case name takes the free space, the row
+ * The columns of the table: the scenario name takes the free space, the row
  * actions take what they need on the right. A checkbox column is added at
  * the start of every row when the table is in selection mode.
  */
@@ -55,6 +57,8 @@ export type CasesTableProps = {
   /** The scenarios of the open suite, in order. */
   cases: TestCase[];
   canManage: boolean;
+  /** The window the recent runs of a row are read over. */
+  period: Period;
   /** True when the table shows checkboxes for a bulk move-to-suite. */
   isSelectionMode: boolean;
   selectedIds: Set<string>;
@@ -63,11 +67,10 @@ export type CasesTableProps = {
   /** Enters selection mode with this row pre-checked. */
   onStartMoveToSuite: (scenarioId: string) => void;
   onRowClick: (testCase: TestCase) => void;
-  /** Opens the run dialog for the case. */
+  /** Opens the run dialog for the scenario. */
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
-  onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
 };
 
@@ -120,6 +123,7 @@ function TableHeaderRow({
 export function CasesTable({
   cases,
   canManage,
+  period,
   isSelectionMode,
   selectedIds,
   hasLastRunByCase,
@@ -129,7 +133,6 @@ export function CasesTable({
   onRunCase,
   onEdit,
   onDuplicate,
-  onOpenLastRun,
   onArchive,
 }: CasesTableProps) {
   const templateColumns = isSelectionMode
@@ -158,6 +161,7 @@ export function CasesTable({
             testCase={testCase}
             templateColumns={templateColumns}
             canManage={canManage}
+            period={period}
             hasLastRun={hasLastRunByCase(testCase.id)}
             isSelectionMode={isSelectionMode}
             isSelected={selectedIds.has(testCase.id)}
@@ -167,7 +171,6 @@ export function CasesTable({
             onRunCase={onRunCase}
             onEdit={onEdit}
             onDuplicate={onDuplicate}
-            onOpenLastRun={onOpenLastRun}
             onArchive={onArchive}
           />
         ))}
@@ -180,6 +183,7 @@ function CaseRow({
   testCase,
   templateColumns,
   canManage,
+  period,
   hasLastRun,
   isSelectionMode,
   isSelected,
@@ -189,12 +193,12 @@ function CaseRow({
   onRunCase,
   onEdit,
   onDuplicate,
-  onOpenLastRun,
   onArchive,
 }: {
   testCase: TestCase;
   templateColumns: string;
   canManage: boolean;
+  period: Period;
   hasLastRun: boolean;
   isSelectionMode: boolean;
   isSelected: boolean;
@@ -204,7 +208,6 @@ function CaseRow({
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
-  onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
 }) {
   const handleRowClick = () => {
@@ -262,12 +265,12 @@ function CaseRow({
       <CaseRowActions
         testCase={testCase}
         canManage={canManage}
+        period={period}
         hasLastRun={hasLastRun}
         onRunCase={onRunCase}
         onEdit={onEdit}
         onDuplicate={onDuplicate}
         onStartMoveToSuite={onStartMoveToSuite}
-        onOpenLastRun={onOpenLastRun}
         onArchive={onArchive}
       />
     </Box>
@@ -277,22 +280,22 @@ function CaseRow({
 function CaseRowActions({
   testCase,
   canManage,
+  period,
   hasLastRun,
   onRunCase,
   onEdit,
   onDuplicate,
   onStartMoveToSuite,
-  onOpenLastRun,
   onArchive,
 }: {
   testCase: TestCase;
   canManage: boolean;
+  period: Period;
   hasLastRun: boolean;
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onStartMoveToSuite: (scenarioId: string) => void;
-  onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
 }) {
   return (
@@ -310,11 +313,11 @@ function CaseRowActions({
       <CaseRowActionsMenu
         testCase={testCase}
         canManage={canManage}
+        period={period}
         hasLastRun={hasLastRun}
         onEdit={onEdit}
         onDuplicate={onDuplicate}
         onStartMoveToSuite={onStartMoveToSuite}
-        onOpenLastRun={onOpenLastRun}
         onArchive={onArchive}
       />
     </HStack>
@@ -324,20 +327,20 @@ function CaseRowActions({
 function CaseRowActionsMenu({
   testCase,
   canManage,
+  period,
   hasLastRun,
   onEdit,
   onDuplicate,
   onStartMoveToSuite,
-  onOpenLastRun,
   onArchive,
 }: {
   testCase: TestCase;
   canManage: boolean;
+  period: Period;
   hasLastRun: boolean;
   onEdit: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onStartMoveToSuite: (scenarioId: string) => void;
-  onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
 }) {
   const stop = (event: React.MouseEvent) => event.stopPropagation();
@@ -381,17 +384,7 @@ function CaseRowActionsMenu({
           </Menu.Item>
         )}
         {hasLastRun && (
-          <Menu.Item
-            value="open-last-run"
-            onClick={(event) => {
-              stop(event);
-              onOpenLastRun(testCase);
-            }}
-          >
-            <MenuActionLabel action="openLastRun">
-              Open last run
-            </MenuActionLabel>
-          </Menu.Item>
+          <RecentRunsSubmenu period={period} scenarioIds={[testCase.id]} />
         )}
         {canManage && (
           <Menu.Item
@@ -482,7 +475,7 @@ export function ExternalCasesTable({
   );
 }
 
-/** The skeleton the table stands in as while the case list is read. */
+/** The skeleton the table stands in as while the scenario list is read. */
 export function CasesTableSkeleton() {
   return (
     <VStack align="stretch" gap={2} data-testid="agent-testing-cases-skeleton">

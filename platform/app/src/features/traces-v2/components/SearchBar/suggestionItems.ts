@@ -35,7 +35,7 @@ export interface SuggestionItem {
  * matches; ties keep input order. Matching the raw field too means typing
  * `cost` still surfaces "Cost" even though the label is what renders.
  */
-function rankByMatch<T extends { keys: string[] }>(
+export function rankByMatch<T extends { keys: string[] }>(
   candidates: readonly T[],
   query: string,
   limit: number | null,

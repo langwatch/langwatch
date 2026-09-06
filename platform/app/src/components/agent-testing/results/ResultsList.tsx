@@ -39,6 +39,7 @@ import { FlatRowsTable, GroupedRowsTable } from "./GroupedRowsTable";
 import { PlanRowsTable } from "./PlanRowsTable";
 import { ResultsChartsBlock } from "./ResultsChartsBlock";
 import { ResultsFilterRow } from "./ResultsFilterRow";
+import { nextWiderWindow } from "./RunPlanResultsStates";
 import type { ResultGrouping, ResultRow } from "./result-atoms";
 import type { RunPlan } from "./run-plans";
 import { type UseResultGroupsResult, useResultGroups } from "./useResultGroups";
@@ -87,8 +88,22 @@ function LoadingRows() {
   );
 }
 
-/** What the tab says to a project that has never run anything. */
-function NoRunsYet() {
+/**
+ * What the tab says while the window holds nothing.
+ *
+ * It offers the next wider window as well. The period picker lives in the
+ * filter row, which this state stands in for, so without the button a person
+ * whose runs are older than the window has no way back to them.
+ */
+function NoRunsYet({
+  period,
+  setRelativePeriod,
+}: {
+  period: Period;
+  setRelativePeriod: (key: RelativePresetKey) => void;
+}) {
+  const wider = nextWiderWindow(period);
+
   return (
     <EmptyState.Root paddingY={12}>
       <EmptyState.Content>
@@ -99,6 +114,12 @@ function NoRunsYet() {
         <EmptyState.Description>
           Run a test suite or a single scenario and the results land here.
         </EmptyState.Description>
+        <SmallButton
+          onClick={() => setRelativePeriod(wider.key)}
+          data-testid="widen-period-button"
+        >
+          {wider.label}
+        </SmallButton>
       </EmptyState.Content>
     </EmptyState.Root>
   );
@@ -133,7 +154,9 @@ function ResultsTable({
       <PlanRowsTable
         rows={results.planRows}
         days={days}
+        hasRunsOutsidePlans={results.totals.executions > 0}
         resolveTargetName={results.resolveTargetName}
+        resolveTargetKind={results.resolveTargetKind}
         onSelectPlan={onSelectPlan}
         onEditPlan={onEditPlan}
         onArchivePlan={onArchivePlan}
@@ -151,6 +174,7 @@ function ResultsTable({
         onToggleOpen={onToggleOpen}
         rowsByGroupKey={results.rowsByGroupKey}
         resolveTargetName={results.resolveTargetName}
+        resolveTargetKind={results.resolveTargetKind}
         onOpenRun={onOpenRun}
       />
     );
@@ -171,6 +195,8 @@ function ResultsBody({
   view,
   results,
   period,
+  periodMode,
+  setPeriod,
   setRelativePeriod,
   days,
   onSelectPlan,
@@ -182,6 +208,8 @@ function ResultsBody({
   view: ReturnType<typeof useResultsView>;
   results: UseResultGroupsResult;
   period: Period;
+  periodMode: PeriodMode;
+  setPeriod: (startDate: Date, endDate: Date) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
   days: number;
   onSelectPlan: (planSlug: string) => void;
@@ -203,6 +231,8 @@ function ResultsBody({
         isChartsShown={view.isChartsShown}
         onChartsToggle={view.onChartsToggle}
         period={period}
+        periodMode={periodMode}
+        setPeriod={setPeriod}
         setRelativePeriod={setRelativePeriod}
       />
 
@@ -252,6 +282,7 @@ export function ResultsList({
   isPlansLoading,
   period,
   periodMode,
+  setPeriod,
   setRelativePeriod,
   onSelectPlan,
   onSelectRun,
@@ -274,6 +305,14 @@ export function ResultsList({
 
   const isLoading = isPlansLoading || results.isLoading;
 
+  // The empty state is about the window, not about the plan list. Runs started
+  // outside a run plan, a single scenario or a test suite, are counted by the
+  // header and listed by the scenario, target and flat groupings, so a project
+  // holding those and no plan was told it had no runs while the same header
+  // counted them, and lost the grouping selector and the period picker with
+  // the filter row.
+  const isEmptyWindow = !hasAnyPlans && results.totals.executions === 0;
+
   const openRun = (row: ResultRow) => onSelectRun(row.planSlug, row.runId);
 
   return (
@@ -288,13 +327,15 @@ export function ResultsList({
 
       {isLoading ? (
         <LoadingRows />
-      ) : !hasAnyPlans ? (
-        <NoRunsYet />
+      ) : isEmptyWindow ? (
+        <NoRunsYet period={period} setRelativePeriod={setRelativePeriod} />
       ) : (
         <ResultsBody
           view={view}
           results={results}
           period={period}
+          periodMode={periodMode}
+          setPeriod={setPeriod}
           setRelativePeriod={setRelativePeriod}
           days={periodDays(period)}
           onSelectPlan={onSelectPlan}

@@ -71,3 +71,183 @@ describe("the models the run settings read", () => {
     });
   });
 });
+
+describe("the targets the run settings read", () => {
+  describe("when the same agent ran on two sets of parameters", () => {
+    /** @scenario "The repeat count counts the runs of each scenario and target key" */
+    it("counts one run per scenario and target key, not per agent", () => {
+      const settings = readRunSettings([
+        run({
+          targetReferenceId: "agent_1",
+          targetType: "http",
+          targetKey: "agent_1",
+        }),
+        {
+          ...run({
+            targetReferenceId: "agent_1",
+            targetType: "http",
+            targetKey: "agent_1#0123abcd",
+            targetParameters: { model: "gpt-5-mini" },
+          }),
+          scenarioRunId: "run_b",
+        },
+      ]);
+
+      expect(settings?.repeatCount).toBe(1);
+    });
+  });
+
+  describe("when a target carries overrides over the run-level values", () => {
+    /** @scenario "The Parameters row reads the run-level parameters alone" */
+    it("reads the run-level parameters and leaves the target's own out", () => {
+      const withParameters = run({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        targetKey: "agent_1#0123abcd",
+        targetParameters: { model: "gpt-5-mini" },
+      });
+      withParameters.metadata = {
+        ...withParameters.metadata,
+        parameters: { locale: "de", model: "gpt-5-mini" },
+      } as never;
+
+      const settings = readRunSettings([withParameters]);
+
+      expect(settings?.parameters).toEqual([{ name: "locale", value: "de" }]);
+    });
+  });
+
+  describe("when one target overrides a name another target left alone", () => {
+    /** @scenario "A value one target overrides is still read from a target that did not" */
+    it("reads the run-level value from the target that did not override it", () => {
+      const overriding = run({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        targetKey: "agent_1#0123abcd",
+        targetParameters: { plan: "pro" },
+      });
+      overriding.metadata = {
+        ...overriding.metadata,
+        parameters: { plan: "pro", locale: "de" },
+      } as never;
+      const plain = {
+        ...run({
+          targetReferenceId: "agent_2",
+          targetType: "http",
+          targetKey: "agent_2",
+        }),
+        scenarioRunId: "run_b",
+      };
+      plain.metadata = {
+        ...plain.metadata,
+        parameters: { plan: "free", locale: "de" },
+      } as never;
+
+      expect(readRunSettings([overriding, plain])?.parameters).toEqual([
+        { name: "locale", value: "de" },
+        { name: "plan", value: "free" },
+      ]);
+    });
+
+    /** @scenario "A value one target overrides is still read from a target that did not" */
+    it("reads the same values whichever run of the batch comes first", () => {
+      const overriding = run({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        targetKey: "agent_1#0123abcd",
+        targetParameters: { plan: "pro" },
+      });
+      overriding.metadata = {
+        ...overriding.metadata,
+        parameters: { plan: "pro", locale: "de" },
+      } as never;
+      const plain = {
+        ...run({
+          targetReferenceId: "agent_2",
+          targetType: "http",
+          targetKey: "agent_2",
+        }),
+        scenarioRunId: "run_b",
+      };
+      plain.metadata = {
+        ...plain.metadata,
+        parameters: { plan: "free", locale: "de" },
+      } as never;
+
+      expect(readRunSettings([overriding, plain])?.parameters).toEqual(
+        readRunSettings([plain, overriding])?.parameters,
+      );
+    });
+  });
+
+  describe("when the run went against the same agent on two sets of parameters", () => {
+    /** @scenario "Each target of a run reads every parameter it received" */
+    it("reads the full set each target received, keyed by target key", () => {
+      const plain = run({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        targetKey: "agent_1",
+      });
+      plain.metadata = {
+        ...plain.metadata,
+        parameters: { locale: "de" },
+      } as never;
+      const variant = {
+        ...run({
+          targetReferenceId: "agent_1",
+          targetType: "http",
+          targetKey: "agent_1#0123abcd",
+          targetParameters: { model: "gpt-5-mini" },
+        }),
+        scenarioRunId: "run_b",
+      };
+      variant.metadata = {
+        ...variant.metadata,
+        parameters: { model: "gpt-5-mini", locale: "de" },
+      } as never;
+
+      const settings = readRunSettings([plain, variant]);
+
+      expect(settings?.parametersByTarget.get("agent_1")).toEqual([
+        { name: "locale", value: "de" },
+      ]);
+      expect(settings?.parametersByTarget.get("agent_1#0123abcd")).toEqual([
+        { name: "locale", value: "de" },
+        { name: "model", value: "gpt-5-mini" },
+      ]);
+    });
+
+    /** @scenario "Each target of a run reads every parameter it received" */
+    it("takes the names of every run of the target together, first value kept", () => {
+      const first = run({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        targetKey: "agent_1",
+      });
+      first.metadata = {
+        ...first.metadata,
+        parameters: { plan: "pro" },
+      } as never;
+      const second = {
+        ...run({
+          targetReferenceId: "agent_1",
+          targetType: "http",
+          targetKey: "agent_1",
+        }),
+        scenarioRunId: "run_b",
+        scenarioId: "scenario_parcel",
+      };
+      second.metadata = {
+        ...second.metadata,
+        parameters: { locale: "de", plan: "free" },
+      } as never;
+
+      const settings = readRunSettings([first, second]);
+
+      expect(settings?.parametersByTarget.get("agent_1")).toEqual([
+        { name: "locale", value: "de" },
+        { name: "plan", value: "pro" },
+      ]);
+    });
+  });
+});

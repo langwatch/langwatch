@@ -21,15 +21,15 @@ class GetApiScenariosByIdVersionsByVersionResponse200:
     Attributes:
         version (int): The version number, counting from 1.
         author_label (None | str): Which surface wrote the version: user, api, cli or langy. Null on the synthesized
-            Created entry of a case saved before versions were recorded.
+            Created entry of a scenario saved before versions were recorded.
         author_id (None | str): The user who saved the version. Null when the save came from an API key.
         change_description (None | str):
         changed_fields (list[str]): The fields whose value this save changed.
         created_at (str): When the version was written, in ISO 8601.
-        is_synthesized (bool): True on the Created entry a case saved before versions were recorded shows. It has no
+        is_synthesized (bool): True on the Created entry a scenario saved before versions were recorded shows. It has no
             stored snapshot, so it cannot be read back.
         schema_version (int): The shape the snapshot was written in.
-        snapshot (GetApiScenariosByIdVersionsByVersionResponse200Snapshot): The editable content of the case as this
+        snapshot (GetApiScenariosByIdVersionsByVersionResponse200Snapshot): The editable content of the scenario as this
             version saved it.
     """
 

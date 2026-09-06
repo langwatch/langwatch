@@ -9,6 +9,7 @@ import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
 import { getCodexVercelAIModel } from "./codexGatewayModel";
 import { isCodexModel } from "./codexRestrictions";
 import { featureByKey } from "./featureRegistry";
+import { expandLatestAlias } from "./latestAliases";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 import { ModelProviderDisabledError } from "./modelProviderDisabledError";
 import type { MaybeStoredModelProvider } from "./registry";
@@ -117,8 +118,9 @@ async function resolveModel({
   featureKey: string;
   modelProviders: Record<string, MaybeStoredModelProvider>;
 }): Promise<string> {
-  // 1. Explicit model always wins.
-  if (explicit) return explicit;
+  // 1. Explicit model always wins. A latest alias resolves to the concrete
+  //    model here so the provider lookup below reads the real prefix.
+  if (explicit) return expandLatestAlias(explicit);
 
   // 2. Cascade-resolved default for the given feature key. Throws
   //    ModelNotConfiguredError when nothing is set at any scope —

@@ -33,7 +33,9 @@ export {
   evaluateRules,
   featureFlagRuleSchema,
   featureFlagRulesSchema,
+  featureFlagRulesWriteSchema,
   parseRules,
+  readNeedsOrganizationAge,
   resolveEffectiveForListing,
 } from "./rules";
 export type { FeatureFlagTargetId, NotTargeted } from "./targeting";

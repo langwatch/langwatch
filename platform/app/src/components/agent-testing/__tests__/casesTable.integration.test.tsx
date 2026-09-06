@@ -6,7 +6,7 @@
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/suites-rail.feature
- * @see specs/scenarios/scenario-folder-assignment.feature
+ * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -30,9 +30,12 @@ import type { AgentTestingSelection } from "../useAgentTestingRouting";
 
 const suiteRunDataQuery = vi.hoisted(() => vi.fn());
 const suitesGetAllQuery = vi.hoisted(() => vi.fn());
+const mockEvaluatorsGetAll = vi.hoisted(() => vi.fn());
 
 vi.mock("~/utils/api", () => ({
   api: {
+    // The evaluator pills under the suite name read the saved evaluators.
+    evaluators: { getAll: { useQuery: mockEvaluatorsGetAll } },
     suites: {
       // Every run of the v2 dialog is queued under a plan name.
       runPlan: {
@@ -87,18 +90,24 @@ const DEFAULT_SUITE: TestSuiteEntry = {
   name: "Default",
   slug: "default",
   caseCount: 1,
+  fields: [],
+  evaluators: [],
 };
 const REFUNDS: TestSuiteEntry = {
   id: "suite_refunds",
   name: "Refunds",
   slug: "refunds",
   caseCount: 2,
+  fields: [],
+  evaluators: [],
 };
 const CHECKOUT: TestSuiteEntry = {
   id: "suite_checkout",
   name: "Checkout",
   slug: "checkout",
   caseCount: 1,
+  fields: [],
+  evaluators: [],
 };
 
 function makeCase(overrides: Partial<TestCase> = {}): TestCase {
@@ -106,7 +115,7 @@ function makeCase(overrides: Partial<TestCase> = {}): TestCase {
     id: "case_1",
     name: "Double charge",
     labels: [],
-    folderId: REFUNDS.id,
+    testSuiteId: REFUNDS.id,
     createdAt: new Date("2026-07-06T12:00:00.000Z"),
     lastUpdatedById: null,
     ...overrides,
@@ -137,7 +146,7 @@ function panelProps(
     cases: [],
     externalCases: [],
     isLoading: false,
-    // A case with a run inside the period, which is what offers the recent
+    // A scenario with a run inside the period, which is what offers the recent
     // runs control under the table.
     lastResults: new Map([["case_1", makeResult()]]),
     isLastResultsLoading: false,
@@ -160,10 +169,9 @@ function panelProps(
     onEdit: vi.fn(),
     onDuplicate: vi.fn(),
     onMoveToSuite: vi.fn(),
-    onOpenLastRun: vi.fn(),
     onArchive: vi.fn(),
     onOpenExternalCase: vi.fn(),
-    onRenameSuite: vi.fn(),
+    onEditSuite: vi.fn(),
     ...overrides,
   };
 }
@@ -296,7 +304,7 @@ async function openRowMenu(caseName: string) {
   return user;
 }
 
-/** The view model for one address, with a fixed suite list and case list. */
+/** The view model for one address, with a fixed suite list and scenario list. */
 function renderView({
   selection,
   suites,
@@ -325,14 +333,15 @@ describe("the scenarios table", () => {
     suitesGetAllQuery.mockReset();
     suiteRunDataQuery.mockReturnValue({ data: undefined, isLoading: false });
     suitesGetAllQuery.mockReturnValue({ data: RUN_PLANS });
+    mockEvaluatorsGetAll.mockReturnValue({ data: [], isLoading: false });
   });
 
   // --- Which suite is open ---
 
   describe("given an address and a rail of suites", () => {
     const cases = [
-      makeCase({ id: "case_default", folderId: DEFAULT_SUITE.id }),
-      makeCase({ id: "case_refunds", folderId: REFUNDS.id }),
+      makeCase({ id: "case_default", testSuiteId: DEFAULT_SUITE.id }),
+      makeCase({ id: "case_refunds", testSuiteId: REFUNDS.id }),
     ];
     const suites = [DEFAULT_SUITE, REFUNDS];
 
@@ -438,7 +447,7 @@ describe("the scenarios table", () => {
   });
 
   /** @scenario "A row carries no leading file icon" */
-  it("draws no file icon at the leading edge of a case row", () => {
+  it("draws no file icon at the leading edge of a scenario row", () => {
     renderPanel({ cases: [makeCase()] });
 
     const row = screen.getByTestId("case-row-Double charge");
@@ -453,11 +462,11 @@ describe("the scenarios table", () => {
     const critical = within(row).getByTestId("tag-pill-critical");
     const billing = within(row).getByTestId("tag-pill-billing");
     // Quieter than the name: the pill palette is a subtle surface, not the
-    // foreground the case name is drawn in.
+    // foreground the scenario name is drawn in.
     expect(critical.className).not.toEqual(billing.className);
   });
 
-  /** @scenario "The cases table shows the scenario column and the row actions, and no last result" */
+  /** @scenario "The scenarios table shows the scenario column and the row actions, and no last result" */
   it("has no LAST RESULT column header and no per-row result cell", () => {
     renderPanel({
       cases: [makeCase()],
@@ -474,11 +483,11 @@ describe("the scenarios table", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("draws no folder row, because the rail is the only list of suites", () => {
+  it("draws no test suite row, because the rail is the only list of suites", () => {
     renderPanel({ cases: [makeCase()] });
 
     expect(
-      document.querySelector('[data-testid^="folder-header-row-"]'),
+      document.querySelector('[data-testid^="test-suite-header-row-"]'),
     ).toBeNull();
   });
 
@@ -493,8 +502,8 @@ describe("the scenarios table", () => {
     expect(runButton.querySelector("svg.lucide-play")).toBeInTheDocument();
   });
 
-  /** @scenario "The row menu offers Edit, Duplicate, Open last run, Move to suite... and Archive in order" */
-  it("offers Edit, Duplicate, Open last run, Move to suite... and Archive in order", async () => {
+  /** @scenario "The row menu offers Edit, Duplicate, Open recent runs, Move to suite... and Archive in order" */
+  it("offers Edit, Duplicate, Open recent runs, Move to suite... and Archive in order", async () => {
     renderPanel({
       cases: [makeCase()],
       lastResults: new Map([["case_1", makeResult()]]),
@@ -507,7 +516,7 @@ describe("the scenarios table", () => {
     expect(items).toEqual([
       "Edit",
       "Duplicate",
-      "Open last run",
+      "Open recent runs",
       "Move to suite...",
       "Archive",
     ]);
@@ -535,8 +544,8 @@ describe("the scenarios table", () => {
     ]);
   });
 
-  /** @scenario "Open last run is not offered for a case that never ran" */
-  it("does not offer Open last run for a case that never ran", async () => {
+  /** @scenario "Open recent runs is not offered for a scenario that never ran" */
+  it("does not offer Open recent runs for a scenario that never ran", async () => {
     renderPanel({ cases: [makeCase()], lastResults: new Map() });
     await openRowMenu("Double charge");
 
@@ -544,13 +553,13 @@ describe("the scenarios table", () => {
       await screen.findByRole("menuitem", { name: "Edit" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("menuitem", { name: "Open last run" }),
+      screen.queryByRole("menuitem", { name: "Open recent runs" }),
     ).not.toBeInTheDocument();
   });
 
   /** @scenario "Duplicate creates a copy in the same suite" */
-  /** @scenario "Duplicating a case copies its suite" */
-  it("puts the copy of a duplicated case in the same suite", async () => {
+  /** @scenario "Duplicating a scenario copies its suite" */
+  it("puts the copy of a duplicated scenario in the same suite", async () => {
     const original = makeCase({ labels: ["critical"] });
     const { props, view } = renderPanel({ cases: [original] });
     const user = await openRowMenu("Double charge");
@@ -630,8 +639,8 @@ describe("the scenarios table", () => {
 
   // --- Row click ---
 
-  /** @scenario "Clicking a row opens the case editor" */
-  it("opens the case editor when the row is clicked", async () => {
+  /** @scenario "Clicking a row opens the scenario editor" */
+  it("opens the scenario editor when the row is clicked", async () => {
     const user = userEvent.setup();
     const testCase = makeCase();
     const { props } = renderPanel({
@@ -642,11 +651,10 @@ describe("the scenarios table", () => {
     await user.click(screen.getByText("Double charge"));
 
     expect(props.onRowClick).toHaveBeenCalledWith(testCase);
-    expect(props.onOpenLastRun).not.toHaveBeenCalled();
   });
 
-  /** @scenario "Clicking a row with no last run opens the case editor" */
-  it("opens the case editor when a row with no last run is clicked", async () => {
+  /** @scenario "Clicking a row with no last run opens the scenario editor" */
+  it("opens the scenario editor when a row with no last run is clicked", async () => {
     const user = userEvent.setup();
     const testCase = makeCase();
     const { props } = renderPanel({
@@ -703,52 +711,142 @@ describe("the scenarios table", () => {
     expect(screen.queryByText("Late refund")).not.toBeInTheDocument();
   });
 
-  // --- Renaming the open suite ---
-
   describe("given the suite Refunds is open", () => {
-    /** @scenario "The name of the open suite carries a rename control" */
-    it("offers a rename control beside the name that opens the name dialog", async () => {
+    /** @scenario "Edit suite sits between New scenario and Run suite above the table" */
+    it("offers Edit suite between New scenario and Run suite, which opens the suite editor", async () => {
       const user = userEvent.setup();
       const { props } = renderPanel({ cases: [makeCase()] });
 
-      const rename = screen.getByRole("button", { name: "Rename test suite" });
-      // It sits with the name, not among the actions at the far end of the line.
-      expect(rename.parentElement).toHaveTextContent("Refunds");
+      const header = screen.getByTestId("edit-suite-button").parentElement;
+      const labels = Array.from(header?.querySelectorAll("button") ?? [])
+        .map((button) => button.textContent)
+        .filter((label) => !!label);
+      expect(labels).toEqual([
+        "New scenario",
+        "Edit suite",
+        "Open recent run",
+        "Run suite",
+      ]);
 
-      await user.click(rename);
-      expect(props.onRenameSuite).toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Edit suite" }));
+      expect(props.onEditSuite).toHaveBeenCalledWith();
     });
 
-    /** @scenario "The rename control is reachable from the keyboard" */
-    it("takes keyboard focus, so it is not offered on hover alone", () => {
-      renderPanel({ cases: [makeCase()] });
+    /** @scenario "A person with read-only access is offered no Edit suite" */
+    it("offers no Edit suite to a person with read-only access", () => {
+      renderPanel({ cases: [makeCase()], canManage: false });
 
-      const rename = screen.getByRole("button", { name: "Rename test suite" });
-      rename.focus();
-
-      expect(document.activeElement).toBe(rename);
-      expect(rename).not.toHaveAttribute("tabindex", "-1");
-      expect(rename).not.toHaveAttribute("aria-hidden");
-    });
-
-    /** @scenario "No Edit suite button sits above the table" */
-    it("offers no Edit suite button above the table", () => {
-      renderPanel({ cases: [makeCase()] });
-
-      expect(screen.queryByText("Edit suite")).not.toBeInTheDocument();
+      expect(screen.getByText("Refunds")).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Edit suite" }),
       ).not.toBeInTheDocument();
     });
 
-    /** @scenario "A person with read-only access is offered no rename control" */
-    it("offers no rename control to a person with read-only access", () => {
-      renderPanel({ cases: [makeCase()], canManage: false });
+    /** @scenario "A suite with nothing declared shows no chips row" */
+    it("shows no chips row and counts the scenarios alone when nothing is declared", () => {
+      renderPanel({ cases: [makeCase()] });
 
-      expect(screen.getByText("Refunds")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Rename test suite" }),
+        screen.queryByTestId("suite-declarations-row"),
       ).not.toBeInTheDocument();
+      expect(screen.getByTestId("cases-panel-count-line")).toHaveTextContent(
+        "1 scenario",
+      );
+    });
+
+    /** @scenario "The header lists the fields and the evaluators of the open suite" */
+    /** @scenario "Choosing a header chip opens the suite editor" */
+    it("lists the fields and the evaluators under the name, and opens the editor from a chip", async () => {
+      const user = userEvent.setup();
+      mockEvaluatorsGetAll.mockReturnValue({
+        data: [
+          {
+            id: "eval_sql",
+            name: "SQL Query Equivalence",
+            type: "evaluator",
+            config: { evaluatorType: "ragas/sql_query_equivalence" },
+            fields: [
+              { identifier: "output", type: "str" },
+              { identifier: "expected_output", type: "str" },
+            ],
+            outputFields: [{ identifier: "passed", type: "bool" }],
+          },
+        ],
+        isLoading: false,
+      });
+      const { props } = renderPanel({
+        cases: [makeCase()],
+        suite: {
+          ...REFUNDS,
+          fields: [
+            { identifier: "golden_sql", type: "text" },
+            { identifier: "attempts", type: "number" },
+          ],
+          evaluators: [
+            {
+              id: "att_1",
+              evaluatorId: "eval_sql",
+              required: true,
+              mappings: {
+                output: {
+                  type: "source",
+                  sourceId: "conversation",
+                  path: ["last_agent_message"],
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      const fields = screen.getByTestId("suite-fields-group");
+      expect(within(fields).getByText("Fields")).toBeInTheDocument();
+      expect(
+        within(fields).getByTestId("suite-field-chip-golden_sql"),
+      ).toHaveTextContent("golden_sql");
+      expect(
+        within(fields).getByTestId("suite-field-chip-attempts"),
+      ).toHaveTextContent("attempts");
+
+      const evaluators = screen.getByTestId("suite-evaluators-group");
+      const pill = within(evaluators).getByTestId("evaluator-pill-att_1");
+      expect(pill).toHaveTextContent("SQL Query Equivalence");
+      expect(
+        within(pill).getByTestId("evaluator-pill-required-att_1"),
+      ).toBeInTheDocument();
+      // expected_output reads nothing yet, so the pill carries the alert.
+      expect(pill).toHaveAttribute("data-missing", "true");
+      expect(
+        within(pill).getByTestId("evaluator-pill-alert-att_1"),
+      ).toBeInTheDocument();
+
+      expect(screen.getByTestId("cases-panel-count-line")).toHaveTextContent(
+        "1 scenario · 2 fields · 1 evaluator",
+      );
+
+      await user.click(screen.getByTestId("suite-field-chip-golden_sql"));
+      expect(props.onEditSuite).toHaveBeenLastCalledWith();
+      await user.click(pill);
+      expect(props.onEditSuite).toHaveBeenLastCalledWith("att_1");
+    });
+
+    /** @scenario "The header shows a group only when it has something to list" */
+    it("shows the Fields group alone when the suite declares no evaluator", () => {
+      renderPanel({
+        cases: [makeCase()],
+        suite: {
+          ...REFUNDS,
+          fields: [{ identifier: "golden_sql", type: "text" }],
+        },
+      });
+
+      expect(screen.getByTestId("suite-fields-group")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("suite-evaluators-group"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("cases-panel-count-line")).toHaveTextContent(
+        "1 scenario · 1 field",
+      );
     });
   });
 
@@ -773,15 +871,20 @@ describe("the scenarios table", () => {
       renderPanel({ cases: [makeCase()] });
 
       const header = screen.getByTestId("recent-runs-trigger").parentElement;
-      // The rename control beside the suite name carries an icon and no words.
       const labels = Array.from(header?.querySelectorAll("button") ?? [])
         .map((button) => button.textContent)
         .filter((label) => !!label);
 
-      expect(labels).toEqual(["New scenario", "Open recent run", "Run suite"]);
+      expect(labels).toEqual([
+        "New scenario",
+        "Edit suite",
+        "Open recent run",
+        "Run suite",
+      ]);
     });
 
     /** @scenario "A run of one scenario of the suite is offered above the table" */
+    /** @scenario "The submenu holds a run of a suite whose scenarios ran one at a time" */
     it("offers a run that a scenario of the suite made its own plan for", async () => {
       setRecentRuns([makeSuiteRun({ batchRunId: "batch_alone" })], {
         batch_alone: ONE_CASE_SET,
@@ -950,6 +1053,61 @@ describe("the scenarios table", () => {
     });
   });
 
+  describe("when the recent runs hang off a row menu", () => {
+    /** @scenario "Open recent runs holds the runs of that scenario" */
+    it("lists the runs of that scenario and opens one under its plan", async () => {
+      setRecentRuns(threeRuns());
+      renderPanel({
+        cases: [makeCase()],
+        lastResults: new Map([["case_1", makeResult()]]),
+      });
+      const user = await openRowMenu("Double charge");
+
+      await user.click(
+        await screen.findByRole("menuitem", { name: /Open recent runs/ }),
+      );
+
+      const list = await screen.findByTestId("recent-runs-submenu-list");
+      const rows = within(list).getAllByTestId(/^recent-run-/);
+      expect(rows).toHaveLength(3);
+
+      await user.click(rows[0]!);
+
+      // The row opens the run under the plan that holds it, the way the button
+      // above the table does, rather than in the single run drawer.
+      expect(routerPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: "/[project]/agent-testing/[[...path]]",
+        }),
+        expect.stringContaining("/results/"),
+        { shallow: true },
+      );
+    });
+
+    /** @scenario "The runs of a row are read only when its submenu is opened" */
+    it("reads nothing while the submenu stays closed", async () => {
+      setRecentRuns(threeRuns());
+      renderPanel({
+        cases: [makeCase()],
+        lastResults: new Map([["case_1", makeResult()]]),
+      });
+      suiteRunDataQuery.mockClear();
+      suitesGetAllQuery.mockClear();
+
+      const user = await openRowMenu("Double charge");
+      await screen.findByRole("menuitem", { name: /Open recent runs/ });
+
+      expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(false);
+
+      await user.click(
+        screen.getByRole("menuitem", { name: /Open recent runs/ }),
+      );
+      await screen.findByTestId("recent-runs-submenu-list");
+
+      expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(true);
+    });
+  });
+
   /** @scenario "A suite whose scenarios have no run in the period offers no recent runs button" */
   it("offers no recent runs button when no scenario of the suite ran", () => {
     renderPanel({ cases: [makeCase()], lastResults: new Map() });
@@ -1066,8 +1224,8 @@ describe("the scenarios table", () => {
 
   // --- External sets ---
 
-  /** @scenario "An external set lists its cases read-only with a last run column" */
-  it("lists the cases of an external set read-only", () => {
+  /** @scenario "An external set lists its scenarios read-only with a last run column" */
+  it("lists the scenarios of an external set read-only", () => {
     renderPanel({
       selection: { kind: "external", setId: "nightly-ci" },
       title: "nightly-ci",

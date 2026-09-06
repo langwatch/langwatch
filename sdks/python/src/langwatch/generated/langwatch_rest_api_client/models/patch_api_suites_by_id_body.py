@@ -27,9 +27,9 @@ class PatchApiSuitesByIdBody:
         description (None | str | Unset):
         scope (PatchApiSuitesByIdBodyScopeType0 | PatchApiSuitesByIdBodyScopeType1 | PatchApiSuitesByIdBodyScopeType2 |
             PatchApiSuitesByIdBodyScopeType3 | Unset): What the run plan covers: all (every active scenario), folders (the
-            cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds
-            below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the
-            plan.
+            scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the
+            scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without
+            editing the plan.
         scenario_ids (list[str] | Unset):
         targets (list[PatchApiSuitesByIdBodyTargetsItem] | Unset):
         repeat_count (int | Unset):

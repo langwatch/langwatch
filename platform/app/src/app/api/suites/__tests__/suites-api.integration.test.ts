@@ -24,6 +24,7 @@ import { SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
 import { prisma } from "~/server/db";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
+import { featureFlagService } from "~/server/featureFlag";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -221,13 +222,13 @@ describe("Feature: Suites REST API", () => {
       /** @scenario "Every suites response carries the deprecation headers" */
       it("carries the deprecation headers on every route", async () => {
         const suite = await createSuite({ name: "Headers" });
-        const folder = await prisma.simulationSuite.create({
+        const testSuite = await prisma.simulationSuite.create({
           data: {
             id: `suite_${nanoid()}`,
             projectId: testProjectId,
-            name: "Headers folder",
-            slug: `headers-folder-${nanoid(6)}`,
-            kind: "folder",
+            name: "Headers test suite",
+            slug: `headers-testSuite-${nanoid(6)}`,
+            kind: "test_suite",
             scenarioIds: [],
             targets: [],
             labels: [],
@@ -247,7 +248,7 @@ describe("Feature: Suites REST API", () => {
             name: `Headers renamed ${nanoid(6)}`,
           }),
           await helpers.api.post(`/api/suites/${suite.id}/duplicate`, {}),
-          await helpers.api.post(`/api/suites/${folder.id}/run`, {}),
+          await helpers.api.post(`/api/suites/${testSuite.id}/run`, {}),
           await helpers.api.delete(`/api/suites/${suite.id}`),
         ];
 
@@ -311,17 +312,17 @@ describe("Feature: Suites REST API", () => {
     });
   });
 
-  // A folder holds no execution settings, so a run of one states them. A run
+  // A test suite holds no execution settings, so a run of one states them. A run
   // plan holds its own, so a run of one that states them is refused.
   describe("Running through the alias", () => {
-    async function createFolderWithOneCase() {
-      const folder = await prisma.simulationSuite.create({
+    async function createTestSuiteWithOneCase() {
+      const testSuite = await prisma.simulationSuite.create({
         data: {
           id: `suite_${nanoid()}`,
           projectId: testProjectId,
           name: "Refunds",
           slug: `refunds-${nanoid(6)}`,
-          kind: "folder",
+          kind: "test_suite",
           scenarioIds: [],
           targets: [],
           labels: [],
@@ -330,29 +331,29 @@ describe("Feature: Suites REST API", () => {
       const scenario = await createScenario("Refund Flow");
       await prisma.scenario.updateMany({
         where: { id: scenario.id, projectId: testProjectId },
-        data: { folderId: folder.id },
+        data: { testSuiteId: testSuite.id },
       });
       await prisma.simulationSuite.updateMany({
-        where: { id: folder.id, projectId: testProjectId },
+        where: { id: testSuite.id, projectId: testProjectId },
         data: { scenarioIds: [scenario.id] },
       });
-      return folder;
+      return testSuite;
     }
 
     describe("when the id names a test suite and the body carries targets", () => {
       /** @scenario "Running a test suite through the alias takes its targets from the body" */
       it("schedules the runs against the plan the suite and target name", async () => {
-        const folder = await createFolderWithOneCase();
-        // A scope that names every folder of the project is the whole
+        const testSuite = await createTestSuiteWithOneCase();
+        // A scope that names every test suite of the project is the whole
         // project, and normalises to "all" before the plan name is derived. A
-        // second folder keeps this a folder run, which the name reads from.
+        // second test suite keeps this a test suite run, which the name reads from.
         await prisma.simulationSuite.create({
           data: {
             id: `suite_${nanoid()}`,
             projectId: testProjectId,
             name: "Checkout",
             slug: `checkout-${nanoid(6)}`,
-            kind: "folder",
+            kind: "test_suite",
             scenarioIds: [],
             targets: [],
             labels: [],
@@ -372,8 +373,8 @@ describe("Feature: Suites REST API", () => {
           },
         });
 
-        const res = await helpers.api.post(`/api/suites/${folder.id}/run`, {
-          idempotencyKey: "alias-folder-run-1",
+        const res = await helpers.api.post(`/api/suites/${testSuite.id}/run`, {
+          idempotencyKey: "alias-testSuite-run-1",
           targets: [{ type: "http", referenceId: agent.id }],
         });
 
@@ -385,7 +386,7 @@ describe("Feature: Suites REST API", () => {
         const plan = await prisma.simulationSuite.findFirst({
           where: {
             projectId: testProjectId,
-            kind: "custom",
+            kind: "run_plan",
             name: "Refunds dev-agent",
           },
         });
@@ -396,10 +397,10 @@ describe("Feature: Suites REST API", () => {
     describe("when the id names a test suite and the body carries no target", () => {
       /** @scenario "Running a test suite through the alias with no target answers suite_targets_required" */
       it("answers 400 naming the code", async () => {
-        const folder = await createFolderWithOneCase();
+        const testSuite = await createTestSuiteWithOneCase();
 
-        const res = await helpers.api.post(`/api/suites/${folder.id}/run`, {
-          idempotencyKey: "alias-folder-run-2",
+        const res = await helpers.api.post(`/api/suites/${testSuite.id}/run`, {
+          idempotencyKey: "alias-testSuite-run-2",
         });
 
         expect(res.status).toBe(400);
@@ -427,20 +428,20 @@ describe("Feature: Suites REST API", () => {
     describe("when a test suite is updated with targets", () => {
       /** @scenario "Updating a test suite through the alias with targets answers validation_error" */
       it("answers 400 naming the code", async () => {
-        const folder = await prisma.simulationSuite.create({
+        const testSuite = await prisma.simulationSuite.create({
           data: {
             id: `suite_${nanoid()}`,
             projectId: testProjectId,
             name: "Refunds update",
             slug: `refunds-update-${nanoid(6)}`,
-            kind: "folder",
+            kind: "test_suite",
             scenarioIds: [],
             targets: [],
             labels: [],
           },
         });
 
-        const res = await helpers.api.patch(`/api/suites/${folder.id}`, {
+        const res = await helpers.api.patch(`/api/suites/${testSuite.id}`, {
           targets: [{ type: "http", referenceId: "agent_abc" }],
         });
 
@@ -490,15 +491,15 @@ describe("Feature: Suites REST API", () => {
     });
   });
 
-  describe("GET /api/suites with folders in the project", () => {
-    async function createFolder(name: string) {
+  describe("GET /api/suites with test suites in the project", () => {
+    async function createTestSuite(name: string) {
       return prisma.simulationSuite.create({
         data: {
           id: `suite_${nanoid()}`,
           projectId: testProjectId,
           name,
           slug: `${name.toLowerCase()}-${nanoid(6)}`,
-          kind: "folder",
+          kind: "test_suite",
           scenarioIds: [],
           targets: [],
           labels: [],
@@ -507,10 +508,10 @@ describe("Feature: Suites REST API", () => {
     }
 
     describe("when no kind is named", () => {
-      /** @scenario "The v1 run plan list holds no folder rows" */
-      it("returns only custom run plans", async () => {
-        await createFolder("Refunds");
-        await createFolder("Checkout");
+      /** @scenario "The v1 run plan list holds no test suite rows" */
+      it("returns only run plans", async () => {
+        await createTestSuite("Refunds");
+        await createTestSuite("Checkout");
         const plan = await createSuite({ name: "Nightly" });
 
         const res = await helpers.api.get("/api/suites");
@@ -523,15 +524,15 @@ describe("Feature: Suites REST API", () => {
     });
 
     describe("when kind=folder is named", () => {
-      it("returns the folders only", async () => {
-        const folder = await createFolder("Refunds");
+      it("returns the test suites only", async () => {
+        const testSuite = await createTestSuite("Refunds");
         await createSuite({ name: "Nightly" });
 
         const res = await helpers.api.get("/api/suites?kind=folder");
 
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body.map((s: { id: string }) => s.id)).toEqual([folder.id]);
+        expect(body.map((s: { id: string }) => s.id)).toEqual([testSuite.id]);
         expect(body[0].kind).toBe("folder");
       });
     });
@@ -539,8 +540,8 @@ describe("Feature: Suites REST API", () => {
 
   describe("POST /api/suites with a kind", () => {
     describe("when the body names kind folder", () => {
-      /** @scenario "A new folder is created empty and appears in the rail" */
-      it("creates an empty folder without scenarios or targets", async () => {
+      /** @scenario "A new test suite is created empty and appears in the rail" */
+      it("creates an empty test suite without scenarios or targets", async () => {
         const res = await helpers.api.post("/api/suites", {
           name: "Refunds",
           kind: "folder",
@@ -553,7 +554,7 @@ describe("Feature: Suites REST API", () => {
         expect(body.targets).toEqual([]);
       });
 
-      it("refuses a folder body that carries scenarios or targets", async () => {
+      it("refuses a test suite body that carries scenarios or targets", async () => {
         const res = await helpers.api.post("/api/suites", {
           name: "Refunds",
           kind: "folder",
@@ -578,17 +579,17 @@ describe("Feature: Suites REST API", () => {
     });
   });
 
-  // A folder holds the cases filed into it, so archiving the folder archives
-  // them with it. A run plan only references cases and leaves them alone.
-  describe("DELETE /api/suites/:id for a folder", () => {
-    async function createFolderWithCases(name: string, caseCount: number) {
-      const folder = await prisma.simulationSuite.create({
+  // A test suite holds the scenarios filed into it, so archiving the test suite archives
+  // them with it. A run plan only references scenarios and leaves them alone.
+  describe("DELETE /api/suites/:id for a test suite", () => {
+    async function createTestSuiteWithCases(name: string, caseCount: number) {
+      const testSuite = await prisma.simulationSuite.create({
         data: {
           id: `suite_${nanoid()}`,
           projectId: testProjectId,
           name,
           slug: `${name.toLowerCase()}-${nanoid(6)}`,
-          kind: "folder",
+          kind: "test_suite",
           scenarioIds: [],
           targets: [],
           labels: [],
@@ -596,38 +597,38 @@ describe("Feature: Suites REST API", () => {
       });
       const cases: Scenario[] = [];
       for (let index = 0; index < caseCount; index++) {
-        const scenario = await createScenario(`${name} case ${index}`);
+        const scenario = await createScenario(`${name} scenario ${index}`);
         await prisma.scenario.updateMany({
           where: { id: scenario.id, projectId: testProjectId },
-          data: { folderId: folder.id },
+          data: { testSuiteId: testSuite.id },
         });
         cases.push(scenario);
       }
       await prisma.simulationSuite.updateMany({
-        where: { id: folder.id, projectId: testProjectId },
+        where: { id: testSuite.id, projectId: testProjectId },
         data: { scenarioIds: cases.map((one) => one.id) },
       });
-      return { folder, cases };
+      return { testSuite, cases };
     }
 
-    it("archives the folder", async () => {
-      const { folder } = await createFolderWithCases("Refunds", 2);
+    it("archives the test suite", async () => {
+      const { testSuite } = await createTestSuiteWithCases("Refunds", 2);
 
-      const res = await helpers.api.delete(`/api/suites/${folder.id}`);
+      const res = await helpers.api.delete(`/api/suites/${testSuite.id}`);
 
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ id: folder.id, archived: true });
+      expect(await res.json()).toEqual({ id: testSuite.id, archived: true });
 
       const stored = await prisma.simulationSuite.findFirst({
-        where: { id: folder.id, projectId: testProjectId },
+        where: { id: testSuite.id, projectId: testProjectId },
       });
       expect(stored?.archivedAt).not.toBeNull();
     });
 
     it("archives every scenario filed in it", async () => {
-      const { folder, cases } = await createFolderWithCases("Refunds", 2);
+      const { testSuite, cases } = await createTestSuiteWithCases("Refunds", 2);
 
-      await helpers.api.delete(`/api/suites/${folder.id}`);
+      await helpers.api.delete(`/api/suites/${testSuite.id}`);
 
       const stored = await prisma.scenario.findMany({
         where: {
@@ -641,7 +642,7 @@ describe("Feature: Suites REST API", () => {
       }
     });
 
-    it("leaves the cases of a run plan alone", async () => {
+    it("leaves the scenarios of a run plan alone", async () => {
       const scenario = await createScenario("Still active");
       const plan = await prisma.simulationSuite.create({
         data: {
@@ -688,6 +689,35 @@ describe("Feature: Suites REST API", () => {
         });
         expect(body.scenarioIds).toHaveLength(1);
         expect(body.targets).toHaveLength(1);
+      });
+    });
+
+    describe("when the project reads Agent Testing", () => {
+      // The interface a project reads comes from a release flag, which the
+      // service resolves from environment overrides and persisted rows before
+      // the registry default. Pinning it is what makes the precondition of
+      // this block true rather than whatever the machine happens to carry.
+      let flagSpy: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        flagSpy = vi
+          .spyOn(featureFlagService, "isEnabled")
+          .mockResolvedValue(true);
+      });
+
+      afterEach(() => {
+        flagSpy.mockRestore();
+      });
+
+      it("answers with the plan address of that interface", async () => {
+        const suite = await createSuite({ name: "Address Suite" });
+
+        const res = await helpers.api.get(`/api/suites/${suite.id}`);
+
+        const body = await res.json();
+        expect(body.platformUrl).toContain(
+          `/${testProject.slug}/agent-testing/results/${suite.slug}`,
+        );
       });
     });
 

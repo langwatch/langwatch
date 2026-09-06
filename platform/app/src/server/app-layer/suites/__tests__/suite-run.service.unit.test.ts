@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { targetKeyOf } from "~/server/suites/target-key";
 import { NullSuiteRunReadRepository } from "../repositories/suite-run.repository";
 import { SuiteRunService } from "../suite-run.service";
 
@@ -184,13 +185,14 @@ describe("SuiteRunService", () => {
           langwatch: {
             targetReferenceId: "t1",
             targetType: "http",
+            targetKey: "t1",
             scenarioVersion: 3,
           },
         });
       });
     });
 
-    describe("the version stamp on queued runs", () => {
+    describe("when a run is started with a version read for each scenario", () => {
       /** @scenario "The version stamped is the version read when the batch was queued" */
       it("stamps each queued run with its own scenario's version from the queue-time read", async () => {
         await service.startRun({
@@ -220,11 +222,13 @@ describe("SuiteRunService", () => {
         expect(byScenarioId.get("s1")).toEqual({
           targetReferenceId: "t1",
           targetType: "http",
+          targetKey: "t1",
           scenarioVersion: 3,
         });
         expect(byScenarioId.get("s2")).toEqual({
           targetReferenceId: "t1",
           targetType: "http",
+          targetKey: "t1",
           scenarioVersion: 7,
         });
       });
@@ -248,8 +252,84 @@ describe("SuiteRunService", () => {
         ).toEqual({
           targetReferenceId: "prompt-9",
           targetType: "prompt",
+          targetKey: "prompt-9",
           scenarioVersion: 1,
         });
+      });
+    });
+
+    describe("when a run is started with a target that carries parameters", () => {
+      const plain = { type: "http", referenceId: "prod-agent" } as const;
+      const variant = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { model: "gpt-5-mini" },
+      } as const;
+      const variantKey = targetKeyOf(variant);
+
+      /** @scenario "The target key and its parameters travel in the run metadata" */
+      it("stamps every run with its target key and the variant with its overrides", async () => {
+        await service.startRun({
+          suiteId: "suite-1",
+          projectId: "project-1",
+          activeScenarioIds: ["s1"],
+          scenarioNameMap: new Map(),
+          scenarioVersionMap: new Map([["s1", 1]]),
+          activeTargets: [plain, variant],
+          repeatCount: 1,
+          skippedArchived: { scenarios: [], targets: [] },
+          idempotencyKey: "idem-target-1",
+          parametersByTargetKey: new Map([
+            ["prod-agent", new Map([["s1", { model: "gpt-5", region: "eu" }]])],
+            [
+              variantKey,
+              new Map([["s1", { model: "gpt-5-mini", region: "eu" }]]),
+            ],
+          ]),
+        });
+
+        const byTargetKey = new Map(
+          queueSimulationRunCommand.mock.calls.map((call) => [
+            call[0].metadata.langwatch.targetKey,
+            call[0].metadata,
+          ]),
+        );
+        expect(byTargetKey.get("prod-agent")).toEqual({
+          langwatch: {
+            targetReferenceId: "prod-agent",
+            targetType: "http",
+            targetKey: "prod-agent",
+            scenarioVersion: 1,
+          },
+          parameters: { model: "gpt-5", region: "eu" },
+        });
+        expect(byTargetKey.get(variantKey)).toEqual({
+          langwatch: {
+            targetReferenceId: "prod-agent",
+            targetType: "http",
+            targetKey: variantKey,
+            targetParameters: { model: "gpt-5-mini" },
+            scenarioVersion: 1,
+          },
+          parameters: { model: "gpt-5-mini", region: "eu" },
+        });
+      });
+
+      it("queues one run per target, so a repeated agent runs twice", async () => {
+        const result = await service.startRun({
+          suiteId: "suite-1",
+          projectId: "project-1",
+          activeScenarioIds: ["s1"],
+          scenarioNameMap: new Map(),
+          scenarioVersionMap: new Map([["s1", 1]]),
+          activeTargets: [plain, variant],
+          repeatCount: 1,
+          skippedArchived: { scenarios: [], targets: [] },
+          idempotencyKey: "idem-target-2",
+        });
+
+        expect(result.jobCount).toBe(2);
+        expect(queueSimulationRunCommand).toHaveBeenCalledTimes(2);
       });
     });
 

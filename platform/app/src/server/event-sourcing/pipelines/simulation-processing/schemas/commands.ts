@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
+import { scenarioEvaluationResultSchema } from "~/server/scenarios/schemas/event-schemas";
 import { simulationMessageSchema, simulationResultsSchema } from "./shared";
 
 export const queueRunCommandDataSchema = z.object({
@@ -19,7 +20,7 @@ export const queueRunCommandDataSchema = z.object({
   /** Target for execution. Used by the process manager's execute intent to spawn the right adapter. */
   target: z
     .object({
-      type: z.enum(["prompt", "http", "code", "workflow"]),
+      type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
       referenceId: z.string(),
     })
     .optional(),
@@ -78,6 +79,22 @@ export const finishRunCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 export type FinishRunCommandData = z.infer<typeof finishRunCommandDataSchema>;
+
+/**
+ * Records the evaluator results of a finished run. The verdict after the
+ * gate, the identity and the verdict the run held before are all read from
+ * the run's prior events by RecordEvaluationsCommand, so the caller sends
+ * only the results.
+ */
+export const recordEvaluationsCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  evaluations: z.array(scenarioEvaluationResultSchema),
+  occurredAt: z.number(),
+});
+export type RecordEvaluationsCommandData = z.infer<
+  typeof recordEvaluationsCommandDataSchema
+>;
 
 export const textMessageStartCommandDataSchema = z.object({
   tenantId: z.string(),

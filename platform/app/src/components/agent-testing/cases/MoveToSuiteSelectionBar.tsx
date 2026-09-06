@@ -39,8 +39,6 @@ export function MoveToSuiteSelectionBar({
         <SmallButton
           variant="solid"
           colorPalette="blue"
-          background={undefined}
-          borderColor="transparent"
           onClick={() => setIsDialogOpen(true)}
           data-testid="cases-selection-move-to-suite"
         >
@@ -156,8 +154,6 @@ function MoveToSuiteDialog({
           <SmallButton
             variant="solid"
             colorPalette="blue"
-            background={undefined}
-            borderColor="transparent"
             disabled={!value}
             onClick={() => onConfirm(value)}
             data-testid="cases-move-to-suite-confirm"

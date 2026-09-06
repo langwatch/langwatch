@@ -40,7 +40,7 @@ Feature: A run records who started it
 
   @unit
   Scenario: A one-off run started in the app records the person who started it
-    Given a signed-in person opens a test case
+    Given a signed-in person opens a scenario
     When they run it against a target
     Then the run records their user id
     And the run records the surface "user"

@@ -124,6 +124,79 @@ describe("RunPlansApiService", () => {
       });
     });
 
+    /** @scenario "Run a configuration with plan evaluators" */
+    it("posts the evaluators inside the configuration", async () => {
+      const { service, calls } = serviceWith({ data: { runPlanId: "plan_abc" } });
+      const piiScanner = {
+        id: "att_pii",
+        evaluatorId: "evaluator_pii",
+        required: false,
+        mappings: {
+          input: {
+            type: "source" as const,
+            sourceId: "conversation" as const,
+            path: ["transcript"],
+          },
+        },
+      };
+
+      await service.run({
+        config: {
+          scope: { mode: "all" },
+          targets: [{ type: "http", referenceId: "agent_abc" }],
+          evaluators: [piiScanner],
+        },
+      });
+
+      expect(calls.POST).toHaveBeenCalledWith("/api/v1/run-plans/run", {
+        body: {
+          config: {
+            scope: { mode: "all" },
+            targets: [{ type: "http", referenceId: "agent_abc" }],
+            evaluators: [piiScanner],
+          },
+        },
+      });
+    });
+
+    /** @scenario "Run a configuration scoped to test suites" */
+    it("posts a test_suites scope with the test suite ids", async () => {
+      const { service, calls } = serviceWith({ data: {} });
+
+      await service.run({
+        config: {
+          scope: { mode: "test_suites", testSuiteIds: ["suite_1", "suite_2"] },
+          targets: [{ type: "http", referenceId: "agent_abc" }],
+        },
+      });
+
+      expect(calls.POST.mock.calls[0]?.[1]?.body).toMatchObject({
+        config: {
+          scope: { mode: "test_suites", testSuiteIds: ["suite_1", "suite_2"] },
+        },
+      });
+    });
+
+    /** @scenario "Run a configuration scoped to named scenarios" */
+    it("posts a scenarios scope beside the scenario ids", async () => {
+      const { service, calls } = serviceWith({ data: {} });
+
+      await service.run({
+        config: {
+          scope: { mode: "scenarios" },
+          scenarioIds: ["scenario_1", "scenario_2"],
+          targets: [{ type: "http", referenceId: "agent_abc" }],
+        },
+      });
+
+      expect(calls.POST.mock.calls[0]?.[1]?.body).toMatchObject({
+        config: {
+          scope: { mode: "scenarios" },
+          scenarioIds: ["scenario_1", "scenario_2"],
+        },
+      });
+    });
+
     /** @scenario "Run a configuration with a note of only spaces" */
     it("sends no note when the note holds only spaces", async () => {
       const { service, calls } = serviceWith({ data: {} });

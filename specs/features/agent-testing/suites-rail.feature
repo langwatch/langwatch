@@ -50,14 +50,14 @@ Feature: The test suites rail
   Scenario: The Default suite carries the actions of an ordinary suite
     Given the Default test suite in the rail
     When its row menu is opened
-    Then "New scenario", "Run suite", "Rename" and "Archive suite" are offered
+    Then "New scenario", "Run suite", "Edit" and "Archive suite" are offered
     And nothing marks it as unchangeable
 
   @integration
   Scenario: An external set carries the code icon and no counts
     Given a project with an external set
     When the rail is read
-    Then the external set carries the folder-with-code icon
+    Then the external set carries the test suite-with-code icon
     And it shows no count and no run time
     And it shows no Run control
 
@@ -81,7 +81,7 @@ Feature: The test suites rail
   Scenario: The row menu of a test suite offers its five actions in order
     Given a test suite in the rail
     When its row menu is opened
-    Then the actions read, in order: "New scenario", "Run suite", "Rename", "Open last run", "Archive suite"
+    Then the actions read, in order: "New scenario", "Run suite", "Edit", "Open recent runs", "Archive suite"
 
   @integration
   Scenario: Every action of the rail row menu carries its icon
@@ -94,26 +94,27 @@ Feature: The test suites rail
     Given the actions the two menus share
     When the icon of an action is read
     Then both menus read it from the same list
-    And renaming a suite and editing a scenario carry the same pencil
+    And editing a suite and editing a scenario carry the same pencil
 
   @integration
-  Scenario: Open last run goes straight to the last run of that suite
+  Scenario: Open recent runs holds the runs that covered the suite
     Given a test suite with a finished run
-    When "Open last run" is chosen from its row menu
-    Then the Results tab opens on the run plan that holds the run
+    When "Open recent runs" is opened from its row menu
+    Then the runs that covered a scenario of the suite are listed newest first
+    And choosing one opens the Results tab on the run plan that holds it
     And that run is the one selected
 
   @integration
-  Scenario: Open last run opens the newest run of any scenario of the suite
+  Scenario: The submenu holds a run of a suite whose scenarios ran one at a time
     Given a suite whose scenarios only ran one at a time, each on its own run plan
-    When "Open last run" is chosen from its row menu
-    Then the newest of those runs opens, under the plan it ran on
+    When "Open recent runs" is opened from its row menu
+    Then each of those runs is listed, under the plan it ran on
 
   @integration
-  Scenario: Open last run is not offered for a suite that never ran
+  Scenario: Open recent runs is not offered for a suite that never ran
     Given a test suite whose scenarios have no run inside the period
     When its row menu is opened
-    Then "Open last run" is not offered
+    Then "Open recent runs" is not offered
 
   @integration
   Scenario: Archive suite opens the confirmation dialog
@@ -129,66 +130,54 @@ Feature: The test suites rail
     Then the first remaining suite is open
     And no empty view is shown in between
 
-  # --- Renaming a test suite ---
-
-  @integration
-  Scenario: Rename opens a small centered dialog holding only a Name field
-    Given a test suite in the rail
-    When "Rename" is chosen from its row menu
-    Then a small centered dialog opens titled "Rename test suite"
-    And the name of that suite is already in the field
-    And the only field it holds is "Name"
-    And it is sized to what it holds
+  # --- Editing a test suite ---
+  #
+  # Editing a suite that exists, its name, its fields and its evaluators, is
+  # the suite editor's job: see suite-editor.feature. The dialog below only
+  # names a new one.
 
   @integration
   Scenario: The name dialog carries no targets, no models, no repeat count and no evaluators
-    Given the name dialog is open on a test suite
+    Given the new suite dialog is open
     When it is read
     Then no agent, no simulation model, no judge, no repeat count and no evaluator is offered
-    And no tab strip is shown, because a suite is only a grouping
+    And no tab strip is shown, because a new suite starts as a name
 
   @integration
   Scenario: The name dialog does not manage which scenarios are in the suite
-    Given the name dialog is open on a test suite
+    Given the new suite dialog is open
     When it is read
     Then it lists no scenarios and offers no way to add or remove one
     And membership stays in the scenarios table, where "Move to suite..." changes it
 
   @integration
-  Scenario: Saving the name dialog renames the suite
-    Given the name dialog is open on the suite "Refunds"
-    When the name is changed to "Refunds and returns" and saved
-    Then the rail reads the new name
-    And the dialog closes
-
-  @integration
   Scenario: The name dialog refuses an empty name
-    Given the name dialog is open on a test suite
-    When the name is cleared and saved
+    Given the new suite dialog is open
+    When it is confirmed with no name
     Then the dialog says a test suite needs a name
     And nothing is saved
 
   @integration
   Scenario: The name dialog offers no destructive action
-    Given the name dialog is open on a test suite
+    Given the new suite dialog is open
     When its actions are read
-    Then only "Cancel" and "Save" are offered
+    Then only "Cancel" and "Create" are offered
     And archiving stays in the row menu of the rail, where it already was
 
   @integration
   Scenario: A person with read-only access sees no changing actions in the row menu
     Given a person with read-only access to the project
     When a test suite row menu is opened
-    Then "Open last run" is the only action offered
-    And "New scenario", "Run suite", "Rename" and "Archive suite" are not offered
+    Then "Open recent runs" is the only action offered
+    And "New scenario", "Run suite", "Edit" and "Archive suite" are not offered
 
   # --- Selection ---
 
   @integration
-  Scenario: Choosing a suite filters the case table to that suite
+  Scenario: Choosing a suite filters the scenario table to that suite
     Given a project with two test suites
     When one of them is chosen in the rail
-    Then the case table lists only the cases of that suite
+    Then the scenario table lists only the scenarios of that suite
     And the suite is marked as selected in the rail
 
   @integration
@@ -236,7 +225,8 @@ Feature: The test suites rail
     Given the Agent Testing page is open
     When the period picker is opened
     Then its list opens above the control
-    And it stays inside the page
+    And it offers the same ranges as the shared period control
+    And a free start and end date reaches any window, older than thirty days included
 
   @integration
   Scenario: Changing the period reloads the last results and the runs
@@ -246,10 +236,10 @@ Feature: The test suites rail
     And the runs sidebar reloads for the shorter period
     And the address names the new period
 
-  # --- The voice agents note ---
+  # --- The new-simulations announcement ---
 
   @integration
-  Scenario: The rail keeps the voice agents note
+  Scenario: The rail carries the new-simulations announcement
     Given the Agent Testing page is open
     When the rail is read
-    Then the voice agents note is shown, as it is on the v1 page
+    Then the announcement offering the way back to the previous screens is shown

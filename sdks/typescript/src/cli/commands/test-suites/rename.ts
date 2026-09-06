@@ -10,7 +10,7 @@ import { resolveSuiteId } from "./resolveSuite";
  * Renames a test suite. The slug is kept, so links and run history stay where
  * they are.
  *
- * @see specs/features/suite-cli.feature
+ * @see specs/features/test-suite-cli.feature
  */
 export const renameTestSuiteCommand = async (
   reference: string,

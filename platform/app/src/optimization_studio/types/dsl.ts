@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { FieldMappingSchema } from "~/server/scenarios/field-mapping";
+import { scenarioParameterDefinitionSchema } from "~/server/scenarios/parameters";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 import { datasetColumnTypeSchema } from "../../server/datasets/types";
@@ -634,22 +635,50 @@ export const httpComponentSchema = baseComponentSchema.extend({
   auth: httpAuthSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  /** JSONPath of the conversation value the endpoint returns, sent back as `{{ session }}`. */
+  sessionPath: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /**
    * Present while `langwatch agent dev` points this agent at a local tunnel:
    * `previousUrl` is what the CLI restores on exit, `connectedAt` when the
-   * session started. Set and removed by the CLI; the platform reads it to
-   * show the local-tunnel badge and to name tunnel failures.
+   * session started, `heartbeatAt` the last time the session's health monitor
+   * saw the tunnel answer. Set and removed by the CLI; the platform reads it
+   * to show the local-tunnel badge and to name tunnel failures.
    */
   devTunnel: z
     .object({
       previousUrl: z.string().optional(),
       connectedAt: z.string().optional(),
+      heartbeatAt: z.string().optional(),
     })
     .optional(),
 });
+
+/**
+ * Schema for a connected agent's config (ADR-128).
+ *
+ * The SDK registers it from the decorated function, so it holds what the
+ * function declares and nothing about the runtime: presence lives in
+ * `Agent.lastSeenAt` and in Redis.
+ */
+export const connectedComponentSchema = baseComponentSchema
+  .omit({ description: true })
+  .extend({
+    parameters: z.array(scenarioParameterDefinitionSchema).default([]),
+    /** Per-call budget in milliseconds, capped by the platform. */
+    timeoutMs: z.number().int().positive().optional(),
+    /** Calls one instance takes at once; the SDK's default applies when absent. */
+    concurrency: z.number().int().positive().optional(),
+    /** Whether a thread is pinned to the instance that served its first turn. */
+    sticky: z.boolean().optional(),
+    sdk: z.object({
+      name: z.string(),
+      version: z.string(),
+      language: z.string(),
+    }),
+  });
 
 /**
  * Union type for all valid agent config types
@@ -659,3 +688,4 @@ export type SignatureComponentConfig = z.infer<typeof signatureComponentSchema>;
 export type CodeComponentConfig = z.infer<typeof codeComponentSchema>;
 export type CustomComponentConfig = z.infer<typeof customComponentSchema>;
 export type HttpComponentConfig = z.infer<typeof httpComponentSchema>;
+export type ConnectedComponentConfig = z.infer<typeof connectedComponentSchema>;

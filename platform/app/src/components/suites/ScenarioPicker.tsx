@@ -24,17 +24,17 @@ interface Scenario {
   id: string;
   name: string;
   labels: string[];
-  /** The test suite the case is filed in, when the project uses them. */
-  folderId?: string | null;
+  /** The test suite the scenario is filed in, when the project uses them. */
+  testSuiteId?: string | null;
 }
 
 /** One test suite, so the list can be read under the suite names. */
-export interface ScenarioPickerFolder {
+export interface ScenarioPickerTestSuite {
   id: string;
   name: string;
 }
 
-/** What the group of cases filed in no test suite reads as. */
+/** What the group of scenarios filed in no test suite reads as. */
 export const PICKER_UNFILED_GROUP_NAME = "No test suite";
 
 export interface ScenarioPickerProps {
@@ -69,31 +69,32 @@ export interface ScenarioPickerProps {
   /** Handler to remove an archived scenario. */
   onRemoveArchived?: (id: string) => void;
   /**
-   * The test suites the cases are filed in. When any is given the list reads
+   * The test suites the scenarios are filed in. When any is given the list reads
    * under the suite names; an empty list keeps the flat list.
    */
-  folders?: ScenarioPickerFolder[];
+  testSuites?: ScenarioPickerTestSuite[];
 }
 
-/** The cases under their suite name, unfiled last. Empty groups are left out. */
-function groupScenariosByFolder(
+/** The scenarios under their suite name, unfiled last. Empty groups are left out. */
+function groupScenariosByTestSuite(
   scenarios: Scenario[],
-  folders: ScenarioPickerFolder[],
+  testSuites: ScenarioPickerTestSuite[],
 ): { id: string; name: string; scenarios: Scenario[] }[] {
   const groups: { id: string; name: string; scenarios: Scenario[] }[] = [];
 
-  for (const folder of folders) {
+  for (const testSuite of testSuites) {
     const held = scenarios.filter(
-      (scenario) => scenario.folderId === folder.id,
+      (scenario) => scenario.testSuiteId === testSuite.id,
     );
     if (held.length > 0) {
-      groups.push({ id: folder.id, name: folder.name, scenarios: held });
+      groups.push({ id: testSuite.id, name: testSuite.name, scenarios: held });
     }
   }
 
-  const folderIds = new Set(folders.map((folder) => folder.id));
+  const testSuiteIds = new Set(testSuites.map((testSuite) => testSuite.id));
   const unfiled = scenarios.filter(
-    (scenario) => !scenario.folderId || !folderIds.has(scenario.folderId),
+    (scenario) =>
+      !scenario.testSuiteId || !testSuiteIds.has(scenario.testSuiteId),
   );
   if (unfiled.length > 0) {
     groups.push({
@@ -122,11 +123,11 @@ export function ScenarioPicker({
   hasError,
   archivedIds = [],
   onRemoveArchived,
-  folders,
+  testSuites,
 }: ScenarioPickerProps) {
   const groups =
-    folders && folders.length > 0
-      ? groupScenariosByFolder(scenarios, folders)
+    testSuites && testSuites.length > 0
+      ? groupScenariosByTestSuite(scenarios, testSuites)
       : null;
 
   return (

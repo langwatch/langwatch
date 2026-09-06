@@ -4,11 +4,17 @@ import {
   isOnPlatformSet,
   ON_PLATFORM_DISPLAY_NAME,
 } from "~/server/scenarios/internal-set-id";
+import {
+  parseRunParametersJson,
+  type RunParameterValues,
+} from "~/server/scenarios/parameters";
+import { columnsToEvaluations } from "~/server/simulations/simulation-evaluations.columns";
 import { mapStatus } from "~/server/simulations/simulation-run.mappers";
 import { extractSuiteId, getSuiteSetId } from "~/server/suites/suite-set-id";
 import type {
   AtomCost,
   AtomCostSource,
+  AtomEvaluation,
   AtomOutcome,
   CodeScenario,
   ResultAtom,
@@ -16,6 +22,7 @@ import type {
   ResultsFilter,
   ResultsGroupBy,
   ResultsOverview,
+  RunTarget,
   SeriesBucket,
   TrendPoint,
 } from "./atom.types";
@@ -124,6 +131,34 @@ export class ResultAtomsService {
     }));
   }
 
+  /**
+   * The targets the window names that the stored lists cannot, for the
+   * target filter: those named by a run from code, and the parameter
+   * variants of stored targets. Read over the window alone, for the same
+   * reason the scenarios that ran from code are.
+   */
+  async getRunTargets({
+    projectId,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    startDate: number;
+    endDate?: number;
+  }): Promise<RunTarget[]> {
+    const rows = await this.repository.findRunTargets({
+      projectId,
+      startDate,
+      endDate,
+    });
+    return rows.map((row) => ({
+      key: row.TargetKey,
+      referenceId: row.ReferenceId === "" ? null : row.ReferenceId,
+      parameters: targetParametersOf(row.TargetParameters),
+      name: row.Name !== "" ? row.Name : row.TargetKey,
+    }));
+  }
+
   /** The stat strip and the group rows, both cut by the same filter. */
   async getOverview({
     filter,
@@ -191,9 +226,9 @@ export class ResultAtomsService {
   }
 
   /**
-   * Turns a label or a folder filter into the scenario ids it names.
+   * Turns a label or a test suite filter into the scenario ids it names.
    *
-   * Labels and folder membership live in Postgres and the run row carries
+   * Labels and test suite membership live in Postgres and the run row carries
    * neither, so this is the only place the two stores meet. The result
    * INTERSECTS with an explicit scenario filter rather than replacing it: two
    * filters both narrow, and a union would widen the page when a person added
@@ -207,15 +242,15 @@ export class ResultAtomsService {
     filter: ResultsFilter,
   ): Promise<ResultsFilter> {
     const hasLabels = (filter.labels?.length ?? 0) > 0;
-    const hasFolders = (filter.folderIds?.length ?? 0) > 0;
-    if (!hasLabels && !hasFolders) return filter;
+    const hasTestSuites = (filter.testSuiteIds?.length ?? 0) > 0;
+    if (!hasLabels && !hasTestSuites) return filter;
 
     const matched = await this.prisma.scenario.findMany({
       where: {
         projectId: filter.projectId,
         archivedAt: null,
         ...(hasLabels ? { labels: { hasSome: filter.labels } } : {}),
-        ...(hasFolders ? { folderId: { in: filter.folderIds } } : {}),
+        ...(hasTestSuites ? { testSuiteId: { in: filter.testSuiteIds } } : {}),
       },
       select: { id: true },
     });
@@ -229,7 +264,7 @@ export class ResultAtomsService {
       ...filter,
       scenarioIds: ids,
       labels: undefined,
-      folderIds: undefined,
+      testSuiteIds: undefined,
     };
   }
 
@@ -318,6 +353,17 @@ const runKey = (setId: string, batchRunId: string): string =>
   `${setId}\0${batchRunId}`;
 
 /**
+ * The overrides a row carries, or null when it carries none. '' is what a
+ * target with no overrides, and every run recorded before targets carried
+ * any, reads as.
+ */
+function targetParametersOf(raw: string): RunParameterValues | null {
+  if (raw === "") return null;
+  const parsed = parseRunParametersJson(raw);
+  return Object.keys(parsed).length > 0 ? parsed : null;
+}
+
+/**
  * How a set id reads when no suite owns it.
  *
  * A code-pushed set keeps the name the SDK gave it, which is what the person
@@ -356,13 +402,37 @@ function toAtom({
     scenarioKey: row.ScenarioKey,
     scenarioName: row.ScenarioName === "" ? null : row.ScenarioName,
     targetKey: row.TargetKey,
+    targetParameters: targetParametersOf(row.TargetParameters),
+    targetName: row.TargetName === "" ? null : row.TargetName,
     status: mapStatus(row.Status),
     outcome: row.Outcome as AtomOutcome,
+    evaluations: atomEvaluationsOf(row),
     durationMs: row.DurationMs === "" ? null : Number(row.DurationMs),
     // '' is the one value that means "never measured". Zero is a real answer.
     costUsd: row.CostUsd === "" ? null : Number(row.CostUsd),
     costSource,
   };
+}
+
+/** The evaluator results an atom row carries, without the prose. */
+function atomEvaluationsOf(row: RawAtomRow): AtomEvaluation[] {
+  return columnsToEvaluations({
+    "Evaluations.EvaluatorId": row.EvaluationIds ?? [],
+    "Evaluations.Name": row.EvaluationNames ?? [],
+    "Evaluations.Status": row.EvaluationStatuses ?? [],
+    "Evaluations.Required": row.EvaluationRequired ?? [],
+    "Evaluations.Passed": row.EvaluationPassed ?? [],
+    "Evaluations.Score": row.EvaluationScores ?? [],
+    "Evaluations.Label": row.EvaluationLabels ?? [],
+  }).map((evaluation) => ({
+    evaluatorId: evaluation.evaluatorId,
+    name: evaluation.name,
+    status: evaluation.status,
+    required: evaluation.required,
+    passed: evaluation.passed ?? null,
+    score: evaluation.score ?? null,
+    label: evaluation.label ?? null,
+  }));
 }
 
 function toGroup({
@@ -387,6 +457,11 @@ function toGroup({
     scenarioCount: Number(row.ScenarioCount),
     lastRunAt: row.LastRunAt === "0" ? null : Number(row.LastRunAt),
     targetKeys: row.TargetKeys,
+    // Only a target group names one target. Any other grouping folds runs of
+    // several targets, and the overrides of one of them would name the group
+    // after a target it does not stand for.
+    targetParameters:
+      groupBy === "target" ? targetParametersOf(row.TargetParameters) : null,
     trend,
     cost: toCost({
       totalUsd: Number(row.CostTotal),
@@ -403,6 +478,15 @@ function toGroup({
  */
 function carriedName(row: RawGroupRow): string {
   return row.Name !== "" ? row.Name : row.GroupKey;
+}
+
+/**
+ * The name a target group reads under: the agent name the code that pushed
+ * the runs reported, and the key itself when it reported none. A platform
+ * target reports none, and the client names it from its own target map.
+ */
+function carriedTargetName(row: RawGroupRow): string {
+  return row.TargetName !== "" ? row.TargetName : row.GroupKey;
 }
 
 function headline({
@@ -434,8 +518,9 @@ function headline({
       subtitle: null,
     };
   }
-  // Target: the client names a reference id through its own target map.
-  return { key: row.GroupKey, title: row.GroupKey, subtitle: null };
+  // Target: a run from code reads under the agent name it reported, and the
+  // client names a platform reference id through its own target map.
+  return { key: row.GroupKey, title: carriedTargetName(row), subtitle: null };
 }
 
 /**
@@ -557,6 +642,7 @@ function withQuietPlans({
       scenarioCount: 0,
       lastRunAt: null,
       targetKeys: [],
+      targetParameters: null,
       trend: [],
       cost: { totalUsd: 0, knownAtoms: 0, unknownAtoms: 0 },
     });

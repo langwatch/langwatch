@@ -66,6 +66,7 @@ import {
 import { prisma } from "~/server/db";
 import { getFeatureFlagStore } from "~/server/featureFlag";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { app as queryApp } from "../../query/[[...route]]/app";
 import { app } from "../[[...route]]/app";
 
 /** Names a LangWatchQL dataset every deployment publishes, and reads nothing gated. */
@@ -175,8 +176,16 @@ describe("given the saved workbench chart REST endpoints", () => {
     method?: string;
     body?: unknown;
     auth: Record<string, string>;
+    /**
+     * The Hono instance to route through. Defaults to this family's own app.
+     *
+     * Structural rather than `typeof app`: a call site also passes
+     * `queryApp`, whose route generic differs, and `.request()` is the only
+     * member used below regardless of which app is routed through.
+     */
+    app?: Pick<typeof app, "request">;
   }) =>
-    app.request(options.path, {
+    (options.app ?? app).request(options.path, {
       method: options.method ?? "GET",
       headers: { "Content-Type": "application/json", ...options.auth },
       ...(options.body === undefined
@@ -484,14 +493,15 @@ describe("given the saved workbench chart REST endpoints", () => {
       });
 
       const running = await refused({
-        path: `/api/v1/projects/${gatedProject.id}/analytics/query/clickhouse`,
+        app: queryApp,
+        path: "/api/v1/query",
         method: "POST",
         auth: asProject(gatedProject),
         body: { sql: GATED_SQL },
       });
 
       expect(saving.error.code).toBe("lwql_not_permitted");
-      expect(saving.error.code).toBe(running.error.code);
+      expect(running.error.code).toBe(saving.error.code);
       expect(await listedIds(gatedProject)).toEqual([]);
 
       // The control: the same statement, a key whose protections do not
@@ -1154,7 +1164,8 @@ describe("given the saved workbench chart REST endpoints", () => {
 
         // REST directly: the governed query door with the same statement.
         const viaRest = await refused({
-          path: `/api/v1/projects/${gatedProject.id}/analytics/query/clickhouse`,
+          app: queryApp,
+          path: "/api/v1/query",
           method: "POST",
           auth: asProject(gatedProject),
           body: { sql: GATED_SQL },

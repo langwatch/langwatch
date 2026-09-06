@@ -21,28 +21,28 @@ import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import type { RunScope } from "./run-configuration";
 
 /** A test suite the scope can name. */
-export type ScopeFolder = { id: string; name: string };
+export type ScopeTestSuite = { id: string; name: string };
 
 /** A scenario the scope can name, or count. */
 export type ScopeScenario = {
   id: string;
   name: string;
-  folderId: string | null;
+  testSuiteId: string | null;
   labels: string[];
 };
 
 const SCOPE_CHOICES: { mode: RunScope["mode"]; label: string }[] = [
   { mode: "all", label: "All scenarios" },
-  { mode: "folders", label: "Selected test suites" },
+  { mode: "test_suites", label: "Selected test suites" },
   { mode: "labels", label: "Selected labels" },
-  { mode: "cases", label: "Specific scenarios" },
+  { mode: "scenarios", label: "Specific scenarios" },
 ];
 
 /** The empty rule of each mode, so switching mode starts from nothing picked. */
 function emptyScopeOf(mode: RunScope["mode"]): RunScope {
-  if (mode === "folders") return { mode: "folders", folderIds: [] };
+  if (mode === "test_suites") return { mode: "test_suites", testSuiteIds: [] };
   if (mode === "labels") return { mode: "labels", labels: [] };
-  if (mode === "cases") return { mode: "cases", caseIds: [] };
+  if (mode === "scenarios") return { mode: "scenarios", scenarioIds: [] };
   return { mode: "all" };
 }
 
@@ -69,12 +69,13 @@ export function scenariosInScope({
   scenarios: readonly ScopeScenario[];
 }): string[] {
   if (scope.mode === "all") return scenarios.map((scenario) => scenario.id);
-  if (scope.mode === "cases") return [...scope.caseIds];
-  if (scope.mode === "folders") {
+  if (scope.mode === "scenarios") return [...scope.scenarioIds];
+  if (scope.mode === "test_suites") {
     return scenarios
       .filter(
         (scenario) =>
-          !!scenario.folderId && scope.folderIds.includes(scenario.folderId),
+          !!scenario.testSuiteId &&
+          scope.testSuiteIds.includes(scenario.testSuiteId),
       )
       .map((scenario) => scenario.id);
   }
@@ -86,16 +87,16 @@ export function scenariosInScope({
 }
 
 /** The test suites of the project, as check boxes. */
-function FolderChoices({
-  folders,
+function TestSuiteChoices({
+  testSuites,
   chosen,
   onToggle,
 }: {
-  folders: readonly ScopeFolder[];
+  testSuites: readonly ScopeTestSuite[];
   chosen: readonly string[];
-  onToggle: (folderId: string) => void;
+  onToggle: (testSuiteId: string) => void;
 }) {
-  if (folders.length === 0) {
+  if (testSuites.length === 0) {
     return (
       <Text fontSize="11.5px" color={FG_MUTED}>
         No test suite yet. Make one in the rail on the left.
@@ -105,15 +106,15 @@ function FolderChoices({
 
   return (
     <HStack gap={4} flexWrap="wrap" data-testid="run-scope-suites-list">
-      {folders.map((folder) => (
+      {testSuites.map((testSuite) => (
         <Checkbox
-          key={folder.id}
+          key={testSuite.id}
           size="sm"
-          checked={chosen.includes(folder.id)}
-          onCheckedChange={() => onToggle(folder.id)}
-          data-testid={`run-scope-folder-${folder.id}`}
+          checked={chosen.includes(testSuite.id)}
+          onCheckedChange={() => onToggle(testSuite.id)}
+          data-testid={`run-scope-test-suite-${testSuite.id}`}
         >
-          <Text fontSize="12px">{folder.name}</Text>
+          <Text fontSize="12px">{testSuite.name}</Text>
         </Checkbox>
       ))}
     </HStack>
@@ -164,30 +165,30 @@ function LabelChoices({
 
 /** The project's scenarios, read under the test suite they are filed in. */
 function CaseChoices({
-  folders,
+  testSuites,
   scenarios,
   chosen,
   onToggle,
 }: {
-  folders: readonly ScopeFolder[];
+  testSuites: readonly ScopeTestSuite[];
   scenarios: readonly ScopeScenario[];
   chosen: readonly string[];
   onToggle: (scenarioId: string) => void;
 }) {
-  const filed = new Set(folders.map((folder) => folder.id));
+  const filed = new Set(testSuites.map((testSuite) => testSuite.id));
   const groups = [
-    ...folders.map((folder) => ({
-      id: folder.id,
-      name: folder.name,
+    ...testSuites.map((testSuite) => ({
+      id: testSuite.id,
+      name: testSuite.name,
       scenarios: scenarios.filter(
-        (scenario) => scenario.folderId === folder.id,
+        (scenario) => scenario.testSuiteId === testSuite.id,
       ),
     })),
     {
       id: "__unfiled__",
       name: PICKER_UNFILED_GROUP_NAME,
       scenarios: scenarios.filter(
-        (scenario) => !scenario.folderId || !filed.has(scenario.folderId),
+        (scenario) => !scenario.testSuiteId || !filed.has(scenario.testSuiteId),
       ),
     },
   ].filter((group) => group.scenarios.length > 0);
@@ -247,24 +248,24 @@ function CaseChoices({
 /** What the chosen rule needs picked. "All scenarios" needs nothing. */
 function ScopeDetail({
   scope,
-  folders,
+  testSuites,
   scenarios,
   onChange,
 }: {
   scope: RunScope;
-  folders: readonly ScopeFolder[];
+  testSuites: readonly ScopeTestSuite[];
   scenarios: readonly ScopeScenario[];
   onChange: (scope: RunScope) => void;
 }) {
-  if (scope.mode === "folders") {
+  if (scope.mode === "test_suites") {
     return (
-      <FolderChoices
-        folders={folders}
-        chosen={scope.folderIds}
-        onToggle={(folderId) =>
+      <TestSuiteChoices
+        testSuites={testSuites}
+        chosen={scope.testSuiteIds}
+        onToggle={(testSuiteId) =>
           onChange({
-            mode: "folders",
-            folderIds: toggled(scope.folderIds, folderId),
+            mode: "test_suites",
+            testSuiteIds: toggled(scope.testSuiteIds, testSuiteId),
           })
         }
       />
@@ -281,16 +282,16 @@ function ScopeDetail({
       />
     );
   }
-  if (scope.mode === "cases") {
+  if (scope.mode === "scenarios") {
     return (
       <CaseChoices
-        folders={folders}
+        testSuites={testSuites}
         scenarios={scenarios}
-        chosen={scope.caseIds}
+        chosen={scope.scenarioIds}
         onToggle={(scenarioId) =>
           onChange({
-            mode: "cases",
-            caseIds: toggled(scope.caseIds, scenarioId),
+            mode: "scenarios",
+            scenarioIds: toggled(scope.scenarioIds, scenarioId),
           })
         }
       />
@@ -301,12 +302,12 @@ function ScopeDetail({
 
 export function RunScopeSection({
   scope,
-  folders,
+  testSuites,
   scenarios,
   onChange,
 }: {
   scope: RunScope;
-  folders: readonly ScopeFolder[];
+  testSuites: readonly ScopeTestSuite[];
   scenarios: readonly ScopeScenario[];
   onChange: (scope: RunScope) => void;
 }) {
@@ -349,7 +350,7 @@ export function RunScopeSection({
               <Box marginTop={1.5} marginLeft={5}>
                 <ScopeDetail
                   scope={scope}
-                  folders={folders}
+                  testSuites={testSuites}
                   scenarios={scenarios}
                   onChange={onChange}
                 />

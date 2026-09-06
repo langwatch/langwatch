@@ -10,9 +10,17 @@ import {
   InvokeWithResponseStreamCommand,
   LambdaClient,
   UpdateFunctionCodeCommand,
+  UpdateFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
 import { createLogger } from "@langwatch/observability";
 import { env } from "../../../env.mjs";
+import {
+  CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS,
+  LAMBDA_INVOCATION_TIMEOUT_SECONDS,
+  NLP_LAMBDA_MEMORY_SIZE_MB,
+  NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
+  NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS,
+} from "../../../server/nlpgo/timeouts";
 import {
   deleteStagedObject,
   STAGED_PAYLOAD_HEADER,
@@ -226,6 +234,99 @@ const createLogGroupWithRetention = async (
   }
 };
 
+/**
+ * The code-block ceiling this Lambda is given, from the operator's raw
+ * `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`.
+ *
+ * Two deadlines enclose a code block here, and the ceiling has to sit under
+ * BOTH or the block is killed by something that cannot say why:
+ *
+ *   - The Lambda's own invocation timeout. Past it, Lambda terminates the
+ *     invocation before nlpgo reports its own timeout to the caller.
+ *   - The engine's SSE stream idle timeout. A running code block emits no
+ *     events, so past that budget the stream is torn down underneath it and
+ *     the caller sees a dead socket instead of the engine's verdict. This
+ *     Lambda runs the engine's own default for it — the idle timeout is not
+ *     among the variables {@link buildDesiredLambdaEnvironmentVariables}
+ *     sets, so there is no per-project override to read.
+ *
+ * Clamp rather than trust the raw env value; the safety margin leaves nlpgo
+ * a moment to report its timeout before the enclosing deadline fires.
+ */
+export const clampCodeBlockTimeoutSeconds = (
+  rawValue: string | undefined,
+): number => {
+  const MAX_SECONDS =
+    Math.min(
+      LAMBDA_INVOCATION_TIMEOUT_SECONDS,
+      NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS,
+    ) - CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS;
+  const parsed = Number(rawValue);
+  if (
+    !rawValue ||
+    !Number.isFinite(parsed) ||
+    !Number.isInteger(parsed) ||
+    parsed <= 0
+  ) {
+    return NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS;
+  }
+  return Math.min(parsed, MAX_SECONDS);
+};
+
+/**
+ * The single source of truth for the environment variables every per-project
+ * langwatch_nlp Lambda must carry. Used both when creating a function and when
+ * reconciling an existing one, so the two can never drift apart.
+ */
+const buildDesiredLambdaEnvironmentVariables = (
+  config: LangWatchLambdaConfig,
+): Record<string, string> => ({
+  LANGWATCH_ENDPOINT: env.BASE_HOST,
+  STUDIO_RUNTIME: "async",
+  AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
+  CACHE_BUCKET: config.cache_bucket,
+  // nlpgo's own compiled default for a Python code block was 60s, which
+  // killed legitimate long-running studio code blocks (raised to 600s on the
+  // nlpgo side in #7640). Override it here so per-project Lambdas — both
+  // freshly created and reconciled — don't fall back to the old 60s default.
+  // Clamped below this Lambda's own 900s Timeout (see
+  // clampCodeBlockTimeoutSeconds): an unclamped override at or above 900
+  // would let Lambda kill the invocation before nlpgo reports its own
+  // timeout.
+  NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: String(
+    clampCodeBlockTimeoutSeconds(
+      process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS,
+    ),
+  ),
+});
+
+/**
+ * Everything `reconcileProjectLambdaConfig` checks for drift (env vars,
+ * memory, timeout), reduced to one order-stable string. The ARN cache
+ * compares this on every read, the same way it already compares
+ * `imageUri` -- so a config-only rollout (e.g. raising
+ * NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS with no new image) invalidates
+ * warm cache entries instead of silently serving a stale ARN for up to
+ * LAMBDA_ARN_CACHE_TTL_MS.
+ *
+ * Built from buildDesiredLambdaEnvironmentVariables() -- the same call
+ * reconcileProjectLambdaConfig uses -- so the cache key and the reconcile
+ * drift check can never disagree. Env entries are sorted by key before
+ * joining: buildDesiredLambdaEnvironmentVariables happens to return a
+ * fixed-order literal today, but nothing enforces that, and an unsorted
+ * join would reintroduce spurious cache misses the moment it doesn't.
+ */
+const buildDesiredLambdaConfigFingerprint = (
+  config: LangWatchLambdaConfig,
+): string => {
+  const desiredEnv = buildDesiredLambdaEnvironmentVariables(config);
+  const env = Object.keys(desiredEnv)
+    .sort()
+    .map((key) => `${key}=${desiredEnv[key]}`)
+    .join("&");
+  return `env:${env}|memory:${NLP_LAMBDA_MEMORY_SIZE_MB}|timeout:${LAMBDA_INVOCATION_TIMEOUT_SECONDS}`;
+};
+
 const createProjectLambda = async (
   lambda: LambdaClient,
   functionName: string,
@@ -238,31 +339,15 @@ const createProjectLambda = async (
       ImageUri: config.image_uri,
     },
     PackageType: "Image",
-    Timeout: 900, // 15 minutes
-    // 2048 MB (was 1024) gives Python multiprocessing.fork() enough RSS
-    // headroom when the bundled image runs nlpgo + uvicorn + litellm in
-    // the same container. At 1024 MB observed Max Memory Used hit
-    // 805/1024 MB mid-request on lw-dev (TEST H, 2026-04-28); fork()
-    // would fail to clone parent pages and the uvicorn worker pool
-    // crashed, cascading to /studio/* 502s. 2048 MB also doubles
-    // Lambda's allocated CPU (Lambda allocates CPU proportional to
-    // memory; ~0.58 vCPU at 1024 → ~1.17 vCPU at 2048), shaving cold-
-    // start init time too. Existing per-project Lambdas keep 1024 until
-    // a one-shot migration runs `aws lambda update-function-configuration
-    // --memory-size 2048` over each.
-    MemorySize: 2048,
+    Timeout: LAMBDA_INVOCATION_TIMEOUT_SECONDS, // 15 minutes
+    MemorySize: NLP_LAMBDA_MEMORY_SIZE_MB,
     Architectures: ["arm64"],
     VpcConfig: {
       SubnetIds: config.subnet_ids,
       SecurityGroupIds: config.security_group_ids,
     },
     Environment: {
-      Variables: {
-        LANGWATCH_ENDPOINT: env.BASE_HOST,
-        STUDIO_RUNTIME: "async",
-        AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
-        CACHE_BUCKET: config.cache_bucket,
-      },
+      Variables: buildDesiredLambdaEnvironmentVariables(config),
     },
     Tags: {
       Project: "langwatch",
@@ -342,6 +427,81 @@ const updateProjectLambdaImage = async (
   return response;
 };
 
+/**
+ * Checks if an error is a Lambda update-in-progress conflict.
+ * Discriminates by exception name (the contract) rather than message text
+ * (which can change). Message check retained as fallback for older SDK versions.
+ */
+const isLambdaUpdateInProgressError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const err = error as any;
+  if (err.name === "ResourceConflictException") {
+    return true;
+  }
+  // Fallback: check message for older SDK versions
+  return error.message.includes("An update is in progress");
+};
+
+/**
+ * Bring an already-created Lambda's env vars and memory size up to the values
+ * this code wants. `CreateFunctionCommand` only runs once, and
+ * `UpdateFunctionCodeCommand` touches the container image only, so without this
+ * every pre-existing per-project Lambda would keep whatever configuration it
+ * was born with forever.
+ *
+ * @returns the updated configuration, or `null` when nothing had drifted (the
+ *   common case — no AWS call is made then).
+ */
+const reconcileProjectLambdaConfig = async ({
+  lambda,
+  functionName,
+  config,
+  currentConfig,
+  projectId,
+}: {
+  lambda: LambdaClient;
+  functionName: string;
+  config: LangWatchLambdaConfig;
+  currentConfig: FunctionConfiguration;
+  projectId: string;
+}): Promise<FunctionConfiguration | null> => {
+  const desiredEnv = buildDesiredLambdaEnvironmentVariables(config);
+  const currentEnv = currentConfig.Environment?.Variables ?? {};
+  const envDrifted = Object.entries(desiredEnv).some(
+    ([key, value]) => currentEnv[key] !== value,
+  );
+  const memoryDrifted = currentConfig.MemorySize !== NLP_LAMBDA_MEMORY_SIZE_MB;
+  const timeoutDrifted =
+    currentConfig.Timeout !== LAMBDA_INVOCATION_TIMEOUT_SECONDS;
+
+  if (!envDrifted && !memoryDrifted && !timeoutDrifted) {
+    return null;
+  }
+
+  logger.info(
+    { projectId, envDrifted, memoryDrifted, timeoutDrifted },
+    `Reconciling Lambda function configuration for ${functionName}`,
+  );
+
+  const command = new UpdateFunctionConfigurationCommand({
+    FunctionName: functionName,
+    Environment: {
+      // Merge, never replace: preserve any env var this code doesn't
+      // manage (e.g. one set out-of-band) instead of clobbering it.
+      Variables: {
+        ...currentEnv,
+        ...desiredEnv,
+      },
+    },
+    MemorySize: NLP_LAMBDA_MEMORY_SIZE_MB,
+    Timeout: LAMBDA_INVOCATION_TIMEOUT_SECONDS,
+  });
+
+  return lambda.send(command);
+};
+
 // Cluster-wide ARN cache, plus per-pod single-flight.
 //
 // Why this exists: getProjectLambdaArn() issues 2-N AWS Lambda control-plane
@@ -369,7 +529,13 @@ const updateProjectLambdaImage = async (
 // The cache key is projectId, and the cached payload includes image_uri so
 // a deploy (which bumps image_uri) auto-invalidates without any extra
 // plumbing — readers compare to the current config.image_uri and treat a
-// mismatch as a miss, re-running the UpdateFunctionCode path.
+// mismatch as a miss, re-running the UpdateFunctionCode path. The payload
+// also carries a configFingerprint (see
+// buildDesiredLambdaConfigFingerprint) covering env vars, MemorySize and
+// Timeout, so a config-only rollout (no new image_uri, e.g. raising
+// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS) invalidates the same way instead
+// of serving a stale ARN — and skipping reconcileProjectLambdaConfig — for
+// up to the full TTL.
 //
 // Failures are NOT cached: a TooManyRequestsException must self-heal on
 // the next call so we don't pin a stale rejection cluster-wide.
@@ -379,7 +545,11 @@ const updateProjectLambdaImage = async (
 // self-heals within the window.
 export const LAMBDA_ARN_CACHE_TTL_MS = 10 * 60 * 1000;
 
-type LambdaArnCacheEntry = { arn: string; imageUri: string };
+type LambdaArnCacheEntry = {
+  arn: string;
+  imageUri: string;
+  configFingerprint: string;
+};
 
 const lambdaArnCache = new TtlCache<LambdaArnCacheEntry>(
   LAMBDA_ARN_CACHE_TTL_MS,
@@ -403,9 +573,14 @@ export const getProjectLambdaArn = async (
 ): Promise<string> => {
   const config = parseLambdaConfig();
   const functionName = `langwatch_nlp-${projectId}`;
+  const configFingerprint = buildDesiredLambdaConfigFingerprint(config);
 
   const cached = await lambdaArnCache.get(projectId);
-  if (cached && cached.imageUri === config.image_uri) {
+  if (
+    cached &&
+    cached.imageUri === config.image_uri &&
+    cached.configFingerprint === configFingerprint
+  ) {
     return cached.arn;
   }
 
@@ -424,7 +599,11 @@ export const getProjectLambdaArn = async (
         functionName,
       );
       trackedProjectIds.add(projectId);
-      await lambdaArnCache.set(projectId, { arn, imageUri: config.image_uri });
+      await lambdaArnCache.set(projectId, {
+        arn,
+        imageUri: config.image_uri,
+        configFingerprint,
+      });
       return arn;
     } finally {
       inFlightLambdaArn.delete(projectId);
@@ -433,6 +612,150 @@ export const getProjectLambdaArn = async (
 
   inFlightLambdaArn.set(projectId, resolution);
   return resolution;
+};
+
+/**
+ * Swap a Lambda's container image when the desired URI has drifted from
+ * what's deployed. Returns the updated configuration, or `null` when no
+ * update was needed or attempted.
+ */
+const updateProjectLambdaImageIfDrifted = async (
+  lambda: LambdaClient,
+  functionName: string,
+  params: {
+    config: LangWatchLambdaConfig;
+    projectId: string;
+    currentImageUri: string | undefined;
+  },
+): Promise<FunctionConfiguration | null> => {
+  const { config, projectId, currentImageUri } = params;
+
+  if (!currentImageUri || currentImageUri === config.image_uri) {
+    return null;
+  }
+
+  logger.info(
+    { projectId },
+    `Image URI mismatch for ${functionName}. Current: ${currentImageUri}, Expected: ${config.image_uri}. Updating lambda image`,
+  );
+
+  try {
+    const updated = await updateProjectLambdaImage(
+      lambda,
+      functionName,
+      config.image_uri,
+      projectId,
+    );
+    // AWS rejects UpdateFunctionConfiguration while a code update is still in
+    // flight ("ResourceConflictException: An update is in progress"), so the
+    // code update must fully land before a reconcile can follow.
+    await pollLambdaUntilReady(lambda, functionName);
+    return updated;
+  } catch (error) {
+    if (isLambdaUpdateInProgressError(error)) {
+      logger.info(
+        { projectId },
+        "Lambda function update in progress, skipping update",
+      );
+      return null;
+    }
+    throw error;
+  }
+};
+
+/**
+ * `reconcileProjectLambdaConfig`, tolerant of a concurrent update: AWS
+ * rejects `UpdateFunctionConfiguration` while another update is in flight,
+ * which is expected under overlapping reconcile attempts and not an error.
+ */
+const reconcileProjectLambdaConfigSafely = async ({
+  lambda,
+  functionName,
+  config,
+  currentConfig,
+  projectId,
+}: {
+  lambda: LambdaClient;
+  functionName: string;
+  config: LangWatchLambdaConfig;
+  currentConfig: FunctionConfiguration;
+  projectId: string;
+}): Promise<FunctionConfiguration | null> => {
+  try {
+    return await reconcileProjectLambdaConfig({
+      lambda,
+      functionName,
+      config,
+      currentConfig,
+      projectId,
+    });
+  } catch (error) {
+    if (isLambdaUpdateInProgressError(error)) {
+      logger.info(
+        { projectId },
+        "Lambda function config reconcile skipped, update in progress",
+      );
+      return null;
+    }
+    throw error;
+  }
+};
+
+/**
+ * Bring an already-existing Lambda's container image and configuration in
+ * line with what this invocation wants: swap the image if the URI drifted,
+ * then reconcile env vars / memory against the pre-update configuration
+ * baseline. Split out of `resolveProjectLambdaArn` to keep that function
+ * under the house line-count limit.
+ */
+const syncExistingProjectLambda = async (
+  lambda: LambdaClient,
+  functionName: string,
+  params: {
+    config: LangWatchLambdaConfig;
+    projectId: string;
+    existingConfig: FunctionConfiguration;
+  },
+): Promise<FunctionConfiguration> => {
+  const { config, projectId, existingConfig } = params;
+  let lambdaConfig = existingConfig;
+
+  // Get complete function details to check image URI
+  const getFunctionCommand = new GetFunctionCommand({
+    FunctionName: functionName,
+  });
+  const functionDetails = await lambda.send(getFunctionCommand);
+
+  const updatedByImage = await updateProjectLambdaImageIfDrifted(
+    lambda,
+    functionName,
+    {
+      config,
+      projectId,
+      currentImageUri: functionDetails.Code?.ImageUri,
+    },
+  );
+  if (updatedByImage) {
+    lambdaConfig = updatedByImage;
+  }
+
+  // `functionDetails.Configuration` was fetched before either update, and is
+  // a correct drift baseline regardless: UpdateFunctionCode never changes
+  // Environment or MemorySize.
+  if (functionDetails.Configuration) {
+    const reconciled = await reconcileProjectLambdaConfigSafely({
+      lambda,
+      functionName,
+      config,
+      currentConfig: functionDetails.Configuration,
+      projectId,
+    });
+    if (reconciled) {
+      lambdaConfig = reconciled;
+    }
+  }
+
+  return lambdaConfig;
 };
 
 const resolveProjectLambdaArn = async (
@@ -459,7 +782,7 @@ const resolveProjectLambdaArn = async (
       if (
         error instanceof Error &&
         (error.message.includes("already exist") ||
-          error.message.includes("An update is in progress"))
+          isLambdaUpdateInProgressError(error))
       ) {
         logger.info(
           { projectId },
@@ -475,40 +798,11 @@ const resolveProjectLambdaArn = async (
       }
     }
   } else {
-    // Get complete function details to check image URI
-    const getFunctionCommand = new GetFunctionCommand({
-      FunctionName: functionName,
+    lambdaConfig = await syncExistingProjectLambda(lambda, functionName, {
+      config,
+      projectId,
+      existingConfig: lambdaConfig,
     });
-    const functionDetails = await lambda.send(getFunctionCommand);
-
-    const currentImageUri = functionDetails.Code?.ImageUri;
-    if (currentImageUri && currentImageUri !== config.image_uri) {
-      logger.info(
-        { projectId },
-        `Image URI mismatch for ${functionName}. Current: ${currentImageUri}, Expected: ${config.image_uri}. Updating lambda image`,
-      );
-
-      try {
-        lambdaConfig = await updateProjectLambdaImage(
-          lambda,
-          functionName,
-          config.image_uri,
-          projectId,
-        );
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message.includes("An update is in progress")
-        ) {
-          logger.info(
-            { projectId },
-            "Lambda function update in progress, skipping update",
-          );
-        } else {
-          throw error;
-        }
-      }
-    }
   }
 
   // Poll until Lambda is ready

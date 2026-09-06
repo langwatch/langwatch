@@ -7,6 +7,7 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.get_api_suites_response_200_item_kind import GetApiSuitesResponse200ItemKind
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_suites_response_200_item_scope_type_0 import GetApiSuitesResponse200ItemScopeType0
@@ -26,42 +27,43 @@ class GetApiSuitesResponse200Item:
         id (str):
         name (str):
         slug (str):
-        kind (GetApiSuitesResponse200ItemKind): custom is a hand-assembled run plan; folder is a test suite that groups
-            scenarios filed into it.
         description (None | str):
         scenario_ids (list[str]):
-        scope (GetApiSuitesResponse200ItemScopeType0 | GetApiSuitesResponse200ItemScopeType1 |
-            GetApiSuitesResponse200ItemScopeType2 | GetApiSuitesResponse200ItemScopeType3 | None): What the run plan covers:
-            all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any
-            of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario
-            written later runs without editing the plan.
         targets (list[GetApiSuitesResponse200ItemTargetsItem]):
         repeat_count (float):
         labels (list[str]):
         created_at (str):
         updated_at (str):
         platform_url (str):
+        kind (GetApiSuitesResponse200ItemKind | Unset): custom is a hand-assembled run plan; folder is a test suite that
+            groups scenarios filed into it. Absent on servers that predate test suites.
+        scope (GetApiSuitesResponse200ItemScopeType0 | GetApiSuitesResponse200ItemScopeType1 |
+            GetApiSuitesResponse200ItemScopeType2 | GetApiSuitesResponse200ItemScopeType3 | None | Unset): What the run plan
+            covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the
+            scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at
+            every run, so a scenario written later runs without editing the plan.
     """
 
     id: str
     name: str
     slug: str
-    kind: GetApiSuitesResponse200ItemKind
     description: None | str
     scenario_ids: list[str]
-    scope: (
-        GetApiSuitesResponse200ItemScopeType0
-        | GetApiSuitesResponse200ItemScopeType1
-        | GetApiSuitesResponse200ItemScopeType2
-        | GetApiSuitesResponse200ItemScopeType3
-        | None
-    )
     targets: list[GetApiSuitesResponse200ItemTargetsItem]
     repeat_count: float
     labels: list[str]
     created_at: str
     updated_at: str
     platform_url: str
+    kind: GetApiSuitesResponse200ItemKind | Unset = UNSET
+    scope: (
+        GetApiSuitesResponse200ItemScopeType0
+        | GetApiSuitesResponse200ItemScopeType1
+        | GetApiSuitesResponse200ItemScopeType2
+        | GetApiSuitesResponse200ItemScopeType3
+        | None
+        | Unset
+    ) = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -76,24 +78,10 @@ class GetApiSuitesResponse200Item:
 
         slug = self.slug
 
-        kind = self.kind.value
-
         description: None | str
         description = self.description
 
         scenario_ids = self.scenario_ids
-
-        scope: dict[str, Any] | None
-        if isinstance(self.scope, GetApiSuitesResponse200ItemScopeType0):
-            scope = self.scope.to_dict()
-        elif isinstance(self.scope, GetApiSuitesResponse200ItemScopeType1):
-            scope = self.scope.to_dict()
-        elif isinstance(self.scope, GetApiSuitesResponse200ItemScopeType2):
-            scope = self.scope.to_dict()
-        elif isinstance(self.scope, GetApiSuitesResponse200ItemScopeType3):
-            scope = self.scope.to_dict()
-        else:
-            scope = self.scope
 
         targets = []
         for targets_item_data in self.targets:
@@ -110,6 +98,24 @@ class GetApiSuitesResponse200Item:
 
         platform_url = self.platform_url
 
+        kind: str | Unset = UNSET
+        if not isinstance(self.kind, Unset):
+            kind = self.kind.value
+
+        scope: dict[str, Any] | None | Unset
+        if isinstance(self.scope, Unset):
+            scope = UNSET
+        elif isinstance(self.scope, GetApiSuitesResponse200ItemScopeType0):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, GetApiSuitesResponse200ItemScopeType1):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, GetApiSuitesResponse200ItemScopeType2):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, GetApiSuitesResponse200ItemScopeType3):
+            scope = self.scope.to_dict()
+        else:
+            scope = self.scope
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -117,10 +123,8 @@ class GetApiSuitesResponse200Item:
                 "id": id,
                 "name": name,
                 "slug": slug,
-                "kind": kind,
                 "description": description,
                 "scenarioIds": scenario_ids,
-                "scope": scope,
                 "targets": targets,
                 "repeatCount": repeat_count,
                 "labels": labels,
@@ -129,6 +133,10 @@ class GetApiSuitesResponse200Item:
                 "platformUrl": platform_url,
             }
         )
+        if kind is not UNSET:
+            field_dict["kind"] = kind
+        if scope is not UNSET:
+            field_dict["scope"] = scope
 
         return field_dict
 
@@ -147,8 +155,6 @@ class GetApiSuitesResponse200Item:
 
         slug = d.pop("slug")
 
-        kind = GetApiSuitesResponse200ItemKind(d.pop("kind"))
-
         def _parse_description(data: object) -> None | str:
             if data is None:
                 return data
@@ -158,6 +164,30 @@ class GetApiSuitesResponse200Item:
 
         scenario_ids = cast(list[str], d.pop("scenarioIds"))
 
+        targets = []
+        _targets = d.pop("targets")
+        for targets_item_data in _targets:
+            targets_item = GetApiSuitesResponse200ItemTargetsItem.from_dict(targets_item_data)
+
+            targets.append(targets_item)
+
+        repeat_count = d.pop("repeatCount")
+
+        labels = cast(list[str], d.pop("labels"))
+
+        created_at = d.pop("createdAt")
+
+        updated_at = d.pop("updatedAt")
+
+        platform_url = d.pop("platformUrl")
+
+        _kind = d.pop("kind", UNSET)
+        kind: GetApiSuitesResponse200ItemKind | Unset
+        if isinstance(_kind, Unset):
+            kind = UNSET
+        else:
+            kind = GetApiSuitesResponse200ItemKind(_kind)
+
         def _parse_scope(
             data: object,
         ) -> (
@@ -166,8 +196,11 @@ class GetApiSuitesResponse200Item:
             | GetApiSuitesResponse200ItemScopeType2
             | GetApiSuitesResponse200ItemScopeType3
             | None
+            | Unset
         ):
             if data is None:
+                return data
+            if isinstance(data, Unset):
                 return data
             try:
                 if not isinstance(data, dict):
@@ -206,43 +239,27 @@ class GetApiSuitesResponse200Item:
                 | GetApiSuitesResponse200ItemScopeType1
                 | GetApiSuitesResponse200ItemScopeType2
                 | GetApiSuitesResponse200ItemScopeType3
-                | None,
+                | None
+                | Unset,
                 data,
             )
 
-        scope = _parse_scope(d.pop("scope"))
-
-        targets = []
-        _targets = d.pop("targets")
-        for targets_item_data in _targets:
-            targets_item = GetApiSuitesResponse200ItemTargetsItem.from_dict(targets_item_data)
-
-            targets.append(targets_item)
-
-        repeat_count = d.pop("repeatCount")
-
-        labels = cast(list[str], d.pop("labels"))
-
-        created_at = d.pop("createdAt")
-
-        updated_at = d.pop("updatedAt")
-
-        platform_url = d.pop("platformUrl")
+        scope = _parse_scope(d.pop("scope", UNSET))
 
         get_api_suites_response_200_item = cls(
             id=id,
             name=name,
             slug=slug,
-            kind=kind,
             description=description,
             scenario_ids=scenario_ids,
-            scope=scope,
             targets=targets,
             repeat_count=repeat_count,
             labels=labels,
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
+            kind=kind,
+            scope=scope,
         )
 
         get_api_suites_response_200_item.additional_properties = d

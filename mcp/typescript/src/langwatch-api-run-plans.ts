@@ -4,7 +4,9 @@ import type {
   runParametersSchema,
   runPlanScopeSchema,
   runPlanTargetSchema,
+  RunPlanTargetWire,
 } from "./schemas/run-plan.js";
+import type { EvaluatorAttachmentWire } from "./schemas/suite-fields.js";
 
 /**
  * Client for `/api/v1/run-plans`.
@@ -25,7 +27,7 @@ import type {
 /** What a run plan covers. Mirrors `suiteScopeSchema` on the platform. */
 export type RunPlanScope = z.infer<typeof runPlanScopeSchema>;
 
-/** One thing a plan runs its cases against. */
+/** One thing a plan runs its scenarios against, as a tool caller writes it. */
 export type RunPlanTarget = z.infer<typeof runPlanTargetSchema>;
 
 /** The values a run supplies for the parameters its scenarios declare. */
@@ -37,7 +39,7 @@ export interface RunPlan {
   slug: string;
   scope: RunPlanScope | null;
   scenarioIds: string[];
-  targets: RunPlanTarget[];
+  targets: RunPlanTargetWire[];
   repeatCount: number;
   simulatorModel: string | null;
   judgeModel: string | null;
@@ -46,16 +48,24 @@ export interface RunPlan {
   createdAt: string;
   updatedAt: string;
   platformUrl: string;
+  /** The plan's own evaluators. Absent on servers that predate them. */
+  evaluators?: EvaluatorAttachmentWire[];
 }
 
 /** The configuration a run either writes onto a plan or creates it with. */
 export interface RunPlanConfig {
   scope: RunPlanScope;
-  targets: RunPlanTarget[];
+  targets: RunPlanTargetWire[];
   repeatCount?: number;
   simulatorModel?: string | null;
   judgeModel?: string | null;
   scenarioIds?: string[];
+  /**
+   * The plan's own evaluators, run beside the ones its test suites attach. A
+   * plan evaluator reads the conversation and the trace, never a scenario
+   * field. Left out, the plan keeps what it already holds.
+   */
+  evaluators?: EvaluatorAttachmentWire[];
 }
 
 export interface RunPlanRunResult {
@@ -70,7 +80,7 @@ export interface RunPlanRunResult {
   items: Array<{
     scenarioRunId: string;
     scenarioId: string;
-    target: RunPlanTarget;
+    target: RunPlanTargetWire;
     name: string | null;
   }>;
   runPlanId: string;

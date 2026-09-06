@@ -77,7 +77,7 @@ async function planUrl({
     projectId: app.project.id,
     organizationId: app.organizationId,
     slug: suite.slug,
-    kind: "custom",
+    kind: "run_plan",
   });
   return platformUrl({ projectSlug: app.project.slug, path });
 }
@@ -95,7 +95,7 @@ async function planWire({
 /**
  * The custom row this id names.
  *
- * A folder id reads as a missing run plan rather than as a run plan of the
+ * A test suite id reads as a missing run plan rather than as a run plan of the
  * wrong kind: the two families address disjoint sets of rows, so an id from
  * one is simply not a member of the other.
  */
@@ -107,7 +107,7 @@ async function readPlan({
   id: string;
 }): Promise<SimulationSuite> {
   const suite = await app.suites.getById({ id, projectId: app.project.id });
-  if (suite?.kind !== "custom") {
+  if (suite?.kind !== "run_plan") {
     throw new SuiteNotFoundError("Run plan not found");
   }
   return suite;
@@ -132,7 +132,7 @@ const registerCollectionEndpoints = (v: RunPlansVersion): void => {
     ) => {
       const suites = await app.suites.getAll({
         projectId: app.project.id,
-        kinds: ["custom"],
+        kinds: ["run_plan"],
         includeArchived: query.includeArchived,
       });
       return Promise.all(suites.map((suite) => planWire({ app, suite })));

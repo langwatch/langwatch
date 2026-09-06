@@ -158,6 +158,12 @@ model User {
   // dismissal applies across projects, browsers, and devices.
   // Spec: specs/traces-v2/tour-visibility-and-persistence.feature
   tracesExplorerTourDismissedAt DateTime?
+  /// How Langy should reach this person's code when a task needs a change
+  /// (ADR-129). "github" means they chose the pull request path and asked to
+  /// be remembered; NULL means ask. A shared local folder is never stored
+  /// here, because a folder has to be shared again each time.
+  /// Spec: specs/langy/langy-code-access.feature
+  langyCodeAccessPreference     String?
   /// When this person last said "not now" to being offered a passkey
   /// (ADR-120). On the account rather than in browser storage for two
   /// reasons: a per-browser record forgets on a new device, which is exactly
@@ -1783,6 +1789,13 @@ model ModelProvider {
   // tried first. Tiebreak by createdAt ASC. Deterministic across runs.
   fallbackPriorityGlobal Int?
 
+  // Regular expression sources, one per entry, naming the models of this
+  // provider that may run a Langy conversation with the permission checks
+  // skipped on the developer's machine (ADR-129). Null or an empty list
+  // means the provider's registry default applies; a stored list replaces
+  // that default rather than extending it.
+  langySkipPermissionsModels Json?
+
   // Health / circuit breaker state written by the gateway.
   healthStatus      GatewayProviderHealthStatus @default(UNKNOWN)
   circuitOpenedAt   DateTime?
@@ -2796,13 +2809,23 @@ model Agent {
   copiedFromAgentId String?
   copiedFrom        Agent?    @relation("AgentCopies", fields: [copiedFromAgentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   copiedAgents      Agent[]   @relation("AgentCopies")
+  // Connected agents (ADR-128): the environment the SDK resolved, the scope of
+  // a development agent (a personal key's owner, or the host of a project key),
+  // the identity the SDK upserts by, and the last time an instance was seen.
+  environment       String?
+  ownerUserId       String?
+  hostLabel         String?
+  identityKey       String?
+  lastSeenAt        DateTime?
   archivedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
+  @@unique([projectId, identityKey])
   @@index([projectId])
   @@index([workflowId])
   @@index([copiedFromAgentId])
+  @@index([projectId, lastSeenAt])
 }
 
 model Evaluator {
@@ -2857,13 +2880,19 @@ model Scenario {
   judgeModel      String?
   maxTurns        Int?
   minTurns        Int?
-  // The folder (a SimulationSuite with kind "folder") this scenario is filed
-  // in, or null for an unfiled scenario. This column is the source of truth
-  // for folder membership; the folder's scenarioIds is a denormalized copy
-  // kept in step by reconcileFolderMembership (server/suites/folder-membership.ts).
-  // See specs/suites/folder-membership-invariant.feature.
-  folderId        String?
-  folder          SimulationSuite? @relation("FolderScenarios", fields: [folderId], references: [id], onDelete: SetNull)
+  // The value this scenario carries for each field its test suite declares,
+  // keyed by field identifier: { golden_sql: "SELECT ...", max_rows: 12 }.
+  // Values are text, numbers or booleans. A field with no value has no key.
+  // Null reads as no values. See specs/scenarios/scenario-fields.feature.
+  fields          Json?
+  // The test suite (a SimulationSuite with kind "test_suite") this scenario is
+  // filed in, or null for an unfiled scenario. This column is the source of
+  // truth for test suite membership; the test suite's scenarioIds is a
+  // denormalized copy kept in step by reconcileTestSuiteMembership
+  // (server/suites/test-suite-membership.ts).
+  // See specs/suites/test-suite-membership-invariant.feature.
+  testSuiteId     String?
+  testSuite       SimulationSuite? @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
   // Counts one up on every save of the editable fields. Each number has a
   // ScenarioVersion row holding the state as saved; the unique constraint
   // there is what keeps two concurrent saves from sharing a number. See
@@ -2877,7 +2906,7 @@ model Scenario {
   updatedAt       DateTime  @default(now()) @updatedAt
 
   @@index([projectId])
-  @@index([projectId, folderId])
+  @@index([projectId, testSuiteId])
 }
 
 // One saved state of a scenario's editable fields. Append-only: a restore
@@ -2936,19 +2965,32 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel String?
   judgeModel     String?
-  // "folder" | "custom" (see SUITE_KINDS in server/suites/types.ts). A folder
-  // is a suite that groups scenarios through Scenario.folderId; a custom suite
-  // is a hand-assembled run plan. String rather than a Prisma enum so a new
-  // kind needs no database migration.
-  kind            String     @default("custom")
+  // "test_suite" | "run_plan" (see SUITE_KINDS in server/suites/types.ts). A
+  // test suite groups scenarios through Scenario.testSuiteId; a run plan is
+  // hand-assembled. String rather than a Prisma enum so a new kind needs no
+  // database migration.
+  kind            String     @default("run_plan")
   // What the plan covers, as { mode } plus the mode's own field: "all",
-  // "folders" with folderIds, "labels" with labels, or "cases", which runs the
-  // stored scenarioIds. Null reads as "cases", so a plan written before scopes
-  // keeps the list it already held. A folder carries none: its members come
-  // from Scenario.folderId. See server/suites/scope.ts and
-  // specs/suites/run-plan-dynamic-scopes.feature.
+  // "test_suites" with testSuiteIds, "labels" with labels, or "scenarios",
+  // which runs the stored scenarioIds. Null reads as "scenarios", so a plan
+  // written before scopes keeps the list it already held. A test suite carries
+  // none: its members come from Scenario.testSuiteId. See
+  // server/suites/scope.ts and specs/suites/run-plan-dynamic-scopes.feature.
   scope           Json?
-  folderScenarios Scenario[] @relation("FolderScenarios")
+  // The fields a test suite declares beyond situation and criteria, as an
+  // array of { identifier, type } with type text, number or boolean. Every
+  // scenario filed in the suite carries a value per field in Scenario.fields.
+  // A run plan carries none. Null reads as no fields. See
+  // server/scenarios/suite-fields.ts and specs/scenarios/scenario-fields.feature.
+  fields          Json?
+  // The evaluators that run after every scenario run of this suite or plan,
+  // as an array of { id, evaluatorId, required, mappings }. A mapping names
+  // where an evaluator input reads its value: the conversation, the scenario
+  // (situation, criteria or a field) or the trace. A run plan's attachments
+  // run beside the ones of the test suites its scenarios belong to. Null
+  // reads as none. See server/scenarios/evaluator-attachments.ts.
+  evaluators      Json?
+  testSuiteScenarios Scenario[] @relation("TestSuiteScenarios")
   archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now()) @updatedAt
@@ -3173,6 +3215,16 @@ model Grant {
   // the partiality and rebuild it over every share-link row, which is the one
   // thing the WHERE clause exists to avoid.
   //
+  // The API-key permission check's holder lookup - who else holds this key's
+  // private role - is served by "Grant_organizationId_roleKey_live_idx",
+  // partial on `WHERE "revokedAt" IS NULL`, from migration
+  // 20260831120000_grant_role_key_live_index. Partial for the same reason and
+  // undeclarable here for the same reason as the principal scan above: every
+  // read that decides access fences on the mark, and an `@@index` would strip
+  // the WHERE on the next `prisma migrate dev`. Without it the leading column
+  // selects the whole organization and the read degrades to a full scan on
+  // every check.
+  //
   // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
   // four identity columns (token, permission, resourceKind, projectId), tied
   // to scopeType = 'RESOURCE'. Added over two columns in
@@ -3247,6 +3299,14 @@ model ApiKey {
   expiresAt       DateTime?
   lastUsedAt      DateTime?
   revokedAt       DateTime?
+
+  /// Why the key was revoked, set with `revokedAt`: "user" when a person
+  /// revoked it (the API-keys page, the REST API), "rotation" when a hard-cut
+  /// mint replaced it, "cap" when the personal ingest-key cap retired it. The
+  /// CLI reads it to decide whether a dead ingest key may be re-minted: a key
+  /// a person revoked stays dead. NULL for live keys and for keys revoked
+  /// before the cause was recorded.
+  revocationCause String?
 
   /// Non-null marks this key as an "ingestion key": a project-scoped,
   /// ingest-only ApiKey the unified `langwatch <tool>` CLI (and template
