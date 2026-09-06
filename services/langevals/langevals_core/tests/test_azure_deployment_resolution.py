@@ -17,6 +17,7 @@ from langevals_core.litellm_patch import (
     patch_litellm_embedding_params,
     patch_litellm_params,
 )
+from langevals_core.request_env import request_env
 
 
 @pytest.fixture(autouse=True)
@@ -97,3 +98,52 @@ def test_an_embedding_deployment_does_not_divert_another_provider(monkeypatch):
     kwargs = patch_litellm_embedding_params({"model": "openai/text-embedding-3-small"})
 
     assert kwargs["model"] == "openai/text-embedding-3-small"
+
+
+# @scenario "Credentials follow the model the request ends up naming"
+def test_embedding_credentials_follow_the_resolved_model():
+    """The credentials belong to the provider the call finally addresses.
+
+    An evaluator carrying a baked-in OpenAI embeddings default is redirected
+    to the provider the project configured, and the redirect arrives as
+    X_LITELLM_EMBEDDINGS_model. Resolving credentials from the model on the
+    way in picks the provider the call no longer addresses.
+
+    The request env here deliberately carries no X_LITELLM_EMBEDDINGS_api_key:
+    the platform does send one, and it would mask the ordering. What is under
+    test is which provider's table the resolution reads.
+    """
+    env = {
+        "X_LITELLM_EMBEDDINGS_model": "azure/text-embedding-ada-002",
+        "AZURE_OPENAI_API_KEY": "azure-key",
+        "AZURE_OPENAI_ENDPOINT": "https://example-resource.openai.azure.test",
+        "OPENAI_API_KEY": "openai-key",
+    }
+
+    with request_env(env):
+        kwargs = patch_litellm_embedding_params(
+            {"model": "openai/text-embedding-ada-002"}
+        )
+
+    assert kwargs["model"] == "azure/text-embedding-ada-002"
+    assert kwargs["api_key"] == "azure-key"
+    assert kwargs["api_base"] == "https://example-resource.openai.azure.test"
+
+
+# @scenario "Credentials follow the model the request ends up naming"
+def test_completion_credentials_follow_the_resolved_model():
+    """The same ordering on the completion path, where X_LITELLM_model can
+    equally name a provider the caller's own argument did not."""
+    env = {
+        "X_LITELLM_model": "azure/gpt-4o",
+        "AZURE_OPENAI_API_KEY": "azure-key",
+        "AZURE_OPENAI_ENDPOINT": "https://example-resource.openai.azure.test",
+        "OPENAI_API_KEY": "openai-key",
+    }
+
+    with request_env(env):
+        kwargs = patch_litellm_params({"model": "openai/gpt-4o"})
+
+    assert kwargs["model"] == "azure/gpt-4o"
+    assert kwargs["api_key"] == "azure-key"
+    assert kwargs["api_base"] == "https://example-resource.openai.azure.test"

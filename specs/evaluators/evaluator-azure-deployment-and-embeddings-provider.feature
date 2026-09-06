@@ -72,6 +72,15 @@ Feature: Evaluators reach the Azure deployment and the embeddings provider a pro
     When langevals prepares the call
     Then the request still names the provider the caller chose
 
+  # The redirect below arrives as a request setting, so the provider the call
+  # addresses is only settled once that setting has landed. Credentials picked
+  # from the model on the way in belong to the provider it no longer names.
+  @unit
+  Scenario: Credentials follow the model the request ends up naming
+    Given a call whose model is redirected to another provider by a request setting
+    When langevals prepares the call
+    Then the call carries the credentials of the provider it ends up naming
+
   @unit
   Scenario: An evaluator embeds with the provider the project actually configured
     Given a project that configured no OpenAI provider
