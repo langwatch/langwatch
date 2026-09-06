@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Protections } from "../../../traces/protections";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
+import { LangWatchQLUnavailableError } from "../errors";
 import {
   applyLangWatchQLResultLimits,
   type LangWatchQLExecutor,
@@ -142,7 +143,7 @@ describe("given the LangWatchQL service", () => {
       // any change to that algorithm, so the digest the key map is provisioned
       // against is stated as a constant instead.
       expect(executor.calls[0]!.tenantCapability).toBe(
-        "4c99f991d0fce515d9326788c6c85359c26cf1536dd1ae0dbb23e806ea05eda2",
+        "$2b$10$QIF0tEPWE8jC7LFk0/WjYuv9Zo0bbNsHsOGS5rZY5C0OQ6WyBWD9q",
       );
       // The raw key is the secret the digest exists to keep out of the
       // database; a capability that merely contained it would be a leak.
@@ -169,12 +170,13 @@ describe("given the LangWatchQL service", () => {
       });
 
       expect(executor.calls[0]!.tenantCapability).toBe(
-        "4c99f991d0fce515d9326788c6c85359c26cf1536dd1ae0dbb23e806ea05eda2",
+        "$2b$10$QIF0tEPWE8jC7LFk0/WjYuv9Zo0bbNsHsOGS5rZY5C0OQ6WyBWD9q",
       );
-      // sha256 of PROJECT_WITH_API_KEY.apiKey — what the key map would have to
-      // hold instead, and what no LangWatchQL query may ever present.
+      // The same derivation over PROJECT_WITH_API_KEY.apiKey — what the key map
+      // would have to hold instead, and what no LangWatchQL query may ever
+      // present.
       expect(executor.calls[0]!.tenantCapability).not.toBe(
-        "725346695d40d416f268694ccc9481c4dc7285693e36226bca84c1b5dade1bd6",
+        "$2b$10$G9AJgeBrTpRaf52Bh0T/BuQ32i9XeCHzW3t4PYxSnM6JbiLjm7/Uu",
       );
       expect(executor.calls[0]!.tenantCapability).not.toContain(
         PROJECT_WITH_API_KEY.apiKey,
@@ -841,24 +843,64 @@ describe("given the LangWatchQL service", () => {
      * indistinguishable from a tenant with no data, and stays that way until
      * someone asks why the numbers are missing.
      *
-     * A plain `Error`, not a handled one: nothing the caller of the API did
-     * causes it and nothing they can do fixes it (ADR-045).
+     * The derivation itself throws a plain `Error`, correctly: nothing the
+     * caller did causes it and nothing they can do fixes it (ADR-045). The
+     * service maps it onto `lwql_unavailable` before it reaches the boundary,
+     * because a plain `Error` escaping here reads to the customer as a generic
+     * unknown failure, and this one has a name: the project cannot be resolved
+     * to a tenant, so there is no identity to run its SQL as. Asserted on the
+     * `code`, never on the prose, which is copy and will change.
      */
-    it("fails loudly instead of hashing an empty secret into a digest that matches nothing", async () => {
+    it("refuses as lwql_unavailable rather than hashing an empty secret into a digest that matches nothing", async () => {
       const executor = recordingExecutor();
 
-      await expect(
-        serviceWith(executor).execute({
+      const refusal = await serviceWith(executor)
+        .execute({
           project: PROJECT_WITHOUT_LWQL_KEY,
           protections: FULLY_PERMITTED,
           sql: "SELECT count() FROM analytics.traces",
-        }),
-      ).rejects.toThrow(
-        "LangWatchQL tenant capability requires a non-empty secret",
+        })
+        .then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+
+      expect(refusal).toBeInstanceOf(LangWatchQLUnavailableError);
+      expect((refusal as LangWatchQLUnavailableError).code).toBe(
+        "lwql_unavailable",
       );
+      // The cause is kept rather than swallowed, so the log line still says
+      // which of the derivation's two refusals fired.
+      expect(
+        (refusal as LangWatchQLUnavailableError).reasons?.[0]?.message,
+      ).toMatch(/non-empty secret/);
 
       // Nothing reached the database: the refusal is before execution, not a
       // query that ran and quietly answered nothing.
+      expect(executor.calls).toHaveLength(0);
+    });
+
+    /**
+     * bcrypt's other refusal, reaching the caller through the same door. A
+     * project cannot have a key this long today — the column is a UUID default
+     * — which is why the mapping has to be tested rather than assumed: the day
+     * the key gets longer is the day this fires in production.
+     */
+    it("maps an underivable over-long key onto the same refusal", async () => {
+      const executor = recordingExecutor();
+
+      const refusal = await serviceWith(executor)
+        .execute({
+          project: { ...PROJECT, lwqlKey: "x".repeat(73) },
+          protections: FULLY_PERMITTED,
+          sql: "SELECT count() FROM analytics.traces",
+        })
+        .then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+
+      expect(refusal).toBeInstanceOf(LangWatchQLUnavailableError);
       expect(executor.calls).toHaveLength(0);
     });
   });

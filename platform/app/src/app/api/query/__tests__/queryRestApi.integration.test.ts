@@ -313,10 +313,12 @@ describe("given the /api/v1/query REST family", () => {
     await harness.admin.insert({
       table: `${database}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
-      values: [projectA, projectB].map((project) => ({
-        KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
-        TenantId: project.id,
-      })),
+      values: await Promise.all(
+        [projectA, projectB].map(async (project) => ({
+          KeyHash: await lwqlTenantCapability({ secret: project.lwqlKey }),
+          TenantId: project.id,
+        })),
+      ),
     });
 
     for (const project of [projectA, projectB]) {

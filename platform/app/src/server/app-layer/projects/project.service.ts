@@ -313,7 +313,7 @@ export class ProjectService {
       // comment.
       const { database: sourceDatabase } = parseConnectionUrl();
       const row: LwqlKeyMapRow = {
-        KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
+        KeyHash: await lwqlTenantCapability({ secret: project.lwqlKey }),
         TenantId: project.id,
       };
       if (!this.lwqlKeyMap) {

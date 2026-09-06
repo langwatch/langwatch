@@ -604,8 +604,10 @@ export function lwqlPolicyCoverageQuery({
  * audit that compares those columns against the raw hash silently never
  * matches, and reads as "the hash was not recorded".
  *
- * Correct for the hex digests this model uses; a value containing a quote or a
- * backslash would additionally be escaped by the dump.
+ * Correct for the capabilities this model audits: bcrypt writes its digests in
+ * `$`, `.`, `/` and the alphanumerics, so none of them carries a quote or a
+ * backslash. A value that did would additionally be escaped by the dump, and
+ * this would have to escape it too.
  */
 export function auditedSettingValue(value: string): string {
   return `'${value}'`;
