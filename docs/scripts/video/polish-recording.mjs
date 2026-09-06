@@ -837,24 +837,41 @@ async function* readFrames(stream, bytes) {
 function cutFilter(cut) {
   const parts = [];
   let labels = "";
-  cut.segments.forEach(([start, end], i) => {
-    parts.push(`[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[c${i}];`);
+  cut.segments.forEach((seg, i) => {
+    const [start, end] = seg;
+    parts.push(
+      `[0:v]trim=start=${start}:end=${end},setpts=(PTS-STARTPTS)/${segmentSpeed(cut, seg)}[c${i}];`,
+    );
     labels += `[c${i}]`;
   });
   parts.push(`${labels}concat=n=${cut.segments.length}:v=1:a=0[cat];`);
-  parts.push(`[cat]setpts=PTS/${cut.speed || 1}[s];`);
+  parts.push(`[cat]setpts=PTS[s];`);
   return parts.join("");
+}
+
+/**
+ * How fast one segment runs. A third number on a segment overrides `speed` for
+ * that stretch, which is how a beat opens at 2x and then follows a long live
+ * run at 3x without a second encode.
+ */
+function segmentSpeed(cut, [, , speed]) {
+  return speed || cut.speed || 1;
+}
+
+/** Seconds one segment lasts in the cut result. */
+function segmentDuration(cut, seg) {
+  return (seg[1] - seg[0]) / segmentSpeed(cut, seg);
 }
 
 /** Maps a second of the raw take onto its second in the cut result. */
 function mapCutTime(cut, tRaw) {
   let acc = 0;
-  for (const [start, end] of cut.segments) {
-    if (tRaw < start) break;
-    if (tRaw <= end) return (acc + (tRaw - start)) / (cut.speed || 1);
-    acc += end - start;
+  for (const seg of cut.segments) {
+    if (tRaw < seg[0]) break;
+    if (tRaw <= seg[1]) return acc + (tRaw - seg[0]) / segmentSpeed(cut, seg);
+    acc += segmentDuration(cut, seg);
   }
-  return acc / (cut.speed || 1);
+  return acc;
 }
 
 // ----------------------------------------------------------------------- main
@@ -999,7 +1016,7 @@ async function main() {
   const pointer = buildSprite(pointerBmp, cfg.cursor.hotspot.pointer, cfg.cursor.shadow);
 
   const srcDuration = cfg.cut
-    ? cfg.cut.segments.reduce((a, [s, e]) => a + (e - s), 0) / (cfg.cut.speed || 1)
+    ? cfg.cut.segments.reduce((a, seg) => a + segmentDuration(cfg.cut, seg), 0)
     : meta.duration;
 
   // Beats are authored against the source clock. Pacing freezes the source
