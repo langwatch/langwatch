@@ -244,7 +244,7 @@ async function declare({
   });
 
   const posted = await postSessionContext({ target, env, payload, fetchImpl });
-  if (!posted) {
+  if (!posted.ok) {
     // Under codex's default sandbox this shell has no network, so retrying
     // from here would fail exactly the same way every time. The declaration
     // is queued instead, for the session report to deliver: that runs from

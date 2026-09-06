@@ -32,7 +32,7 @@ export type ScenarioRunConfig = {
   parameters: Prisma.JsonValue;
   /**
    * The version at the moment of this read. Stamped onto every run queued
-   * from it, so a run says which state of the case produced it.
+   * from it, so a run says which state of the scenario produced it.
    */
   version: number;
 };
@@ -40,7 +40,7 @@ export type ScenarioRunConfig = {
 /**
  * The client a repository write runs on: the repository's own PrismaClient by
  * default, or the caller's transaction client when the write must land with
- * other writes (folder membership reconciliation, version rows) or not at all.
+ * other writes (test suite membership reconciliation, version rows) or not at all.
  */
 type ScenarioWriteClient = Pick<
   Prisma.TransactionClient,
@@ -162,38 +162,38 @@ export class ScenarioRepository {
   }
 
   /**
-   * All scenarios filed in a folder, archived ones included, oldest first.
+   * All scenarios filed in a test suite, archived ones included, oldest first.
    *
-   * The run path reads membership from here rather than from the folder's
+   * The run path reads membership from here rather than from the test suite's
    * denormalized scenarioIds: that cache holds only active members, and a run
    * reports the archived ones as skipped.
    */
-  async findManyByFolder(input: {
+  async findManyByTestSuite(input: {
     projectId: string;
-    folderId: string;
+    testSuiteId: string;
   }): Promise<{ id: string; archivedAt: Date | null }[]> {
     return this.prisma.scenario.findMany({
-      where: { projectId: input.projectId, folderId: input.folderId },
+      where: { projectId: input.projectId, testSuiteId: input.testSuiteId },
       select: { id: true, archivedAt: true },
       orderBy: { createdAt: "asc" },
     });
   }
 
   /**
-   * Archives every active scenario filed in the folder, in the caller's
-   * transaction. Scenarios keep their folderId so the archived folder reads
+   * Archives every active scenario filed in the test suite, in the caller's
+   * transaction. Scenarios keep their testSuiteId so the archived test suite reads
    * back with the membership it had. Already-archived scenarios are left
    * untouched, original archive time included.
    */
-  async archiveManyByFolder(input: {
+  async archiveManyByTestSuite(input: {
     projectId: string;
-    folderId: string;
+    testSuiteId: string;
     tx: ScenarioWriteClient;
   }): Promise<number> {
     const result = await input.tx.scenario.updateMany({
       where: {
         projectId: input.projectId,
-        folderId: input.folderId,
+        testSuiteId: input.testSuiteId,
         archivedAt: null,
       },
       data: { archivedAt: new Date() },
@@ -203,13 +203,13 @@ export class ScenarioRepository {
 
   /**
    * Find multiple scenarios by IDs regardless of archived status.
-   * Returns id, archivedAt and folderId for lightweight classification.
+   * Returns id, archivedAt and testSuiteId for lightweight classification.
    */
   async findManyIncludingArchived(input: {
     ids: string[];
     projectId: string;
   }): Promise<
-    { id: string; archivedAt: Date | null; folderId: string | null }[]
+    { id: string; archivedAt: Date | null; testSuiteId: string | null }[]
   > {
     return tracer.withActiveSpan(
       "ScenarioRepository.findManyIncludingArchived",
@@ -236,7 +236,7 @@ export class ScenarioRepository {
             id: { in: input.ids },
             projectId: input.projectId,
           },
-          select: { id: true, archivedAt: true, folderId: true },
+          select: { id: true, archivedAt: true, testSuiteId: true },
         });
         span.setAttribute("result.count", results.length);
         return results;
@@ -284,6 +284,27 @@ export class ScenarioRepository {
   }): Promise<{ id: string; name: string }[]> {
     return this.prisma.scenario.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, name: true },
+    });
+  }
+
+  /**
+   * The names of the given scenarios, archived ones left out.
+   *
+   * A test suite's detail view reads its members through this: the test suite's
+   * `scenarioIds` cache holds active members, and an archived test suite keeps a
+   * snapshot that may name scenarios archived since, which the view must not show.
+   */
+  async findActiveNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.prisma.scenario.findMany({
+      where: {
+        id: { in: input.ids },
+        projectId: input.projectId,
+        archivedAt: null,
+      },
       select: { id: true, name: true },
     });
   }

@@ -1,13 +1,16 @@
-import { Box, Button, HStack, Input, Text } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Input, Text } from "@chakra-ui/react";
 import {
   BookText,
   ChevronDown,
   Code,
   Globe,
+  Plug,
   Plus,
   Workflow,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useSession } from "~/utils/auth-client";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
@@ -15,10 +18,16 @@ import {
   agentHasDevTunnel,
   LocalTunnelBadge,
 } from "../agents/LocalTunnelBadge";
-import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
+import {
+  agentTargetLabel,
+  isAgentTarget,
+  ownerOnlyCopy,
+  type ScenarioAgent,
+  useFilteredAgents,
+} from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
-  type: "prompt" | "http" | "code" | "workflow";
+  type: "prompt" | "http" | "code" | "workflow" | "connected";
   id: string;
 } | null;
 
@@ -49,6 +58,7 @@ export function TargetSelector({
     { enabled: !!project?.id },
   );
 
+  const { data: session } = useSession();
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
   const [maxDropdownHeight, setMaxDropdownHeight] = useState(400);
@@ -87,7 +97,11 @@ export function TargetSelector({
     );
   }, [prompts, searchValue]);
 
-  const filteredAgents = useFilteredAgents(agents, searchValue);
+  const filteredAgents = useFilteredAgents({
+    agents,
+    searchValue,
+    viewerUserId: session?.user?.id ?? null,
+  });
 
   // Get the selected item's label for display
   const selectedLabel = useMemo(() => {
@@ -97,7 +111,7 @@ export function TargetSelector({
       return prompt ? (prompt.handle ?? prompt.id) : null;
     }
     const agent = agents?.find((a) => a.id === value.id);
-    return agent?.name ?? null;
+    return agent ? agentTargetLabel(agent) : null;
   }, [value, prompts, agents]);
 
   const handleSelect = (target: NonNullable<TargetValue>) => {
@@ -159,6 +173,7 @@ export function TargetSelector({
           {value?.type === "http" && <Globe size={14} />}
           {value?.type === "code" && <Code size={14} />}
           {value?.type === "workflow" && <Workflow size={14} />}
+          {value?.type === "connected" && <Plug size={14} />}
           <Text>{selectedLabel ?? placeholder}</Text>
         </HStack>
         <ChevronDown size={14} />
@@ -226,40 +241,14 @@ export function TargetSelector({
                 </Text>
               ) : (
                 filteredAgents.map((agent) => (
-                  <HStack
+                  <AgentOption
                     key={agent.id}
-                    data-testid={`target-option-${agent.id}`}
-                    paddingX={3}
-                    paddingY={2}
-                    cursor="pointer"
-                    bg={
-                      isAgentTarget(value) && value.id === agent.id
-                        ? "blue.50"
-                        : "transparent"
+                    agent={agent}
+                    isSelected={isAgentTarget(value) && value.id === agent.id}
+                    onSelect={() =>
+                      handleSelect({ type: agent.type, id: agent.id })
                     }
-                    _hover={{ bg: "bg.subtle" }}
-                    onClick={() =>
-                      handleSelect({
-                        type: agent.type,
-                        id: agent.id,
-                      })
-                    }
-                  >
-                    {agent.type === "code" ? (
-                      <Code size={14} color="var(--chakra-colors-gray-500)" />
-                    ) : (
-                      <Globe size={14} color="var(--chakra-colors-gray-500)" />
-                    )}
-                    <Text fontSize="sm" flex={1}>
-                      {agent.name}
-                    </Text>
-                    {agentHasDevTunnel(agent) && <LocalTunnelBadge />}
-                    {isAgentTarget(value) && value.id === agent.id && (
-                      <Text color="blue.500" fontSize="sm">
-                        ✓
-                      </Text>
-                    )}
-                  </HStack>
+                  />
                 ))
               )}
               {/* Add New Agent Button */}
@@ -346,5 +335,105 @@ export function TargetSelector({
         </Box>
       )}
     </Box>
+  );
+}
+
+/**
+ * The mark on the left of a row: presence for a connected agent, kind for the
+ * agents the project defines itself.
+ */
+function AgentOptionMark({ agent }: { agent: ScenarioAgent }) {
+  if (agent.type === "connected") {
+    return (
+      <Box
+        boxSize="8px"
+        borderRadius="full"
+        flexShrink={0}
+        background={agent.status === "online" ? "green.500" : "fg.subtle"}
+        data-testid={`target-option-status-${agent.status ?? "offline"}`}
+      />
+    );
+  }
+  if (agent.type === "code") {
+    return <Code size={14} color="var(--chakra-colors-gray-500)" />;
+  }
+  return <Globe size={14} color="var(--chakra-colors-gray-500)" />;
+}
+
+/**
+ * The row itself: the mark, the label, and the marks the state adds to it.
+ *
+ * It is a button, so the keyboard reaches it and Enter or Space picks it. A
+ * row that cannot be run keeps its focus, so the reason in its tooltip is
+ * still readable, and only drops the handler.
+ */
+function AgentOptionRow({
+  agent,
+  isSelected,
+  onSelect,
+}: {
+  agent: ScenarioAgent;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const isRunnable = agent.isRunnable;
+  return (
+    <chakra.button
+      type="button"
+      data-testid={`target-option-${agent.id}`}
+      display="flex"
+      alignItems="center"
+      gap={2}
+      width="full"
+      textAlign="left"
+      paddingX={3}
+      paddingY={2}
+      cursor={isRunnable ? "pointer" : "not-allowed"}
+      opacity={isRunnable ? 1 : 0.5}
+      bg={isSelected ? "blue.50" : "transparent"}
+      _hover={{ bg: "bg.subtle" }}
+      onClick={isRunnable ? onSelect : undefined}
+      aria-disabled={!isRunnable}
+    >
+      <AgentOptionMark agent={agent} />
+      <Text fontSize="sm" flex={1}>
+        {agent.label}
+      </Text>
+      {agentHasDevTunnel(agent) && <LocalTunnelBadge />}
+      {isSelected && (
+        <Text color="blue.500" fontSize="sm">
+          ✓
+        </Text>
+      )}
+    </chakra.button>
+  );
+}
+
+/**
+ * One agent in the list: its kind, its label, and, for a connected agent,
+ * whether a process is holding it right now.
+ *
+ * A development agent of another person is drawn but cannot be picked: only
+ * its owner can run it, and hiding the reason would leave the reader clicking
+ * a row that does nothing.
+ */
+function AgentOption({
+  agent,
+  isSelected,
+  onSelect,
+}: {
+  agent: ScenarioAgent;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const row = (
+    <AgentOptionRow agent={agent} isSelected={isSelected} onSelect={onSelect} />
+  );
+
+  if (agent.isRunnable) return row;
+  return (
+    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
+      <Box>{row}</Box>
+    </Tooltip>
   );
 }

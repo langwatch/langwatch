@@ -1,15 +1,18 @@
 /**
- * The scrolling body of the suites rail: All test cases, the test suites of
- * the project, and the sets that run from code.
+ * The scrolling body of the suites rail: the test suites of the project, then
+ * the sets that run from code.
  *
- * No row carries a count or a time. How many cases a set holds reads once,
+ * Both headings are plain labels. There is no root list of suites to open, so
+ * a heading has nowhere to lead.
+ *
+ * No row carries a count or a time. How many scenarios a set holds reads once,
  * beside the title of the panel.
  *
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
 import { Icon, Skeleton, VStack } from "@chakra-ui/react";
-import { Folder, FolderCode, FolderPlus, ListChecks } from "lucide-react";
+import { Folder, FolderCode, FolderPlus } from "lucide-react";
 import { FG_MUTED } from "../shared/design";
 import type { SuiteRailProps } from "./SuiteRail";
 import { RailAddButton, RailItem, RailSectionHeading } from "./SuiteRailItem";
@@ -21,16 +24,14 @@ export const FROM_CODE_HEADING = "From Code";
 
 export type SuiteRailSectionsProps = Omit<
   SuiteRailProps,
-  "onArchiveSuite" | "isArchiving" | "period" | "periodMode"
+  "onArchiveSuite" | "isArchiving" | "periodMode"
 > & {
-  /** Asks for the new-suite dialog. */
-  onNewSuite: () => void;
   /** Asks for the archive confirmation of one suite. */
   onRequestArchive: (suite: TestSuiteEntry) => void;
 };
 
 export function SuiteRailSections(props: SuiteRailSectionsProps) {
-  const { selection, collapsed, canManage, onSelect } = props;
+  const { collapsed, canManage } = props;
 
   return (
     <VStack
@@ -41,18 +42,6 @@ export function SuiteRailSections(props: SuiteRailSectionsProps) {
       paddingX={3}
       paddingY={4}
     >
-      <RailItem
-        label="All test cases"
-        icon={
-          collapsed ? (
-            <Icon as={ListChecks} boxSize="13px" color={FG_MUTED} />
-          ) : undefined
-        }
-        selected={selection.kind === "all"}
-        collapsed={collapsed}
-        onClick={() => onSelect({ kind: "all" })}
-      />
-
       <RailSectionHeading collapsed={collapsed} label="Test Suites" />
 
       <SuiteRailSuiteList {...props} />
@@ -72,7 +61,7 @@ export function SuiteRailSections(props: SuiteRailSectionsProps) {
 
 /** The rows of the test suites, or the skeleton that stands in for them. */
 function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
-  const { selection, suites, collapsed, canManage, onSelect } = props;
+  const { selectedSuiteId, suites, collapsed, canManage, onSelect } = props;
 
   if (props.isLoading) {
     return (
@@ -92,7 +81,7 @@ function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
           icon={
             <Icon as={Folder} boxSize="13px" color={FG_MUTED} flexShrink={0} />
           }
-          selected={selection.kind === "suite" && selection.slug === suite.slug}
+          selected={selectedSuiteId === suite.id}
           collapsed={collapsed}
           onClick={() => onSelect({ kind: "suite", slug: suite.slug })}
           actions={
@@ -100,11 +89,12 @@ function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
               <SuiteRailMenu
                 suite={suite}
                 canManage={canManage}
-                hasRun={props.suiteIdsWithRuns.has(suite.id)}
+                hasRun={props.lastRunBySuiteId.has(suite.id)}
+                period={props.period}
+                scenarioIds={props.scenarioIdsBySuiteId.get(suite.id) ?? []}
                 onNewTestCase={props.onNewTestCase}
                 onRunSuite={props.onRunSuite}
-                onEditSuite={props.onEditSuite}
-                onOpenLastRun={props.onOpenLastRun}
+                onRenameSuite={props.onRenameSuite}
                 onArchiveSuite={() => props.onRequestArchive(suite)}
               />
             )
@@ -117,7 +107,7 @@ function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
 
 /** The sets a code run writes into, listed under their own heading. */
 function SuiteRailExternalSets(props: SuiteRailSectionsProps) {
-  const { selection, externalSets, collapsed, onSelect } = props;
+  const { selectedExternalSetId, externalSets, collapsed, onSelect } = props;
 
   if (externalSets.length === 0) return null;
 
@@ -141,9 +131,7 @@ function SuiteRailExternalSets(props: SuiteRailSectionsProps) {
               aria-label="Runs from code"
             />
           }
-          selected={
-            selection.kind === "external" && selection.setId === set.setId
-          }
+          selected={selectedExternalSetId === set.setId}
           collapsed={collapsed}
           onClick={() => onSelect({ kind: "external", setId: set.setId })}
         />

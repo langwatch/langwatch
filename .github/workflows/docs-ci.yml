@@ -174,6 +174,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The check reads docs written in the pull request and prints them in a
+      # ::error annotation, which GitHub reads as a workflow command. This
+      # proves the values are encoded before they reach one.
+      - name: Check the prose script encodes its annotations
+        run: bash docs/scripts/check-docs-prose.test.sh
+
       - name: Check docs prose for banned words
         run: bash docs/scripts/check-docs-prose.sh
         env:
@@ -189,27 +195,16 @@ jobs:
 
       # Shared pnpm + Node setup with pnpm-store caching, so this job stops
       # re-downloading the full langwatch + skills dependency trees on every run.
+      # skills/ pulls node-pty, whose postinstall falls back to `node-gyp
+      # rebuild` on linux, so the install runs through the action too: it puts
+      # node-gyp on PATH and makes pnpm's bundled gyp_main.py executable.
+      # skills/ used to need `--ignore-workspace` to escape the root workspace
+      # it sat inside without being a member of; it is a member now. See ADR-076.
       - name: Setup pnpm + Node
         uses: ./.github/actions/setup-pnpm-node
         with:
           cache-dependency-path: pnpm-lock.yaml
-
-      # skills/ pulls node-pty, whose postinstall falls back to `node-gyp
-      # rebuild` on linux. The composite action above installs node-gyp only
-      # when it does the install itself, and here it does not, so it has to be
-      # installed explicitly before the install below reaches that lifecycle
-      # script — otherwise it ELIFECYCLEs with "node-gyp: not found".
-      - name: Install node-gyp (for node-pty postinstall)
-        run: npm install -g node-gyp@12.3.0
-
-      # One install for the app and the skills compiler. skills/ used to need
-      # `--ignore-workspace` to escape the root workspace it sat inside without
-      # being a member of; it is a member now. See ADR-076.
-      - name: Install dependencies
-        run: >
-          pnpm install --frozen-lockfile
-          --filter "@langwatch/web..."
-          --filter "@langwatch/skills..."
+          install: "@langwatch/web... @langwatch/skills..."
 
       - name: Regenerate docs/skills pages
         run: bash docs/scripts/sync-prompts.sh
@@ -226,8 +221,11 @@ jobs:
       - name: Check for stale generated files
         run: |
           STALE=0
+          # Every page the skills manifest drives, read from the generator, so
+          # a new entry in the manifest is covered without editing this list.
+          SKILL_PAGES=$(node docs/scripts/generate-skills-pages.mjs --list-pages)
           if ! git diff --exit-code \
-            docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx \
+            $SKILL_PAGES \
             docs/llms.txt docs/llms-full.txt \
             docs/api-reference/openapiLangWatch.json docs/docs.json; then
             STALE=1

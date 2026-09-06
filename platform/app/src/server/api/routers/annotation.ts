@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import type {
   AnnotationQueueItem,
+  Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
 import { AnnotationService } from "~/server/annotations/annotation.service";
@@ -285,6 +286,89 @@ const queuedAtRangeFilter = ({
   if (startDate) createdAt.gte = startDate;
   if (endDate) createdAt.lte = endDate;
   return Object.keys(createdAt).length > 0 ? { createdAt } : {};
+};
+
+/**
+ * A queue-item `where` whose `AND` is always a list, so clauses can be stacked
+ * onto it. Prisma allows a single object there too, which would make every
+ * push a type error for a shape this code never builds.
+ */
+type QueueItemWhere = Prisma.AnnotationQueueItemWhereInput & {
+  AND: Prisma.AnnotationQueueItemWhereInput[];
+};
+
+/**
+ * Which queue items the optimized list reads. The clauses stack rather than
+ * replace: the caller's reach is settled first, and the reviewer's own pick of
+ * queues is applied last, so a queue id from anywhere else can subtract rows
+ * but never add one.
+ */
+const optimizedQueueItemsWhere = ({
+  input,
+  userId,
+  organizationId,
+  userQueueIds,
+}: {
+  input: {
+    projectId: string;
+    selectedAnnotations: string;
+    queueId?: string;
+    queueIds?: string[];
+    startDate?: Date;
+    endDate?: Date;
+  };
+  userId: string;
+  organizationId: string;
+  /** The queues the caller belongs to, where those were looked up. */
+  userQueueIds: string[];
+}): QueueItemWhere => {
+  const whereCondition: QueueItemWhere = {
+    ...queueItemReferenceFilter({
+      projectId: input.projectId,
+      organizationId,
+    }),
+    doneAt: doneAtFilter(input.selectedAnnotations),
+    ...queuedAtRangeFilter(input),
+  };
+
+  if (input.queueId) {
+    // Pin the requested queue to the caller's project so a queue id from
+    // another tenant cannot surface its items here.
+    whereCondition.AND.push({
+      annotationQueue: {
+        id: input.queueId,
+        projectId: input.projectId,
+      },
+    });
+  } else if (userQueueIds.length > 0) {
+    // No specific queue requested: include items from the queues the caller
+    // belongs to, plus items assigned directly to them.
+    whereCondition.AND.push({
+      OR: [{ annotationQueueId: { in: userQueueIds } }, { userId }],
+    });
+  } else {
+    // Nothing else has narrowed the read, so it is the caller's own items or
+    // nothing: without this the reference filter alone would return the
+    // project's whole queue.
+    whereCondition.userId = userId;
+  }
+
+  // The reviewer's own pick of which queues to read, applied last so it can
+  // only cut into what the clauses above already allow.
+  if (input.queueIds && input.queueIds.length > 0) {
+    whereCondition.AND.push({
+      annotationQueueId: { in: input.queueIds },
+    });
+  }
+
+  return whereCondition;
+};
+
+/** Pending items have no `doneAt`, completed ones have one, "all" reads both. */
+const doneAtFilter = (selectedAnnotations: string) => {
+  if (selectedAnnotations === "pending") return null;
+  if (selectedAnnotations === "completed") return { not: null };
+  return undefined;
 };
 
 /**
@@ -694,11 +778,39 @@ export const annotationRouter = createTRPCRouter({
       }
     }),
   getQueues: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        /**
+         * Ask for only the queues whose items this caller can already read.
+         * A picker built from every queue in the project offers ones the
+         * optimized read narrows straight back out, so choosing them empties
+         * the list and looks broken. Callers that genuinely target any queue
+         * — adding a trace to one, inviting people to one — leave this off.
+         */
+        reachableOnly: z.boolean().optional(),
+      }),
+    )
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueue.findMany({
-        where: { projectId: input.projectId },
+        where: {
+          projectId: input.projectId,
+          // The same reach the optimized queue-item read applies: the queues
+          // this caller belongs to, plus any holding an item assigned to them.
+          ...(input.reachableOnly
+            ? {
+                OR: [
+                  { members: { some: { userId: ctx.session.user.id } } },
+                  {
+                    AnnotationQueueItems: {
+                      some: { userId: ctx.session.user.id },
+                    },
+                  },
+                ],
+              }
+            : {}),
+        },
         select: {
           id: true,
           name: true,
@@ -1006,6 +1118,12 @@ export const annotationRouter = createTRPCRouter({
         pageSize: z.number(),
         pageOffset: z.number(),
         queueId: z.string().optional(),
+        /**
+         * Narrows the read to these queues. Only ever narrows: it is applied
+         * on top of the reach the caller already has, so a queue id from
+         * anywhere else can subtract rows but never add one.
+         */
+        queueIds: z.array(z.string()).optional(),
         showQueueAndUser: z.boolean().optional(),
         allQueueItems: z.boolean().optional(),
         // The list's date range. A queue item is dated by when it was queued,
@@ -1043,49 +1161,12 @@ export const annotationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      // Build the where condition based on the scenario
-      const whereCondition: any = {
-        ...queueItemReferenceFilter({
-          projectId: input.projectId,
-          organizationId,
-        }),
-        doneAt:
-          input.selectedAnnotations === "pending"
-            ? null
-            : input.selectedAnnotations === "completed"
-              ? { not: null }
-              : undefined,
-        ...queuedAtRangeFilter(input),
-      };
-
-      if (input.queueId) {
-        // Pin the requested queue to the caller's project so a queue id from
-        // another tenant cannot surface its items here.
-        whereCondition.AND.push({
-          annotationQueue: {
-            id: input.queueId,
-            projectId: input.projectId,
-          },
-        });
-      } else if (userQueueIds.length > 0) {
-        // No specific queue requested: include items from the queues the caller
-        // belongs to, plus items assigned directly to them.
-        whereCondition.AND.push({
-          OR: [
-            {
-              annotationQueueId: {
-                in: userQueueIds,
-              },
-            },
-            {
-              userId: userId,
-            },
-          ],
-        });
-      } else {
-        // Default case - just user's items
-        whereCondition.userId = userId;
-      }
+      const whereCondition = optimizedQueueItemsWhere({
+        input,
+        userId,
+        organizationId,
+        userQueueIds,
+      });
 
       // Get total count for pagination
       const totalCount = await ctx.prisma.annotationQueueItem.count({

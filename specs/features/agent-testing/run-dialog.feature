@@ -1,24 +1,158 @@
 Feature: The run dialog
   As a person about to start a run
-  I want a short dialog that asks only what it must
+  I want one dialog that asks only what it must
   So that a repeat run is one click and a special run is still possible
 
-  Background: the shape of the dialog.
-    The dialog opens with one section, "Agent to be tested". Under it sits a
-    "Customize your run" section that offers chips. A chip adds one field to
-    the form, and each added field can be removed again.
+  Background: one dialog, four entry points.
+    The run dialog is the only place a run is configured. There is no separate
+    run plan editor. It opens from a scenario row, from a test suite, from Run
+    all, and from New run plan.
 
-    The chips are "Add a note to your run", "Override parameters" and, last,
-    "Run against a prompt". Choosing the prompt chip replaces the agent area
-    with a prompt picker; removing it brings the agent area back. The chips are
-    drawn flat, with a dashed border and no shadow.
+    The first three fix the scope, so the dialog says nothing about what runs.
+    New run plan is the one entry point that asks, so it alone shows the "What
+    runs" block with the four scope rules.
 
-    The run options of a test suite are written onto the suite itself, so the
-    next run dialog of that suite opens on them for everybody on the team: the
-    target, the parameter overrides, and a prompt in place of an agent. The
-    note is the one field that never comes back. A secret value never joins
-    them either: a secret row is written down by its key alone, so the next
-    dialog shows the row and asks for the value again.
+    The order is: "Run name", then "Agent to be tested", then "What runs" when
+    the entry point asks for it, then the chip row.
+
+    The chips are, in this order, "Add parameters", "Compare agents", "Add a
+    note", "Run against a prompt", "Custom simulation models" and "Run multiple
+    times". A chip adds one block to the form, and each added block can be
+    removed again. The chips are drawn flat, with a dashed border and no shadow.
+
+    A test suite is only a grouping and carries no run option. The run options
+    of a run belong to the run plan its name resolves onto, so the next run
+    dialog of that scope opens on the newest configuration for everybody on the
+    team: the target, the targets of a comparison, the parameter
+    overrides, the repeat count and the simulation models. A secret value is
+    never written down: a secret row is written down by its key alone, so the
+    next dialog shows the row and asks for the value again.
+
+  # --- The run name ---
+
+  @integration
+  Scenario: The run name is the first field and holds the derived name
+    Given a test suite named "Refunds" with the agent "dev-agent" used before
+    When the run dialog is opened
+    Then the first field reads "Run name"
+    And it holds "Refunds dev-agent"
+    And no text under it explains what the name does
+
+  @integration
+  Scenario: A stored run plan opens on the name it is stored under
+    Given a stored run plan named "Refunds prod-agent"
+    When the run dialog is opened on that plan
+    Then the run name reads "Refunds prod-agent"
+    And the agent is not added to the name a second time
+
+    A plan is identified by its name, and the name of a plan already ends with
+    the target it runs against. A name derived again would end with the target
+    twice, the run would go out under a name no plan answers to, and that
+    creates a second plan and forks the one the person opened.
+
+  @unit
+  Scenario: A test suite answers to no plan name, so its run still derives one
+    Given a suite of kind test suite and a run plan of kind custom
+    When each is opened in the run dialog from the Results tab
+    Then the run plan opens on the name it is stored under
+    And the test suite opens on a name derived from its scope and its target
+
+  @integration
+  Scenario: The derived name follows the agent until the person types
+    Given the run dialog open on the test suite "Refunds"
+    When another agent is chosen
+    Then the run name follows the new agent
+    And typing a name of their own stops it following
+
+  @integration
+  Scenario: A comparison run derives both targets into the name
+    Given the run dialog open on the test suite "Refunds" with "dev-agent" chosen
+    When "Compare agents" is chosen and the second row defaults to "prod-agent"
+    Then the run name reads "Refunds dev-agent vs prod-agent"
+    And the name reads the targets in the order the run plan sorts them
+
+  @integration
+  Scenario: The name field lists the configurations this scope ran with before
+    Given a test suite that ran with two different configurations before
+    When the caret of the run name is chosen
+    Then both configurations are listed, newest first
+    And each says what it was run with
+
+  @unit
+  Scenario: Two configurations of one plan name are told apart by what differs
+    Given two stored configurations that share the plan name and differ in repeat count
+    When the list of previous configurations is read
+    Then both are listed
+    And each names the repeat count that tells it from the other
+
+  @integration
+  Scenario: The note text is never carried over
+    Given a previous run of this scope that carried a note
+    When its configuration is picked from the list
+    Then the note field is empty
+    And no note text is listed as part of the configuration
+
+  @integration
+  Scenario: A run plan that takes a note opens the note field ready
+    Given a previous run of this scope that carried a note
+    When its configuration is picked from the list
+    Then the note block is open
+    And the note field is empty
+    And the note chip is no longer offered
+
+  @integration
+  Scenario: A stored run plan that took a note opens the note field ready
+    Given a stored run plan whose last run carried a note
+    When the run dialog is opened on that plan
+    Then the note block is open
+    And the note field is empty
+    And "Add a note" is no longer offered
+
+    The plan remembers that it takes a note. The words of the note belong to
+    one run, and they never leave the run store.
+
+  @integration
+  Scenario: Picking a configuration refills the dialog and opens what it used
+    Given a previous configuration with parameter overrides and a repeat count of 3
+    When it is picked from the list
+    Then the targets, the parameters and the repeat count are filled in
+    And the parameter block and the repeat block are open
+    And the run name stops following the agent
+
+  @integration
+  Scenario: Typing filters the list and opens it
+    Given the run dialog with three previous configurations
+    When part of one name is typed
+    Then only the matching configurations are listed
+    And a name that matches none of them leaves a plain field with no list
+
+  @integration
+  Scenario: The arrow keys move and Enter takes the highlighted entry
+    Given the run name list is open with two entries
+    When the down arrow is pressed twice and Enter is pressed
+    Then the second entry is taken
+
+  @integration
+  Scenario: Escape closes the list and leaves the dialog open
+    Given the run name list is open
+    When Escape is pressed
+    Then the list closes
+    And the dialog is still open
+
+  @integration
+  Scenario: A scope with no history offers a plain field
+    Given a test suite that never ran
+    When the run dialog is opened
+    Then the run name is a plain input
+    And no caret is offered
+
+  @integration
+  Scenario: The run carries the name the dialog holds
+    Given the run dialog with the run name "Nightly refunds"
+    When the run is confirmed
+    Then the run carries that name
+    And it carries the scope, the targets and the repeat count with it
+    And no run option is written onto the test suite
 
   # --- The agent section ---
 
@@ -35,6 +169,7 @@ Feature: The run dialog
     Given the run dialog is open on the agent section
     When the label line is read
     Then it offers "Configure" on the right
+    And "Configure" reads as words alone, with no icon after it
     And choosing it opens the agents page in another tab
     And the run dialog stays open
 
@@ -64,9 +199,15 @@ Feature: The run dialog
   # --- Chips ---
 
   @integration
+  Scenario: The chips read in one fixed order
+    Given the run dialog is open with a prompt published and parameters declared
+    When the customize chips are read
+    Then they read "Add parameters", "Compare agents", "Add a note", "Run against a prompt", "Custom simulation models" and "Run multiple times"
+
+  @integration
   Scenario: The note chip adds a note field
     Given the run dialog is open
-    When "Add a note to your run" is chosen
+    When "Add a note" is chosen
     Then a note field is added to the form
     And the chip is no longer offered
 
@@ -75,16 +216,41 @@ Feature: The run dialog
     Given the run dialog with a note field added
     When the note field is removed
     Then the field is gone
-    And "Add a note to your run" is offered again
+    And "Add a note" is offered again
     And the run carries no note
 
   @integration
-  Scenario: The override parameters chip adds one input line for the values
-    Given a test suite whose cases declare parameters
-    When "Override parameters" is chosen
+  Scenario: The parameters chip adds one input line for the values
+    Given a test suite whose scenarios declare parameters
+    When "Add parameters" is chosen
     Then one input line is added for the parameter values
-    And the values declared on the cases are already filled in
+    And the values declared on the scenarios are already filled in
     And a name written on that line is sent as the run parameter of that name
+
+  @integration
+  Scenario: The compare chip turns the run into a comparison
+    Given the run dialog with one agent chosen
+    When "Compare agents" is chosen
+    Then the agent section becomes the "Compare agents" rows, one per target
+    And the run goes against every row, each with its own parameters
+    And removing the block leaves the first row as the agent to be tested
+
+    The rows, their defaults, the four-row cap and the refusal of two equal
+    targets are in comparison-mode.feature.
+
+  @integration
+  Scenario: The simulation models chip adds the user simulator and the judge
+    Given the run dialog is open
+    When "Custom simulation models" is chosen
+    Then the user simulator and the judge can be chosen
+    And the run carries both
+
+  @integration
+  Scenario: The repeat chip adds the repeat count
+    Given the run dialog is open
+    When "Run multiple times" is chosen
+    Then a repeat count can be given
+    And the run repeats each scenario and target pair that many times
 
   # --- The parameter block ---
 
@@ -134,19 +300,13 @@ Feature: The run dialog
 
   @integration
   Scenario: A declared secret parameter is a locked row of the same list
-    Given a test suite whose cases declare a secret parameter
-    When "Override parameters" is chosen
+    Given a test suite whose scenarios declare a secret parameter
+    When "Add parameters" is chosen
     Then the block opens in rows mode, with no separate secret section
     And the declared secret is a row with its lock on and its key fixed
     And its value starts empty, hides what is typed, and is required
     And the plain parameters are rows of the same list
     And the run waits until the declared secret holds a value
-
-  @integration
-  Scenario: The prompt chip is the last chip of the row
-    Given the run dialog is open with a prompt published
-    When the customize chips are read
-    Then "Run against a prompt" is the last chip
 
   @integration
   Scenario: The prompt chip replaces the agent area
@@ -162,54 +322,136 @@ Feature: The run dialog
     Then the agent area comes back
     And the agent selected before is selected again
 
+  # --- What runs ---
+
+  @integration
+  Scenario: An entry point that fixed the scope says nothing about it
+    Given the run dialog opened from a test suite
+    When the body of the dialog is read
+    Then no "What runs" block is shown
+    And no line says how many scenarios the scope holds
+    And no line says what the run runs as
+
+  @integration
+  Scenario: New run plan opens the same dialog with the scope picker
+    Given the Results tab with no plan open
+    When "New run plan" is chosen
+    Then the run dialog opens
+    And the "What runs" block offers all four scopes
+    And "All scenarios" is the one chosen
+    And it says how many scenarios will run
+
+  @integration
+  Scenario: A run can be scoped to chosen test suites
+    Given the run dialog opened from New run plan
+    When "Selected test suites" is chosen
+    Then the test suites of the project read as check boxes
+    And the count follows the suites that are ticked
+
+  @integration
+  Scenario: A run can be scoped to chosen labels
+    Given the run dialog opened from New run plan
+    When "Selected labels" is chosen
+    Then every label used by a scenario reads as a chip
+    And the count follows the chips that are on
+
+  @integration
+  Scenario: A run can hold a hand-picked list of scenarios
+    Given the run dialog opened from New run plan
+    When "Specific scenarios" is chosen
+    Then the scenarios read under the name of the test suite they are filed in
+    And the count follows the scenarios that are ticked
+
+  @integration
+  Scenario: A run of one scenario is named after that scenario
+    Given the run dialog opened from New run plan with an agent chosen
+    When one scenario is hand-picked
+    Then the run name reads that scenario name and the agent
+    And it never reads a count in place of the name
+
+  @integration
+  Scenario: Running a stored run plan again keeps the scope it holds
+    Given a stored run plan over a hand-picked list of scenarios
+    When it is opened from the Results tab and run again
+    Then the run covers the list the plan holds
+    And the plan is not rewritten to cover the scenarios filed under its own id
+
+  @integration
+  Scenario: The derived name follows the scope while it is being picked
+    Given the run dialog opened from New run plan with an agent chosen
+    When "Selected test suites" is chosen and one suite is ticked
+    Then the run name reads that suite name and the agent
+
   # --- Starting the run ---
 
   @integration
-  Scenario: The dialog has Cancel, Save and Run, with no dropdown on Run
+  Scenario: The dialog has Cancel and Run, with no dropdown on Run
     Given the run dialog is open
     When its footer is read
-    Then it holds "Cancel", "Save" and "Run"
+    Then it holds "Cancel" and "Run"
+    And it offers no Save: running is what writes the plan down
     And Run is the only solid control
-    And Run names how many test cases it starts
+    And Run names how many scenarios it starts
     And Run carries no dropdown
+    And the footer holds no other count
+
+    A test suite carries no run option of its own. What a suite remembers is
+    the newest run plan of its scope, so the scenarios below are answered by
+    that plan and never by the suite row.
+
+  @unit
+  Scenario: A solid button of the surface keeps the hover of its own variant
+    Given the small button every Agent Testing surface is drawn with
+    When a caller asks for the solid variant
+    Then the outlined border, the panel background and the quiet hover are left off
+    And the button keeps the hover its own variant gives it
+    And the label stays readable while the pointer is over it
 
   @integration
   Scenario: Confirming a run remembers the target for next time
-    Given a test suite with no target used before
+    Given a test suite with no run plan yet
     When a target is chosen and the run is confirmed
     And the run dialog for that suite is opened again
     Then that target is already selected
+    And it comes from the run plan that run wrote
+
+  @integration
+  Scenario: A suite run from the Scenarios tab opens on its newest run plan
+    Given a test suite whose rail row carries no run option
+    And a run plan of that suite that ran against an agent
+    When "Run suite" is chosen in the rail
+    Then that agent is already selected
 
   @integration
   Scenario: A suite remembers the parameter overrides of its last run
-    Given a test suite run with parameter overrides
+    Given a test suite whose newest run plan carried parameter overrides
     When the run dialog for that suite is opened again
     Then the parameter block is already open
-    And it holds the values the last run used
+    And it holds the values that run plan used
 
   @integration
   Scenario: A suite remembers that it was run against a prompt
-    Given a test suite run against a published prompt
+    Given a test suite whose newest run plan ran against a published prompt
     When the run dialog for that suite is opened again
     Then the dialog opens on the prompt picker
     And that prompt is already selected
 
   @integration
   Scenario: The run options are remembered for the whole team
-    Given a test suite run with a target and parameter overrides by one person
+    Given a run plan of a suite written by one person, with a target and parameter overrides
     When another person opens the run dialog for that suite
     Then the same target and the same overrides are already selected
 
   @integration
   Scenario: The note of a run is never remembered
-    Given a test suite run with the note "checking the stricter rubric"
+    Given a run of a suite with the note "checking the stricter criterion"
     When the run dialog for that suite is opened again
     Then no note field is shown
-    And "Add a note to your run" is offered again
+    And "Add a note" is offered again
 
   @integration
   Scenario: A secret parameter value is never remembered
-    Given a test suite whose cases declare a secret parameter
+    Given a test suite whose scenarios declare a secret parameter
     And a run of that suite with the secret filled in
     When the run dialog for that suite is opened again
     Then the locked row is empty
@@ -222,11 +464,11 @@ Feature: The run dialog
     Then the block opens in rows mode
     And the plain row holds the key and the value of the last run
     And the secret row holds its key with an empty value the run waits for
-    And no secret value was written onto the suite
+    And no secret value was written onto the run plan
 
   @integration
   Scenario: The dialog closes and the person stays where they were
-    Given the run dialog is open from a test case row
+    Given the run dialog is open from a scenario row
     When the run is confirmed
     Then the dialog closes
     And the view behind it does not change address
@@ -241,15 +483,61 @@ Feature: The run dialog
     And Run does not start a run
 
   @integration
-  Scenario: A parameter value the cases do not declare is refused by name
+  Scenario: A parameter value the scenarios do not declare is refused by name
     Given the run dialog with parameter overrides added
-    When a value is given for a name none of the cases declare
+    When a value is given for a name none of the scenarios declare
     Then the run is refused with "scenario_parameter_unknown"
     And the rejection names the unknown name and the names the run does declare
+    And it says the agent the run goes against does not declare it either
+
+  # --- Where a queued run lands ---
 
   @integration
-  Scenario: A run refused because every case is archived says so in the dialog
-    Given a test suite in which every case is archived
+  Scenario: The dialog is gone before the run drawer opens
+    Given the run dialog with an agent chosen
+    When the run is queued
+    Then the dialog closes first
+    And only then does the caller hear that the run started
+    And the run drawer stays open, because no dialog tears down over it
+
+  # --- Parameters the chosen agent cannot read ---
+  #
+  # A run resolves its values against the scenarios of the run plus the agent
+  # it goes against, so the agent decides which names are known. A remembered
+  # value that came with another agent is dropped; a value somebody typed is
+  # never taken away, and holds the run instead.
+
+  @integration
+  Scenario: A remembered value the chosen agent cannot read is dropped
+    Given a suite that remembers the parameters of a run against a connected agent
+    When the dialog opens on an agent that declares none of them
+    Then the parameter line holds none of the remembered names
+    And the parameter block is folded away
+    And Run can start
+
+  @integration
+  Scenario: A typed value nothing in the run declares is read back
+    Given the run dialog with parameter overrides added
+    When a value is typed for a name neither the scenarios nor the agent declare
+    Then the field says the name is declared by nothing in the run, and names the agent
+    And the value stays as it was typed, so the run still carries it
+
+  @integration
+  Scenario: A value the chosen agent declares is kept
+    Given a suite that remembers the parameters of a run against a connected agent
+    When the dialog opens on that same agent
+    Then the parameter line still holds them
+
+  @integration
+  Scenario: A run refused because every scenario is archived says so in the dialog
+    Given a test suite in which every scenario is archived
     When the run is confirmed
     Then the dialog shows that there is nothing left to run
     And it does not show a generic unknown error
+
+  @integration
+  Scenario: A run with no name cannot start
+    Given the run dialog with the run name cleared
+    When the footer is read
+    Then Run is off
+    And it says the run needs a name

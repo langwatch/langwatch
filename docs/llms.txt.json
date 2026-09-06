@@ -22,7 +22,7 @@
     "integration/mcp.mdx",
     "integration/tools/**/*.mdx",
     "integration/tutorials/*.mdx",
-    "agent-simulations/*.mdx",
+    "agent-testing/*.mdx",
     "datasets/*.mdx",
     "prompt-management/**/*.mdx",
     "dspy-visualization/*.mdx",

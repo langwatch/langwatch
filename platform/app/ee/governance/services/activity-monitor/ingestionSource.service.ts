@@ -57,6 +57,7 @@ export type SourceType =
   | "copilot_studio"
   | "copilot_studio_dataverse"
   | "openai_compliance"
+  | "openai_admin"
   | "claude_compliance"
   | "anthropic_admin"
   | "databricks_genie"
@@ -71,12 +72,29 @@ export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "copilot_studio",
   "copilot_studio_dataverse",
   "openai_compliance",
+  "openai_admin",
   "claude_compliance",
   "anthropic_admin",
   "databricks_genie",
   "s3_custom",
   "http_custom",
 ] as const;
+
+const PUSH_SOURCE_TYPES: ReadonlySet<SourceType> = new Set([
+  "otel_generic",
+  "claude_code",
+  "claude_cowork",
+  "workato",
+  "s3_custom", // webhook callback path authenticated by ingest secret
+]);
+
+export function isPushSourceType({
+  sourceType,
+}: {
+  sourceType: SourceType;
+}): boolean {
+  return PUSH_SOURCE_TYPES.has(sourceType);
+}
 
 export interface CreateIngestionSourceInput {
   organizationId: string;
@@ -118,8 +136,8 @@ export interface UpdateIngestionSourceInput {
 
 export interface CreatedIngestionSource {
   source: IngestionSource;
-  /** Raw ingestSecret — exposed exactly once at creation and never persisted. */
-  ingestSecret: string;
+  /** Raw ingestSecret — exposed exactly once at creation and never persisted. Null for non-push sources. */
+  ingestSecret: string | null;
 }
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -573,8 +591,9 @@ export class IngestionSourceService {
     // lazy-create logic anywhere else (master_orchestrator constraint).
     await ensureHiddenGovernanceProject(this.prisma, input.organizationId);
 
-    const ingestSecret = generateIngestSecret();
-    const ingestSecretHash = hashIngestSecret(ingestSecret);
+    const isPush = isPushSourceType({ sourceType: input.sourceType });
+    const ingestSecret = isPush ? generateIngestSecret() : null;
+    const ingestSecretHash = ingestSecret ? hashIngestSecret(ingestSecret) : "";
 
     // Phase 10 carryover — the schema has `parserConfig` but no
     // `pullConfig` column; the puller worker actually reads
@@ -814,6 +833,18 @@ export class IngestionSourceService {
     organizationId: string,
   ): Promise<{ source: IngestionSource; ingestSecret: string }> {
     const existing = await this.requireById(id, organizationId);
+    if (!isPushSourceType({ sourceType: existing.sourceType as SourceType })) {
+      throw new ValidationError(
+        "Only push-mode sources have an ingest secret to rotate.",
+        {
+          meta: {
+            formErrors: [
+              "Only push-mode sources have an ingest secret to rotate.",
+            ],
+          },
+        },
+      );
+    }
     const newSecret = generateIngestSecret();
     const newHash = hashIngestSecret(newSecret);
     const priorParser =

@@ -284,6 +284,7 @@ beforeEach(() => {
   trackEventMock.mockReset();
   commandBarOpenMock.mockReset();
   localStorage.clear();
+  localStorage.setItem("langwatch:navigation-mode:v1", "icon-rail");
   useNavigationModeStore.setState({ storedMode: "icon-rail" });
 });
 

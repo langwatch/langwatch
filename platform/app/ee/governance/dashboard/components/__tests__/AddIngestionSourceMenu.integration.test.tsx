@@ -65,6 +65,7 @@ describe("given the Add source menu", () => {
         "Workato",
         "Microsoft Copilot Studio",
         "OpenAI Enterprise Compliance",
+        "OpenAI Admin",
         "Anthropic Claude Enterprise Compliance",
         "Anthropic Admin API (usage & cost)",
         "Databricks AI/BI Genie",

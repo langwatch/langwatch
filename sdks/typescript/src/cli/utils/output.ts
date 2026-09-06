@@ -282,6 +282,17 @@ const descend = (value: unknown, key: string): unknown => {
 // failing the way an unsupported expression has to.
 const SUPPORTED_SEGMENT_RE = /^([A-Za-z_][A-Za-z0-9_-]*)?((?:\[(?:-?\d+)?\])*)$/;
 
+/**
+ * What to do instead, on every refusal.
+ *
+ * This subset reads the answer before it reaches disk, so it stays small on
+ * purpose. The shell carries the full tools, and saying so is what stops the
+ * caller trying three spellings of the same idea and losing all three.
+ */
+const USE_THE_SHELL =
+  " Redirect the answer to a file (`--format json > results.json`) and narrow it" +
+  " there: real `jq` and `python` are both in your shell.";
+
 /** One move along the path: into a key, over an array, or at one index. */
 type PathStep =
   | { kind: "key"; key: string }
@@ -305,7 +316,8 @@ const parsePathSteps = (expression: string): PathStep[] => {
       throw new Error(
         `Invalid --jq expression "${expression}": unsupported syntax at "${segment}" ` +
           `(supported: dot paths, .items[], .items[].field, .items[0], length; ` +
-          `no quoting, optionals or operators)`,
+          `no quoting, optionals or operators).` +
+          USE_THE_SHELL,
       );
     }
 
@@ -315,7 +327,8 @@ const parsePathSteps = (expression: string): PathStep[] => {
       // the FIRST segment may be empty, and only to carry a root accessor
       // (`.[]`, `.[0]`), which the accessor branch below handles.
       throw new Error(
-        `Invalid --jq expression "${expression}": empty segment at position ${position + 1}`,
+        `Invalid --jq expression "${expression}": empty segment at position ${position + 1}.` +
+          USE_THE_SHELL,
       );
     }
     if (key !== undefined) steps.push({ kind: "key", key });
@@ -356,7 +369,8 @@ export const applyJq = (expression: string, data: unknown): unknown => {
     const operator = pipeIndex === -1 ? "length" : trimmed.slice(pipeIndex + 1).trim();
     if (operator !== "length" || path.length === 0) {
       throw new Error(
-        `Invalid --jq expression "${expression}": only a terminal "| length" pipe is supported`,
+        `Invalid --jq expression "${expression}": only a terminal "| length" pipe is supported.` +
+          USE_THE_SHELL,
       );
     }
     const value = applyJq(path, data);
@@ -372,7 +386,8 @@ export const applyJq = (expression: string, data: unknown): unknown => {
   if (!trimmed.startsWith(".")) {
     throw new Error(
       `Invalid --jq expression "${expression}": must start with "." (supported: dot paths, ` +
-        `.items[], .items[].field, .items[0], length, | length)`,
+        `.items[], .items[].field, .items[0], length, | length).` +
+        USE_THE_SHELL,
     );
   }
   if (trimmed === ".") return data;

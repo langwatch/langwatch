@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Where the human-chat entry lives per chrome: standalone above the
- * Support menu in the current chrome, folded into the Support menu as
- * "Chat (with a human)" in the navigation-v2 sidebars.
+ * The human-chat entry lives inside the Support menu as "Chat (with a
+ * human)".
  *
  * Spec: specs/navigation/product-sidebars.feature
  */
@@ -24,10 +23,10 @@ vi.mock("~/utils/crispBubblePolicy", () => ({
 
 import { SupportMenu } from "../SupportMenu";
 
-function renderMenu(props: Record<string, unknown> = {}) {
+function renderMenu() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SupportMenu {...props} />
+      <SupportMenu />
     </ChakraProvider>,
   );
 }
@@ -52,22 +51,10 @@ afterEach(() => {
 });
 
 describe("the support menu chat placement", () => {
-  describe("when rendered for the current chrome", () => {
-    /** @scenario The current chrome keeps the standalone chat entry */
-    it("keeps the standalone chat entry and no chat item in the menu", async () => {
-      renderMenu();
-
-      expect(screen.getByRole("button", { name: "Chat" })).toBeInTheDocument();
-
-      await openSupportMenu();
-      expect(screen.queryByText("Chat (with a human)")).not.toBeInTheDocument();
-    });
-  });
-
   describe("when the pointer opens the menu and moves away", () => {
     /** @scenario Closing the Support menu with the pointer leaves no focus ring */
     it("closes the menu without leaving focus on the Support entry", async () => {
-      renderMenu({ chatPlacement: "in-menu" });
+      renderMenu();
       const trigger = screen.getByRole("button", { name: "Support" });
 
       const user = await openSupportMenu();
@@ -84,7 +71,7 @@ describe("the support menu chat placement", () => {
 
     /** @scenario Closing the Support menu with the pointer leaves no focus ring */
     it("keeps focus on the Support entry after a keyboard close", async () => {
-      renderMenu({ chatPlacement: "in-menu" });
+      renderMenu();
       const trigger = screen.getByRole("button", { name: "Support" });
       const user = userEvent.setup();
 
@@ -106,10 +93,10 @@ describe("the support menu chat placement", () => {
     });
   });
 
-  describe("when rendered for a navigation-v2 sidebar", () => {
-    /** @scenario Chat moves inside the Support menu in the new modes */
-    it("folds the chat into the Support menu and drops the standalone entry", async () => {
-      renderMenu({ chatPlacement: "in-menu" });
+  describe("chat entry placement", () => {
+    /** @scenario Chat moves inside the Support menu */
+    it("folds the chat into the Support menu, no standalone entry", async () => {
+      renderMenu();
 
       expect(
         screen.queryByRole("button", { name: "Chat" }),

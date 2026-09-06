@@ -83,9 +83,9 @@ describe("touchesVersionedFields", () => {
     expect(touchesVersionedFields({ situation: "New text" })).toBe(true);
   });
 
-  it("is false for a folder move", () => {
-    expect(touchesVersionedFields({ folderId: "suite_1" })).toBe(false);
-    expect(touchesVersionedFields({ folderId: null })).toBe(false);
+  it("is false for a test suite move", () => {
+    expect(touchesVersionedFields({ testSuiteId: "suite_1" })).toBe(false);
+    expect(touchesVersionedFields({ testSuiteId: null })).toBe(false);
   });
 
   it("is false for an author stamp alone", () => {
@@ -96,9 +96,9 @@ describe("touchesVersionedFields", () => {
 describe("the snapshot envelope", () => {
   /** @scenario "A restore brings back the editable content and nothing else" */
   it("holds the editable content and nothing else", () => {
-    // The versioned field list is the restore's write set: no folder, no
+    // The versioned field list is the restore's write set: no test suite, no
     // archive state, no run history.
-    expect(SCENARIO_VERSIONED_FIELDS).not.toContain("folderId");
+    expect(SCENARIO_VERSIONED_FIELDS).not.toContain("testSuiteId");
     expect(SCENARIO_VERSIONED_FIELDS).not.toContain("archivedAt");
     expect(SCENARIO_VERSIONED_FIELDS).toEqual([
       "name",
@@ -117,7 +117,7 @@ describe("the snapshot envelope", () => {
       // Columns a stored row carries beside the editable content.
       id: "scenario_1",
       projectId: "project_1",
-      folderId: "suite_1",
+      testSuiteId: "suite_1",
       version: 4,
     };
     expect(Object.keys(snapshotFieldsOf(scenarioRow)).sort()).toEqual(

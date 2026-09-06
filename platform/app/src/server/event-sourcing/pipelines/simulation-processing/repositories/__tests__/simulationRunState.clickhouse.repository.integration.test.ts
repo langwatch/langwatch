@@ -93,6 +93,75 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
+/** The state a started event folds to, with the run's identity on it. */
+function makeStartedState(scenarioRunId: string): SimulationRunState["data"] {
+  return {
+    ScenarioRunId: scenarioRunId,
+    ScenarioId: `scenario-${nanoid()}`,
+    BatchRunId: `batch-${nanoid()}`,
+    ScenarioSetId: `set-${nanoid()}`,
+    Status: "IN_PROGRESS",
+    Name: "Started run",
+    Description: null,
+    Metadata: null,
+    Messages: [],
+    TraceIds: [],
+    Verdict: null,
+    Reasoning: null,
+    MetCriteria: [],
+    UnmetCriteria: [],
+    Error: null,
+    DurationMs: null,
+    TotalCost: null,
+    RoleCosts: {},
+    RoleLatencies: {},
+    TraceMetrics: {},
+    StartedAt: now,
+    QueuedAt: null,
+    CreatedAt: now,
+    UpdatedAt: now,
+    FinishedAt: null,
+    ArchivedAt: null,
+    CancellationRequestedAt: null,
+    LastSnapshotOccurredAt: 0,
+    LastEventOccurredAt: 0,
+  };
+}
+
+describe("SimulationRunStateRepositoryClickHouse.storeProjection (integration)", () => {
+  const context = { tenantId: createTenantId(tenantId) };
+
+  describe("when the next event folds right after a projection is stored", () => {
+    /** @scenario "A stored projection is readable by the next event's fold" */
+    it("reads the stored projection back without waiting", async () => {
+      // The fold reads a run's state back on a store miss. If the write is not
+      // visible yet, the next event folds from nothing and rewrites the row
+      // without the identity the started event carried, which drops the run
+      // out of every batch and set listing.
+      const scenarioRunId = `run-readback-${nanoid()}`;
+      const data = makeStartedState(scenarioRunId);
+
+      await repo.storeProjection(
+        {
+          id: `proj-${nanoid()}`,
+          aggregateId: scenarioRunId,
+          tenantId: createTenantId(tenantId),
+          version: new Date(now).toISOString().slice(0, 10),
+          data,
+        } as unknown as SimulationRunState,
+        context,
+      );
+
+      const projection = await repo.getProjection(scenarioRunId, context);
+
+      expect(projection).not.toBeNull();
+      expect(projection!.data.ScenarioId).toBe(data.ScenarioId);
+      expect(projection!.data.BatchRunId).toBe(data.BatchRunId);
+      expect(projection!.data.ScenarioSetId).toBe(data.ScenarioSetId);
+    });
+  });
+});
+
 describe("SimulationRunStateRepositoryClickHouse.getProjection (integration)", () => {
   const context = { tenantId: createTenantId(tenantId) };
 

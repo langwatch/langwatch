@@ -700,6 +700,72 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/* ============================================================ */}}
+{{/* nlpgo timeout coordination                                    */}}
+{{/* ============================================================ */}}
+
+{{/* The engine's code-block ceiling, range-checked, as a bare number.
+
+     The check lives WITH the value rather than in the NLP Deployment because
+     `langwatch.sharedEnv` hands the same number to the app and the workers,
+     and those render even when `langwatch_nlp.enabled` is false (an external,
+     shared or serverless nlpgo). A guard placed inside the optional Deployment
+     does not run in that supported mode, so an out-of-range ceiling would
+     reach the app and workers unchecked and their derived client deadline
+     would cut every turn short of the engine's own ceiling.
+
+     710 is the ceiling — the engine's stream idle timeout default, 720
+     (`NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`, `httpapi.DefaultStreamIdleTimeout`
+     in services/nlpgo; `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS` in
+     platform/app/src/server/nlpgo/timeouts.ts), minus the same 10s margin
+     (`CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS`, also in timeouts.ts) that
+     `clampCodeBlockTimeoutSeconds`
+     (platform/app/src/optimization_studio/server/lambda/index.ts) subtracts
+     before it silently clamps a Lambda's env override. Anything above 710
+     races the stream shutting down with no margin left for nlpgo to report
+     its own timeout first — and, left at 720, would sail through here and
+     be silently cut to 710 on the Lambda path, the exact two-numbers drift
+     this pair exists to prevent.
+
+     With `langwatch_nlp.enabled` false the engine is external and the chart
+     cannot impose the ceiling, only report it to the clients. The value is
+     passed through as given: the operator sets the real ceiling on the external
+     service and matches it here, and the chart has no way to check that pairing,
+     so it does not pretend to. */}}
+{{- define "langwatch.codeBlockTimeoutSeconds" -}}
+{{- $raw := .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 -}}
+{{- $seconds := int $raw -}}
+{{- $streamIdleTimeoutSeconds := 720 -}}
+{{- $safetyMarginSeconds := 10 -}}
+{{- $maxSeconds := sub $streamIdleTimeoutSeconds $safetyMarginSeconds -}}
+{{/* An explicit 0 never reaches this check: `default` above counts it as empty and
+     substitutes 600, so 0 is indistinguishable from unset by the time we get here.
+     Everything else unusable does reach it — `int` reads a value it cannot parse as
+     a whole number as 0, and passes a negative one straight through. */}}
+{{- if lt $seconds 1 -}}
+{{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must be a positive whole number of seconds, at most %d. Got %v. Helm reads a value it cannot parse as a whole number — text, a fraction, exponent notation, or a number past int64 — as 0, and passes a negative one through unchanged, so without this check either would reach every nlpgo caller as its ceiling." $maxSeconds $raw) -}}
+{{- end -}}
+{{- if gt $seconds $maxSeconds -}}
+{{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must stay at or below %d — the engine's %ds stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS) minus the %ds safety margin (CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS in platform/app/src/server/nlpgo/timeouts.ts) that lets nlpgo report its own timeout before the enclosing Lambda deadline fires. Got %d." $maxSeconds $streamIdleTimeoutSeconds $safetyMarginSeconds $seconds) -}}
+{{- end -}}
+{{- $seconds -}}
+{{- end -}}
+
+{{/* Refuses an extraEnvs list that sets a timeout variable the chart owns.
+     Two of them are reserved: setting either by hand puts a second, unchecked
+     number next to `langwatch_nlp.codeBlockTimeoutSeconds` in exactly the
+     processes that must agree on one.
+
+     Call with (dict "envs" <list> "path" "<values path>"); `path` only names
+     the offending list in the message. */}}
+{{- define "langwatch.assertNoReservedTimeoutEnvs" -}}
+{{- range .envs }}
+{{- if or (eq .name "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS") (eq .name "NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS") }}
+{{- fail (printf "%s must not set %s — it is a reserved timeout env var; use langwatch_nlp.codeBlockTimeoutSeconds instead" $.path .name) }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/* ============================================================ */}}
 {{/* Shared Environment Variables                                  */}}
 {{/* ============================================================ */}}
 {{/* Common env vars shared between app and workers deployments */}}
@@ -732,6 +798,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.app.upstreams.nlp.scheme | default "http" }}://{{ .Values.app.upstreams.nlp.name | default (printf "%s-langwatch-nlp" .Release.Name) }}:{{ .Values.app.upstreams.nlp.port | default 5561 }}
 - name: LANGEVALS_ENDPOINT
   value: {{ .Values.app.upstreams.langevals.scheme | default "http" }}://{{ .Values.app.upstreams.langevals.name | default (printf "%s-langevals" .Release.Name) }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
+
+# Engine code-block timeout (seconds), propagated to all processes that invoke
+# nlpgo. Range-checked by the helper, which is why this is emitted through it
+# and not read straight from values.
+- name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
+  value: {{ include "langwatch.codeBlockTimeoutSeconds" . | quote }}
 
 # PostgreSQL connection string
 {{- if .Values.postgresql.chartManaged }}

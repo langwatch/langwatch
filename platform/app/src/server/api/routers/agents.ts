@@ -2,19 +2,29 @@ import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import {
-  codeComponentSchema,
-  customComponentSchema,
-  httpComponentSchema,
-  signatureComponentSchema,
-} from "~/optimization_studio/types/dsl";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
+  type AgentInstanceView,
+  type AgentPresenceStatus,
+  agentPresenceView,
+  readAgentPresence,
+} from "~/server/connected-agents/presence.read";
+import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import {
   type AgentComponentConfig,
-  type AgentType,
   agentTypeSchema,
+  getConfigSchemaForType,
 } from "../../agents/agent.repository";
-import { AgentService } from "../../agents/agent.service";
+import {
+  AgentService,
+  declaredAgentParameters,
+} from "../../agents/agent.service";
+import type { AgentWithFields } from "../../agents/agent-fields";
+import { sendAgentTestTurn } from "../../agents/agent-test-turn";
+import {
+  AgentNotFoundError,
+  AgentRegisterOnlyError,
+} from "../../agents/errors";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   copyWorkflowWithDatasets,
@@ -22,24 +32,36 @@ import {
 } from "./workflows";
 
 /**
- * Get config schema based on agent type for validation
+ * What every agent read carries beside the row (ADR-128): the parameters a
+ * connected agent declares, the owner of a personal one, and its presence.
+ * Other kinds read as offline with no instances and no owner.
  */
-const getConfigInputSchema = (type: AgentType) => {
-  switch (type) {
-    case "signature":
-      return signatureComponentSchema;
-    case "code":
-      return codeComponentSchema;
-    case "workflow":
-      return customComponentSchema;
-    case "http":
-      return httpComponentSchema;
-    default: {
-      const _exhaustive: never = type;
-      throw new Error(`Unknown agent type: ${_exhaustive}`);
-    }
-  }
-};
+async function withConnectedAgentViews<T extends AgentWithFields>({
+  agents,
+  projectId,
+  agentService,
+}: {
+  agents: T[];
+  projectId: string;
+  agentService: AgentService;
+}): Promise<
+  (T & {
+    parameters: ScenarioParameterDefinition[];
+    owner: { userId: string; name: string | null } | null;
+    status: AgentPresenceStatus;
+    instances: AgentInstanceView[];
+  })[]
+> {
+  const [owners, presence] = await Promise.all([
+    agentService.ownersOf(agents),
+    readAgentPresence({ projectId, agents }),
+  ]);
+  return agents.map((agent) => ({
+    ...agent,
+    parameters: declaredAgentParameters(agent),
+    ...agentPresenceView({ agent, owners, presence }),
+  }));
+}
 
 /**
  * Agent Router - Manages agent CRUD operations
@@ -62,7 +84,12 @@ export const agentsRouter = createTRPCRouter({
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
-      return await agentService.getAll({ projectId: input.projectId });
+      const agents = await agentService.getAll({ projectId: input.projectId });
+      return withConnectedAgentViews({
+        agents,
+        projectId: input.projectId,
+        agentService,
+      });
     }),
 
   /**
@@ -74,10 +101,17 @@ export const agentsRouter = createTRPCRouter({
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
-      return await agentService.getById({
+      const agent = await agentService.getById({
         id: input.id,
         projectId: input.projectId,
       });
+      if (!agent) return null;
+      const [view] = await withConnectedAgentViews({
+        agents: [agent],
+        projectId: input.projectId,
+        agentService,
+      });
+      return view ?? null;
     }),
 
   /**
@@ -100,7 +134,7 @@ export const agentsRouter = createTRPCRouter({
         .refine(
           (data) => {
             // Validate config matches the specified type's DSL schema
-            const schema = getConfigInputSchema(data.type);
+            const schema = getConfigSchemaForType(data.type);
             const result = schema.safeParse(data.config);
             return result.success;
           },
@@ -113,6 +147,9 @@ export const agentsRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
+      // A connected agent is registered by the SDK from the process that runs
+      // it; there is nothing a form could fill in for one.
+      if (input.type === "connected") throw new AgentRegisterOnlyError();
       const agentService = AgentService.create(ctx.prisma);
       // Config is validated by the refine above, safe to cast
       return await agentService.create({
@@ -501,6 +538,78 @@ export const agentsRouter = createTRPCRouter({
                 ? "NOT_FOUND"
                 : "BAD_REQUEST",
             message,
+          });
+        }
+        throw error;
+      }
+    }),
+
+  /**
+   * Sends one turn to an agent and answers what it returned.
+   *
+   * The Test panel of the agent drawers. It walks the same path a simulation
+   * turn walks, so what a person sees here is what a run will see: the same
+   * dispatcher and instance choice for a connected agent, the same adapter
+   * for the others, the same handled errors. A personal development agent of
+   * another person is refused before anything is sent.
+   */
+  testTurn: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        projectId: z.string(),
+        message: z.string().min(1),
+        params: z
+          .record(z.union([z.string(), z.number(), z.boolean()]))
+          .optional(),
+      }),
+    )
+    .permission("evaluations:manage")
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await sendAgentTestTurn({
+          projectId: input.projectId,
+          agentId: input.id,
+          message: input.message,
+          params: input.params,
+          actor: { id: ctx.session.user.id, label: "user" },
+          deps: {
+            readAgent: (params) =>
+              AgentService.create(ctx.prisma).getById(params),
+            users: ctx.prisma,
+          },
+        });
+      } catch (error) {
+        if (error instanceof AgentNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Agent not found",
+          });
+        }
+        throw error;
+      }
+    }),
+
+  /**
+   * Runs one scripted scenario against the agent, saving nothing, and answers
+   * with the run's ids so the caller can open the run drawer on it.
+   * The "Test agent" item of the agent card menu.
+   */
+  testRun: protectedProcedure
+    .input(z.object({ projectId: z.string(), agentId: z.string() }))
+    .permission("scenarios:create")
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await AgentService.create(ctx.prisma).testRun({
+          projectId: input.projectId,
+          agentId: input.agentId,
+          actor: { id: ctx.session.user.id, label: "user" },
+        });
+      } catch (error) {
+        if (error instanceof AgentNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Agent not found",
           });
         }
         throw error;

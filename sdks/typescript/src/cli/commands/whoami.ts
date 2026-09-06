@@ -22,6 +22,20 @@ export const loginKeyScopeLine = (
 };
 
 /**
+ * One line for what the login key can DO. "Whole organization" states reach,
+ * not power: the key carries the permission list picked at approval, and a
+ * command the list does not cover is refused with a 403 that reads as a
+ * surprise when `whoami` never said so. Nothing is printed when the login
+ * predates the field.
+ */
+export const loginKeyPermissionsLine = (
+  scope: GovernanceConfig["cli_api_key_scope"],
+): string | undefined => {
+  if (!scope?.permissions || scope.permissions.length === 0) return undefined;
+  return `Permissions:  ${[...scope.permissions].sort().join(", ")}`;
+};
+
+/**
  * `langwatch whoami` — prints the device-flow identity persisted at
  * ~/.langwatch/config.json. Mirrors `git config user.name` /
  * `gh auth status` ergonomics.
@@ -39,6 +53,8 @@ export const whoamiCommand = async (): Promise<void> => {
   if (cfg.organization?.name) console.log(`Organization: ${cfg.organization.name}`);
   const scopeLine = loginKeyScopeLine(cfg.cli_api_key_scope);
   if (scopeLine) console.log(scopeLine);
+  const permissionsLine = loginKeyPermissionsLine(cfg.cli_api_key_scope);
+  if (permissionsLine) console.log(permissionsLine);
   console.log(`Gateway:      ${cfg.gateway_url}`);
   console.log(`Dashboard:    ${cfg.control_plane_url}`);
   if (cfg.default_personal_vk?.prefix) {

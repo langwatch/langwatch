@@ -12,13 +12,13 @@ from ...models.post_api_workflows_by_id_evaluate_response_401 import PostApiWork
 from ...models.post_api_workflows_by_id_evaluate_response_404 import PostApiWorkflowsByIdEvaluateResponse404
 from ...models.post_api_workflows_by_id_evaluate_response_422 import PostApiWorkflowsByIdEvaluateResponse422
 from ...models.post_api_workflows_by_id_evaluate_response_500 import PostApiWorkflowsByIdEvaluateResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PostApiWorkflowsByIdEvaluateBody | Unset = UNSET,
+    body: PostApiWorkflowsByIdEvaluateBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -29,8 +29,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -109,8 +108,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiWorkflowsByIdEvaluateBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiWorkflowsByIdEvaluateBody,
 ) -> Response[
     PostApiWorkflowsByIdEvaluateResponse200
     | PostApiWorkflowsByIdEvaluateResponse400
@@ -126,7 +125,7 @@ def sync_detailed(
 
     Args:
         id (str):
-        body (PostApiWorkflowsByIdEvaluateBody | Unset):
+        body (PostApiWorkflowsByIdEvaluateBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -151,8 +150,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiWorkflowsByIdEvaluateBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiWorkflowsByIdEvaluateBody,
 ) -> (
     PostApiWorkflowsByIdEvaluateResponse200
     | PostApiWorkflowsByIdEvaluateResponse400
@@ -169,7 +168,7 @@ def sync(
 
     Args:
         id (str):
-        body (PostApiWorkflowsByIdEvaluateBody | Unset):
+        body (PostApiWorkflowsByIdEvaluateBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -189,8 +188,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiWorkflowsByIdEvaluateBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiWorkflowsByIdEvaluateBody,
 ) -> Response[
     PostApiWorkflowsByIdEvaluateResponse200
     | PostApiWorkflowsByIdEvaluateResponse400
@@ -206,7 +205,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        body (PostApiWorkflowsByIdEvaluateBody | Unset):
+        body (PostApiWorkflowsByIdEvaluateBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -229,8 +228,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiWorkflowsByIdEvaluateBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiWorkflowsByIdEvaluateBody,
 ) -> (
     PostApiWorkflowsByIdEvaluateResponse200
     | PostApiWorkflowsByIdEvaluateResponse400
@@ -247,7 +246,7 @@ async def asyncio(
 
     Args:
         id (str):
-        body (PostApiWorkflowsByIdEvaluateBody | Unset):
+        body (PostApiWorkflowsByIdEvaluateBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

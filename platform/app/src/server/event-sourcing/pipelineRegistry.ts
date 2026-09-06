@@ -137,6 +137,7 @@ import {
   CodingAgentTraceSessionAppendStore,
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
+import { RedisSessionContextMemo } from "./pipelines/coding-agent-processing/services/session-context-memo";
 import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
 import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
@@ -438,7 +439,7 @@ export interface PipelineRegistryDeps {
   broadcast: BroadcastService;
   langy: {
     buffer: Pick<LangyTokenBuffer, "liveness" | "appendStatus" | "markError">;
-    handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
+    handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash" | "isStopped">;
     worker: Pick<LangyWorkerPort, "dispatch">;
     titleGenerator: LangyTitleGenerator;
   };
@@ -1168,6 +1169,7 @@ export class PipelineRegistry {
           new CodingAgentSessionEventsAppendStore(
             this.deps.repositories.codingAgentSessionEvents,
           ),
+        sessionContextMemo: new RedisSessionContextMemo(this.deps.redis),
         ...(this.deps.codingAgent
           ? {
               pullRequestMappingHandler: createPullRequestMappingHandler(

@@ -19,7 +19,7 @@ import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { OrganizationIntent, Project } from "~/generated/prisma/client";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
-import { ProjectSelector } from "../components/DashboardLayout";
+import { ProjectSelector } from "../components/ProjectSelector";
 import SettingsLayout from "../components/SettingsLayout";
 import { DepartmentPicker } from "../components/settings/DepartmentPicker";
 import { useDepartmentColumn } from "../components/settings/useDepartmentColumn";
@@ -109,11 +109,7 @@ function SettingsForm({
   // surface it routes to is reachable (flag on, which is the default).
   const { enabled: governanceEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    {
-      // Organization settings. The page holds no project of its own.
-      projectId: NOT_TARGETED,
-      organizationId: organization.id,
-    },
+    { projectId: NOT_TARGETED, organizationId: organization.id },
   );
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,

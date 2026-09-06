@@ -1,6 +1,6 @@
 [project]
 name = "langwatch"
-version = "1.2.1" # remember to also update it in src/langwatch/__version__.py
+version = "1.3.1" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
 requires-python = ">=3.10,<3.14"
@@ -44,6 +44,8 @@ dependencies = [
     # Progress bars for experiment loop()/aloop(); pure-python and tiny, so a
     # declared dependency rather than an optional (it always runs there).
     "tqdm>=4.62.0",
+    # The outbound relay of connected agents (langwatch.agent), pure Python.
+    "websockets>=12",
 ]
 
 [project.optional-dependencies]
@@ -75,7 +77,10 @@ markers = [
 ]
 
 [dependency-groups]
-dev = ["black>=26.5.1"]
+dev = [
+    "black>=26.5.1",
+    "langwatch-scenario>=1.3.0",
+]
 examples = [
     "anthropic>=0.36.0,<0.122.0",
     "chainlit>=2.11.1,<3",

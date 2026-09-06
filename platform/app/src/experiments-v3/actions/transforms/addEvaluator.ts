@@ -83,6 +83,12 @@ export const attachEvaluator = ({
  * Blank is not an id: an empty or whitespace-only string is read as "no id
  * given" and gets a generated one, so it can never reach state and make every
  * later lookup match the wrong evaluator.
+ *
+ * The name lands in `localEvaluatorConfig.name`, which is where the chips, the
+ * projection and the run's own errors already read a workbench name from. A
+ * name alone overrides no settings: the execution side reads
+ * `localEvaluatorConfig?.settings`, which stays undefined here and falls
+ * through to the database config the way it does for an unnamed evaluator.
  */
 export const addEvaluator: Transform<
   AddEvaluatorPayload,
@@ -99,11 +105,13 @@ export const addEvaluator: Transform<
     });
   }
 
+  const { name, ...rest } = parsed;
   const evaluator: EvaluatorConfig = {
-    ...parsed,
+    ...rest,
     id: requestedId || newEvaluatorId(),
     evaluatorType: parsed.evaluatorType as EvaluatorConfig["evaluatorType"],
     inputs: parsed.inputs as Field[],
+    localEvaluatorConfig: { ...parsed.localEvaluatorConfig, name },
   };
 
   return {

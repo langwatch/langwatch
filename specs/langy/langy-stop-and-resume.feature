@@ -176,16 +176,37 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then the stop is dispatched against the turn the durable record names
     And that turn reaches a stopped terminal
 
-  # The honesty rule, made structural: the control moves to "stopping" ONLY on
-  # the branch that dispatches a stop. There is no path that shows the stopping
-  # spinner without a request behind it.
-  @unit
-  Scenario: Stop says nothing it cannot back up
-    Given a turn is in flight but no turn id is known yet
+  # --- Stopping while the turn is still starting up -------------------------
+  #
+  # The turn only gets an id when the create/continue call answers, and on a
+  # cold worker that is 6 to 12 seconds after the send. For that whole window
+  # the composer showed Send, so a message sent by accident could not be called
+  # back, and a stop clicked in it was answered with "try again in a moment".
+  #
+  # Stop is now available from the send itself. A click before the turn has an
+  # id is an intent the panel KEEPS and dispatches the moment the turn is
+  # named — by this tab's own send, or by the durable record.
+
+  @integration
+  Scenario: Stop is available the moment I send
+    Given I send a message to Langy
+    Then the composer shows Stop while the turn is still starting up
+    And I do not have to wait for Langy to answer before I can stop it
+
+  @unit @integration
+  Scenario: Stop during startup is kept and dispatched when the turn is identified
+    Given I sent a message and the turn has no id yet
     When I click Stop
-    Then no stop is dispatched
-    And the control stays on Stop rather than showing it is stopping
-    And I am told the turn cannot be stopped yet
+    Then the control shows it is stopping
+    And the stop is dispatched against that turn as soon as it is identified
+    And I am never told to try stopping it again in a moment
+
+  @unit @integration
+  Scenario: A send that fails before the turn is identified hands the control back
+    Given I clicked Stop while my message was still starting up
+    When the send fails before any turn id exists
+    Then no stop is dispatched, because nothing was ever running
+    And the composer returns to Send with my message back in the field
 
   @unit
   Scenario: A stop that never reached the backend hands the control back
@@ -215,6 +236,17 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     When I ask to stop a turn the conversation does not have in flight
     Then the request is refused
     And no terminal is recorded against that turn
+
+  # A turn is admitted on the record before its worker is running: the dispatch
+  # is fired at the manager, and a re-drive (outbox, liveness) can follow it
+  # seconds later. A stop in that window has to reach the work as well as the
+  # record, or the answer the user stopped is generated anyway.
+  @integration
+  Scenario: A stop before the worker starts still stops the turn
+    Given a turn was admitted but its worker is not running it yet
+    When I stop that turn
+    Then the turn settles as stopped on the durable record
+    And a later dispatch of that turn does not start the work
 
   # ===========================================================================
   # (2) Continue a stopped chat

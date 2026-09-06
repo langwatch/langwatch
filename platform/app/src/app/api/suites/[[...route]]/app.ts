@@ -1,8 +1,24 @@
+/**
+ * The suites REST family: a deprecated alias.
+ *
+ * It predates the split between a RUN PLAN, which is what you run and is
+ * identified by its name, and a TEST SUITE, which is a group of scenarios.
+ * Both now have a family of their own, `/api/v1/run-plans` and
+ * `/api/v1/test-suites`, and this one keeps answering exactly as it did.
+ *
+ * Every response carries the deprecation headers and every operation is marked
+ * deprecated in the published document, so an integrator reading either finds
+ * where the family went.
+ */
+
 import { randomUUID } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+import { deprecatedAlias } from "~/app/api/shared/deprecation";
+import { runActorOf } from "~/app/api/shared/run-actor";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { suiteTargetSchema } from "~/app/api/shared/suite-wire";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -11,10 +27,13 @@ import { prisma } from "~/server/db";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runNoteSchema } from "~/server/scenarios/run-note";
+import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import { SuiteDomainError } from "~/server/suites/errors";
-import { parseSuiteScope, suiteScopeSchema } from "~/server/suites/scope";
+import { MAX_PLAN_NAME_LENGTH } from "~/server/suites/plan-name";
+import { readTestingInterface, suitePath } from "~/server/suites/platform-path";
+import { parseSuiteScope, type SuiteScope } from "~/server/suites/scope";
 import { SuiteService } from "~/server/suites/suite.service";
-import { isSuiteKind } from "~/server/suites/types";
+import { isSuiteKind, type SuiteKind } from "~/server/suites/types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -23,31 +42,88 @@ patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:suites");
 
-const suiteTargetSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow"]),
-  referenceId: z.string(),
+/** The one sentence every operation of this family opens with. */
+const DEPRECATION_NOTE =
+  "Deprecated: use /api/v1/run-plans and /api/v1/test-suites.";
+
+/**
+ * The family's refusal body: the flat shape its consumers already parse, plus
+ * the domain code when the refusal names one.
+ */
+const suiteRefusalSchema = badRequestSchema.extend({
+  code: z
+    .string()
+    .optional()
+    .describe("The domain error code, when the refusal names one."),
 });
 
 /**
- * What a run plan covers. Absent on a plan that runs the list it holds, and on
- * a test suite, whose cases are the ones filed into it.
+ * What a run plan covers, in the words this family was published with.
+ *
+ * The domain calls these modes `test_suites` and `scenarios`. This family kept
+ * `folders` and `cases`, so it answers and accepts those and maps at the
+ * boundary through {@link toDomainScope} and {@link toWireScope}. Absent on a
+ * plan that runs the list it holds, and on a test suite, whose scenarios are
+ * the ones filed into it.
  */
-const scopeSchema = suiteScopeSchema.describe(
-  "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan.",
-);
+const scopeSchema = z
+  .discriminatedUnion("mode", [
+    z.object({ mode: z.literal("all") }),
+    z.object({ mode: z.literal("folders"), folderIds: z.array(z.string()) }),
+    z.object({ mode: z.literal("labels"), labels: z.array(z.string()) }),
+    z.object({ mode: z.literal("cases") }),
+  ])
+  .describe(
+    "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
+  );
 
+type WireScope = z.infer<typeof scopeSchema>;
+
+/** A scope this family accepted, as the domain reads it. */
+function toDomainScope(scope: WireScope): SuiteScope {
+  if (scope.mode === "folders") {
+    return { mode: "test_suites", testSuiteIds: scope.folderIds };
+  }
+  if (scope.mode === "cases") return { mode: "scenarios" };
+  return scope;
+}
+
+/** A stored scope, in the words this family answers with. */
+function toWireScope(scope: SuiteScope): WireScope {
+  if (scope.mode === "test_suites") {
+    return { mode: "folders", folderIds: scope.testSuiteIds };
+  }
+  if (scope.mode === "scenarios") return { mode: "cases" };
+  return scope;
+}
+
+/** The suite kinds this family answers with, by the kind the row holds. */
+const WIRE_KINDS = {
+  test_suite: "folder",
+  run_plan: "custom",
+} as const satisfies Record<SuiteKind, "folder" | "custom">;
+
+/**
+ * The suite as this family answers it. `kind` and `scope` are optional in the
+ * document, not in the answer: every server sends both. They arrived after
+ * clients were generated from this family, and a client that reads them as
+ * required fails against a server that predates them.
+ *
+ * @see specs/api-reference/legacy-response-fields-optional.feature
+ */
 const suiteResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
   kind: z
     .enum(["custom", "folder"])
+    .optional()
     .describe(
-      "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.",
+      "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.",
     ),
   description: z.string().nullable(),
   scenarioIds: z.array(z.string()),
-  scope: scopeSchema.nullable(),
+  scope: scopeSchema.nullable().optional(),
   targets: z.array(suiteTargetSchema),
   repeatCount: z.number(),
   labels: z.array(z.string()),
@@ -68,16 +144,19 @@ type CreateSuiteBody = {
 };
 
 /**
- * A folder is created empty by definition, so a scope, a member list and a
+ * A test suite is created empty by definition, so a scope, a member list and a
  * target list are refused rather than silently dropped.
  */
-function refuseFolderExtras(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
+function refuseTestSuiteExtras(
+  body: CreateSuiteBody,
+  ctx: z.RefinementCtx,
+): void {
   if (body.scope) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["scope"],
       message:
-        "A test suite runs the test cases filed in it, so it takes no scope",
+        "A test suite runs the scenarios filed in it, so it takes no scope",
     });
   }
   if (body.scenarioIds.length > 0) {
@@ -85,14 +164,14 @@ function refuseFolderExtras(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
       code: z.ZodIssueCode.custom,
       path: ["scenarioIds"],
       message:
-        "A folder is created empty; file scenarios into it after creating it",
+        "A test suite is created empty; file scenarios into it after creating it",
     });
   }
   if (body.targets.length > 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["targets"],
-      message: "A folder gets its targets when a run is started",
+      message: "A test suite gets its targets when a run is started",
     });
   }
 }
@@ -144,7 +223,7 @@ const createSuiteInputSchema = z
   })
   .superRefine((body, ctx) => {
     if (body.kind === "folder") {
-      refuseFolderExtras(body, ctx);
+      refuseTestSuiteExtras(body, ctx);
       return;
     }
     refusePlanGaps(body, ctx);
@@ -155,7 +234,7 @@ const listSuitesQuerySchema = z.object({
     .enum(["custom", "folder"])
     .default("custom")
     .describe(
-      "Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did.",
+      "Which kind of suite to list. Defaults to custom, so callers that predate test suites keep seeing exactly the run plans they always did.",
     ),
 });
 
@@ -169,8 +248,52 @@ const updateSuiteInputSchema = z.object({
   labels: z.array(z.string()).optional(),
 });
 
+/**
+ * What a run request carries.
+ *
+ * The execution settings are read only when the id names a test suite
+ * (`kind: "folder"`), which stores none of its own. A run plan already holds
+ * its configuration, so sending them against one is refused rather than
+ * silently ignored.
+ */
 const runSuiteInputSchema = z.object({
   idempotencyKey: z.string().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_PLAN_NAME_LENGTH)
+    .optional()
+    .describe(
+      "The run plan this run joins or creates. Used only when the id names a test suite; derived from the suite name and the targets when absent.",
+    ),
+  targets: z
+    .array(suiteTargetSchema)
+    .optional()
+    .describe(
+      "The prompts, agents or workflows the run goes against. Used only when the id names a test suite, which stores no target of its own.",
+    ),
+  repeatCount: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_REPEAT_COUNT)
+    .optional()
+    .describe(
+      `How many times each scenario and target pairing runs, between 1 and ${MAX_REPEAT_COUNT}. Used only when the id names a test suite.`,
+    ),
+  simulatorModel: z
+    .string()
+    .nullish()
+    .describe(
+      "The model that plays the user for every scenario in the run. Used only when the id names a test suite.",
+    ),
+  judgeModel: z
+    .string()
+    .nullish()
+    .describe(
+      "The model that judges every scenario in the run. Used only when the id names a test suite.",
+    ),
   parameters: runParameterValuesSchema
     .optional()
     .describe(
@@ -180,6 +303,31 @@ const runSuiteInputSchema = z.object({
     "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters.",
   ),
 });
+
+/**
+ * The execution settings a run request carried, with the ones it left out
+ * absent rather than undefined.
+ *
+ * A test suite stores none of these and reads them from the request; a run
+ * plan stores its own and the service refuses a request that carries any. The
+ * difference is the service's to make, so this only forwards what was sent.
+ */
+function executionOverridesIn(
+  body: z.infer<typeof runSuiteInputSchema>,
+): Pick<
+  z.infer<typeof runSuiteInputSchema>,
+  "name" | "targets" | "repeatCount" | "simulatorModel" | "judgeModel"
+> {
+  return {
+    ...(body.name !== undefined && { name: body.name }),
+    ...(body.targets !== undefined && { targets: body.targets }),
+    ...(body.repeatCount !== undefined && { repeatCount: body.repeatCount }),
+    ...(body.simulatorModel !== undefined && {
+      simulatorModel: body.simulatorModel,
+    }),
+    ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
+  };
+}
 
 const suiteRunResultSchema = z.object({
   scheduled: z.boolean(),
@@ -211,10 +359,11 @@ function toSuiteResponse(suite: SimulationSuite) {
     id: suite.id,
     name: suite.name,
     slug: suite.slug,
-    kind: isSuiteKind(suite.kind) ? suite.kind : "custom",
+    kind: isSuiteKind(suite.kind) ? WIRE_KINDS[suite.kind] : "custom",
     description: suite.description,
     scenarioIds: suite.scenarioIds,
-    scope: suite.scope === null ? null : parseSuiteScope(suite.scope),
+    scope:
+      suite.scope === null ? null : toWireScope(parseSuiteScope(suite.scope)),
     targets,
     repeatCount: suite.repeatCount,
     labels: suite.labels,
@@ -230,14 +379,55 @@ function createService() {
   });
 }
 
+/**
+ * How this project addresses its run plans in the platform.
+ *
+ * Two interfaces show the same rows, and the project decides which one it
+ * reads, so the interface is read once and applied to every plan an answer
+ * carries.
+ */
+async function planUrlsOf({
+  project,
+  organizationId,
+}: {
+  project: { id: string; slug: string };
+  organizationId: string | undefined;
+}): Promise<(slug: string) => string> {
+  const ui = await readTestingInterface({
+    projectId: project.id,
+    organizationId,
+  });
+  return (slug: string) =>
+    platformUrl({
+      projectSlug: project.slug,
+      path: suitePath({ ui, slug, kind: "run_plan" }),
+    });
+}
+
+/** Where one run plan opens in the platform, for the interface the project reads. */
+async function planUrl({
+  project,
+  organizationId,
+  slug,
+}: {
+  project: { id: string; slug: string };
+  organizationId: string | undefined;
+  slug: string;
+}): Promise<string> {
+  return (await planUrlsOf({ project, organizationId }))(slug);
+}
+
 const secured = createProjectApp({ basePath: "/api/suites" });
+
+// Every response of the family names its successor, refusals included.
+secured.use(deprecatedAlias({ successor: "/api/v1/run-plans" }));
 
 // ── List Suites ────────────────────────────────────────────
 secured.access(requires("scenarios:view")).get(
   "/",
   describeRoute({
-    description:
-      "List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.",
+    deprecated: true,
+    description: `${DEPRECATION_NOTE} List all non-archived suites for the project. By default only run plans are returned; pass kind=folder for test suites.`,
     responses: {
       ...baseResponses,
       200: {
@@ -259,16 +449,18 @@ secured.access(requires("scenarios:view")).get(
     const service = createService();
     const suites = await service.getAll({
       projectId: project.id,
-      kinds: [kind],
+      kinds: [kind === "folder" ? "test_suite" : "run_plan"],
+    });
+
+    const planUrlOf = await planUrlsOf({
+      project,
+      organizationId: c.get("apiKeyOrganizationId"),
     });
 
     return c.json(
       suites.map((s) => ({
         ...toSuiteResponse(s),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/simulations/run-plans/${s.slug}`,
-        }),
+        platformUrl: planUrlOf(s.slug),
       })),
     );
   },
@@ -278,7 +470,8 @@ secured.access(requires("scenarios:view")).get(
 secured.access(requires("scenarios:view")).get(
   "/:id",
   describeRoute({
-    description: "Get a suite (run plan) by its ID",
+    deprecated: true,
+    description: `${DEPRECATION_NOTE} Get a suite (run plan) by its ID.`,
     responses: {
       ...baseResponses,
       200: {
@@ -292,7 +485,7 @@ secured.access(requires("scenarios:view")).get(
       404: {
         description: "Suite not found",
         content: {
-          "application/json": { schema: resolver(badRequestSchema) },
+          "application/json": { schema: resolver(suiteRefusalSchema) },
         },
       },
     },
@@ -311,9 +504,10 @@ secured.access(requires("scenarios:view")).get(
 
     return c.json({
       ...toSuiteResponse(suite),
-      platformUrl: platformUrl({
-        projectSlug: project.slug,
-        path: `/simulations/run-plans/${suite.slug}`,
+      platformUrl: await planUrl({
+        project,
+        organizationId: c.get("apiKeyOrganizationId"),
+        slug: suite.slug,
       }),
     });
   },
@@ -329,7 +523,8 @@ secured.access(requires("scenarios:view")).get(
 secured.access(requires("scenarios:create")).post(
   "/",
   describeRoute({
-    description: "Create a new suite (run plan)",
+    deprecated: true,
+    description: `${DEPRECATION_NOTE} Create a new suite (run plan).`,
     responses: {
       ...baseResponses,
       201: {
@@ -352,7 +547,7 @@ secured.access(requires("scenarios:create")).post(
     try {
       const suite =
         body.kind === "folder"
-          ? await service.createFolder({
+          ? await service.createTestSuite({
               projectId: project.id,
               name: body.name,
             })
@@ -360,7 +555,7 @@ secured.access(requires("scenarios:create")).post(
               name: body.name,
               description: body.description,
               scenarioIds: body.scenarioIds,
-              ...(body.scope && { scope: body.scope }),
+              ...(body.scope && { scope: toDomainScope(body.scope) }),
               targets: body.targets,
               repeatCount: body.repeatCount,
               labels: body.labels,
@@ -369,16 +564,17 @@ secured.access(requires("scenarios:create")).post(
       return c.json(
         {
           ...toSuiteResponse(suite),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/simulations/run-plans/${suite.slug}`,
+          platformUrl: await planUrl({
+            project,
+            organizationId: c.get("apiKeyOrganizationId"),
+            slug: suite.slug,
           }),
         },
         201,
       );
     } catch (error) {
       if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 400);
+        return c.json({ error: error.message, code: error.code }, 400);
       }
       throw error;
     }
@@ -390,7 +586,8 @@ secured.access(requires("scenarios:create")).post(
 secured.access(requires("scenarios:update")).patch(
   "/:id",
   describeRoute({
-    description: "Update a suite (run plan)",
+    deprecated: true,
+    description: `${DEPRECATION_NOTE} Update a suite (run plan).`,
     responses: {
       ...baseResponses,
       200: {
@@ -404,7 +601,7 @@ secured.access(requires("scenarios:update")).patch(
       404: {
         description: "Suite not found",
         content: {
-          "application/json": { schema: resolver(badRequestSchema) },
+          "application/json": { schema: resolver(suiteRefusalSchema) },
         },
       },
     },
@@ -421,18 +618,22 @@ secured.access(requires("scenarios:update")).patch(
       const suite = await service.update({
         id,
         projectId: project.id,
-        data: body,
+        data: {
+          ...body,
+          ...(body.scope && { scope: toDomainScope(body.scope) }),
+        },
       });
       return c.json({
         ...toSuiteResponse(suite),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/simulations/run-plans/${suite.slug}`,
+        platformUrl: await planUrl({
+          project,
+          organizationId: c.get("apiKeyOrganizationId"),
+          slug: suite.slug,
         }),
       });
     } catch (error) {
       if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 400);
+        return c.json({ error: error.message, code: error.code }, 400);
       }
       throw error;
     }
@@ -445,7 +646,8 @@ secured.access(requires("scenarios:update")).patch(
 secured.access(requires("scenarios:create")).post(
   "/:id/duplicate",
   describeRoute({
-    description: "Duplicate a suite (run plan)",
+    deprecated: true,
+    description: `${DEPRECATION_NOTE} Duplicate a suite (run plan).`,
     responses: {
       ...baseResponses,
       201: {
@@ -459,7 +661,7 @@ secured.access(requires("scenarios:create")).post(
       404: {
         description: "Suite not found",
         content: {
-          "application/json": { schema: resolver(badRequestSchema) },
+          "application/json": { schema: resolver(suiteRefusalSchema) },
         },
       },
     },
@@ -475,16 +677,17 @@ secured.access(requires("scenarios:create")).post(
       return c.json(
         {
           ...toSuiteResponse(suite),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/simulations/run-plans/${suite.slug}`,
+          platformUrl: await planUrl({
+            project,
+            organizationId: c.get("apiKeyOrganizationId"),
+            slug: suite.slug,
           }),
         },
         201,
       );
     } catch (error) {
       if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 404);
+        return c.json({ error: error.message, code: error.code }, 404);
       }
       throw error;
     }
@@ -503,8 +706,8 @@ secured.access(requires("scenarios:create")).post(
 secured.access(requires("scenarios:create")).post(
   "/:id/run",
   describeRoute({
-    description:
-      "Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.",
+    deprecated: true,
+    description: `${DEPRECATION_NOTE} Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.`,
     responses: {
       ...baseResponses,
       200: {
@@ -518,7 +721,7 @@ secured.access(requires("scenarios:create")).post(
       404: {
         description: "Suite not found",
         content: {
-          "application/json": { schema: resolver(badRequestSchema) },
+          "application/json": { schema: resolver(suiteRefusalSchema) },
         },
       },
     },
@@ -554,6 +757,12 @@ secured.access(requires("scenarios:create")).post(
         idempotencyKey,
         parameters: body.parameters,
         note: body.note,
+        // Read by a test suite run, which stores none of these; a run plan run
+        // that carries any of them is refused by the service.
+        ...executionOverridesIn(body),
+        // A user-bound key names the person it belongs to. A project key
+        // names nobody, and the run records no actor at all.
+        actor: runActorOf(c),
       });
 
       return c.json({
@@ -562,7 +771,7 @@ secured.access(requires("scenarios:create")).post(
       });
     } catch (error) {
       if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 400);
+        return c.json({ error: error.message, code: error.code }, 400);
       }
       throw error;
     }
@@ -575,8 +784,8 @@ secured.access(requires("scenarios:create")).post(
 secured.access(requires("scenarios:manage")).delete(
   "/:id",
   describeRoute({
-    description:
-      "Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction.",
+    deprecated: true,
+    description: `${DEPRECATION_NOTE} Archive (soft-delete) a suite. Archiving a folder also archives every scenario filed in it, in one transaction.`,
     responses: {
       ...baseResponses,
       200: {
@@ -592,7 +801,7 @@ secured.access(requires("scenarios:manage")).delete(
       404: {
         description: "Suite not found",
         content: {
-          "application/json": { schema: resolver(badRequestSchema) },
+          "application/json": { schema: resolver(suiteRefusalSchema) },
         },
       },
     },
@@ -609,10 +818,14 @@ secured.access(requires("scenarios:manage")).delete(
       return c.json({ error: "Suite not found" }, 404);
     }
 
-    // A folder holds the cases filed into it, so archiving it archives them
-    // too. A run plan only references cases and leaves them where they are.
-    if (existing.kind === "folder") {
-      await service.archiveFolder({ projectId: project.id, folderId: id });
+    // A test suite holds the scenarios filed into it, so archiving it archives
+    // them too. A run plan only references scenarios and leaves them where
+    // they are.
+    if (existing.kind === "test_suite") {
+      await service.archiveTestSuite({
+        projectId: project.id,
+        testSuiteId: id,
+      });
       return c.json({ id, archived: true });
     }
 

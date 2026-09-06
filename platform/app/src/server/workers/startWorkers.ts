@@ -92,6 +92,18 @@ async function bootScenarioProcessor(
   logger.info("scenario processor ready");
 }
 
+// NLP fetch dispatchers (undici Agents, memoized per timeoutMs by
+// ~/server/nlpgo/timeouts.ts) hold pooled sockets to nlpgo open for the
+// scenario adapters bootScenarioProcessor just started. Nothing to start
+// here, only a teardown to register, so every dispatcher the process built
+// gets closed on shutdown instead of leaking its connection pool.
+async function bootNlpFetchDispatcherTeardown(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { closeNlpFetchDispatchers } = await import("~/server/nlpgo/timeouts");
+  shutdownHandles.push(() => closeNlpFetchDispatchers());
+}
+
 // Per-tenant enqueue-rate anomaly detector (surfaces runaway tenants on
 // the Ops page).
 async function bootAnomalyWorker(
@@ -463,10 +475,10 @@ async function respondToLivenessThread(
 
 /**
  * Boots the background worker stack: ingestion pullers, topic clustering,
- * ClickHouse storage-stats collection, the scenario executor pool, the
- * enqueue-rate anomaly detector, the governance spend-spike detector, the
- * self-hosted usage-stats telemetry, and (optionally) the Prometheus metrics
- * HTTP server.
+ * ClickHouse storage-stats collection, the scenario executor pool (plus its
+ * NLP fetch dispatcher cleanup), the enqueue-rate anomaly detector, the
+ * governance spend-spike detector, the self-hosted usage-stats telemetry,
+ * and (optionally) the Prometheus metrics HTTP server.
  *
  * Assumes the App has ALREADY been initialized by the caller with a
  * worker-capable role — `initializeWorkerApp()` for the standalone deployment,
@@ -512,6 +524,7 @@ export async function startWorkers(
     // execution; there is no separate queue worker to boot.
     await bootStorageStatsCollection(shutdownHandles);
     await bootScenarioProcessor(shutdownHandles);
+    await bootNlpFetchDispatcherTeardown(shutdownHandles);
     // Langy turns self-drive: the process outbox dispatches to the Go manager,
     // which pushes signed frames to the relay. No in-process pool/executor to
     // boot; heartbeat recovery belongs to the direct liveness subscriber.

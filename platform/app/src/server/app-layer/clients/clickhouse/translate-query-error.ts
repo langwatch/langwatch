@@ -60,6 +60,18 @@ const TOO_MANY_BYTES: ServerError = { code: "307", name: "TOO_MANY_BYTES" };
 // missing table, missing database, and an RBAC refusal. Grouped because a
 // caller cannot tell them apart and must not be able to — which of the three
 // fired describes the server's internals, not the query.
+/**
+ * A name in the query that resolves to no column.
+ *
+ * Kept apart from the three below: those describe the deployment (a missing
+ * view, an ungranted grant), whereas this one describes the SQL, and only a
+ * caller who wrote the SQL can act on it.
+ */
+const UNKNOWN_IDENTIFIER: ServerError = {
+  code: "47",
+  name: "UNKNOWN_IDENTIFIER",
+};
+
 const UNKNOWN_TABLE: ServerError = { code: "60", name: "UNKNOWN_TABLE" };
 const UNKNOWN_DATABASE: ServerError = { code: "81", name: "UNKNOWN_DATABASE" };
 const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
@@ -109,6 +121,76 @@ export function isClickHouseObjectUnavailableError(error: unknown): boolean {
     error,
     variants: [UNKNOWN_TABLE, UNKNOWN_DATABASE, ACCESS_DENIED],
   });
+}
+
+/**
+ * True when the server refused because a name in the query resolves to no
+ * column: UNKNOWN_IDENTIFIER (47).
+ *
+ * Not mapped inside {@link translateClickHouseQueryError}, for the same reason
+ * as {@link isClickHouseObjectUnavailableError}: on the application's own
+ * connection every column name is one this repository wrote, so a rejected one
+ * is a plain bug and must degrade to "unknown" (ADR-045). Exported for the
+ * caller where the SQL is the customer's own and the name is theirs to fix,
+ * the LangWatchQL executor.
+ */
+export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [UNKNOWN_IDENTIFIER] });
+}
+
+/**
+ * A single identifier, as ClickHouse writes one: a leading letter or
+ * underscore, then word characters, optionally qualified by a table alias.
+ * Anything else is not something to hand back.
+ */
+const IDENTIFIER_SHAPE = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
+
+/**
+ * The sentences ClickHouse uses to say a name resolved to nothing.
+ *
+ * Captured from a real server rather than assumed. 25.x writes:
+ *
+ *     Unknown expression identifier `trace_idd_typo` in scope SELECT ...
+ *
+ * Note the **backticks**: the analyzer quotes identifiers with them, not with
+ * the single quotes the rest of its diagnostics use. An earlier version of this
+ * matched `'...'` only, passed its own fixtures, and read nothing at all off
+ * the live engine, which is what `unknownIdentifier.integration.test.ts`
+ * exists to catch. The older non-analyzer path writes `Missing columns: 'x'
+ * while processing query: ...` with single quotes, so both delimiters are
+ * accepted and the shape check below decides what is usable.
+ *
+ * Either delimiter opens and closes, rather than a matched pair: an identifier
+ * can contain neither, so a mismatched pair cannot smuggle anything past
+ * {@link IDENTIFIER_SHAPE}.
+ */
+const IDENTIFIER_PATTERNS: readonly RegExp[] = [
+  /Unknown (?:expression |table |column )?identifier [`'"]([^`'"]{1,128})[`'"]/,
+  /Missing columns: [`'"]([^`'"]{1,128})[`'"]/,
+];
+
+/**
+ * The identifier ClickHouse could not resolve, or `undefined`.
+ *
+ * **This is the only thing that may be taken from the message.** A ClickHouse
+ * error echoes the submitted query and names internal objects, so relaying the
+ * text would leak both the query and the deployment's shape to whoever
+ * receives the error. So the extraction is deliberately narrow and fails
+ * closed twice: the sentence has to match one of the known forms, and the
+ * token it captures has to look like an identifier. A miss returns
+ * `undefined`, and the caller reports the failure without naming a column,
+ * which is worse copy and still correct.
+ */
+export function unknownIdentifierFromError(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  for (const pattern of IDENTIFIER_PATTERNS) {
+    const candidate = pattern.exec(error.message)?.[1];
+    if (candidate !== undefined && IDENTIFIER_SHAPE.test(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
 }
 
 /**

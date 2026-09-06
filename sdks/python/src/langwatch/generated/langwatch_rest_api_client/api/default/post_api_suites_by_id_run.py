@@ -12,13 +12,13 @@ from ...models.post_api_suites_by_id_run_response_401 import PostApiSuitesByIdRu
 from ...models.post_api_suites_by_id_run_response_404 import PostApiSuitesByIdRunResponse404
 from ...models.post_api_suites_by_id_run_response_422 import PostApiSuitesByIdRunResponse422
 from ...models.post_api_suites_by_id_run_response_500 import PostApiSuitesByIdRunResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PostApiSuitesByIdRunBody | Unset = UNSET,
+    body: PostApiSuitesByIdRunBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -29,8 +29,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -109,8 +108,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiSuitesByIdRunBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiSuitesByIdRunBody,
 ) -> Response[
     PostApiSuitesByIdRunResponse200
     | PostApiSuitesByIdRunResponse400
@@ -119,11 +118,13 @@ def sync_detailed(
     | PostApiSuitesByIdRunResponse422
     | PostApiSuitesByIdRunResponse500
 ]:
-    """Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.
+    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario
+    executions for all active scenarios x targets x repeatCount. When the id names a test suite, the
+    targets, the repeat count and the models are read from the body.
 
     Args:
         id (str):
-        body (PostApiSuitesByIdRunBody | Unset):
+        body (PostApiSuitesByIdRunBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -148,8 +149,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiSuitesByIdRunBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiSuitesByIdRunBody,
 ) -> (
     PostApiSuitesByIdRunResponse200
     | PostApiSuitesByIdRunResponse400
@@ -159,11 +160,13 @@ def sync(
     | PostApiSuitesByIdRunResponse500
     | None
 ):
-    """Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.
+    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario
+    executions for all active scenarios x targets x repeatCount. When the id names a test suite, the
+    targets, the repeat count and the models are read from the body.
 
     Args:
         id (str):
-        body (PostApiSuitesByIdRunBody | Unset):
+        body (PostApiSuitesByIdRunBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -183,8 +186,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiSuitesByIdRunBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiSuitesByIdRunBody,
 ) -> Response[
     PostApiSuitesByIdRunResponse200
     | PostApiSuitesByIdRunResponse400
@@ -193,11 +196,13 @@ async def asyncio_detailed(
     | PostApiSuitesByIdRunResponse422
     | PostApiSuitesByIdRunResponse500
 ]:
-    """Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.
+    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario
+    executions for all active scenarios x targets x repeatCount. When the id names a test suite, the
+    targets, the repeat count and the models are read from the body.
 
     Args:
         id (str):
-        body (PostApiSuitesByIdRunBody | Unset):
+        body (PostApiSuitesByIdRunBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -220,8 +225,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiSuitesByIdRunBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiSuitesByIdRunBody,
 ) -> (
     PostApiSuitesByIdRunResponse200
     | PostApiSuitesByIdRunResponse400
@@ -231,11 +236,13 @@ async def asyncio(
     | PostApiSuitesByIdRunResponse500
     | None
 ):
-    """Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.
+    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario
+    executions for all active scenarios x targets x repeatCount. When the id names a test suite, the
+    targets, the repeat count and the models are read from the body.
 
     Args:
         id (str):
-        body (PostApiSuitesByIdRunBody | Unset):
+        body (PostApiSuitesByIdRunBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -12,6 +12,7 @@ import {
 import type { AppErrorCode } from "~/features/errors/logic/codes";
 import { remediation } from "~/server/app-layer/error-remediation";
 import type { ScenarioContentField } from "./execution/scenario-content-template";
+import type { ScenarioParameterValue } from "./parameters";
 
 export class ScenarioNotFoundError extends Error {
   constructor(message = "Scenario not found") {
@@ -21,18 +22,18 @@ export class ScenarioNotFoundError extends Error {
 }
 
 /**
- * Thrown when a scenario is filed into something that is not an active folder
- * of the same project: a custom run plan, an archived folder, another
- * project's folder, or an id that names nothing.
+ * Thrown when a scenario is filed into something that is not an active test suite
+ * of the same project: a run plan, an archived test suite, another
+ * project's test suite, or an id that names nothing.
  */
-export class ScenarioFolderNotFoundError extends HandledError {
-  declare readonly code: "scenario_folder_not_found";
+export class ScenarioTestSuiteNotFoundError extends HandledError {
+  declare readonly code: "scenario_test_suite_not_found";
 
   constructor() {
-    super("scenario_folder_not_found", "Test suite folder not found", {
+    super("scenario_test_suite_not_found", "Test suite not found", {
       httpStatus: 404,
     });
-    this.name = "ScenarioFolderNotFoundError";
+    this.name = "ScenarioTestSuiteNotFoundError";
   }
 }
 
@@ -41,7 +42,7 @@ export class ScenarioFolderNotFoundError extends HandledError {
  *
  * Raised only when the caller sent an expected version: a caller that sends
  * none asked for "save over whatever is there", and gets the next number. The
- * refusal happens before the write, so the stored case is exactly as the other
+ * refusal happens before the write, so the stored scenario is exactly as the other
  * save left it. `currentVersion` rides on `meta` so the editor can offer the
  * reload it needs.
  *
@@ -53,7 +54,7 @@ export class ScenarioStaleVersionError extends HandledError {
   constructor({ currentVersion }: { currentVersion: number }) {
     super(
       "scenario_stale_version",
-      "This test case changed since it was loaded",
+      "This scenario changed since it was loaded",
       {
         httpStatus: 409,
         fault: "customer",
@@ -144,11 +145,16 @@ export class ScenarioParameterError extends HandledError {
 }
 
 /**
- * Thrown when a run supplies a value for a name no scenario in it declares.
+ * Thrown when a run supplies a value for a name nothing in it declares.
  *
- * Both lists are on `meta` because the run dialog renders them: the rejected
- * names so the customer can see their typo, and the declared ones so they can
- * see what they meant to type.
+ * A run reads two sets of declarations: what the scenarios in it declare, and
+ * what the agent it goes against declares on its own. A name in neither is
+ * refused, and the target is named because the same value can be right for
+ * one agent of the run and unknown to the next.
+ *
+ * All three go on `meta` because the run dialog renders them: the rejected
+ * names so the customer can see their typo, the declared ones so they can see
+ * what they meant to type, and the target the run was refused for.
  */
 export class ScenarioParameterUnknownError extends ScenarioParameterError {
   declare readonly code: "scenario_parameter_unknown";
@@ -156,9 +162,12 @@ export class ScenarioParameterUnknownError extends ScenarioParameterError {
   constructor({
     unknownKeys,
     declaredNames,
+    targetLabel,
   }: {
     unknownKeys: string[];
     declaredNames: string[];
+    /** The target the run was refused for, when the run names one. */
+    targetLabel?: string;
   }) {
     super({
       message: `Unknown scenario parameters: ${unknownKeys.join(", ")}. Declared: ${
@@ -166,9 +175,68 @@ export class ScenarioParameterUnknownError extends ScenarioParameterError {
       }`,
       code: "scenario_parameter_unknown",
       httpStatus: 422,
-      meta: { unknownKeys, declaredNames },
+      meta: {
+        unknownKeys,
+        declaredNames,
+        ...(targetLabel ? { targetLabel } : {}),
+      },
     });
     this.name = "ScenarioParameterUnknownError";
+  }
+}
+
+/**
+ * Thrown when a run supplies a value outside the closed option list a
+ * parameter declares.
+ *
+ * The options are on `meta` because the run dialog renders them: the customer
+ * reads what the parameter accepts next to the value that was refused.
+ */
+export class ScenarioParameterOptionInvalidError extends ScenarioParameterError {
+  declare readonly code: "scenario_parameter_option_invalid";
+
+  constructor({
+    name,
+    value,
+    options,
+  }: {
+    name: string;
+    value: ScenarioParameterValue;
+    options: ScenarioParameterValue[];
+  }) {
+    super({
+      message: `The value of "${name}" is not one of its options: ${options
+        .map((option) => String(option))
+        .join(", ")}`,
+      code: "scenario_parameter_option_invalid",
+      httpStatus: 422,
+      meta: { name, value, options },
+    });
+    this.name = "ScenarioParameterOptionInvalidError";
+  }
+}
+
+/**
+ * Thrown when a parameter declared required resolved no value for the run.
+ *
+ * A connected agent declares one for every function parameter its own code
+ * gives no default. The SDK refuses a call that carries none, so the run
+ * would be queued only to fail on its first turn.
+ *
+ * The names are on `meta` because the run dialog renders them: the customer
+ * reads which values the run still needs.
+ */
+export class ScenarioParameterRequiredError extends ScenarioParameterError {
+  declare readonly code: "scenario_parameter_required";
+
+  constructor({ names }: { names: string[] }) {
+    super({
+      message: `No value for required scenario parameters: ${names.join(", ")}`,
+      code: "scenario_parameter_required",
+      httpStatus: 422,
+      meta: { names },
+    });
+    this.name = "ScenarioParameterRequiredError";
   }
 }
 
@@ -289,5 +357,38 @@ export class ScenarioParameterTemplateInvalidError extends ScenarioParameterErro
       meta: { field },
     });
     this.name = "ScenarioParameterTemplateInvalidError";
+  }
+}
+
+/**
+ * Refuses a run addressed to a set the platform owns.
+ *
+ * The internal namespace holds two kinds of address. `__internal__<suiteId>__
+ * suite` is a run plan's, and every read of that plan aggregates the runs
+ * stored there, so a one-off run written into it moves that plan's pass rate,
+ * cost and trend. `__internal__<projectId>__on-platform-scenarios` is the
+ * one-off bucket, and only the project's own.
+ *
+ * A set name outside the namespace is the customer's own and stays free.
+ *
+ * Tenancy is enforced elsewhere. This refusal is about not corrupting a plan
+ * the caller is otherwise entitled to read.
+ *
+ * @see specs/scenarios/reserved-set-write-guard.feature
+ */
+export class ScenarioReservedSetIdError extends HandledError {
+  declare readonly code: "scenario_reserved_set_id";
+
+  constructor() {
+    super(
+      "scenario_reserved_set_id",
+      "This run cannot be recorded under a reserved set",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...remediation("scenario_reserved_set_id"),
+      },
+    );
+    this.name = "ScenarioReservedSetIdError";
   }
 }

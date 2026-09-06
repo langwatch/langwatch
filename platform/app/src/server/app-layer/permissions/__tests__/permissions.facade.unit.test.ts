@@ -23,6 +23,7 @@ const repository = {
 
 const credentials = {
   findApiKeyDecision: vi.fn(),
+  findApiKeyProjectDecisions: vi.fn(),
   findProjectScope: vi.fn(),
 } satisfies CredentialDecisionRepository;
 

@@ -1,10 +1,9 @@
-Feature: Settings shell in the new navigation modes
-  As a user on a new navigation mode
+Feature: Settings shell
+  As a user
   I want Settings to read as a detour with a clear way back
   So that configuration never feels like another product
 
-  In the new modes the settings pages render inside the navigation-v2
-  shell. The top bar shows a static "Settings" title in place of the
+  The settings pages render inside the navigation-v2 shell. The top bar shows a static "Settings" title in place of the
   product dropdown (the icon rail marks its Settings tile instead), and
   the organization control stays. The sidebar opens with a back entry
   that returns to the product the user came from, then Quick Search,
@@ -22,31 +21,28 @@ Feature: Settings shell in the new navigation modes
   came after four enterprise entries most readers cannot open, which put
   a page they use often at the bottom of a group they have no use for.
 
-  Devices on the legacy mode keep the current settings chrome
-  unchanged.
-
   @integration
   Scenario: The Settings sidebar opens with the way back
-    Given I entered Settings from a Gateway page in a new navigation mode
+    Given I entered Settings from a Gateway page
     Then the first sidebar entry goes back to that Gateway page
     And Quick Search comes right after it
 
   @integration
   Scenario: The settings menu is grouped with its gates kept
-    Given I open Settings in a new navigation mode
+    Given I open Settings
     Then the sidebar shows the ORGANIZATION and ACCESS groups
     And General and Members keep their current addresses
 
   @integration
   Scenario: Enterprise entries carry a quiet grey pill
     Given my plan shows the enterprise settings entries
-    When the settings sidebar renders in a new navigation mode
+    When the settings sidebar renders
     Then the enterprise entries carry an "ENT" pill
     And the pill is grey with a hairline border, not a coloured one
 
   @integration
   Scenario: The settings groups fold, and start open
-    Given I open Settings in a new navigation mode
+    Given I open Settings
     Then every settings group is open
     When I press a group heading
     Then that group folds away and the other groups stay as they are
@@ -54,25 +50,25 @@ Feature: Settings shell in the new navigation modes
 
   @integration
   Scenario: A rule separates the way back from the pages below it
-    Given I open Settings in a new navigation mode
+    Given I open Settings
     Then a rule runs under the way back entry
 
   @integration
   Scenario: The way back stays in place while the menu scrolls
-    Given I open Settings in a new navigation mode
+    Given I open Settings
     When the settings menu scrolls
     Then the way back entry stays where it is
     And only the pages under the rule move
 
   @integration
   Scenario: The pages are cut at the rule as they scroll under the way back
-    Given I open Settings in a new navigation mode
+    Given I open Settings
     Then the part that scrolls starts at the rule under the way back
     And the space under that rule scrolls with the pages
 
   @integration
   Scenario: API Keys sits under General
-    Given I open Settings in a new navigation mode
+    Given I open Settings
     Then API Keys comes right after General in the ORGANIZATION group
     And the ACCESS group does not hold it
 
@@ -85,7 +81,7 @@ Feature: Settings shell in the new navigation modes
   @integration
   Scenario: A lite member sees no restricted settings entries
     Given I am a lite member
-    When the settings sidebar renders in a new navigation mode
+    When the settings sidebar renders
     Then there is no API Keys entry and no Secrets entry
 
   @integration
@@ -93,9 +89,3 @@ Feature: Settings shell in the new navigation modes
     Given I open Settings in the product-switcher mode
     Then the top bar shows "Settings" with no product dropdown
     And the organization control stays in the top bar
-
-  @integration
-  Scenario: Legacy mode keeps the current settings chrome
-    Given my device is on the legacy mode
-    When I open Settings
-    Then the current settings navigation renders unchanged

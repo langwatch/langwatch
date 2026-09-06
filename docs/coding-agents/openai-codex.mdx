@@ -113,6 +113,18 @@ cd "<repo>/.claude/worktrees/<name>" && codex
 
 Everything above is telemetry: Codex keeps your own plan and your own login. Choosing **Using an API key** on the first wrapper run instead routes the model calls themselves through the LangWatch AI Gateway with a virtual key, which adds budgets, model policies and model aliases on top of the same telemetry. [Codex CLI through the gateway](/ai-gateway/cli/codex) covers that setup and the governance recipes.
 
+The same rule decides what a long-lived session reports. A session resumed across days keeps the directory it was first started in, and commands that reach into a checkout from somewhere else, such as `git -C <repo>` or a `cd` inside a subshell, do not move it. So a standing review agent that lives in a scratch directory reports no repository, no branch and no pull request, no matter how many pull requests it reviews. Give such an agent a fresh `codex` session inside a worktree of the pull request's branch for each review:
+
+```bash
+git -C <repo> fetch origin <branch>
+git -C <repo> worktree add -B <branch> <repo>/.claude/worktrees/<name> origin/<branch>
+cd <repo>/.claude/worktrees/<name> && codex
+```
+
+`-B` points the local branch at the ref the fetch just updated, so an old local copy of the branch does not decide what the agent reviews. Git refuses the `worktree add` if the branch is already checked out somewhere else: start `codex` in that worktree instead of making a second one. A pull request from a fork has no branch on `origin`. For one of those, fetch `refs/pull/<number>/head` from `origin` and use `FETCH_HEAD` in place of `origin/<branch>`, and keep `-B <branch>` at the name of the pull request's own branch so the attribution still matches.
+
+Claude Code sessions can switch natively instead, with the EnterWorktree tool. Codex has no equivalent, so the restart is the way. See [the Claude Code page](/integration/tools/integrations/claude-code#attribute-sessions-to-pull-requests) for the Claude Code rules.
+
 ## Content and privacy
 
 Content reaches LangWatch on one path only, and you can turn that path off. Codex's own OpenTelemetry export carries no conversation content; the `notify` program LangWatch installs does send it. Read both parts below before you decide.

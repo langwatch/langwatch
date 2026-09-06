@@ -3,6 +3,7 @@ from enum import Enum
 
 class GetApiSuitesResponse200ItemTargetsItemType(str, Enum):
     CODE = "code"
+    CONNECTED = "connected"
     HTTP = "http"
     PROMPT = "prompt"
     WORKFLOW = "workflow"

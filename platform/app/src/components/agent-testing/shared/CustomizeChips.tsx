@@ -1,5 +1,5 @@
 /**
- * The chips that customize a dialog: the run dialog and the test case dialog
+ * The chips that customize a dialog: the run dialog and the scenario dialog
  * both offer their optional fields this way.
  *
  * Each chip adds one block to the form. A chip that was chosen is no longer

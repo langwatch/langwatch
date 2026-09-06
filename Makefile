@@ -1,6 +1,7 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
+.PHONY: dogfood-langy-local
 .PHONY: herrgen herrgen-check
 .PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-changed
 .PHONY: _dev-up-deprecation-warning
@@ -60,12 +61,20 @@ help:
 	@echo "    make boxd-preview-down BRANCH=<n>   destroy preview VM"
 	@echo "    make boxd-preview-status BRANCH=<n> VM status + stack state"
 	@echo ""
+	@echo "  Dogfood applications (the customer application Langy works on):"
+	@echo "    make dogfood-langy-local lang=python      boot the ACME support demo (FastAPI)"
+	@echo "    make dogfood-langy-local lang=typescript  boot the ACME support demo (Hono)"
+	@echo ""
 	@echo "  Per-worktree isolated stacks (for AI agents / parallel work):"
 	@echo "    make dev-up [PROFILE=full]            start isolated containers"
 	@echo "    make dev-down                          stop isolated containers"
 	@echo "    make dev-logs                          tail isolated logs"
 	@echo ""
 	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
+
+# The demo applications keep their own Makefile; this only forwards `lang`.
+dogfood-langy-local:
+	@$(MAKE) -C dev/dogfood/acme-support dogfood-langy-local $(if $(lang),lang=$(lang))
 
 include dev/boxd.mk
 # dev/haven.mk is included at the BOTTOM of this file: its `make haven <sub>`
@@ -183,7 +192,10 @@ test-scripts:
 # Mirror the Go services' herr error codes into
 # packages/handled-error/src/codes.generated.ts, so the TypeScript control
 # plane stops compiling when a Go service gains a code with no presentation.
-# Run after adding or renaming a `herr.Code(...)` const. `herrgen-check` is the
+# Run after adding or renaming a `herr.Code(...)` const — and after EDITING one's
+# doc comment, which the generator copies into the emitted file, so a reworded
+# sentence fails `generated` in CI exactly like a new code does.
+# `herrgen-check` is the
 # drift check, and go-ci.yaml's `generated` job calls this same target, so what
 # CI runs and what you run cannot drift apart.
 herrgen:
