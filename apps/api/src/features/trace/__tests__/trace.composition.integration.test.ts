@@ -1422,6 +1422,7 @@ describe("given the anonymous share read assembles its payload", () => {
   });
 
   describe("given the trace belongs to a conversation", () => {
+    /** @scenario A shared link never reveals the surrounding conversation */
     it("names the conversation the trace is in and carries none of it", async () => {
       const { application } = composeAssemblingShare({ spanCount: 2 });
 
