@@ -46,7 +46,6 @@ export function ProviderScreen({
   picksCount,
   organizationId,
   projectId,
-  codexAvailable,
   fading,
   onConnected,
   onSkip,
@@ -54,17 +53,13 @@ export function ProviderScreen({
   picksCount: number;
   organizationId: string;
   projectId: string | undefined;
-  codexAvailable: boolean;
   fading: boolean;
   onConnected: (connected: GuidedConnectedProvider) => void;
   onSkip: () => void;
 }) {
   const { emit } = useAnalytics();
   const [typed, setTyped] = useState(false);
-  const providers = useMemo(
-    () => guidedProvidersFor({ codexAvailable }),
-    [codexAvailable],
-  );
+  const providers = useMemo(() => guidedProvidersFor(), []);
   const [selectedId, setSelectedId] = useState(providers[0]?.id ?? "openai");
   const selected = providers.find((p) => p.id === selectedId) ?? providers[0]!;
   const [confirmSkip, setConfirmSkip] = useState(false);

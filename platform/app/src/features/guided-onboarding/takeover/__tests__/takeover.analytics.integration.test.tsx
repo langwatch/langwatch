@@ -147,7 +147,6 @@ describe("the takeover's analytics", () => {
             picksCount={1}
             organizationId="org_1"
             projectId="proj_1"
-            codexAvailable
             fading={false}
             onConnected={vi.fn()}
             onSkip={vi.fn()}

@@ -30,7 +30,6 @@ export function GuidedTakeover({
   initialPhase,
   initialPaths = [],
   returnTo,
-  codexAvailable,
 }: {
   organizationId: string;
   organizationName: string;
@@ -42,7 +41,6 @@ export function GuidedTakeover({
   initialPhase: TakeoverPhase;
   initialPaths?: GuidedPath[];
   returnTo: string | null;
-  codexAvailable: boolean;
 }) {
   const [phase, setPhase] = useState<TakeoverPhase>(initialPhase);
   const [fading, setFading] = useState(false);
@@ -113,7 +111,6 @@ export function GuidedTakeover({
             picksCount={paths.length}
             organizationId={organizationId}
             projectId={projectId}
-            codexAvailable={codexAvailable}
             fading={fading}
             onConnected={() => {
               setFading(true);

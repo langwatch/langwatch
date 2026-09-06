@@ -50,7 +50,6 @@ export const WelcomeScreen: React.FC = () => {
     getFormData,
     formContextValue,
     isPublicEnvLoading,
-    isSaaS,
     onboardingVariant,
   } = useOnboardingFlow();
 
@@ -280,7 +279,6 @@ export const WelcomeScreen: React.FC = () => {
         usageStyle={form.usageStyle}
         initialPhase="hello"
         returnTo={returnTo}
-        codexAvailable={isSaaS}
       />
     );
   }
@@ -296,7 +294,6 @@ export const WelcomeScreen: React.FC = () => {
         initialPhase={resume.phase}
         initialPaths={resume.paths}
         returnTo={returnTo}
-        codexAvailable={isSaaS}
       />
     );
   }

@@ -123,19 +123,19 @@ vi.mock("~/components/settings/useCodexDeviceSignIn", () => ({
   },
 }));
 
+import { providersForSurface } from "~/features/onboarding/regions/model-providers/providersForSurface";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
 import { ProviderScreen } from "../ProviderScreen";
+import { guidedProvidersFor } from "../providers";
 
 afterEach(cleanup);
 
 function renderProvider({
   picksCount = 2,
-  codexAvailable = true,
   onConnected = vi.fn(),
   onSkip = vi.fn(),
 }: {
   picksCount?: number;
-  codexAvailable?: boolean;
   onConnected?: (c: unknown) => void;
   onSkip?: () => void;
 } = {}) {
@@ -145,7 +145,6 @@ function renderProvider({
         picksCount={picksCount}
         organizationId="org_1"
         projectId="proj_1"
-        codexAvailable={codexAvailable}
         fading={false}
         onConnected={onConnected}
         onSkip={onSkip}
@@ -482,15 +481,19 @@ describe("ProviderScreen", () => {
     });
   });
 
-  describe("when the install is self-hosted", () => {
-    /** @scenario "A self-hosted install offers the takeover without Codex" */
-    it("starts the marks at OpenAI, selected, with no Codex", () => {
-      renderProvider({ codexAvailable: false });
+  describe("when the panel's inline model setup offers Codex", () => {
+    /** @scenario "The takeover offers Codex wherever the panel's model setup does" */
+    it("offers the same providers the panel's model setup offers, Codex included", () => {
+      renderProvider();
       const names = marks().map((m) => m.getAttribute("aria-label"));
-      expect(names[0]).toBe("OpenAI");
-      expect(names).not.toContain("Codex");
-      expect(mark("OpenAI")).toHaveAttribute("aria-checked", "true");
-      expect(screen.getByLabelText("API key")).toBeInTheDocument();
+      const offeredToLangy = providersForSurface("langy").map((p) => p.key);
+      expect(offeredToLangy).toContain("codex");
+      expect(names).toContain("Codex");
+      // One rule for both pickers: every mark points at a provider the
+      // panel's inline model setup also lists.
+      for (const provider of guidedProvidersFor()) {
+        expect(offeredToLangy).toContain(provider.registryKey);
+      }
     });
   });
 });

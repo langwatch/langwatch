@@ -1,3 +1,4 @@
+import { providersForSurface } from "~/features/onboarding/regions/model-providers/providersForSurface";
 import {
   getModelProvider,
   modelProviderRegistry,
@@ -214,19 +215,14 @@ export const GUIDED_PROVIDERS: GuidedProvider[] = [
 export const GUIDED_MODEL_PILLS_MAX = 4;
 
 /**
- * The providers offered on this install: the registry's per-surface rules
- * apply, and Codex only where its sign-in is available.
+ * The providers offered on this install, decided by the registry's
+ * per-surface rule and nothing else: the same rule the panel's inline model
+ * setup applies, so the takeover never hides a provider (Codex included)
+ * that the panel offers a moment later.
  */
-export function guidedProvidersFor({
-  codexAvailable,
-}: {
-  codexAvailable: boolean;
-}): GuidedProvider[] {
-  return GUIDED_PROVIDERS.filter((p) => {
-    if (p.kind === "oauth" && !codexAvailable) return false;
-    const spec = getModelProvider(p.registryKey);
-    return !spec?.hiddenOn?.includes("guided");
-  });
+export function guidedProvidersFor(): GuidedProvider[] {
+  const offered = new Set(providersForSurface("guided").map((mp) => mp.key));
+  return GUIDED_PROVIDERS.filter((p) => offered.has(p.registryKey));
 }
 
 export function registrySpecFor(provider: GuidedProvider): ModelProviderSpec {

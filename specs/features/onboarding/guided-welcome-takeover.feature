@@ -285,11 +285,14 @@ Feature: Guided welcome flow and takeover screens
   # ============================================================================
 
   @integration
-  Scenario: A self-hosted install offers the takeover without Codex
+  Scenario: The takeover offers Codex wherever the panel's model setup does
+    # One availability rule for both pickers, the provider registry's own
+    # per-surface rule, so a self-hosted install never hides Codex from the
+    # takeover while the panel's inline model setup offers it.
     Given the install is self-hosted
     When the provider screen opens
-    Then the marks start with OpenAI and Codex is not offered
-    And OpenAI is selected
+    Then the marks start with Codex, selected
+    And every mark is a provider the panel's inline model setup also offers
 
   # ============================================================================
   # Resume and continuation

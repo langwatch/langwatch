@@ -150,7 +150,6 @@ function renderTakeover({
         initialPhase={initialPhase}
         initialPaths={initialPaths}
         returnTo={returnTo}
-        codexAvailable
       />
     </ChakraProvider>,
   );
