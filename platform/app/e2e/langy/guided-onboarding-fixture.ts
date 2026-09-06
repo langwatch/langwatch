@@ -603,7 +603,12 @@ export function expectSnippetOnThisGateway({
   gatewayUrl: string;
 }): void {
   const escaped = gatewayUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  expect(text).toMatch(new RegExp(`OPENAI_BASE_URL=["']?${escaped}/v1`));
+  // The address ends at /v1: a sentence's full stop copied from the brief
+  // into the quotes would give the user an invalid base URL.
+  expect(text).toMatch(
+    new RegExp(`OPENAI_BASE_URL=["']?${escaped}/v1["']?(\\s|$)`, "m"),
+  );
+  expect(text).not.toMatch(new RegExp(`${escaped}/v1\\.`));
   expect(text).not.toMatch(/gateway\.langwatch\.ai/);
 }
 
