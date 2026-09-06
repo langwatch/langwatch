@@ -150,3 +150,11 @@ Feature: Python SDK HTTP client redirects
     Given the SDK source tree outside the generated client and the shared module
     When the source is scanned for raw httpx client constructions and module level httpx calls
     Then none are found
+
+  @unit
+  Scenario: the client keeps httpx's environment proxy discovery
+    Given HTTP_PROXY names a proxy and the SDK sends a request to an http origin
+    When the shared sync or async client sends it
+    Then the proxy receives the request and its transport applies the redirect rule
+    And NO_PROXY sends the request straight to the origin instead
+    And trust_env set to false ignores the environment proxy

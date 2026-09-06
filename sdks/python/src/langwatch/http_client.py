@@ -51,11 +51,6 @@ CREDENTIAL_HEADERS = (
 
 _SCHEME_DEFAULT_PORTS = {"http": 80, "https": 443}
 
-# Keyword arguments that httpx only honours on the transport it builds itself.
-# Passing them to a client that already carries a transport does nothing, so
-# the factories move them onto the inner transport.
-_TRANSPORT_KWARGS = ("verify", "cert", "http1", "http2", "limits", "proxy")
-
 
 class RedirectRefusedError(Exception):
     """A LangWatch request answered with a redirect the SDK will not follow."""
@@ -292,40 +287,34 @@ class AsyncSchemeUpgradeTransport(httpx.AsyncBaseTransport):
         await self.transport.aclose()
 
 
-def _split_transport_kwargs(httpx_kwargs: dict[str, Any]) -> dict[str, Any]:
-    transport_kwargs = {
-        key: httpx_kwargs.pop(key) for key in _TRANSPORT_KWARGS if key in httpx_kwargs
-    }
-    if "trust_env" in httpx_kwargs:
-        transport_kwargs["trust_env"] = httpx_kwargs["trust_env"]
-    return transport_kwargs
+def _wrap_transports(client: Any, wrapper: type) -> None:
+    """Wrap the client's own transports in place, after httpx has built them.
 
+    httpx enables environment proxy discovery only when it builds the transport
+    itself (`allow_env_proxies = trust_env and transport is None`), so handing
+    it a ready-made transport would silently drop HTTP_PROXY, HTTPS_PROXY,
+    ALL_PROXY and the NO_PROXY routing that goes with them. The client is built
+    the stock way and its transport and every proxy mount are wrapped here, so
+    the rule applies to direct and proxied requests alike.
+    """
+    transport = getattr(client, "_transport", None)
+    if transport is not None and not isinstance(transport, wrapper):
+        client._transport = wrapper(transport)
 
-def _wrap_mounts(client: Any, wrapper: type) -> None:
-    """Proxy settings read from the environment become extra transports on the
-    client. Those must apply the rule too, so they are wrapped in place."""
     mounts = getattr(client, "_mounts", None)
     if not isinstance(mounts, dict):
         return
-    for pattern, transport in list(mounts.items()):
-        if transport is not None and not isinstance(transport, wrapper):
-            mounts[pattern] = wrapper(transport)
+    for pattern, mounted in list(mounts.items()):
+        if mounted is not None and not isinstance(mounted, wrapper):
+            mounts[pattern] = wrapper(mounted)
 
 
 def create_client(**httpx_kwargs: Any) -> httpx.Client:
     """An `httpx.Client` for the LangWatch API. Accepts the `httpx.Client`
     keyword arguments (timeout, headers, base_url, and so on); a `transport`
     argument becomes the inner transport."""
-    inner = httpx_kwargs.pop("transport", None)
-    transport_kwargs = _split_transport_kwargs(httpx_kwargs)
-    if inner is None:
-        inner = httpx.HTTPTransport(**transport_kwargs)
-    client = httpx.Client(
-        follow_redirects=False,
-        transport=SchemeUpgradeTransport(inner),
-        **httpx_kwargs,
-    )
-    _wrap_mounts(client, SchemeUpgradeTransport)
+    client = httpx.Client(follow_redirects=False, **httpx_kwargs)
+    _wrap_transports(client, SchemeUpgradeTransport)
     return client
 
 
@@ -333,14 +322,6 @@ def create_async_client(**httpx_kwargs: Any) -> httpx.AsyncClient:
     """An `httpx.AsyncClient` for the LangWatch API. Accepts the
     `httpx.AsyncClient` keyword arguments; a `transport` argument becomes the
     inner transport."""
-    inner = httpx_kwargs.pop("transport", None)
-    transport_kwargs = _split_transport_kwargs(httpx_kwargs)
-    if inner is None:
-        inner = httpx.AsyncHTTPTransport(**transport_kwargs)
-    client = httpx.AsyncClient(
-        follow_redirects=False,
-        transport=AsyncSchemeUpgradeTransport(inner),
-        **httpx_kwargs,
-    )
-    _wrap_mounts(client, AsyncSchemeUpgradeTransport)
+    client = httpx.AsyncClient(follow_redirects=False, **httpx_kwargs)
+    _wrap_transports(client, AsyncSchemeUpgradeTransport)
     return client

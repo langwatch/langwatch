@@ -10,9 +10,13 @@ process.
 Spec: specs/python-sdk/http-client-redirects.feature
 """
 
+import asyncio
+import http.server
 import json
 import logging
 import re
+import socketserver
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -575,6 +579,88 @@ def test_generated_client_carries_the_transport():
         assert async_http.headers["x-auth-token"] == "sk-lw-test"
     finally:
         Client.reset_for_testing()
+
+
+# --- Environment proxy discovery ---
+#
+# httpx builds its environment proxy mounts only when it builds the transport
+# itself, so the factories must let it construct the client and wrap the
+# transports afterwards. These run against real loopback servers: a stub origin
+# and a stub proxy, each answering with its own name, so the assertion is on
+# which one actually received the request.
+
+
+def _serve(body: bytes) -> "tuple[socketserver.TCPServer, int]":
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802 - the BaseHTTPRequestHandler contract
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):  # the stub keeps the test output quiet
+            pass
+
+    server = socketserver.TCPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, server.server_address[1]
+
+
+@pytest.fixture
+def origin_and_proxy(monkeypatch: pytest.MonkeyPatch):
+    """A loopback origin and a loopback proxy, with HTTP_PROXY pointing at the
+    proxy. Yields the origin's URL; the response body names who answered."""
+    origin, origin_port = _serve(b"ORIGIN")
+    proxy, proxy_port = _serve(b"PROXY")
+    monkeypatch.setenv("HTTP_PROXY", f"http://127.0.0.1:{proxy_port}")
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+    try:
+        yield f"http://127.0.0.1:{origin_port}/api/v1/things"
+    finally:
+        origin.shutdown()
+        proxy.shutdown()
+
+
+# @scenario "the client keeps httpx's environment proxy discovery"
+def test_create_client_routes_through_the_environment_proxy(origin_and_proxy: str):
+    with create_client() as client:
+        assert client.get(origin_and_proxy).text == "PROXY"
+
+
+# @scenario "the client keeps httpx's environment proxy discovery"
+def test_create_async_client_routes_through_the_environment_proxy(
+    origin_and_proxy: str,
+):
+    async def call() -> str:
+        async with create_async_client() as client:
+            return (await client.get(origin_and_proxy)).text
+
+    assert asyncio.run(call()) == "PROXY"
+
+
+# @scenario "the client keeps httpx's environment proxy discovery"
+def test_the_proxy_transport_carries_the_redirect_rule(origin_and_proxy: str):
+    with create_client() as client:
+        assert client._mounts
+        for mounted in client._mounts.values():
+            assert isinstance(mounted, SchemeUpgradeTransport)
+
+
+# @scenario "the client keeps httpx's environment proxy discovery"
+def test_no_proxy_sends_the_request_straight_to_the_origin(
+    origin_and_proxy: str, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1")
+
+    with create_client() as client:
+        assert client.get(origin_and_proxy).text == "ORIGIN"
+
+
+# @scenario "the client keeps httpx's environment proxy discovery"
+def test_trust_env_false_ignores_the_environment_proxy(origin_and_proxy: str):
+    with create_client(trust_env=False) as client:
+        assert client.get(origin_and_proxy).text == "ORIGIN"
 
 
 RAW_HTTPX_CALL = re.compile(
