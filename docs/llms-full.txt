@@ -70686,6 +70686,24 @@ Query analytics timeseries data with metrics, aggregations, and filters.
 
 ---
 
+# FILE: ./api-reference/analytics/post-create-timeseries-timeseries.mdx
+
+---
+title: "Create Timeseries"
+openapi: "POST /api/v1/analytics/timeseries"
+---
+
+---
+
+# FILE: ./api-reference/analytics/post-create-timeseries.mdx
+
+---
+title: "Create Timeseries"
+openapi: "POST /api/v1/analytics/latest/timeseries"
+---
+
+---
+
 # FILE: ./api-reference/analytics/query-analytics-timeseries-legacy-path.mdx
 
 ---
@@ -70775,6 +70793,15 @@ openapi: "PATCH /api/v1/annotations/{id}"
 
 ---
 
+# FILE: ./api-reference/api-keys/create-an-api-key.mdx
+
+---
+title: "Create an API key"
+openapi: "POST /api/v1/api-keys/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/api-keys/create-api-key.mdx
 
 ---
@@ -70784,11 +70811,56 @@ openapi: "POST /api/v1/api-keys"
 
 ---
 
+# FILE: ./api-reference/api-keys/delete-revoke-an-api-key.mdx
+
+---
+title: "Revoke an API key"
+openapi: "DELETE /api/v1/api-keys/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/api-keys/get-an-api-key.mdx
+
+---
+title: "Get an API key"
+openapi: "GET /api/v1/api-keys/2026-08-07/{id}"
+---
+
+---
+
 # FILE: ./api-reference/api-keys/get-api-key.mdx
 
 ---
 title: "Get an API key"
 openapi: "GET /api/v1/api-keys/{id}"
+---
+
+---
+
+# FILE: ./api-reference/api-keys/get-get-an-api-key.mdx
+
+---
+title: "Get an API key"
+openapi: "GET /api/v1/api-keys/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/api-keys/get-list-api-keys-.mdx
+
+---
+title: "List API keys"
+openapi: "GET /api/v1/api-keys/latest/"
+---
+
+---
+
+# FILE: ./api-reference/api-keys/get-list-api-keys.mdx
+
+---
+title: "List API keys"
+openapi: "GET /api/v1/api-keys/2026-08-07/"
 ---
 
 ---
@@ -70917,6 +70989,33 @@ A key can never grant more than the person or organization behind it already has
 
 ---
 
+# FILE: ./api-reference/api-keys/patch-update-an-api-key.mdx
+
+---
+title: "Update an API key"
+openapi: "PATCH /api/v1/api-keys/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/api-keys/post-create-an-api-key.mdx
+
+---
+title: "Create an API key"
+openapi: "POST /api/v1/api-keys/latest/"
+---
+
+---
+
+# FILE: ./api-reference/api-keys/revoke-an-api-key.mdx
+
+---
+title: "Revoke an API key"
+openapi: "DELETE /api/v1/api-keys/2026-08-07/{id}"
+---
+
+---
+
 # FILE: ./api-reference/api-keys/revoke-api-key.mdx
 
 ---
@@ -70926,11 +71025,38 @@ openapi: "DELETE /api/v1/api-keys/{id}"
 
 ---
 
+# FILE: ./api-reference/api-keys/update-an-api-key.mdx
+
+---
+title: "Update an API key"
+openapi: "PATCH /api/v1/api-keys/2026-08-07/{id}"
+---
+
+---
+
 # FILE: ./api-reference/api-keys/update-api-key.mdx
 
 ---
 title: "Update an API key"
 openapi: "PATCH /api/v1/api-keys/{id}"
+---
+
+---
+
+# FILE: ./api-reference/coding-agents/get-list-coding-agent-session-events-events.mdx
+
+---
+title: "List coding agent session events"
+openapi: "GET /api/v1/coding-agent/sessions/{sessionId}/events"
+---
+
+---
+
+# FILE: ./api-reference/coding-agents/get-list-coding-agent-session-events.mdx
+
+---
+title: "List coding agent session events"
+openapi: "GET /api/v1/coding-agent/latest/sessions/{sessionId}/events"
 ---
 
 ---
@@ -70980,11 +71106,38 @@ The same data renders in the product on the [sessions](/coding-agents/sessions) 
 
 ---
 
+# FILE: ./api-reference/dashboards/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create a new dashboard"
+openapi: "POST /api/v1/dashboards/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/dashboards/create-dashboards.mdx
 
 ---
 title: "Create a new dashboard"
 openapi: "POST /api/v1/dashboards"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/create-latest.mdx
+
+---
+title: "Create a new dashboard"
+openapi: "POST /api/v1/dashboards/latest/"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Delete a dashboard and its graphs"
+openapi: "DELETE /api/v1/dashboards/2026-08-07/{id}"
 ---
 
 ---
@@ -70998,6 +71151,24 @@ openapi: "DELETE /api/v1/dashboards/{id}"
 
 ---
 
+# FILE: ./api-reference/dashboards/delete-latest.mdx
+
+---
+title: "Delete a dashboard and its graphs"
+openapi: "DELETE /api/v1/dashboards/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get a dashboard by its id, including its graphs"
+openapi: "GET /api/v1/dashboards/2026-08-07/{id}"
+---
+
+---
+
 # FILE: ./api-reference/dashboards/get-dashboards.mdx
 
 ---
@@ -71007,11 +71178,38 @@ openapi: "GET /api/v1/dashboards/{id}"
 
 ---
 
+# FILE: ./api-reference/dashboards/get-latest.mdx
+
+---
+title: "Get a dashboard by its id, including its graphs"
+openapi: "GET /api/v1/dashboards/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List 2026 08 07"
+openapi: "GET /api/v1/dashboards/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/dashboards/list-dashboards.mdx
 
 ---
 title: "List Dashboards"
 openapi: "GET /api/v1/dashboards"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/list-latest.mdx
+
+---
+title: "List Latest"
+openapi: "GET /api/v1/dashboards/latest/"
 ---
 
 ---
@@ -71029,11 +71227,47 @@ Manage custom analytics dashboards. Create, reorder, and organize dashboards wit
 
 ---
 
+# FILE: ./api-reference/dashboards/put-update-reorder-reorder.mdx
+
+---
+title: "Update Reorder"
+openapi: "PUT /api/v1/dashboards/reorder"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/put-update-reorder.mdx
+
+---
+title: "Update Reorder"
+openapi: "PUT /api/v1/dashboards/latest/reorder"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Rename a dashboard"
+openapi: "PATCH /api/v1/dashboards/2026-08-07/{id}"
+---
+
+---
+
 # FILE: ./api-reference/dashboards/update-dashboards.mdx
 
 ---
 title: "Rename a dashboard"
 openapi: "PATCH /api/v1/dashboards/{id}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/update-latest.mdx
+
+---
+title: "Rename a dashboard"
+openapi: "PATCH /api/v1/dashboards/latest/{id}"
 ---
 
 ---
@@ -71294,11 +71528,38 @@ openapi: "POST /api/v1/evaluations/{evaluator}/evaluate"
 
 ---
 
+# FILE: ./api-reference/evaluators-config/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create a new evaluator"
+openapi: "POST /api/v1/evaluators/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/evaluators-config/create-evaluators.mdx
 
 ---
 title: "Create a new evaluator"
 openapi: "POST /api/v1/evaluators"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/create-latest.mdx
+
+---
+title: "Create a new evaluator"
+openapi: "POST /api/v1/evaluators/latest/"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Archive"
+openapi: "DELETE /api/v1/evaluators/2026-08-07/{id}"
 ---
 
 ---
@@ -71312,6 +71573,24 @@ openapi: "DELETE /api/v1/evaluators/{id}"
 
 ---
 
+# FILE: ./api-reference/evaluators-config/delete-latest.mdx
+
+---
+title: "Archive"
+openapi: "DELETE /api/v1/evaluators/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get a specific evaluator by ID or slug"
+openapi: "GET /api/v1/evaluators/2026-08-07/{idOrSlug}"
+---
+
+---
+
 # FILE: ./api-reference/evaluators-config/get-evaluators.mdx
 
 ---
@@ -71321,11 +71600,38 @@ openapi: "GET /api/v1/evaluators/{idOrSlug}"
 
 ---
 
+# FILE: ./api-reference/evaluators-config/get-latest.mdx
+
+---
+title: "Get a specific evaluator by ID or slug"
+openapi: "GET /api/v1/evaluators/latest/{idOrSlug}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get all evaluators for a project"
+openapi: "GET /api/v1/evaluators/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/evaluators-config/list-evaluators.mdx
 
 ---
 title: "Get all evaluators for a project"
 openapi: "GET /api/v1/evaluators"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/list-latest.mdx
+
+---
+title: "Get all evaluators for a project"
+openapi: "GET /api/v1/evaluators/latest/"
 ---
 
 ---
@@ -71343,11 +71649,29 @@ Manage evaluator configurations for your project. Create, update, and organize e
 
 ---
 
+# FILE: ./api-reference/evaluators-config/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update an existing evaluator"
+openapi: "PUT /api/v1/evaluators/2026-08-07/{id}"
+---
+
+---
+
 # FILE: ./api-reference/evaluators-config/update-evaluators.mdx
 
 ---
 title: "Update an existing evaluator"
 openapi: "PUT /api/v1/evaluators/{id}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/update-latest.mdx
+
+---
+title: "Update an existing evaluator"
+openapi: "PUT /api/v1/evaluators/latest/{id}"
 ---
 
 ---
@@ -71848,11 +72172,29 @@ Record customer events against a trace or thread, so behaviour like a thumbs-up,
 
 ---
 
-# FILE: ./api-reference/events/track-an-event-legacy-path.mdx
+# FILE: ./api-reference/events/post-create-track-track.mdx
 
 ---
-title: "Track an event (legacy path)"
-openapi: "POST /api/track_event"
+title: "Record a user event"
+openapi: "POST /api/v1/events/latest/track"
+---
+
+---
+
+# FILE: ./api-reference/events/post-create-track.mdx
+
+---
+title: "Record a user event"
+openapi: "POST /api/v1/events/2026-08-07/track"
+---
+
+---
+
+# FILE: ./api-reference/experiments/create-an-experiment-and-its-setup.mdx
+
+---
+title: "Create an experiment and its setup"
+openapi: "POST /api/v1/experiments/2026-08-07/"
 ---
 
 ---
@@ -71862,6 +72204,132 @@ openapi: "POST /api/track_event"
 ---
 title: "Create an experiment"
 openapi: "POST /api/v1/experiment/init"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-list-an-experiment-s-versions-versions.mdx
+
+---
+title: "List an experiment's versions"
+openapi: "GET /api/v1/experiments/latest/{slug}/versions"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-list-an-experiment-s-versions.mdx
+
+---
+title: "List an experiment's versions"
+openapi: "GET /api/v1/experiments/2026-08-07/{slug}/versions"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-list-experiments-for-the-project-.mdx
+
+---
+title: "List experiments for the project"
+openapi: "GET /api/v1/experiments/latest/"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-list-experiments-for-the-project.mdx
+
+---
+title: "List experiments for the project"
+openapi: "GET /api/v1/experiments/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-list-runs-of-an-experiment-runs.mdx
+
+---
+title: "List runs of an experiment"
+openapi: "GET /api/v1/experiments/latest/runs"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-list-runs-of-an-experiment.mdx
+
+---
+title: "List runs of an experiment"
+openapi: "GET /api/v1/experiments/2026-08-07/runs"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-poll-a-run-runId.mdx
+
+---
+title: "Poll a run"
+openapi: "GET /api/v1/experiments/latest/runs/{runId}"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-poll-a-run.mdx
+
+---
+title: "Poll a run"
+openapi: "GET /api/v1/experiments/2026-08-07/runs/{runId}"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-read-an-experiment-s-setup-workbench-state.mdx
+
+---
+title: "Read an experiment's setup"
+openapi: "GET /api/v1/experiments/latest/{slug}/workbench-state"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-read-an-experiment-s-setup.mdx
+
+---
+title: "Read an experiment's setup"
+openapi: "GET /api/v1/experiments/2026-08-07/{slug}/workbench-state"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-read-one-experiment-slug.mdx
+
+---
+title: "Read one experiment"
+openapi: "GET /api/v1/experiments/latest/{slug}"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-read-one-experiment.mdx
+
+---
+title: "Read one experiment"
+openapi: "GET /api/v1/experiments/2026-08-07/{slug}"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-read-run-results-results.mdx
+
+---
+title: "Read run results"
+openapi: "GET /api/v1/experiments/latest/runs/{runId}/results"
+---
+
+---
+
+# FILE: ./api-reference/experiments/get-read-run-results.mdx
+
+---
+title: "Read run results"
+openapi: "GET /api/v1/experiments/2026-08-07/runs/{runId}/results"
 ---
 
 ---
@@ -71915,11 +72383,74 @@ openapi: "GET /api/v1/experiments/runs/{runId}"
 
 ---
 
+# FILE: ./api-reference/experiments/post-create-an-experiment-and-its-setup.mdx
+
+---
+title: "Create an experiment and its setup"
+openapi: "POST /api/v1/experiments/latest/"
+---
+
+---
+
 # FILE: ./api-reference/experiments/post-create-an-experiment.mdx
 
 ---
 title: "Create an experiment and its setup"
 openapi: "POST /api/v1/experiments"
+---
+
+---
+
+# FILE: ./api-reference/experiments/post-restore-an-experiment-version-restore.mdx
+
+---
+title: "Restore an experiment version"
+openapi: "POST /api/v1/experiments/latest/{slug}/versions/{version}/restore"
+---
+
+---
+
+# FILE: ./api-reference/experiments/post-restore-an-experiment-version.mdx
+
+---
+title: "Restore an experiment version"
+openapi: "POST /api/v1/experiments/2026-08-07/{slug}/versions/{version}/restore"
+---
+
+---
+
+# FILE: ./api-reference/experiments/post-run-an-experiment-run.mdx
+
+---
+title: "Run an experiment"
+openapi: "POST /api/v1/experiments/latest/{slug}/run"
+---
+
+---
+
+# FILE: ./api-reference/experiments/post-run-an-experiment.mdx
+
+---
+title: "Run an experiment"
+openapi: "POST /api/v1/experiments/2026-08-07/{slug}/run"
+---
+
+---
+
+# FILE: ./api-reference/experiments/put-save-an-experiment-s-setup-workbench-state.mdx
+
+---
+title: "Save an experiment's setup"
+openapi: "PUT /api/v1/experiments/latest/{slug}/workbench-state"
+---
+
+---
+
+# FILE: ./api-reference/experiments/put-save-an-experiment-s-setup.mdx
+
+---
+title: "Save an experiment's setup"
+openapi: "PUT /api/v1/experiments/2026-08-07/{slug}/workbench-state"
 ---
 
 ---
@@ -72255,11 +72786,38 @@ openapi: "PATCH /api/gateway/v1/virtual-keys/{id}"
 
 ---
 
+# FILE: ./api-reference/graphs/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create a custom graph on a dashboard"
+openapi: "POST /api/v1/graphs/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/graphs/create-graphs.mdx
 
 ---
 title: "Create a custom graph on a dashboard"
 openapi: "POST /api/v1/graphs"
+---
+
+---
+
+# FILE: ./api-reference/graphs/create-latest.mdx
+
+---
+title: "Create a custom graph on a dashboard"
+openapi: "POST /api/v1/graphs/latest/"
+---
+
+---
+
+# FILE: ./api-reference/graphs/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Delete a custom graph"
+openapi: "DELETE /api/v1/graphs/2026-08-07/{id}"
 ---
 
 ---
@@ -72273,6 +72831,24 @@ openapi: "DELETE /api/v1/graphs/{id}"
 
 ---
 
+# FILE: ./api-reference/graphs/delete-latest.mdx
+
+---
+title: "Delete a custom graph"
+openapi: "DELETE /api/v1/graphs/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/graphs/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get a custom graph by its ID"
+openapi: "GET /api/v1/graphs/2026-08-07/{id}"
+---
+
+---
+
 # FILE: ./api-reference/graphs/get-graphs.mdx
 
 ---
@@ -72282,11 +72858,38 @@ openapi: "GET /api/v1/graphs/{id}"
 
 ---
 
+# FILE: ./api-reference/graphs/get-latest.mdx
+
+---
+title: "Get a custom graph by its ID"
+openapi: "GET /api/v1/graphs/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/graphs/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List 2026 08 07"
+openapi: "GET /api/v1/graphs/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/graphs/list-graphs.mdx
 
 ---
 title: "List Graphs"
 openapi: "GET /api/v1/graphs"
+---
+
+---
+
+# FILE: ./api-reference/graphs/list-latest.mdx
+
+---
+title: "List Latest"
+openapi: "GET /api/v1/graphs/latest/"
 ---
 
 ---
@@ -72304,11 +72907,47 @@ Manage custom analytics graphs within dashboards. Create, update, and configure 
 
 ---
 
+# FILE: ./api-reference/graphs/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update 2026 08 07"
+openapi: "PATCH /api/v1/graphs/2026-08-07/{id}"
+---
+
+---
+
 # FILE: ./api-reference/graphs/update-graphs.mdx
 
 ---
 title: "Update Graphs"
 openapi: "PATCH /api/v1/graphs/{id}"
+---
+
+---
+
+# FILE: ./api-reference/graphs/update-latest.mdx
+
+---
+title: "Update Latest"
+openapi: "PATCH /api/v1/graphs/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/groups/action-bindings.mdx
+
+---
+title: "Add a role binding to a group"
+openapi: "POST /api/v1/groups/2026-08-07/{id}/bindings"
+---
+
+---
+
+# FILE: ./api-reference/groups/action-members.mdx
+
+---
+title: "Add a member to a group"
+openapi: "POST /api/v1/groups/2026-08-07/{id}/members"
 ---
 
 ---
@@ -72331,11 +72970,65 @@ openapi: "POST /api/v1/groups/{id}/members"
 
 ---
 
+# FILE: ./api-reference/groups/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create a new group"
+openapi: "POST /api/v1/groups/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/groups/create-group.mdx
 
 ---
 title: "Create group"
 openapi: "POST /api/v1/groups"
+---
+
+---
+
+# FILE: ./api-reference/groups/create-latest.mdx
+
+---
+title: "Create a new group"
+openapi: "POST /api/v1/groups/latest/"
+---
+
+---
+
+# FILE: ./api-reference/groups/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Delete a group"
+openapi: "DELETE /api/v1/groups/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/groups/delete-bindings.mdx
+
+---
+title: "Remove a role binding from a group"
+openapi: "DELETE /api/v1/groups/2026-08-07/{id}/bindings/{bindingId}"
+---
+
+---
+
+# FILE: ./api-reference/groups/delete-delete-bindings.mdx
+
+---
+title: "Remove a role binding from a group"
+openapi: "DELETE /api/v1/groups/latest/{id}/bindings/{bindingId}"
+---
+
+---
+
+# FILE: ./api-reference/groups/delete-delete-members.mdx
+
+---
+title: "Remove a member from a group"
+openapi: "DELETE /api/v1/groups/latest/{id}/members/{userId}"
 ---
 
 ---
@@ -72349,11 +73042,92 @@ openapi: "DELETE /api/v1/groups/{id}"
 
 ---
 
+# FILE: ./api-reference/groups/delete-latest.mdx
+
+---
+title: "Delete a group"
+openapi: "DELETE /api/v1/groups/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/groups/delete-members.mdx
+
+---
+title: "Remove a member from a group"
+openapi: "DELETE /api/v1/groups/2026-08-07/{id}/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/groups/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get a group with members and bindings"
+openapi: "GET /api/v1/groups/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/groups/get-bindings.mdx
+
+---
+title: "List role bindings for a group"
+openapi: "GET /api/v1/groups/2026-08-07/{id}/bindings"
+---
+
+---
+
+# FILE: ./api-reference/groups/get-get-bindings.mdx
+
+---
+title: "List role bindings for a group"
+openapi: "GET /api/v1/groups/latest/{id}/bindings"
+---
+
+---
+
+# FILE: ./api-reference/groups/get-get-members.mdx
+
+---
+title: "List members of a group"
+openapi: "GET /api/v1/groups/latest/{id}/members"
+---
+
+---
+
 # FILE: ./api-reference/groups/get-group.mdx
 
 ---
 title: "Get group"
 openapi: "GET /api/v1/groups/{id}"
+---
+
+---
+
+# FILE: ./api-reference/groups/get-latest.mdx
+
+---
+title: "Get a group with members and bindings"
+openapi: "GET /api/v1/groups/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/groups/get-members.mdx
+
+---
+title: "List members of a group"
+openapi: "GET /api/v1/groups/2026-08-07/{id}/members"
+---
+
+---
+
+# FILE: ./api-reference/groups/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List all groups for the organization"
+openapi: "GET /api/v1/groups/2026-08-07/"
 ---
 
 ---
@@ -72372,6 +73146,15 @@ openapi: "GET /api/v1/groups/{id}/bindings"
 ---
 title: "List groups"
 openapi: "GET /api/v1/groups"
+---
+
+---
+
+# FILE: ./api-reference/groups/list-latest.mdx
+
+---
+title: "List all groups for the organization"
+openapi: "GET /api/v1/groups/latest/"
 ---
 
 ---
@@ -72501,6 +73284,24 @@ Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`)
 
 ---
 
+# FILE: ./api-reference/groups/post-action-bindings.mdx
+
+---
+title: "Add a role binding to a group"
+openapi: "POST /api/v1/groups/latest/{id}/bindings"
+---
+
+---
+
+# FILE: ./api-reference/groups/post-action-members.mdx
+
+---
+title: "Add a member to a group"
+openapi: "POST /api/v1/groups/latest/{id}/members"
+---
+
+---
+
 # FILE: ./api-reference/groups/remove-binding.mdx
 
 ---
@@ -72524,6 +73325,24 @@ openapi: "DELETE /api/v1/groups/{id}/members/{userId}"
 ---
 title: "Rename group"
 openapi: "PATCH /api/v1/groups/{id}"
+---
+
+---
+
+# FILE: ./api-reference/groups/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Rename a group"
+openapi: "PATCH /api/v1/groups/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/groups/update-latest.mdx
+
+---
+title: "Rename a group"
+openapi: "PATCH /api/v1/groups/latest/{id}"
 ---
 
 ---
@@ -72790,6 +73609,24 @@ openapi: "PATCH /api/v1/organization/members/{userId}"
 
 ---
 
+# FILE: ./api-reference/model-providers/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List 2026 08 07"
+openapi: "GET /api/v1/model-providers/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/model-providers/list-latest.mdx
+
+---
+title: "List Latest"
+openapi: "GET /api/v1/model-providers/latest/"
+---
+
+---
+
 # FILE: ./api-reference/model-providers/list-model-providers.mdx
 
 ---
@@ -72812,6 +73649,24 @@ Manage model provider configurations (API keys for OpenAI, Anthropic, etc.) used
 
 ---
 
+# FILE: ./api-reference/model-providers/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create or update a model provider"
+openapi: "PUT /api/v1/model-providers/2026-08-07/{provider}"
+---
+
+---
+
+# FILE: ./api-reference/model-providers/update-latest.mdx
+
+---
+title: "Create or update a model provider"
+openapi: "PUT /api/v1/model-providers/latest/{provider}"
+---
+
+---
+
 # FILE: ./api-reference/model-providers/update-model-providers.mdx
 
 ---
@@ -72830,11 +73685,47 @@ openapi: "POST /api/v1/monitors/{id}/toggle"
 
 ---
 
+# FILE: ./api-reference/monitors/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create a new online evaluation monitor"
+openapi: "POST /api/v1/monitors/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/monitors/create-latest.mdx
+
+---
+title: "Create a new online evaluation monitor"
+openapi: "POST /api/v1/monitors/latest/"
+---
+
+---
+
 # FILE: ./api-reference/monitors/create-monitors.mdx
 
 ---
 title: "Create a new online evaluation monitor"
 openapi: "POST /api/v1/monitors"
+---
+
+---
+
+# FILE: ./api-reference/monitors/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Delete a monitor"
+openapi: "DELETE /api/v1/monitors/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/monitors/delete-latest.mdx
+
+---
+title: "Delete a monitor"
+openapi: "DELETE /api/v1/monitors/latest/{id}"
 ---
 
 ---
@@ -72848,11 +73739,47 @@ openapi: "DELETE /api/v1/monitors/{id}"
 
 ---
 
+# FILE: ./api-reference/monitors/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get a monitor by its ID"
+openapi: "GET /api/v1/monitors/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/monitors/get-latest.mdx
+
+---
+title: "Get a monitor by its ID"
+openapi: "GET /api/v1/monitors/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/monitors/get-monitors.mdx
 
 ---
 title: "Get a monitor by its ID"
 openapi: "GET /api/v1/monitors/{id}"
+---
+
+---
+
+# FILE: ./api-reference/monitors/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List 2026 08 07"
+openapi: "GET /api/v1/monitors/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/monitors/list-latest.mdx
+
+---
+title: "List Latest"
+openapi: "GET /api/v1/monitors/latest/"
 ---
 
 ---
@@ -72879,6 +73806,42 @@ Manage online evaluation monitors that automatically evaluate traces as they arr
 
 ---
 
+# FILE: ./api-reference/monitors/post-action-toggle-toggle.mdx
+
+---
+title: "Enable or disable a monitor"
+openapi: "POST /api/v1/monitors/latest/{id}/toggle"
+---
+
+---
+
+# FILE: ./api-reference/monitors/post-action-toggle.mdx
+
+---
+title: "Enable or disable a monitor"
+openapi: "POST /api/v1/monitors/2026-08-07/{id}/toggle"
+---
+
+---
+
+# FILE: ./api-reference/monitors/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update a monitor"
+openapi: "PATCH /api/v1/monitors/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/monitors/update-latest.mdx
+
+---
+title: "Update a monitor"
+openapi: "PATCH /api/v1/monitors/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/monitors/update-monitors.mdx
 
 ---
@@ -72888,11 +73851,146 @@ openapi: "PATCH /api/v1/monitors/{id}"
 
 ---
 
+# FILE: ./api-reference/organization/create-invites.mdx
+
+---
+title: "Create Invites"
+openapi: "POST /api/v1/organization/2026-08-07/invites"
+---
+
+---
+
+# FILE: ./api-reference/organization/delete-delete-invites.mdx
+
+---
+title: "Revoke a pending invite"
+openapi: "DELETE /api/v1/organization/latest/invites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/organization/delete-delete-members.mdx
+
+---
+title: "Delete Members"
+openapi: "DELETE /api/v1/organization/latest/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/organization/delete-invites.mdx
+
+---
+title: "Revoke a pending invite"
+openapi: "DELETE /api/v1/organization/2026-08-07/invites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/organization/delete-members.mdx
+
+---
+title: "Delete Members"
+openapi: "DELETE /api/v1/organization/2026-08-07/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/organization/get-access.mdx
+
+---
+title: "Get Access"
+openapi: "GET /api/v1/organization/2026-08-07/members/{userId}/access"
+---
+
+---
+
+# FILE: ./api-reference/organization/get-get-access.mdx
+
+---
+title: "Get Access"
+openapi: "GET /api/v1/organization/latest/members/{userId}/access"
+---
+
+---
+
+# FILE: ./api-reference/organization/get-get-members.mdx
+
+---
+title: "Get Members"
+openapi: "GET /api/v1/organization/latest/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/organization/get-list-invites.mdx
+
+---
+title: "List pending invites"
+openapi: "GET /api/v1/organization/latest/invites"
+---
+
+---
+
+# FILE: ./api-reference/organization/get-list-members.mdx
+
+---
+title: "List Members"
+openapi: "GET /api/v1/organization/latest/members"
+---
+
+---
+
+# FILE: ./api-reference/organization/get-members.mdx
+
+---
+title: "Get Members"
+openapi: "GET /api/v1/organization/2026-08-07/members/{userId}"
+---
+
+---
+
 # FILE: ./api-reference/organization/get-organization.mdx
 
 ---
 title: "Get organization"
 openapi: "GET /api/v1/organization"
+---
+
+---
+
+# FILE: ./api-reference/organization/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List 2026 08 07"
+openapi: "GET /api/v1/organization/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/organization/list-invites.mdx
+
+---
+title: "List pending invites"
+openapi: "GET /api/v1/organization/2026-08-07/invites"
+---
+
+---
+
+# FILE: ./api-reference/organization/list-latest.mdx
+
+---
+title: "List Latest"
+openapi: "GET /api/v1/organization/latest/"
+---
+
+---
+
+# FILE: ./api-reference/organization/list-members.mdx
+
+---
+title: "List Members"
+openapi: "GET /api/v1/organization/2026-08-07/members"
 ---
 
 ---
@@ -72959,6 +74057,51 @@ Setting `traceSharingEnabled` to `false` revokes every trace share link already 
 
 ---
 
+# FILE: ./api-reference/organization/patch-update-members.mdx
+
+---
+title: "Update Members"
+openapi: "PATCH /api/v1/organization/latest/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/organization/post-create-invites.mdx
+
+---
+title: "Create Invites"
+openapi: "POST /api/v1/organization/latest/invites"
+---
+
+---
+
+# FILE: ./api-reference/organization/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update the organization profile"
+openapi: "PATCH /api/v1/organization/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/organization/update-latest.mdx
+
+---
+title: "Update the organization profile"
+openapi: "PATCH /api/v1/organization/latest/"
+---
+
+---
+
+# FILE: ./api-reference/organization/update-members.mdx
+
+---
+title: "Update Members"
+openapi: "PATCH /api/v1/organization/2026-08-07/members/{userId}"
+---
+
+---
+
 # FILE: ./api-reference/organization/update-organization.mdx
 
 ---
@@ -72968,11 +74111,56 @@ openapi: "PATCH /api/v1/organization"
 
 ---
 
+# FILE: ./api-reference/organizations/create-an-organization.mdx
+
+---
+title: "Create an organization"
+openapi: "POST /api/v1/organizations/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/organizations/create-organization.mdx
 
 ---
 title: "Create an organization"
 openapi: "POST /api/v1/organizations"
+---
+
+---
+
+# FILE: ./api-reference/organizations/get-an-organization.mdx
+
+---
+title: "Get an organization"
+openapi: "GET /api/v1/organizations/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/organizations/get-get-an-organization.mdx
+
+---
+title: "Get an organization"
+openapi: "GET /api/v1/organizations/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/organizations/get-list-organizations-.mdx
+
+---
+title: "List organizations"
+openapi: "GET /api/v1/organizations/latest/"
+---
+
+---
+
+# FILE: ./api-reference/organizations/get-list-organizations.mdx
+
+---
+title: "List organizations"
+openapi: "GET /api/v1/organizations/2026-08-07/"
 ---
 
 ---
@@ -73070,11 +74258,38 @@ The slug is optional and is derived from the name when you leave it out. It is a
 
 ---
 
+# FILE: ./api-reference/organizations/post-create-an-organization.mdx
+
+---
+title: "Create an organization"
+openapi: "POST /api/v1/organizations/latest/"
+---
+
+---
+
+# FILE: ./api-reference/projects/archive-a-project.mdx
+
+---
+title: "Archive a project"
+openapi: "DELETE /api/projects/2026-08-07/{id}"
+---
+
+---
+
 # FILE: ./api-reference/projects/archive-project.mdx
 
 ---
 title: "Archive project"
 openapi: "DELETE /api/projects/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/create-a-project.mdx
+
+---
+title: "Create a project"
+openapi: "POST /api/projects/2026-08-07/"
 ---
 
 ---
@@ -73088,6 +74303,24 @@ openapi: "POST /api/projects"
 
 ---
 
+# FILE: ./api-reference/projects/delete-archive-a-project.mdx
+
+---
+title: "Archive a project"
+openapi: "DELETE /api/projects/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/get-a-project.mdx
+
+---
+title: "Get a project"
+openapi: "GET /api/projects/2026-08-07/{id}"
+---
+
+---
+
 # FILE: ./api-reference/projects/get-api-key.mdx
 
 ---
@@ -73097,11 +74330,56 @@ openapi: "GET /api/projects/{id}/api-key"
 
 ---
 
+# FILE: ./api-reference/projects/get-get-a-project.mdx
+
+---
+title: "Get a project"
+openapi: "GET /api/projects/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/get-get-the-project-api-key.mdx
+
+---
+title: "Get the project API key"
+openapi: "GET /api/projects/latest/{id}/api-key"
+---
+
+---
+
+# FILE: ./api-reference/projects/get-list-projects-.mdx
+
+---
+title: "List projects"
+openapi: "GET /api/projects/latest/"
+---
+
+---
+
+# FILE: ./api-reference/projects/get-list-projects.mdx
+
+---
+title: "List projects"
+openapi: "GET /api/projects/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/projects/get-project.mdx
 
 ---
 title: "Get project"
 openapi: "GET /api/projects/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/get-the-project-api-key.mdx
+
+---
+title: "Get the project API key"
+openapi: "GET /api/projects/2026-08-07/{id}/api-key"
 ---
 
 ---
@@ -73186,11 +74464,56 @@ LANGWATCH_PROJECT_ID=<project id>
 
 ---
 
+# FILE: ./api-reference/projects/patch-update-a-project.mdx
+
+---
+title: "Update a project"
+openapi: "PATCH /api/projects/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/post-create-a-project.mdx
+
+---
+title: "Create a project"
+openapi: "POST /api/projects/latest/"
+---
+
+---
+
+# FILE: ./api-reference/projects/post-regenerate-the-project-api-key.mdx
+
+---
+title: "Regenerate the project API key"
+openapi: "POST /api/projects/latest/{id}/regenerate-api-key"
+---
+
+---
+
 # FILE: ./api-reference/projects/regenerate-api-key.mdx
 
 ---
 title: "Regenerate project API key"
 openapi: "POST /api/projects/{id}/regenerate-api-key"
+---
+
+---
+
+# FILE: ./api-reference/projects/regenerate-the-project-api-key.mdx
+
+---
+title: "Regenerate the project API key"
+openapi: "POST /api/projects/2026-08-07/{id}/regenerate-api-key"
+---
+
+---
+
+# FILE: ./api-reference/projects/update-a-project.mdx
+
+---
+title: "Update a project"
+openapi: "PATCH /api/projects/2026-08-07/{id}"
 ---
 
 ---
@@ -73408,6 +74731,24 @@ openapi: "POST /api/v1/query"
 
 ---
 
+# FILE: ./api-reference/role-bindings/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create 2026 08 07"
+openapi: "POST /api/v1/role-bindings/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/role-bindings/create-latest.mdx
+
+---
+title: "Create Latest"
+openapi: "POST /api/v1/role-bindings/latest/"
+---
+
+---
+
 # FILE: ./api-reference/role-bindings/create-role-binding.mdx
 
 ---
@@ -73417,11 +74758,47 @@ openapi: "POST /api/v1/role-bindings"
 
 ---
 
+# FILE: ./api-reference/role-bindings/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Delete a role binding"
+openapi: "DELETE /api/v1/role-bindings/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/role-bindings/delete-latest.mdx
+
+---
+title: "Delete a role binding"
+openapi: "DELETE /api/v1/role-bindings/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/role-bindings/delete-role-binding.mdx
 
 ---
 title: "Delete role binding"
 openapi: "DELETE /api/v1/role-bindings/{id}"
+---
+
+---
+
+# FILE: ./api-reference/role-bindings/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List 2026 08 07"
+openapi: "GET /api/v1/role-bindings/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/role-bindings/list-latest.mdx
+
+---
+title: "List Latest"
+openapi: "GET /api/v1/role-bindings/latest/"
 ---
 
 ---
@@ -73542,11 +74919,47 @@ A create response can carry `hasLegacyAccessNotice: true`. It means this is the 
 
 ---
 
+# FILE: ./api-reference/role-bindings/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Change a binding's role"
+openapi: "PATCH /api/v1/role-bindings/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/role-bindings/update-latest.mdx
+
+---
+title: "Change a binding's role"
+openapi: "PATCH /api/v1/role-bindings/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/role-bindings/update-role-binding.mdx
 
 ---
 title: "Update role binding"
 openapi: "PATCH /api/v1/role-bindings/{id}"
+---
+
+---
+
+# FILE: ./api-reference/roles/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create 2026 08 07"
+openapi: "POST /api/v1/roles/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/roles/create-latest.mdx
+
+---
+title: "Create Latest"
+openapi: "POST /api/v1/roles/latest/"
 ---
 
 ---
@@ -73560,6 +74973,24 @@ openapi: "POST /api/v1/roles"
 
 ---
 
+# FILE: ./api-reference/roles/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Delete a custom role"
+openapi: "DELETE /api/v1/roles/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/roles/delete-latest.mdx
+
+---
+title: "Delete a custom role"
+openapi: "DELETE /api/v1/roles/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/roles/delete-role.mdx
 
 ---
@@ -73569,11 +75000,65 @@ openapi: "DELETE /api/v1/roles/{id}"
 
 ---
 
+# FILE: ./api-reference/roles/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Read one custom role"
+openapi: "GET /api/v1/roles/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/roles/get-latest.mdx
+
+---
+title: "Read one custom role"
+openapi: "GET /api/v1/roles/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/roles/get-list-permissions-permissions.mdx
+
+---
+title: "List Permissions"
+openapi: "GET /api/v1/roles/latest/permissions"
+---
+
+---
+
+# FILE: ./api-reference/roles/get-list-permissions.mdx
+
+---
+title: "List Permissions"
+openapi: "GET /api/v1/roles/2026-08-07/permissions"
+---
+
+---
+
 # FILE: ./api-reference/roles/get-role.mdx
 
 ---
 title: "Get role"
 openapi: "GET /api/v1/roles/{id}"
+---
+
+---
+
+# FILE: ./api-reference/roles/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List 2026 08 07"
+openapi: "GET /api/v1/roles/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/roles/list-latest.mdx
+
+---
+title: "List Latest"
+openapi: "GET /api/v1/roles/latest/"
 ---
 
 ---
@@ -73691,6 +75176,24 @@ A role that a role binding or a team assignment still points at cannot be delete
 
 ---
 
+# FILE: ./api-reference/roles/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update a custom role"
+openapi: "PATCH /api/v1/roles/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/roles/update-latest.mdx
+
+---
+title: "Update a custom role"
+openapi: "PATCH /api/v1/roles/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/roles/update-role.mdx
 
 ---
@@ -73758,6 +75261,24 @@ openapi: "POST /api/v1/run-plans/{id}/run"
 
 ---
 
+# FILE: ./api-reference/scenario-events/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create a new scenario event"
+openapi: "POST /api/v1/scenario-events/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/scenario-events/create-browser-tab-browser-tab.mdx
+
+---
+title: "Create Browser Tab"
+openapi: "POST /api/v1/scenario-events/2026-08-07/browser-tab"
+---
+
+---
+
 # FILE: ./api-reference/scenario-events/create-browser-tab.mdx
 
 ---
@@ -73767,11 +75288,38 @@ openapi: "POST /api/v1/scenario-events/browser-tab"
 
 ---
 
+# FILE: ./api-reference/scenario-events/create-latest.mdx
+
+---
+title: "Create a new scenario event"
+openapi: "POST /api/v1/scenario-events/latest/"
+---
+
+---
+
 # FILE: ./api-reference/scenario-events/create-scenario-events.mdx
 
 ---
 title: "Create a new scenario event"
 openapi: "POST /api/v1/scenario-events"
+---
+
+---
+
+# FILE: ./api-reference/scenario-events/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Archive simulation runs"
+openapi: "DELETE /api/v1/scenario-events/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/scenario-events/delete-latest.mdx
+
+---
+title: "Archive simulation runs"
+openapi: "DELETE /api/v1/scenario-events/latest/"
 ---
 
 ---
@@ -73848,11 +75396,56 @@ This event marks the end of a scenario run and includes the final results.
 
 ---
 
+# FILE: ./api-reference/scenario-events/post-create-browser-tab-browser-tab.mdx
+
+---
+title: "Create Browser Tab"
+openapi: "POST /api/v1/scenario-events/latest/browser-tab"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create a new scenario"
+openapi: "POST /api/v1/scenarios/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/create-latest.mdx
+
+---
+title: "Create a new scenario"
+openapi: "POST /api/v1/scenarios/latest/"
+---
+
+---
+
 # FILE: ./api-reference/scenarios/create-scenarios.mdx
 
 ---
 title: "Create a new scenario"
 openapi: "POST /api/v1/scenarios"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Archive"
+openapi: "DELETE /api/v1/scenarios/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/delete-latest.mdx
+
+---
+title: "Archive"
+openapi: "DELETE /api/v1/scenarios/latest/{id}"
 ---
 
 ---
@@ -73866,6 +75459,51 @@ openapi: "DELETE /api/v1/scenarios/{id}"
 
 ---
 
+# FILE: ./api-reference/scenarios/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get a specific scenario by ID"
+openapi: "GET /api/v1/scenarios/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/get-get-versions-version.mdx
+
+---
+title: "Get Versions"
+openapi: "GET /api/v1/scenarios/latest/{id}/versions/{version}"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/get-get-versions-versions.mdx
+
+---
+title: "Get Versions"
+openapi: "GET /api/v1/scenarios/latest/{id}/versions"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/get-get-versions.mdx
+
+---
+title: "Get Versions"
+openapi: "GET /api/v1/scenarios/2026-08-07/{id}/versions/{version}"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/get-latest.mdx
+
+---
+title: "Get a specific scenario by ID"
+openapi: "GET /api/v1/scenarios/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/scenarios/get-scenarios.mdx
 
 ---
@@ -73875,11 +75513,38 @@ openapi: "GET /api/v1/scenarios/{id}"
 
 ---
 
+# FILE: ./api-reference/scenarios/get-versions.mdx
+
+---
+title: "Get Versions"
+openapi: "GET /api/v1/scenarios/2026-08-07/{id}/versions"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get all scenarios for a project"
+openapi: "GET /api/v1/scenarios/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/scenarios/list-a-scenario-s-versions.mdx
 
 ---
 title: "List a scenario's versions"
 openapi: "GET /api/v1/scenarios/{id}/versions"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/list-latest.mdx
+
+---
+title: "Get all scenarios for a project"
+openapi: "GET /api/v1/scenarios/latest/"
 ---
 
 ---
@@ -73906,6 +75571,24 @@ Manage test scenarios for agent simulations. Create, update, and organize scenar
 
 ---
 
+# FILE: ./api-reference/scenarios/patch-update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update an existing scenario"
+openapi: "PATCH /api/v1/scenarios/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/patch-update-latest.mdx
+
+---
+title: "Update an existing scenario"
+openapi: "PATCH /api/v1/scenarios/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/scenarios/patch-update-scenarios.mdx
 
 ---
@@ -73924,6 +75607,24 @@ openapi: "GET /api/v1/scenarios/{id}/versions/{version}"
 
 ---
 
+# FILE: ./api-reference/scenarios/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update an existing scenario"
+openapi: "PUT /api/v1/scenarios/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/update-latest.mdx
+
+---
+title: "Update an existing scenario"
+openapi: "PUT /api/v1/scenarios/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/scenarios/update-scenarios.mdx
 
 ---
@@ -73933,11 +75634,65 @@ openapi: "PUT /api/v1/scenarios/{id}"
 
 ---
 
+# FILE: ./api-reference/scim-tokens/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create 2026 08 07"
+openapi: "POST /api/v1/scim-tokens/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/scim-tokens/create-latest.mdx
+
+---
+title: "Create Latest"
+openapi: "POST /api/v1/scim-tokens/latest/"
+---
+
+---
+
 # FILE: ./api-reference/scim-tokens/create-scim-token.mdx
 
 ---
 title: "Create SCIM token"
 openapi: "POST /api/v1/scim-tokens"
+---
+
+---
+
+# FILE: ./api-reference/scim-tokens/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Delete 2026 08 07"
+openapi: "DELETE /api/v1/scim-tokens/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim-tokens/delete-latest.mdx
+
+---
+title: "Delete Latest"
+openapi: "DELETE /api/v1/scim-tokens/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim-tokens/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List 2026 08 07"
+openapi: "GET /api/v1/scim-tokens/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/scim-tokens/list-latest.mdx
+
+---
+title: "List Latest"
+openapi: "GET /api/v1/scim-tokens/latest/"
 ---
 
 ---
@@ -74243,11 +75998,29 @@ openapi: "PATCH /api/scim/v2/Users/{id}"
 
 ---
 
+# FILE: ./api-reference/secrets/create-a-project-secret.mdx
+
+---
+title: "Create a project secret"
+openapi: "POST /api/v1/secrets"
+---
+
+---
+
 # FILE: ./api-reference/secrets/create-secrets.mdx
 
 ---
 title: "Create a new project secret"
 openapi: "POST /api/secrets"
+---
+
+---
+
+# FILE: ./api-reference/secrets/delete-a-project-secret.mdx
+
+---
+title: "Delete a project secret"
+openapi: "DELETE /api/v1/secrets/{id}"
 ---
 
 ---
@@ -74261,11 +76034,29 @@ openapi: "DELETE /api/secrets/{id}"
 
 ---
 
+# FILE: ./api-reference/secrets/get-project-secret-metadata.mdx
+
+---
+title: "Get project-secret metadata"
+openapi: "GET /api/v1/secrets/{id}"
+---
+
+---
+
 # FILE: ./api-reference/secrets/get-secrets.mdx
 
 ---
 title: "Get a secret by its ID"
 openapi: "GET /api/secrets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/secrets/list-project-secrets.mdx
+
+---
+title: "List project secrets"
+openapi: "GET /api/v1/secrets"
 ---
 
 ---
@@ -74292,11 +76083,29 @@ Manage project secrets used for external integrations. Values are encrypted at r
 
 ---
 
+# FILE: ./api-reference/secrets/replace-a-project-secret-value.mdx
+
+---
+title: "Replace a project secret value"
+openapi: "PUT /api/v1/secrets/{id}"
+---
+
+---
+
 # FILE: ./api-reference/secrets/update-secrets.mdx
 
 ---
 title: "Update a secret's value"
 openapi: "PUT /api/secrets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get a single simulation run by its ID"
+openapi: "GET /api/v1/simulation-runs/2026-08-07/{scenarioRunId}"
 ---
 
 ---
@@ -74310,11 +76119,74 @@ openapi: "GET /api/v1/simulation-runs/batches/{batchRunId}"
 
 ---
 
+# FILE: ./api-reference/simulation-runs/get-get-batches-batchRunId.mdx
+
+---
+title: "Get Batches"
+openapi: "GET /api/v1/simulation-runs/latest/batches/{batchRunId}"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/get-get-batches.mdx
+
+---
+title: "Get Batches"
+openapi: "GET /api/v1/simulation-runs/batches/{batchRunId}"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/get-latest.mdx
+
+---
+title: "Get a single simulation run by its ID"
+openapi: "GET /api/v1/simulation-runs/latest/{scenarioRunId}"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/get-list-list-list.mdx
+
+---
+title: "List batch summaries for a scenario set"
+openapi: "GET /api/v1/simulation-runs/latest/batches/list"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/get-list-list.mdx
+
+---
+title: "List batch summaries for a scenario set"
+openapi: "GET /api/v1/simulation-runs/batches/list"
+---
+
+---
+
 # FILE: ./api-reference/simulation-runs/get-simulation-runs.mdx
 
 ---
 title: "Get a single simulation run by its ID"
 openapi: "GET /api/v1/simulation-runs/{scenarioRunId}"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List 2026 08 07"
+openapi: "GET /api/v1/simulation-runs/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/list-latest.mdx
+
+---
+title: "List Latest"
+openapi: "GET /api/v1/simulation-runs/latest/"
 ---
 
 ---
@@ -74368,11 +76240,47 @@ openapi: "POST /api/v1/suites/{id}/run"
 
 ---
 
+# FILE: ./api-reference/suites/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create 2026 08 07"
+openapi: "POST /api/v1/suites/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/suites/create-latest.mdx
+
+---
+title: "Create Latest"
+openapi: "POST /api/v1/suites/latest/"
+---
+
+---
+
 # FILE: ./api-reference/suites/create-suites.mdx
 
 ---
 title: "Create a new suite"
 openapi: "POST /api/v1/suites"
+---
+
+---
+
+# FILE: ./api-reference/suites/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Delete 2026 08 07"
+openapi: "DELETE /api/v1/suites/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/suites/delete-latest.mdx
+
+---
+title: "Delete Latest"
+openapi: "DELETE /api/v1/suites/latest/{id}"
 ---
 
 ---
@@ -74386,11 +76294,47 @@ openapi: "DELETE /api/v1/suites/{id}"
 
 ---
 
+# FILE: ./api-reference/suites/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get 2026 08 07"
+openapi: "GET /api/v1/suites/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/suites/get-latest.mdx
+
+---
+title: "Get Latest"
+openapi: "GET /api/v1/suites/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/suites/get-suites.mdx
 
 ---
 title: "Get a suite"
 openapi: "GET /api/v1/suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/suites/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List 2026 08 07"
+openapi: "GET /api/v1/suites/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/suites/list-latest.mdx
+
+---
+title: "List Latest"
+openapi: "GET /api/v1/suites/latest/"
 ---
 
 ---
@@ -74417,11 +76361,74 @@ Deprecated. The `/api/v1/suites` family stays for the clients that already call 
 
 ---
 
+# FILE: ./api-reference/suites/post-action-duplicate-duplicate.mdx
+
+---
+title: "Create Duplicate"
+openapi: "POST /api/v1/suites/latest/{id}/duplicate"
+---
+
+---
+
+# FILE: ./api-reference/suites/post-action-duplicate.mdx
+
+---
+title: "Create Duplicate"
+openapi: "POST /api/v1/suites/2026-08-07/{id}/duplicate"
+---
+
+---
+
+# FILE: ./api-reference/suites/post-action-run-run.mdx
+
+---
+title: "Create Run"
+openapi: "POST /api/v1/suites/latest/{id}/run"
+---
+
+---
+
+# FILE: ./api-reference/suites/post-action-run.mdx
+
+---
+title: "Create Run"
+openapi: "POST /api/v1/suites/2026-08-07/{id}/run"
+---
+
+---
+
+# FILE: ./api-reference/suites/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update 2026 08 07"
+openapi: "PATCH /api/v1/suites/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/suites/update-latest.mdx
+
+---
+title: "Update Latest"
+openapi: "PATCH /api/v1/suites/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/suites/update-suites.mdx
 
 ---
 title: "Update a suite"
 openapi: "PATCH /api/v1/suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/action-members.mdx
+
+---
+title: "Add a member to a team"
+openapi: "POST /api/v1/teams/2026-08-07/{id}/members"
 ---
 
 ---
@@ -74444,6 +76451,24 @@ openapi: "DELETE /api/v1/teams/{id}"
 
 ---
 
+# FILE: ./api-reference/teams/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create 2026 08 07"
+openapi: "POST /api/v1/teams/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/teams/create-latest.mdx
+
+---
+title: "Create Latest"
+openapi: "POST /api/v1/teams/latest/"
+---
+
+---
+
 # FILE: ./api-reference/teams/create-team.mdx
 
 ---
@@ -74453,11 +76478,119 @@ openapi: "POST /api/v1/teams"
 
 ---
 
+# FILE: ./api-reference/teams/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Archive a team"
+openapi: "DELETE /api/v1/teams/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/delete-delete-members.mdx
+
+---
+title: "Remove a member from a team"
+openapi: "DELETE /api/v1/teams/latest/{id}/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/teams/delete-latest.mdx
+
+---
+title: "Archive a team"
+openapi: "DELETE /api/v1/teams/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/delete-members.mdx
+
+---
+title: "Remove a member from a team"
+openapi: "DELETE /api/v1/teams/2026-08-07/{id}/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/teams/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get a team by its id"
+openapi: "GET /api/v1/teams/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/get-get-members.mdx
+
+---
+title: "List members of a team"
+openapi: "GET /api/v1/teams/latest/{id}/members"
+---
+
+---
+
+# FILE: ./api-reference/teams/get-get-projects.mdx
+
+---
+title: "List projects in a team"
+openapi: "GET /api/v1/teams/latest/{id}/projects"
+---
+
+---
+
+# FILE: ./api-reference/teams/get-latest.mdx
+
+---
+title: "Get a team by its id"
+openapi: "GET /api/v1/teams/latest/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/get-members.mdx
+
+---
+title: "List members of a team"
+openapi: "GET /api/v1/teams/2026-08-07/{id}/members"
+---
+
+---
+
+# FILE: ./api-reference/teams/get-projects.mdx
+
+---
+title: "List projects in a team"
+openapi: "GET /api/v1/teams/2026-08-07/{id}/projects"
+---
+
+---
+
 # FILE: ./api-reference/teams/get-team.mdx
 
 ---
 title: "Get team"
 openapi: "GET /api/v1/teams/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List all non-archived teams for the organization"
+openapi: "GET /api/v1/teams/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/teams/list-latest.mdx
+
+---
+title: "List all non-archived teams for the organization"
+openapi: "GET /api/v1/teams/latest/"
 ---
 
 ---
@@ -74565,11 +76698,38 @@ curl -X POST https://app.langwatch.ai/api/projects \
 
 ---
 
+# FILE: ./api-reference/teams/post-action-members.mdx
+
+---
+title: "Add a member to a team"
+openapi: "POST /api/v1/teams/latest/{id}/members"
+---
+
+---
+
 # FILE: ./api-reference/teams/remove-member.mdx
 
 ---
 title: "Remove team member"
 openapi: "DELETE /api/v1/teams/{id}/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/teams/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update a team by its id"
+openapi: "PATCH /api/v1/teams/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/update-latest.mdx
+
+---
+title: "Update a team by its id"
+openapi: "PATCH /api/v1/teams/latest/{id}"
 ---
 
 ---
@@ -74650,20 +76810,29 @@ openapi: "PATCH /api/v1/test-suites/{id}"
 
 ---
 
-# FILE: ./api-reference/traces/create-public-trace-path.mdx
+# FILE: ./api-reference/traces/create-search.mdx
 
 ---
-title: "Create public path for single trace"
-openapi: "POST /api/v1/trace/{id}/share"
+title: "Search traces for a project"
+openapi: "POST /api/v1/traces/2026-08-07/search"
 ---
 
 ---
 
-# FILE: ./api-reference/traces/delete-public-trace-path.mdx
+# FILE: ./api-reference/traces/get-2026-08-07-2026-08-07.mdx
 
 ---
-title: "Delete an existing public path for a trace"
-openapi: "POST /api/v1/trace/{id}/unshare"
+title: "Get a single trace by ID"
+openapi: "GET /api/v1/traces/2026-08-07/{traceId}"
+---
+
+---
+
+# FILE: ./api-reference/traces/get-latest.mdx
+
+---
+title: "Get a single trace by ID"
+openapi: "GET /api/v1/traces/latest/{traceId}"
 ---
 
 ---
@@ -74673,15 +76842,6 @@ openapi: "POST /api/v1/trace/{id}/unshare"
 ---
 title: "Get trace details"
 openapi: "GET /api/v1/traces/{traceId}"
----
-
----
-
-# FILE: ./api-reference/traces/get-transcript.mdx
-
----
-title: "Get Transcript"
-openapi: "GET /api/v1/traces/{traceId}/transcript"
 ---
 
 ---
@@ -74729,6 +76889,33 @@ Pass your LangWatch API key in the `X-Auth-Token` header. Your API key can be fo
   Migrate to `/api/v1/traces/search` and `/api/v1/traces/{traceId}` for the improved `format` parameter
   and AI-readable digests.
 </Info>
+
+---
+
+# FILE: ./api-reference/traces/patch-update-trace-metadata-metadata.mdx
+
+---
+title: "Update trace metadata"
+openapi: "PATCH /api/v1/traces/latest/{traceId}/metadata"
+---
+
+---
+
+# FILE: ./api-reference/traces/patch-update-trace-metadata.mdx
+
+---
+title: "Update trace metadata"
+openapi: "PATCH /api/v1/traces/2026-08-07/{traceId}/metadata"
+---
+
+---
+
+# FILE: ./api-reference/traces/post-create-search.mdx
+
+---
+title: "Search traces for a project"
+openapi: "POST /api/v1/traces/latest/search"
+---
 
 ---
 
@@ -74980,11 +77167,29 @@ openapi: "PATCH /api/v1/traces/{traceId}/metadata"
 
 ---
 
+# FILE: ./api-reference/triggers/create-2026-08-07-2026-08-07.mdx
+
+---
+title: "Create a new trigger"
+openapi: "POST /api/v1/triggers/2026-08-07/"
+---
+
+---
+
 # FILE: ./api-reference/triggers/create-a-slack-alert-trigger.mdx
 
 ---
 title: "Create a Slack alert trigger"
 openapi: "POST /api/v1/trigger/slack"
+---
+
+---
+
+# FILE: ./api-reference/triggers/create-latest.mdx
+
+---
+title: "Create a new trigger"
+openapi: "POST /api/v1/triggers/latest/"
 ---
 
 ---
@@ -74998,6 +77203,24 @@ openapi: "POST /api/v1/triggers"
 
 ---
 
+# FILE: ./api-reference/triggers/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Delete"
+openapi: "DELETE /api/v1/triggers/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/triggers/delete-latest.mdx
+
+---
+title: "Delete"
+openapi: "DELETE /api/v1/triggers/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/triggers/delete-triggers.mdx
 
 ---
@@ -75007,11 +77230,47 @@ openapi: "DELETE /api/v1/triggers/{id}"
 
 ---
 
+# FILE: ./api-reference/triggers/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get a trigger by its ID"
+openapi: "GET /api/v1/triggers/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/triggers/get-latest.mdx
+
+---
+title: "Get a trigger by its ID"
+openapi: "GET /api/v1/triggers/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/triggers/get-triggers.mdx
 
 ---
 title: "Get a trigger by its ID"
 openapi: "GET /api/v1/triggers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/triggers/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List all active triggers"
+openapi: "GET /api/v1/triggers/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/triggers/list-latest.mdx
+
+---
+title: "List all active triggers"
+openapi: "GET /api/v1/triggers/latest/"
 ---
 
 ---
@@ -75035,6 +77294,24 @@ description: "Manage automation triggers that fire actions based on trace events
 ## Intro
 
 Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.
+
+---
+
+# FILE: ./api-reference/triggers/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update a trigger"
+openapi: "PATCH /api/v1/triggers/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/triggers/update-latest.mdx
+
+---
+title: "Update a trigger"
+openapi: "PATCH /api/v1/triggers/latest/{id}"
+---
 
 ---
 
@@ -75177,6 +77454,24 @@ openapi: "POST /api/v1/workflows/{id}/evaluate"
 
 ---
 
+# FILE: ./api-reference/workflows/delete-2026-08-07-2026-08-07.mdx
+
+---
+title: "Archive"
+openapi: "DELETE /api/v1/workflows/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/delete-latest.mdx
+
+---
+title: "Archive"
+openapi: "DELETE /api/v1/workflows/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/workflows/delete-workflows.mdx
 
 ---
@@ -75186,11 +77481,47 @@ openapi: "DELETE /api/v1/workflows/{id}"
 
 ---
 
+# FILE: ./api-reference/workflows/get-2026-08-07-2026-08-07.mdx
+
+---
+title: "Get a workflow by its ID"
+openapi: "GET /api/v1/workflows/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/get-latest.mdx
+
+---
+title: "Get a workflow by its ID"
+openapi: "GET /api/v1/workflows/latest/{id}"
+---
+
+---
+
 # FILE: ./api-reference/workflows/get-workflows.mdx
 
 ---
 title: "Get a workflow by its ID"
 openapi: "GET /api/v1/workflows/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/list-2026-08-07-2026-08-07.mdx
+
+---
+title: "List all non-archived workflows for the project"
+openapi: "GET /api/v1/workflows/2026-08-07/"
+---
+
+---
+
+# FILE: ./api-reference/workflows/list-latest.mdx
+
+---
+title: "List all non-archived workflows for the project"
+openapi: "GET /api/v1/workflows/latest/"
 ---
 
 ---
@@ -75217,6 +77548,24 @@ Manage Optimization Studio workflows. List, update, and archive workflows used f
 
 ---
 
+# FILE: ./api-reference/workflows/post-action-evaluate-evaluate.mdx
+
+---
+title: "Create Evaluate"
+openapi: "POST /api/v1/workflows/latest/{id}/evaluate"
+---
+
+---
+
+# FILE: ./api-reference/workflows/post-action-evaluate.mdx
+
+---
+title: "Create Evaluate"
+openapi: "POST /api/v1/workflows/2026-08-07/{id}/evaluate"
+---
+
+---
+
 # FILE: ./api-reference/workflows/run-a-specific-workflow-version.mdx
 
 ---
@@ -75240,6 +77589,24 @@ openapi: "POST /api/v1/optimization/{workflowId}/{versionId}"
 ---
 title: "Run a workflow"
 openapi: "POST /api/v1/workflows/{workflowId}/run"
+---
+
+---
+
+# FILE: ./api-reference/workflows/update-2026-08-07-2026-08-07.mdx
+
+---
+title: "Update a workflow's metadata"
+openapi: "PATCH /api/v1/workflows/2026-08-07/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/update-latest.mdx
+
+---
+title: "Update a workflow's metadata"
+openapi: "PATCH /api/v1/workflows/latest/{id}"
 ---
 
 ---

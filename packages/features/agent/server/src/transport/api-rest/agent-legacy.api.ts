@@ -92,6 +92,10 @@ export function createAgentLegacyRestApp(options: {
     // The bare paths alone: `/api/v1/agents` is the family that supersedes
     // this one, so this family publishes no version namespace of its own.
     bareMount: true,
+    // No derived twin (see above): the successor family already answers
+    // literally at `/api/v1/agents`, so this legacy family must not also
+    // claim it via the automatic bare-mount alias.
+    v1Alias: false,
     // Every answer names the successor, refusals included: an integrator
     // reading the wire finds the move without reading the docs.
     routeMiddleware: [deprecatedAlias({ successor: AGENTS_ALIAS_SUCCESSOR })],

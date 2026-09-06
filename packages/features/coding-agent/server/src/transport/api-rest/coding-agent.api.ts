@@ -169,7 +169,10 @@ function decodeCursor(raw: string): CodingAgentSessionCursor | null {
 }
 
 const sessionParamsSchema = z.object({
-  sessionId: z.string().min(1).describe("The agent's own session id (session.id / conversation id)."),
+  sessionId: z
+    .string()
+    .min(1)
+    .describe("The agent's own session id (session.id / conversation id)."),
 });
 
 const sessionEventsResponseSchema = z.object({
@@ -212,6 +215,7 @@ export function createCodingAgentRestApp(options: {
     // declared by the organization-scoped v1 family, which answers the same
     // question for a different credential.
     bareMount: true,
+    v1Alias: false,
   });
 
   type CodingAgentContext = ProjectScopedContext<EndpointVariables>;

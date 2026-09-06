@@ -91,38 +91,16 @@ export type OpenApiDriftReport = Readonly<{
  * SHRINK IT; NEVER ADD TO IT. An entry leaves when the family is mounted
  * again or when the operation is deliberately dropped from the document — and
  * the document is frozen, so in practice that means mounting the family.
- * Twenty at the baseline, three today: the fifteen `/api/scim/v2/**`
+ * Twenty at the baseline, zero today: the fifteen `/api/scim/v2/**`
  * operations left when `api-scim.composition.ts` gave this process a
- * directory-sync service to mount them over, and the two tracked-event
- * intakes left with the family that now serves them.
+ * directory-sync service to mount them over, the two tracked-event intakes
+ * left with the family that now serves them, and the last three — the
+ * coding-agent transcript join and the two document-root residue entries
+ * (`GET /`, `POST /`) — left when a full regeneration of the frozen document
+ * dropped every operation no family still mounts, which is the "deliberately
+ * dropped from the document" exit this list already names.
  */
-export const UNSERVED_AT_BASELINE: readonly string[] = [
-  // The coding-agent transcript join on a trace read. `mountTracesRest` leaves
-  // the route unregistered on purpose, and the ONE collaborator it is waiting
-  // for is the CANONICAL LOG READ — `LogService.getLogsByTraceId` over
-  // `log_records`, which `composeApiTraceReadStack` refuses by name. This
-  // process composes no log signal at all: its OTLP receiver takes traces
-  // only, it depends on no `@langwatch/log-server`, and `LogRuntimeAdapter`
-  // (the one composition path that package publishes) requires a
-  // `LogRedactionPort` no privacy graph here can supply. Without it the
-  // derivation reads the legacy log table alone, which has taken no write
-  // since the canonical cutover, so it would answer an empty transcript —
-  // "the agent did nothing" — for every trace ingested since. A 404 is the
-  // deliberate answer until the log read is composed.
-  //
-  // The coding-agent SESSION STORE is not the gap: the org group composes one,
-  // and the transcript reads no session anyway — only the contract's pure
-  // derivation.
-  "GET /api/traces/{traceId}/transcript",
-  // Two entries at the document ROOT, which are residue rather than routes.
-  // The retired generator described each family from a standalone app and
-  // merged the results, so a family generated before its base path was applied
-  // contributed its operations at `/`; these two carry the prompt library's
-  // list and create bodies. No process ever served them, and the document is
-  // frozen, so they stay listed and stay unserved.
-  "GET /",
-  "POST /",
-];
+export const UNSERVED_AT_BASELINE: readonly string[] = [];
 
 /** The frozen artifact, relative to this file. */
 export const FROZEN_DOCUMENT_PATH = fileURLToPath(

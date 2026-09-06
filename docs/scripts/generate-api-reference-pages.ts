@@ -84,6 +84,25 @@ const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
   "Not yet documented in the API reference: the saved workbench chart routes require the analytics:view permission and have no reference pages yet.";
 
 /**
+ * The dated (`2026-08-07`) and literal-`latest`-segment address of an
+ * operation this generator already skips, or already documents, at its
+ * default address. These families are not `bareMount`, so each registered
+ * date mounts its own route and its own `/api/v1` twin — with the version
+ * segment landing BEFORE the family's own path segment (`/api/v1/{version}/
+ * governance/ingestion-templates`, not `/api/v1/governance/{version}/
+ * ingestion-templates`) — which is a shape no `pathPrefixes` entry can match
+ * and which per-version reference pages are not generated for regardless.
+ */
+const UNDOCUMENTED_DATED_VERSION_PIN =
+  "Not yet documented in the API reference: this is the dated or 'latest'-pinned address of an operation already covered above; per-version reference pages are not generated.";
+
+const RETIRED_LEGACY_AGENTS =
+  "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";
+
+const RETIRED_LEGACY_SECRET_SINGULAR =
+  "Retired surface, intentionally undocumented: superseded by /api/secrets (see the Secrets family below); this singular-named alias is the same family under its original path.";
+
+/**
  * Spec paths that deliberately get no reference page, each with the reason it
  * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
  * entry, and the generator fails when one is owned by neither.
@@ -96,15 +115,42 @@ const SKIP_PATHS: Record<string, string> = {
     "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
+  "/api/agents": RETIRED_LEGACY_AGENTS,
+  "/api/agents/{id}": RETIRED_LEGACY_AGENTS,
+  "/api/secret": RETIRED_LEGACY_SECRET_SINGULAR,
+  "/api/secret/{id}": RETIRED_LEGACY_SECRET_SINGULAR,
+  "/api/v1/secret": RETIRED_LEGACY_SECRET_SINGULAR,
+  "/api/v1/secret/{id}": RETIRED_LEGACY_SECRET_SINGULAR,
+  "/api/v1/2026-08-07/trigger/slack": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/latest/trigger/slack": UNDOCUMENTED_DATED_VERSION_PIN,
   "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/{id}": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/{id}/ottl-rules": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/v1/governance/2026-08-07/ingestion-templates": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/governance/2026-08-07/ingestion-templates/admin": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/governance/2026-08-07/ingestion-templates/clone": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/governance/2026-08-07/ingestion-templates/{id}": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/governance/2026-08-07/ingestion-templates/{id}/ottl-rules":
+    UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/governance/latest/ingestion-templates": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/governance/latest/ingestion-templates/admin": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/governance/latest/ingestion-templates/clone": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/governance/latest/ingestion-templates/{id}": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/governance/latest/ingestion-templates/{id}/ottl-rules": UNDOCUMENTED_DATED_VERSION_PIN,
   "/api/me/project": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
+  "/api/v1/me/2026-08-07/project": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/me/2026-08-07/usage": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/me/latest/project": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/me/latest/usage": UNDOCUMENTED_DATED_VERSION_PIN,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
+  "/api/v1/model-defaults/2026-08-07/": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/model-defaults/2026-08-07/{id}": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/model-defaults/latest/": UNDOCUMENTED_DATED_VERSION_PIN,
+  "/api/v1/model-defaults/latest/{id}": UNDOCUMENTED_DATED_VERSION_PIN,
   "/api/v1/langy/control/connect/frames": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
   "/api/v1/langy/control/connect/poll": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
   "/api/v1/langy/control/connect/register": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
@@ -151,10 +197,10 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     overviewDescription:
       "Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs.",
     endpointOrder: [
-      "GET /api/evaluations/list",
-      "POST /api/evaluations/{evaluator}/evaluate",
-      "POST /api/evaluations/{evaluator}/{subpath}/evaluate",
-      "POST /api/guardrails/{evaluator}/evaluate",
+      "GET /api/v1/evaluations/list",
+      "POST /api/v1/evaluations/{evaluator}/evaluate",
+      "POST /api/v1/evaluations/{evaluator}/{subpath}/evaluate",
+      "POST /api/v1/guardrails/{evaluator}/evaluate",
     ],
   },
   {
@@ -169,13 +215,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     // The order the overview describes, so a reader going down the sidebar
     // meets the calls in the order they would make them.
     endpointOrder: [
-      "POST /api/experiment/init",
-      "GET /api/experiments",
-      "POST /api/experiments/{slug}/run",
-      "GET /api/experiments/runs",
-      "GET /api/experiments/runs/{runId}",
-      "GET /api/experiments/runs/{runId}/results",
-      "POST /api/dspy/log_steps",
+      "POST /api/v1/experiment/init",
+      "GET /api/v1/experiments",
+      "POST /api/v1/experiments/{slug}/run",
+      "GET /api/v1/experiments/runs",
+      "GET /api/v1/experiments/runs/{runId}",
+      "GET /api/v1/experiments/runs/{runId}/results",
+      "POST /api/v1/dspy/log_steps",
     ],
   },
   {
@@ -264,12 +310,10 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
     name: "Events",
     dirName: "events",
-    // `/api/track_event` is the older spelling of the same call, still the one
-    // most SDK versions in the wild send.
-    pathPrefixes: ["/api/events", "/api/track_event"],
+    pathPrefixes: ["/api/events"],
     overviewDescription:
       "Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it.",
-    endpointOrder: ["POST /api/events/track", "POST /api/track_event"],
+    endpointOrder: ["POST /api/v1/events/track"],
   },
   {
     name: "Workflows",
@@ -381,12 +425,12 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     // The catalog comes first because it is where the permission keys a role is
     // built from come from, and the overview walks a reader in that order.
     endpointOrder: [
-      "GET /api/roles/permissions",
-      "GET /api/roles",
-      "POST /api/roles",
-      "GET /api/roles/{id}",
-      "PATCH /api/roles/{id}",
-      "DELETE /api/roles/{id}",
+      "GET /api/v1/roles/permissions",
+      "GET /api/v1/roles",
+      "POST /api/v1/roles",
+      "GET /api/v1/roles/{id}",
+      "PATCH /api/v1/roles/{id}",
+      "DELETE /api/v1/roles/{id}",
     ],
   },
   {
@@ -560,20 +604,52 @@ function generateFileName(method: string, apiPath: string, op: OpenAPIOperation)
 }
 
 /**
+ * The `/api/{family}` twin of a spec path served at `/api/v1/{family}`, or
+ * null when `apiPath` carries no `/api/v1` generation segment to strip.
+ *
+ * Decision 20 (2026-09-04) mounts every REST family at both `/api/{family}`
+ * and `/api/v1/{family}`, but ENDPOINT_GROUPS and SKIP_PATHS still name only
+ * the bare form for every family except the four this generator only ever
+ * documented at v1 (Agents, Run Plans, Test Suites, Query). Rather than
+ * duplicate every prefix and skip reason under `/api/v1`, ownership and skip
+ * lookups fall back to this bare twin whenever the literal path matches
+ * nothing — which leaves the four v1-only families alone, since their own
+ * literal `/api/v1/...` prefix already matches first.
+ */
+function bareTwinOf(apiPath: string): string | null {
+  if (apiPath === "/api/v1" || !apiPath.startsWith("/api/v1/")) return null;
+  return `/api${apiPath.slice("/api/v1".length)}`;
+}
+
+/** Whether `apiPath`, or its `/api/v1` bare twin, is named in SKIP_PATHS. */
+function isSkipped(apiPath: string): boolean {
+  if (Object.hasOwn(SKIP_PATHS, apiPath)) return true;
+  const bare = bareTwinOf(apiPath);
+  return bare !== null && Object.hasOwn(SKIP_PATHS, bare);
+}
+
+/**
  * How much of `apiPath` this group's best prefix covers, or 0 when none match.
  * Ownership goes to the longest match, so `/api/gateway/v1/spend-events` beats
  * a shorter sibling prefix and a sub-path like `/spend-events/replay` lands in
- * the same group as its parent instead of nowhere.
+ * the same group as its parent instead of nowhere. Checked against `apiPath`
+ * and its `/api/v1` bare twin (see {@link bareTwinOf}), so a family with no
+ * literal `/api/v1` entry of its own still resolves through the address it
+ * is actually documented under.
  */
 function matchStrength(apiPath: string, group: EndpointGroup): number {
+  const bare = bareTwinOf(apiPath);
+  const candidates = bare === null ? [apiPath] : [apiPath, bare];
   let best = 0;
   for (const prefix of group.pathPrefixes) {
-    if (
-      apiPath === prefix ||
-      apiPath.startsWith(prefix + "/") ||
-      apiPath.startsWith(prefix + "?")
-    ) {
-      best = Math.max(best, prefix.length);
+    for (const candidate of candidates) {
+      if (
+        candidate === prefix ||
+        candidate.startsWith(prefix + "/") ||
+        candidate.startsWith(prefix + "?")
+      ) {
+        best = Math.max(best, prefix.length);
+      }
     }
   }
   return best;
@@ -583,7 +659,7 @@ function matchStrength(apiPath: string, group: EndpointGroup): number {
 function resolveOwners(specPaths: string[]): Map<string, EndpointGroup> {
   const owners = new Map<string, EndpointGroup>();
   for (const apiPath of specPaths) {
-    if (Object.hasOwn(SKIP_PATHS, apiPath)) continue;
+    if (isSkipped(apiPath)) continue;
     let winner: EndpointGroup | undefined;
     let winningStrength = 0;
     for (const group of ENDPOINT_GROUPS) {
@@ -663,7 +739,7 @@ function main() {
   }
 
   const unowned = Object.keys(spec.paths).filter(
-    (apiPath) => !Object.hasOwn(SKIP_PATHS, apiPath) && !owners.has(apiPath),
+    (apiPath) => !isSkipped(apiPath) && !owners.has(apiPath),
   );
   if (unowned.length > 0) {
     const noun = unowned.length === 1 ? "spec path has" : "spec paths have";

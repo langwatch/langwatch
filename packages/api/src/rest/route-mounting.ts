@@ -22,13 +22,14 @@ type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
  * dated namespace and no version guard, because a family based at bare `/api`
  * would claim `/api/:apiVersion{…}/*` and shadow every sibling.
  *
- * A family based at bare `/api` additionally answers at the `/api/v1` address
- * of each of its own paths — `/api/evaluations/list` at
- * `/api/v1/evaluations/list` — which is the generation it already served and
- * the address the published document names (ADR 002 §1). The alias is per
- * ROUTE because `/api` has no segment of its own to alias. A bare mount at a
- * DEEPER prefix gets no alias: it is bare precisely because a different family
- * already answers on its `/api/v1` twin.
+ * Every bare-mounted family additionally answers at the `/api/v1` address of
+ * each of its own paths — `/api/dataset` at `/api/v1/dataset`,
+ * `/api/evaluations/list` at `/api/v1/evaluations/list` — which is the
+ * generation it already served and the address the published document names
+ * (ADR 002 §1, decision 20). A family opts out by setting `v1Alias: false` on
+ * its own service config (the auth and project families do, because their
+ * `/api/v1` twin belongs to another family or to nothing at all); that
+ * opt-out is respected here unchanged, nothing in this function overrides it.
  */
 function mountBareRoutes<TProject>({
   app,
@@ -47,9 +48,6 @@ function mountBareRoutes<TProject>({
 }): void {
   const latest = versionMap.get(VERSION_LATEST);
   if (!latest) return;
-
-  const aliasedConfig: ServiceConfig =
-    basePath === "/api" ? serviceConfig : { ...serviceConfig, v1Alias: false };
 
   for (const endpoint of latest) {
     const method = endpoint.method === "sse" ? "get" : endpoint.method;
@@ -71,7 +69,7 @@ function mountBareRoutes<TProject>({
       basePath,
       method,
       path,
-      serviceConfig: aliasedConfig,
+      serviceConfig,
       stack,
     });
     serviceConfig.onRouteMounted?.({
