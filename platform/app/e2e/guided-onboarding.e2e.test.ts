@@ -159,6 +159,7 @@ async function readGuidedState({
   currentPath?: string;
   tourCompletedAt?: string;
   providerSkippedAt?: string;
+  tourSkippedAt?: string;
 }> {
   const organizations = await trpcQuery<Array<{ id: string; name: string }>>({
     page,
@@ -339,6 +340,10 @@ test.describe("guided onboarding", () => {
     await expect(page.getByTestId("guided-onboarding-offer")).toHaveCount(0);
     const state = await readGuidedState({ page, organizationName });
     expect(state.providerSkippedAt).toBeTruthy();
+    // Skip anyway skips the guide as a whole: the tour is recorded as skipped
+    // too, which is what makes Langy open with the no-worries line.
+    expect(state.tourSkippedAt).toBeTruthy();
+    expect(state.tourCompletedAt).toBeFalsy();
     expect(state.currentPath).toBe("coding");
   });
 
