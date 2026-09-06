@@ -288,6 +288,13 @@ Feature: Guided onboarding tour
     Then nothing is queued
 
   @unit
+  Scenario: a skipped provider means no tour
+    Given the user clicked "Skip anyway" on the provider screen
+    When the host mounts on the landing
+    Then no tour runs
+    And the kickoff is queued with the tour status "skipped", so Langy opens with the no-worries line
+
+  @unit
   Scenario: the tour never runs twice for the same path
     Given the tour was completed for the current path
     When the host mounts

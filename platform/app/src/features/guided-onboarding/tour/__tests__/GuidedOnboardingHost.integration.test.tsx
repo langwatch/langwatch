@@ -156,6 +156,26 @@ describe("GuidedOnboardingHost", () => {
     });
   });
 
+  describe("given the provider screen was skipped", () => {
+    /** @scenario a skipped provider means no tour */
+    it("runs no tour and queues the kickoff as skipped", () => {
+      guidedState = {
+        paths: ["gateway"],
+        currentPath: "gateway",
+        donePaths: [],
+        providerSkippedAt: "2026-09-05T10:00:00.000Z",
+        tourSkippedAt: "2026-09-05T10:00:00.000Z",
+      };
+      renderHost();
+      expect(useGuidedTourStore.getState().running).toBe(false);
+      expect(openPanel).toHaveBeenCalled();
+      expect(queueGuidedKickoff).toHaveBeenCalledTimes(1);
+      expect(queueGuidedKickoff).toHaveBeenCalledWith(
+        expect.objectContaining({ path: "gateway", tourStatus: "skipped" }),
+      );
+    });
+  });
+
   describe("given the tour already ended", () => {
     /** @scenario a reload after the tour queues the kickoff again only while no conversation is attached */
     it("queues the kickoff without a tour while no conversation is attached", () => {

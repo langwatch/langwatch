@@ -125,8 +125,13 @@ export class GuidedOnboardingService {
     });
   }
 
+  /**
+   * "Skip anyway" on the provider screen skips the guide as a whole: the
+   * tour is recorded as skipped in the same breath, so the landing never
+   * starts it and Langy opens with the no-worries line instead.
+   */
   async recordProviderSkipped(actor: Actor): Promise<GuidedOnboardingState> {
-    return this.write(actor, {
+    await this.write(actor, {
       event: "provider_skipped",
       payload: {},
       mutate: (state) => ({
@@ -134,6 +139,7 @@ export class GuidedOnboardingService {
         providerSkippedAt: this.now().toISOString(),
       }),
     });
+    return this.recordTour(actor, { status: "skipped" });
   }
 
   async recordTour(

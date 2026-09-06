@@ -237,6 +237,22 @@ describe("onboarding guided state", () => {
         false,
       );
     });
+
+    /** @scenario "Skip anyway skips the tour as well" */
+    it("records the tour as skipped in the same call and fires both events", async () => {
+      const state = await callerFor(owner).recordProviderSkipped({
+        organizationId,
+      });
+      expect(typeof state.tourSkippedAt).toBe("string");
+      expect(state.tourCompletedAt).toBeUndefined();
+      const events = onGuidedOnboardingEvent.mock.calls
+        .map((call) => call[0] as { organizationId: string; event: string })
+        .filter((event) => event.organizationId === organizationId)
+        .map((event) => event.event);
+      expect(events).toEqual(
+        expect.arrayContaining(["provider_skipped", "tour_skipped"]),
+      );
+    });
   });
 
   describe("when the user completes, skips and replays the tour", () => {

@@ -274,6 +274,12 @@ Feature: Guided welcome flow and takeover screens
     Then the organization records that the provider was skipped
     And I land on the first pick's page
 
+  @integration
+  Scenario: Skip anyway skips the tour as well
+    When the provider skip is recorded
+    Then the organization records the tour as skipped in the same call
+    And the provider skipped and tour skipped events both reach the onboarding event hook
+
   # ============================================================================
   # Self-hosted
   # ============================================================================
