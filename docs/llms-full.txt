@@ -57150,7 +57150,9 @@ Two conversations in one pod belong to two different people, and a prompt-inject
 
 **Unix identity is the configurable one.** By default each conversation's worker gets a distinct UID; its home, tmp dir and session store are `chown`ed to that UID and `chmod`ed `0700`/`0600`, and the process is `setuid`ed into that UID before `exec`. That is what stops a sibling reading another worker's process environment through `/proc/<pid>/environ` or its conversation content out of the session directory.
 
-The chart supports `per-uid` with a manager running as UID 0 and five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`). This is the supported configuration for provisioning worker files with `chown` and handing each worker its identity with `setuid`/`setgid`. To keep the blast radius small the container drops all capabilities and adds back exactly those five, sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`, omits `fsGroup` (sharing it would reopen the boundary it exists to hold), and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
+The chart supports `per-uid` with a manager running as UID 0 and five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`). This is the supported configuration for provisioning worker files with `chown` and handing each worker its identity with `setuid`/`setgid`.
+
+To keep the blast radius small the container drops all capabilities and adds back exactly those five, sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`, omits `fsGroup` (sharing it would reopen the boundary it exists to hold), and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
 
 ### On a cluster that refuses root
 
@@ -57988,7 +57990,9 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 </Note>
 
 <Warning>
-`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart. Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely: the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.dataplane.enabled` toggle) for any horizontally-scaled deployment.
+`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart.
+
+Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely: the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.dataplane.enabled` toggle) for any horizontally-scaled deployment.
 </Warning>
 
 ## Object Storage (Azure Blob)
@@ -58009,7 +58013,9 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
 
 <Warning>
-When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below). An incomplete active Azure configuration fails loudly and never falls back to S3 or the local filesystem. Inactive Azure settings are validated only when an `azure-blob://` address is used, so they cannot break global or private-bucket S3 traffic. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
+When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below). An incomplete active Azure configuration fails loudly and never falls back to S3 or the local filesystem.
+
+Inactive Azure settings are validated only when an `azure-blob://` address is used, so they cannot break global or private-bucket S3 traffic. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
 </Warning>
 
 ### Migrating an existing installation
@@ -58030,7 +58036,9 @@ OBJECT_STORAGE_MIGRATION_READS_PAUSED=1 \
 pnpm run task migrateObjectStorage verify
 ```
 
-`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object. `finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
+`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object.
+
+`finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
 
 After `finalize` succeeds, update `STORED_OBJECTS_BACKEND` and the active provider credentials while traffic remains paused, deploy that configuration, run `verify`, then resume traffic. A global migration excludes projects with private S3 buckets; they remain on their tenant-owned S3 destination.
 
@@ -60998,7 +61006,11 @@ The `langyagent` pod is a single Go "manager" process that spawns one [worker](/
 
 ## Hard requirements
 
-- **A sandboxed runtime: recommended, not required, and not the default.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so a pod-to-host sandbox is worth having. The chart nonetheless ships `runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`, because most self-managed clusters cannot offer one and refusing them made the assistant hosted-only in practice: **a default install runs on the node's own runtime, with no sandbox.** To harden, pin a class and set `acceptUnsandboxedRuntime: false`: GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly), on AKS point `runtimeClassName` at your Kata VM isolation class, and on EKS install gVisor on the node group. Once pinned, blanking it again is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox; and pinning a class the cluster does not define creates no pod at all. See [The sandbox](/langy/security/sandbox).
+- **A sandboxed runtime: recommended, not required, and not the default.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so a pod-to-host sandbox is worth having. The chart nonetheless ships `runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`, because most self-managed clusters cannot offer one and refusing them made the assistant hosted-only in practice: **a default install runs on the node's own runtime, with no sandbox.**
+
+  To harden, pin a class and set `acceptUnsandboxedRuntime: false`: GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly), on AKS point `runtimeClassName` at your Kata VM isolation class, and on EKS install gVisor on the node group.
+
+  Once pinned, blanking it again is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox; and pinning a class the cluster does not define creates no pod at all. See [The sandbox](/langy/security/sandbox).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
@@ -62614,7 +62626,11 @@ helm install lw . \
 A **default** install does not pass on its own. Everything LangWatch authors already complies (read-only root, non-root at both levels, dropped capabilities, `RuntimeDefault` seccomp, no privilege escalation, no automounted token, CPU + memory requests and limits), but three bundled components cannot, and the overlay turns all three off:
 
 - **Prometheus** (`prometheus.chartManaged`) is an upstream subchart LangWatch doesn't control. Its pods carry no `readOnlyRootFilesystem`, no seccomp profile, and no resource limits on the config-reload sidecar. Bring your own, or disable metrics.
-- **The Langy assistant** (`langyagent.chartManaged`) runs its manager as root with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID` by default. The manager needs those capabilities to provision and launch each worker under a distinct UID. Removing them makes provisioning fail; it does not select shared identity. The overlay disables the assistant. To run it non-root, explicitly set `langyagent.workerIsolation: none` with `langyagent.acceptWorkerIsolationDisabled: true`. That defaults to UID 1000 with `drop: [ALL]` and `RuntimeDefault` seccomp. Set `langyagent.podSecurityContext.runAsUser` to an allowed nonzero UID when required by cluster policy; a nonzero `langyagent.containerSecurityContext.runAsUser` overrides the pod UID. Read [the accepted exposure](/self-hosting/langy/setup#hardening-clusters-that-refuse-root): workers share credentials, files and control-descriptor access, and can read manager secrets. Forcing `runAsNonRoot` or a nonzero UID while retaining `per-uid` is rejected during Helm rendering.
+- **The Langy assistant** (`langyagent.chartManaged`) runs its manager as root with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID` by default. The manager needs those capabilities to provision and launch each worker under a distinct UID. Removing them makes provisioning fail; it does not select shared identity. The overlay disables the assistant.
+
+  To run it non-root, explicitly set `langyagent.workerIsolation: none` with `langyagent.acceptWorkerIsolationDisabled: true`. That defaults to UID 1000 with `drop: [ALL]` and `RuntimeDefault` seccomp. Set `langyagent.podSecurityContext.runAsUser` to an allowed nonzero UID when required by cluster policy; a nonzero `langyagent.containerSecurityContext.runAsUser` overrides the pod UID.
+
+  Read [the accepted exposure](/self-hosting/langy/setup#hardening-clusters-that-refuse-root): workers share credentials, files and control-descriptor access, and can read manager secrets. Forcing `runAsNonRoot` or a nonzero UID while retaining `per-uid` is rejected during Helm rendering.
 
 One more toggle in the overlay isn't an admission failure but an unmet dependency:
 

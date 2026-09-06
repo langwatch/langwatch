@@ -39,7 +39,9 @@ Two conversations in one pod belong to two different people, and a prompt-inject
 
 **Unix identity is the configurable one.** By default each conversation's worker gets a distinct UID; its home, tmp dir and session store are `chown`ed to that UID and `chmod`ed `0700`/`0600`, and the process is `setuid`ed into that UID before `exec`. That is what stops a sibling reading another worker's process environment through `/proc/<pid>/environ` or its conversation content out of the session directory.
 
-The chart supports `per-uid` with a manager running as UID 0 and five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`). This is the supported configuration for provisioning worker files with `chown` and handing each worker its identity with `setuid`/`setgid`. To keep the blast radius small the container drops all capabilities and adds back exactly those five, sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`, omits `fsGroup` (sharing it would reopen the boundary it exists to hold), and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
+The chart supports `per-uid` with a manager running as UID 0 and five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`). This is the supported configuration for provisioning worker files with `chown` and handing each worker its identity with `setuid`/`setgid`.
+
+To keep the blast radius small the container drops all capabilities and adds back exactly those five, sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`, omits `fsGroup` (sharing it would reopen the boundary it exists to hold), and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
 
 ### On a cluster that refuses root
 

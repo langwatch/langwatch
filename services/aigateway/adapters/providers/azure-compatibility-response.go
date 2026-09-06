@@ -66,7 +66,7 @@ func normalizeAzureCompatibilityResponse(out *domain.Response, req *domain.Reque
 		return normalizeAzureTranscription(out, req, fields)
 	case domain.RequestTypeSpeech:
 		return normalizeAzureSpeech(out, req)
-	case domain.RequestTypeMessages, domain.RequestTypeResponses, domain.RequestTypePassthrough, domain.RequestTypeRealtimeSession:
+	case domain.RequestTypeMessages, domain.RequestTypeResponses, domain.RequestTypePassthrough, domain.RequestTypeRealtimeSession, domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
 		return nil
 	}
 	return nil
