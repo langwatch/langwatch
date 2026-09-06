@@ -19,6 +19,8 @@ import type {
   LangyToolCallFailedEvent,
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
+  LangyUserWaitEndedEvent,
+  LangyUserWaitStartedEvent,
 } from "../schemas/events";
 import {
   LangyAgentRespondedEventSchema,
@@ -28,6 +30,8 @@ import {
   LangyToolCallFailedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
+  LangyUserWaitEndedEventSchema,
+  LangyUserWaitStartedEventSchema,
 } from "../schemas/events";
 
 export interface LangyConversationTurn
@@ -43,6 +47,8 @@ const langyConversationTurnEvents = [
   LangyPlanUpdatedEventSchema,
   LangyAgentResponseFailedEventSchema,
   LangyAgentRespondedEventSchema,
+  LangyUserWaitStartedEventSchema,
+  LangyUserWaitEndedEventSchema,
 ] as const;
 
 /**
@@ -143,6 +149,20 @@ export class LangyConversationTurnFoldProjection
 
   handleLangyConversationAgentResponded(
     event: LangyAgentRespondedEvent,
+    state: LangyConversationTurnData,
+  ): LangyConversationTurnData {
+    return foldLangyConversationTurn(state, event);
+  }
+
+  handleLangyConversationUserWaitStarted(
+    event: LangyUserWaitStartedEvent,
+    state: LangyConversationTurnData,
+  ): LangyConversationTurnData {
+    return foldLangyConversationTurn(state, event);
+  }
+
+  handleLangyConversationUserWaitEnded(
+    event: LangyUserWaitEndedEvent,
     state: LangyConversationTurnData,
   ): LangyConversationTurnData {
     return foldLangyConversationTurn(state, event);

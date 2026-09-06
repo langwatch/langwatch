@@ -369,7 +369,7 @@ func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
 	td := ptrace.NewTraces()
 	rs := td.ResourceSpans().AppendEmpty()
 	rs.Resource().Attributes().PutStr("langwatch.origin", "platform_internal")
-	rs.Resource().Attributes().PutStr("service.name", "opencode")
+	rs.Resource().Attributes().PutStr("service.name", "langy-worker")
 	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	span.SetName("ai.streamText")
 	span.SetTraceID(pcommon.TraceID{7})
@@ -396,7 +396,7 @@ func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
 		"a worker-forged langwatch.origin must be replaced by the platform's stamp, never forwarded")
 	serviceName, ok := attrs.Get("service.name")
 	require.True(t, ok)
-	assert.Equal(t, "opencode", serviceName.Str(), "legitimate worker resource attributes must survive the strip")
+	assert.Equal(t, "langy-worker", serviceName.Str(), "legitimate worker resource attributes must survive the strip")
 }
 
 // The customer-forward allowlist fails closed: a resource attribute outside
@@ -416,7 +416,7 @@ func TestCustomerForwardDropsUnlistedResourceAttributes(t *testing.T) {
 
 	td := ptrace.NewTraces()
 	rs := td.ResourceSpans().AppendEmpty()
-	rs.Resource().Attributes().PutStr("service.name", "opencode")
+	rs.Resource().Attributes().PutStr("service.name", "langy-worker")
 	rs.Resource().Attributes().PutStr("k8s.pod.name", "worker-pod-7")
 	rs.Resource().Attributes().PutStr("telemetry.sdk.name", "opentelemetry")
 	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
@@ -446,7 +446,7 @@ func TestCustomerForwardDropsUnlistedResourceAttributes(t *testing.T) {
 	}
 	serviceName, ok := attrs.Get("service.name")
 	require.True(t, ok)
-	assert.Equal(t, "opencode", serviceName.Str())
+	assert.Equal(t, "langy-worker", serviceName.Str())
 }
 
 func TestInternalExportIsBoundedDuringCollectorOutage(t *testing.T) {

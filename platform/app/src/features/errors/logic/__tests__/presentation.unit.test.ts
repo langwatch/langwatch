@@ -304,6 +304,40 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("given a permission card that was already answered", () => {
+    /** @scenario "A card that was already answered says which answer closed it" */
+    it("names the answer that closed it, and never says Langy gave up", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "langy_wait_expired",
+          httpStatus: 410,
+          meta: {
+            waitId: "lwait_1",
+            outcome: "answered",
+            decision: "allow_pattern",
+          },
+        }),
+      );
+
+      expect(description).toContain("allowed this pattern for the session");
+      expect(description).not.toContain("stopped waiting");
+    });
+
+    describe("when nobody answered in time", () => {
+      it("still says Langy stopped waiting", () => {
+        const { description } = explainHandledError(
+          shape({
+            code: "langy_wait_expired",
+            httpStatus: 410,
+            meta: { waitId: "lwait_1", outcome: "expired" },
+          }),
+        );
+
+        expect(description).toContain("stopped waiting");
+      });
+    });
+  });
+
   describe("given a code the registry has never seen", () => {
     /**
      * The fallback used to be `FAULT_TITLES[fault]`, which is a guess dressed
