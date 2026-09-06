@@ -50,6 +50,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "    route /settings/topic-clustering -> pages/settings/topic-clustering",
   "    route /settings/usage -> pages/settings/usage",
   "    route /settings/email-suppressions -> pages/settings/email-suppressions",
+  "    route /settings/* -> pages/settings/not-found",
   "    route /governance -> pages/governance/index",
   "    route /governance/inventory -> pages/governance/inventory.enterprise",
   "    route /governance/inventory/:id -> pages/governance/ingestion-source-detail.enterprise",
