@@ -5,6 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderCommandService } from "../services/model-provider-command.service";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
@@ -130,10 +131,10 @@ describe.skipIf(!DB_URL)(
         });
         await prisma.modelProvider.deleteMany({ where: { organizationId: org } });
       }
-      await prisma.team.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({
-        where: { id: { in: [organizationId, outsiderOrganizationId] } },
-      });
+      await cleanupTestRows(prisma, [
+        ["team", { organizationId }],
+        ["organization", { id: { in: [organizationId, outsiderOrganizationId] } }],
+      ]);
       await prisma.$disconnect();
     });
 

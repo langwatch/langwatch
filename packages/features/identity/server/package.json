@@ -48,6 +48,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@types/node": "^26",
     "better-auth": "^1.7.1",
     "typescript": "^7.0.2",

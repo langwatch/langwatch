@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
@@ -54,10 +55,12 @@ describe.skipIf(!DB_URL)("given an organization publishing an AI tools catalog",
 
   afterAll(async () => {
     if (!organizationId) return;
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
-    await prisma.user.deleteMany({ where: { id: liteUserId } });
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { id: liteUserId }],
+    ]);
     await prisma.$disconnect();
   });
 

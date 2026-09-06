@@ -11,6 +11,7 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { PrismaRecentItemsRepository } from "../repositories/prisma/prisma.recent-items.repository";
 import { RecentItemsService } from "../services/recent-items.service";
 
@@ -76,14 +77,16 @@ describe.skipIf(!DB_URL)("given a project with an audit-log trail", () => {
 
   afterAll(async () => {
     if (!organizationId) return;
-    await prisma.auditLog.deleteMany({ where: { projectId: { in: [projectId, otherProjectId] } } });
-    await prisma.llmPromptConfig.deleteMany({ where: { projectId } });
-    await prisma.workflow.deleteMany({ where: { projectId } });
-    await prisma.dataset.deleteMany({ where: { projectId } });
-    await prisma.project.deleteMany({ where: { teamId } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await cleanupTestRows(prisma, [
+      ["auditLog", { projectId: { in: [projectId, otherProjectId] } }],
+      ["llmPromptConfig", { projectId }],
+      ["workflow", { projectId }],
+      ["dataset", { projectId }],
+      ["project", { teamId }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { id: userId }],
+    ]);
     await prisma.$disconnect();
   });
 

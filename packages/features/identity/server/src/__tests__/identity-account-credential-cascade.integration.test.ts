@@ -11,6 +11,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -25,8 +26,10 @@ describe.skipIf(!DB_URL)("AccountCredential cascade on User delete", () => {
 
   afterAll(async () => {
     if (!prisma) return;
-    await prisma.accountCredential.deleteMany({ where: { userId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await cleanupTestRows(prisma, [
+      ["accountCredential", { userId }],
+      ["user", { id: userId }],
+    ]);
     await prisma.$disconnect();
   });
 

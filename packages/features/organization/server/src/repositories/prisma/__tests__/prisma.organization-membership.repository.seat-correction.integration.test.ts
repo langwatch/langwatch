@@ -21,6 +21,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository";
 
@@ -181,12 +182,14 @@ describe.skipIf(!DB_URL)(
     });
 
     afterAll(async () => {
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      await prisma.project.deleteMany({ where: { team: { organizationId } } });
-      await prisma.team.deleteMany({ where: { organizationId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
-      await prisma.user.deleteMany({ where: { id: { in: [adminUserId, memberUserId] } } });
+      await cleanupTestRows(prisma, [
+        ["roleBinding", { organizationId }],
+        ["project", { team: { organizationId } }],
+        ["team", { organizationId }],
+        ["organizationUser", { organizationId }],
+        ["organization", { id: organizationId }],
+        ["user", { id: { in: [adminUserId, memberUserId] } }],
+      ]);
       await prisma.$disconnect();
     });
 

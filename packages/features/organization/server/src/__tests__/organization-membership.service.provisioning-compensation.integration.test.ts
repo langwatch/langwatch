@@ -11,6 +11,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { OrganizationMembershipService } from "../services/organization-membership.service";
 import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository";
@@ -79,9 +80,11 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
   afterAll(async () => {
     if (!prisma) return;
     if (retriedOrganizationId) {
-      await prisma.promptTag.deleteMany({ where: { organizationId: retriedOrganizationId } });
-      await prisma.team.deleteMany({ where: { organizationId: retriedOrganizationId } });
-      await prisma.organization.deleteMany({ where: { id: retriedOrganizationId } });
+      await cleanupTestRows(prisma, [
+        ["promptTag", { organizationId: retriedOrganizationId }],
+        ["team", { organizationId: retriedOrganizationId }],
+        ["organization", { id: retriedOrganizationId }],
+      ]);
     }
     await prisma.$disconnect();
   });

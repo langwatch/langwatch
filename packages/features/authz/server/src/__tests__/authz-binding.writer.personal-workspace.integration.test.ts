@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";
 import {
   PrismaAuthzBindingRepository,
@@ -126,14 +127,16 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
 
   afterAll(async () => {
     if (!organizationId) return;
-    await prisma.project.deleteMany({ where: { team: { organizationId } } });
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.groupMembership.deleteMany({ where: { groupId } });
-    await prisma.group.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
-    await prisma.user.deleteMany({ where: { id: { in: [ownerUserId, colleagueUserId] } } });
+    await cleanupTestRows(prisma, [
+      ["project", { team: { organizationId } }],
+      ["roleBinding", { organizationId }],
+      ["groupMembership", { groupId }],
+      ["group", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { id: { in: [ownerUserId, colleagueUserId] } }],
+    ]);
     await prisma.$disconnect();
   });
 

@@ -15,6 +15,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
+import { cleanupTestRows } from "@langwatch/test-harness";
 
 import { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
 import { GovernanceEncryptionPort } from "../ports/governance-encryption.port";
@@ -130,10 +131,12 @@ describe.skipIf(!databaseUrl)("IngestionSourceService token-at-rest", () => {
   }, 60_000);
 
   afterAll(async () => {
-    await prisma.ingestionSource.deleteMany({ where: { organizationId } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.organization.deleteMany({ where: { slug: `--${ns}` } });
-    await prisma.user.deleteMany({ where: { email: `${ns}-admin@example.com` } });
+    await cleanupTestRows(prisma, [
+      ["ingestionSource", { organizationId }],
+      ["team", { organizationId }],
+      ["organization", { slug: `--${ns}` }],
+      ["user", { email: `${ns}-admin@example.com` }],
+    ]);
   });
 
   describe("given an admin saves a Genie source carrying a workspace token", () => {

@@ -5,6 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderCommandService } from "../services/model-provider-command.service";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
@@ -95,7 +96,7 @@ describe.skipIf(!DB_URL)(
     });
 
     afterAll(async () => {
-      await prisma.team.deleteMany({ where: { id: otherTeamId } });
+      await cleanupTestRows(prisma, [["team", { id: otherTeamId }]]);
       await cleanupTenancyFixture(prisma, fixture);
       await prisma.$disconnect();
     });
@@ -298,7 +299,7 @@ describe.skipIf(!DB_URL)(
       });
 
       afterAll(async () => {
-        await prisma.project.deleteMany({ where: { id: otherProjectId } });
+        await cleanupTestRows(prisma, [["project", { id: otherProjectId }]]);
       });
 
       /** @scenario A row's unrelated project scope does not inflate its specificity */

@@ -5,6 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderDefaultsService } from "../services/model-provider-defaults.service";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
@@ -123,15 +124,17 @@ describe.skipIf(!DB_URL)(
     });
 
     afterAll(async () => {
-      await prisma.modelDefaultConfigScope.deleteMany({ where: { configId: { in: configIds } } });
-      await prisma.modelDefaultConfig.deleteMany({ where: { organizationId } });
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.project.deleteMany({ where: { teamId } });
-      await prisma.project.deleteMany({ where: { teamId: otherTeamId } });
-      await prisma.team.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
-      await prisma.user.deleteMany({ where: { id: bindingMemberUserId } });
+      await cleanupTestRows(prisma, [
+        ["modelDefaultConfigScope", { configId: { in: configIds } }],
+        ["modelDefaultConfig", { organizationId }],
+        ["roleBinding", { organizationId }],
+        ["organizationUser", { organizationId }],
+        ["project", { teamId }],
+        ["project", { teamId: otherTeamId }],
+        ["team", { organizationId }],
+        ["organization", { id: organizationId }],
+        ["user", { id: bindingMemberUserId }],
+      ]);
       await prisma.$disconnect();
     });
 

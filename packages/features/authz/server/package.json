@@ -45,6 +45,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@types/node": "^26",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"

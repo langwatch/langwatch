@@ -13,6 +13,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
@@ -100,12 +101,14 @@ describe.skipIf(!DB_URL)("given a member whose project access is a team-scoped b
   });
 
   afterAll(async () => {
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.project.deleteMany({ where: { team: { organizationId } } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["project", { team: { organizationId } }],
+      ["team", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { id: userId }],
+    ]);
     await prisma.$disconnect();
   });
 

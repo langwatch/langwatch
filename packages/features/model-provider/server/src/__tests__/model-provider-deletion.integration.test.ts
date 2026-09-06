@@ -5,6 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderCommandService } from "../services/model-provider-command.service";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
@@ -68,7 +69,7 @@ describe.skipIf(!DB_URL)("ModelProviderCommandService.delete (real Postgres)", (
   });
 
   afterAll(async () => {
-    await prisma.project.deleteMany({ where: { id: siblingProjectId } });
+    await cleanupTestRows(prisma, [["project", { id: siblingProjectId }]]);
     await cleanupTenancyFixture(prisma, fixture);
     await cleanupTenancyFixture(prisma, otherFixture);
     await prisma.$disconnect();

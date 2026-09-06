@@ -11,6 +11,7 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository";
 import type { ProjectCredentialsPort } from "../ports/project.port";
@@ -129,11 +130,13 @@ describe.skipIf(!DB_URL)(
       const teamIds = teams.map((team) => team.id);
       await prisma.project.deleteMany({ where: { teamId: { in: teamIds } } });
       await prisma.teamUser.deleteMany({ where: { teamId: { in: teamIds } } });
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.team.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
-      await prisma.user.deleteMany({ where: { id: ownerUserId } });
+      await cleanupTestRows(prisma, [
+        ["roleBinding", { organizationId }],
+        ["organizationUser", { organizationId }],
+        ["team", { organizationId }],
+        ["organization", { id: organizationId }],
+        ["user", { id: ownerUserId }],
+      ]);
       await prisma.$disconnect();
     });
 

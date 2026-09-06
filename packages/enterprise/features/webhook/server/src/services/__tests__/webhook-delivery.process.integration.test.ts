@@ -34,6 +34,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 
 import { WebhookEndpointAdapter } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter";
 import type { WebhookEndpointRuntime } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter";
@@ -329,9 +330,11 @@ describe.skipIf(!databaseUrl)("webhook delivery via the transactional inbox", ()
   });
 
   afterAll(async () => {
-    await prisma.webhookEndpointDelivery.deleteMany({ where: { organizationId } });
-    await prisma.webhookEndpoint.deleteMany({ where: { organizationId } });
-    await prisma.project.deleteMany({ where: { teamId } });
+    await cleanupTestRows(prisma, [
+      ["webhookEndpointDelivery", { organizationId }],
+      ["webhookEndpoint", { organizationId }],
+      ["project", { teamId }],
+    ]);
     await prisma.team.delete({ where: { id: teamId } });
     await prisma.organization.delete({ where: { id: organizationId } });
     await connection?.closeOnce();

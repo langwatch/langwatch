@@ -11,6 +11,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { PersonalWorkspaceIdentityAdapter } from "../../../adapters/resource-identifiers.adapter";
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository";
@@ -84,13 +85,15 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
 
   afterAll(async () => {
     if (!prisma) return;
-    await prisma.project.deleteMany({ where: { teamId: personalTeamId } });
-    await prisma.teamUser.deleteMany({ where: { teamId: personalTeamId } });
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
-    await prisma.user.deleteMany({ where: { id: leaverUserId } });
+    await cleanupTestRows(prisma, [
+      ["project", { teamId: personalTeamId }],
+      ["teamUser", { teamId: personalTeamId }],
+      ["roleBinding", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { id: leaverUserId }],
+    ]);
     await prisma.$disconnect();
   });
 

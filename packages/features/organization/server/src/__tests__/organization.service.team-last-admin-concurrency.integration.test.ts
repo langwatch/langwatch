@@ -17,6 +17,7 @@ import {
   TeamUserRole,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type {
   AuthzAccessBinding,
   AuthzGrantsService,
@@ -151,12 +152,14 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
 
   afterAll(async () => {
     if (!organizationId) return;
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.teamUser.deleteMany({ where: { teamId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.user.deleteMany({ where: { id: { in: [firstAdminId, secondAdminId] } } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["teamUser", { teamId }],
+      ["organizationUser", { organizationId }],
+      ["team", { organizationId }],
+      ["user", { id: { in: [firstAdminId, secondAdminId] } }],
+      ["organization", { id: organizationId }],
+    ]);
     await connection.closeOnce();
   });
 

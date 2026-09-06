@@ -11,6 +11,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -172,15 +173,15 @@ describe.skipIf(!DB_URL)("a workflow agent's fields", () => {
       });
       // Child rows first: every relation below is enforced, so a parent
       // deleted early fails the whole teardown on a constraint.
-      await db.agent.deleteMany({ where: { id: { in: agentIds }, projectId: PROJECT_ID } });
-      await db.workflowVersion.deleteMany({
-        where: { workflowId: { in: workflowIds }, projectId: PROJECT_ID },
-      });
-      await db.workflow.deleteMany({ where: { id: { in: workflowIds }, projectId: PROJECT_ID } });
-      await db.project.deleteMany({ where: { id: PROJECT_ID } });
-      await db.user.deleteMany({ where: { id: authorId } });
-      await db.team.deleteMany({ where: { id: TEAM_ID } });
-      await db.organization.deleteMany({ where: { id: ORGANIZATION_ID } });
+      await cleanupTestRows(db, [
+        ["agent", { id: { in: agentIds }, projectId: PROJECT_ID }],
+        ["workflowVersion", { workflowId: { in: workflowIds }, projectId: PROJECT_ID }],
+        ["workflow", { id: { in: workflowIds }, projectId: PROJECT_ID }],
+        ["project", { id: PROJECT_ID }],
+        ["user", { id: authorId }],
+        ["team", { id: TEAM_ID }],
+        ["organization", { id: ORGANIZATION_ID }],
+      ]);
     } finally {
       await connection?.closeOnce();
     }

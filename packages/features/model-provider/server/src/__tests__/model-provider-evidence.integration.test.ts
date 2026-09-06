@@ -12,6 +12,7 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
 import { PostgresModelProviderEvidenceAdapter } from "../adapters/postgres.model-provider-evidence.adapter";
 import { ModelCostProjectPort } from "../ports/model-provider.port";
@@ -82,11 +83,13 @@ describe.skipIf(!DB_URL)("given a project's model-provider cascade", () => {
 
   afterAll(async () => {
     if (!organizationId) return;
-    await prisma.modelProviderScope.deleteMany({ where: { modelProviderId: { in: providerIds } } });
-    await prisma.modelProvider.deleteMany({ where: { id: { in: providerIds } } });
-    await prisma.project.deleteMany({ where: { teamId } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
+    await cleanupTestRows(prisma, [
+      ["modelProviderScope", { modelProviderId: { in: providerIds } }],
+      ["modelProvider", { id: { in: providerIds } }],
+      ["project", { teamId }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+    ]);
     await prisma.$disconnect();
   });
 

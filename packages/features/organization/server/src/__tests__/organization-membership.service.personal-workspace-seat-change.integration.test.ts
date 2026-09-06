@@ -12,6 +12,7 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { OrganizationMembershipService } from "../services/organization-membership.service";
 import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository";
@@ -186,12 +187,14 @@ describe.skipIf(!DB_URL)(
 
     afterAll(async () => {
       if (!organizationId) return;
-      await prisma.project.deleteMany({ where: { team: { organizationId } } });
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.team.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
-      await prisma.user.deleteMany({ where: { id: { in: [adminUserId, seatUserId] } } });
+      await cleanupTestRows(prisma, [
+        ["project", { team: { organizationId } }],
+        ["roleBinding", { organizationId }],
+        ["organizationUser", { organizationId }],
+        ["team", { organizationId }],
+        ["organization", { id: organizationId }],
+        ["user", { id: { in: [adminUserId, seatUserId] } }],
+      ]);
       await prisma.$disconnect();
     });
 

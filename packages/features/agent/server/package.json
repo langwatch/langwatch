@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "@langwatch/scenario-server": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@types/ws": "^8.18.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"

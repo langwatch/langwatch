@@ -26,6 +26,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import { type PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { PersonalWorkspaceIdentityAdapter } from "../../../adapters/resource-identifiers.adapter";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository";
 import type { OrganizationSettingsSecretPort } from "../../../ports/organization.port";
@@ -52,12 +53,14 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace",
 
   afterAll(async () => {
     if (!prisma) return;
-    await prisma.project.deleteMany({ where: { team: { organizationId } } });
-    await prisma.teamUser.deleteMany({ where: { team: { organizationId } } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await cleanupTestRows(prisma, [
+      ["project", { team: { organizationId } }],
+      ["teamUser", { team: { organizationId } }],
+      ["team", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { id: userId }],
+    ]);
     await prisma.$disconnect();
   });
 
