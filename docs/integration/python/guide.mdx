@@ -206,7 +206,7 @@ langwatch.setup(
 
 <ParamField path="endpoint_url" type="str | None">
   The LangWatch endpoint URL. Defaults to the `LANGWATCH_ENDPOINT` environment
-  variable or `https://app.langwatch.ai`. GET requests follow redirects, up to
+  variable or `https://app.langwatch.ai`. GET and HEAD requests follow redirects, up to
   five hops. Every other request only follows an `http://` endpoint's redirect
   to the same `https://` URL, once, with one warning per process. A refused
   redirect raises `langwatch.http_client.RedirectRefusedError`: set the
