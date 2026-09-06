@@ -157,11 +157,9 @@ func (r *BifrostRouter) dispatchAzureCompatibility(ctx context.Context, req *dom
 	if berr != nil {
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
-	out := &domain.Response{Body: resp.Body, StatusCode: resp.StatusCode, Headers: passthroughResponseHeaders(resp.Headers)}
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		if err := normalizeAzureCompatibilityResponse(out, req, azureResponseOptions{model: target.model, fields: resp.ExtraFields}); err != nil {
-			return nil, herr.New(ctx, domain.ErrProviderError, herr.M{"reason": err.Error()})
-		}
+	out, err := azureCompatibilityResponse(resp, req, target.model)
+	if err != nil {
+		return nil, herr.New(ctx, domain.ErrProviderError, herr.M{"reason": err.Error()})
 	}
 	return out, nil
 }
@@ -179,7 +177,7 @@ func (r *BifrostRouter) dispatchAzureCompatibilityStream(ctx context.Context, re
 		cancel()
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
-	it := &azureChatIterator{ch: ch, cancel: cancel}
+	it := &azureChatIterator{ch: ch, cancel: cancel, model: target.model}
 	if err := it.prepare(ctx); err != nil {
 		cancel()
 		return nil, err

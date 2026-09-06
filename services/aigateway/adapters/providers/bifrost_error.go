@@ -366,7 +366,7 @@ func bfCustomerMessage(code herr.Code, berr *bfschemas.BifrostError) string {
 		return "The credentials configured for this model provider were not accepted, so the request never reached the provider and will fail the same way on every retry. Check the provider's credentials in your model provider settings."
 	case domain.ErrProviderConfigInvalid:
 		if model := berr.ExtraFields.OriginalModelRequested; model != "" {
-			return fmt.Sprintf("This model provider is not configured to serve %q. Check the models and deployments configured for it in your model provider settings.", model)
+			return fmt.Sprintf("This model provider is not configured to serve %q. Check the models and deployments configured for it in your model provider settings.", bfClampMetaValue(model))
 		}
 		return "This model provider is not configured to serve the requested model. Check the models and deployments configured for it in your model provider settings."
 	case domain.ErrInternal:

@@ -2,9 +2,11 @@ package providers
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
@@ -21,83 +23,98 @@ func TestAzureCompatibility_DeploymentURLs(t *testing.T) {
 	for _, version := range []string{"", "2025-04-01-preview"} {
 		t.Run("version="+version, func(t *testing.T) {
 			for _, typ := range []domain.RequestType{domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypeSpeech, domain.RequestTypeTranscription} {
-				t.Run(string(typ), func(t *testing.T) {
-					expectedVersion := version
-					if expectedVersion == "" {
-						expectedVersion = "2024-10-21"
-					}
-					hits := make(chan struct{}, 1)
-					backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						assert.Equal(t, "/openai/deployments/customer-deployment/"+map[domain.RequestType]string{domain.RequestTypeChat: "chat/completions", domain.RequestTypeEmbeddings: "embeddings", domain.RequestTypeSpeech: "audio/speech", domain.RequestTypeTranscription: "audio/transcriptions"}[typ], r.URL.Path)
-						assert.Equal(t, expectedVersion, r.URL.Query().Get("api-version"))
-						assert.Equal(t, "azure-test-key", r.Header.Get("api-key"))
-						if typ == domain.RequestTypeTranscription {
-							r.Body = http.MaxBytesReader(w, r.Body, 1024*1024)
-							assert.NoError(t, r.ParseMultipartForm(1024))
-							assert.Equal(t, "customer-deployment", r.MultipartForm.Value["model"][0])
-							assert.Equal(t, "en", r.MultipartForm.Value["language"][0])
-							file, _, err := r.FormFile("file")
-							if assert.NoError(t, err) {
-								content, readErr := io.ReadAll(file)
-								assert.NoError(t, readErr)
-								assert.Equal(t, "audio bytes", string(content))
-								_ = file.Close()
-							}
-						} else {
-							body, err := io.ReadAll(r.Body)
-							assert.NoError(t, err)
-							assert.Equal(t, "customer-deployment", gjson.GetBytes(body, "model").String())
-							assert.False(t, gjson.GetBytes(body, "drop_tuning_params").Exists())
-						}
-						hits <- struct{}{}
-						w.Header().Set("Content-Type", "application/json")
-						switch typ {
-						default:
-							t.Fatalf("unexpected request type %s", typ)
-						case domain.RequestTypeChat:
-							_, _ = io.WriteString(w, `{"id":"chat-test","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":7,"completion_tokens":3,"total_tokens":10}}`)
-						case domain.RequestTypeEmbeddings:
-							_, _ = io.WriteString(w, `{"object":"list","data":[{"index":0,"object":"embedding","embedding":[0.1]}],"usage":{"prompt_tokens":7,"total_tokens":7}}`)
-						case domain.RequestTypeSpeech:
-							_, _ = io.WriteString(w, "audio result")
-						case domain.RequestTypeTranscription:
-							_, _ = io.WriteString(w, `{"text":"hello","usage":{"type":"duration","seconds":3}}`)
-						}
-					}))
-					defer backend.Close()
-					router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop(), InitialPoolSize: 10})
-					require.NoError(t, err)
-					defer router.Close()
-					extra := map[string]string{"api_base": backend.URL}
-					if version != "" {
-						extra["api_version"] = version
-					}
-					cred := domain.Credential{ID: "azure", ProviderID: domain.ProviderAzure, APIKey: "azure-test-key", Extra: extra, DeploymentMap: map[string]string{"gpt-test": "customer-deployment"}}
-					req := &domain.Request{Type: typ, Model: "gpt-test", Body: []byte(`{"model":"azure/gpt-test","messages":[{"role":"user","content":"hi"}],"input":"hello","voice":"alloy","drop_tuning_params":true}`), Transcription: &domain.TranscriptionUpload{File: []byte("audio bytes"), Filename: "test.wav", Params: map[string]string{"language": "en"}}}
-					resp, err := router.Dispatch(context.Background(), req, cred)
-					require.NoError(t, err)
-					require.Equal(t, http.StatusOK, resp.StatusCode)
-					require.Len(t, hits, 1, "request must reach the selected deployment")
-					switch typ {
-					default:
-						t.Fatalf("unexpected request type %s", typ)
-					case domain.RequestTypeChat:
-						assert.Equal(t, 10, resp.Usage.TotalTokens)
-						assert.Equal(t, "ok", gjson.GetBytes(resp.Body, "choices.0.message.content").String())
-					case domain.RequestTypeEmbeddings:
-						assert.Equal(t, 7, resp.Usage.PromptTokens)
-						assert.Equal(t, "gpt-test", gjson.GetBytes(resp.Body, "model").String())
-					case domain.RequestTypeSpeech:
-						assert.Equal(t, "audio result", string(resp.Body))
-						assert.Equal(t, "audio/mpeg", resp.Headers["Content-Type"])
-						assert.Equal(t, 5, resp.Usage.InputChars)
-					case domain.RequestTypeTranscription:
-						assert.InDelta(t, 3.0, resp.Usage.AudioSeconds, 0.001)
-						assert.Equal(t, "hello", gjson.GetBytes(resp.Body, "text").String())
-					}
-				})
+				t.Run(string(typ), func(t *testing.T) { runAzureDeploymentCase(t, typ, version) })
 			}
 		})
+	}
+}
+
+func runAzureDeploymentCase(t *testing.T, typ domain.RequestType, version string) {
+	t.Helper()
+	expectedVersion := version
+	if expectedVersion == "" {
+		expectedVersion = "2024-10-21"
+	}
+	backend := httptest.NewServer(azureDeploymentHandler(t, typ, expectedVersion))
+	defer backend.Close()
+	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop(), InitialPoolSize: 10})
+	require.NoError(t, err)
+	defer router.Close()
+	extra := map[string]string{"api_base": backend.URL}
+	if version != "" {
+		extra["api_version"] = version
+	}
+	cred := domain.Credential{ID: "azure", ProviderID: domain.ProviderAzure, APIKey: "azure-test-key", Extra: extra, DeploymentMap: map[string]string{"gpt-test": "customer-deployment"}}
+	req := &domain.Request{Type: typ, Model: "gpt-test", Body: []byte(`{"model":"azure/gpt-test","messages":[{"role":"user","content":"hi"}],"input":"hello","voice":"alloy","drop_tuning_params":true}`), Transcription: &domain.TranscriptionUpload{File: []byte("audio bytes"), Filename: "test.wav", Params: map[string]string{"language": "en"}}}
+	resp, err := router.Dispatch(context.Background(), req, cred)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assertAzureDeploymentResponse(t, typ, resp)
+}
+
+func azureDeploymentHandler(t *testing.T, typ domain.RequestType, expectedVersion string) http.Handler {
+	t.Helper()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/openai/deployments/customer-deployment/"+map[domain.RequestType]string{domain.RequestTypeChat: "chat/completions", domain.RequestTypeEmbeddings: "embeddings", domain.RequestTypeSpeech: "audio/speech", domain.RequestTypeTranscription: "audio/transcriptions"}[typ], r.URL.Path)
+		assert.Equal(t, expectedVersion, r.URL.Query().Get("api-version"))
+		assert.Equal(t, "azure-test-key", r.Header.Get("api-key"))
+		assertAzureDeploymentRequestBody(t, w, r)
+		w.Header().Set("Content-Type", "application/json")
+		switch typ {
+		default:
+			t.Fatalf("unexpected request type %s", typ)
+		case domain.RequestTypeChat:
+			_, _ = io.WriteString(w, `{"id":"chat-test","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":7,"completion_tokens":3,"total_tokens":10}}`)
+		case domain.RequestTypeEmbeddings:
+			_, _ = io.WriteString(w, `{"object":"list","data":[{"index":0,"object":"embedding","embedding":[0.1]}],"usage":{"prompt_tokens":7,"total_tokens":7}}`)
+		case domain.RequestTypeSpeech:
+			_, _ = io.WriteString(w, "audio result")
+		case domain.RequestTypeTranscription:
+			_, _ = io.WriteString(w, `{"text":"hello","usage":{"type":"duration","seconds":3}}`)
+		}
+	})
+}
+
+func assertAzureDeploymentRequestBody(t *testing.T, w http.ResponseWriter, r *http.Request) {
+	t.Helper()
+	if strings.HasSuffix(r.URL.Path, "audio/transcriptions") {
+		r.Body = http.MaxBytesReader(w, r.Body, 1024*1024)
+		assert.NoError(t, r.ParseMultipartForm(1024))
+		assert.Equal(t, "customer-deployment", r.MultipartForm.Value["model"][0])
+		assert.Equal(t, "en", r.MultipartForm.Value["language"][0])
+		file, _, err := r.FormFile("file")
+		if assert.NoError(t, err) {
+			content, readErr := io.ReadAll(file)
+			assert.NoError(t, readErr)
+			assert.Equal(t, "audio bytes", string(content))
+			_ = file.Close()
+		}
+	} else {
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "customer-deployment", gjson.GetBytes(body, "model").String())
+		assert.False(t, gjson.GetBytes(body, "drop_tuning_params").Exists())
+	}
+}
+
+func assertAzureDeploymentResponse(t *testing.T, typ domain.RequestType, resp *domain.Response) {
+	t.Helper()
+	switch typ {
+	default:
+		t.Fatalf("unexpected request type %s", typ)
+	case domain.RequestTypeChat:
+		assert.Equal(t, 10, resp.Usage.TotalTokens)
+		assert.Equal(t, "ok", gjson.GetBytes(resp.Body, "choices.0.message.content").String())
+	case domain.RequestTypeEmbeddings:
+		assert.Equal(t, 7, resp.Usage.PromptTokens)
+		assert.Equal(t, "gpt-test", gjson.GetBytes(resp.Body, "model").String())
+	case domain.RequestTypeSpeech:
+		assert.Equal(t, "audio result", string(resp.Body))
+		assert.Equal(t, "audio/mpeg", resp.Headers["Content-Type"])
+		assert.Equal(t, 5, resp.Usage.InputChars)
+	case domain.RequestTypeTranscription:
+		assert.InDelta(t, 3.0, resp.Usage.AudioSeconds, 0.001)
+		assert.Equal(t, "hello", gjson.GetBytes(resp.Body, "text").String())
 	}
 }
 
@@ -124,7 +141,11 @@ func TestAzureCompatibility_Stream(t *testing.T) {
 	require.True(t, iter.Next(context.Background()))
 	assert.Equal(t, "assistant", gjson.GetBytes(iter.Chunk(), "choices.0.delta.role").String())
 	assert.Equal(t, "hello", gjson.GetBytes(iter.Chunk(), "choices.0.delta.content").String())
+	assert.Equal(t, "gpt-test", gjson.GetBytes(iter.Chunk(), "model").String())
+	assert.Equal(t, "chat.completion.chunk", gjson.GetBytes(iter.Chunk(), "object").String())
+	assert.Positive(t, gjson.GetBytes(iter.Chunk(), "created").Int())
 	for iter.Next(context.Background()) {
+		assert.Equal(t, "gpt-test", gjson.GetBytes(iter.Chunk(), "model").String())
 	}
 	require.NoError(t, iter.Err())
 	assert.Equal(t, 10, iter.Usage().TotalTokens)
@@ -218,4 +239,17 @@ func TestAzureCompatibility_PassthroughConfiguredVersion(t *testing.T) {
 	response, err := router.Dispatch(context.Background(), &domain.Request{Type: domain.RequestTypePassthrough, Model: "image-model", Body: []byte(`{"prompt":"hello"}`), Passthrough: domain.PassthroughRequest{Method: http.MethodPost, Path: "/openai/deployments/deployment/images/generations", RawQuery: "api-version=client-version&extra=kept"}}, domain.Credential{ID: "azure", ProviderID: domain.ProviderAzure, APIKey: "key", Extra: map[string]string{"endpoint": backend.URL, "api_version": "2025-04-01-preview"}})
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"data":[]}`, string(response.Body))
+}
+
+func TestAzureCompatibility_ZeroStatusNormalizesSuccess(t *testing.T) {
+	for _, status := range []int{0, http.StatusOK} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			resp, err := azureCompatibilityResponse(&bfschemas.BifrostPassthroughResponse{StatusCode: status, Body: []byte(`{"data":[{"index":0,"embedding":[0.5]}],"usage":{"prompt_tokens":7,"total_tokens":7}}`)}, &domain.Request{Type: domain.RequestTypeEmbeddings}, "public-model")
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Equal(t, 7, resp.Usage.PromptTokens)
+			assert.Equal(t, "public-model", gjson.GetBytes(resp.Body, "model").String())
+			assert.InDelta(t, 0.5, gjson.GetBytes(resp.Body, "data.0.embedding.0").Float(), 0.0001)
+		})
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"unicode/utf8"
 
@@ -16,6 +17,20 @@ import (
 type azureResponseOptions struct {
 	model  string
 	fields bfschemas.BifrostResponseExtraFields
+}
+
+func azureCompatibilityResponse(resp *bfschemas.BifrostPassthroughResponse, req *domain.Request, model string) (*domain.Response, error) {
+	status := resp.StatusCode
+	if status == 0 {
+		status = http.StatusOK
+	}
+	out := &domain.Response{Body: resp.Body, StatusCode: status, Headers: passthroughResponseHeaders(resp.Headers)}
+	if status >= 200 && status < 300 {
+		if err := normalizeAzureCompatibilityResponse(out, req, azureResponseOptions{model: model, fields: resp.ExtraFields}); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func normalizeAzureCompatibilityResponse(out *domain.Response, req *domain.Request, options azureResponseOptions) error {
@@ -100,6 +115,7 @@ func normalizeAzureSpeech(out *domain.Response, req *domain.Request) error {
 const azureMaxFrameBytes = 10 * 1024 * 1024
 
 type azureChatIterator struct {
+	model     string
 	cancel    context.CancelFunc
 	ch        <-chan *bfschemas.BifrostStreamChunk
 	chat      bifrostStreamIterator
@@ -235,6 +251,10 @@ func (it *azureChatIterator) decodeChat(data []byte) bool {
 		it.fail(err)
 		return false
 	}
+	if response.Object == "" {
+		response.Object = "chat.completion.chunk"
+	}
+	response.BackfillParams(&bfschemas.BifrostChatRequest{Model: it.model})
 	it.chat.ensureLeadingRoleDelta(&response)
 	it.chat.current, it.chat.err = sonic.Marshal(response)
 	if response.Usage != nil {

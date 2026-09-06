@@ -573,3 +573,19 @@ func TestBfCodeForMessage_UnknownProseStaysGeneric(t *testing.T) {
 
 	assert.False(t, ok, "an unrecognized message must not be forced into a specific code")
 }
+
+func TestClassifyBifrostError_ConfigMessageClampsModel(t *testing.T) {
+	for _, model := range []string{strings.Repeat("m", 4000), "ab" + strings.Repeat("🙂", 4000)} {
+		berr := &bfschemas.BifrostError{Error: &bfschemas.ErrorField{Message: "no keys found that support model: requested"}, ExtraFields: bfschemas.BifrostErrorExtraFields{OriginalModelRequested: model}}
+		var classified herr.E
+		require.ErrorAs(t, classifyBifrostError(context.Background(), berr), &classified)
+		require.Equal(t, domain.ErrProviderConfigInvalid, classified.Code)
+		message, ok := classified.Meta["message"].(string)
+		require.True(t, ok)
+		assert.True(t, utf8.ValidString(message))
+		assert.NotContains(t, message, model)
+		assert.Less(t, len(message), 300)
+		assert.Contains(t, message, "...")
+		assert.Contains(t, message, "Check the models and deployments")
+	}
+}
