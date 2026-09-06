@@ -189,7 +189,7 @@ export function createClaudeCodeAgent({
 			...extraEnv,
 			// The local bin/ wrapper first, so Claude uses the locally-built
 			// `langwatch` CLI with the latest commands.
-			PATH: `${path.join(workingDirectory, "bin")}:${process.env.PATH ?? ""}`,
+			PATH: `${path.join(workingDirectory, "bin")}:${extraEnv.PATH ?? process.env.PATH ?? ""}`,
 		},
 		logger: {
 			log: (message) => console.log(chalk.cyan("Claude Code:"), message),

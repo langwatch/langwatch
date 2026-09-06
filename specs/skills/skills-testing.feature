@@ -38,6 +38,7 @@ Feature: Scenario tests for skills quality assurance
     And it returns each turn as messages with tool-call and tool-result parts, so the judge and the run view see what the agent ran
     And it keeps the batch id of the suite and the keys a test withholds out of the agent's environment
 
+  @integration
   Scenario: No Claude Code process outlives the test harness
     Given a scenario test is running Claude Code
     When the vitest worker that spawned it is killed
