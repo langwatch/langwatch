@@ -6,12 +6,12 @@
  * exactly the `xai/grok-4` regression this test was written to catch.
  */
 import { describe, expect, it } from "vitest";
+import { isLatestAlias } from "../latestAliases";
+import { llmModels } from "../loadModelCatalog";
 import {
   PROVIDER_DEFAULT_MODELS,
   PROVIDER_RESOLUTION_ORDER,
 } from "../modelProvider.constants";
-import { isLatestAlias } from "../latestAliases";
-import { llmModels } from "../loadModelCatalog";
 
 describe("PROVIDER_DEFAULT_MODELS", () => {
   const registry = llmModels.models;
