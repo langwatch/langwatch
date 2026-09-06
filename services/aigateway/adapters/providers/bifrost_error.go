@@ -249,7 +249,7 @@ func bfErrorCode(berr *bfschemas.BifrostError) herr.Code {
 	//    before classification runs, so a positive status reaches this function
 	//    only on a direct call — the code->status contract of AC19, exercised by
 	//    TestClassifyBifrostError_StatusBaseline — or when Bifrost synthesized
-	//    the status, and the synthesized ones (504/timeout, 499/cancelled) are
+	//    the status, and the synthesized ones (504/timeout, 499/canceled) are
 	//    already resolved by their type above.
 	if status := bfStatus(berr); status > 0 {
 		switch status {
