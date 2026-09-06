@@ -240,7 +240,9 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     return { eligible: false, reason: "denied-command" };
   }
 
-  if (input.args.some((arg) => DENIED_FLAGS.has(arg))) {
+  // `--wait=90` carries its value in the same token, so the flag is read up
+  // to the equals sign.
+  if (input.args.some((arg) => DENIED_FLAGS.has(arg.split("=")[0] ?? arg))) {
     return { eligible: false, reason: "long-running-flag" };
   }
 

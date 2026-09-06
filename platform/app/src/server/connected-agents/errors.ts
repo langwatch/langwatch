@@ -172,6 +172,48 @@ export class AgentBusyError extends HandledError {
   }
 }
 
+/** The environments a message lists, joined the way a sentence reads them. */
+function listEnvironments(environments: readonly string[]): string {
+  if (environments.length <= 1) return environments.join("");
+  return `${environments.slice(0, -1).join(", ")} and ${environments[environments.length - 1]}`;
+}
+
+/**
+ * A target named a connected agent without an environment, and the name
+ * alone settles on none: no process is connected in any environment, or
+ * more than one environment besides development has a process connected.
+ */
+export class AgentEnvironmentUnresolvedError extends HandledError {
+  declare readonly code: "agent_environment_unresolved";
+
+  constructor({
+    agentName,
+    registeredEnvironments,
+    onlineEnvironments,
+  }: {
+    agentName: string;
+    registeredEnvironments: readonly string[];
+    onlineEnvironments: readonly string[];
+  }) {
+    const message =
+      onlineEnvironments.length > 1
+        ? `"${agentName}" is online in ${listEnvironments(onlineEnvironments)}. Name one of them, as connected:${agentName}@${onlineEnvironments[0]}.`
+        : `No process running "${agentName}" is connected. It is registered in ${listEnvironments(registeredEnvironments)}. Start the process, or name the environment as connected:${agentName}@${registeredEnvironments[0]}.`;
+    super("agent_environment_unresolved", message, {
+      httpStatus: 422,
+      // The process that runs the agent, and the target that names it, are the customer's own.
+      fault: "customer",
+      meta: {
+        agentName,
+        registeredEnvironments: [...registeredEnvironments],
+        onlineEnvironments: [...onlineEnvironments],
+      },
+      ...remediation("agent_environment_unresolved"),
+    });
+    this.name = "AgentEnvironmentUnresolvedError";
+  }
+}
+
 /** A declared parameter, or a value for one, is not one the platform accepts. */
 export class AgentParameterInvalidError extends HandledError {
   declare readonly code: "agent_parameter_invalid";

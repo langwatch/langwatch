@@ -25,15 +25,13 @@ import {
 import {
   CALL_KEY_SLACK_SECONDS,
   DEFAULT_CALL_TIMEOUT_MS,
-  DEFAULT_CONCURRENCY_DEVELOPMENT,
-  DEFAULT_CONCURRENCY_SHARED,
+  DEFAULT_CONCURRENCY,
   MAX_CALL_TIMEOUT_MS,
   RESULT_TTL_SECONDS,
   relayPayloadCaps,
 } from "./constants";
 import { AgentPayloadTooLargeError, AgentRegisterRefusedError } from "./errors";
 import {
-  DEVELOPMENT_ENVIRONMENT,
   deriveScope,
   identityKeyOf,
   isValidEnvironment,
@@ -205,11 +203,7 @@ export class AgentSessionCore {
       label: frame.instance.label ?? null,
       podId: this.runtime.podId,
       connectedAt: this.now(),
-      maxConcurrency:
-        frame.instance.maxConcurrency ??
-        (agents.every((agent) => agent.environment === DEVELOPMENT_ENVIRONMENT)
-          ? DEFAULT_CONCURRENCY_DEVELOPMENT
-          : DEFAULT_CONCURRENCY_SHARED),
+      maxConcurrency: frame.instance.maxConcurrency ?? DEFAULT_CONCURRENCY,
     };
     const session: SessionInfo = {
       instanceId: frame.instance.id,

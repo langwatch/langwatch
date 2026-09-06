@@ -16,7 +16,7 @@ type LangyFlagEvaluator = Pick<typeof featureFlagService, "isEnabled">;
  * `release_langy_enabled` evaluation; there is no identity-based bypass, so the
  * flag is a true kill switch rather than one with a hole in it.
  *
- * That matters while Langy's OpenCode workers still share the manager pod's
+ * That matters while Langy's workers still share the manager pod's
  * network namespace: a prompt-injected worker can reach a sibling's
  * unauthenticated control port and lift that user's live credentials, so the
  * cohort must stay exactly who was deliberately opted in (ADR-033). UI hiding is

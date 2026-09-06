@@ -318,15 +318,6 @@ export const FEATURE_FLAGS = [
       "Lets a project API key start and continue Langy turns over the public REST surface (spec: specs/langy/langy-api-key-turns.feature). Strictly narrower than release_langy_enabled and ANDed with it: this flag opens a new way in for an actor who already has Langy, and never grants Langy itself. Off = the REST surface 404s and only the browser can start a turn, which is the rollback position — turning it off cannot break the in-product assistant. Internal flag store only, so the /ops/feature-flags toggle is the one lever.",
   },
   {
-    key: "release_langy_pi_harness",
-    scope: "SYSTEM",
-    defaultValue: true,
-    envOverridable: false,
-    family: "Langy",
-    description:
-      "Runs Langy turns on the pi worker harness instead of opencode. Evaluated once per turn and rides the worker credential signature, so flipping it re-warms the conversation's worker on the next message rather than mutating a running one. Default ON = pi everywhere; the flag is the per-project rollback lever to opencode. Managed only from the internal flag store (/ops/feature-flags); PostHog and env vars are not consulted.",
-  },
-  {
     key: "release_langy_ui_actions",
     scope: "SYSTEM",
     defaultValue: true,

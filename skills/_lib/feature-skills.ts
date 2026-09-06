@@ -30,6 +30,7 @@ export const NATIVE_ONLY_SKILLS = [
   "github",
   "prompt-optimization",
   "drive-the-ui",
+  "code-changes",
 ] as const;
 
 export interface PublishedSkill {

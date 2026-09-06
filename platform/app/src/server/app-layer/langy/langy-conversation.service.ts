@@ -11,6 +11,10 @@ import type {
   LangyConversationMetadataUpdatedEventData,
   LangyConversationStartedEventData,
   LangyConversationTitleGeneratedEventData,
+  LangyLocalControlRequestedEventData,
+  LangyLocalPolicyChangedEventData,
+  LangyLocalWorkspaceConnectedEventData,
+  LangyLocalWorkspaceDisconnectedEventData,
   LangyMessageImportedEventData,
   LangyMessagePart,
   LangyMessageRecordedEventData,
@@ -19,13 +23,20 @@ import type {
   LangyToolCallFailedEventData,
   LangyToolCallInitiatedEventData,
   LangyToolCallSucceededEventData,
+  LangyUserWaitEndedEventData,
+  LangyUserWaitStartedEventData,
 } from "@langwatch/langy";
 import {
   cursorHasReachedEvent,
+  foldLangyConversationTurn,
+  initLangyConversationTurnState,
+  LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
   LANGY_CONVERSATION_TURN_EVENT_TYPES,
+  type LangyConversationTurnFoldState,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
+  type LangyTurnWait,
   langyConversationTurnEventSchema,
   langyJsonValueSchema,
 } from "@langwatch/langy";
@@ -68,6 +79,67 @@ import type {
 } from "./streaming/langyTurnOrder";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "./repositories/langy-conversation.repository";
+
+/**
+ * Whether the developer's folder is attached, as of the last connect or
+ * disconnect in the log. Absent either, it was never attached.
+ */
+function lastWorkspaceConnection(
+  events: readonly LangyConversationProcessingEvent[],
+): boolean {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const type = events[i]?.type;
+    if (type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED) {
+      return true;
+    }
+    if (type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED) {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * One document per turn, folded from that turn's card events only: the waits
+ * ride on the tool calls, and no other part of the vocabulary is needed to
+ * read them back.
+ */
+function foldWaitTurns(
+  events: readonly LangyConversationProcessingEvent[],
+): Map<string, LangyConversationTurnFoldState> {
+  const turns = new Map<string, LangyConversationTurnFoldState>();
+  for (const event of events) {
+    if (!isLangyWaitEventType(event.type)) continue;
+    const parsed = langyConversationTurnEventSchema.safeParse({
+      id: event.id,
+      createdAt: event.createdAt,
+      occurredAt: event.occurredAt,
+      type: event.type,
+      data: event.data,
+    });
+    if (!parsed.success) continue;
+    const turnId = parsed.data.data.turnId;
+    turns.set(
+      turnId,
+      foldLangyConversationTurn(
+        turns.get(turnId) ?? initLangyConversationTurnState(),
+        parsed.data,
+      ),
+    );
+  }
+  return turns;
+}
+
+/** Every card the folded turns carry, tagged with the turn that raised it. */
+function recordWaitsOf(
+  turns: ReadonlyMap<string, LangyConversationTurnFoldState>,
+): LangyLocalRecordWait[] {
+  return [...turns].flatMap(([turnId, turn]) =>
+    turn.ToolCalls.flatMap((call) =>
+      call.wait ? [{ turnId, toolCallId: call.toolCallId, ...call.wait }] : [],
+    ),
+  );
+}
 
 /**
  * Narrow read port over the canonical event log, for the tail read (ADR-059).
@@ -199,6 +271,15 @@ export interface LangyConversationCommands {
   recordTurnHandoff: Dispatch<LangyConversationHandoffPendingEventData>;
   consumeTurnHandoff: Dispatch<LangyConversationHandoffConsumedEventData>;
   generateConversationTitle: Dispatch<LangyConversationTitleGeneratedEventData>;
+  // ADR-129 local control: the shared folder and the cards that wait for the
+  // developer. Written by the local control services, folded by the spine and
+  // the turn document.
+  requestLocalControl: Dispatch<LangyLocalControlRequestedEventData>;
+  connectLocalWorkspace: Dispatch<LangyLocalWorkspaceConnectedEventData>;
+  disconnectLocalWorkspace: Dispatch<LangyLocalWorkspaceDisconnectedEventData>;
+  changeLocalPolicy: Dispatch<LangyLocalPolicyChangedEventData>;
+  startUserWait: Dispatch<LangyUserWaitStartedEventData>;
+  endUserWait: Dispatch<LangyUserWaitEndedEventData>;
 }
 
 function newConversationId(): string {
@@ -269,6 +350,29 @@ function toListItem(
     ),
     messageCount: row.messageCount,
   };
+}
+
+/** One card the developer's machine put up, as the durable record holds it. */
+export type LangyLocalRecordWait = LangyTurnWait & {
+  /** The turn that raised it, so the panel keeps them in turn order. */
+  turnId: string;
+  /** The tool call it rides on. */
+  toolCallId: string;
+};
+
+/** Everything one conversation's local control left on the record. */
+export interface LangyLocalRecord {
+  waits: LangyLocalRecordWait[];
+  /** Whether the last thing the folder did was connect. */
+  workspaceConnected: boolean;
+}
+
+/** The two events that carry a card, as the fold reads them. */
+function isLangyWaitEventType(type: string): boolean {
+  return (
+    type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED ||
+    type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED
+  );
 }
 
 /**
@@ -462,6 +566,53 @@ export class LangyConversationService {
       events,
       cursor: last ? { acceptedAt: last.createdAt, eventId: last.id } : after,
       truncated,
+    };
+  }
+
+  /**
+   * The developer's own machine in one conversation, off the durable record
+   * (ADR-129): every card it raised, in the order they were raised, and
+   * whether the folder is connected right now.
+   *
+   * The live stream cannot answer either question. A tab that adopted a
+   * running turn never subscribes to it, so a card raised before that tab
+   * opened reached nobody; and the browser's local fold starts at the
+   * snapshot's cursor, so everything the turn did before that cursor — a
+   * pending permission ask included — is not in it. Reopening a finished
+   * conversation had the same hole in the other direction: none of the cards
+   * the developer answered were on screen any more.
+   *
+   * Authorized exactly like the other reads (owner-or-shared, reported as
+   * not-found so it cannot probe), and folded with the SAME reducer the
+   * browser and the server projection use.
+   */
+  async getLocalRecord({
+    projectId,
+    conversationId,
+    userId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<LangyLocalRecord> {
+    const visible = await this.findVisibleToleratingDispatchLag({
+      id: conversationId,
+      projectId,
+      userId,
+    });
+    if (!visible) throw new LangyConversationNotFoundError(conversationId);
+    if (!this.events) return { waits: [], workspaceConnected: false };
+
+    const all = await this.events.getEventsOccurredSince(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+      0,
+    );
+
+    return {
+      waits: recordWaitsOf(foldWaitTurns(all)),
+      workspaceConnected: lastWorkspaceConnection(all),
     };
   }
 

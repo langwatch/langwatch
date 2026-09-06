@@ -24,8 +24,7 @@ from .schema import TURN_FIELDS, AgentSignature, analyze_signature
 
 DEFAULT_TIMEOUT_SECONDS = 120
 MAX_TIMEOUT_SECONDS = 300
-DEFAULT_CONCURRENCY_DEVELOPMENT = 1
-DEFAULT_CONCURRENCY_SHARED = 4
+DEFAULT_CONCURRENCY = 10
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -122,11 +121,7 @@ class ConnectedAgent:
         self.concurrency = (
             concurrency
             if concurrency is not None and concurrency > 0
-            else (
-                DEFAULT_CONCURRENCY_DEVELOPMENT
-                if self.environment == "development"
-                else DEFAULT_CONCURRENCY_SHARED
-            )
+            else DEFAULT_CONCURRENCY
         )
         self.sticky = sticky
         self.api_key = api_key
@@ -309,7 +304,9 @@ def connect_agent(
             `LANGWATCH_AGENT_CONNECT=0` always disables.
         instance_label: Names this process; also `LANGWATCH_AGENT_INSTANCE_LABEL`.
         timeout: Seconds one call may take, default 120, at most 300.
-        concurrency: Calls in flight per process, default 1 in development and 4 elsewhere.
+        concurrency: Calls in flight per process, default 10. A test suite sends
+            several scenarios at once; the ceiling is there because the model
+            providers rate limit the calls behind them.
         sticky: Keep one conversation on one process.
         api_key, endpoint, project_id: Override the SDK configuration.
         transport: `websocket` (default, falls back to HTTP when the upgrade

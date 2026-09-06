@@ -1255,41 +1255,6 @@ describe("when no prompt project is configured", () => {
   });
 });
 
-describe("when the harness flag resolves for the turn", () => {
-  it("rides the harness on the probe, the handoff stash and the dispatch", async () => {
-    const { deps, mocks } = makeDeps({
-      resolveHarness: vi.fn(async () => "pi" as const),
-    });
-
-    await LangyTurnService.create(deps).startConversationTurn(input());
-
-    expect(mocks.probe).toHaveBeenCalledWith(
-      expect.objectContaining({ harness: "pi" }),
-    );
-    expect(mocks.stash).toHaveBeenCalledWith(
-      expect.objectContaining({
-        credentials: expect.objectContaining({ harness: "pi" }),
-      }),
-    );
-    expect(mocks.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        credentials: expect.objectContaining({ harness: "pi" }),
-      }),
-    );
-  });
-
-  it("leaves the harness unset when no resolver is composed", async () => {
-    const { deps, mocks } = makeDeps();
-
-    await LangyTurnService.create(deps).startConversationTurn(input());
-
-    const probeArgs = mocks.probe.mock.calls[0]![0] as unknown as {
-      harness?: string;
-    };
-    expect(probeArgs.harness).toBeUndefined();
-  });
-});
-
 describe("when a turn requests a skill gated off for the caller", () => {
   afterEach(() => {
     vi.restoreAllMocks();

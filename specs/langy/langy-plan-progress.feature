@@ -37,6 +37,45 @@ Feature: Langy shows a live plan checklist for multi-step work
     Then it carries the steps and their status
     And it carries none of the tool calls that ran
 
+  # A whole turn ran with all five steps finished and the card read
+  # "Plan · 0 of 5 done" the entire time, including after the pull request had
+  # opened. The status crosses the wire as a free string, and only the four
+  # exact words the tool documents were understood, so a model that wrote
+  # "done" or "in-progress" instead had every one of its steps recorded as not
+  # started.
+  @unit
+  Scenario: A step written with another word for done still counts as done
+    Given the agent wrote its statuses as "done", "Completed" and "in-progress"
+    When the checklist is folded from the turn
+    Then the finished steps are marked done and counted in the header
+    And the step written as in progress is the current step
+    And a status word that means nothing to us still reads as not started
+
+  @unit
+  Scenario: The agent's own todo tool reads those words the same way
+    Given the todo tool is given a status word that means done
+    Then it records the step as completed, exactly as the checklist folds it
+
+  # The live snapshot is not always the newer one. A dropped stream, or a tab
+  # that adopted the turn late, leaves it holding the first all-pending list
+  # while the turn's own plan updates already carry the finished steps.
+  @unit
+  Scenario: The fresher of the two plan snapshots wins
+    Given a live plan snapshot in which nothing has finished
+    And the turn's own plan updates in which three steps have
+    When the checklist is folded
+    Then it shows those three steps as done
+    And no step is ever ticked from anything but a snapshot the agent wrote
+
+  # The plan was written to the turn's durable record end to end and nothing
+  # read it back, so a reader who reloaded mid-turn lost the checklist until
+  # the turn finished.
+  @integration
+  Scenario: A reload in the middle of a turn keeps the checklist
+    Given a turn that is running and has maintained a plan
+    When the reader reloads the page before the turn ends
+    Then the checklist still shows the plan the turn has reached
+
   @integration
   Scenario: Completed steps read as one line each
     Given a plan with steps that have finished

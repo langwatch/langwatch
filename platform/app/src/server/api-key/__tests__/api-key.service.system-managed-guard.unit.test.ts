@@ -49,6 +49,18 @@ function mockPrisma(name: string): PrismaClient {
       }),
       create: reached,
       update: reached,
+      // The revoke path's two calls: the fenced write, then the read-back.
+      updateMany: vi.fn().mockImplementation(async (...args: unknown[]) => {
+        await reached(...args);
+        return { count: 1 };
+      }),
+      findUniqueOrThrow: vi.fn().mockResolvedValue({
+        id: KEY_ID,
+        name,
+        organizationId: ORG_ID,
+        userId: USER_ID,
+        revokedAt: new Date(),
+      }),
     },
     // The personal-workspace guard reads the scopes a binding names.
     team: { findFirst: vi.fn().mockResolvedValue(null) },
