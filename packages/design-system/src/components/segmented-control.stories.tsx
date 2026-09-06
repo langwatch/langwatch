@@ -1,6 +1,6 @@
-import { Box } from "@chakra-ui/react";
+import { Box, Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { SegmentedControl } from "../../src/components/segmented-control";
+import { SegmentedControl } from "./segmented-control";
 
 const meta = {
   title: "Components/Segmented control",
@@ -37,4 +37,37 @@ export const WithDisabledItem: Story = {
       { value: "archived", label: "Archived", disabled: true },
     ],
   },
+};
+
+export const Disabled: Story = {
+  args: { disabled: true },
+};
+
+export const Sizes: Story = {
+  render: (args) => (
+    <Stack gap="3" align="start">
+      <SegmentedControl {...args} size="xs" />
+      <SegmentedControl {...args} size="sm" />
+      <SegmentedControl {...args} size="md" />
+      <SegmentedControl {...args} size="lg" />
+    </Stack>
+  ),
+};
+
+export const LongText: Story = {
+  args: {
+    items: [
+      { value: "day", label: "Last twenty four hours" },
+      { value: "week", label: "Last seven days" },
+      { value: "month", label: "Last thirty days" },
+    ],
+  },
+};
+
+export const NarrowWidth: Story = {
+  render: (args) => (
+    <Box maxWidth="180px">
+      <SegmentedControl {...args} />
+    </Box>
+  ),
 };

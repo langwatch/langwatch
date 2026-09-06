@@ -1,32 +1,58 @@
 # Design system
 
 `@langwatch/design-system` owns LangWatch's browser-safe Chakra system, shared
-components, and their isolated documentation surface. It must not import the
-host app, a feature package, routing, transport, or server code.
+components, and their documentation surface. It must not import the host app,
+a feature package, routing, transport, or server code.
 
-## Storybook
+## The workshop
 
-Start the component workshop with `pnpm --filter @langwatch/design-system
-storybook`. Build its static form with `pnpm --filter @langwatch/design-system
-build:storybook`.
+```bash
+pnpm --filter @langwatch/design-system storybook   # standalone, port 6006
+```
 
-Stories mount the package's `DesignSystemProvider`, not Chakra's default
-system. The toolbar controls the real light and dark colour modes, so every
-story documents the tokens a consuming app receives. The accessibility addon
-is enabled for each story; use Storybook's Vitest addon when interaction or
-browser-level story tests are introduced.
+While the browser application's dev server runs (`pnpm dev` or `pnpm dev:ui`),
+`/design-system` opens the same workshop. Storybook starts on the first visit
+to that address, so it costs the dev server nothing at boot, and
+`LANGWATCH_SKIP_STORYBOOK=1` turns it off entirely.
+
+Stories mount `DesignSystemProvider`, not Chakra's default system, so a story
+shows the tokens a consuming application receives. The toolbar switches between
+System, Light and Dark. The accessibility addon runs on every story.
+
+## Adding a component
+
+1. One file per component in `src/components/`, named in kebab case.
+2. Add its named subpath to `exports` in `package.json` — consumers import
+   `@langwatch/design-system/<name>`, never a deep path.
+3. Write `src/components/<name>.stories.tsx` beside it. A directory of
+   components (`icons/`, `messages/`) takes one story named after the
+   directory.
+4. Add or extend a scenario in `specs/design-system/` and bind it to a test.
+
+`specs/design-system/component-catalogue.feature` is enforced: a component with
+no story, or a story that will not render in both colour modes, fails
+`pnpm --filter @langwatch/design-system test:unit`.
+
+## What a story owes
+
+Every realistic state the component actually has: default, and whichever of
+loading, empty, error, disabled, long text and narrow width apply. Where the
+component takes variants or sizes, one story shows them side by side. Use CSF3,
+keep `tags: ["autodocs"]`, and leave controls on for the props a person would
+change.
+
+## Checklist
+
+- Tokens, never literals: `fg.muted`, `border.emphasized`, `red.solid` — no hex.
+- No `@chakra-ui/react` import outside this package.
+- Sizes and variants are props, not copies of the component.
+- Accessible name on every control; decorative icons carry `aria-hidden`.
+- Copy follows `dev/docs/best_practices/copywriting.md`: no abbreviations, no
+  internals.
 
 ## Catalogue taxonomy
 
-Use Storybook's sidebar to describe the stability and intended reuse level:
-
-- **Foundations**: token visualizations and non-component rules such as colour,
-  typography, spacing, elevation, and motion.
-- **Primitives**: small accessible building blocks that remain broadly
-  composable.
-- **Components**: named reusable controls or display units with a stable API.
-- **Patterns**: deliberate, app-independent compositions already owned by this
-  package. Do not add a pattern merely to reproduce an app screen.
-
-This avoids forcing every UI element into an atoms/molecules hierarchy while
-leaving a clear place for future prefab compositions.
+**Foundations** are tokens and non-component rules (colour, the logo, icons,
+overlay depth). **Primitives** are small accessible building blocks.
+**Components** are named reusable controls with a stable API. **Patterns** are
+app-independent compositions this package already owns.

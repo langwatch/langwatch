@@ -1,6 +1,11 @@
 import type { Preview } from "@storybook/react-vite";
 import { DesignSystemProvider } from "../src/provider";
 
+/**
+ * Every story mounts the package's own provider and system, so a story shows
+ * the tokens a consuming application receives rather than Chakra's defaults.
+ * "System" follows the viewer's operating system; the other two pin a mode.
+ */
 const preview: Preview = {
   globalTypes: {
     colorMode: {
@@ -8,14 +13,16 @@ const preview: Preview = {
       toolbar: {
         icon: "mirror",
         items: [
+          { value: "system", title: "System" },
           { value: "light", title: "Light" },
           { value: "dark", title: "Dark" },
         ],
+        dynamicTitle: true,
       },
     },
   },
   initialGlobals: {
-    colorMode: "light",
+    colorMode: "system",
   },
   parameters: {
     a11y: {
@@ -31,10 +38,11 @@ const preview: Preview = {
   },
   decorators: [
     (Story, context) => {
-      const colorMode = context.globals.colorMode === "dark" ? "dark" : "light";
+      const chosen = context.globals.colorMode;
+      const forcedTheme = chosen === "light" || chosen === "dark" ? chosen : undefined;
 
       return (
-        <DesignSystemProvider forcedTheme={colorMode}>
+        <DesignSystemProvider forcedTheme={forcedTheme} enableSystem defaultTheme="system">
           <Story />
         </DesignSystemProvider>
       );

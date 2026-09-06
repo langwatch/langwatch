@@ -15,6 +15,7 @@ import { UI_ASSET_URL_GLOBAL } from "./src/model/ui-asset-base";
 import { createDevLogger } from "./vite/dev-logging";
 import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
 import { havenHmrGate } from "./vite/havenHmrGate";
+import { designSystemStorybook } from "./vite/design-system-storybook";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 
 // This package declares `"type": "module"`, so Vite bundles the config as ESM
@@ -139,6 +140,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       patchObjectInspectBrowserStub(),
       ...(publicConfig ? [injectDevelopmentPublicConfig(publicConfig)] : []),
       havenHmrGate(),
+      designSystemStorybook({ appPort: FRONTEND_PORT }),
     ],
     resolve: {
       // ONE zod instance for the app AND linked workspace packages
