@@ -190,7 +190,7 @@ async function resolveFromSession({
   opts,
   endpoint,
 }: {
-  opts: { project?: string };
+  opts: { project?: string; preferSession?: boolean };
   endpoint: string;
 }): Promise<ResolvedCredentials | undefined> {
   // Stored state. Re-read from disk on every call, never cached in-process
@@ -214,8 +214,10 @@ async function resolveFromSession({
     session.projectId;
   setResolvedProjectId(projectId);
   // An explicit --project names the identity on the command line, so
-  // there is nothing implicit left to warn about.
-  if (opts.project === undefined) {
+  // there is nothing implicit left to warn about. A command that acts as
+  // the person reads no project either way, so the notice about which
+  // project it reads would be wrong; that command names its own login.
+  if (opts.project === undefined && !opts.preferSession) {
     await maybePrintIdentityNotice({
       mode: session.isLoginKey ? "device-login-key" : "device",
       apiKey: session.apiKey,

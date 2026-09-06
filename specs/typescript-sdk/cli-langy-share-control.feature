@@ -30,6 +30,15 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Then the request list is read with my login's key
       And no login flow runs
 
+    # A request is addressed to me and answered on its own project, so the
+    # line says who I am, not which project the login reads by default.
+    @unit
+    Scenario: The command names the login it uses
+      Given a device session on this machine as Riley at ACME
+      When I run "langwatch langy --share-control"
+      Then the CLI prints "Using your login as Riley at ACME."
+      And no line mentions a project or a --project flag
+
     @unit
     Scenario: An open request is shown with the conversation and the folder
       Given a Langy conversation recorded a control request for me

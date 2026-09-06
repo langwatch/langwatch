@@ -281,6 +281,9 @@ export async function ensureSignedIn({
     await login({ device: true });
   }
   const credentials = await resolveCredentials({ preferSession: true });
+  if (credentials.source === "session") {
+    console.log(chalk.gray(loginLine()));
+  }
   return {
     apiKey: credentials.apiKey,
     endpoint: credentials.endpoint,
@@ -288,6 +291,33 @@ export async function ensureSignedIn({
       ? {}
       : { projectId: credentials.projectId }),
   };
+}
+
+/**
+ * The one line that says who the command acts as: the person and their
+ * organization, as the login recorded them. A request is addressed to the
+ * person and answered on the request's own project, so no project and no
+ * --project belong in this line.
+ */
+const nonEmpty = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+export function loginLine(): string {
+  let cfg: ReturnType<typeof loadConfig> | undefined;
+  try {
+    cfg = loadConfig();
+  } catch {
+    cfg = undefined;
+  }
+  const person = nonEmpty(cfg?.user?.name) ?? nonEmpty(cfg?.user?.email);
+  const organization = nonEmpty(cfg?.organization?.name);
+  if (person && organization) {
+    return `Using your login as ${person} at ${organization}.`;
+  }
+  if (person) return `Using your login as ${person}.`;
+  return "Using your login.";
 }
 
 const requestTitle = (

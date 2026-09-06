@@ -27,6 +27,9 @@ import type { UiWriter } from "../ui";
 
 const ENDPOINT = "https://app.langwatch.test";
 
+const ANSI_SEQUENCE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+const stripAnsi = (text: string): string => text.replace(ANSI_SEQUENCE, "");
+
 const requestNamed = (id: string, title: string): ControlRequest => ({
   id,
   conversationId: `conv_${id}`,
@@ -117,6 +120,8 @@ describe("given the share-control command", () => {
           access_token: "session-token",
           expires_at: Math.floor(Date.now() / 1000) + 3600,
           cli_api_key: "sk-lw-login-key",
+          user: { id: "user_1", email: "riley@acme.test", name: "Riley" },
+          organization: { id: "org_1", slug: "acme", name: "ACME" },
           personal_project: {
             id: "project_personal",
             slug: "riley-personal",
@@ -131,18 +136,35 @@ describe("given the share-control command", () => {
       };
       process.env.LANGWATCH_CLI_CONFIG = configPath;
       process.env.LANGWATCH_API_KEY = "sk-lw-folder-project-key";
+      const printed: string[] = [];
+      const log = vi
+        .spyOn(console, "log")
+        .mockImplementation((text) => printed.push(String(text)));
+      const error = vi
+        .spyOn(console, "error")
+        .mockImplementation((text) => printed.push(String(text)));
       try {
         const credentials = await ensureSignedIn({ login });
         expect(login).not.toHaveBeenCalled();
         expect(credentials.apiKey).toBe("sk-lw-login-key");
         expect(credentials.projectId).toBe("project_personal");
       } finally {
+        log.mockRestore();
+        error.mockRestore();
         if (before.config === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
         else process.env.LANGWATCH_CLI_CONFIG = before.config;
         if (before.key === undefined) delete process.env.LANGWATCH_API_KEY;
         else process.env.LANGWATCH_API_KEY = before.key;
         fs.rmSync(dir, { recursive: true, force: true });
       }
+      /** @scenario "The command names the login it uses" */
+      expect(printed.map(stripAnsi)).toContain(
+        "Using your login as Riley at ACME.",
+      );
+      const wrong = printed.filter(
+        (line) => line.includes("--project") || line.includes("personal project"),
+      );
+      expect(wrong).toEqual([]);
     });
   });
 
