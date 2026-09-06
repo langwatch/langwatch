@@ -123,7 +123,7 @@ class TestWorkbenchAccess extends WorkbenchAccessPort {
  * arrives before an executor is consulted.
  */
 function validatorOnlyLangWatchQL(): LangWatchQLService {
-  return new LangWatchQLService({ executor: null, database: "analytics" });
+  return LangWatchQLService.create({ executor: null, database: "analytics" });
 }
 
 type Context = Readonly<{ app: Readonly<{ dashboard: DashboardApp }> }>;

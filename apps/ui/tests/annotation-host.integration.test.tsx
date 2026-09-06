@@ -6,6 +6,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toasts = vi.hoisted(() => ({ created: [] as Array<Record<string, unknown>> }));
@@ -125,9 +126,11 @@ function mountHost(userId: string): {
   };
   render(
     <ChakraProvider value={defaultSystem}>
-      <UiCapabilityContextProvider value={capabilities}>
-        <Mounted />
-      </UiCapabilityContextProvider>
+      <MemoryRouter initialEntries={["/project-1/annotations"]}>
+        <UiCapabilityContextProvider value={capabilities}>
+          <Mounted />
+        </UiCapabilityContextProvider>
+      </MemoryRouter>
     </ChakraProvider>,
   );
   if (!published) throw new Error("the provider published no host");

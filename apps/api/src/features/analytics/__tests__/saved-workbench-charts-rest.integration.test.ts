@@ -129,7 +129,7 @@ function database(): PrismaClient {
  * executor is ever consulted.
  */
 function validatorOnlyLangWatchQL(): LangWatchQLService {
-  return new LangWatchQLService({ executor: null, database: "analytics" });
+  return LangWatchQLService.create({ executor: null, database: "analytics" });
 }
 
 const NO_GRAPH_ALERTS: DashboardGraphAlertLookup = {
