@@ -5,7 +5,13 @@
     "jsx": "react-jsx",
     "lib": ["es2022", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    // See the same entries in `apps/ui/tsconfig.json`: the checker reads the
+    // trimmed browser contract, the bundler still resolves the real package.
+    "paths": {
+      "better-auth/react": ["../../../../types/browser/better-auth-react.d.ts"],
+      "@better-auth/passkey/client": ["../../../../types/browser/better-auth-passkey-client.d.ts"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vitest.setup.ts"]
 }

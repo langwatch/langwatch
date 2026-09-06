@@ -25,13 +25,17 @@ import {
   nestedTernaryRule,
   noRawHonoMountRule,
   overloadByLiteralRule,
+  planLiteralsRule,
   prismaContainmentRule,
   runtimeUndefinedRule,
+  secretsThroughSourceRule,
   serviceClassesRule,
   serviceDependenciesRule,
   serviceMemberSpacingRule,
   serviceQualityRule,
+  temporalOnlyRule,
   typedPrismaSeamRule,
+  webImportsServerShapedValueRule,
 } from "@langwatch/lint-core";
 
 export const rules = {
@@ -46,7 +50,9 @@ export const rules = {
   "layer-class": layerClassRule,
   "no-raw-hono-mount": noRawHonoMountRule,
   "overload-by-literal": overloadByLiteralRule,
+  "plan-literals": planLiteralsRule,
   "prisma-containment": prismaContainmentRule,
+  "temporal-only": temporalOnlyRule,
   "typed-prisma-seam": typedPrismaSeamRule,
   "cognitive-complexity": cognitiveComplexityRule,
   "condition-shape": conditionShapeRule,
@@ -60,9 +66,11 @@ export const rules = {
   "service-member-spacing": serviceMemberSpacingRule,
   "service-dependencies": serviceDependenciesRule,
   "runtime-undefined": runtimeUndefinedRule,
+  "secrets-through-source": secretsThroughSourceRule,
   "logical-statement-spacing": logicalStatementSpacingRule,
   "boolean-wall": booleanWallRule,
   "awaited-return-chain": awaitedReturnChainRule,
+  "web-imports-server-shaped-value": webImportsServerShapedValueRule,
 };
 
 export default {

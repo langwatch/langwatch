@@ -144,3 +144,32 @@ Feature: Date and time arithmetic runs on Temporal
       Given a span crossing the spring change in Europe/Amsterdam and the autumn change in America/New_York
       When elapsed milliseconds and wall-clock seconds are both taken
       Then the elapsed count includes the hour the clock skipped or repeated and the wall-clock count does not
+
+  Rule: A Date is minted only where a boundary demands one
+
+    Nothing in the product creates a Date any more. The package owns the two
+    conversions instead, so a Prisma column or an SDK that only speaks Date is
+    the only place one appears, and it appears through a named helper.
+
+    @unit
+    Scenario: The clock reads the present moment as an instant
+      When the package is asked for the current moment
+      Then it answers with an instant rather than a Date
+
+    @unit
+    Scenario: A Date arriving from a boundary becomes an instant naming the same moment
+      Given a Date handed over by a store or an SDK that only speaks Date
+      When it is converted at the boundary
+      Then the instant names the same epoch millisecond count
+
+    @unit
+    Scenario: An instant becomes a Date for a boundary that accepts nothing else
+      Given an instant the product computed with
+      When it is converted for a store or an SDK that only accepts a Date
+      Then the Date names the same epoch millisecond count
+
+    @unit
+    Scenario: A zoned value converts for the same boundary as an instant does
+      Given a moment read in the viewer's time zone
+      When it is converted for a boundary that only accepts a Date
+      Then the Date names the same epoch millisecond count

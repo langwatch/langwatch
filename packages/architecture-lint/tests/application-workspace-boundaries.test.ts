@@ -7,12 +7,12 @@ import {
   discoverClassifiedPackages,
   formatLegacyApplicationBoundaryBaseline,
   lintWorkspace,
-} from "../src";
+} from "../src/index.ts";
 import type {
   ApplicationPackageRole,
   ArchitectureViolation,
   EnterpriseCompositionRole,
-} from "../src";
+} from "../src/index.ts";
 
 let root = "";
 
@@ -158,7 +158,7 @@ describe("application workspace classification", () => {
     application("api", { source: "export const runtime = true;" });
     application("ui", {
       dependencies: { "@langwatch/platform-api": "workspace:*" },
-      source: 'import { runtime } from "../../api/src/index"; export { runtime };',
+      source: 'import { runtime } from "../../api/src/index.ts"; export { runtime };',
     });
 
     expect(policy("application-boundary").length).toBeGreaterThanOrEqual(2);

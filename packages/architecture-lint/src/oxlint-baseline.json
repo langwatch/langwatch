@@ -11300,6 +11300,4290 @@
     {
       "key": "nested-ternary|sdks/typescript/src/observability-sdk/instrumentation/langchain/index.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "plan-literals|apps/api/src/app/api-usage.composition.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/billing/contract/src/plan-limits.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/billing/server/src/repositories/prisma/prisma.subscription.repository.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/billing/server/src/services/billing-subscription-lifecycle.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/billing/web/src/screens/billing/subscription-page.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/contract/src/license-constants.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/contract/src/license-minting.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/contract/src/license-plan-defaults.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/contract/src/license-plan-floor.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/contract/src/license-plan-mapping.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/contract/src/license-plan-templates.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/contract/src/license.commands.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/contract/src/license.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/server/src/app/licensing.app.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/server/src/services/license-generation.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/server/src/services/license.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/server/src/testing.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/server/src/transport/api-trpc/license.api.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/web/src/model/plan-form-defaults.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/enterprise/features/licensing/web/src/screens/licensing/license-generator-form.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/features/entitlement/contract/src/plan-next-step.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/features/entitlement/contract/src/plan.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "plan-literals|packages/features/entitlement/server/src/services/plan-next-step.service.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "secrets-through-source|packages/prisma-client/prisma/seed.ts",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "temporal-only|apps/api/src/app/api-automation.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/app/api-trace-read-stack.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/app/api-usage.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/agent-cache/agent-cache.store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/enterprise/governance-ingest-rest.mount.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/entitlement/spend.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/evaluator/evaluator.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/experiment/experiment.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/feature-flag/feature-flag.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/health/health-probe-rest.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/scenario/scenario.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/topic/topic.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/trace/trace-rest.mount.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/features/workflow/workflow.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/api/src/platform/infrastructure/api-rate-limit.infrastructure.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/predeps/_download.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/aigateway.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/app-dir.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/clickhouse.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/health.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/langevals.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/langwatch.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/langy-cli.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/langyagent.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/migrate.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/nlpgo.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/node-deps.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/postgres.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/redis.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/server/src/services/venvs.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/ui/src/behavior/chunk-reload.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/ui/src/behavior/poll-for-global.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/ui/src/behavior/ui-passkeys.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/ui/src/features/navigation/ui/sections/navigation-host.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-automation-graph.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-automation-settlement-reads.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-automation-settlement.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-evaluation-processing.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-feature-flags.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-gateway-spend.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-model-provider.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-ops.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-realtime-session.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-report-schedule.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-scenario-execution.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/app/worker-webhook-egress.composition.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/features/automation/automation-notification-delivery.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/features/automation/automation-runaway.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/features/topic/topic-worker-feature.installer.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|apps/worker/src/platform/liveness/worker-metrics.server.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/http-security.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/http-server.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/tools/experiment-run-status.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/tools/get-analytics.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/tools/get-simulation-run.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/tools/list-api-keys.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/tools/list-experiment-runs.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/tools/list-experiments.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/tools/run-experiment.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/tools/search-traces.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|mcp/typescript/src/utils/date-parsing.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/api/src/rest/idempotency-ledger.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/api/src/rest/media-response.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/api/src/rest/middleware.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/api/src/rest/schemas.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/api/src/rest/types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/api/src/trpc/trpc-call-logging.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/api/src/trpc/trpc-runtime-policy.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/architecture-lint/src/boundary-edge-baseline.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/architecture-lint/src/comment-blocks.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/api/src/governance/admin-workspace-view-audit.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/api/src/governance/gateway-debit.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/api/src/governance/governance-eventing.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/api/src/governance/governance-kpis.clickhouse.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/api/src/governance/governance-ocsf-events.clickhouse.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/api/src/governance/governance-products.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/api/src/governance/governance-signals.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/api/src/governance/personal-usage.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/api/src/governance/personal-usage.clickhouse.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/worker/src/governance/governance-ingestion-pull.host.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/composition/worker/src/governance/spend-spike-anomaly.worker.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/contract/src/billing-types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/contract/src/plan-types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/adapters/eventing.billing-meter-dispatch.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/adapters/eventing.report-usage-for-month.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/ports/subscription.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/repositories/clickhouse/clickhouse.billable-events-meter.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/repositories/duplicate-subscriptions-report.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/repositories/nurturing-profile.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/billable-events-query.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/billing-alert-cooldown.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/billing-checkout-completion.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/billing-subscription-lifecycle.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/billing-usage-notice.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/nurturing-activity-tracking.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/nurturing-signup-identification.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/nurturing-sso-auto-add.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/nurturing-user-sync.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/seat-event-subscription.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/usage-limit.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/services/usage-warning.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/tasks/duplicate-subscriptions-report.task.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/server/src/tasks/stripe-prices-sync.task.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/web/src/model/invoice-utils.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/web/src/screens/billing/subscription-page.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/billing/web/src/screens/billing/user-management-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/contract/src/canonical-cost.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/adapters/anthropic-admin-puller.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/adapters/copilot-studio-dataverse-puller.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/adapters/databricks-genie-puller.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/adapters/http-poller.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/adapters/openai-admin-puller.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/adapters/s3-puller.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/intents/gateway-debit.intent.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/intents/pulled-usage-ledger.intent.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/ports/gateway-debit.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/ports/governance-signal.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/ports/governance-subscriber.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/ports/ingestion-pull-lifecycle.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/ports/ingestion-pull-worker.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/ports/ingestion-source-key.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/ports/ingestion-source.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/ports/ingestion-template.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/ports/pulled-usage-ledger.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/ports/spend-spike-anomaly.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/processes/governance-event-delivery.process.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/anomaly-rule.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/canonical-cost-extractor.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/copilot-studio-trace-mapper.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/copilot-transcript-grouping.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/genie-trace-mapper.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/governance-signal.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/ingestion-pull-worker.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/ingestion-source-key.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/ingestion-source.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/ingestion-template.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/personal-usage.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/pulled-usage-record.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/services/spend-spike-anomaly-evaluator.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/subscribers/governance-kpis.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/subscribers/governance-ocsf.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/transport/api-rest/governance-ingest.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/transport/api-trpc/anomaly-rules.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/server/src/transport/api-trpc/ingestion-sources.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/web/src/features/ingestion-sources/model/pull-cadence.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/web/src/features/source-events/model/governance-events-pager.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/web/src/features/source-events/ui/sections/source-events-table.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/web/src/screens/governance/governance-ingestion-source.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/web/src/screens/governance/governance-inventory.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/web/src/screens/governance/governance-overview.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/web/src/screens/governance/governance-team.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/web/src/screens/governance/governance-teams.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/web/src/screens/governance/governance-user.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/governance/web/src/screens/governance/governance-users.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/licensing/server/src/adapters/node.license-cryptography.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/licensing/server/src/app/licensing.app.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/licensing/server/src/ports/license-cryptography.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/licensing/server/src/ports/license-storage.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/licensing/server/src/services/license-generation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/licensing/server/src/services/license.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/licensing/server/src/transport/api-trpc/license.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/licensing/web/src/behavior/licensing-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/licensing/web/src/model/license-status.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/licensing/web/src/screens/licensing/license-generator-form.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/scim/contract/src/scim-token.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/scim/server/src/adapters/identity.scim-sync-lifecycle.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/scim/server/src/ports/scim-repository.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/scim/server/src/services/scim.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/scim/server/src/transport/api-rest/scim-webhook-intake.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/scim/web/src/behavior/scim-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/scim/web/src/screens/scim/scim.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/webhook/server/src/adapters/sqs.webhook-destination.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/webhook/server/src/adapters/webhook-endpoint.webhook-endpoint.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/webhook/server/src/repositories/clickhouse/clickhouse.webhook-events.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/webhook/server/src/services/webhook-delivery.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/webhook/server/src/services/webhook-envelope.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/webhook/server/src/services/webhook-health.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/enterprise/features/webhook/server/src/transport/api-rest/webhook.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/eventSourcing.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/process-manager/metrics.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/process-manager/processRuntime.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/projections/abstractFoldProjection.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/projections/redisCachedFoldStore.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/queues/dispatchError.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/queues/memory.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/replay/replayDiscovery.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/replay/replayDrain.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/replay/replayEngine.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/replay/replayStatePath.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/server/adapters/postgres/pg-timestamp.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/server/adapters/postgres/prisma-process-store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/server/schedule/next-run-at.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/server/schedule/scheduler.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/server/schedule/scheduler.types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/services/queues/queueManager.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/stores/eventStoreUtils.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/eventing/src/utils/event.utils.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/contract/src/connected-agent.view.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/contract/src/connected-agent.visibility.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/adapters/connected-agent-dispatch.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/adapters/connected-agent-registry.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/adapters/connected-agent-state.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/projections/connected-agent-presence.projection.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/repositories/agent.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/rules/agent-test-tracing.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/rules/agent-view.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/services/connected-agent-presence.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/services/connected-agent-session.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/tasks/agent-audit-log-ids-backfill.task.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/testing.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/transport/api-rest/agent-legacy.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/server/src/transport/api-trpc/http-proxy.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/web/src/features/history/ui/sections/agent-history-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/web/src/model/connected-agent-rows.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/agent/web/src/screens/agent-management/agent-management.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/contract/src/analytics.lwql-time-window.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/contract/src/analytics.query-shapes.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/adapters/clickhouse.langwatch-ql-executor.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/repositories/analytics.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.analytics-persistence.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.analytics.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.timeseries-query-shared.mapper.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/rules/langwatch-ql-diagnostics-shape.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/services/analytics-comparison-window.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/services/analytics.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/services/langwatch-ql-bucket-diagnostics.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/server/src/services/langwatch-ql.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/behavior/analytics-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/behavior/lwql-execute.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/behavior/use-analytics-period.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/model/analytics-period.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/model/chart-date.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/screens/analytics/custom-graph.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/ui/elements/langwatch-ql-time-window-editor.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/ui/elements/period-selector.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/ui/sections/analytics-period-picker.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/ui/sections/custom-graph.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/ui/sections/feedbacks-table.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/ui/sections/saved-views-logic.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/analytics/web/src/ui/sections/use-saved-views.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/contract/src/annotation.queue.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/contract/src/annotation.record.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/server/src/tasks/annotation-clickhouse-backfill.task.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/server/src/transport/api-trpc/annotation.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/web/src/behavior/annotation-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/web/src/behavior/use-annotation-period.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/web/src/behavior/use-annotation-queues.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/web/src/model/annotation-export.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/web/src/model/annotation-period.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/web/src/model/annotation-row.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/web/src/ui/blocks/annotation-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/web/src/ui/blocks/annotation-table.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/web/src/ui/elements/annotation-hover-chip.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/annotation/web/src/ui/elements/period-picker.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/contract/src/api-key.list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/contract/src/api-key.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/server/src/adapters/redis.agent-sandbox-key-share.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/server/src/app/api-key.app.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/server/src/repositories/api-key.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/server/src/services/agent-sandbox-key-mint.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/server/src/services/agent-sandbox-key-reap.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/server/src/services/api-key-cli.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/server/src/services/api-key-token-resolution.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/server/src/services/api-key.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/server/src/services/legacy-api-key-grant.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/web/src/behavior/api-key-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/web/src/model/api-key-form.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/web/src/screens/api-key/api-keys.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/web/src/screens/api-key/cli-auth.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/web/src/testing.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/web/src/ui/blocks/ingestion-keys-section.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/api-key/web/src/ui/sections/create-api-key-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/auth/server/src/ports/auth-clock.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/auth/server/src/repositories/better-auth-hooks.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/auth/server/src/services/auth0-password.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/auth/server/src/services/cli-device-session.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/auth/server/src/services/signup-verification.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/auth/server/src/transport/better-auth/better-auth-hooks.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/auth/server/src/transport/better-auth/better-auth.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/auth/web/src/behavior/auth-client.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/contract/src/authz.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/adapters/eventing.authz-audit.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/adapters/eventing.authz-ledger.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/projections/authz-grant.projection.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/repositories/authz-read.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/repositories/eventing/eventing.authz-listing.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/repositories/eventing/eventing.authz-read.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/rules/role-binding-read-back.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/services/authz-collector.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/services/authz-grant-snapshot.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/services/authz.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/stores/memory/memory.per-organization-cached-gate.store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/authz/server/src/transport/api-rest/role-binding.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/contract/src/automation.queries.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/contract/src/automation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/contract/src/report.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/contract/src/templating/template-context.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/contract/src/trigger-policies.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/adapters/webhook-delivery.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/adapters/webhook-provider.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/app/automation.app.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/fixtures/graph-activity.fixture.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/intents/graph-alert-sweep.intent.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/ports/automation-clock.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/ports/automation-provider.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/ports/automation-scheduled-intent.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/ports/automation-settlement-ledger.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/ports/scheduled-jobs.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/processes/trigger-settlement.process.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/repositories/graph-trigger-sent.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/repositories/trigger-fire-history.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/repositories/webhook-delivery.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/rules/retry-after-message.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/automation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/email-cap.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/graph-trigger-evaluation-plan.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/graph-trigger-heartbeat.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/persist-cap.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/report-chart.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/report-dispatch.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/report-schedule.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/report-trace-row.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/runaway-containment.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/trigger-evaluator.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/services/trigger-graph.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/subscribers/evaluation-alert-trigger-match.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/subscribers/graph-trigger-activity.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/server/src/transport/api-trpc/automation.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/web/src/behavior/automation-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/web/src/features/authoring/ui/sections/automation-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/web/src/features/authoring/ui/sections/slack.client.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/web/src/features/authoring/ui/sections/subject-section.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/web/src/features/authoring/ui/sections/view-automation-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/web/src/features/overview/ui/elements/automation-history.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/web/src/features/overview/ui/elements/automation-table-cells.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/web/src/model/relative-time.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/automation/web/src/screens/automations/automations.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/contract/src/testing.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/server/src/adapters/coding-agent-clock.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/server/src/ports/coding-agent-project-activity.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/server/src/repositories/coding-agent-clickhouse/clickhouse.mapper.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/server/src/repositories/coding-agent-session-event/clickhouse.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/server/src/repositories/coding-agent-session/clickhouse.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/server/src/repositories/coding-agent-trace-session/clickhouse.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/server/src/repositories/session-metric-series/clickhouse.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/server/src/services/coding-agent-session-seen.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/server/src/transport/api-trpc/coding-agent.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/web/src/last-update.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/web/src/period-selector.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/web/src/pull-request-sessions-section.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/web/src/pull-request-status-badge.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/web/src/pull-requests-table.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/web/src/session-filters.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/web/src/sessions-toolbar.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/web/src/short-date.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/coding-agent/web/src/trace/terminal-view.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dashboard/server/src/ports/dashboard.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dashboard/server/src/transport/api-rest/graph.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/data-privacy/contract/src/data-privacy.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/data-privacy/server/src/services/data-privacy-cache.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/contract/src/dataset-file.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/contract/src/dataset.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/server/src/adapters/dataset-upload.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/server/src/ports/dataset.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/server/src/repositories/dataset-content.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/server/src/repositories/dataset.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/server/src/services/dataset.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/web/src/behavior/use-dataset-editor-store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/web/src/behavior/use-dataset-slug-validation.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/web/src/model/convert-record-values.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/web/src/model/reserved-columns.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/web/src/screens/datasets/datasets.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/web/src/ui/blocks/dataset-picker-list.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/dataset/web/src/ui/sections/datasets/upload-csv-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/entitlement/server/src/transport/api-trpc/cost.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/entitlement/server/src/transport/api-trpc/limits.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluation/server/src/projections/evaluation-analytics-rollup.projection.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluation/server/src/repositories/clickhouse/evaluation-run-read.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluation/server/src/repositories/clickhouse/evaluation-run-write.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluation/server/src/repositories/clickhouse/monitor-performance.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluation/server/src/services/evaluation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluation/server/src/transport/api-trpc/evaluation.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluator/server/src/adapters/prisma.evaluator-change-history.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluator/server/src/ports/evaluator.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluator/web/src/ui/blocks/evaluator-grid-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluator/web/src/ui/sections/checks/try-it-out.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluator/web/src/ui/sections/evaluator-history-panel.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluator/web/src/ui/sections/evaluator-list-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluator/web/src/ui/sections/evaluators/evaluator-editor-content.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/adapters/redis.experiment-run-abort.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/adapters/redis.experiment-run-progress.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/processes/experiment-cell-workflow.process.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/projections/experiment-run-result-storage.projection.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/repositories/clickhouse/clickhouse.experiment-dspy.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run-state.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run.mapper.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/repositories/experiment.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/services/experiment-carried-board.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/services/experiment-connected-cell.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/services/experiment-run-driver.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/services/experiment-run-storage.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/services/experiment.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/transport/api-rest/experiment-dspy-steps.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/server/src/transport/api-rest/experiment.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/behavior/experiments-v3/use-evaluations-v3-store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/behavior/experiments-v3/use-workbench-update-listener.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/model/batch-evaluation-results.run-state.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/model/prisma-types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/screens/experiments/experiments.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/elements/experiments/BatchEvaluationV2/batch-evaluation-v2-evaluation-results.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/elements/experiments/batch-evaluation.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/sections/batch-evaluation-results.csv.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/sections/batch-evaluation-results/batch-evaluation-results.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/sections/batch-results/batch-runs-sidebar.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/sections/batch-results/batch-summary-footer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/sections/batch-results/presentation.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/experiment/web/src/ui/sections/experiments-v3/version-history-list.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/feature-flag/contract/src/feature-flag-rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/feature-flag/contract/src/feature-flag.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/feature-flag/server/src/adapters/prisma.feature-flag-row.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/feature-flag/server/src/adapters/redis.feature-flag-cache.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/feature-flag/server/src/repositories/feature-flag.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/feature-flag/server/src/repositories/memory/feature-flag.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/feature-flag/server/src/services/organization-created-at-cache.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/feature-flag/web/src/model/rule-editing.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/feature-flag/web/src/model/targeting-summary.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/feature-flag/web/src/operator-feature-flag-catalogue.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/contract/src/gateway-cache-rule.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/contract/src/gateway.budget-period.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/contract/src/gateway.budget-window.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/contract/src/gateway.budget.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/contract/src/gateway.errors.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/contract/src/gateway.realtime-session.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/contract/src/gateway.rows.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/adapters/gateway-budget-dto.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/adapters/gateway-wire-pagination.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/adapters/jwt.gateway-token.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/adapters/virtual-key-crypto.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/app/gateway.app.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/ports/gateway-budget-spend.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/ports/gateway-internal-store.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/ports/gateway-spend-events.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/ports/gateway-virtual-key-spend.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/ports/gateway-virtual-key.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/processes/gateway-spend-commands.process.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/repositories/clickhouse/clickhouse.gateway-budget.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/repositories/gateway-budget.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/repositories/gateway-key-budget.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/repositories/gateway-realtime-session.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/repositories/gateway-trace-destination-report.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/rules/gateway-config-wire.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/gateway-budget-overview.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/gateway-end-user-caps.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/gateway-realtime-session-reconciliation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/gateway-realtime-session.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/gateway-usage.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/gateway.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/virtual-key-budget.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/virtual-key-direct-budget.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/virtual-key-rotation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/virtual-key-validation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/services/virtual-key.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/tasks/virtual-key-config-backfill.task.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/transport/api-rest/elevenlabs-webhook.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/transport/api-rest/gateway-internal.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/transport/api-rest/gateway-platform.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/transport/api-rest/gateway-spend.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/transport/api-trpc/gateway-usage.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/server/src/transport/api-trpc/virtual-key.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/behavior/gateway-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/behavior/use-rolling-window.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/features/budgets/ui/sections/budget-create-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/features/routing-policies/behavior/use-routing-policy-drawer-form.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/features/virtual-keys/model/eligible-model-providers.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/features/virtual-keys/model/virtual-key-expiration.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/features/virtual-keys/ui/elements/virtual-key-budget-bar.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/features/webhooks/ui/sections/webhook-deliveries-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/model/format-time-ago.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/screens/gateway/gateway-billing-events.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/screens/gateway/gateway-budget.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/screens/gateway/gateway-budgets.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/screens/gateway/gateway-guardrails.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/screens/gateway/gateway-usage.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/screens/gateway/gateway-virtual-key.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/screens/gateway/gateway-virtual-keys.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/screens/gateway/gateway-webhooks.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/gateway/web/src/surfaces/budget-overview/budget-overview-list.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/adapters/github-api.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/adapters/github-install-state.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/adapters/github-token-cache.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/intents/github-branch-recheck.intent.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/ports/github-app-token.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/ports/github-project-activity.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/repositories/github-installations.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/repositories/github-pull-requests.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/services/github-branch-demand.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/services/github-branch-maintenance.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/services/github-branch-mapping.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/services/github-installations.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/services/github-pull-request-status.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/github/server/src/transport/api-rest/github.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/hosted-mcp/server/src/services/mcp-rate-limit.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/hosted-mcp/server/src/transport/api-rest/mcp-authorize.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/adapters/better-auth.identity-storage.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/adapters/eventing.join-request-ledger.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/adapters/eventing.sso-connection-ledger.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/adapters/identity-ledger.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/adapters/join-request-ledger.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/repositories/identity-newborn.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/repositories/identity-reservations.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/repositories/join-request.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/rules/identity-storage-ports.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/services/identity-newborn-reconciliation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/services/join-requests.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/services/per-subject-cached-gate.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/identity/server/src/services/sso-connection-backoffice.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/contract/src/langy.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/adapters/clickhouse.langy-analytics-event.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/adapters/eventing.langy-conversation-runtime.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/adapters/redis.langy-local-presence.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/adapters/redis.langy-token-buffer.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/ports/langy-feedback-prompt.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/repositories/langy-message.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/repositories/langy-session-key-reap.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/repositories/langy-session-key.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/services/langy-conversation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/services/langy-github-pr-quota.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/services/langy-local-call-dispatcher.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/services/langy-local-control-request.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/services/langy-local-session.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/services/langy-local-user-wait.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/services/langy-session-key-reap.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/services/langy-session-key.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/services/langy-skip-permissions.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/services/langy-turn-preparation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/subscribers/langy-conversation.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/transport/api-rest/langy-local-control-long-poll.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/transport/api-rest/langy-local.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/server/src/transport/api-trpc/langy.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/behavior/langy-context-target.store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/behavior/capabilities/capability-hydrators.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/behavior/stores/langy-dev-log.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/behavior/use-langy-conversation-update-listener.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/behavior/use-langy-stick-to-bottom.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/behavior/use-langy-trace-view-context.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-metrics-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-trace-sample-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/langy-card-gallery.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/langy-dev-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/features/langy/ui/sections/recent-chats-view.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/model/langy-conversation-date.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/model/langy-row-format.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/model/langy-trace-explorer-link.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/ui/sections/derived-cards/langy-code-access-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/ui/sections/langy-thinking-line.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/langy/web/src/ui/sections/streaming-status-line.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/log/server/src/adapters/canonical-log.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/log/server/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/log/server/src/repositories/clickhouse/clickhouse.canonical-log-record.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/log/server/src/services/log-request-collection.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/metric/contract/src/metric-rollup/rollup-row.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/metric/contract/src/schemas/metric-processing/metric-data-point.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/metric/server/src/adapters/canonical-metric.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/metric/server/src/repositories/clickhouse/clickhouse.metric-data-point.mapper.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/metric/server/src/repositories/clickhouse/clickhouse.metric-data-point.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/metric/server/src/services/metric-request-collection.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/contract/src/model-provider-registry.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/adapters/codex-oauth.model-provider-token-refresher.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/adapters/registry.model-provider-catalog.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/adapters/windowed.model-provider-connection-rate-limiter.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/ports/model-provider.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/rules/legacy-model-provider.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/services/model-cost-preview.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/services/model-provider-codex.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/services/model-provider-command.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/services/model-provider-costs.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/services/model-provider-project-scope.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/services/model-provider-scope.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/tasks/model-registry-sync.task.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/server/src/transport/api-trpc/model-provider.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/web/src/behavior/use-codex-device-sign-in.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/web/src/model/default-model-cascade.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/web/src/model/relative-time.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/web/src/ui/sections/model-provider-advanced-section.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/model-provider/web/src/ui/sections/model-provider-form.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/monitor/server/src/app/monitor.app.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/monitor/server/src/transport/api-rest/monitor.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/navigation/web/src/behavior/navigation-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/navigation/web/src/behavior/use-recent-items.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/navigation/web/src/model/coding-agent-activity.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/navigation/web/src/model/navigation-host.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/navigation/web/src/ui/blocks/admin-viewing-as-banner.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/navigation/web/src/ui/sections/main-menu.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/notification/server/src/adapters/redis.tenant-broadcast.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/notification/server/src/services/email-mime.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/notification/web/src/behavior/notification-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/notification/web/src/screens/email-suppressions/email-suppressions.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/onboarding/web/src/behavior/onboarding-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/onboarding/web/src/behavior/use-project-by-slug-or-latest.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/onboarding/web/src/ui/elements/screen-lifecycle.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/onboarding/web/src/ui/sections/observability/waiting-for-traces-chip.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/contract/src/ops-bug-report.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/contract/src/ops-snapshot.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/app/ops.app.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/ports/ops-worker.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/ports/scheduler-audit-sink.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/repositories/admin-backoffice.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/repositories/redis/queue.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/repositories/redis/redis.blob-store.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/repositories/scheduler-ops.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/rules/system-migration-support.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/admin-backoffice.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/anomaly-detector.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/event-explorer.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/impersonation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/manager-explorer.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/ops-dashboard-view.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/ops-metrics-collector.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/ops-metrics-publication.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/ops-metrics-sampling.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/ops-metrics-window.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/ops-snapshot-reader.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/replay-lock-heartbeat.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/replay.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/scheduler-ops.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/storage-stats-collection.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/system-migration-rollback.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/system-migrations.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/services/usage-stats-collection.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/server/src/transport/api-trpc/ops.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/behavior/ops-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/elements/backoffice-cells.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/bug-reports-view.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/organizations-view.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/projects-view.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/sso-connections-view.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/subscriptions-view.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/backoffice/ui/sections/users-view.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/blob-store/model/blob-formatters.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/deja-view/model/deja-view-fragment.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/deja-view/ui/blocks/deja-view-manager-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/model/process-presentation.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/model/scheduler-presentation.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/blocks/replay-history-section.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/elements/connection-status-indicator.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/elements/scheduler-recent-actions.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/elements/throughput-chart.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/elements/upcoming-work-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/bulk-replay-wizard.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/dead-letters-content.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/event-sourcing-overview.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/process-instance-content.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/process-instances-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/process-recent-actions-panel.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/replay-history-table.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/replay-progress-content.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/replay-progress-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/scheduler-content.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/scheduler-panel.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/single-aggregate-replay.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/event-store/ui/sections/upcoming-work-panel.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/foundry/behavior/trace-executor.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/foundry/ui/sections/execution-controls.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/foundry/ui/sections/foundry-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/foundry/ui/sections/generate-conversation-dialog.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/migrations/ui/sections/migrations-content.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/queue/model/queue-pipeline-utils.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/queue/ui/sections/anomalies-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/queue/ui/sections/groups-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/features/queue/ui/sections/queue-group-detail-content.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/ops/web/src/model/ops-formatters.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/contract/src/organization.rows.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/contract/src/organization.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/ports/organization.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/repositories/organization-invite.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/repositories/organization-membership.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/repositories/team.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/rules/invite-display-status.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/services/invite-creation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/services/invite-lifecycle.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/services/invite-send-throttle.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/services/organization-membership.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/transport/api-rest/organization-provisioning.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/transport/api-rest/organization.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/transport/api-rest/team.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/transport/api-trpc/join-request.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/server/src/transport/api-trpc/organization.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/web/src/behavior/organization-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/web/src/model/audit-log-export.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/web/src/model/audit-period.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/web/src/screens/organization/audit-log.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/web/src/ui/blocks/join-requests-table.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/organization/web/src/ui/sections/invites-table.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/presence/server/src/adapters/broadcast-tenant-rate-limiter.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/presence/server/src/adapters/broadcast.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/presence/server/src/repositories/memory/memory.presence.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/presence/server/src/services/presence.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/contract/src/project.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/server/src/app/project.app.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/server/src/repositories/project.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/server/src/repositories/recent-items.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/server/src/rules/recent-items.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/server/src/services/project.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/server/src/services/recent-items.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/server/src/transport/api-rest/project.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/web/src/screens/home/briefing/components/home-overview-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/web/src/screens/home/briefing/hooks/use-langy-briefing.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/web/src/screens/home/components/learning-resources.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/web/src/screens/home/components/recent-items-section.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/project/web/src/screens/home/components/welcome-header.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/prompt/server/src/repositories/prompt-tag-assignment.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/prompt/server/src/repositories/prompt-version.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/prompt/server/src/repositories/prompt.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/prompt/server/src/services/prompt.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/prompt/web/src/model/prompt-chat-sync-context.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/prompt/web/src/model/prompt-form/version-metadata.schemas.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/prompt/web/src/screens/prompt-studio/browser/experiment-from-playground-button.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/prompt/web/src/screens/prompt-studio/chat/synced-chat-input.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/contract/src/scenario.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/adapters/node-scenario-child-process.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/adapters/serialized-connected-agent.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/adapters/serialized-http-agent.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/app/scenario.app.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/intents/simulation-run-execution.intent.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/ports/scenario-clock.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/repositories/clickhouse/clickhouse.simulation-run-metrics.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/repositories/clickhouse/clickhouse.simulation-run-state.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/repositories/clickhouse/simulation-clickhouse.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/repositories/scenario.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/services/agent-test.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/services/result-atoms.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/services/run-configurations.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/services/scenario-execution.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/services/scenario-failure-handler.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/services/scenario-processor.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/services/scenario-run-export-csv.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/tasks/stalled-runs-backfill.task.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/transport/api-rest/scenario-event.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/transport/api-rest/scenario-run-export.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/transport/api-trpc/result-atoms.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/server/src/transport/api-trpc/scenario-events.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/behavior/agent-testing/results/use-widen-window-for-plan.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/behavior/scenarios/use-filtered-scenario-targets.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/behavior/suites/use-export-scenario-runs.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/behavior/use-now.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/behavior/use-scenario-tab-follow.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/behavior/use-simulation-streaming-state.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/behavior/use-simulation-update-listener.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/model/agent-testing/cases/test-cases.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/model/agent-testing/drawers/scenario-versions.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/model/prisma-types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/model/scenario-list.types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/elements/agent-testing/shared/period-picker.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/elements/scenario-run-actions.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/elements/scenario-table.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/elements/set-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agent-testing/cases/suite-rail.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agent-testing/cases/use-test-cases-data.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agent-testing/cases/use-test-cases-tab.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agent-testing/drawers/scenario-version-row.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agent-testing/results/results-filter-row.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agent-testing/results/results-list.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agent-testing/results/run-plan-detail.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agent-testing/results/use-run-plan-results-column.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agent-testing/run/run-configuration.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agent-testing/run/run-name-field.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agents/agent-list-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agents/agent-workflow-editor-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agents/agent-workflow-target-editor-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/agents/connected/connected-agent-drawer.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/scenario-target-selector.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/scenarios/save-and-run-menu.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/suites/new-simulations-callout.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/suites/simulations-page.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/scenario/web/src/ui/sections/use-scenario-target.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/secret/web/src/screens/secret/secrets.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/share/server/src/repositories/ledger/ledger.share.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/share/server/src/repositories/share.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/share/server/src/services/share.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/share/web/src/share-expiry.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/share/web/src/share-link-status.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/adapters/azure-blob-token-provider.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/adapters/azure-blob.stored-object-driver.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/adapters/group-queue.object-storage-migration.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/adapters/s3.payload-staging.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/migrations/clickhouse-import.stored-object.migration.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/ports/stored-object.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/repositories/clickhouse/stored-objects.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/services/object-storage-migration.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/services/stored-object-upload.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/services/stored-object.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/services/stored-objects.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/stores/postgres/postgres.stored-object.store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/stores/stored-object.store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/stored-object/server/src/testing.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/suite/server/src/repositories/clickhouse/clickhouse.suite-run.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/suite/server/src/repositories/suite.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/suite/server/src/services/connected-target.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/suite/server/src/services/suite-execution.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/suite/server/src/services/suite.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/suite/server/src/transport/api-rest/suite.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/suite/server/src/transport/api-trpc/suite.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/suite/web/src/now-provider.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/suite/web/src/suite-form.types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/server/src/adapters/eventing.topic-clustering-schedule.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/server/src/adapters/redis.topic-clustering-bootstrap.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/server/src/adapters/topic-server-installer.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/server/src/intents/topic-clustering-runner.intent.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/server/src/intents/topic-clustering.intent.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/server/src/migrations/legacy-import.topic-clustering.migration.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/server/src/ports/topic-clustering-schedule.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/server/src/processes/topic-clustering.process.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/server/src/repositories/topic-clustering.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/server/src/tasks/topic-clustering-run.task.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/topic/web/src/screens/topic-clustering/topic-clustering.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/contract/src/trace-edit-overlay.contract.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/contract/src/trace-mapping.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/contract/src/trace-rag-extraction.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/adapters/eventing.deferred-origin.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/app/trace.app.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/projections/trace-derived.projection.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/projections/trace-rollup.projection.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/span-storage.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-analytics-rollup.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-list.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-metrics-analytics.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-span-storage.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-span.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/repositories/clickhouse/trace-summary.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/repositories/trace-edit-overlay.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/rules/trace-storage-anchor.rules.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/scenario-role-metrics-derivation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-discover.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-evaluation-mapping.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-event-derivation.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-facet-values.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-formatting.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-ingestion.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-legacy-read.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-metadata-write.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-ttl-cache.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-value-media-extraction.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-visibility-window.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace-windowed-read.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/trace.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/services/tracked-event-span.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/subscribers/custom-evaluation-sync.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/subscribers/experiment-metrics-sync.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/subscribers/origin-guarded.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/subscribers/simulation-metrics-sync.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/subscribers/tracked-event-sync.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/transport/api-rest/collector.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/transport/api-rest/otlp-ingest.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/transport/api-rest/trace-export.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/transport/api-rest/trace-legacy.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/server/src/transport/api-trpc/traces-v2.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/behavior/explorer/onboarding/store/onboarding-store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/behavior/filter.store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/behavior/row-pulse.store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/behavior/span-pulse.store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/behavior/sse-status.store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/behavior/time-range-presets.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/behavior/trace-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/behavior/use-filter-params.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/behavior/view.store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/model/display-formatters.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/model/evaluation-run-data.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/model/prisma-types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/discover-cache.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-conversation-turns.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-export-traces.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-is-new-account.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-newly-arrived-trace-ids.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-list-refresh.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-new-count.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-query-args.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/hooks/use-visible-trace-ids.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/onboarding/data/sample-preview-traces.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/onboarding/hooks/use-trace-explorer-tour-preference.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/onboarding/integration-cta-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/onboarding/traces-empty-onboarding.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/toolbar/live-indicator.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/toolbar/time-range-picker.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/anchored-comments/anchor-comment-thread.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/anchored-comments/trace-comment-list.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/turn-annotations.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/utils.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/edited-original-toggle.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/eval-cards/eval-history-stack.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/markdown-view/build-trace-markdown.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-table/empty-filter-state.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/trace-table/skeleton-placeholders.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/explorer/utils/use-relative-time.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/presence/hooks/use-peer-cursors.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/traces/evaluation-status-item.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/traces/span-details.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/traces/thread-mapping.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/traces/traces-mapping.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/use-project-event-types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/use-project-span-names.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/trace/web/src/ui/sections/use-trace-update-listener.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/user/server/src/repositories/user.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/user/server/src/services/user.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/user/server/src/transport/api-trpc/user.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/user/web/src/behavior/use-personal-context.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/user/web/src/model/personal-workspace-host.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/user/web/src/model/relative-time.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/user/web/src/ui/sections/devices-panel.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/user/web/src/ui/sections/passkeys-section.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/contract/src/prisma-types.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/server/src/adapters/aws.nlp-lambda-fleet.adapter.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/server/src/ports/nlp-lambda-fleet.port.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/server/src/repositories/workflow.repository.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/server/src/services/nlp-lambda-cleanup.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/server/src/services/workflow-studio-dispatch.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/server/src/services/workflow.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/server/src/transport/api-rest/workflow-studio.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/server/src/transport/api-trpc/workflow.api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/behavior/studio-host/use-organization-team-project.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/behavior/use-workflow-prompt-picker-flow.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/behavior/workflow-store.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/model/edge-mapping.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/properties/custom-properties-panel.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/publish.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-component-execution.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-evaluation-execution.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-optimization-execution.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-post-event.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-run-evalution.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-workflow-execution.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/workflow-list-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/group-queue/src/blobSweeper.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/group-queue/src/contracts.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/group-queue/src/dispatcher.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/group-queue/src/groupQueue.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/group-queue/src/metricsCollector.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/group-queue/src/readyScore.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/group-queue/src/scripts.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/group-queue/src/tasks/reap-stranded-groups.task.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/mail/src/providers/mime.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/mail/src/templates/license-email.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/prisma-client/src/slow-query-warning.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|packages/test-harness/src/nlpgo-subprocess.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/agent/client.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/agent/define.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/agent/identity.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/agent/protocol.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/agent/transport.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/agents/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/agents/tunnel/write-back.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/analytics/query.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/analytics/timeseriesShape.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/annotations/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/api-keys/create.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/api-keys/list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/dashboards/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/evaluators/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/experiment/list-runs.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/experiment/status.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/gateway-budgets/archive.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/gateway-budgets/create.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/gateway-budgets/list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/gateway-budgets/reset.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/graphs/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/ingest/codex.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/ingest/health.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/ingest/list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/ingest/tail.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/langy/executor.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/langy/relay-client.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/langy/requests.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/langy/ui.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/management/_shared.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/monitors/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/projects/delete.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/projects/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/projects/list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/projects/update.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/prompt/versions.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/pull.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/push.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/scenarios/versions/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/scenarios/versions/list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/secrets/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/secrets/list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/sessions/events.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/simulation-runs/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/simulation-runs/list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/spend-events/list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/spend-events/summary.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/status.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/sync.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/traces/export.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/traces/search.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/triggers/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/virtual-keys/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/virtual-keys/list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/virtual-keys/revoke.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/virtual-keys/spend.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/virtual-keys/update.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/webhooks/deliveries.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/webhooks/events.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/webhooks/list.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/commands/workflows/get.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/daemon/runner.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/daemon/server.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/daemon/spawn-hint.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/telemetry/events.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/apiKey.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/event-clock.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/formatting.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/governance/claude-plugin.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/governance/codex-ancestor-session.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/governance/device-flow.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/governance/hook-state.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/governance/login-ceremony.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/governance/login-flow.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/governance/session-api.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/governance/session-context-spool.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/governance/session-refresh.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/governance/wrapper.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/identityNotice.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/instant.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/cli/utils/waitForBatchRun.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/client-sdk/services/experiments/experiment.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/client-sdk/services/experiments/experiments.facade.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/client-sdk/services/experiments/run-status.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/client-sdk/services/prompts/prompts.facade.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/client-sdk/services/suites/suites-api.service.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/client-sdk/services/webhooks/verify-signature.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/observability-sdk/evaluation/index.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|sdks/typescript/src/observability-sdk/logger/implementation.ts",
+      "measured": "2026-09-06"
     }
   ]
 }

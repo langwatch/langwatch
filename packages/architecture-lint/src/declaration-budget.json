@@ -1,0 +1,34 @@
+{
+  "version": 0,
+  "measured": "2026-09-07",
+  "budgets": [
+    {
+      "package": "@langwatch/ui",
+      "directory": "apps/ui",
+      "project": "tsconfig.test.json",
+      "files": 9482,
+      "measuredFiles": 9296
+    },
+    {
+      "package": "@langwatch/platform-api",
+      "directory": "apps/api",
+      "project": "tsconfig.test.json",
+      "files": 12502,
+      "measuredFiles": 12256
+    },
+    {
+      "package": "@langwatch/worker",
+      "directory": "apps/worker",
+      "project": "tsconfig.test.json",
+      "files": 12059,
+      "measuredFiles": 11822
+    },
+    {
+      "package": "@langwatch/tasks",
+      "directory": "apps/tasks",
+      "project": "tsconfig.test.json",
+      "files": 5135,
+      "measuredFiles": 5034
+    }
+  ]
+}

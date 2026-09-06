@@ -4,7 +4,7 @@
  * calculation after that is Temporal.
  */
 
-import { Temporal, type ZonedDateTime } from "./temporal";
+import { Temporal, type Instant, type ZonedDateTime } from "./temporal.ts";
 
 /** What every operation in this package accepts where a moment is wanted. */
 export type TimeInput = Date | number | string | ZonedDateTime;
@@ -40,7 +40,17 @@ export function toZonedDateTime(value: TimeInput, options?: ZoneOptions): ZonedD
   return Temporal.Instant.fromEpochMilliseconds(epochMs).toZonedDateTimeISO(timeZone);
 }
 
-/** Back to a `Date`, for the call sites that still hold one. */
-export function toDate(value: ZonedDateTime): Date {
+/** The moment right now, as an instant. */
+export function nowInstant(): Instant {
+  return Temporal.Now.instant();
+}
+
+/** A `Date` from a boundary that only speaks `Date`, as an instant. */
+export function fromDate(value: Date): Instant {
+  return Temporal.Instant.fromEpochMilliseconds(value.getTime());
+}
+
+/** Back to a `Date`, for the boundaries that only accept one. */
+export function toDate(value: Instant | ZonedDateTime): Date {
   return new Date(value.epochMilliseconds);
 }

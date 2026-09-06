@@ -9,6 +9,8 @@ import {
   lintBoundaryEdgeBaseline,
   lintCommentBlocks,
   lintCommentBlockRoots,
+  lintComposedExports,
+  lintComposedExportsBaseline,
   lintFeatureLayouts,
   lintManifests,
   lintOxlintBaseline,
@@ -19,7 +21,7 @@ import {
   lintTestQuality,
   lintWorkspace,
   type ArchitectureViolation,
-} from "./index";
+} from "./index.ts";
 
 function valueAfter(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
@@ -49,6 +51,11 @@ const boundaryEdgeBaselineReference =
 const oxlintBaselineReference =
   valueAfter("--oxlint-baseline-reference") ??
   (baselineReferenceDirectory ? `${baselineReferenceDirectory}/oxlint-baseline.json` : void 0);
+const composedExportsBaselineReference =
+  valueAfter("--composed-exports-baseline-reference") ??
+  (baselineReferenceDirectory
+    ? `${baselineReferenceDirectory}/composed-exports-baseline.json`
+    : void 0);
 const commentBlockRoots = lintCommentBlockRoots(root, commentBlockRootsBaselineReference);
 // Validity (sorted, no duplicates, every entry carries `measured`) is checked
 // on every run, not only `--shrinking-baseline-only`: an entry missing
@@ -80,6 +87,7 @@ const baselineCheck = baselineOnly
         boundaryEdgeBaselineReference,
       ),
       oxlintBaseline: lintOxlintBaseline(root, oxlintBaselineReference),
+      composedExports: lintComposedExportsBaseline(root, composedExportsBaselineReference),
       commentBlockRoots,
     }
   : void 0;
@@ -90,6 +98,7 @@ const baselinePolicyViolations =
         ...baselineCheck.strictPorts.violations,
         ...baselineCheck.boundaryEdges.violations,
         ...baselineCheck.oxlintBaseline.violations,
+        ...baselineCheck.composedExports.violations,
         ...baselineCheck.commentBlockRoots.violations,
         ...lintServiceCeilings(root, baselineDiscovery.packages),
         ...lintStrictPortModules(root, baselineDiscovery.packages),
@@ -125,6 +134,7 @@ function fullWorkspaceViolations(): ArchitectureViolation[] {
     ...commentBlockRoots.violations,
     ...boundaryEdges.violations,
     ...oxlintBaselineValidity.violations,
+    ...(process.argv.includes("--no-composed-exports") ? [] : lintComposedExports(root)),
   ];
 }
 

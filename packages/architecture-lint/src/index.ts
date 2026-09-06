@@ -1,25 +1,25 @@
 import { relative, resolve } from "node:path";
-import { lintApplicationBoundaries } from "./application-boundaries";
-import { lintApiTransportBoundaries } from "./api-transport-boundaries";
-import { lintApiTransportFramework } from "./api-transport-framework";
-import { lintArchitectureRecords } from "./architecture-records";
-import { lintCycles } from "./cycles";
-import { changedSourceFiles } from "./comment-blocks";
-import { lintStrictContractBuildConfigs } from "./contract-build-config";
-import { lintDeclarations } from "./declarations";
-import { lintEventingRoles } from "./eventing-roles";
-import { lintFeatureLayouts } from "./feature-layout";
-import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries";
-import { lintGlobalAppAccess } from "./global-app-access";
-import { lintLegacyFeatureFragments } from "./legacy-feature-fragments";
-import { lintManifests } from "./manifests";
-import { lintOverengineeringBaseline } from "./overengineering";
-import { lintStrictPortModules } from "./port-modules";
-import { lintServiceCeilings } from "./service-ceilings";
-import { lintServiceProjectionBoundaries } from "./service-projection-boundaries";
-import { lintTestQuality } from "./test-quality";
-import type { ArchitectureViolation, LintWorkspaceOptions } from "./types";
-import { discoverClassifiedPackages } from "./workspace";
+import { lintApplicationBoundaries } from "./application-boundaries.ts";
+import { lintApiTransportBoundaries } from "./api-transport-boundaries.ts";
+import { lintApiTransportFramework } from "./api-transport-framework.ts";
+import { lintArchitectureRecords } from "./architecture-records.ts";
+import { lintCycles } from "./cycles.ts";
+import { changedSourceFiles } from "./comment-blocks.ts";
+import { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
+import { lintDeclarations } from "./declarations.ts";
+import { lintEventingRoles } from "./eventing-roles.ts";
+import { lintFeatureLayouts } from "./feature-layout.ts";
+import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
+import { lintGlobalAppAccess } from "./global-app-access.ts";
+import { lintLegacyFeatureFragments } from "./legacy-feature-fragments.ts";
+import { lintManifests } from "./manifests.ts";
+import { lintOverengineeringBaseline } from "./overengineering.ts";
+import { lintStrictPortModules } from "./port-modules.ts";
+import { lintServiceCeilings } from "./service-ceilings.ts";
+import { lintServiceProjectionBoundaries } from "./service-projection-boundaries.ts";
+import { lintTestQuality } from "./test-quality.ts";
+import type { ArchitectureViolation, LintWorkspaceOptions } from "./types.ts";
+import { discoverClassifiedPackages } from "./workspace.ts";
 
 export type {
   ApplicationPackageRole,
@@ -30,71 +30,74 @@ export type {
   EnterpriseCompositionRole,
   LintWorkspaceOptions,
   PackageKind,
-} from "./types";
-export { readFeatureCatalogue } from "./feature-catalogue";
+} from "./types.ts";
+export { readFeatureCatalogue } from "./feature-catalogue.ts";
 export {
   boundaryEdgesFromViolations,
   compareBoundaryEdgeBaseline,
   filterBaselinedBoundaryEdges,
   lintBoundaryEdgeBaseline,
-} from "./boundary-edge-baseline";
+} from "./boundary-edge-baseline.ts";
 export type {
   BoundaryEdge,
   BoundaryEdgeBaselineCheck,
   BoundaryEdgeEntry,
   BoundaryEdgeKind,
-} from "./boundary-edge-baseline";
-export { lintApiTransportBoundaries } from "./api-transport-boundaries";
+} from "./boundary-edge-baseline.ts";
+export { lintApiTransportBoundaries } from "./api-transport-boundaries.ts";
 export {
   apiTransportFrameworkFindings,
   lintApiTransportFramework,
   readApiTransportFrameworkAllowlist,
-} from "./api-transport-framework";
+} from "./api-transport-framework.ts";
 export {
   changedSourceFiles,
   compareCommentBlockRoots,
   lintCommentBlocks,
   lintCommentBlockRoots,
-} from "./comment-blocks";
+} from "./comment-blocks.ts";
 export type {
   CommentBlockLintOptions,
   CommentBlockLintResult,
   CommentBlockReview,
   CommentBlockRootEntry,
   CommentBlockRootsBaselineCheck,
-} from "./comment-blocks";
+} from "./comment-blocks.ts";
 export type {
   LegacyApplicationBoundaryEdge,
   LegacyApplicationBoundaryKind,
-} from "./application-boundaries";
+} from "./application-boundaries.ts";
 export {
   collectLegacyApplicationBoundaryEdges,
   formatLegacyApplicationBoundaryBaseline,
-} from "./application-boundaries";
-export type { LegacyFeatureFragment, LegacyFeatureFragmentKind } from "./legacy-feature-fragments";
+} from "./application-boundaries.ts";
+export type {
+  LegacyFeatureFragment,
+  LegacyFeatureFragmentKind,
+} from "./legacy-feature-fragments.ts";
 export {
   collectLegacyFeatureFragments,
   formatLegacyFeatureFragmentBaseline,
-} from "./legacy-feature-fragments";
-export { discoverClassifiedPackages } from "./workspace";
-export { lintFeatureLayouts } from "./feature-layout";
-export { lintManifests } from "./manifests";
-export { formatServiceCeilingsBaseline } from "./service-ceilings";
-export { collectServiceCeilings } from "./service-ceilings";
-export { compareServiceCeilingsBaselines } from "./service-ceilings";
-export { readServiceCeilingsBaselineFile } from "./service-ceilings";
-export { lintServiceCeilingsBaseline } from "./service-ceilings";
-export { lintServiceCeilings } from "./service-ceilings";
-export { lintServiceCeilingsFile } from "./service-ceilings";
-export { lintServiceProjectionBoundaries } from "./service-projection-boundaries";
-export { lintStrictContractBuildConfigs } from "./contract-build-config";
-export { lintFrontendUiBoundaries } from "./frontend-ui-boundaries";
+} from "./legacy-feature-fragments.ts";
+export { discoverClassifiedPackages } from "./workspace.ts";
+export { lintFeatureLayouts } from "./feature-layout.ts";
+export { lintManifests } from "./manifests.ts";
+export { formatServiceCeilingsBaseline } from "./service-ceilings.ts";
+export { collectServiceCeilings } from "./service-ceilings.ts";
+export { compareServiceCeilingsBaselines } from "./service-ceilings.ts";
+export { readServiceCeilingsBaselineFile } from "./service-ceilings.ts";
+export { lintServiceCeilingsBaseline } from "./service-ceilings.ts";
+export { lintServiceCeilings } from "./service-ceilings.ts";
+export { lintServiceCeilingsFile } from "./service-ceilings.ts";
+export { lintServiceProjectionBoundaries } from "./service-projection-boundaries.ts";
+export { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
+export { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
 export type {
   ModuleImport,
   PackageManifestRecord,
   ValueImportGraph,
   WorkspaceModuleResolver,
-} from "./module-graph";
+} from "./module-graph.ts";
 export {
   chainsToSeeds,
   createWorkspaceModuleResolver,
@@ -104,33 +107,44 @@ export {
   resolveSourceCandidate,
   valueImports,
   walkValueImportGraph,
-} from "./module-graph";
-export { lintTestQuality } from "./test-quality";
-export type { TestQualityLintOptions } from "./test-quality";
+} from "./module-graph.ts";
+export { lintTestQuality } from "./test-quality.ts";
+export type { TestQualityLintOptions } from "./test-quality.ts";
 export {
   collectGlobalAppAccesses,
   formatGlobalAppAccessBaseline,
   lintGlobalAppAccess,
-} from "./global-app-access";
+} from "./global-app-access.ts";
 export {
   collectOverengineering,
   formatOverengineeringBaseline,
   lintOverengineeringBaseline,
-} from "./overengineering";
-export { lintStrictPortModules } from "./port-modules";
-export { lintStrictPortBaseline } from "./port-modules";
-export { readStrictPortBaselineFile } from "./port-modules";
-export { collectStrictPortBaseline } from "./port-modules";
-export { formatStrictPortBaseline } from "./port-modules";
-export { lintTypedPrismaSeamBaseline } from "./typed-prisma-seam";
-export { readTypedPrismaSeamBaselineFile } from "./typed-prisma-seam";
-export { lintOxlintBaseline, readOxlintBaselineFile } from "./oxlint-baseline-check";
+} from "./overengineering.ts";
+export { lintStrictPortModules } from "./port-modules.ts";
+export { lintStrictPortBaseline } from "./port-modules.ts";
+export { readStrictPortBaselineFile } from "./port-modules.ts";
+export { collectStrictPortBaseline } from "./port-modules.ts";
+export { formatStrictPortBaseline } from "./port-modules.ts";
+export {
+  collectComposedExportSubjects,
+  collectUncomposedExports,
+  formatComposedExportsBaseline,
+  lintComposedExports,
+  lintComposedExportsBaseline,
+  reachableFiles,
+  readComposedExportsBaselineFile,
+  serverPackageIndexes,
+} from "./composed-exports.ts";
+export type { ComposedExportSubject } from "./composed-exports.ts";
+export { lintTypedPrismaSeamBaseline } from "./typed-prisma-seam.ts";
+export { readTypedPrismaSeamBaselineFile } from "./typed-prisma-seam.ts";
+export { lintOxlintBaseline, readOxlintBaselineFile } from "./oxlint-baseline-check.ts";
 export {
   applyFilenameMigration,
   collectFilenameMigrationMappings,
   planFilenameMigration,
-} from "./filename-migration";
-export type { FilenameMigrationPlan, FilenameRename } from "./filename-migration";
+} from "./filename-migration.ts";
+export type { FilenameMigrationPlan, FilenameRename } from "./filename-migration.ts";
 
 export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolation[] {
   const root = resolve(options.root);

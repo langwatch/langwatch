@@ -1,0 +1,38 @@
+{
+  "name": "@langwatch/plans",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The one catalogue of LangWatch plans: identity, pricing, limits with their units, gates, ladder rungs, the self-hosted baseline, and the overrides a bespoke contract applies over them. Zod and nothing else, so contract, server, web and mail can all read it.",
+  "keywords": [
+    "billing",
+    "langwatch",
+    "plans",
+    "pricing"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "src"
+  ],
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

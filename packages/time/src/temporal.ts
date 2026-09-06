@@ -12,5 +12,6 @@ const scope = globalThis as { Temporal?: TemporalNamespace };
 
 export const Temporal: TemporalNamespace = scope.Temporal ?? PolyfilledTemporal;
 
+export type Instant = PolyfilledTemporal.Instant;
 export type ZonedDateTime = PolyfilledTemporal.ZonedDateTime;
 export type PlainDateTime = PolyfilledTemporal.PlainDateTime;

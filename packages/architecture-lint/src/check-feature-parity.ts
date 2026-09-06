@@ -262,7 +262,6 @@ const LEGACY_INERT: string[] = [
   // every scenario @unimplemented on purpose. Remove each entry with its
   // first real binding.
   "packages/features/authz/specs/offboarding.feature",
-  "packages/features/organization/specs/invitations.feature",
   "packages/features/scenario/specs/simulation-run.feature",
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",

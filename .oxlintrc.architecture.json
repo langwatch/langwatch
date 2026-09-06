@@ -27,9 +27,13 @@
     "langwatch/layer-class": "error",
     "langwatch/no-raw-hono-mount": "error",
     "langwatch/overload-by-literal": "error",
+    "langwatch/plan-literals": "error",
     "langwatch/prisma-containment": "error",
+    "langwatch/temporal-only": "error",
     "langwatch/typed-prisma-seam": "error",
+    "langwatch/web-imports-server-shaped-value": "error",
     "langwatch/environment-boundaries": "error",
+    "langwatch/secrets-through-source": "error",
     "langwatch/package-boundaries": "error",
     "langwatch/feature-module-classes": "error",
     "langwatch/service-classes": "error",
@@ -241,7 +245,6 @@
         "no-shadow": "error"
       }
     },
-
 
     // Test files are held to 40: a table-driven test or a fixture scanner
     // legitimately branches more than a service method, and 3 of them sit
@@ -830,4 +833,3 @@
     // is only noise. The rules above stand unconditionally.
   ]
 }
-
