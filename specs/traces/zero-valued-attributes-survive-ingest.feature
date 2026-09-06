@@ -16,32 +16,41 @@ Feature: A reading of zero survives ingest
   # trigger matching — the event read as carrying nothing rather than carrying
   # a neutral reading.
   #
+  # Scope of what these scenarios observe: the step that turns an incoming
+  # attribute into a value, which every span event's attributes pass through
+  # on the ingest path. They do not replay a write to storage and read it
+  # back, so they establish that the value survives normalization and not
+  # that no later step drops it. That is the whole of the reported loss as
+  # far as it was traced, and it is the step where the loss was found.
+  #
   # Bindings:
   #   platform/app/src/server/event-sourcing/pipelines/trace-processing/utils/traceRequest.utils.ts
   #   platform/app/src/server/event-sourcing/pipelines/trace-processing/utils/__tests__/traceRequest.utils.test.ts
 
   @unit
-  Scenario: A neutral vote is stored as the value it was sent as
-    Given a tracked event whose reading is zero
-    When the event is ingested
-    Then the stored event carries that reading
+  Scenario: A neutral vote is kept as the value it was sent as
+    Given an event attribute whose reading is zero
+    When the attribute is normalized on the way in
+    Then the normalized attributes carry that reading
 
   @unit
   Scenario: A zero sent over the wire as text is still a zero
-    Given a tracked event whose reading arrives as text
-    When the event is ingested
-    Then the stored event carries that reading as a number
+    Given an event attribute whose reading arrives as text
+    When the attribute is normalized on the way in
+    Then the normalized attributes carry that reading as a number
 
+  # Not reachable from the tracked-event endpoint, which sends one number per
+  # metric — this covers the same value arriving on an ordinary span.
   @unit
   Scenario: A list of readings keeps the zeroes in it
-    Given a tracked event carrying a list of readings, one of them zero
-    When the event is ingested
-    Then the stored list carries every reading it was sent
+    Given an attribute carrying a list of readings, one of them zero
+    When the attribute is normalized on the way in
+    Then the normalized list carries every reading it was sent
 
   # The distinction the truthiness check destroyed, stated the other way
   # round: an attribute that genuinely carries nothing is still absent.
   @unit
   Scenario: An attribute that carries no value at all is still absent
-    Given a tracked event carrying an attribute with no value
-    When the event is ingested
-    Then the stored event does not carry that attribute
+    Given an attribute with no value at all
+    When the attribute is normalized on the way in
+    Then the normalized attributes do not carry it

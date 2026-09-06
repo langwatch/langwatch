@@ -472,7 +472,7 @@ describe("traceRequest.utils", () => {
         expect(result).toEqual({ flag: false });
       });
 
-      /** @scenario "A neutral vote is stored as the value it was sent as" */
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
       it("keeps intValue 0", () => {
         const result = TraceRequestUtils.normalizeOtlpAnyValue(
           { intValue: 0 },
@@ -482,7 +482,7 @@ describe("traceRequest.utils", () => {
         expect(result).toEqual({ count: 0 });
       });
 
-      /** @scenario "A neutral vote is stored as the value it was sent as" */
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
       it("keeps doubleValue 0", () => {
         const result = TraceRequestUtils.normalizeOtlpAnyValue(
           { doubleValue: 0 },
@@ -492,7 +492,7 @@ describe("traceRequest.utils", () => {
         expect(result).toEqual({ value: 0 });
       });
 
-      /** @scenario "A neutral vote is stored as the value it was sent as" */
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
       it("keeps doubleValue 0.0", () => {
         const result = TraceRequestUtils.normalizeOtlpAnyValue(
           { doubleValue: 0.0 },
@@ -1019,7 +1019,7 @@ describe("traceRequest.utils", () => {
      * accepted and then stored as absent.
      */
     describe("when a numeric attribute is zero", () => {
-      /** @scenario "A neutral vote is stored as the value it was sent as" */
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
       it("keeps a whole-number zero", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes([
           { key: "event.metrics.vote", value: { intValue: 0 } },
@@ -1028,7 +1028,7 @@ describe("traceRequest.utils", () => {
         expect(result["event.metrics.vote"]).toBe(0);
       });
 
-      /** @scenario "A neutral vote is stored as the value it was sent as" */
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
       it("keeps a fractional zero", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes([
           { key: "event.metrics.vote", value: { doubleValue: 0 } },
@@ -1076,7 +1076,7 @@ describe("traceRequest.utils", () => {
         expect(result).not.toHaveProperty("event.metrics.missing");
       });
 
-      /** @scenario "A neutral vote is stored as the value it was sent as" */
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
       it("keeps a non-zero reading untouched", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes([
           { key: "event.metrics.vote", value: { doubleValue: -1 } },
