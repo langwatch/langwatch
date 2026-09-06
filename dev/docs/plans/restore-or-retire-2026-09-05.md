@@ -87,4 +87,6 @@ Prior lists: `binding-gaps-2026-09-04.md` (written at 1,333 unbound) and
 
 | `specs/licensing/license-router.feature` "Rejects request for unauthorized organization", `subscription-handler-integration.feature` "getLicenseHandler returns same instance" | 2 | name a license router and a getLicenseHandler singleton the branch replaced with composition; asserting instance identity of a thing that no longer exists is vacuous |
 
+| `specs/features/setup/fresh-clone-dev-setup.feature` "First-run env validation surfaces a self-documenting error for unset gateway secrets" | 1 | main's `env-create.mjs` refused short or partial gateway secrets; the branch declares them optional on purpose so a boot never fails on them. `.env.example` still ships `REPLACE_ME` and nothing rejects it. Proposed restore: all-or-none plus a minimum length **when set**, unset stays fine |
+
 Proposed: delete the first four groups as stale against decisions already taken; keep the switcher three parked; align the api-reference wording with decision 20's exceptions; leave the browser scenario `@e2e` for the Playwright lane.
