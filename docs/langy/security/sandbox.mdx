@@ -51,7 +51,7 @@ langyagent:
   acceptWorkerIsolationDisabled: true
 ```
 
-The pod then renders as UID 1000 with `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`: a spec that satisfies PSA `restricted` with no exemption, no RuntimeClass and no separate namespace. The render fails without the acknowledgement, so nobody arrives at the weaker posture by leaving a field blank.
+The pod then defaults to UID 1000 with `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`: a spec that satisfies PSA `restricted` with no exemption, no RuntimeClass and no separate namespace. Operator identity overrides can select another nonzero UID; see [the Helm settings](/self-hosting/langy/setup#hardening-clusters-that-refuse-root). The render fails without the acknowledgement, so nobody arrives at the weaker posture by leaving a field blank.
 
 Shared identity removes isolation between workers and the manager. A worker can read sibling credentials and conversation files, reopen control pipes through `/proc/<pid>/fd`, and read manager secrets through `/proc/<pid>/environ`. This includes `LANGY_INTERNAL_SECRET` and any configured mirror key; the internal secret can authenticate manager RPCs and internal turn-result callbacks. Treat every conversation as trusted with that authority.
 

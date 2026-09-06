@@ -56,8 +56,9 @@ clickhouse:
 #
 # THERE IS NOW A SECOND OPTION, and it is the reason this comment changed.
 # ADR-130 made the per-worker identity wall an operator-selectable posture.
-# Turning it off renders the same pod as UID 1000 with drop:[ALL], no adds and
-# RuntimeDefault seccomp — a spec this overlay's own hardening assertions pass.
+# Turning it off defaults to UID 1000 and honours operator identity overrides,
+# with drop:[ALL], no adds and RuntimeDefault seccomp — a spec this overlay's
+# own hardening assertions pass.
 # To run the assistant on a restricted cluster, replace the two lines below with:
 #
 #   langyagent:

@@ -159,3 +159,23 @@ func TestAccountGetKeysForProvider_Azure_ConcurrentDispatchesWarnOnce(t *testing
 		t.Fatalf("want exactly 1 warning across %d concurrent dispatches for the same credential, got %d", n, len(entries))
 	}
 }
+
+func TestAccountGetKeysForProvider_AppliedAzureVersionDoesNotConsumeWarning(t *testing.T) {
+	core, logs := observer.New(zapcore.WarnLevel)
+	acc := &account{logger: zap.New(core)}
+	cred := azureCredWithVersion("mp-azure-applied", "2023-05-15")
+	nativeCtx := withCredential(context.Background(), cred)
+	appliedCtx := context.WithValue(nativeCtx, azureAPIVersionAppliedKey{}, true)
+	if _, err := acc.GetKeysForProvider(appliedCtx, bfschemas.Azure); err != nil {
+		t.Fatal(err)
+	}
+	if logs.Len() != 0 {
+		t.Fatal("a preserved API version must not produce a dropped-version warning")
+	}
+	if _, err := acc.GetKeysForProvider(nativeCtx, bfschemas.Azure); err != nil {
+		t.Fatal(err)
+	}
+	if got := logs.FilterMessageSnippet("api_version override is ignored").Len(); got != 1 {
+		t.Fatalf("native dispatch after a preserved version must still warn once, got %d", got)
+	}
+}

@@ -1,21 +1,19 @@
 Feature: Azure api-version override — dedup the drop warning, tell the customer
-  Bifrost v1.5 pins Azure's api-version itself, so a caller-supplied
-  AZURE_OPENAI_API_VERSION / AZURE_API_GATEWAY_VERSION override is silently
-  dropped on the AI Gateway dispatch path (see #7877). Two follow-up gaps
-  from #7892:
+  Azure non-Claude chat, embeddings, speech and transcription requests use
+  versioned deployment endpoints and honor the credential's api-version.
+  Passthrough requests use it where the Azure endpoint accepts api-version;
+  Responses keeps its required preview version. Native endpoint routing does
+  not honor the credential override and warns once per credential, including
+  when native key resolution is concurrent. Direct/Studio dispatch continues
+  honoring its configured version.
 
-  1. The drop warning (`warnIgnoredAzureAPIVersion`, bifrost.go) fires on
-     every single dispatch for a credential instead of once — a busy Azure
-     provider floods the gateway logs with a static configuration fact.
-  2. The settings form offers the api-version fields with no indication
-     that they do nothing on Gateway-routed traffic, while the same fields
-     are still honored on the direct/Studio dispatch path
-     (prepareLitellmParams). A customer cannot tell which mode is in
-     force for their own provider.
+  The settings form explains the endpoint distinction for both Azure API
+  version fields, so a customer can tell where the value takes effect.
 
   Background:
     Given an Azure OpenAI provider whose credential carries a caller-supplied
       api-version override
+    And ignored-version warnings are checked on native Azure key resolution
 
   @unit
   Scenario: Repeated dispatches for one Azure credential warn only once
@@ -56,13 +54,14 @@ Feature: Azure api-version override — dedup the drop warning, tell the custome
     And the race detector reports no data race
 
   @integration
-  Scenario: The Azure provider drawer tells the customer the api-version is ignored on AI Gateway routing
+  Scenario: The Azure provider drawer explains which endpoints honor the api-version
     When a customer opens the Azure OpenAI provider settings drawer
-    Then the direct-mode api-version field explains, without naming any
-      internal service, that the value is ignored when traffic routes
-      through the AI Gateway
-    And the API Management gateway-mode api-version field explains the same
-      thing
+    Then the direct-mode api-version field explains that chat except Claude,
+      embeddings, speech and transcription honor the value through the AI Gateway
+    And it explains that Responses and other endpoint types ignore the value
+    And it explains that passthrough honors it where the Azure endpoint supports it
+    And the API Management gateway-mode api-version field explains the same thing
+    And neither field names an internal service
 
   @integration
   Scenario: A non-Azure provider drawer shows no api-version note

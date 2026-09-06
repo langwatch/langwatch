@@ -448,7 +448,7 @@ func bfDescribeUnquotableCause(category string, cause error) (string, bool) {
 }
 
 // bfMaxMetaValue bounds the customer-supplied strings copied into meta.
-// ModelRequested is whatever the caller put in the request body, and meta is
+// OriginalModelRequested is whatever the caller put in the request body, and meta is
 // rendered into a sentence in the browser and written to a log line; neither
 // has a length of its own to fall back on.
 const bfMaxMetaValue = 120

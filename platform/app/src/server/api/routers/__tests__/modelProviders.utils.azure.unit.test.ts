@@ -1,11 +1,7 @@
 /**
- * #7892: prepareLitellmParams is the direct/Studio dispatch path, and it
- * still honors AZURE_OPENAI_API_VERSION / AZURE_API_GATEWAY_VERSION (unlike
- * the AI Gateway/bifrost dispatch path, which drops a caller-supplied
- * override — see azure_api_version_dedup_test.go). These pin that the
- * direct-mode value and the API Management gateway-mode default are both
- * unaffected by the #7892 change, since regressing either would make the
- * two dispatch paths agree for the wrong reason.
+ * prepareLitellmParams honors configured Azure API versions for direct/Studio
+ * dispatch. AI Gateway versioned deployment compatibility honors them too;
+ * native endpoint routing retains provider-selected versions.
  *
  * Covers @unit scenarios from specs/ai-gateway/azure-api-version-override.feature.
  *

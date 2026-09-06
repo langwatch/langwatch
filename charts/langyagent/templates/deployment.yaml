@@ -110,15 +110,12 @@ spec:
              value only on the pod — which is how a customer's install
              first failed (specs/security/helm-strict-admission.feature). */ -}}
       {{- if eq $isolation "none" }}
-      {{- /* The operator's IDENTITY fields layer over the hardened floor; the
-             security fields do not. Hardcoding uid 1000 outright looked safer
-             and locks out the largest family of clusters that refuse root:
-             OpenShift's restricted-v2 SCC assigns each project a uid range via
-             openshift.io/sa.scc.uid-range, which never contains 1000, so the
-             pod is refused at admission and setting runAsUser did nothing
-             because this branch discarded it. fsGroup is safe to honour here
-             precisely because there are no per-worker uids left to group-share
-             — it is omitted under per-uid for the opposite reason. */ -}}
+      {{- /* Shared identity defaults to UID 1000 and honours nonzero operator
+             UIDs for cluster-specific admission ranges. Container identity
+             overrides pod identity; otherwise the container inherits the pod
+             UID. Security fields remain fixed. fsGroup is safe here because
+             workers already share one identity; per-uid isolation omits it
+             to prevent group access to sibling files. */ -}}
       {{- $podIdent := dict }}
       {{- range $k := list "runAsUser" "runAsGroup" "fsGroup" "supplementalGroups" "seLinuxOptions" }}
       {{- if and (hasKey $podSCVals $k) (not (and (eq $k "runAsUser") (eq (toString (index $podSCVals $k)) "0"))) }}{{- $_ := set $podIdent $k (index $podSCVals $k) }}{{- end }}

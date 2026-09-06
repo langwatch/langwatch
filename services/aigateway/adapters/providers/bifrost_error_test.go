@@ -338,7 +338,7 @@ func TestClassifyBifrostError_MetaCarriesOnlyWhatTheClientRenders(t *testing.T) 
 	}
 }
 
-// ModelRequested is whatever the caller put in the request body, and it is
+// OriginalModelRequested is whatever the caller put in the request body, and it is
 // rendered into a sentence in the browser and written to a log line. Neither
 // has a length of its own to fall back on.
 func TestClassifyBifrostError_ClampsTheModelTheCallerSupplied(t *testing.T) {

@@ -1,13 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * #7892: bifrost v1.5 pins Azure's api-version itself, so a caller-supplied
- * AZURE_OPENAI_API_VERSION / AZURE_API_GATEWAY_VERSION is silently dropped
- * on the AI Gateway dispatch path (still honored on direct/Studio dispatch
- * via prepareLitellmParams). The settings drawer offered both fields with no
- * indication of that split. This pins the registry helper text the drawer
- * renders for each field, in customer-facing language that never names an
- * internal component (bifrost/aigateway), per CLAUDE.md copywriting rules.
+ * Versioned Azure deployment requests honor the configured API version.
+ * Native endpoint routing retains provider-selected versions. The drawer must
+ * explain the endpoint distinction for both Azure configuration modes.
  *
  * Covers @integration scenarios from
  * specs/ai-gateway/azure-api-version-override.feature.
@@ -185,7 +181,7 @@ const azureEntry = modelProviderRegistry.find(
   (entry) => entry.backendModelProviderKey === "azure",
 );
 
-describe("Feature: the Azure drawer says the api-version override is ignored on AI Gateway routing", () => {
+describe("Feature: the Azure drawer explains which AI Gateway endpoints use the api-version override", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -196,15 +192,20 @@ describe("Feature: the Azure drawer says the api-version override is ignored on 
 
   describe("given the Azure provider in direct-dispatch mode", () => {
     describe("when the drawer is opened", () => {
-      /** @scenario "The Azure provider drawer tells the customer the api-version is ignored on AI Gateway routing" */
-      it("shows the direct-mode api-version note saying the value is ignored on Gateway routing", () => {
+      /** @scenario "The Azure provider drawer explains which endpoints honor the api-version" */
+      it("shows the endpoint-specific version note for direct mode", () => {
         primeQueries([azureDirectRow()]);
         renderDrawer({ providerKey: "azure" });
 
-        const description =
-          azureEntry?.fieldMetadata?.AZURE_OPENAI_API_VERSION?.description;
+        const description = azureEntry?.fieldMetadata?.AZURE_OPENAI_API_VERSION?.description;
         expect(description).toBeTruthy();
-        expect(description).toMatch(/ignored/i);
+        expect(description).toMatch(
+          /uses this value for chat \(except Claude\), embeddings, speech, and transcription/i,
+        );
+        expect(description).toMatch(/ignored for Responses and other endpoint types/i);
+        expect(description).toMatch(
+          /Passthrough requests use it where the Azure endpoint supports api-version/i,
+        );
         expect(description).not.toMatch(/bifrost|aigateway/i);
         expect(screen.getByText(description!)).toBeInTheDocument();
       });
@@ -213,15 +214,20 @@ describe("Feature: the Azure drawer says the api-version override is ignored on 
 
   describe("given the Azure provider in API Management gateway mode", () => {
     describe("when the drawer is opened", () => {
-      /** @scenario "The Azure provider drawer tells the customer the api-version is ignored on AI Gateway routing" */
-      it("shows the gateway-mode api-version note saying the value is ignored on Gateway routing", () => {
+      /** @scenario "The Azure provider drawer explains which endpoints honor the api-version" */
+      it("shows the endpoint-specific version note for API Management mode", () => {
         primeQueries([azureGatewayRow()]);
         renderDrawer({ providerKey: "azure" });
 
-        const description =
-          azureEntry?.fieldMetadata?.AZURE_API_GATEWAY_VERSION?.description;
+        const description = azureEntry?.fieldMetadata?.AZURE_API_GATEWAY_VERSION?.description;
         expect(description).toBeTruthy();
-        expect(description).toMatch(/ignored/i);
+        expect(description).toMatch(
+          /uses this value for chat \(except Claude\), embeddings, speech, and transcription/i,
+        );
+        expect(description).toMatch(/ignored for Responses and other endpoint types/i);
+        expect(description).toMatch(
+          /Passthrough requests use it where the Azure endpoint supports api-version/i,
+        );
         expect(description).not.toMatch(/bifrost|aigateway/i);
         expect(screen.getByText(description!)).toBeInTheDocument();
       });

@@ -271,10 +271,13 @@ langyagent:
   acceptWorkerIsolationDisabled: true
 ```
 
-The pod then renders as UID 1000 with `runAsNonRoot: true`,
+The pod then defaults to UID 1000 with `runAsNonRoot: true`,
 `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`.
-a spec that PSA `restricted` admits with no exemption, no RuntimeClass and no
-separate namespace. Omitting the acknowledgement fails the render with a message
+This satisfies PSA `restricted` with no exemption, no RuntimeClass and no
+separate namespace. For clusters requiring a different UID, set
+`langyagent.podSecurityContext.runAsUser` to an allowed nonzero UID. The
+container inherits that UID unless `langyagent.containerSecurityContext.runAsUser`
+sets a nonzero override. Omitting the acknowledgement fails the render with a message
 naming the trade, so nobody reaches this posture by leaving a field blank.
 
 <Warning>
