@@ -1,9 +1,7 @@
 /**
- * Whether the model behind a Langy conversation may skip the permission checks on the
- * developer's machine (ADR-129).
- *
- * The server owns this answer. The command line keeps the path guard and the allowlist whatever
- * the server says, so this gate only ever decides whether the toggle is offered at all.
+ * Whether the model behind a Langy conversation may skip permission checks on
+ * the developer's machine (ADR-129). Server owns this; the command line keeps
+ * its own path guard and allowlist regardless.
  */
 import {
   matchesSkipList,
@@ -40,13 +38,9 @@ export interface SkipPermissionsDecision {
 }
 
 /**
- * Splits a conversation's model reference into the provider family and the
- * bare model id.
- *
- * Three prefixes reach here. A stored row id ("mp_abc/gpt-6") and a routing
- * handle ("eu/claude-sonnet-5") both name ONE row, so they resolve through the
- * accessible rows. A provider family ("anthropic/claude-fable-5-1") names a
- * kind, and every row of that kind answers to it.
+ * Splits a conversation's model reference into provider family and bare model
+ * id. A stored row id or routing handle names ONE row; a provider family
+ * ("anthropic/claude-fable-5-1") names a kind that every row of it answers to.
  */
 function splitModelReference({
   model,
@@ -81,11 +75,8 @@ function splitModelReference({
 
 /**
  * The list that decides for a provider family when no single row was named.
- *
- * A stored list is an operator's explicit decision, so it wins over the
- * registry default. When several rows of the same family carry one, the oldest
- * decides, which keeps the answer the same on every call rather than following
- * whatever order the database returned.
+ * A stored list wins over the registry default; the oldest row wins ties, to
+ * keep the answer stable across calls regardless of query order.
  */
 function listForFamily({
   provider,
@@ -113,11 +104,8 @@ export class SkipPermissionsService {
   }
 
   /**
-   * Answers whether `model` may run with the permission checks skipped.
-   *
-   * `model` is the conversation's model reference in any of the shapes the
-   * platform stores it in: "openai/gpt-6", "mp_abc123/gpt-6", or a routing
-   * handle such as "eu/claude-sonnet-5".
+   * Answers whether `model` may run with permission checks skipped. `model`
+   * may be "openai/gpt-6", "mp_abc123/gpt-6", or a routing handle.
    */
   static async canModelSkipPermissions({
     projectId,

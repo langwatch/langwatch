@@ -149,10 +149,8 @@ export class LangyApp {
   }
 
   /**
-   * Every card the developer's machine raised in one conversation, and whether
-   * the folder is connected, off the durable record (ADR-129). The live stream
-   * cannot answer either: a tab that adopted a running turn never subscribed
-   * to it.
+   * Every card and connection state for one conversation, off the durable
+   * record (ADR-129) — the live stream can't answer either for an adopted tab.
    */
   /** Writes one line into the transcript without starting a turn (ADR-129). */
   recordUserMessage(input: {

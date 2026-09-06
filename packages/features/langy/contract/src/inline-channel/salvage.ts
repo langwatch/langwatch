@@ -1,22 +1,7 @@
 /**
- * Salvage — the transport-tolerant half of ADR-060 §2.
- *
- * A ```langy-card fence carries model-generated JSON that may be mechanically
- * damaged: cut off mid-string or mid-array by a truncated stream, carrying a
- * trailing comma, missing its closing brackets. Repair is as aggressive as
- * engineering allows — close unclosed strings and brackets, drop a dangling
- * key or half-written literal, trim an unfinished number — because transport
- * damage is not the model's meaning.
- *
- * What salvage never does is guess CONTENT: unquoted garbage, a value that is
- * not JSON, or trailing junk after the document is unsalvageable, full stop.
- * And the repaired document must then pass the derived-card schema STRICTLY
- * (`salvageLangyDerivedCard`) — a payload that parses but does not validate is
- * a failed card, never a guessed one.
- *
- * Pure: no dependencies beyond zod (via schemas.ts) for the post-validation.
- * The relay stamps and the client previews through this same module, so the
- * two runtimes repair identically.
+ * Salvage — the transport-tolerant half of ADR-060 §2. Repairs mechanical
+ * fence damage (truncation, unclosed brackets) aggressively, but never
+ * guesses CONTENT — the result still must pass the schema STRICTLY.
  */
 import { langyModelEmittedCardSchema, type LangyModelEmittedCard } from "../cards/derived-safe.js";
 
@@ -33,10 +18,8 @@ type Step =
 const WHITESPACE = new Set([" ", "\t", "\n", "\r"]);
 
 /**
- * Repair-parse a JSON document. Returns the parsed value after repairing
- * mechanical damage (truncation, unclosed strings/brackets, trailing commas),
- * or `{ ok: false }` when the text is not a damaged JSON document but a
- * different thing entirely.
+ * Repair-parse a JSON document, or `{ ok: false }` when the text is not a
+ * damaged JSON document but a different thing entirely.
  */
 export function salvageJsonText(raw: string): LangySalvageResult {
   const text = raw.trim();
@@ -76,11 +59,9 @@ export function salvageJsonText(raw: string): LangySalvageResult {
   };
 
   /**
-   * Parse a string starting at the opening quote. An unterminated string at
-   * end of input is CLOSED with what it has; a dangling or half-written
-   * escape at the end is dropped. Control characters (a raw newline the
-   * model forgot to escape) are kept as literal content — aggressive, and
-   * safe because validation is strict afterwards.
+   * Parse a string from its opening quote. Unterminated at end-of-input is
+   * CLOSED with what it has; a raw unescaped newline is kept as literal
+   * content — safe because validation is strict afterwards.
    */
   const parseString = (): Step => {
     i++; // opening quote
@@ -245,9 +226,8 @@ export type LangyDerivedCardParseResult =
 
 /**
  * The ONE decision the channel makes about a fence's content (ADR-060 §2):
- * salvage the JSON as leniently as engineering allows, then validate the
- * repaired document STRICTLY against the closed derived-safe allowlist. The relay
- * stamps with this; the client previews with this; nothing else re-decides.
+ * salvage leniently, then validate STRICTLY. Relay and client both use this;
+ * nothing else re-decides.
  */
 export function salvageLangyDerivedCard(raw: string): LangyDerivedCardParseResult {
   const salvaged = salvageJsonText(raw);

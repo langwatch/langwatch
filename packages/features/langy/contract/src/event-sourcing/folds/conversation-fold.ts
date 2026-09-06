@@ -1,14 +1,6 @@
 /**
- * The Langy conversation SPINE fold — the whole reduction of a conversation's
- * durable events into its operational state, as one pure module (ADR-059 §1),
- * exactly like `turnFold.ts` for the per-turn document.
- *
- * The server's `LangyConversationStateFoldProjection` delegates every handler
- * here; a browser spine fold (ADR-059 Phase 4, client half) will call the same
- * function. NOTE the state deliberately models the server-only columns
- * (RunToken, PendingHandoffToken) — they are part of the fold's truth — but
- * they never ride the client wire: the tail read serves only the turn
- * vocabulary, and any future spine wire schema must exclude them explicitly.
+ * The Langy conversation SPINE fold (ADR-059 §1), pure like `turnFold.ts`.
+ * Models server-only columns; a future client wire schema must exclude them.
  */
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
@@ -35,23 +27,15 @@ import type {
 } from "../contracts/langy.events";
 
 /**
- * Conversation-level operational state. It holds no message content; the
- * per-message content lives in the separate message projection.
- *
- * State = stored data: one type, not two. The fold does all computation; the
- * store is a dumb read/write layer.
+ * Conversation-level operational state, no message content (separate
+ * projection). One type: the fold computes, the store just reads/writes.
  */
 export interface LangyConversationStateData {
   ConversationId: string;
   /** Owner. Set once, from the first message (first-writer-wins). */
   UserId: string;
   Title: string | null;
-  /**
-   * Where `Title` came from — governs auto-regeneration precedence:
-   * `derived` (first-message placeholder) → may be replaced by an auto title;
-   * `auto` (cheap-model regeneration) → may be refined by a later regeneration;
-   * `user` (manual rename) → sticky, never overridden by an auto title.
-   */
+  /** Where `Title` came from: `derived` < `auto` < `user` (sticky). */
   TitleSource: LangyTitleSource;
   Status: string;
   IsShared: boolean;
@@ -60,34 +44,17 @@ export interface LangyConversationStateData {
   MessageCount: number;
   LastActivityAt: number | null;
   /**
-   * The turn currently in flight, or null when idle. Set by the durable
-   * `agent_turn_accepted`, cleared by `agent_responded` / `agent_response_failed`.
-   * Turn LIVENESS (is the worker still alive?) is NOT tracked here — it is a
-   * purely ephemeral concern that lives in the Redis signal buffer (ADR-046).
+   * The turn in flight, or null when idle. LIVENESS is NOT tracked here — it
+   * lives in the Redis signal buffer (ADR-046).
    */
   CurrentTurnId: string | null;
   LastError: string | null;
-  /**
-   * The model the latest accepted turn ran on (provider-prefixed). Reopening
-   * the conversation seeds the composer's picker from it, so a conversation
-   * keeps the model it was last used with. Null until a turn carrying the
-   * field is accepted (conversations predating it stay null).
-   */
+  /** Latest accepted turn's model (provider-prefixed); seeds the composer's picker on reopen. */
   LastModel: string | null;
-  /**
-   * ADR-048 shutdown-handoff. When a turn checkpoints on pod termination it
-   * leaves an opaque, worker-authored resume token here; the next turn threads
-   * it to a fresh worker and clears it. Null when there is nothing to resume.
-   * SERVER-ONLY: never surfaced to a client.
-   */
+  /** ADR-048 shutdown-handoff resume token; SERVER-ONLY, never surfaced to a client. */
   PendingHandoffToken: string | null;
   PendingHandoffTurnId: string | null;
-  /**
-   * The per-conversation `runToken`: the HMAC key for authenticating the
-   * worker's stream frames. Set once from `conversation_started`
-   * (first-writer-wins). SERVER-ONLY: read only by the worker-provisioning
-   * path, never by list/detail reads, the turn render fold, or any wire.
-   */
+  /** Per-conversation `runToken` HMAC key. SERVER-ONLY: worker-provisioning path only. */
   RunToken: string | null;
   ArchivedAt: number | null;
   CreatedAt: number;

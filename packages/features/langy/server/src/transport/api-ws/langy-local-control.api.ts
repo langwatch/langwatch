@@ -1,19 +1,7 @@
 /**
- * The socket side of local control: `GET /api/v1/langy/control/connect`
- * upgrades, authenticates with the minted Langy session key, registers the
- * developer's folder for one conversation, and holds the socket for every call
- * the worker writes (ADR-129, "Transport is the connected-agents relay").
- *
- * Authentication is the bearer key and nothing else. There is no Origin check,
- * because this is not cookie auth, which is what lets the dev proxy and the
- * ingress carry the handshake with no per-path entry (ADR-128 made the same
- * choice for `/api/v1/agents/connect`).
- *
- * The gateway reads envelopes off Redis, never off the nudge message, and
- * rescans the conversation's pending calls when it registers, so a call
- * written while the socket was reconnecting is still delivered. On register it
- * records the connection and starts the next turn with a message that names
- * the folder, unless a turn is already running.
+ * Socket side of local control: `GET /api/v1/langy/control/connect` (ADR-129
+ * "Transport"). Bearer key only, no Origin check (ADR-128 precedent). Reads
+ * envelopes off Redis, never the nudge; rescans pending calls on register.
  */
 
 import type { IncomingMessage } from "node:http";
@@ -110,13 +98,9 @@ export class LocalControlGateway {
   }
 
   /**
-   * Authenticates the upgrade, then waits for the register frame.
-   *
-   * The command line sends its register frame the moment the socket opens,
-   * which is before the credential lookup has answered, so the first frame is
-   * held until then. Later frames are dropped: only the register frame is read
-   * here, and a peer that is not authenticated yet must not be able to fill
-   * this process's memory with the frames after it.
+   * Authenticates the upgrade, then waits for the register frame. Holds the
+   * first frame (sent before auth resolves) and drops later ones — an
+   * unauthenticated peer must not fill process memory with frames.
    */
   private async accept(ws: WebSocket, request: IncomingMessage): Promise<void> {
     let held: WebSocket.RawData | undefined;
@@ -272,14 +256,9 @@ export class LocalControlGateway {
     }, this.pingIntervalMs);
     live.ping.unref();
 
-    // Presence is refreshed for as long as the socket is open, and nothing
-    // else. Reading the ping's own in-flight flag here would be wrong twice
-    // over: both clocks run on the same period and are armed in the same tick,
-    // so the ping always clears the flag first and the refresh never runs,
-    // and a peer that stops answering is already handled — the pong deadline
-    // above terminates the socket, detach stops this clock, and presence then
-    // expires on its own. Without this the folder read offline thirty seconds
-    // after it connected, with the command line still connected and healthy.
+    // Presence is refreshed only while the socket is open. Must not read the
+    // ping's own in-flight flag: same period, same tick, so the ping would
+    // always clear it first and the refresh would never run.
     live.heartbeat = setInterval(() => {
       if (live.released) return;
       if (live.socket.readyState !== WebSocket.OPEN) return;
@@ -289,11 +268,8 @@ export class LocalControlGateway {
   }
 
   /**
-   * One heartbeat, and a line the first time its answer changes.
-   *
-   * A restored record is worth saying once: it means this process stopped for
-   * longer than the record lives, which is also what a slow local call turns
-   * into for everything else on the pod.
+   * One heartbeat, and a line the first time its answer changes. "restored"
+   * means this process stopped longer than the record lives.
    */
   private async beat(live: LiveSocket): Promise<void> {
     const outcome = await this.core.heartbeat(live.session);
@@ -325,13 +301,9 @@ export class LocalControlGateway {
   }
 
   /**
-   * The socket is gone, and the folder may not be.
-   *
-   * A dropped socket is a network event, not a decision: the command line
-   * reconnects and expects its calls to be there. So this drops only what this
-   * process holds, and presence, which the heartbeat stops refreshing, expires
-   * on its own thirty seconds later. That is the same clock a sleeping machine
-   * reads offline on.
+   * The socket is gone, but the folder may not be — a dropped socket is a
+   * network event, not a decision. Drops only what this process holds;
+   * presence expires on its own via the unrefreshed heartbeat.
    */
   private async detach(live: LiveSocket): Promise<void> {
     if (!this.sockets.has(live)) return;

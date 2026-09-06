@@ -1,18 +1,7 @@
 /**
- * The frames of the local control socket (ADR-129).
- *
- * `langwatch langy --share-control` opens this socket from the developer's
- * machine. Langy's local tools become `call` frames the CLI executes in the
- * shared folder; the CLI answers with `result`. When a call needs the
- * developer's approval the CLI says so with `permission_required`, the panel
- * renders the card, and the platform answers with `permission`. The developer
- * can also answer in the terminal, which the CLI reports with
- * `permission_answered`. The first answer wins.
- *
- * Every frame is JSON text with a `type` and the protocol version. The CLI
- * keeps a copy of these shapes in `sdks/typescript/src/agent/local-control-protocol.ts`;
- * a drift test on its side pins them to this file. Browser-safe: zod and
- * nothing else.
+ * The frames of the local control socket (ADR-129). CLI keeps a copy in
+ * `sdks/typescript/src/agent/local-control-protocol.ts`, pinned to this file
+ * by a drift test. Browser-safe: zod only.
  */
 
 import { z } from "zod";
@@ -250,13 +239,9 @@ export const resultFrameSchema = versioned.extend({
 export type ResultFrame = z.infer<typeof resultFrameSchema>;
 
 /**
- * One segment of a shell command chain, as the card lists it.
- *
- * A chain that stages, commits and pushes is one call and three segments. A
- * card that offered a single pattern granted the first segment's pattern and
- * ran the rest under it, so the segments travel with the ask: the reader sees
- * every part, and an "allow this pattern" answer covers exactly the segments
- * that are not read-only.
+ * One segment of a shell command chain, as the card lists it. Segments
+ * travel with the ask so "allow this pattern" covers exactly the
+ * non-read-only ones.
  */
 export const commandSegmentSchema = z.object({
   /** The segment as the developer wrote it. */

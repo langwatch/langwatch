@@ -1,25 +1,16 @@
 /**
- * Event PAYLOAD schemas for the `langy_conversation` aggregate (ADR-046) — the
- * `data` half of every durable event, shared by the server pipeline (which
- * wraps them in its own branded event envelope) and the browser (which folds
- * them locally, ADR-059). Payloads are pure Zod: no server types, no branding.
- *
- * The full event schemas — envelope + `type`/`version` literals — stay in the
- * server pipeline (`langy-conversation-processing/schemas/events.ts`): the
- * envelope carries server-domain branding (TenantId, AggregateType) that has
- * no business in a browser bundle.
+ * Event PAYLOAD schemas for the `langy_conversation` aggregate (ADR-046) —
+ * shared by the server pipeline and the browser fold (ADR-059). Pure Zod, no
+ * branding; the full envelope (TenantId, AggregateType) stays server-side.
  */
 import { z } from "zod";
 
 import { langyJsonValueSchema, langyMessagePartSchema, langyMessageRoleSchema } from "../../json";
 
 /**
- * ConversationStarted — an explicit conversation-creation event. Sets the owner
- * (first-writer-wins) and, optionally, an initial title, BEFORE any message.
- * Distinct from `message_recorded` (which also lazily creates on the fold
- * for robustness): a `create → then message` flow emits this first, so an empty
- * conversation can exist. Feeds the conversation spine fold only — no message
- * row, no turn document (it is not turn-scoped).
+ * ConversationStarted — explicit creation event, sets owner (first-writer-
+ * wins) and optional title BEFORE any message. Feeds the conversation spine
+ * fold only — no message row, no turn document.
  */
 export const langyConversationStartedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -28,12 +19,9 @@ export const langyConversationStartedEventDataSchema = z.object({
   /** Optional initial title (else derived from the first message). */
   title: z.string().nullable().optional(),
   /**
-   * The per-conversation `runToken` (see `streaming/langyFrameAuth.ts`): a 32-byte
-   * CSPRNG secret (hex) minted here, injected into the worker at spawn, and used
-   * to HMAC every frame the worker streams back. SERVER-ONLY — it is folded into
-   * a server-only state column (never a client-facing projection or the turn
-   * render doc) and never re-sent on the wire. Nullable/optional so events
-   * predating this field, and lazily-created conversations, still replay.
+   * The per-conversation `runToken` (`streaming/langyFrameAuth.ts`): HMACs
+   * worker frames. SERVER-ONLY — never re-sent on the wire, never in a
+   * client-facing projection.
    */
   runToken: z.string().nullable().optional(),
 });
@@ -43,9 +31,8 @@ export type LangyConversationStartedEventData = z.infer<
 
 /**
  * ConversationForked — a fresh user-owned aggregate branched from a visible
- * conversation. The source id is durable lineage in the event log; imported
- * transcript rows arrive as explicit `message_imported` events so a replay can
- * rebuild the new conversation without reading the source projection again.
+ * conversation. Imported transcript rows arrive as explicit
+ * `message_imported` events, so a replay never re-reads the source.
  */
 export const langyConversationForkedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -76,11 +63,9 @@ export const langyMessageRecordedEventDataSchema = z.object({
 export type LangyMessageRecordedEventData = z.infer<typeof langyMessageRecordedEventDataSchema>;
 
 /**
- * MessageImported — one immutable message copied into a fork. It is distinct
- * from `message_recorded` and `agent_responded`: importing history must
- * not start a turn, trigger title generation, or pretend the agent responded
- * again. New message ids keep the fork independent; source ids preserve audit
- * lineage.
+ * MessageImported — one immutable message copied into a fork. Distinct from
+ * `message_recorded`/`agent_responded`: importing must not start a turn,
+ * generate a title, or pretend the agent responded.
  */
 export const langyMessageImportedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -93,17 +78,9 @@ export const langyMessageImportedEventDataSchema = z.object({
 export type LangyMessageImportedEventData = z.infer<typeof langyMessageImportedEventDataSchema>;
 
 /**
- * AgentTurnAccepted — the user's turn was durably admitted for dispatch.
- *
- * `questionParts` carries the user's question that opened this turn, so the
- * per-turn document (langyConversationTurn) is self-contained — question AND
- * answer in one render doc — without a join back to message history. Optional:
- * an accepted turn without a captured question still records.
- *
- * `model` is the provider-prefixed model this turn runs on (the composer's
- * pick, or the resolved default when none). The conversation fold keeps the
- * latest as `LastModel`, so reopening a conversation restores the model it
- * last ran on. Optional: events predating the field still fold.
+ * AgentTurnAccepted — the turn was durably admitted for dispatch.
+ * `questionParts` keeps the per-turn render doc self-contained; `model`
+ * (provider-prefixed) becomes the fold's `LastModel`. Both optional.
  */
 export const langyAgentTurnAcceptedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -114,20 +91,9 @@ export const langyAgentTurnAcceptedEventDataSchema = z.object({
 export type LangyAgentTurnAcceptedEventData = z.infer<typeof langyAgentTurnAcceptedEventDataSchema>;
 
 /**
- * ToolCallInitiated — the agent began a tool call during a response. Recorded
- * as a meaningful transition (not a token) and treated as liveness.
- *
- * It carries WHAT THE CALL IS DOING, not merely that one happened. A tool name
- * on its own is close to worthless here: half of Langy's calls are `bash`, and
- * "the agent ran bash" answers nothing you would ever ask of an event log. The
- * command is the identity of the call — the thing you search for, the thing you
- * reproduce, the thing that tells you `bash` was really a trace search.
- *
- * `command` is the shell command when the tool is a shell (the overwhelmingly
- * common case, and the one worth having a first-class field for). `input` keeps
- * the full argument object for every other tool. Both are optional because a
- * frame that never surfaced its arguments must still be recordable — an event we
- * refuse to write is strictly worse than one that is missing a field.
+ * ToolCallInitiated — the agent began a tool call; treated as liveness.
+ * Carries WHAT THE CALL IS DOING (`command`/`input`), not just the tool
+ * name — `bash` alone answers nothing. Both optional.
  */
 export const langyToolCallInitiatedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -140,17 +106,8 @@ export const langyToolCallInitiatedEventDataSchema = z.object({
 export type LangyToolCallInitiatedEventData = z.infer<typeof langyToolCallInitiatedEventDataSchema>;
 
 /**
- * ToolCallSucceeded — a tool call the agent initiated returned without error.
- *
- * Self-describing, exactly like its `initiated` twin: it repeats the `command`
- * so that ONE event answers "what ran, and how long did it take?" without a join
- * back to the start. Debugging a response is reading a list of these, and a list
- * that says only `bash` sends you hunting for the other half.
- *
- * `durationMs` is what turns the log into something you can find a slow call in
- * — the CLI spawn alone has been measured in the hundreds of milliseconds, and
- * you cannot chase that without a number. A tool call that errored is a distinct
- * event (`tool_call_failed`), so no `isError` boolean lives here.
+ * ToolCallSucceeded — repeats `command` so ONE event answers "what ran, and
+ * how long". Errors are a distinct event (`tool_call_failed`), no `isError`.
  */
 export const langyToolCallSucceededEventDataSchema = z.object({
   conversationId: z.string(),
@@ -164,12 +121,9 @@ export const langyToolCallSucceededEventDataSchema = z.object({
 export type LangyToolCallSucceededEventData = z.infer<typeof langyToolCallSucceededEventDataSchema>;
 
 /**
- * ToolCallFailed — a tool call the agent initiated returned an error. The
- * failing twin of `tool_call_succeeded`: a call reaches exactly one of the two.
- *
- * `errorText` keeps the failure itself, truncated, rather than a bare boolean
- * that tells you a thing broke but not why — the whole reason a failed call is
- * its own event is that the failure detail is worth first-class carriage.
+ * ToolCallFailed — the failing twin of `tool_call_succeeded`; a call reaches
+ * exactly one of the two. `errorText` carries the failure detail, not a bare
+ * boolean.
  */
 export const langyToolCallFailedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -184,13 +138,9 @@ export const langyToolCallFailedEventDataSchema = z.object({
 export type LangyToolCallFailedEventData = z.infer<typeof langyToolCallFailedEventDataSchema>;
 
 /**
- * PlanUpdated — a full snapshot of the agent's plan (its `todowrite` todo list)
- * during a turn. Snapshot-typed: `todowrite` rewrites the whole list per call, so
- * each event carries the entire list and the fold applies last-write-wins (by
- * occurredAt). One "meaningful transition" per todowrite call — the plan the
- * panel mirrors as a live checklist, now durable so the checklist survives a
- * reload from the fold. `status` is a permissive string (the client tolerates an
- * unknown value as pending), and `items` is capped/truncated at the manager.
+ * PlanUpdated — full snapshot of the agent's `todowrite` plan. Snapshot-
+ * typed: each event carries the whole list, fold applies last-write-wins.
+ * `status` is a permissive string (unknown reads as pending).
  */
 export const langyPlanItemSchema = z.record(z.string(), langyJsonValueSchema).and(
   z.object({
@@ -222,18 +172,8 @@ export type LangyAgentResponseFailedEventData = z.infer<
 >;
 
 /**
- * AgentResponded — the whole final answer of an agent response, the source of
- * truth. Streamed tokens are NOT events; this single event carries the complete
- * assistant message. Feeds operational state (terminal status, count) and the
- * assistant message projection.
- *
- * `outcome` is the terminal discriminant on the ONE answer-carrying terminal:
- * `completed` (the agent finished), `failed` (it ran but ended in failure, still
- * with something to carry — distinct from `agent_response_failed`, which is the
- * no-answer stall), and `stopped` (the USER stopped the turn mid-answer, ADR-078).
- * A stop is not a failure and carries the partial answer streamed so far, so it
- * rides this event and its `turn-terminal` idempotency slot rather than inventing
- * a parallel terminal.
+ * AgentResponded — the whole final answer (streamed tokens are NOT events).
+ * `outcome`: `completed`, `failed`, or `stopped` (user-stopped, ADR-078).
  */
 export const langyAgentRespondedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -273,12 +213,9 @@ export type LangyConversationMetadataUpdatedEventData = z.infer<
 >;
 
 /**
- * ConversationHandoffPending (ADR-048) — a turn checkpointed on pod termination
- * and left an opaque, worker-authored resume token. The fold stores the token
- * (PendingHandoffToken/PendingHandoffTurnId), clears CurrentTurnId (the turn
- * handed off, it did not fail), and returns the conversation to idle. The token
- * is OPAQUE to the pipeline — persisted verbatim, only opencode authors and
- * consumes it.
+ * ConversationHandoffPending (ADR-048) — a turn checkpointed on pod
+ * termination, leaving an OPAQUE worker-authored resume token. Fold clears
+ * CurrentTurnId (handed off, not failed) and returns to idle.
  */
 export const langyConversationHandoffPendingEventDataSchema = z.object({
   conversationId: z.string(),
@@ -303,12 +240,9 @@ export type LangyConversationHandoffConsumedEventData = z.infer<
 >;
 
 /**
- * ConversationTitleGenerated — a cheap-model auto title produced after a
- * finalized response by the process-outbox title effect. Updates operational
- * `Title` ONLY when `titleSource !== "user"` (a manual rename is sticky), and
- * marks the title source as `auto`. Carries the model that produced it
- * for provenance. No message row and no activity bump — it refines metadata,
- * it is not conversational activity.
+ * ConversationTitleGenerated — cheap-model auto title, updates `Title` ONLY
+ * when `titleSource !== "user"` (manual rename is sticky). No message row,
+ * no activity bump — metadata, not conversational activity.
  */
 export const langyConversationTitleGeneratedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -487,12 +421,8 @@ export const langyPermissionAnswerSources = ["panel", "terminal"] as const;
 export type LangyPermissionAnswerSource = (typeof langyPermissionAnswerSources)[number];
 
 /**
- * UserWaitEnded — the wait reached its one terminal. An answered permission
- * wait carries the decision; an answered question wait carries the choices.
- *
- * A permission ask can be answered on the card or in the terminal that shares
- * the folder, and the first answer wins, so `source` says which one closed it
- * and the settled card can name the place the reader is not looking at.
+ * UserWaitEnded — the wait reached its one terminal: decision (permission)
+ * or choices (question). `source` says card vs terminal — first answer wins.
  */
 export const langyUserWaitEndedEventDataSchema = z.object({
   conversationId: z.string(),

@@ -1,23 +1,7 @@
 /**
- * One local tool call, from the worker's request to the answer the command
- * line sends back (ADR-129, "Transport").
- *
- * The worker starts a call with one HTTP request and long-polls the result.
- * The command line's socket may be held by another pod, so the envelope, the
- * state and the result all live in Redis and the socket's pod is nudged over
- * pub/sub. The worker never subscribes to anything: it polls the state key,
- * which is what makes its side survive a pod it never talked to.
- *
- * The state machine is
- *
- *   pending -> running -> done                     the ordinary call
- *   pending -> running -> awaiting_permission -> running -> done
- *                                                  a command that had to ask
- *   pending|running|awaiting_permission -> done    cancelled, or the folder left
- *
- * `done` is terminal and written once. Everything that can end a call, the
- * command line's result, the turn's Stop, an expired permission card, contends
- * for that one transition, so a call cannot answer twice.
+ * One local tool call (ADR-129 "Transport"): worker polls Redis for the
+ * result; the socket (maybe another pod) is nudged over pub/sub. States:
+ * pending -> running -> [awaiting_permission -> running ->] done (terminal).
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -183,17 +167,9 @@ export class LocalCallDispatcherService {
   }
 
   /**
-   * Waits for the call to leave `pending`/`running`, up to the hold, then
-   * answers with whatever state it is in. A worker that gets a non-terminal
-   * answer simply asks again, so a hold that ends early costs one request.
-   *
-   * The hold is also what keeps the turn alive. A command that takes minutes
-   * writes nothing on the turn while it runs, and the liveness subscriber ends
-   * a turn whose heartbeat has been gone for three grace windows, which lost
-   * the answer while the machine was still working. The poll request is itself
-   * the evidence that the worker is alive, so the refresh belongs here rather
-   * than on a timer: a worker that died stops polling and the turn ends as it
-   * should.
+   * Waits for the call to leave `pending`/`running`, up to the hold. Also
+   * refreshes turn liveness here rather than on a timer, so a dead worker's
+   * turn ends once it stops polling.
    */
   async poll({
     callId,
@@ -245,17 +221,9 @@ export class LocalCallDispatcherService {
   }
 
   /**
-   * Holds the turn open for another heartbeat window, and says on the panel
-   * what the machine is doing, at most once per keepalive window.
-   *
-   * A call that answers in under a heartbeat interval says nothing: its tool
-   * card is already on screen and a line that appears and goes reads as a
-   * flicker. Only a call worth waiting for explains itself.
-   *
-   * The activity line is gated on a key of its own rather than on the call
-   * record. Two replicas polling one call would otherwise write a line each,
-   * and a write onto the record could put a call that has just answered back
-   * in flight.
+   * Holds the turn open, and says on the panel what the machine is doing, at
+   * most once per window. Gated on its own key, not the call record — two
+   * replicas polling one call must not each write a line.
    */
   private async keepTurnAlive(call: StoredLocalCall): Promise<void> {
     const buffer = this.buffer;
@@ -304,13 +272,8 @@ export class LocalCallDispatcherService {
 
   /**
    * The command line needs the developer's answer first. Returns the call as
-   * it now stands so the caller can raise the card against it.
-   *
-   * The envelope now has to outlive the CARD, not the command. A thirty second
-   * command left its envelope sixty seconds past its own deadline while the
-   * card was allowed ten minutes, so an ask answered ninety seconds later
-   * polled a call the platform had already dropped, and the worker read three
-   * "not found" answers as a folder that had gone away.
+   * it now stands so the caller can raise the card against it. The envelope
+   * now has to outlive the CARD's wait budget, not the command's own deadline.
    */
   async awaitPermission({
     callId,

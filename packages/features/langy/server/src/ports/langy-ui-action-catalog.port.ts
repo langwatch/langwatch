@@ -1,18 +1,7 @@
 /**
- * The server's own registry of every page action an agent may dispatch.
- *
- * The browser registers handlers per page, but the SERVER decides what exists:
- * a kind is only dispatchable when this catalogue names it, and its payload is
- * parsed with the schema the catalogue holds before anything reaches the
- * stream. The client-asserted registration is never consulted for validation.
- *
- * It is a port rather than a module inside this package because the only
- * catalogue that exists belongs to the experiments workbench, and a Langy
- * server package may not reach into another feature's. A kind's domain prefix
- * (`workbench.`) names the page family it belongs to; which context-chip kinds
- * sit on such a page is `LANGY_UI_ACTION_CHIP_KINDS`
- * (`@langwatch/langy-contract`), read by the turn block that advertises the
- * channel.
+ * Server's registry of dispatchable page actions; browser registration is
+ * never consulted for validation. A port, not a module: the only catalogue
+ * belongs to the experiments workbench, another feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 
@@ -23,20 +12,15 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 export type LangyUiActionBackendMode = "read" | "transform" | "run";
 
 /**
- * One dispatchable action, as the channel needs it.
- *
- * Structural rather than imported from the workbench that declares it: the
- * five fields below are everything the dispatch reads, and naming the
- * workbench's own type here would be the cross-feature reach this port exists
- * to avoid.
+ * One dispatchable action, as the channel needs it. Structural rather than
+ * imported from the declaring workbench, to avoid the cross-feature reach
+ * this port exists to prevent.
  */
 export type LangyUiActionDefinition = Readonly<{
   /**
-   * Parses the dispatched payload. A failure is refused, never forwarded.
-   *
-   * A discriminated result rather than a Zod type: this package parses nothing
-   * of its own here and only reads the two branches, so declaring the shape it
-   * reads keeps the catalogue's own schema library the catalogue's business.
+   * Parses the dispatched payload; a failure is refused, never forwarded.
+   * Discriminated result rather than a Zod type, to keep the schema library
+   * the catalogue's own business.
    */
   payloadSchema: {
     safeParse(

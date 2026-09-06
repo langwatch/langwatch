@@ -1,16 +1,7 @@
 /**
- * The Langy turn fold — the WHOLE reduction of a turn's durable events into its
- * render document, as one pure module (ADR-059 §1).
- *
- * The server's `LangyConversationTurnFoldProjection` and the browser's local
- * projection both call `foldLangyConversationTurn`: same events, same reducer,
- * so a turn renders identically on both sides because it is literally the same
- * computation. Everything here is `(state, event) → state` — no store, no
- * versioning, no server types; those stay in the pipeline wrapper.
- *
- * The event parameter is the PORTABLE shape of a turn event — `type`,
- * `occurredAt`, `data` — which the server's full (branded-envelope) event types
- * satisfy structurally, and which a wire-parsed tail event satisfies exactly.
+ * The Langy turn fold — the WHOLE reduction of a turn's events into its
+ * render document, one pure module (ADR-059 §1). Server and browser both
+ * call `foldLangyConversationTurn`: same reducer, identical render.
  */
 import { z } from "zod";
 
@@ -44,10 +35,8 @@ import { langyJsonValueSchema } from "../../json";
 import type { LangyJsonObject, LangyJsonValue, LangyMessagePart } from "../../json";
 
 /**
- * Composite fold key: one turn document per `(conversationId, turnId)` within a
- * conversation's event stream. conversationId (ksuid) and turnId (uuid) never
- * contain ":", so a single ":" is an unambiguous delimiter (mirrors
- * experiment-run's makeExperimentRunKey).
+ * Composite fold key: one turn document per `(conversationId, turnId)`.
+ * Neither id contains ":", so a single ":" is an unambiguous delimiter.
  */
 export function makeConversationTurnKey(conversationId: string, turnId: string): string {
   return `${conversationId}:${turnId}`;
@@ -65,11 +54,9 @@ export function parseConversationTurnKey(key: string): {
 }
 
 /**
- * One tool call in a turn, folded from its durable lifecycle events:
- * `tool_call_initiated` pushes it, `tool_call_succeeded`/`tool_call_failed`
- * resolves it. Tool OUTPUT is not here — it rides the final answer parts (the
- * tool-output cards on `agent_responded`); this list is the lifecycle audit
- * (what ran, how it went, how long) so a turn can be rendered without a join.
+ * One tool call, folded from `tool_call_initiated`/`_succeeded`/`_failed`.
+ * Tool OUTPUT is not here — it rides `agent_responded`'s parts; this is the
+ * lifecycle audit (what ran, how, how long).
  */
 export type LangyTurnToolCall = LangyJsonObject & {
   toolCallId: string;
@@ -83,12 +70,7 @@ export type LangyTurnToolCall = LangyJsonObject & {
   wait?: LangyTurnWait;
 };
 
-/**
- * The card one tool call put in front of the developer: a permission ask, or a
- * question. It rides on the tool call it belongs to, so the turn document
- * renders the card without a second list and without a new column, and a
- * reload shows a pending card as pending and an answered one as answered.
- */
+/** The card one tool call put in front of the developer: a permission ask or a question, ridden on the call it belongs to. */
 /** One card the developer's machine put up, as the durable record holds it. */
 export type LangyLocalRecordWait = LangyTurnWait & {
   /** The turn that raised it, so the panel keeps them in turn order. */
@@ -175,12 +157,9 @@ export const langyTurnWaitSchema = z.object({
 });
 
 /**
- * Wire/persistence schema for one folded tool call. Lives HERE — composed
- * inside the package's own zod instance — because zod v3's `z.record(key,
- * value)` overload detection instanceof-checks its second argument: composing
- * a package schema into a consumer-side `z.record` silently mis-parses when
- * two physical zod copies are in play. Consumers compose it only through
- * instanceof-safe combinators (`z.array`, `.parse`).
+ * Wire/persistence schema for one folded tool call. Lives HERE, in the
+ * package's own zod instance: zod v3's `z.record` overload detection
+ * instanceof-checks its argument and mis-parses across two zod copies.
  */
 export const langyTurnToolCallSchema = z.record(z.string(), langyJsonValueSchema).and(
   z.object({
@@ -243,16 +222,8 @@ function endedWait(
 }
 
 /**
- * The turn render document — one turn folded into its final state. A SECOND fold
- * projection over the langy_conversation aggregate (the first is the
- * conversation spine): same event stream, keyed per turn instead of per
- * conversation. Reading one document is enough to render an entire turn.
- *
- * `QuestionParts` is reserved: it is populated once the conversation flow shares
- * a turnId between the user message (`message_recorded`) and the response
- * (`agent_turn_accepted`) — see ADR-046. Until then the
- * answer parts already carry everything renderable (text + tool-output cards +
- * enrichment card + actions).
+ * The turn render document. A SECOND fold over langy_conversation (first is
+ * the spine), keyed per turn. `QuestionParts` is reserved for ADR-046 S2.
  */
 export interface LangyConversationTurnData {
   ConversationId: string;
@@ -264,12 +235,7 @@ export interface LangyConversationTurnData {
   AnswerParts: LangyMessagePart[];
   /** Tool calls in initiation order (lifecycle audit; outputs live in AnswerParts). */
   ToolCalls: LangyTurnToolCall[];
-  /**
-   * The agent's plan (its `todowrite` todo list) for this turn — a full snapshot,
-   * last-write-wins, so the checklist survives a reload from the fold. Null when
-   * the turn never maintained a plan (⇒ today's rendering). Each item is
-   * `{ content, status }` with status kept as the tool authored it.
-   */
+  /** The `todowrite` plan snapshot, last-write-wins. Null when the turn never maintained one. */
   Plan: LangyPlanItemData[] | null;
   Error: string | null;
   StartedAt: number | null;
@@ -364,10 +330,8 @@ function withIdentity<S extends LangyConversationTurnFoldState>(
 }
 
 /**
- * Resolve a tool call in place (by toolCallId), or append when it is missing —
- * a terminal that arrives before its `initiated` (out-of-order or dropped)
- * must still land. Callers re-fold in occurredAt order, so the common path
- * is initiate-then-resolve; this is the defensive branch.
+ * Resolve a tool call in place, or append when missing — a terminal arriving
+ * before its `initiated` must still land (defensive; common path re-folds).
  */
 function upsertToolCall(
   state: LangyConversationTurnFoldState,
@@ -389,9 +353,7 @@ function waitToolName(kind: LangyUserWaitKind): string {
 
 /**
  * Fold ONE turn event onto the turn document. Pure and total over the turn
- * vocabulary; unknown-to-this-fold events must be filtered before the call
- * (the server routes by handler name, the browser by
- * LANGY_CONVERSATION_TURN_EVENT_TYPES).
+ * vocabulary; unknown events must be filtered before the call.
  */
 export function foldLangyConversationTurn<S extends LangyConversationTurnFoldState>(
   state: S,

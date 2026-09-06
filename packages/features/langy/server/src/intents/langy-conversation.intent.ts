@@ -527,10 +527,8 @@ export const StartUserWaitCommand = defineCommand({
 });
 
 /**
- * EndUserWait → user_wait_ended. A wait reaches exactly one terminal, so the
- * answer, the expiry and the cancel share one idempotency slot and the first
- * one recorded wins. That is what makes a late answer to an expired card a
- * no-op rather than a contradiction in the log.
+ * EndUserWait → user_wait_ended. Answer/expiry/cancel share one idempotency
+ * slot; first recorded wins, so a late answer to an expired card is a no-op.
  */
 export const EndUserWaitCommand = defineCommand({
   commandType: LANGY_CONVERSATION_COMMAND_TYPES.END_USER_WAIT,

@@ -1,15 +1,6 @@
 /**
- * The lines the platform itself writes into a Langy conversation about the
- * developer's own folder (ADR-129).
- *
- * They are written as USER messages, because they are what starts the next
- * turn and what the model reads. They are not what the developer said, and the
- * panel does not draw the connect one as a bubble: the header chip and the code
- * access card already carry it, so a bubble made the same fact appear three
- * times in a row.
- *
- * Shared, because the server writes them and the panel reads them, and two
- * copies of a string like this drift into a notice nobody hides.
+ * Lines the platform writes about the developer's folder (ADR-129), as
+ * USER messages. Shared so server and panel never drift on the string.
  */
 
 /** The message the connected folder starts the next turn with. */

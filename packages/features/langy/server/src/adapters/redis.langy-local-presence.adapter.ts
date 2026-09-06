@@ -1,14 +1,7 @@
 /**
- * Which folder is shared with which conversation, right now (ADR-129).
- *
- * One workspace per conversation, and the record dies on its own thirty
- * seconds after the last heartbeat, so a machine that went to sleep reads
- * offline without anything having to notice. A Ctrl-C does not wait for that:
- * the command line deregisters and the gateway clears the record at once.
- *
- * The workspace description rides in the record, so a card, a chip and the
- * `code_access` tool all read the folder, the machine and the branch from one
- * place.
+ * Which folder is shared with which conversation, right now (ADR-129). One
+ * workspace per conversation; the record expires 30s after the last
+ * heartbeat, so a sleeping machine reads offline with no explicit deregister.
  */
 
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
@@ -56,19 +49,9 @@ export class LangyLocalPresenceAdapter extends LangyLocalPresencePort {
   }
 
   /**
-   * Refreshes the record on a heartbeat, and writes it again when it is gone.
-   *
-   * The record lives thirty seconds and the heartbeat runs every ten, so three
-   * missed beats lose it. The platform can miss three: a pod that pauses for
-   * half a minute, under load or under a stop-the-world pause, stops every
-   * clock it owns at once while the socket, the command line and the command
-   * itself are all still there. The connection is the fact, so a heartbeat
-   * from a live connection writes the record back rather than reading the
-   * lapse as a folder that went away.
-   *
-   * A heartbeat from an instance that no longer holds the record still writes
-   * nothing: a socket that lost the folder to a newer share cannot take it
-   * back, which is why "replaced" is answered rather than restored.
+   * Refreshes the record on heartbeat, re-writing it if lapsed (TTL 30s vs a
+   * 10s heartbeat, under a pod pause). A heartbeat from a replaced instance
+   * answers "replaced" rather than restoring the old record.
    */
   async heartbeat(workspace: ConnectedWorkspace): Promise<PresenceHeartbeat> {
     const current = await this.read(workspace.conversationId);

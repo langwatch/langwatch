@@ -237,12 +237,9 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   }
 
   /**
-   * Ephemeral run of the model's reasoning (thinking). Live edge ONLY — it is
-   * never flushed to the durable final and never survives a reload; the browser
-   * shows it while it streams and drops it when the turn settles. Providers can
-   * emit reasoning one token at a time, so coalesce it on the same short cadence
-   * as visible answer text. That avoids rerendering the entire panel per token
-   * without making the thinking indicator feel delayed.
+   * Ephemeral run of the model's reasoning. Live edge ONLY: never flushed to
+   * the durable final, dropped when the turn settles. Coalesced on the same
+   * cadence as answer text.
    */
   async appendReasoning({
     conversationId,
@@ -463,20 +460,9 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   }): Promise<{ backstopped: boolean; text?: string }> {
     await this.flush({ conversationId, turnId });
     await this.flushReasoning({ conversationId, turnId });
-    // A turn that completes without a text delta leaves a finished spinner and
-    // nothing else, which reads as a broken product even when every command in
-    // the turn succeeded. The agent is told to always end with visible text;
-    // this is the backstop. Pure whitespace reads the same as nothing, so it
-    // takes the fallback too.
-    //
-    // The stream also decides WHICH line: a turn holding on a card is waiting
-    // for the reader, not failing to answer them.
-    //
-    // The tail is what decides both, not `sawVisibleText`: that map is in
-    // memory and a buffer is built per relay request, so a worker that
-    // reconnected mid-turn ends the stream on an instance that never saw the
-    // earlier deltas. Only read when instance memory says nothing was written,
-    // which is the rare case, so the normal path pays no read.
+    // Backstop for a turn that ends without visible text (whitespace counts).
+    // Reads the durable tail, not the in-memory `sawVisibleText` map: a worker
+    // that reconnected mid-turn never saw the earlier deltas on that instance.
     let backstopped = false;
     let text: string | undefined;
     if (backstopSilentTurn && !this.sawVisibleText.has(this.pendingKey(conversationId, turnId))) {

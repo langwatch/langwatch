@@ -17,17 +17,9 @@ import { Prisma } from "@langwatch/prisma-client/generated";
 import type { LangyDatabase } from "./prisma.langy-database";
 
 /**
- * The status values this column accepts, derived from the ONE definition rather
- * than restated here.
- *
- * `status` is TEXT in the database — see the schema comment — so this parse is
- * what the Postgres enum used to do. It is deliberately at the write boundary
- * and not in the fold: the fold is already typed, and a guard that only repeats
- * a type it trusts catches nothing. What this catches is the case the type
- * cannot see — a projection replayed from an event written by a newer version
- * of the fold, carrying a status this deployment has never heard of. Failing
- * the write is right there: a silently stored unknown status would be read back
- * as one, and every consumer would have to guess.
+ * `status` is TEXT in the database, so this parse stands in for the Postgres
+ * enum. Deliberately at the write boundary, not the fold: catches a status a
+ * newer fold version wrote that this deployment doesn't recognize.
  */
 const turnStatusSchema = z.enum(
   // Cast to the UNION, not to `[string, ...string[]]`: the latter is enough for

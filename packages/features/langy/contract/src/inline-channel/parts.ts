@@ -1,20 +1,7 @@
 /**
- * The typed message parts the inline card channel adds to the durable event stream
- * (ADR-060 §1, §6, §8) — the relay PRODUCES these, the browser PARSES them,
- * so the contract lives here where both runtimes import it.
- *
- *   - `langy-card`         a stamped card, in place of its fence, between
- *                          the prose parts it sat among. The one decision
- *                          point's output; downstream reads it, never
- *                          re-parses text.
- *   - `langy-card-failed`  a card that could not be salvaged or did not
- *                          validate. It carries the raw fenced text so the
- *                          disclosure can show it — a failure may never be
- *                          quieter than a success.
- *   - `langy-choice-selection`  the structured half of a choices answer,
- *                          riding the next USER message beside its readable
- *                          text ("Chose: X"). The UI binds by blockId; the
- *                          model just reads the words.
+ * Typed message parts the inline card channel adds to the event stream
+ * (ADR-060 §1, §6, §8): `langy-card`, `langy-card-failed`, and
+ * `langy-choice-selection` (structured choices answer, bound by blockId).
  */
 import * as z from "zod";
 

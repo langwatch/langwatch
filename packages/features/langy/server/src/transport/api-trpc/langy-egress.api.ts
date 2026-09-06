@@ -1,30 +1,7 @@
 /**
- * The per-project Langy egress allow-list over the process's tRPC transport
- * (ADR-076).
- *
- *   get — the current allow-list for the settings editor. `null` means the
- *         project is in monitor-only mode (watch, never block).
- *   set — replaces the allow-list. An empty array clears it back to
- *         monitor-only. Gated on `langy:manage` — this is a project network
- *         policy, not per-user state.
- *
- * The enforcement path is the credentials envelope + the agent's egress
- * adapter (see LangyCredentialService.tryGetEgressAllowlist and
- * app-layer/langyagent/adapters/egress/adapter.go). This surface is only how a
- * customer reads and sets the value; a change takes effect on the
- * conversation's next turn (the worker recycles when its egress signature
- * changes).
- *
- * Both procedures sit behind the authoritative Langy internal-only gate as well
- * as their `langy:*` permission — this is Langy config, so it stays dark for
- * accounts that don't have Langy.
- *
- * They also refuse the demo project, mirroring the conversation surface. These
- * used to read `project:view` / `project:update`, and `project:view` is granted
- * to EVERY authenticated user on the demo project (DEMO_VIEW_PERMISSIONS), so
- * `get` was exposing the demo project's egress allow-list — the set of hosts
- * Langy's sandbox may reach — to anyone with an account. `langy:*` is not
- * demo-granted, and the explicit refusal keeps it that way if that ever changes.
+ * Per-project Langy egress allow-list over tRPC (ADR-076). `get`/`set` gated
+ * on `langy:manage`, refuse the demo project (unlike demo-granted
+ * `project:view`). This surface only reads/writes; enforcement is elsewhere.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -39,11 +16,8 @@ const langyEgressStateSchema = z
 
 /**
  * The process supplies authentication; authorization arrives as `policy`.
- *
- * The same slice the conversation door takes, and the same {@link LangyApp}
- * object: one application, two doors. Before it, this door declared
- * `Readonly<{ langy: LangyService }>` and the conversation door declared a
- * wider bag of its own, and neither could reach the other's.
+ * Same slice and same {@link LangyApp} object the conversation door takes —
+ * one application, two doors.
  */
 export type LangyEgressTrpcContext = Readonly<{
   app: Readonly<{ langy: LangyApp }>;
@@ -58,13 +32,9 @@ type LangyEgressTrpcProcedures<
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
-   * The process's tracing, logging, error, scope-lineage, authorization, audit,
-   * demo-refusal and Langy-rollout policy for one declared permission.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
+   * The process's cross-cutting policy for one declared permission. Applied
+   * AFTER `.input()`: the authz check reads its scope id from validated
+   * input, and tRPC runs middlewares in add order.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
   /** Whether the chain checks every answer against its declared output schema. */

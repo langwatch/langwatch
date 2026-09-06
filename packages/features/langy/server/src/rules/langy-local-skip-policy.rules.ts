@@ -1,14 +1,7 @@
 /**
  * The skip choice, re-read against the model that runs the conversation
- * (ADR-129, "Skipping permission checks is one explicit choice, gated by the
- * model").
- *
- * The developer's consent is recorded once, and the gate behind it is not a
- * fact of that moment: a conversation that moves to another model moves the
- * answer with it. So the policy is reconciled where it is about to matter, on
- * the register that reports it and on the call that would run without a card.
- * A model the provider does not allow drops the policy, tells the command line
- * with a `policy` frame, and records the change.
+ * (ADR-129): consent is recorded once but reconciled per-model, so a model the
+ * provider no longer allows drops the policy and notifies via a `policy` frame.
  */
 
 import { createLogger } from "@langwatch/observability";

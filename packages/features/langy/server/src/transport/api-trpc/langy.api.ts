@@ -1300,11 +1300,8 @@ export class LangyTrpcApi {
 
       /**
        * Turn the permission cards off for this conversation, or back on.
-       *
-       * The server owns one half of this and one half only: whether the model
-       * running the conversation is on its provider's allowed list. The command
-       * line keeps the folder boundary and the privilege rule whatever the
-       * answer is, so nothing here can widen what may run on the machine.
+       * Server owns only whether the model is on its provider's allowed list;
+       * the command line keeps its own folder boundary and privilege rule.
        */
       .mutation("setLocalPolicy", (p) =>
         p
@@ -1358,12 +1355,8 @@ export class LangyTrpcApi {
             const runtime = ports.local.runtime;
             const workspace = await runtime.presence.read(input.conversationId);
 
-            // The credential goes first, and it goes whether or not a folder is
-            // there to be told. The frame below is best effort: a command line
-            // that lost the network a second before this never receives it, and
-            // its own reconnect would otherwise pass authentication on a binding
-            // that lives six hours, restoring the folder the reader had just
-            // disconnected.
+            // Revoke first, unconditionally: the frame below is best effort, and
+            // a reconnect must not pass auth on a binding that outlives it.
             await runtime.requests.revokeConversationBindings(input.conversationId);
             await runtime.store.publish(
               workspaceChannel(input.conversationId),

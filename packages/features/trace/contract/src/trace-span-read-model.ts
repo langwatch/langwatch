@@ -1,14 +1,9 @@
 import { z } from "zod";
 
 /**
- * The per-span read models the trace drawer and the trace list render.
- *
- * These rows are projections of `stored_spans`, not the stored span itself:
- * each one is the slim shape a particular surface reads, and each one is
- * published by the trace transport. They live in the contract for the same
- * reason as `TraceListItem` — a payload type declared in the application
- * would narrow to its declared constraint for every client once the transport
- * moved into a package.
+ * The per-span read models the trace drawer and trace list render —
+ * projections of `stored_spans`, not the stored span itself, each the slim
+ * shape one surface reads.
  */
 
 /** One event name a trace recorded, with how often and when it first fired. */
@@ -52,25 +47,14 @@ export interface SpanSummaryRow {
   /** Tool-call join key (`tool_use_id` ?? `gen_ai.tool.call.id`). */
   toolUseId: string | null;
   model: string | null;
-  /**
-   * USD cost: `gen_ai.usage.cost` when the SDK reported one, otherwise
-   * computed at read time from token counts × model pricing (same
-   * cascade the trace-level fold uses). Null when neither yields a
-   * value — most ingest paths only emit token counts, so without the
-   * computed fallback the waterfall never had a per-span cost to show.
-   */
+  /** USD cost: SDK-reported, else computed from tokens × pricing at read time. */
   cost: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
   cacheReadTokens: number | null;
   cacheCreationTokens: number | null;
   startTimeMs: number;
-  /**
-   * Row version, not span timing: bumped every time a span is re-projected.
-   * The live delta poll keys off this rather than `startTimeMs`, because a
-   * span updated in place (end time, duration, status, cost) keeps its start
-   * time and a start-keyed poll could never see it.
-   */
+  /** Row version, bumped on re-projection. The live delta poll keys off this, not `startTimeMs`. */
   updatedAtMs: number;
 }
 
@@ -101,14 +85,7 @@ export const traceLogRecordDtoSchema = z.object({
   resourceAttributes: z.record(z.string(), z.string()),
   scopeName: z.string(),
   scopeVersion: z.string().nullable(),
-  /**
-   * True when this record carried captured content the viewer may not see, so
-   * the content was withheld — the top-level body, the per-event content
-   * attributes (`prompt` / `response` / `body`), and the ingest-derived
-   * `langwatch.gen_ai.*` content attrs. The UI renders the redacted
-   * placeholder, mirroring the span endpoints' `inputRedacted` /
-   * `outputRedacted`.
-   */
+  /** True when content was withheld (body + content attrs); mirrors span `inputRedacted`/`outputRedacted`. */
   bodyRedacted: z.boolean().optional(),
   /** Audience label naming who CAN see the withheld content, when restricted. */
   bodyVisibleTo: z.string().nullable().optional(),

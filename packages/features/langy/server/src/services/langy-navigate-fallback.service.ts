@@ -1,10 +1,7 @@
 /**
- * Resolution for a navigate destination the conversation remembered no platform
- * link for. The address is STILL platform-computed, never agent-authored: a
- * page name resolves through the closed page table, and a resource id is looked
- * up with the project's own access. Anything neither table knows resolves to
- * null so the navigate drops, and a lookup that fails resolves to null rather
- * than tearing down the relay stream.
+ * Resolution for a navigate destination with no remembered platform link. The
+ * address is STILL platform-computed, never agent-authored; anything unknown
+ * or failing resolves to null rather than tearing down the relay stream.
  */
 import type { LangyNavigateProjectPort } from "../ports/langy-navigate-project.port";
 import type { LangyNavigateResourcePort } from "../ports/langy-navigate-resource.port";

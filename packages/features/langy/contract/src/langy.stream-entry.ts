@@ -23,23 +23,15 @@ export const langyStreamEntrySchema = z.discriminatedUnion("type", [
     batchDurationMs: z.number().optional(),
   }),
   z.object({ type: z.literal("milestone"), kind: z.string(), detail: z.string().optional() }),
-  /**
-   * A full snapshot of the agent's plan (todo list), mirrored to the live UI as
-   * a checklist. Ephemeral on this buffer — the durable `plan_updated` event is
-   * dispatched separately; the client prefers this typed snapshot over parsing
-   * the raw `todowrite` tool part.
-   */
+  /** Full plan snapshot, mirrored live. Ephemeral — the durable `plan_updated` event is separate. */
   z.object({
     type: z.literal("plan"),
     items: z.array(z.object({ content: z.string(), status: z.string() })),
   }),
   /**
-   * A tool call the agent ran, mirrored onto the live edge so the UI renders a
-   * card as the tool starts and updates it when it returns. `phase:"start"`
-   * carries the name + input; `phase:"end"` carries the result (`output`, a
-   * string), `isError`, and — for a LangWatch CLI call — the result `digest`
-   * the relay's envelope computed. The durable
-   * `tool_call_started`/`tool_call_completed` events are dispatched separately.
+   * A tool call, mirrored live. `phase:"start"` carries name+input;
+   * `phase:"end"` carries `output`/`isError`/`digest`. Durable events are
+   * dispatched separately.
    */
   z.object({
     type: z.literal("tool"),
@@ -54,18 +46,14 @@ export const langyStreamEntrySchema = z.discriminatedUnion("type", [
     result: cliToolResultSchema.optional(),
   }),
   /**
-   * The agent navigating the browser to a resource it surfaced. `href` is
-   * ALWAYS platform-computed and already stripped to a same-app relative path —
-   * never something the agent authored. LIVE-ONLY by design: never a durable
-   * event, so reopening a past conversation never replays a navigation.
+   * The agent navigating the browser. `href` is ALWAYS platform-computed,
+   * never agent-authored. LIVE-ONLY: never a durable event, never replayed.
    */
   z.object({ type: z.literal("navigate"), href: z.string() }),
   /**
-   * The agent asking the OPEN PAGE to carry out one typed action. `kind` names
-   * an entry in a page's action manifest and `payload` has already passed that
-   * entry's schema server-side before it was appended. LIVE-ONLY like
-   * `navigate`, and `actionId` is the server-minted claim/result key, which
-   * makes the whole round trip at-most-once.
+   * The agent asking the OPEN PAGE to run one typed action, `payload`
+   * already schema-validated server-side. LIVE-ONLY; `actionId` makes the
+   * round trip at-most-once.
    */
   z.object({
     type: z.literal("ui"),
@@ -74,11 +62,9 @@ export const langyStreamEntrySchema = z.discriminatedUnion("type", [
     payload: z.unknown(),
   }),
   /**
-   * ADR-129. A card the developer has to answer while the turn is in flight: a permission ask
-   * for one command on their machine, or a question Langy needs settled before it goes on. The
-   * durable `user_wait_started` event is the source of truth, because a tab that adopted a
-   * running turn never subscribes to this stream; these entries are the fast path for the tab
-   * that sent the message, and the wake-up that says the card is there now.
+   * ADR-129. A card to answer mid-turn (permission or question). The durable
+   * `user_wait_started` event is the source of truth; this is the fast-path
+   * wake-up for the tab that sent the message.
    */
   z.object({
     type: z.literal("local_permission"),

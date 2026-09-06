@@ -70,21 +70,12 @@ export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
     });
   }
 
-  /**
-   * The sweep, delegated so the App's repository and a worker's narrow one run
-   * the identical UPDATE. Two copies of this predicate is how a widened sweep
-   * gets shipped by only half the fleet.
-   */
+  /** Delegated so the App's repository and a worker's narrow one run the identical UPDATE. */
   revokeExpiredByName(input: { name: string; now: Date }): Promise<number> {
     return this.reap.revokeExpiredByName(input);
   }
 
-  /**
-   * The same sweep under the shape the App's tenancy-guard suite drives it
-   * through. It is not on `LangySessionKeyReapRepository`: a worker composing
-   * only the sweep gets the named-parameter form, and this positional one stays
-   * on the Prisma class where its one caller reaches it.
-   */
+  /** Same sweep, positional args, for the App's tenancy-guard suite call shape. */
   reapExpired(revokedAt: Date, name: string): Promise<number> {
     return this.revokeExpiredByName({ name, now: revokedAt });
   }

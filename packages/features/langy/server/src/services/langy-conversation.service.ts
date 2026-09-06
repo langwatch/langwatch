@@ -450,12 +450,9 @@ export class LangyConversationService {
   }
 
   /**
-   * The developer's own machine in one conversation, off the durable record (ADR-129): every
-   * card it raised, in the order they were raised, and whether the folder is connected now.
-   *
-   * The live stream cannot answer either question: a tab that adopted a running turn never
-   * subscribes to it, and the browser's local fold starts at the snapshot's cursor. Authorized
-   * exactly like the other reads (owner-or-shared, reported as not-found so it cannot probe).
+   * The developer's own machine in one conversation, off the durable record
+   * (ADR-129): every card it raised in order, and whether it's connected now.
+   * The live stream can't answer either for an adopted tab.
    */
   async getLocalRecord({
     projectId,

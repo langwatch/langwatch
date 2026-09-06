@@ -1,10 +1,7 @@
 /**
- * The handled errors of local control (ADR-129).
- *
- * Every message is written so a customer could read it: the REST boundary
- * ships it in the response body, and the worker hands the text to the model as
- * the tool result. The words the panel shows live in the client presentation
- * registry, keyed by `code`.
+ * The handled errors of local control (ADR-129). Every message is
+ * customer-readable: the REST boundary ships it, the worker hands it to the
+ * model as the tool result. Panel copy lives in the presentation registry.
  */
 
 import { HandledError } from "@langwatch/handled-error";
@@ -110,12 +107,7 @@ export class LangyLocalSkipModelNotAllowedError extends HandledError {
   }
 }
 
-/**
- * The card is no longer waiting: it was answered, it expired, or it was
- * stopped. Which of the three rides in `meta`, because the three are very
- * different news: an answered card ran the command the reader allowed, and
- * telling them Langy gave up on it is wrong on both halves.
- */
+/** The card is no longer waiting: answered, expired, or stopped — which one rides in `meta`. */
 export class LangyWaitExpiredError extends HandledError {
   declare readonly code: "langy_wait_expired";
 

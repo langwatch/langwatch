@@ -1,15 +1,9 @@
 import type { PlatformFrame } from "@langwatch/langy-contract";
 
 /**
- * The calls one connection has already been handed.
- *
- * A connection learns about calls two ways: the subscription that carries
- * every call written from now on, and the scan of pending calls that runs
- * once it is registered. A call written between the two reaches both, and a
- * command handed over twice runs twice on the developer's machine. So each
- * connection keeps the ids it sent and hands a call over once. An id is
- * dropped when the call's result arrives, so the set stays as small as the
- * calls in flight.
+ * The calls one connection has already been handed. A connection learns about
+ * calls via both a subscription and a pending-calls scan, which can overlap,
+ * so each connection dedupes by id and drops it once the result arrives.
  */
 export class DeliveredCalls {
   private readonly ids = new Set<string>();
@@ -17,11 +11,6 @@ export class DeliveredCalls {
   /**
    * Claim an id without sending anything: the command line said it is already
    * running this call, so the connection must not hand it over again.
-   *
-   * A reconnect used to replay every call the platform still held, and the
-   * command line ran a second copy of a migration, a deploy or whatever else
-   * the developer had already approved. The register frame names what is in
-   * flight; this is where that list is honoured.
    */
   reserve(callId: string): void {
     this.ids.add(callId);

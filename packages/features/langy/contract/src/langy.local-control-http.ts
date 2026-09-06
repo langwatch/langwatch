@@ -1,25 +1,7 @@
 /**
- * The HTTP shapes of local control (ADR-129), shared by the three callers:
- * the CLI on the device session, the worker on its session key, and the
- * panel through tRPC. Browser-safe: zod and nothing else.
- *
- * Routes:
- *   CLI, device session or API key with scenarios:manage on the project:
- *     GET  /api/v1/langy/control/requests                open requests of the caller
- *     POST /api/v1/langy/control/requests/:id/approve    mints the session key
- *     POST /api/v1/langy/control/requests/:id/cancel
- *     GET  /api/v1/langy/control/connect                 WebSocket upgrade, session key
- *     POST /api/v1/langy/control/connect/register        long-poll fallback, session key
- *     GET  /api/v1/langy/control/connect/poll
- *     POST /api/v1/langy/control/connect/frames
- *   Worker, session key of the conversation:
- *     GET  /api/langy/local/workspace                     what code_access reads
- *     POST /api/langy/local/requests                      records the control request
- *     POST /api/langy/local/calls                         starts one local tool call
- *     GET  /api/langy/local/calls/:id                     long-polls the call
- *     POST /api/langy/local/calls/:id/cancel
- *     POST /api/langy/waits                               starts a question wait
- *     GET  /api/langy/waits/:id                           long-polls the wait
+ * The HTTP shapes of local control (ADR-129), shared by the CLI, the worker,
+ * and the panel (tRPC). Browser-safe: zod and nothing else. See the route
+ * mounts under `server/src/transport/api-rest` for the full path list.
  */
 
 import { z } from "zod";

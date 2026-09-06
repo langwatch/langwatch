@@ -39,10 +39,8 @@ export abstract class LangyTurnHandoffPort {
   abstract refresh(input: { conversationId: string; turnId: string }): Promise<boolean>;
 
   /**
-   * Records that this turn was stopped, so nothing dispatches it afterwards. A turn is admitted
-   * and its handoff stashed before any worker runs it, and the outbox re-drives that handoff for
-   * as long as it lives; this marker is what a dispatch checks before spending a worker on an
-   * answer nobody is waiting for. Same TTL as the handoff it guards.
+   * Records that this turn was stopped, so a re-driven outbox handoff is not
+   * dispatched again. Same TTL as the handoff it guards.
    */
   abstract markStopped(input: { conversationId: string; turnId: string }): Promise<void>;
 

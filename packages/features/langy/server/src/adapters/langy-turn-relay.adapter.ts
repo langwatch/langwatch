@@ -612,13 +612,9 @@ export class LangyTurnRelayAdapter {
       }
 
       case "final": {
-        // The one terminal that means the turn finished. Stop and handoff also
-        // end the stream, and neither may claim the turn wrote no reply.
-        //
-        // The durable message is built from the frame, the live stream from the
-        // deltas, so this is the one place that sees both. Whether the backstop
-        // fired decides both, or the fallback would show live and the turn
-        // would render blank again the moment history reloads.
+        // The one terminal meaning the turn finished (Stop/handoff end the
+        // stream but never claim no reply). Only place that sees both the
+        // durable message and the live stream, so the backstop decides both.
         const { backstopped, text: backstopText } = await this.deps.buffer.markEnd({
           ...at,
           backstopSilentTurn: (frame.text ?? "").trim() === "",

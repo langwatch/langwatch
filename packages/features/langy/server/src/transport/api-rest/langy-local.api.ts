@@ -1,19 +1,7 @@
 /**
- * The worker's door onto the developer's folder and onto the developer
- * themselves (ADR-129).
- *
- * Mounted under `/api/langy/local` and `/api/langy/waits`, beside the turn
- * surface and the page-action surface, and deliberately NOT under
- * `/api/internal`, which the Helm ingress blocks by default. The credential is
- * the worker's own per-conversation session key, and the conversation in every
- * body is a claim the route proves against that key rather than a fact it
- * takes.
- *
- * The worker's standard error is not a log line: its stderr goes to
- * `/dev/null`, so everything it needs to know about a refusal has to ride the
- * HTTP answer. Every refusal here is therefore a `HandledError` with a code
- * and a customer-safe message, which is also what the model reads as the tool
- * result.
+ * The worker's door onto the developer's folder (ADR-129), deliberately NOT
+ * under `/api/internal`. Every refusal is a `HandledError`: the worker's
+ * stderr is `/dev/null`, so the HTTP answer is all it has.
  */
 
 import { handlerManagedAuth } from "@langwatch/api";
@@ -177,10 +165,8 @@ export function createLangyLocalRestApp(options: {
   };
 
   /**
-   * The conversation the caller named, proved against the key.
-   *
-   * A conversation the key's user cannot see dies as not-found rather than as a
-   * refusal, so a foreign id never confirms that it exists.
+   * The conversation the caller named, proved against the key. Invisible
+   * dies as not-found, not refusal, so a foreign id never confirms it exists.
    */
   const requireConversation = async (input: {
     conversationId: string;

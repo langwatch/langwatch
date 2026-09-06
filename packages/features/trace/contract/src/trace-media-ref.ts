@@ -3,27 +3,9 @@ import { collectAnnotatedMediaParts } from "./trace-media-part.collector";
 import { isMediaPartRole, MEDIA_PART_ROLES, type MediaPartRole } from "./trace-media-role";
 
 /**
- * Compact trace-level media references, and the chat roles they carry.
- *
- * The trace summary's computed input/output are flattened human-readable
- * text — media parts (players, images, attachments) only exist at span
- * level. So the IO accumulation ALSO derives a compact list of media
- * references from the winning span IO and stores it in the summary's
- * reserved attributes, giving the trace list and the drawer summary a way to
- * show thumbnails and players without reloading span payloads.
- *
- * The shape lives in the contract rather than beside the fold that writes it
- * because it is a READ MODEL: it rides on `TraceListItem`, which the trace
- * transport publishes to every client. A payload type defined in the
- * application would narrow to its declared constraint the moment the
- * transport moved into a package (see the type-narrowing note on
- * `TraceListItem`).
- *
- * Refs are STRICTLY `/api/files/{projectId}/{id}` references — the shape the
- * extraction pipeline mints. Inline base64 would re-bloat the summary row the
- * extraction just slimmed, and an arbitrary URL here would hand every list
- * viewer's browser to whoever controls span content, so both the collector
- * and the defensive parser reject anything else.
+ * Compact trace-level media references, letting the trace list and drawer
+ * show thumbnails without reloading span payloads. Refs are STRICTLY
+ * `/api/files/{projectId}/{id}` — no arbitrary URLs.
  */
 
 export const traceMediaRefSchema = z.object({
@@ -32,13 +14,7 @@ export const traceMediaRefSchema = z.object({
   filename: z.string().optional(),
   /** Carried for `file` refs so the attachment chip can pick its icon. */
   mimeType: z.string().optional(),
-  /**
-   * Role of the chat message the part was found under. A voice turn puts the
-   * caller's recording and the agent's reply in the same span payload, so the
-   * summary strips need this to show each side its own media. Absent for parts
-   * outside a message envelope and for traces ingested before roles were
-   * recorded, which every consumer treats as "belongs wherever it used to".
-   */
+  /** Role of the chat message the part was found under; absent for pre-role traces. */
   role: z.enum(MEDIA_PART_ROLES).optional(),
 });
 
@@ -49,17 +25,8 @@ export const RESERVED_OUTPUT_MEDIA_REFS = "langwatch.reserved.media_refs.output"
 
 /**
  * THE FORMAT LOGIC BELOW IS A FROZEN TWIN of
- * `platform/app/src/shared/traces/media-refs.ts`. The application keeps its
- * copy while both graphs ingest; edit neither without editing the other.
- *
- * It lives in the CONTRACT rather than in the fold that writes it because the
- * serialised column has three readers and one writer: the projection writes
- * it, and the trace read path, `trace-list.service` and the summary strips all
- * read it back. A format two of them disagree about is a media reference that
- * resolves to nothing — the thumbnail vanishes and no error says why. The url
- * policy is the same argument with teeth: an arbitrary address admitted on the
- * way back in hands every list viewer's browser to whoever controls span
- * content, so the collection side and the parse side apply one rule, once.
+ * `platform/app/src/shared/traces/media-refs.ts` — edit neither without the
+ * other. Lives in the CONTRACT: one writer, three readers share the column.
  */
 
 /** Which summary strip a ref belongs on. */
@@ -67,16 +34,8 @@ export type TraceMediaSide = "input" | "output";
 
 /**
  * Whether media found under the given chat role belongs on the given side.
- *
- * The agent's reply is the only side we can place with certainty, so it is the
- * only one excluded from the input side: everything the caller sent (user,
- * system, tool results, roleless) stays on INPUT, and OUTPUT takes the
- * assistant plus anything with no role recorded. Media is therefore never
- * dropped from both sides.
- *
- * The rule lives here once for every surface that splits a payload by side:
- * the summary strips read it off compact refs, the conversation thread reads
- * it off the parts it collected from the turn.
+ * Only the assistant's reply is excluded from INPUT; everything else
+ * (including roleless) stays there. Never dropped from both sides.
  */
 export function mediaRoleBelongsToSide(
   role: MediaPartRole | undefined,
@@ -101,22 +60,12 @@ function kindFromMime(mimeType: string): TraceMediaRef["kind"] {
   return "file";
 }
 
-/**
- * Trace-summary refs only ever point at our own stored-objects read route.
- * Anything else — external http(s), `data:` payloads (bloat), `javascript:`
- * (XSS), protocol-relative — is dropped both when folding refs in and when
- * parsing them back out.
- */
+/** Trace-summary refs only ever point at our own stored-objects route (external/data:/javascript: rejected). */
 function isStoredObjectRefUrl(url: string): boolean {
   return url.startsWith("/api/files/") && !url.includes("..");
 }
 
-/**
- * Walks a span IO value (typed envelope, messages, nested JSON strings — the
- * same shapes `collectMediaParts` handles) and returns the compact reference
- * list. `collectMediaParts` is React-free and isomorphic by design; this is
- * its fold-side consumer.
- */
+/** Walks a span IO value and returns the compact reference list — the fold-side consumer of `collectMediaParts`. */
 export function collectMediaRefs(value: unknown): TraceMediaRef[] {
   const refs: TraceMediaRef[] = [];
   const seen = new Set<string>();
@@ -145,19 +94,9 @@ export function collectMediaRefs(value: unknown): TraceMediaRef[] {
 }
 
 /**
- * Fold two ref lists into one, keeping the first occurrence of each url and
- * stopping at the cap.
- *
- * The url IS the identity: storage is content-addressed, so two refs with the
- * same url are the same bytes reached by two paths through one payload: a
- * message content part and a mirrored field, the same recording quoted by two
- * spans of the trace. Rendering both draws the identical player twice. When one
- * url does arrive under two different chat roles, the first role recorded wins,
- * which puts an echoed recording on the side that actually sent it.
- *
- * `precedence` says where the incoming list goes: the span that wins the
- * trace's headline input/output prepends, so its media stays the trace's
- * thumbnail, and every other span appends behind it.
+ * Fold two ref lists into one, keeping the first occurrence of each url
+ * (content-addressed, so same url = same bytes) and stopping at the cap.
+ * `precedence`: the headline span prepends so its media stays the thumbnail.
  */
 export function mergeMediaRefs({
   existing,
@@ -188,11 +127,7 @@ export function serializeMediaRefList(refs: TraceMediaRef[]): string | null {
 
 const VALID_KINDS = new Set(["audio", "image", "video", "file"]);
 
-/**
- * One parsed entry from the reserved attribute, validated: kind must be
- * allowlisted and the url must be a stored-objects reference. Returns null
- * for anything else.
- */
+/** One parsed entry, validated: kind allowlisted, url a stored-objects reference, else null. */
 function parseMediaRefEntry(entry: unknown): TraceMediaRef | null {
   if (typeof entry !== "object" || entry === null) return null;
   const candidate = entry as Record<string, unknown>;
@@ -216,11 +151,8 @@ function parseMediaRefEntry(entry: unknown): TraceMediaRef | null {
 }
 
 /**
- * Defensive parse of a reserved media-refs attribute value. The attribute
- * namespace is not writable by SDKs in the normal flow, but nothing in this
- * parser assumes that: kinds are allowlisted and every url must be a
- * stored-objects reference (see `parseMediaRefEntry`), so a crafted
- * attribute cannot smuggle an external or scripted URL to a renderer.
+ * Defensive parse of a reserved media-refs attribute value: assumes nothing
+ * about SDK trust, allowlists kinds and urls (`parseMediaRefEntry`).
  */
 export function parseMediaRefs(serialized: string | null | undefined): TraceMediaRef[] {
   if (!serialized) return [];

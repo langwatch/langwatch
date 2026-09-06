@@ -1,11 +1,7 @@
 /**
- * The Redis key family of local control (ADR-129).
- *
- * Every key and channel is built here so no module hand-copies a format. The
- * `v1` segment is the shape version: a later incompatible layout takes `v2`
- * and the two never read each other's keys. Every key that belongs to one
- * conversation carries the conversation id, so a folder shared with one chat
- * can never be read by another.
+ * Redis key family of local control (ADR-129), built here so no module
+ * hand-copies a format. `v1` is the shape version — an incompatible layout
+ * takes `v2` and the two never read each other's keys.
  */
 
 const PREFIX = "langy_local:v1";
@@ -52,14 +48,9 @@ export function sessionKeyBindingKey(apiKeyId: string): string {
 }
 
 /**
- * ZSET of the minted keys that control one conversation, scored by when each
- * binding lapses.
- *
- * The binding above is keyed by the key's own id, which the panel does not
- * have: disconnecting from the header chip knows a conversation and nothing
- * else. Without this index the disconnect could clear presence and leave the
- * credential alive for another six hours, so a command line that missed the
- * disconnect frame simply reconnected and restored the folder.
+ * ZSET of minted keys controlling one conversation, scored by binding lapse.
+ * Needed because the disconnect panel knows only a conversation id, not the
+ * key id, so this index is what lets it revoke the credential too.
  */
 export function conversationKeyBindingsKey(conversationId: string): string {
   return `${PREFIX}:conversation_keys:${conversationId}`;

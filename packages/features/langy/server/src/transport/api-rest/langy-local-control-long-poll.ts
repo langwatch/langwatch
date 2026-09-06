@@ -1,15 +1,7 @@
 /**
- * The HTTP fallback for the local control socket (ADR-129).
- *
- * A network that blocks WebSockets still has to carry the folder, so the same
- * three moves are available over plain requests: register once, poll for the
- * frames the platform has for you, and post the frames you have for it. The
- * meaning of each move is `LocalControlSessionCoreService`'s, exactly as it is for the
- * socket; this file owns only the queue that turns a subscription into a poll.
- *
- * One hold per poll, twenty seconds, so a proxy sees one request every twenty
- * seconds rather than one every half second. That is the number the ADR-128
- * ingress requirement is written against.
+ * HTTP fallback for the local control socket (ADR-129): register, poll,
+ * post — same meaning via `LocalControlSessionCoreService`. 20s hold per
+ * poll, per the ADR-128 ingress requirement.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -52,10 +44,8 @@ export interface LocalControlLongPollOptions {
 }
 
 /**
- * One process's long-poll sessions. A session lives on the pod that registered
- * it: the token is that pod's handle on a subscription, and a poll that lands
- * elsewhere finds nothing and re-registers, which is the same recovery a
- * dropped socket takes.
+ * One process's long-poll sessions, keyed by a pod-local token. A poll that
+ * lands on another pod finds nothing and re-registers, same as a dropped socket.
  */
 export class LocalControlLongPoll {
   private readonly core: LocalControlSessionCoreService;
@@ -143,14 +133,9 @@ export class LocalControlLongPoll {
   }
 
   /**
-   * Holds until there is something to send, then answers with everything that
-   * queued. An empty answer is normal: the command line polls again, and the
-   * poll doubles as the folder's heartbeat.
-   *
-   * `inFlightCallIds` are the calls the command line believes it is still
-   * running. A call the platform no longer holds is answered with a cancel, so
-   * a command line that polled through a restart stops work nobody is waiting
-   * for rather than running it to the end.
+   * Holds until there is something to send. An empty answer is normal — the
+   * poll doubles as the folder's heartbeat. `inFlightCallIds` are answered
+   * with a cancel when the platform no longer holds them.
    */
   async poll({
     token,

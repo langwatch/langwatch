@@ -1,11 +1,7 @@
 /**
  * Event and command type constants for the langy-conversation-processing
- * pipeline (ADR-046).
- *
- * A Langy conversation is an event-sourced aggregate: `aggregateId` is the
- * conversationId and `TenantId` is the projectId. Writes are imperative
- * commands that emit past-tense events; the conversation row and its message
- * rows are both derived projections.
+ * pipeline (ADR-046). Event-sourced aggregate: `aggregateId` is the
+ * conversationId, `TenantId` the projectId.
  */
 
 /**
@@ -82,17 +78,9 @@ export type LangyConversationProcessingEventType =
   (typeof LANGY_CONVERSATION_PROCESSING_EVENT_TYPES)[number];
 
 /**
- * EPHEMERAL signal type identifiers — NOT durable events. They are never
- * written to `event_log`, the fold, or the map projection (ADR-046). They flow
- * through a short-lived, per-conversation Redis buffer (see `../ephemeral.ts`)
- * that backs the live UI stream, and are dropped when the turn ends or the TTL
- * lapses. Persisting one per tick/token would flood `event_log` and leave a
- * residue no consumer wants — so they simply do not enter the durable pipeline.
- *
- * The same durable/ephemeral split applies to simulations
- * (`text_message_start` / `text_message_end` / `message_snapshot` flood
- * `simulation_runs` today), so this classification is a candidate to graduate
- * to a framework-level concept shared across pipelines (ADR-046 open question 4).
+ * EPHEMERAL signal type identifiers — NOT durable events (ADR-046). Flow
+ * through a short-lived per-conversation Redis buffer (`../ephemeral.ts`)
+ * backing the live UI stream, dropped on turn end or TTL.
  */
 export const LANGY_EPHEMERAL_SIGNAL_TYPES = {
   STATUS_REPORTED: "lw.langy_conversation.status_reported",
@@ -165,10 +153,8 @@ export type LangyConversationProcessingCommandType =
   (typeof LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES)[number];
 
 /**
- * Conversation lifecycle status values held on the fold.
- * `active` = has messages, no turn in flight; `running` = an agent turn is in
- * progress; `idle` = a turn just completed; `failed` = the last turn failed;
- * `archived` = soft-deleted.
+ * Conversation lifecycle status held on the fold: `active` (no turn in
+ * flight), `running`, `idle` (turn just completed), `failed`, `archived`.
  */
 export const LANGY_CONVERSATION_STATUS = {
   ACTIVE: "active",
@@ -179,10 +165,9 @@ export const LANGY_CONVERSATION_STATUS = {
 } as const;
 
 /**
- * Where the conversation's current title came from. Operational projection
- * handlers enforce precedence: a `user` title is sticky and never overridden;
- * an `auto` title is stable across later turns; a `derived` placeholder is the
- * only thing an auto title replaces.
+ * Where the title came from. Precedence: `user` is sticky and never
+ * overridden; `auto` is stable across turns; `derived` is the only one an
+ * auto title replaces.
  */
 export const LANGY_TITLE_SOURCE = {
   /** First-message placeholder slice (or none yet). */
@@ -196,16 +181,9 @@ export const LANGY_TITLE_SOURCE = {
 export type LangyTitleSource = (typeof LANGY_TITLE_SOURCE)[keyof typeof LANGY_TITLE_SOURCE];
 
 /**
- * Lifecycle status of a single turn, held on the langyConversationTurn fold —
- * the per-turn render document. `pending` = the turn document exists but the
- * agent has not started (init default); `running` = the agent is working;
- * `completed`/`failed`/`stopped` = terminal. A turn reaches exactly one terminal.
- *
- * `stopped` is a user-initiated stop (ADR-078): the agent was mid-answer and the
- * user halted it, so the turn keeps the partial answer it had written and renders
- * distinctly from both a clean `completed` and a red `failed` — it is the anchor
- * for the Continue affordance. It is the render-doc face of an `agent_responded`
- * whose `outcome` is `stopped`; the conversation spine simply reads it as idle.
+ * Lifecycle status of one turn (langyConversationTurn fold): `pending` (init
+ * default), `running`, then exactly one terminal of `completed`/`failed`/
+ * `stopped`. `stopped` (ADR-078) keeps the partial answer and anchors Continue.
  */
 export const LANGY_CONVERSATION_TURN_STATUS = {
   PENDING: "pending",

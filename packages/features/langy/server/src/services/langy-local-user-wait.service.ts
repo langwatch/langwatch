@@ -1,25 +1,7 @@
 /**
- * The user wait: one primitive behind the permission card and the question
- * card (ADR-129).
- *
- * A tool asks, the turn stays in flight, the developer answers in the panel,
- * and the tool returns with the answer and its plan intact. Three rules decide
- * the design:
- *
- * - **Durable first.** A tab that adopted a running turn from Recent chats
- *   never subscribes to the live stream, so a live-only card would reach
- *   exactly one tab. The durable `user_wait_started` event is the card; the
- *   live entry is the fast path for the tab that sent the message.
- * - **The live stream has to be kept alive.** Its key expires 180 s after the
- *   last append, and a wait appends nothing while it waits. Every poll that
- *   crosses the keepalive interval writes one `status` entry, which restores
- *   the full window. The poll is where it happens, so there is no timer to own
- *   and no pod that has to stay the same one. The same poll refreshes the
- *   turn's liveness key, or the subscriber ends a turn that is only waiting
- *   for an answer.
- * - **One terminal.** An answer, an expiry and a turn's Stop contend for the
- *   same transition, so a late answer to an expired card changes nothing and
- *   the record never contradicts itself.
+ * The user wait: one primitive behind the permission and question cards
+ * (ADR-129). Durable `user_wait_started` is the card; answer/expiry/Stop
+ * share one terminal.
  */
 
 import type {
@@ -79,13 +61,7 @@ export const storedUserWaitSchema = z.object({
 });
 export type StoredUserWait = z.infer<typeof storedUserWaitSchema>;
 
-/**
- * The fields that were given, with every absent one left out of the object.
- *
- * A wait carries only what its ask supplied, and a field that is written as
- * `undefined` is not the same as a field that is not there: it is what the
- * stored record and the live entry are both typed for.
- */
+/** The fields that were given; an explicit `undefined` is dropped, not stored. */
 function given<T extends object>(fields: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(fields).filter(([, value]) => value !== undefined),
@@ -306,12 +282,9 @@ export class UserWaitService {
   }
 
   /**
-   * The developer answered, on the card or in the terminal that shares the
-   * folder. The first answer wins: a wait that already settled refuses the
-   * second one, and `source` records the place the answer came from.
-   *
-   * @throws {LangyWaitExpiredError} the card is not waiting any more, so the
-   * panel falls back to sending the answer as the next message
+   * The developer answered, on the card or in the terminal. First answer wins.
+   * @throws {LangyWaitExpiredError} not waiting any more; panel falls back to
+   * sending the answer as the next message
    */
   async answer({
     waitId,
@@ -452,15 +425,9 @@ export class UserWaitService {
   }
 
   /**
-   * Locks the card on the live edge, then writes the terminal event.
-   *
-   * The live entry goes FIRST, and that order is the point. An answer given in
-   * the terminal reaches the panel only through this entry, and it used to be
-   * written after the durable event: the card kept its buttons for as long as
-   * the event store took, four seconds on a quiet machine and thirteen on a
-   * busy one, with the command already running behind it. The panel's own
-   * answer never had that lag, because the card settles itself the moment its
-   * mutation returns.
+   * Locks the card on the live edge, then writes the terminal event. Order
+   * matters: a terminal-given answer reaches the panel only via the live
+   * entry, so writing it first avoids the card lagging the event store.
    */
   private async end(
     wait: StoredUserWait,
@@ -642,12 +609,8 @@ export class UserWaitService {
 }
 
 /**
- * The refusal a second answer gets, carrying how the card ended.
- *
- * The three ways a card can end are very different news, and the answer that
- * closed an already-answered one decides what the panel says in its place, so
- * the record's own fields travel with the refusal.
- *
+ * The refusal a second answer gets, carrying how the card ended so the panel
+ * can say what happened instead.
  * @throws {LangyWaitExpiredError} always
  */
 function refuseSettled({ waitId, wait }: { waitId: string; wait: StoredUserWait | null }): never {

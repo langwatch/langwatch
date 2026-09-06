@@ -1,12 +1,7 @@
 /**
  * What a shared folder MEANS to the platform, independent of the transport
- * that carries it (ADR-129).
- *
- * The WebSocket gateway and the long-poll routes both call this: authenticate
- * the minted session key, register presence, subscribe to the conversation's
- * channel, record the connection, start the next turn, and translate the
- * command line's frames into calls, results and permission cards. Everything
- * that decides a policy lives here; the transports own only their own clocks.
+ * (ADR-129). WebSocket and long-poll both call this for auth, presence,
+ * subscription, turn start, and frame translation; transports own only clocks.
  */
 
 import type {
@@ -92,12 +87,7 @@ export type RegisterOutcome =
       ok: true;
       session: ControlSession;
       reply: PlatformFrame;
-      /**
-       * The calls the command line says it is still running. The transport
-       * marks each as already handed over, so the scan of pending calls that
-       * follows a reconnect does not start a second copy of a command the
-       * developer already approved.
-       */
+      /** Calls the command line says it's still running — marked handed over so a reconnect's pending-calls scan doesn't start a second copy. */
       inFlightCallIds: string[];
     }
   | { ok: false; code: LocalControlRefusedCode; message: string };
@@ -262,12 +252,8 @@ export class LocalControlSessionCoreService {
   }
 
   /**
-   * The bearer key, and nothing else.
-   *
-   * Three refusals, and each one names a different mistake: a key that does
-   * not resolve, a key that resolves but is not a Langy session key, and a
-   * session key that controls no conversation (it was never approved for one,
-   * or the folder was disconnected from the panel and its binding revoked).
+   * The bearer key, and nothing else. Three distinct refusals: unresolvable
+   * key, not a Langy session key, or a session key bound to no conversation.
    */
   async authenticate({
     authorization,
@@ -431,11 +417,8 @@ export class LocalControlSessionCoreService {
   }
 
   /**
-   * Records the connection and starts the turn that says so.
-   *
-   * A turn already in flight is not a failure: the developer connected while
-   * Langy was working, and the running turn picks the folder up on its next
-   * call. The event still lands, so the card reads connected either way.
+   * Records the connection and starts the turn that says so. A turn already
+   * in flight is not a failure — it picks the folder up on its next call.
    */
   async afterRegister(session: ControlSession): Promise<void> {
     const workspace = await this.presence.read(session.conversationId);
@@ -494,18 +477,9 @@ export class LocalControlSessionCoreService {
   }
 
   /**
-   * Is this connection still the folder of its conversation?
-   *
-   * Registering a second folder overwrites presence but cannot reach into the
-   * pod that holds the first one's socket, so both were subscribed to the same
-   * conversation channel and both received every call: a write landed in two
-   * checkouts, and either machine's answer could become the tool result. The
-   * presence record's instance id is the generation, and this is the fence.
-   *
-   * A record that is simply GONE is not evidence of being superseded: a
-   * heartbeat that lapsed under load writes itself back, and refusing a result
-   * on that would lose an answer the developer's machine really produced. Only
-   * a record naming a DIFFERENT instance retires this connection.
+   * Is this connection still the folder of its conversation? Only a presence
+   * record naming a DIFFERENT instance retires it — a lapsed-then-restored
+   * record does not.
    */
   private async isCurrentConnection(session: ControlSession): Promise<boolean> {
     const workspace = await this.presence.read(session.conversationId);
@@ -528,12 +502,8 @@ export class LocalControlSessionCoreService {
   }
 
   /**
-   * The command line answered the call.
-   *
-   * A result for a call that already ended changes nothing and is not an
-   * error: the command line keeps a result it could not send while the socket
-   * was down and sends it again on the next connection, so the second copy
-   * has to be accepted quietly.
+   * The command line answered the call. A result for a call that already
+   * ended is a quiet no-op, not an error — a resend after a dropped socket.
    */
   async result(session: ControlSession, frame: ResultFrame): Promise<void> {
     const call = await this.dispatcher.read(frame.callId);
@@ -585,13 +555,9 @@ export class LocalControlSessionCoreService {
   }
 
   /**
-   * The developer answered in the terminal instead of on the card.
-   *
-   * The command line has already applied the answer and is running or refusing
-   * the call, so this only settles the wait the card is holding: the card
-   * stops asking and says where it was answered. The first answer wins, so a
-   * wait the card already settled ignores this frame; the `permission` frame
-   * for that answer is on its way to the command line, which drops it.
+   * The developer answered in the terminal instead of on the card. Only
+   * settles the wait — the command line already applied the answer. First
+   * answer wins; an already-settled wait ignores this frame.
    */
   async permissionAnswered(session: ControlSession, frame: PermissionAnsweredFrame): Promise<void> {
     const call = await this.dispatcher.read(frame.callId);
@@ -630,11 +596,8 @@ export class LocalControlSessionCoreService {
   }
 
   /**
-   * Whether the conversation's model is allowed to skip the permission cards.
-   *
-   * A model that cannot resolve, or a conversation that has run no turn yet,
-   * answers no: the switch is offered only when the platform can name the
-   * model and its provider's list allows it.
+   * Whether the conversation's model is allowed to skip permission cards. An
+   * unresolvable model, or no turn run yet, answers no.
    */
   private async maySkip(session: ControlSession): Promise<boolean> {
     const conversation = await this.conversations().findByIdVisible({
@@ -702,13 +665,9 @@ export class LocalControlSessionCoreService {
   }
 
   /**
-   * Says in the chat that the folder is gone.
-   *
-   * The connect is already a line in the transcript, and Ctrl-C was not: the
-   * chip simply vanished from the header and the conversation kept reading as
-   * though the folder were still there. Recorded with the `system` role, so
-   * the transcript carries it as a notice: it starts no turn, and the panel
-   * draws it as a plain line rather than as something the developer asked.
+   * Says in the chat that the folder is gone (the connect is already a
+   * transcript line; Ctrl-C was not). Recorded with the `system` role: starts
+   * no turn, renders as a plain notice.
    */
   private async recordDisconnect(
     session: ControlSession,

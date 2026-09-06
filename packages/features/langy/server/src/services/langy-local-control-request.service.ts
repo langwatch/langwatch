@@ -1,22 +1,7 @@
 /**
- * The control request: the one thing that binds a folder to a conversation
- * (ADR-129).
- *
- * The code access card records a request for (conversation, user, project).
- * `langwatch langy --share-control` lists the open requests of the signed-in
- * person and approves one in the terminal. Approving mints a Langy session key
- * scoped to that conversation, and spends the request.
- *
- * Three properties this service owns, and the reasons they are here:
- *
- * - **Only the requesting user ever sees it.** The list read is keyed by
- *   (project, user), and the approve path checks the record's own `userId`
- *   again, so a teammate holding the id cannot spend it.
- * - **Single use.** The claim is a SET NX on a second key, so two approvals
- *   racing each other contend for one key and exactly one mints a credential.
- * - **Fifteen minutes.** The record carries its own expiry as well as the key
- *   TTL, so an expired request refuses with the reason rather than reading as
- *   a request that never existed.
+ * The control request binding a folder to a conversation (ADR-129). Owns
+ * three properties: user-scoped visibility, single-use (SET NX), and a
+ * 15-minute self-carried expiry.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -56,12 +41,8 @@ export type StoredControlRequest = z.infer<typeof storedControlRequestSchema>;
 const KEY_BINDING_TTL_SECONDS = 6 * 60 * 60;
 
 /**
- * How long the record outlives the request's own fifteen minutes.
- *
- * A developer who approves a minute late should read "that request expired",
- * not "that request is not open for you": the second sentence sends them
- * looking for a mistake they did not make. So the record is kept past its
- * validity and the expiry check answers, rather than the key simply going.
+ * How long the record outlives the request's own 15 minutes, so a late
+ * approval reads "that request expired" rather than "not found".
  */
 const RECORD_GRACE_MS = 30 * 60 * 1000;
 
@@ -122,12 +103,8 @@ export class ControlRequestService {
   }
 
   /**
-   * Records the request the code access card renders.
-   *
-   * A conversation holds one open request at a time. The card can be raised
-   * again in the same chat, and the developer runs the command minutes later:
-   * without this, the terminal lists the same conversation two or three times
-   * and the developer has to guess which row is the live one.
+   * Records the request the code access card renders. A conversation holds
+   * one open request at a time — a re-raised card supersedes the old one.
    */
   async create({
     projectId,
@@ -183,10 +160,8 @@ export class ControlRequestService {
   }
 
   /**
-   * The caller's own open requests in one project, newest first.
-   *
-   * Members whose expiry has passed are dropped from the index on the way, so
-   * the set does not grow with every card a person left unanswered.
+   * The caller's own open requests in one project, newest first. Expired
+   * members are dropped from the index on the way.
    */
   async listOpen({
     projectId,
@@ -257,13 +232,8 @@ export class ControlRequestService {
   }
 
   /**
-   * Drops every binding for one conversation, so nothing controls it any more.
-   *
-   * What the panel's Disconnect needs: it knows the conversation, not the key.
-   * Presence is a separate thing and may already be gone, so this never reads
-   * it: revoking is the decision, and it holds whether or not a socket is
-   * still there to be told about it.
-   *
+   * Drops every binding for one conversation. Never reads presence — revoking
+   * holds whether or not a socket is still there to be told about it.
    * @returns the keys that were revoked
    */
   async revokeConversationBindings(conversationId: string): Promise<string[]> {
@@ -293,11 +263,9 @@ export class ControlRequestService {
   }
 
   /**
-   * Spends one request and mints the session key the command line connects
-   * with.
-   *
+   * Spends one request and mints the command line's session key.
    * @throws {LangyLocalRequestInvalidError} unknown, another user's, or spent
-   * @throws {LangyLocalRequestExpiredError} the fifteen minutes are over
+   * @throws {LangyLocalRequestExpiredError} the 15 minutes are over
    */
   async approve({
     requestId,
@@ -397,10 +365,8 @@ export class ControlRequestService {
   }
 
   /**
-   * The organization the project belongs to. A project always has a team, and
-   * a team an organization; a row that says otherwise is broken data the
-   * caller can do nothing about, so it degrades to an unknown error with a
-   * trace id rather than a cause we cannot name (ADR-045).
+   * The organization the project belongs to. A row saying otherwise is
+   * broken data, so it degrades to unknown error + trace id (ADR-045).
    */
   private async organizationOf(projectId: string): Promise<string> {
     const organizationId = await this.projects.tryReadOrganizationId(projectId);

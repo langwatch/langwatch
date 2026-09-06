@@ -1,21 +1,7 @@
 /**
- * The local control REST family, `/api/langy/control` (ADR-129).
- *
- * Two kinds of endpoint live here, and they carry different credentials on
- * purpose.
- *
- * The **request** endpoints are the developer's own: list the control requests
- * Langy opened for me, approve one, cancel one. They run on the API key the
- * command line is signed in with, and every one of them resolves the caller to
- * a user, because a control request belongs to a person. A key with no user
- * behind it can hold no requests, so it lists none and can approve none.
- *
- * The **connect** endpoints are the long-poll transport of the control socket,
- * for a network that blocks WebSockets. They carry the minted session key, not
- * the developer's key, and they authenticate inside the handler with the same
- * check the socket runs, so a refusal is the same `refused` frame the command
- * line already reads. The WebSocket upgrade is served by the gateway on the
- * same listener, not by this family.
+ * The local control REST family, `/api/langy/control` (ADR-129). **request**
+ * runs on the developer's own key, resolved to a user. **connect** carries
+ * the minted session key, authenticated in-handler like the socket.
  */
 
 import { handlerManagedAuth, requires } from "@langwatch/api";
@@ -129,12 +115,9 @@ export function createLangyLocalControlRestApp(options: {
   type ControlContext = ProjectScopedContext<EndpointVariables>;
 
   /**
-   * The user behind the caller's key.
-   *
-   * A control request belongs to a person, so a credential with no person
-   * behind it holds none. A legacy project key is exactly that case, and it
-   * refuses the same way an unknown request id does, so the answer never tells
-   * a caller which requests exist.
+   * The user behind the caller's key. A legacy project key holds no user and
+   * refuses the same way an unknown request id does — the answer never
+   * reveals which requests exist.
    */
   const requireUser = (c: ControlContext): string => {
     const userId = c.get("apiKeyUserId") as string | undefined;

@@ -1,11 +1,6 @@
 /**
- * What the trace feature's tRPC transports answer, stated once.
- *
- * The chain declares each procedure's `withOutput` from here, so the shape a
- * client reads is written down in the contract rather than implied by
- * whatever a handler happened to return. The schemas are checked against
- * real answers in development and test; production returns the handler's
- * own value.
+ * What the trace feature's tRPC transports answer, stated once in the
+ * contract via `withOutput` rather than implied by a handler's return.
  */
 import { evaluationRunDataSchema } from "@langwatch/evaluation-contract";
 import { z } from "zod";

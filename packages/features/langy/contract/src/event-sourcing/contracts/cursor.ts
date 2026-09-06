@@ -1,17 +1,9 @@
 import { z } from "zod";
 
 /**
- * The Langy event cursor — a position in a conversation's durable event stream
- * (ADR-059 §2). The server's projection stores persist one next to every folded
- * document; the wire carries it on snapshots and freshness signals; the browser
- * compares it to know whether a tail fetch is due and which events are already
- * folded in.
- *
- * Ordering is `(acceptedAt, eventId)`: the millisecond the canonical event log
- * accepted the event, tie-broken by the event's KSUID. KSUIDs are ASCII, so the
- * tie-break MUST be plain byte-wise string comparison (`<` / `>`), NEVER
- * `localeCompare` — locale collation reorders case and can disagree with KSUID
- * byte order, silently corrupting catch-up on both sides at once.
+ * A position in a conversation's durable event stream (ADR-059 §2). Ordered
+ * by `(acceptedAt, eventId)`; tie-break MUST be byte-wise (`<`/`>`), NEVER
+ * `localeCompare` — it can disagree with KSUID byte order.
  */
 export const langyEventCursorSchema = z.object({
   /** When the canonical event log accepted the event (Unix ms, UTC). */

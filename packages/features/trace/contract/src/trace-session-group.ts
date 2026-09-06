@@ -2,13 +2,7 @@ import { z } from "zod";
 
 /**
  * The Sessions lens read model (specs/traces-v2/sessions-lens.feature): one
- * row per `gen_ai.conversation.id`, with rollups computed over every trace of
- * the session in range.
- *
- * Here rather than beside the service that builds it for the same reason as
- * `TraceListItem`: the trace transport publishes these rows, and a payload
- * type declared in the application narrows to its constraint once the
- * transport is package-owned.
+ * row per `gen_ai.conversation.id`, rollups over every trace of the session.
  */
 
 export const sessionGroupPullRequestDtoSchema = z.object({
@@ -24,23 +18,14 @@ export const sessionGroupCodingAgentDtoSchema = z.object({
   compactions: z.number(),
   peakContextTokens: z.number(),
   subAgents: z.number(),
-  /**
-   * Where the session ran, from the LangWatch companion event, and the title
-   * the agent generated for it. Null for every session whose agent has no
-   * companion emitter, which is most of them.
-   */
+  /** Where the session ran (companion event) and its generated title; null for most agents. */
   repositoryHost: z.string().nullable(),
   repositoryOwner: z.string().nullable(),
   repositoryName: z.string().nullable(),
   gitBranch: z.string().nullable(),
   gitWorktree: z.string().nullable(),
   title: z.string().nullable(),
-  /**
-   * The pull request this session's work belongs to, decided by the tenure
-   * rule over the branch's mapped pull requests. Null for a session with no
-   * git context, a repository the organization's GitHub connection does not
-   * reach, or a branch whose pull request has not been opened yet.
-   */
+  /** The pull request this session's work belongs to (tenure rule); null with no git context. */
   pullRequest: sessionGroupPullRequestDtoSchema.nullable(),
 });
 
