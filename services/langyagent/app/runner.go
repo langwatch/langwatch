@@ -26,8 +26,9 @@ import (
 //
 // Implemented by adapters/runner/sandboxed and adapters/runner/sharedidentity.
 type Runner interface {
-	// CommandContext builds the coding-agent command. Per-uid wraps the binary
-	// with prlimit; shared identity executes it directly.
+	// CommandContext builds the coding-agent command. Both runners apply
+	// inherited resource limits; shared identity omits RLIMIT_NPROC because
+	// Linux accounts it across all processes sharing the UID.
 	CommandContext(ctx context.Context, binary string, args ...string) *exec.Cmd
 	// Chown gives a provisioned file to the worker's per-conversation UID so a
 	// sibling worker cannot read it. A no-op under shared identity: mode 0700

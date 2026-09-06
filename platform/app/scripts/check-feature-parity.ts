@@ -464,7 +464,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-session-key-lifecycle.feature",
   "specs/langy/langy-shutdown-handoff.feature",
   "specs/langy/langy-workbench-sidebar.feature",
-  "specs/langy/langy-worker-isolation.feature",
   "specs/licensing/dual-pricing-model.feature",
   "specs/licensing/enforcement-hono-api.feature",
   "specs/licensing/license-activation-ui.feature",

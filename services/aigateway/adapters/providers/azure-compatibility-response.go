@@ -131,6 +131,9 @@ func (it *azureChatIterator) prepare(ctx context.Context) error {
 }
 
 func (it *azureChatIterator) Next(ctx context.Context) bool {
+	if it.done {
+		return false
+	}
 	if it.primed {
 		it.primed = false
 		return true

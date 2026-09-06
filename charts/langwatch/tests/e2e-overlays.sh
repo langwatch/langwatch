@@ -983,11 +983,16 @@ test_langy_isolation_postures() {
   assert_contains "langy per-uid: posture reaches the manager" \
     "$(tmpl_only "charts/langyagent/templates/configmap.yaml" --set autogen.enabled=true)" \
     'LANGY_WORKER_ISOLATION: "per-uid"'
-  local cap
-  for cap in CHOWN DAC_OVERRIDE FOWNER SETUID SETGID; do
-    assert_contains "langy per-uid: keeps CAP_${cap}" "$per_uid" "- ${cap}"
-  done
-  assert_not_contains "langy per-uid: no SYS_ADMIN" "$per_uid" "- SYS_ADMIN"
+  local actual_caps expected_caps
+  actual_caps=$(awk '
+    /^[[:space:]]+capabilities:$/ { in_caps=1; next }
+    in_caps && /^[[:space:]]+add:$/ { in_add=1; next }
+    in_add && /^[[:space:]]+- / { sub(/^.*- /, ""); print; next }
+    in_add { exit }
+  ' <<< "$per_uid" | LC_ALL=C sort)
+  expected_caps=$(printf '%s\n' CHOWN DAC_OVERRIDE FOWNER SETGID SETUID)
+  assert_eq "langy per-uid: keeps exactly the supported capabilities" \
+    "$actual_caps" "$expected_caps"
 
   # 2. `none` + the acknowledgement. The whole point: a spec PSA "restricted"
   #    admits. Held to the same bar as every hardened workload — non-root at
@@ -1041,6 +1046,16 @@ test_langy_isolation_postures() {
     fail "langy: refused an unrecognized workerIsolation, but not for that reason"
   else
     pass "langy: an unrecognized workerIsolation is refused, not defaulted"
+  fi
+
+  out=$(tmpl_only "$tpl" --set autogen.enabled=true \
+    --set-json 'langyagent.workerIsolation=false' 2>&1) && rc=0 || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
+    fail "langy: expected helm to refuse a non-string workerIsolation"
+  elif ! grep -qF 'must be "per-uid" or "none"' <<< "$out"; then
+    fail "langy: refused a non-string workerIsolation, but not for that reason"
+  else
+    pass "langy: a non-string workerIsolation is refused, not defaulted"
   fi
 
   # 4. The accident. Forcing the DEFAULT posture non-root is what the customer

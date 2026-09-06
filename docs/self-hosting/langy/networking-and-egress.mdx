@@ -22,7 +22,7 @@ The one boundary to understand before you rely on this in a regulated environmen
 
 ## Why egress is L7, not iptables
 
-On a pod pinned to gVisor (an optional hardening setting), the user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table there. The L7 adapter below is what makes egress control work identically whichever runtime the pod lands on, which is why it is the mechanism rather than a gVisor workaround.
+On a pod pinned to gVisor (an optional hardening setting), the default Netstack mode does not expose the host kernel's netfilter, so egress controls based on `iptables` or `nftables` features such as REDIRECT, OWNER-match DROP, and NAT are unavailable inside the sandbox. gVisor's host-networking mode uses the host network stack and its firewall rules, but gives up part of Netstack's isolation. The L7 adapter avoids Netstack's firewall limitations and works consistently whichever runtime the pod uses.
 
 That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. See [The sandbox](/langy/security/sandbox).
 

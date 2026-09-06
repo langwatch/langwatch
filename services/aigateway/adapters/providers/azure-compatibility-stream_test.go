@@ -108,3 +108,11 @@ func TestAzureCompatibilityStreamClosesSourceAtDone(t *testing.T) {
 	require.NoError(t, it.Err())
 	require.ErrorIs(t, ctx.Err(), context.Canceled)
 }
+
+func TestAzureCompatibilityStreamCloseDiscardsPrimedChunk(t *testing.T) {
+	it := azureTestStream(200, "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"}}]}\n\n")
+	require.NoError(t, it.prepare(context.Background()))
+	require.NoError(t, it.Close())
+
+	require.False(t, it.Next(context.Background()))
+}

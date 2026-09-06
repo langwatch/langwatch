@@ -60,9 +60,18 @@ func (Runner) AppliesIdentity() bool { return false }
 // Name identifies the runner in logs and telemetry.
 func (Runner) Name() string { return "shared-identity" }
 
-// CommandContext runs the worker with no isolation wrapper.
+// CommandContext applies the resource limits that remain per-process when all
+// workers share one UID. The POSIX-shell launcher works in both the Linux image
+// and local macOS development, and exec replaces it rather than leaving a
+// wrapper process behind. RLIMIT_NPROC is deliberately absent: Linux accounts
+// it across the UID, so applying it here would let one worker exhaust the
+// allowance for every other worker. Memory and aggregate process limits remain
+// the pod cgroup's responsibility.
 func (Runner) CommandContext(ctx context.Context, binary string, args ...string) *exec.Cmd {
-	return exec.CommandContext(ctx, binary, args...)
+	const limits = "set -eu; ulimit -n 1024; ulimit -f 2097152; ulimit -c 0; exec \"$@\""
+	limitArgs := []string{"-c", limits, "langy-worker-limits", binary}
+	//nolint:gosec // G204: the executable and shell program are fixed; binary+args are passed as positional parameters, not interpolated into shell text.
+	return exec.CommandContext(ctx, "/bin/sh", append(limitArgs, args...)...)
 }
 
 // Chown is a no-op: the manager already owns the files it wrote, and mode 0700

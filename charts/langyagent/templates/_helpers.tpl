@@ -3,7 +3,11 @@
 {{- end }}
 
 {{- define "langyagent.workerIsolation" -}}
-{{- .Values.workerIsolation | default "per-uid" -}}
+{{- if hasKey .Values "workerIsolation" -}}
+{{- .Values.workerIsolation -}}
+{{- else -}}
+per-uid
+{{- end -}}
 {{- end }}
 
 {{- define "langyagent.fullname" -}}

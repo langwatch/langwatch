@@ -111,16 +111,14 @@ reading `/ops/feature-flags` for targeting rules on
 
 ### 3. What deliberately survives
 
-**`OPENCODE_AGENT_URL` stays, under its legacy name.** It is the app→langyagent
-base URL and has nothing to do with the harness. It is read by
+**`LANGY_AGENT_URL` stays.** It is the app→langyagent base URL and has nothing
+to do with the harness. It is read by
 `packages/server/src/shared/env.ts:100,175`, set by
 `charts/langwatch/templates/{app,workers}/deployment.yaml`, asserted by
 `charts/langwatch/tests/e2e-overlays.sh:583,592`, and modelled in
-`tools/thuishaven/domain/overlay.go:151`. Renaming it is a separate change that
-must move the chart, `.env.example`, the haven overlay, the tests and the docs
-in one commit; doing it opportunistically inside this one is how the app loses
-its agent. It is left alone, with a comment at its definition saying why the
-name is what it is.
+`tools/thuishaven/domain/overlay.go:151`. The setting belongs to the connection
+between the app and the agent service, so removing a worker harness does not
+change it.
 
 **Everything in column (B) stays**, untouched and unmentioned by the
 implementation.

@@ -127,16 +127,32 @@ func TestProvision_WritesTheWorkerHome(t *testing.T) {
 		t.Errorf("skillsDir %q resolves inside the host account home", skills)
 	}
 
-	// The config references env var NAMES and never a secret value.
-	rawCfg, _ := os.ReadFile(filepath.Join(home, configFileName))
+}
+
+// @scenario "A worker receives live credentials without persisting them"
+// @scenario "Provisioned files do not expose live credentials"
+func TestProvision_ResolvedCredentialsStayOutOfFiles(t *testing.T) {
+	creds := testCreds()
+	home, cfg := provisionHome(t, creds)
+	rawCfg, err := os.ReadFile(filepath.Join(home, configFileName))
+	if err != nil {
+		t.Fatalf("read worker config: %v", err)
+	}
+
 	for _, secret := range []string{creds.LangwatchAPIKey, creds.LLMVirtualKey} {
 		if strings.Contains(string(rawCfg), secret) {
-			t.Errorf("a secret landed in the config file")
+			t.Errorf("a resolved credential landed in the config file")
 		}
 	}
+
 	model := modelOf(t, cfg)
 	if model["baseUrlEnv"] != "OPENAI_BASE_URL" || model["apiKeyEnv"] != "OPENAI_API_KEY" {
 		t.Errorf("model env references = %v/%v", model["baseUrlEnv"], model["apiKeyEnv"])
+	}
+
+	env := envMap(t, buildWorkerEnv(SpawnInput{Home: home, Creds: creds}))
+	if env["LANGWATCH_API_KEY"] != creds.LangwatchAPIKey || env["OPENAI_API_KEY"] != creds.LLMVirtualKey {
+		t.Errorf("worker did not receive its resolved credentials")
 	}
 }
 

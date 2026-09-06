@@ -146,13 +146,13 @@ scratchSizeLimit: 1Gi
 # manager RPCs and internal turn-result callbacks. Only select this posture
 # when every conversation is trusted with that authority.
 #
-# One further cost, smaller but real: the per-uid runner execs each worker
-# through prlimit, capping its processes, open files and file size. Those caps
-# go with the identity. RLIMIT_NPROC in particular is accounted PER UID, so it
-# cannot simply be reapplied here — one cap would be shared by every worker in
-# the pod and the first busy conversation would starve the rest. Under `none` a
-# runaway worker is bounded by the pod's own cgroup limits and the /workspace
-# sizeLimit rather than per-worker.
+# One further cost, smaller but real: both runners use per-process limits for
+# open files, individual file size and core dumps. The per-uid runner also caps
+# process count. RLIMIT_NPROC is accounted PER UID, so the shared-identity
+# runner cannot apply it — one worker could exhaust the allowance for every
+# other worker in the pod. Under `none`, aggregate CPU and memory use are
+# bounded by the pod's cgroup, /workspace has its own sizeLimit, and aggregate
+# process count depends on the node/runtime's pod PID limit.
 #
 # Who can reasonably take it: a single-tenant install whose users are all
 # colleagues in one organization. Who cannot: anyone serving mutually

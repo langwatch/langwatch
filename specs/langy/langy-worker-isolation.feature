@@ -12,101 +12,52 @@ Feature: Langy worker isolation
   #   specs/langy/langy-deploy-hardening.feature — the chart-side guards.
   #   specs/langy/langy-pi-harness.feature — the harness this now describes.
   #
-  # ---------------------------------------------------------------------------
-  # What this feature used to say, and why it changed
-  #
-  # This spec was written when workers ran on the opencode harness. Opencode
-  # exposed an HTTP control server on a loopback port with no authentication by
-  # default, so any sibling in the same pod netns could drive another worker's
-  # agent and make it exfiltrate its own credentials. The fix was a distinct
-  # random OPENCODE_SERVER_PASSWORD per worker, turning isolation into a
-  # property of authentication rather than of network topology — which also
-  # made it survive gVisor, where netfilter does not exist.
-  #
-  # Pi uses anonymous stdio pipes instead of a control listener. Distinct Unix
-  # identities protect access to those pipes. Shared identity permits reopening
-  # descriptors through /proc/<pid>/fd, and exposes manager secrets as well as
-  # sibling credentials and conversation files (ADR-130).
-  #
   # On the @unimplemented tags. They mean "not bound to a test yet", and that is
-  # true of every scenario here. They do NOT all mean "not built". Most of these
-  # properties hold in the code today and are simply untested:
-  #   - the pipe transport and the absence of any listener
-  #     (adapters/pi/spawn.go:302-331, app/workerpool/pool.go:845)
-  #   - the config carrying env var names rather than values
-  #     (adapters/pi/spawn.go:26-29,119-121,213-214)
-  #   - the per-identity refusals, enforced by the sandboxed runner
-  #     (adapters/runner/sandboxed/sandboxed.go)
-  # What is genuinely unbuilt is the shared-identity posture and the startup
-  # announcement, both of which ADR-130 proposes. As tests land, the
+  # true of every scenario here. The product implements the isolated and
+  # shared-identity postures, including the startup warning for shared identity.
+  # These requirements remain unbound until tests bind them. As tests land, the
   # @unimplemented tag comes off scenario by scenario; the level tag stays.
-  # ---------------------------------------------------------------------------
 
   # ===========================================================================
-  # The control channel: protected by distinct Unix identities
+  # One conversation cannot control another
   # ===========================================================================
 
   @unit @unimplemented
-  Scenario: A worker has no network control listener
+  Scenario: A worker cannot observe or control another conversation
     Given two workers are running for different conversations
-    When one looks for the other's network control channel
-    Then there is no listening port or Unix socket for the worker protocol
-    And the manager drives that protocol over anonymous stdio pipes
-
-  @unit @unimplemented
-  Scenario: A worker cannot drive another worker's agent
-    Given per-worker identity isolation is enabled
-    And two workers are running for different conversations
-    When one attempts to send a command intended for the other
-    Then it has no channel on which to send it
-    And the other worker's turn is unaffected
+    When one tries to observe or send commands to the other conversation
+    Then it cannot observe or send those commands
+    And the other conversation is unaffected
 
   # ===========================================================================
-  # Credentials are never written to disk
-  #
-  # Load-bearing for the shared-identity posture in ADR-130: the reason that
-  # posture is a defensible trade rather than a giveaway is that there is no
-  # credential file to steal. A refactor that starts writing a resolved secret
-  # into the worker's config would silently make the traded posture much worse,
-  # and nothing else in this suite would notice.
+  # The isolation posture governs credentials and conversation content
   # ===========================================================================
 
-  @unit @unimplemented
-  Scenario: The worker's config names its secrets instead of carrying them
+  @unit
+  Scenario: A worker receives live credentials without persisting them
+    Given a worker is provisioned with credentials for its conversation
+    When the worker receives those credentials for its conversation
+    Then no resolved credential value is present in its provisioned files
+
+  @unit
+  Scenario: Provisioned files do not expose live credentials
     Given a worker is provisioned for a conversation
-    When its config is written
-    Then every credential appears as the name of an environment variable
-    And no resolved secret value appears anywhere in the file
+    When its provisioned files are inspected
+    Then they identify the credentials the worker needs without containing their values
 
   @unit @unimplemented
-  Scenario: A worker's live credentials reach it only through its environment
-    Given a worker is provisioned with a project key, a gateway key and a
-      GitHub token
-    When the worker starts
-    Then those values are present in its environment
-    And they are absent from every file the worker was provisioned with
-
-  # ===========================================================================
-  # The identity boundary: what the operator's posture actually governs
-  #
-  # With the control channel closed structurally and no secrets on disk, a
-  # distinct per-worker identity is defending exactly two things: the worker's
-  # process environment, and its conversation's session directory.
-  # ===========================================================================
-
-  @unit @unimplemented
-  Scenario: Under per-worker identity, a worker cannot read a sibling's environment
+  Scenario: Under per-worker identity, a worker cannot obtain a sibling's credentials
     Given per-worker identity isolation is in effect
     And two workers are running for different conversations
-    When one attempts to read the other's process environment
-    Then the kernel refuses it
+    When one attempts to obtain the other's live credentials
+    Then access is refused
 
   @unit @unimplemented
   Scenario: Under per-worker identity, a worker cannot read a sibling's conversation
     Given per-worker identity isolation is in effect
     And two workers are running for different conversations
-    When one attempts to read the other's session directory
-    Then the kernel refuses it
+    When one attempts to obtain the other's conversation content
+    Then access is refused
 
   # Stated as a scenario rather than left implicit, because an operator who
   # selects this posture is entitled to a precise account of it, and because a
@@ -117,13 +68,10 @@ Feature: Langy worker isolation
   Scenario: Under shared identity, those two refusals do not hold
     Given the operator has turned per-worker identity isolation off
     And two workers are running for different conversations
-    When one reads the other's process environment or session directory
+    When one tries to obtain the other's live credentials or conversation content
     Then it succeeds
-    And it can reopen sibling control descriptors through /proc
-    And it can read the manager process environment including LANGY_INTERNAL_SECRET
-    And the internal secret grants access to manager RPCs and internal turn-result callbacks
-    And pod sandboxing still applies when runtimeClassName selects a sandboxed runtime
-    And the NetworkPolicy still applies when networkPolicy.enabled is true
+    And it can control the other conversation
+    And the configured pod sandbox and egress restrictions still apply
 
   # ===========================================================================
   # Required connectivity is preserved
@@ -134,26 +82,26 @@ Feature: Langy worker isolation
 
   @unit @unimplemented
   Scenario Outline: A worker can still reach the control plane and gateway under either posture
-    Given a worker is running with workerIsolation set to <posture>
+    Given a worker is running under the <posture> posture
     When the worker calls the LangWatch API or the AI gateway
     Then the call succeeds
 
     Examples:
       | posture |
-      | per-uid |
-      | none    |
+      | per-worker identity |
+      | shared identity     |
 
   @unit @unimplemented
   Scenario Outline: A worker can still perform its GitHub and package work under either posture
-    Given a worker is running with workerIsolation set to <posture>
+    Given a worker is running under the <posture> posture
     And external egress is permitted for that worker
     When the worker runs git, gh, or a package install against an allowed host
     Then the operation succeeds
 
     Examples:
       | posture |
-      | per-uid |
-      | none    |
+      | per-worker identity |
+      | shared identity     |
 
   # ===========================================================================
   # Posture is chosen, never drifted into

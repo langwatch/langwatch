@@ -2,18 +2,49 @@ package sharedidentity
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
-func TestCommandContext_ExecutesBinaryDirectly(t *testing.T) {
+func TestCommandContext_AppliesUIDIndependentRlimits(t *testing.T) {
 	cmd := Runner{}.CommandContext(context.Background(), "/tmp/langy-worker", "serve")
-	if cmd.Path != "/tmp/langy-worker" {
-		t.Fatalf("command path = %q, want direct binary", cmd.Path)
+	if cmd.Path != "/bin/sh" {
+		t.Fatalf("command path = %q, want POSIX shell", cmd.Path)
 	}
-	if want := []string{"/tmp/langy-worker", "serve"}; !reflect.DeepEqual(cmd.Args, want) {
+	want := []string{
+		"/bin/sh", "-c",
+		"set -eu; ulimit -n 1024; ulimit -f 2097152; ulimit -c 0; exec \"$@\"",
+		"langy-worker-limits", "/tmp/langy-worker", "serve",
+	}
+	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("command args = %#v, want %#v", cmd.Args, want)
+	}
+	for _, arg := range cmd.Args {
+		if strings.Contains(arg, "ulimit -u") || strings.Contains(arg, "--nproc=") {
+			t.Fatal("shared-identity runner must not apply a per-UID process limit")
+		}
+	}
+}
+
+func TestCommandContext_EnforcesLimitsAndPreservesArguments(t *testing.T) {
+	probe := filepath.Join(t.TempDir(), "probe.sh")
+	script := `#!/bin/sh
+printf '%s\n' "$1" "$(ulimit -n)" "$(ulimit -f)" "$(ulimit -c)"
+`
+	if err := os.WriteFile(probe, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := (Runner{}).CommandContext(context.Background(), probe, "argument with spaces").CombinedOutput()
+	if err != nil {
+		t.Fatalf("limited worker failed: %v: %s", err, output)
+	}
+	want := "argument with spaces\n1024\n2097152\n0\n"
+	if string(output) != want {
+		t.Fatalf("worker output = %q, want %q", output, want)
 	}
 }
 
