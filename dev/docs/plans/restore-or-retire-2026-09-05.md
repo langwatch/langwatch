@@ -89,4 +89,6 @@ Prior lists: `binding-gaps-2026-09-04.md` (written at 1,333 unbound) and
 
 | `specs/features/setup/fresh-clone-dev-setup.feature` "First-run env validation surfaces a self-documenting error for unset gateway secrets" | 1 | main's `env-create.mjs` refused short or partial gateway secrets; the branch declares them optional on purpose so a boot never fails on them. `.env.example` still ships `REPLACE_ME` and nothing rejects it. Proposed restore: all-or-none plus a minimum length **when set**, unset stays fine |
 
+| `specs/scenarios/otel-trace-context-propagation.feature` remote-span collection | 9 | ADR-009's platform span collection is superseded by ADR-097, which deletes the platform path and moves remote-trace judging into the SDKs; nothing implements it here or on main. Parked `@unimplemented`; proposed retire with ADR-009 |
+
 Proposed: delete the first four groups as stale against decisions already taken; keep the switcher three parked; align the api-reference wording with decision 20's exceptions; leave the browser scenario `@e2e` for the Playwright lane.
