@@ -46,11 +46,11 @@ export const GOVERNANCE_COST_CURRENCY_USD = "USD";
  * How long after a pull last touched a day that day may still move (ADR-128
  * §15).
  *
- * MEASURED FOR ANTHROPIC ONLY, which is why this is a default rather than a
- * fact: Anthropic restates cost for up to 30 days. Azure's and Databricks'
- * windows have not been probed, so they run on this number until somebody
- * measures them — the per-source override below is what makes measuring one
- * not a re-decision about the others.
+ * MEASURED FOR ANTHROPIC ONLY, which is why this reads as a default rather
+ * than a fact: Anthropic restates cost for up to 30 days. Azure's and
+ * Databricks' windows have not been probed, so every source runs on this
+ * number until somebody measures one — at which point a per-source override
+ * is worth building; a hook for it sat here unused and was removed (#7923).
  *
  * No provider tells us a day is final. FOCUS's `ChargeClass="Correction"`
  * describes only periods that have already closed, so nothing on the wire
@@ -58,22 +58,3 @@ export const GOVERNANCE_COST_CURRENCY_USD = "USD";
  * looked.
  */
 export const GOVERNANCE_SETTLING_WINDOW_DAYS = 30;
-
-/**
- * Per-source overrides of the window above, keyed by the pulled source name
- * (`Provider` on a pulled row, e.g. `anthropic_admin`).
- *
- * Empty on purpose. Every source runs on the default until its window is
- * actually measured, and an entry here is the record that one was.
- */
-const GOVERNANCE_SETTLING_WINDOW_DAYS_BY_SOURCE: Readonly<
-  Record<string, number>
-> = {};
-
-/** The settling window a source's days are judged against. */
-export function settlingWindowDaysForSource(source: string): number {
-  return (
-    GOVERNANCE_SETTLING_WINDOW_DAYS_BY_SOURCE[source] ??
-    GOVERNANCE_SETTLING_WINDOW_DAYS
-  );
-}

@@ -495,14 +495,11 @@ Feature: One cost screen, three honest lanes
   Rule: The total shown is the bill; gateway detail splits it
 
     # Every scenario under this rule says what a reader is SHOWN, and nothing
-    # shows it yet: there is no connected view, and no caller of the arithmetic
-    # behind it. What does exist and is proved is `combineProviderDay` — the
-    # split, the variance line, the unclamped refund, the estimated day and the
-    # add-up-exactly invariant are all unit-tested against it. So these are
-    # parked rather than bound: counting them would report a view as delivered
-    # on the strength of tests that draw nothing. They become @unit the day a
-    # reader can see the numbers, and the day something says which bill pays
-    # for which gateway key — that link is not recorded yet.
+    # shows it yet: there is no connected view, and no arithmetic behind it —
+    # the caller-less `combineProviderDay` and its tests were removed as dead
+    # code (#7923). So these stay parked rather than bound. They become @unit
+    # the day a reader can see the numbers, and the day something says which
+    # bill pays for which gateway key — that link is not recorded yet.
 
     @unimplemented
     Scenario: Gateway detail splits the bill and the remainder is its own line
