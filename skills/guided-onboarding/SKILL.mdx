@@ -38,7 +38,7 @@ Say nothing about the brief itself: the panel draws it as a card, and the user n
   langwatch onboarding complete-path <path>
   ```
 
-  with `<path>` one of `llmops`, `coding`, `gateway`, `governance`. It is idempotent. It runs last: after the closing line has been said, as its own step, never in the same step as another tool call, and never before the path's work is done. On the llmops path that is after the suite run is open and the closing line is said; on the coding and gateway paths after the snippet and the closer; on the governance path after the sources page is open and its one line is said. Nothing follows it.
+  with `<path>` one of `llmops`, `coding`, `gateway`, `governance`. It is idempotent. It runs last: in the same step as the closing line, right after it, with no other tool call beside it, and never before the path's work is done. On the llmops path that is after the suite run is open and the closing line is said; on the coding and gateway paths after the snippet and the closer; on the governance path after the sources page is open and its one line is said. When it returns, the turn is over: say nothing more, and never repeat the closing line. Whatever it printed is the panel's to show, not yours.
 
 ## llmops: Evals & LLM Ops
 
@@ -139,7 +139,7 @@ Say, verbatim, as the last line:
 
 All ready! Let me know if there is anything I can help with.
 
-Then close the path, alone in its own step, and stop:
+Then, in the same step, close the path and stop:
 
 ```bash
 langwatch onboarding complete-path llmops
@@ -157,7 +157,7 @@ npx langwatch claude
 
 Then I can show you around once your first traces are flying through.
 
-The command block is part of the copy: print it between the two lines. Then close the path, alone in its own step, and stop:
+The command block is part of the copy: print it between the two lines. Then, in the same step, close the path and stop:
 
 ```bash
 langwatch onboarding complete-path coding
@@ -192,7 +192,7 @@ Say, verbatim, as the last line:
 
 That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
 
-Then close the path, alone in its own step, and stop:
+Then, in the same step, close the path and stop:
 
 ```bash
 langwatch onboarding complete-path gateway
@@ -215,7 +215,7 @@ Whichever they pick, open the sources page, where both connections start:
 langwatch navigate open governance-sources
 ```
 
-Say in one line which source to add first on that page, then close the path, alone in its own step, and stop:
+Say in one line which source to add first on that page, then, in the same step, close the path and stop:
 
 ```bash
 langwatch onboarding complete-path governance
