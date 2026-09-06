@@ -43,6 +43,7 @@ export const AutomationLimitEmail = ({
   const paused = kind === "paused";
   return (
     <EmailLayout
+      eyebrow="AUTOMATIONS"
       preview={
         paused ? `"${automationName}" was paused` : `"${automationName}" reached its daily limit`
       }

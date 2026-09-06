@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { expressive } from "../email-layout";
 import { mailTemplates } from "../index";
 import { renderMailTemplate, type MailTemplate } from "../registry";
 
@@ -127,6 +128,40 @@ describe.each(everyFixture)(
       it("carries the wordmark with the brand name as its alternative text", async () => {
         const { html } = await renderMailTemplate(template, props);
         expect(html).toContain('alt="LangWatch"');
+      });
+
+      /**
+       * `Img` writes an inline `display: block` that a class rule without
+       * `!important` cannot beat, so the dark cut used to draw through on the
+       * cream page as a washed-out second logo under the real one.
+       *
+       * @scenario "Only the wordmark for the reader's colour scheme draws"
+       */
+      it("hides the wordmark cut that does not belong to the ground", async () => {
+        const { html } = await renderMailTemplate(template, props);
+        const drawing = [...html.matchAll(/<img[^>]*>/g)]
+          .map(([tag]) => tag)
+          .filter((tag) => /style="[^"]*display:block/.test(tag));
+
+        expect(drawing).toHaveLength(1);
+        expect(drawing[0]).toContain('class="lw-light-only"');
+        expect(html).toContain(".lw-dark-only { display: none !important;");
+        expect(html).toContain(".lw-light-only { display: none !important;");
+      });
+
+      /**
+       * `Body` keeps the class on `<body>` and copies its style onto an inner
+       * cell, so the cell that draws the frame around the card needs a class of
+       * its own or the page stays cream around a near-black card.
+       *
+       * @scenario "The dark cut paints the page around the card, not only the card"
+       */
+      it("gives the page ground a dark rule of its own", async () => {
+        const { html } = await renderMailTemplate(template, props);
+        expect(html).toContain('class="lw-page"');
+        expect(html).toContain(
+          `.lw-page { background-color: ${expressive.dark.page} !important; }`,
+        );
       });
 
       /**

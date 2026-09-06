@@ -110,6 +110,7 @@ export const UsageLimitEmail = ({
   actionUrl,
 }: UsageLimitEmailProps) => (
   <EmailLayout
+    eyebrow="USAGE"
     preview={`${usagePercentageFormatted}% of the monthly message limit used`}
     heading={`You have used ${usagePercentageFormatted}% of your monthly message limit`}
     footNote={`You are receiving this because you administer ${organizationName}.`}

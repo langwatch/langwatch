@@ -26,6 +26,7 @@ export const inviteEmailSubject = ({ organization }: InviteEmailProps): string =
 
 export const InviteEmail = ({ email, organization, acceptInviteUrl }: InviteEmailProps) => (
   <EmailLayout
+    eyebrow="INVITATION"
     preview={`Join ${organization.name} on LangWatch`}
     heading={`You have been invited to ${organization.name}`}
   >

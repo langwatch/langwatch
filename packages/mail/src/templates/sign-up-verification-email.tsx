@@ -24,7 +24,11 @@ export const SignUpVerificationEmail = ({
   email,
   verificationUrl,
 }: SignUpVerificationEmailProps) => (
-  <EmailLayout preview="Confirm your address and carry on" heading="Confirm your email address">
+  <EmailLayout
+    eyebrow="ACCOUNT"
+    preview="Confirm your address and carry on"
+    heading="Confirm your email address"
+  >
     <Paragraph>
       Someone started creating a LangWatch account with this address (<strong>{email}</strong>).
       Confirm it below to carry on.

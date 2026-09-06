@@ -14,7 +14,7 @@ export type ResetPasswordEmailProps = z.infer<typeof resetPasswordEmailProps>;
 export const resetPasswordEmailSubject = (): string => "Reset your LangWatch password";
 
 export const ResetPasswordEmail = ({ email, resetUrl }: ResetPasswordEmailProps) => (
-  <EmailLayout preview="Choose a new password" heading="Reset your password">
+  <EmailLayout eyebrow="SECURITY" preview="Choose a new password" heading="Reset your password">
     <Paragraph>
       We received a request to reset the password for your LangWatch account (
       <strong>{email}</strong>). Choose a new one below.

@@ -35,6 +35,7 @@ export const InviteReRequestEmail = ({
   membersSettingsUrl,
 }: InviteReRequestEmailProps) => (
   <EmailLayout
+    eyebrow="INVITATION"
     preview={`${invitedEmail} asked for a new invitation`}
     heading="An invitation expired"
     footNote="You are receiving this because you can invite people to this organization."

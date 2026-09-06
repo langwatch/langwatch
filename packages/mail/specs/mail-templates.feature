@@ -65,3 +65,15 @@ Feature: The transactional messages LangWatch sends
   Scenario: No email is dressed in the application's design system
     When each template is rendered from each of its fixtures
     Then the application's own accent colour appears nowhere in it
+
+  @unit
+  Scenario: Only the wordmark for the reader's colour scheme draws
+    When each template is rendered from each of its fixtures
+    Then exactly one wordmark is drawn on the light ground
+    And the cut for the other ground is hidden rather than faded
+
+  @unit
+  Scenario: The dark cut paints the page around the card, not only the card
+    When each template is rendered from each of its fixtures
+    Then the page around the card carries a dark rule of its own
+    And the frame and the card read as one dark surface
