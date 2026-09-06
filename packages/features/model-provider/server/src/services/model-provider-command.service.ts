@@ -6,6 +6,8 @@ import {
   ModelProviderRoutingHandleInvalidError,
   ModelProviderRoutingHandleTakenError,
   ModelProviderScopesRequiredError,
+  ModelProviderSkipPermissionsPatternInvalidError,
+  firstInvalidSkipPattern,
   modelProviderApiKeyValidationInputSchema,
   modelProviderDeleteInputSchema,
   modelProviderSchema,
@@ -69,6 +71,7 @@ export class ModelProviderCommandService {
     const parsed = modelProviderWriteInputSchema.parse(input);
     this.assertKnownProvider(parsed.provider);
     const routingHandle = this.normalizeRoutingHandle(parsed.routingHandle);
+    this.assertValidSkipPermissionsPatterns(parsed.langySkipPermissionsModels);
     const existing = await this.getExistingProvider(parsed);
     const scopes = this.scopesForWrite(parsed, existing);
     await this.authorizeWrite(parsed.actorId, existing?.scopes, scopes);
@@ -191,6 +194,22 @@ export class ModelProviderCommandService {
     }
 
     return normalized;
+  }
+
+  /**
+   * Checked before any database work: a line that never compiles matches
+   * nothing, so storing it would leave the operator believing a model is
+   * trusted when the gate always says no.
+   */
+  private assertValidSkipPermissionsPatterns(patterns: readonly string[] | null | undefined): void {
+    if (!patterns) {
+      return;
+    }
+
+    const invalid = firstInvalidSkipPattern(patterns);
+    if (invalid) {
+      throw new ModelProviderSkipPermissionsPatternInvalidError(invalid);
+    }
   }
 
   private async getExistingProvider(input: ModelProviderWriteInput): Promise<ModelProvider | null> {

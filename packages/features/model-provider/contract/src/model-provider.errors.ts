@@ -316,6 +316,40 @@ export class ModelProviderCredentialsUnreadableError extends HandledError {
   }
 }
 
+/**
+ * A skip-permissions pattern that does not compile as a regular expression
+ * matches nothing, so storing it would leave the operator believing a model
+ * is trusted to skip Langy's permission checks while the gate always says
+ * no. The whole save is refused instead of storing a list that reads as
+ * narrower than it looks.
+ *
+ * `meta.fieldErrors` names the field so the drawer shows the refusal on the
+ * textarea rather than in a toast, and `meta.line` is the one-based line the
+ * operator has to correct.
+ */
+export class ModelProviderSkipPermissionsPatternInvalidError extends HandledError {
+  declare readonly code: "model_provider_skip_permissions_pattern_invalid";
+
+  constructor({ line, pattern }: { line: number; pattern: string }) {
+    super(
+      "model_provider_skip_permissions_pattern_invalid",
+      `Line ${line} of the allowed models list is not a valid pattern.`,
+      {
+        meta: {
+          line,
+          pattern,
+          fieldErrors: {
+            langySkipPermissionsModels: [`Line ${line} is not a valid pattern.`],
+          },
+        },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderSkipPermissionsPatternInvalidError";
+  }
+}
+
 export class ModelDefaultNotFoundError extends HandledError {
   declare readonly code: "model_default_not_found";
 

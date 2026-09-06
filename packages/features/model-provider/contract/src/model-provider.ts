@@ -135,6 +135,7 @@ export const modelProviderWriteInputSchema = modelProviderTenantInputSchema
       .nullable()
       .optional(),
     routingHandle: z.string().max(32).nullable().optional(),
+    langySkipPermissionsModels: z.array(z.string()).nullable().optional(),
     scopes: z.array(modelProviderScopeSchema).min(1).optional(),
     rateLimitRpm: z.number().int().nonnegative().nullable().optional(),
     rateLimitTpm: z.number().int().nonnegative().nullable().optional(),

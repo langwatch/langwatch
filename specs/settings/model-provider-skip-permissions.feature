@@ -33,6 +33,13 @@ Feature: A provider says which models may skip Langy's permission checks
       Then the field shows which line is invalid
       And nothing is saved
 
+    @unit
+    Scenario: The save is refused server-side even without the field
+      Given a request to create or update a provider with an invalid pattern
+      When the request reaches the model provider service
+      Then it is refused before any database work
+      And a valid list of patterns saves normally
+
     @integration
     Scenario: Clearing the field restores the provider's default list
       Given I saved a custom list
