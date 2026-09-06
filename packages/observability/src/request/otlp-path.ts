@@ -32,7 +32,7 @@ function normalisePathSlashes(pathname: string): string {
     previousWasSlash = isSlash;
   }
 
-  if (characters.length > 1 && characters.at(-1) === "/") {
+  if (characters.length > 1 && characters[characters.length - 1] === "/") {
     characters.pop();
   }
 
