@@ -76,13 +76,13 @@ func (s Stack) OverlayEnv() []string {
 		// on Node trusting the portless CA.
 		fmt.Sprintf("LW_GATEWAY_INTERNAL_URL=http://127.0.0.1:%d", gw.Port),
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
-		// Pretty, human-readable console logging for the Go services (clog reads
-		// LOG_FORMAT; the TS app's pino is already pretty in dev via NODE_ENV). Haven
-		// is always a human at the console, so the dev lanes should read like prose,
-		// not JSON. Haven-dev only — this overlay never exists in prod, where the Go
-		// services keep their JSON default. The collector still receives structured
-		// records regardless of the console format (clog tees the two).
-		"LOG_FORMAT=pretty",
+		// The shared structured format on every lane, dev included
+		// (dev/docs/best_practices/dev-log-format.md). Haven is always a human at
+		// the console, and it is haven that renders for them — one renderer over
+		// eight identical streams, instead of eight pretty consoles that each
+		// invent their own clock and level column. `LOG_FORMAT=pretty` is still
+		// there for a lane run bare in its own terminal.
+		"LOG_FORMAT=json",
 		// A tiny default retention for the dev stack: an unseeded worktree keeps a
 		// week of data so ClickHouse stays small and whole weekly partitions drop
 		// cleanly. Haven-dev only — the control plane fails loud if this var is set

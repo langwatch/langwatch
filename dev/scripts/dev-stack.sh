@@ -206,28 +206,31 @@ fi
 COMMANDS=()
 NAMES=()
 
-# Workers first, so the queue consumers are up before anything can enqueue.
-COMMANDS+=("$RUNTIME_ENV pnpm -s --filter @langwatch/worker dev")
-NAMES+=("workers")
+# Every lane's output goes through the shared renderer, so a `pnpm dev`
+# terminal reads exactly like a `haven logs` one: one clock, one lane column,
+# one level column, whatever library the lane logs with. See
+# dev/docs/best_practices/dev-log-format.md; LANGWATCH_RAW_LOGS=1 opts out.
+# concurrently's own prefix would then be a second lane column, so it is off.
+add_lane() {
+  NAMES+=("$1")
+  COMMANDS+=("bash \"$HERE/lane.sh\" $1 \"$2\"")
+}
 
-COMMANDS+=("$RUNTIME_ENV pnpm -s --filter @langwatch/ui dev")
-NAMES+=("ui")
+# Workers first, so the queue consumers are up before anything can enqueue.
+add_lane workers "$RUNTIME_ENV pnpm -s --filter @langwatch/worker dev"
+add_lane ui "$RUNTIME_ENV pnpm -s --filter @langwatch/ui dev"
 
 if [ -n "$START_GATEWAY_COMMAND" ]; then
-  COMMANDS+=("$START_GATEWAY_COMMAND")
-  NAMES+=("gateway")
+  add_lane gateway "$START_GATEWAY_COMMAND"
 fi
 if [ -n "$START_NLP_COMMAND" ]; then
-  COMMANDS+=("$START_NLP_COMMAND")
-  NAMES+=("nlpgo")
+  add_lane nlpgo "$START_NLP_COMMAND"
 fi
 if [ -n "$START_LANGY_COMMAND" ]; then
-  COMMANDS+=("$START_LANGY_COMMAND")
-  NAMES+=("langy")
+  add_lane langy "$START_LANGY_COMMAND"
 fi
 
-COMMANDS+=("$RUNTIME_ENV pnpm -s --filter @langwatch/platform-api dev")
-NAMES+=("api")
+add_lane api "$RUNTIME_ENV pnpm -s --filter @langwatch/platform-api dev"
 
 NAMES_STR=$(
   IFS=,
@@ -240,5 +243,5 @@ NAMES_STR=$(
 exec pnpm -s exec concurrently \
   --kill-others-on-fail \
   --names "$NAMES_STR" \
-  --prefix-colors "green,blue,yellow,magenta,cyan,white" \
+  --prefix none \
   "${COMMANDS[@]}"

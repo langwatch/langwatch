@@ -128,12 +128,15 @@ func TestViewerDiscoversNewServicesLive(t *testing.T) {
 
 func TestFormatCombinedLine(t *testing.T) {
 	t.Run("a labelled supervisor line gets its lane colour and CLI spelling", func(t *testing.T) {
-		got := formatCombinedLine("langyagent | ERROR exploded")
+		got := formatCombinedLine(`langyagent | {"level":"error","msg":"exploded"}`)
 		if !strings.Contains(got, "langy") || strings.Contains(got, "langyagent") {
 			t.Errorf("got %q, want the langy CLI spelling", got)
 		}
-		if !strings.Contains(got, "\x1b[31m") {
-			t.Errorf("got %q, want the error highlighted red", got)
+		if !strings.Contains(got, "\x1b[31merror") {
+			t.Errorf("got %q, want the error level painted red", got)
+		}
+		if !strings.Contains(got, "exploded") {
+			t.Errorf("got %q, want the message rendered", got)
 		}
 	})
 	t.Run("a label-less provisioning line passes through", func(t *testing.T) {

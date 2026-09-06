@@ -97,22 +97,39 @@ func (o *Orchestrator) StackEnv(p UpParams) ([]string, error) {
 // `eval "$(haven env)"` puts a terminal in the same environment as the lanes
 // haven supervises, which is what replaced loading a dotenv file. --json prints
 // the same set as an object for anything that would rather parse it.
-func (o *Orchestrator) Env(p UpParams, asJSON bool) error {
+func (o *Orchestrator) Env(p UpParams, asJSON bool, reveal bool) error {
 	env, err := o.StackEnv(p)
 	if err != nil {
 		return err
 	}
+	// Masked unless the caller asked for the values: `haven env` is pasted into
+	// issues and read over a shoulder far more often than it is evaluated, and a
+	// registry this checkout cannot read masks on the key's shape instead.
+	var classes map[string]domain.SecretClass
+	if !reveal {
+		classes = domain.SecretClasses(p.WorktreeDir)
+	}
+	shown := func(key, value string) string {
+		if reveal {
+			return value
+		}
+		return domain.MaskEnvValue(classes, key, value)
+	}
 	if asJSON {
+		masked := make(map[string]string, len(env))
+		for key, value := range domain.EnvMap(env) {
+			masked[key] = shown(key, value)
+		}
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		return enc.Encode(domain.EnvMap(env))
+		return enc.Encode(masked)
 	}
 	for _, line := range env {
 		key, value, ok := strings.Cut(line, "=")
 		if !ok {
 			continue
 		}
-		fmt.Printf("export %s=%s\n", key, shellSingleQuoted(value))
+		fmt.Printf("export %s=%s\n", key, shellSingleQuoted(shown(key, value)))
 	}
 	return nil
 }

@@ -294,6 +294,8 @@ var table = []commandSpec{
 			{long: "--since", takesValue: true, value: "<dur>", summary: "only lines from the last e.g. 10m"},
 			{long: "--level", takesValue: true, value: "<lvl>", summary: "only warn-or-worse (warn) / errors (error)"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
+			{long: "--raw", summary: "the child's own bytes, unrendered"},
+			{long: "--json", summary: "one JSON object per line, lane stamped on"},
 		},
 		run: runLogsCmd,
 	},
@@ -309,12 +311,13 @@ var table = []commandSpec{
 	},
 	{
 		name:    "env",
-		summary: "print this stack's resolved environment: eval \"$(haven env)\" to load it in a shell",
+		summary: "print this stack's resolved environment: eval \"$(haven env --reveal)\" to load it in a shell",
 		flags: []flagSpec{
 			{long: "--json", summary: "machine-readable"},
+			{long: "--reveal", summary: "print secret values instead of masking them"},
 		},
 		run: func(_ context.Context, d deps, inv invocation) error {
-			return d.orch.Env(d.params, inv.has("--json"))
+			return d.orch.Env(d.params, inv.has("--json"), inv.has("--reveal"))
 		},
 	},
 	{

@@ -1,4 +1,4 @@
-import { DEFAULT_SERVICE_NAME } from "./constants";
+import { DEFAULT_SERVICE_NAME } from "./constants.ts";
 
 export type LoggerFormat = "pretty" | "json";
 
@@ -30,6 +30,11 @@ export interface LoggerConfiguration {
   deploymentEnvironment?: string;
   /** Pino OTel transport build identity. */
   otelTransportServiceVersion?: string;
+  /**
+   * Field names pino masks in every record. The boot seam passes the secret
+   * class from `@langwatch/secrets`; this package holds no list of its own.
+   */
+  redactPaths?: readonly string[];
 }
 
 export interface ResolvedLoggerConfiguration {
@@ -43,12 +48,13 @@ export interface ResolvedLoggerConfiguration {
   readonly serviceVersion: string | undefined;
   readonly deploymentEnvironment: string;
   readonly otelTransportServiceVersion: string;
+  readonly redactPaths: readonly string[];
 }
 
 /** Deterministic package defaults for an unconfigured development process. */
 export const DEFAULT_LOGGER_CONFIGURATION: ResolvedLoggerConfiguration = {
   environment: "development",
-  format: "pretty",
+  format: "json",
   level: "debug",
   otelExportEnabled: false,
   consoleLevel: "info",
@@ -57,6 +63,7 @@ export const DEFAULT_LOGGER_CONFIGURATION: ResolvedLoggerConfiguration = {
   serviceVersion: void 0,
   deploymentEnvironment: "development",
   otelTransportServiceVersion: "1.0.0",
+  redactPaths: [],
 };
 
 export function resolveLoggerConfiguration(
@@ -64,7 +71,13 @@ export function resolveLoggerConfiguration(
 ): ResolvedLoggerConfiguration {
   const environment = configuration.environment ?? DEFAULT_LOGGER_CONFIGURATION.environment;
   const isTest = environment === "test";
-  const format = configuration.format ?? (environment === "production" ? "json" : "pretty");
+  // JSON in every environment (dev/docs/best_practices/dev-log-format.md).
+  // The terminal never reads this: haven and `pnpm dev` render it through
+  // their own shared renderer, so the process emits one shape everywhere and
+  // a dev line and a production line are the same record. `LOG_FORMAT=pretty`
+  // remains the explicit opt-out for a lane run bare with no renderer in
+  // front of it.
+  const format = configuration.format ?? "json";
   const defaultLevel = isTest ? "error" : DEFAULT_LOGGER_CONFIGURATION.level;
 
   return {
@@ -82,6 +95,7 @@ export function resolveLoggerConfiguration(
     otelTransportServiceVersion:
       configuration.otelTransportServiceVersion ??
       DEFAULT_LOGGER_CONFIGURATION.otelTransportServiceVersion,
+    redactPaths: configuration.redactPaths ?? DEFAULT_LOGGER_CONFIGURATION.redactPaths,
   };
 }
 

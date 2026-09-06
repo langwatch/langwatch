@@ -68,7 +68,9 @@ UI and hit app.<slug>.langwatch.localhost/api for the API — one URL, not two.
 
 Postgres has no routed hostname: unlike ClickHouse (HTTP), it speaks its own
 wire protocol, which the HTTP proxy can't carry — "haven db url postgres" (or
-DATABASE_URL from "haven env") is the real, loopback connection string.
+DATABASE_URL from "haven env --reveal") is the real, loopback connection string:
+plain "haven env" masks every classified secret and strips the credential out of
+a connection string, so paste that one into an issue and the reveal into a shell.
 
 Shared, machine-wide (one daemon, all worktrees):
 

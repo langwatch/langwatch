@@ -1,0 +1,15 @@
+11:10:46.108  api        info   listening  port=6560
+11:10:46.500  api        debug  cache warm  hit=true  keys=["a","b"]  name=langwatch:queue
+11:10:47.000  api        warn   control plane unreachable  cause="connection refused"
+11:10:48.250  api        error  job failed  jobId=j_1
+    Error: boom
+        at run (job.ts:12:3)
+        at async main (main.ts:4:1)
+11:10:48.250  api        info   legacy zap epoch line  caller=app/app.go:88
+11:10:49.000  api        error  uppercase level still reads
+11:10:49.500  api        info   numeric pino level still reads
+11:10:50.000  api        info   quoting  empty=""  note="two words"  url=https://app.langwatch.localhost
+11:10:51.000  api                   at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+11:10:51.000  api               exited — restarting in 1s
+11:10:51.000  api               [23:42:54.604] INFO (vite): server restarted.
+11:10:51.000  api               {"schemaVersion":3,"outputs":[]}

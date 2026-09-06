@@ -137,8 +137,10 @@ service:
 			|| echo "$(DEV_ENV_FILE) not found — using process environment"; } && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
-		export LOG_FORMAT=pretty && \
-		exec go run ./cmd/service $(svc)
+		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
+		if [ -n "$$LANGWATCH_LANE" ]; then exec go run ./cmd/service $(svc); else \
+			set -o pipefail; go run ./cmd/service $(svc) 2>&1 \
+				| node dev/scripts/log-render.mjs $(svc) --color; fi
 
 # Run a Go service with live reload on file changes.
 # Usage: make service-watch svc=aigateway
@@ -150,7 +152,7 @@ service-watch:
 		set -a && . $(DEV_ENV_FILE) && set +a && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
-		export LOG_FORMAT=pretty && \
+		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
 		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
 			--build.bin "./tmp/$(svc) $(svc)" \
 			--build.include_ext "go" \

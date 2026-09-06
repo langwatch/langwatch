@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
 
 // The `haven logs` command: every service's captured output, from any
@@ -53,7 +54,7 @@ func fileToCLIService(name string) string {
 // the same in `haven logs` as it did live.
 var logServiceColors = map[string]string{
 	"ui": "34", "api": "35", "gateway": "33", "nlp": "36", "langy": "92", "workers": "32",
-	"storybook": "96", "mail": "95",
+	"storybook": "96", "mail": "95", "idp": "92",
 }
 
 func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
@@ -107,8 +108,9 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 		// rather than silently shown a shorter history than they asked for.
 		fmt.Fprintf(os.Stderr, "(reading the last %d MiB of each capture — older history elided)\n", logReadCapBytes>>20)
 	}
+	mode := renderModeFrom(inv)
 	for _, l := range lines {
-		printLogLine(l, d.isAgent)
+		printLogLine(l, mode, d.isAgent)
 	}
 	if !inv.has("--tail") {
 		if len(lines) == 0 {
@@ -116,7 +118,7 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 		}
 		return nil
 	}
-	return followLogs(ctx, dir, inv.args, offsets, since, level, d.isAgent)
+	return followLogs(ctx, dir, inv.args, offsets, since, level, mode, d.isAgent)
 }
 
 // selectLogServices resolves which capture files to read: the named services,
@@ -300,6 +302,9 @@ const levelSniffTokens = 4
 // 0 means the line names no level (a continuation, a raw print) — such lines
 // pass an unfiltered view and are hidden by --level.
 func lineLevelRank(text string) int {
+	if rec, ok := logfmt.Parse(text); ok && rec.Level != logfmt.LevelNone {
+		return logLevelRank[string(rec.Level)]
+	}
 	fields := strings.Fields(stripANSI(text))
 	for i, tok := range fields {
 		if i >= levelSniffTokens {
@@ -328,36 +333,57 @@ func filterLogLines(lines []logLine, since time.Time, level string) []logLine {
 	return out
 }
 
-func printLogLine(l logLine, plain bool) { fmt.Println(formatLogLine(l, plain)) }
+func printLogLine(l logLine, mode renderMode, plain bool) { fmt.Println(formatLogLine(l, mode, plain)) }
 
-// formatLogLine renders one captured line: plain for pipes/agents, coloured
-// label + warn/error highlighting for humans. Shared by `haven logs` and the
-// attached up viewer so a service reads the same everywhere.
-func formatLogLine(l logLine, plain bool) string {
-	if plain {
-		return fmt.Sprintf("%s %-8s | %s", l.ts.Format("15:04:05.000"), l.service, l.text)
+// renderMode is what `haven logs` does with a captured payload.
+type renderMode int
+
+const (
+	// renderHuman is the shared reader format (dev-log-format.md).
+	renderHuman renderMode = iota
+	// renderRaw prints the payload exactly as the child wrote it — escapes,
+	// pretty consoles and all — which is the only way to see a line the
+	// renderer could not make sense of.
+	renderRaw
+	// renderJSON prints one JSON object per line with the lane stamped on it,
+	// for a machine consumer.
+	renderJSON
+)
+
+// renderModeFrom reads the two escape-hatch flags. --raw wins if both are
+// given: it is the one that changes nothing at all.
+func renderModeFrom(inv invocation) renderMode {
+	switch {
+	case inv.has("--raw"):
+		return renderRaw
+	case inv.has("--json"):
+		return renderJSON
 	}
-	color := logServiceColors[l.service]
-	if color == "" {
-		color = "37"
-	}
-	return fmt.Sprintf("\x1b[2m%s\x1b[0m \x1b[%sm%-8s\x1b[0m │ %s", l.ts.Format("15:04:05.000"), color, l.service, highlightLevel(l.text))
+	return renderHuman
 }
 
-// highlightLevel paints a line red at error-or-worse, yellow at warn.
-func highlightLevel(text string) string {
-	switch rank := lineLevelRank(text); {
-	case rank >= 5:
-		return "\x1b[31m" + text + "\x1b[0m"
-	case rank == 4:
-		return "\x1b[33m" + text + "\x1b[0m"
+// formatLogLine renders one captured line. Shared by `haven logs` and the
+// attached up viewer so a service reads the same everywhere; the rendering
+// itself lives in domain/logfmt, which the `pnpm dev` renderer mirrors.
+func formatLogLine(l logLine, mode renderMode, plain bool) string {
+	opts := logfmt.Options{
+		Lane:      l.service,
+		LaneColor: logServiceColors[l.service],
+		Time:      l.ts,
+		Color:     !plain,
 	}
-	return text
+	switch mode {
+	case renderRaw:
+		return l.text
+	case renderJSON:
+		return logfmt.RenderJSON(l.text, opts)
+	}
+	return logfmt.Render(l.text, opts)
 }
 
 // followLogs streams appended lines until interrupted, re-scanning the
 // directory each pass so a service added by a later `up +svc` joins the view.
-func followLogs(ctx context.Context, dir string, args []string, offsets map[string]int64, since time.Time, level string, plain bool) error {
+func followLogs(ctx context.Context, dir string, args []string, offsets map[string]int64, since time.Time, level string, mode renderMode, plain bool) error {
 	requested := map[string]bool{}
 	for _, a := range args {
 		requested[cliToFileService(a)] = true
@@ -417,7 +443,7 @@ func followLogs(ctx context.Context, dir string, args []string, offsets map[stri
 		}
 		sort.SliceStable(fresh, func(i, j int) bool { return fresh[i].ts.Before(fresh[j].ts) })
 		for _, l := range filterLogLines(fresh, since, level) {
-			printLogLine(l, plain)
+			printLogLine(l, mode, plain)
 		}
 	}
 }

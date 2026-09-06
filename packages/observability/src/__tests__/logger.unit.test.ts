@@ -1,14 +1,14 @@
 import pino from "pino";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { runWithContext } from "../context";
-import { getLogContext } from "../context/logging";
+import { runWithContext } from "../context/index.ts";
+import { getLogContext } from "../context/logging.ts";
 import {
   configureLogger,
   consoleIgnoreFields,
   createLogger,
   NODE_LOG_SERIALIZERS,
   resetLoggerCache,
-} from "../logger";
+} from "../logger.ts";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },
@@ -165,23 +165,17 @@ describe("createLogger", () => {
   });
 
   describe("when formatting log output", () => {
-    it("uppercases the level label", () => {
+    it("leaves pino's own numeric level alone without our formatter", () => {
       const { dest, chunks } = captureDest();
 
-      const logger = pino(
-        {
-          level: "error",
-          formatters: {
-            level: (label: string) => ({ level: label.toUpperCase() }),
-          },
-        },
-        dest,
-      );
-
+      const logger = pino({ level: "error" }, dest);
       logger.error("test");
 
+      // The shared dev log format
+      // (dev/docs/best_practices/dev-log-format.md); the exhaustive assertion
+      // over the real factory lives in sharedLogFormat.unit.test.ts.
       const parsed = JSON.parse(chunks[0]!);
-      expect(parsed.level).toBe("ERROR");
+      expect(parsed.level).toBe(50);
     });
   });
 

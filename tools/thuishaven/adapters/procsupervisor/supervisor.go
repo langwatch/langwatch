@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
 
 // Supervisor is the real process-backed implementation of app.Supervisor.
@@ -413,23 +414,29 @@ func (c proc) stream(r io.Reader) {
 	}
 }
 
+// logln captures one line and echoes it live. The capture keeps the child's
+// payload byte for byte — it is what `haven logs --raw` replays, and what a
+// later renderer change must still be able to read. Only the echo is rendered,
+// through the same domain/logfmt every other viewer uses.
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\r\n")
 	c.sink.writeLine(line)
+	rendered := logfmt.Render(line, logfmt.Options{
+		Lane:      c.name,
+		LaneColor: c.color,
+		Time:      time.Now(),
+		Color:     !c.isPlain,
+	})
 	if c.preview != nil {
 		c.preview.Lock()
-		c.preview.lines = append(c.preview.lines, fmt.Sprintf("%-8s │ %s", c.name, line))
+		c.preview.lines = append(c.preview.lines, rendered)
 		if len(c.preview.lines) > 12 {
 			c.preview.lines = c.preview.lines[len(c.preview.lines)-12:]
 		}
 		c.preview.Unlock()
 		return
 	}
-	if c.isPlain {
-		fmt.Printf("%-8s | %s\n", c.name, line)
-		return
-	}
-	fmt.Printf("\x1b[%sm%-8s\x1b[0m │ %s\n", c.color, c.name, line)
+	fmt.Println(rendered)
 }
 
 func renderUp(ctx context.Context, logs *recentLogs, children []app.Child) {

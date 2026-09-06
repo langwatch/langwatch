@@ -12,6 +12,7 @@ import (
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
 
 // The attached up viewer: what a human's `haven up` shows. The stack itself
@@ -411,7 +412,7 @@ func (m *viewerModel) ingestCombined() {
 func (m *viewerModel) ingestCapture(fileSvc, cli string) {
 	for _, raw := range m.readFresh(fileSvc, filepath.Join(m.capDir, fileSvc+".log")) {
 		if l, ok := parseLogLine(fileSvc, raw); ok {
-			m.push(cli, formatLogLine(l, false))
+			m.push(cli, formatLogLine(l, renderHuman, false))
 		}
 	}
 }
@@ -489,20 +490,24 @@ func (m *viewerModel) push(group, line string) {
 	m.lines[group] = ring
 }
 
-// formatCombinedLine colours a combined-stream line by its supervisor label
-// prefix ("app      | booted") and level-highlights the payload; label-less
-// lines (provisioning banners) pass through dimmed-label-free.
+// formatCombinedLine renders a combined-stream line, whose lane comes from the
+// supervisor's own label prefix ("api      | {…}") rather than from the file it
+// was read out of. A label-less line (a provisioning banner) renders with an
+// empty lane column, so it still lines up with the lines around it.
 func formatCombinedLine(raw string) string {
 	label, rest, ok := strings.Cut(raw, "|")
 	name := strings.TrimSpace(label)
 	if !ok || name == "" || strings.ContainsRune(name, ' ') {
-		return highlightLevel(raw)
+		return formatLogLine(logLine{text: raw}, renderHuman, false)
 	}
-	color := logServiceColors[fileToCLIService(name)]
+	lane := fileToCLIService(name)
+	color := logServiceColors[lane]
 	if color == "" {
 		color = "90" // one-shot prep lanes (codegen, prepare, seed, deps, langy-image)
 	}
-	return fmt.Sprintf("\x1b[%sm%-8s\x1b[0m │%s", color, fileToCLIService(name), highlightLevel(rest))
+	return logfmt.Render(strings.TrimPrefix(rest, " "), logfmt.Options{
+		Lane: lane, LaneColor: color, Color: true,
+	})
 }
 
 func (m *viewerModel) View() string {

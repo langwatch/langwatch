@@ -1,0 +1,12 @@
+{"time":"2026-09-07T11:10:46.108Z","level":"info","msg":"listening","service":"langwatch-api","port":6560}
+{"time":"2026-09-07T11:10:46.500Z","level":"debug","msg":"cache warm","service":"langwatch-worker","name":"langwatch:queue","hit":true,"keys":["a","b"]}
+{"time":"2026-09-07T11:10:47.000Z","level":"warn","msg":"control plane unreachable","service":"langwatch-service-aigateway","cause":"connection refused","pid":4211,"hostname":"box","version":"dev","env":"local"}
+{"time":"2026-09-07T11:10:48.250Z","level":"error","msg":"job failed","service":"langwatch-worker","jobId":"j_1","stack":"Error: boom\n    at run (job.ts:12:3)\n    at async main (main.ts:4:1)"}
+{"ts":1788779448.25,"level":"info","msg":"legacy zap epoch line","service":"langwatch-service-nlpgo","caller":"app/app.go:88"}
+{"time":"2026-09-07T11:10:49.000Z","level":"ERROR","msg":"uppercase level still reads","service":"langwatch-api"}
+{"time":"2026-09-07T11:10:49.500Z","level":30,"msg":"numeric pino level still reads","service":"langwatch-api"}
+{"time":"2026-09-07T11:10:50.000Z","level":"info","msg":"quoting","service":"langwatch-api","note":"two words","empty":"","url":"https://app.langwatch.localhost"}
+    at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+exited — restarting in 1s
+[23:42:54.604] INFO (vite): server restarted.
+{"schemaVersion":3,"outputs":[]}

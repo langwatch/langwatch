@@ -217,10 +217,11 @@ func langyContainerShell(o langyContainerOpts) string {
 		"-p", fmt.Sprintf("127.0.0.1:%d:%d", o.Port, o.Port),
 		"-e", fmt.Sprintf("PORT=%d", o.Port),
 		"-e", "ENVIRONMENT=local",
-		// Pretty, human-readable console logging (clog reads LOG_FORMAT), matching the
+		// The shared structured format (clog reads LOG_FORMAT), which haven renders
+		// for the terminal like every other lane. Matching the
 		// host-run Go services and the TS app so every haven dev lane reads the same.
 		// Unconditional in the container tier — it is always a human at the console.
-		"-e", "LOG_FORMAT=pretty",
+		"-e", "LOG_FORMAT=json",
 		"-e", "LANGY_INTERNAL_SECRET=" + o.Secret,
 		"-e", fmt.Sprintf("LANGY_MAX_WORKERS=%d", localLangyMaxWorkers),
 		"-e", fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", langyWorkerIdleMS(localLangyWorkerIdleMS)),

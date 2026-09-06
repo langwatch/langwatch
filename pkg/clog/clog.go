@@ -43,7 +43,12 @@ func Get(ctx context.Context) *zap.Logger {
 		return l
 	}
 	fallbackOnce.Do(func() {
-		fallbackLogger, _ = zap.NewProduction()
+		// The shared format, not zap.NewProduction()'s: a line that reaches a
+		// terminal through a bare context is exactly the line nobody set up,
+		// and it must still render rather than showing up as raw JSON.
+		cfg := zap.NewProductionConfig()
+		cfg.EncoderConfig = jsonEncoderConfig()
+		fallbackLogger, _ = cfg.Build()
 	})
 	return fallbackLogger
 }
@@ -67,6 +72,7 @@ func New(ctx context.Context, cfg Config) *zap.Logger {
 		))
 	} else {
 		zapCfg := zap.NewProductionConfig()
+		zapCfg.EncoderConfig = jsonEncoderConfig()
 		zapCfg.Level = zap.NewAtomicLevelAt(cfg.zapLevel())
 		logger, _ = zapCfg.Build()
 	}
@@ -155,8 +161,35 @@ func buildConsoleCore(format string, level zapcore.Level) zapcore.Core {
 	if format == "pretty" {
 		return zapcore.NewCore(prettyConsoleEncoder(), out, level)
 	}
-	return zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), out, level)
+	return zapcore.NewCore(jsonEncoder(), out, level)
 }
+
+// jsonEncoderConfig is the shared machine format
+// (dev/docs/best_practices/dev-log-format.md): zap's production encoder with
+// its epoch-float `ts` replaced by an RFC 3339 `time` to the millisecond, so a
+// Go record and a Node record carry the same timestamp field, spelled the same
+// way, in every environment. `level` is already the lowercase word and `msg`
+// already the message; only the timestamp differed.
+func jsonEncoderConfig() zapcore.EncoderConfig {
+	cfg := zap.NewProductionEncoderConfig()
+	cfg.TimeKey = "time"
+	cfg.EncodeTime = sharedTimeEncoder
+	return cfg
+}
+
+// sharedTimeLayout is RFC 3339 to the millisecond, the one instant format
+// every LangWatch process writes.
+const sharedTimeLayout = "2006-01-02T15:04:05.000Z07:00"
+
+// sharedTimeEncoder writes the instant in UTC, so a record from a laptop in
+// Amsterdam and one from a pod in eu-west sort and compare without anyone
+// having to notice an offset.
+func sharedTimeEncoder(at time.Time, encoder zapcore.PrimitiveArrayEncoder) {
+	encoder.AppendString(at.UTC().Format(sharedTimeLayout))
+}
+
+// jsonEncoder builds the shared machine encoder.
+func jsonEncoder() zapcore.Encoder { return zapcore.NewJSONEncoder(jsonEncoderConfig()) }
 
 // prettyEncoderConfig aligns the Go pretty console with the TS lanes'
 // pino-pretty console, so a terminal interleaving Go and JS services reads as

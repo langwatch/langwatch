@@ -1,18 +1,18 @@
 import pino, { type DestinationStream, type LoggerOptions, type Logger as PinoLogger } from "pino";
-import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
+import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants.ts";
 import {
   resolveLoggerConfiguration,
   type LoggerConfiguration,
   type ResolvedLoggerConfiguration,
-} from "./logger-config";
+} from "./logger-config.ts";
 
 export type {
   LoggerConfiguration,
   LoggerFormat,
   ProcessLoggerInputs,
   ResolvedLoggerConfiguration,
-} from "./logger-config";
-export { loggerConfigurationFrom } from "./logger-config";
+} from "./logger-config.ts";
+export { loggerConfigurationFrom } from "./logger-config.ts";
 
 type LogContextProvider = () => Record<string, string | null>;
 
@@ -189,7 +189,7 @@ function createBrowserLogger(name: string, level: string): PinoLogger {
     },
     formatters: {
       bindings: (bindings) => bindings,
-      level: (label) => ({ level: label.toUpperCase() }),
+      level: (label) => ({ level: label }),
     },
     browser: { asObject: true },
   });
@@ -226,10 +226,19 @@ function createNodeLogger(
         // record), so this injects the same semantic value directly instead.
         ...serviceVersionField(configuration),
       }),
-      level: (label) => ({ level: label.toUpperCase() }),
+      // Lowercase, matching the Go services and Loki's own `detected_level`
+      // (dev/docs/best_practices/dev-log-format.md). This is the wire value:
+      // a LogQL filter written against the old `WARN`/`ERROR` needs widening.
+      level: (label) => ({ level: label }),
     },
     mixin: options?.disableContext ? undefined : () => presentLogContext(),
   };
+  // The last line of defence, not the first: a classified secret is meant to
+  // stop at the composition root, and this masks the field by name for the
+  // one that reaches a record anyway.
+  if (configuration.redactPaths.length > 0) {
+    pinoOptions.redact = { paths: [...configuration.redactPaths], censor: "[redacted]" };
+  }
 
   const transport = getSharedTransport();
   return transport ? pino(pinoOptions, transport) : pino(pinoOptions, process.stdout);
@@ -355,6 +364,7 @@ function loggerConfigurationValues(
     configuration.serviceVersion,
     configuration.deploymentEnvironment,
     configuration.otelTransportServiceVersion,
+    configuration.redactPaths.join(","),
   ];
 }
 
