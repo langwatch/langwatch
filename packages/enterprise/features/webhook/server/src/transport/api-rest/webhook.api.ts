@@ -21,12 +21,13 @@ import {
 import {
   WEBHOOK_EVENT_TYPES,
   webhookDestinationKindSchema,
-  WebhookEndpointsNotEntitledError,
+  WEBHOOK_ENDPOINTS_NOT_ENTITLED_CODE,
   WebhookEventNotFoundError,
   type SqsDestinationInput,
   type WebhookEndpointView,
 } from "@langwatch/enterprise-webhook-contract";
 import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context, Next } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -482,7 +483,11 @@ export function createWebhookRestApp(options: {
     try {
       await webhooks().assertEntitled(organization.id);
     } catch (error) {
-      if (error instanceof WebhookEndpointsNotEntitledError) {
+      // On `code`, not `instanceof`: the gate is composed by the process, so
+      // the refusal crosses a package boundary and an identity check answers
+      // false whenever the two ends resolved the contract differently — which
+      // would drop a named 403 to an unknown 500.
+      if (HandledError.isHandled(error) && error.code === WEBHOOK_ENDPOINTS_NOT_ENTITLED_CODE) {
         throw new ForbiddenError(error.message);
       }
       throw error;

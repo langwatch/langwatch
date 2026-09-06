@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { HttpError, InternalServerError } from "./http-errors.js";
+import { HttpError, InternalServerError, isFrameworkRefusal } from "./http-errors.js";
 import { errorSchema } from "./schemas.js";
 
 /**
@@ -38,7 +38,9 @@ export function createFamilyErrorHandler(options: {
         ? error.status
         : HandledError.isHandled(error)
           ? (error.httpStatus as ContentfulStatusCode)
-          : (((error as { status?: ContentfulStatusCode }).status ?? 500) as ContentfulStatusCode);
+          : isFrameworkRefusal(error)
+            ? error.status
+            : 500;
 
     // A refusal the caller can act on is their fact, not our outage: logging
     // a 404 or a 422 at error level with a "[500]" in the sentence buries the
@@ -69,7 +71,12 @@ export function createFamilyErrorHandler(options: {
     // and report the caller's mistake as our outage. This handler exists to
     // add the family's domain mapping on top of the shared boundary, not to
     // replace it, so anything it has not specifically claimed goes on.
-    if (HandledError.isHandled(error)) return options.boundary(error, c);
+    // A framework refusal — Hono's own `HTTPException` — carries a status the
+    // caller can act on, and the boundary renders it. Collapsing it here would
+    // answer a handler's 404 as our outage.
+    if (HandledError.isHandled(error) || isFrameworkRefusal(error)) {
+      return options.boundary(error, c);
+    }
 
     const internalError = new InternalServerError();
     return c.json(errorSchema.parse(internalError), internalError.status);

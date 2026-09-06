@@ -88,3 +88,22 @@ export class InternalServerError extends HttpError {
     super(message);
   }
 }
+
+/**
+ * Hono's own `HTTPException`, recognised by shape rather than by `instanceof`.
+ *
+ * A framework refusal crosses a package boundary on the way from the family
+ * that raised it to the process handler that renders it, and `instanceof`
+ * answers false whenever the two ends resolved `hono/http-exception` to
+ * different module instances — the ESM and CommonJS builds of one version, or
+ * a copy the loader wrapped. The refusal then loses its status and reaches the
+ * caller as a generic 500, which is the failure this predicate exists to
+ * prevent. The two members below are the whole public shape of the class.
+ */
+export function isFrameworkRefusal(
+  error: unknown,
+): error is Error & { status: ContentfulStatusCode; getResponse: () => Response } {
+  if (!(error instanceof Error)) return false;
+  const candidate = error as { status?: unknown; getResponse?: unknown };
+  return typeof candidate.status === "number" && typeof candidate.getResponse === "function";
+}

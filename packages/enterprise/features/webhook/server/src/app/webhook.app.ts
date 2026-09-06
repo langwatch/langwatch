@@ -104,6 +104,16 @@ export class WebhookApp {
   }
 
   /**
+   * The emitted-events log as this application was composed with it, absent
+   * included. {@link requireEvents} is what a door reads; this is what a
+   * process recomposing the application over a different entitlement gate
+   * passes on, so the log is not silently dropped on the way through.
+   */
+  get events(): WebhookEventsService | undefined {
+    return this.dependencies.events;
+  }
+
+  /**
    * The emitted-events log, or a plain failure when this deployment has no
    * ClickHouse to keep it in.
    *

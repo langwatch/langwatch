@@ -9,6 +9,7 @@ import {
 } from "@langwatch/api/rest";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 
+import { unavailableIdempotentRunner } from "../../../app/api-idempotency.composition";
 import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
 import type {
   ApiPackagedRestAbsenceReport,
@@ -55,7 +56,10 @@ export type RestFamilyCaller = {
  * person. The declarations a family makes over these — `requires("scenarios:view")`, the
  * API-key ceiling, the route-level team and project checks — still run.
  */
-export function createRestFamilySecurity(caller: RestFamilyCaller = {}): AppRestSecurity {
+export function createRestFamilySecurity(
+  caller: RestFamilyCaller = {},
+  ports: { idempotency?: unknown } = {},
+): AppRestSecurity {
   const pass: MiddlewareHandler = async (_c, next) => {
     await next();
   };
@@ -88,6 +92,7 @@ export function createRestFamilySecurity(caller: RestFamilyCaller = {}): AppRest
     authorizeRouteProjectPermission: () => guard,
     authenticateOrganizationThrowing: asOrganization,
     authorizeOrganizationPermissionThrowing: () => guard,
+    ...ports,
   } as never);
 }
 
@@ -171,7 +176,9 @@ export function mountRestFamily(options: {
     : undefined;
 
   for (const app of createApiProcessRestFeatures({
-    security: options.security ?? createRestFamilySecurity(options.caller ?? {}),
+    security:
+      options.security ??
+      createRestFamilySecurity(options.caller ?? {}, { idempotency: unavailableIdempotentRunner }),
     services: {
       ...options.services,
       ...(packaged ? { packaged } : {}),

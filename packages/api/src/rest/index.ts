@@ -149,6 +149,7 @@ export {
   ForbiddenError,
   HttpError,
   InternalServerError,
+  isFrameworkRefusal,
   NotFoundError,
   UnauthorizedError,
   UnprocessableEntityError,

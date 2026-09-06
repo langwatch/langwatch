@@ -1,5 +1,12 @@
 import { HandledError } from "@langwatch/handled-error";
 
+/**
+ * The refusal's machine name. Held as a constant because the gate is composed
+ * by the process and read by both doors, so the two ends recognise it by code
+ * rather than by class identity across a package boundary.
+ */
+export const WEBHOOK_ENDPOINTS_NOT_ENTITLED_CODE = "webhook_endpoints_not_entitled";
+
 export const WEBHOOK_ENDPOINTS_ENTITLEMENT_MESSAGE =
   "Webhook endpoints are an enterprise feature; this organization's plan does not include them.";
 
@@ -7,7 +14,7 @@ export class WebhookEndpointsNotEntitledError extends HandledError {
   declare readonly code: "webhook_endpoints_not_entitled";
 
   constructor() {
-    super("webhook_endpoints_not_entitled", WEBHOOK_ENDPOINTS_ENTITLEMENT_MESSAGE, {
+    super(WEBHOOK_ENDPOINTS_NOT_ENTITLED_CODE, WEBHOOK_ENDPOINTS_ENTITLEMENT_MESSAGE, {
       httpStatus: 403,
       fault: "customer",
     });

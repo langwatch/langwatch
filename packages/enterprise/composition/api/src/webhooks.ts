@@ -27,6 +27,8 @@
  */
 export { eventMatches } from "@langwatch/enterprise-webhook-contract";
 export {
+  WebhookAccessService,
+  WebhookApp,
   WebhookDeliveryService,
   WebhookEndpointAdapter,
   WebhookEnvelopeService,

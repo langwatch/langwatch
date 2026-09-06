@@ -62,6 +62,7 @@ import {
 } from "../features/agent-cache/agent-cache.store";
 import { AgentCacheService } from "../features/agent-cache/agent-cache.service";
 import { canonicalErrorFor } from "./api-canonical-error";
+import { composeApiWebhookApplication } from "../features/enterprise/enterprise-webhook.composition";
 import { orgRequestLedgerActor } from "./api-ledger-actor";
 import { createApiDualCredentialAuth } from "./api-dual-credential-auth";
 import { ApiRestCapabilityUnavailableError, createOrganizationMiddleware } from "./api-rest-ports";
@@ -153,6 +154,12 @@ export function composeApiPackagedRest(
 ): ApiPackagedRestCollaborators {
   const platformUrl = createPlatformUrl(options.publicBaseUrl);
   const enterpriseGate = composeEnterpriseGate(options.plans);
+  // `/api/webhooks/v1`'s entitlement gate is this deployment's plan read, not
+  // the Enterprise governance application's — see the module for why.
+  const webhooks = composeApiWebhookApplication({
+    webhooks: options.enterpriseGovernance.webhooks,
+    plans: options.plans,
+  });
   const agentCache = composeAgentCache(options);
   const storedObjectBytes = options.storedObject.bytes;
   const dualAuth = options.session
@@ -198,7 +205,7 @@ export function composeApiPackagedRest(
       roles: () => options.role.roles,
       ...(options.experiment.experiments ? { experiments: () => options.experiment.app } : {}),
       governance: () => options.enterpriseGovernance.governanceApp,
-      webhooks: () => options.enterpriseGovernance.webhooks,
+      webhooks: () => webhooks,
       ...(options.presence.broadcast ? { broadcast: () => options.presence.broadcast! } : {}),
       ...(options.organization.provisioning
         ? { organizationProvisioning: () => options.organization.provisioning! }

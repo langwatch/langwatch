@@ -16,7 +16,7 @@ import {
   composeApiTraceIngest,
   type ApiTraceIngestAllowance,
 } from "../../../app/api-trace-ingest.composition";
-import type { ApiTraceReadStackPort } from "../trace.composition";
+import type { ApiTraceReadStackPort } from "../trace-read-stack.port";
 
 const PROJECT = {
   id: "project-1",

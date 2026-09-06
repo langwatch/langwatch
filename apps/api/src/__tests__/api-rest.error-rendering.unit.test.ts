@@ -219,6 +219,29 @@ describe("ApiRestObservabilityComposition.legacyErrorHandler", () => {
   });
 });
 
+/**
+ * The same refusal raised through a SECOND copy of the framework's module.
+ *
+ * The booted process resolves `hono/http-exception` more than once — the ESM
+ * and CommonJS builds of one version, and whatever the instrumentation loader
+ * wraps — so the class a feature package throws is not always the class the
+ * boundary imported. Rendering by `instanceof` answered every such refusal as
+ * a 500; this stands in for the second copy so the boundary is pinned on the
+ * shape rather than the identity.
+ */
+class ForeignFrameworkRefusal extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+
+  getResponse(): Response {
+    return new Response(this.message, { status: this.status });
+  }
+}
+
 describe("given a route raises the HTTP framework's own refusal", () => {
   describe("when the client calls that route", () => {
     /** @scenario "A framework refusal keeps the status it was raised with" */
@@ -242,6 +265,29 @@ describe("given a route raises the HTTP framework's own refusal", () => {
       const body = (await response.json()) as { error: Record<string, unknown> };
       expect(body.error.code).toBe("not_found");
       expect(body.error.message).toBe("Config not found");
+    });
+
+    /** @scenario "A framework refusal raised through a second copy of the framework is still a refusal" */
+    it("answers a foreign copy's refusal at its own status on the legacy body", async () => {
+      const response = await routeThrowing(
+        new ForeignFrameworkRefusal(404, "Evaluator not found"),
+      ).request("/");
+
+      expect(response.status).toBe(404);
+      const body = (await response.json()) as Record<string, unknown>;
+      expect(body.message).toBe("Evaluator not found");
+    });
+
+    /** @scenario "A framework refusal raised through a second copy of the framework is still a refusal" */
+    it("answers a foreign copy's refusal at its own status on the canonical envelope", async () => {
+      const response = await canonicalRouteThrowing(
+        new ForeignFrameworkRefusal(404, "Evaluator not found"),
+      ).request("/");
+
+      expect(response.status).toBe(404);
+      const body = (await response.json()) as { error: Record<string, unknown> };
+      expect(body.error.code).toBe("not_found");
+      expect(body.error.message).toBe("Evaluator not found");
     });
 
     /** @scenario "A framework refusal at 5xx still collapses to the generic body" */
