@@ -90,11 +90,37 @@ export async function setupModelEnv(
   const provider = model.split("/")[0]!;
   const modelProvider = modelProviders[provider];
 
+  const embeddingsProviderError = (
+    status: "not configured" | "not enabled",
+  ): EvaluatorConfigError => {
+    const availableProviders = Object.entries(modelProviders)
+      .filter(
+        ([, candidate]) =>
+          candidate.enabled &&
+          ((candidate.embeddingsModels?.length ?? 0) > 0 ||
+            (candidate.customEmbeddingsModels?.length ?? 0) > 0),
+      )
+      .map(([name]) => name)
+      .sort();
+    const availability =
+      availableProviders.length > 0
+        ? ` Available embeddings providers: ${availableProviders.join(", ")}.`
+        : " No enabled embeddings providers are available.";
+
+    return new EvaluatorConfigError(
+      `settings.embeddings_model is "${model}", but provider "${provider}" is ${status}. Set the project's EMBEDDINGS default or select an enabled embeddings model.${availability}`,
+    );
+  };
+
   if (!modelProvider) {
-    throw new EvaluatorConfigError(`Provider ${provider} is not configured`);
+    throw embeddings
+      ? embeddingsProviderError("not configured")
+      : new EvaluatorConfigError(`Provider ${provider} is not configured`);
   }
   if (!modelProvider.enabled) {
-    throw new EvaluatorConfigError(`Provider ${provider} is not enabled`);
+    throw embeddings
+      ? embeddingsProviderError("not enabled")
+      : new EvaluatorConfigError(`Provider ${provider} is not enabled`);
   }
 
   const modelName = model.split("/").slice(1).join("/");
@@ -146,13 +172,24 @@ export async function setupModelEnv(
     modelProvider,
     projectId,
   });
+  const { deployment, ...callParams } = litellmParams;
 
   let envResult = Object.fromEntries(
-    Object.entries(litellmParams).map(([key, value]) => [
+    Object.entries(callParams).map(([key, value]) => [
       embeddings ? `X_LITELLM_EMBEDDINGS_${key}` : `X_LITELLM_${key}`,
       value,
     ]),
   );
+
+  if (
+    modelProvider.provider === "azure" &&
+    typeof deployment === "string" &&
+    deployment.trim() !== ""
+  ) {
+    envResult[
+      embeddings ? "AZURE_EMBEDDINGS_DEPLOYMENT_NAME" : "AZURE_DEPLOYMENT_NAME"
+    ] = deployment;
+  }
 
   // Generation params (temperature, max_tokens, etc.)
   const generationParams = [

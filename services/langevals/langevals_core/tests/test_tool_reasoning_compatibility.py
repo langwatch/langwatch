@@ -20,6 +20,7 @@ import pytest
 
 from langevals_core import litellm_patch
 from langevals_core.litellm_patch import ToolReasoningConflictError, patch_litellm
+from langevals_core.request_env import request_env
 
 # The rejection as the provider words it, captured from a Comparison run whose
 # evaluator model resolved to openai/gpt-5.6-sol.
@@ -113,7 +114,7 @@ def provider(monkeypatch):
     caller's explicit choice.
     """
     for key in list(os.environ):
-        if key.startswith("X_LITELLM_"):
+        if key.startswith("X_LITELLM_") or key == "AZURE_DEPLOYMENT_NAME":
             monkeypatch.delenv(key)
 
     patch_litellm()
@@ -194,6 +195,25 @@ def test_remaining_conflict_is_reported_as_a_fixable_configuration_problem(
     assert "none" in message
     assert "/v1/responses" not in message
     assert "OpenAIException" not in message
+
+
+# @scenario "An Azure judge conflict names the configured model, not its deployment"
+def test_azure_conflict_names_the_requested_model(provider):
+    provider.refusal = Exception(PROVIDER_TOOL_REASONING_REFUSAL)
+
+    with request_env(
+        {
+            "X_LITELLM_model": "azure/gpt-5.6-sol-pro",
+            "AZURE_DEPLOYMENT_NAME": "prod-judge",
+        }
+    ):
+        with pytest.raises(ToolReasoningConflictError) as raised:
+            litellm.completion(**judge_request("azure/gpt-5.6-sol-pro"))
+
+    assert provider.last_request["model"] == "azure/prod-judge"
+    assert raised.value.model == "azure/gpt-5.6-sol-pro"
+    assert "azure/gpt-5.6-sol-pro" in str(raised.value)
+    assert "azure/prod-judge" not in str(raised.value)
 
 
 # @scenario "A refusal that is not this conflict reaches the caller untouched"
