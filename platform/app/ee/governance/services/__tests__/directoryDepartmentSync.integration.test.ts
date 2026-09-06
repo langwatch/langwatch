@@ -129,11 +129,15 @@ describe("Feature: directory departments land on the entities we already have", 
       where: { organizationId },
       data: { departmentId: null },
     });
-    await cleanupTestRows(prisma, [["department", { organizationId }]]);
+    await cleanupTestRows(prisma, [
+      ["departmentMembershipHistory", { organizationId }],
+      ["department", { organizationId }],
+    ]);
   });
 
   afterAll(() =>
     cleanupTestRows(prisma, [
+      ["departmentMembershipHistory", { organizationId }],
       ["department", { organizationId }],
       ["scimExternalId", { connectionId }],
       ["ssoConnection", { id: connectionId }],
@@ -263,5 +267,38 @@ describe("Feature: directory departments land on the entities we already have", 
     expect(first.assigned).toBe(1);
     expect(second.assigned).toBe(0);
     expect(await departments()).toHaveLength(1);
+  });
+
+  /** @scenario "A standing assignment from before dated links gets its link seeded" */
+  it("seeds the dated link for a member whose pointer predates the history table", async () => {
+    // The state every org is in the day the links ship: pointer set, no
+    // history row. Skipping them because the pointer matches would leave
+    // "who was here in January" answering "unassigned" until a real reorg.
+    const dept = await prisma.department.create({
+      data: { organizationId, name: "Engineering" },
+    });
+    await prisma.organizationUser.updateMany({
+      where: { organizationId, userId: mariaUserId },
+      data: { departmentId: dept.id },
+    });
+
+    const outcome = await service().applyDirectoryEvents({
+      organizationId,
+      events: [
+        directoryEvent({
+          actor: MARIA_OID,
+          mail: `m.silva-${ns}@acme.test`,
+          department: "Engineering",
+        }),
+      ],
+    });
+
+    expect(outcome.assigned).toBe(1);
+    const links = await prisma.departmentMembershipHistory.findMany({
+      where: { organizationId, userId: mariaUserId },
+    });
+    expect(links).toHaveLength(1);
+    expect(links[0]?.departmentId).toBe(dept.id);
+    expect(links[0]?.validTo).toBeNull();
   });
 });

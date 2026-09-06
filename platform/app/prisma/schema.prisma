@@ -1051,6 +1051,36 @@ model Department {
   @@index([organizationId])
 }
 
+/// One dated person → department link (ADR-128 §13, #7882).
+///
+/// `OrganizationUser.departmentId` stays the CURRENT assignment every screen
+/// reads; these rows are its history, appended by the same `assignUser` write
+/// so the two cannot drift. They exist for the cost reads: January's spend
+/// stays with January's department, so a read resolves against the link that
+/// was open on the cost's day, not against today's pointer. Members with no
+/// link on a day resolve to "unassigned", never to an error.
+///
+/// Same shape as IdentityMatch's dated links, same one-open-link guard: the
+/// partial unique index in the migration rejects a second open row per
+/// (organizationId, userId) with SQLSTATE 23505.
+model DepartmentMembershipHistory {
+  id             String    @id @default(nanoid())
+  organizationId String
+  userId         String
+  departmentId   String
+  validFrom      DateTime
+  /// Null means the link is open. Reassignment and clearing close it.
+  validTo        DateTime?
+  createdAt      DateTime  @default(now())
+
+  // One-open-link guard, raw SQL in the migration because Prisma cannot
+  // express a partial unique index:
+  //   CREATE UNIQUE INDEX "DepartmentMembershipHistory_one_open_link_key"
+  //     ON "DepartmentMembershipHistory"("organizationId", "userId")
+  //     WHERE "validTo" IS NULL
+  @@index([organizationId, userId, validFrom])
+}
+
 /// Per-(organization, tool) override for which `langwatch <tool>` paths the
 /// CLI may use: `allowVk` gates the gateway / virtual-key path (Path A) and
 /// `allowOtelDirect` gates the direct-OTLP ingestion path (Path B). A missing
