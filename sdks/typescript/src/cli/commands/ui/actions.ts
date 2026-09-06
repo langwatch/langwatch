@@ -1,6 +1,7 @@
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { asCommandResult } from "./call";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Bound the request so a quiet socket cannot hold the CLI open forever. This
@@ -20,7 +21,7 @@ export const uiActionsCommand = async (): Promise<CommandResult | void> => {
 
   let response: Response;
   try {
-    response = await fetch(`${endpoint}/api/langy/ui/actions`, {
+    response = await langwatchFetch(`${endpoint}/api/langy/ui/actions`, {
       method: "GET",
       headers: { "X-Auth-Token": apiKey },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

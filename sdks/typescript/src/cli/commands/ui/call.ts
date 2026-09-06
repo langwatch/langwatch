@@ -3,6 +3,7 @@ import { handledErrorFrom } from "@/internal/api/errors";
 import { resolveCredentials } from "../../utils/apiKey";
 import { reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Bound the request so a wedged control plane cannot hold the whole turn.
@@ -137,7 +138,7 @@ export const uiCallCommand = async (
 
   let response: Response;
   try {
-    response = await fetch(`${endpoint}/api/langy/ui/actions`, {
+    response = await langwatchFetch(`${endpoint}/api/langy/ui/actions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

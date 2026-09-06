@@ -10,6 +10,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
 import { redactTriggerListSecrets } from "./redact";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the listing rather than printing it: the output port renders it in
@@ -24,7 +25,7 @@ export const listTriggersCommand = async (): Promise<CommandResult | void> => {
   const spinner = createSpinner("Fetching triggers...").start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers`, {
+    const response = await langwatchFetch(`${endpoint}/api/triggers`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 
