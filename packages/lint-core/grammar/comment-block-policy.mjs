@@ -9,11 +9,18 @@ export const MAX_COMMENT_BLOCK_LINES = 5;
 export const COMMENT_BLOCK_SIZE_ALLOWED =
   "Split the explanation near the code it describes, or move durable narrative to an ADR or developer document.";
 
+// The one wording, as a template so a rule can declare it under a messageId
+// and let the linter interpolate, and as a function for the callers that
+// already hold the count.
+export const COMMENT_BLOCK_SIZE_MESSAGE =
+  "Comment block has {{lines}} lines; the maximum is {{max}}." +
+  " Comments exist to make code readable and good code needs almost none: keep the why in a" +
+  " line or two, and put design narrative in an ADR the comment points to.";
+
 export function commentBlockSizeMessage(lines) {
-  return (
-    `Comment block has ${lines} lines; the maximum is ${MAX_COMMENT_BLOCK_LINES}.` +
-    " Comments exist to make code readable and good code needs almost none: keep the why in a" +
-    " line or two, and put design narrative in an ADR the comment points to."
+  return COMMENT_BLOCK_SIZE_MESSAGE.replace("{{lines}}", String(lines)).replace(
+    "{{max}}",
+    String(MAX_COMMENT_BLOCK_LINES),
   );
 }
 

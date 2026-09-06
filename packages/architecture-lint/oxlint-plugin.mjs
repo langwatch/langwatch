@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
+  COMMENT_BLOCK_SIZE_MESSAGE,
+  MAX_COMMENT_BLOCK_LINES,
   collectCommentBlocks,
   commentBlockSizeMessage,
   isExemptBlock,
@@ -9,7 +11,7 @@ import {
   marksLicenseHeader,
   mayContainReviewBlock,
   rootCovers,
-} from "./src/comment-block-policy.mjs";
+} from "@langwatch/lint-core/grammar/comment-block-policy.mjs";
 import {
   CONTRACT_ARTIFACT,
   CONTRACT_ARTIFACT_SUFFIX,
@@ -24,7 +26,8 @@ import {
   claimsSubject,
   isLowerKebabFilename,
   isStrictServerFilename,
-} from "./src/feature-layout-policy.mjs";
+} from "@langwatch/lint-core/grammar/feature-layout-policy.mjs";
+import { conditionShapeRule } from "@langwatch/lint-core";
 import { isOverengineeringSource, overengineeringFindings } from "./src/overengineering-policy.mjs";
 
 const workspaceCache = new Map();
@@ -1701,100 +1704,6 @@ const cognitiveComplexityRule = {
   },
 };
 
-// A condition is readable at a glance or it is named. The shape checks are
-// the four ways a test stops being glanceable: a deep property chain, more
-// than one call, a stack of logical operators, or a ternary inside the test.
-const CONDITION_LOGICAL_OPERATORS = new Set(["&&", "||", "??"]);
-
-function chainDepth(node) {
-  if (!node) return 0;
-  if (node.type === "MemberExpression" || node.type === "OptionalMemberExpression") {
-    return 1 + chainDepth(node.object);
-  }
-  if (node.type === "CallExpression" || node.type === "OptionalCallExpression") {
-    return chainDepth(node.callee);
-  }
-  if (node.type === "ChainExpression" || node.type === "TSNonNullExpression") {
-    return chainDepth(node.expression);
-  }
-  return 0;
-}
-
-function conditionShape(test) {
-  const shape = { calls: 0, hops: 0, nestedTernary: false, operators: 0 };
-  const visit = (node) => {
-    if (!node) return;
-    switch (node.type) {
-      case "MemberExpression":
-      case "OptionalMemberExpression":
-        shape.hops = Math.max(shape.hops, chainDepth(node));
-        break;
-      case "CallExpression":
-      case "OptionalCallExpression":
-        shape.calls += 1;
-        break;
-      case "LogicalExpression":
-        if (CONDITION_LOGICAL_OPERATORS.has(node.operator)) shape.operators += 1;
-        break;
-      case "ConditionalExpression":
-        shape.nestedTernary = true;
-        break;
-      default:
-        break;
-    }
-    for (const child of childNodes(node)) visit(child);
-  };
-  visit(test);
-  return shape;
-}
-
-const conditionShapeRule = {
-  meta: {
-    type: "problem",
-    schema: [
-      {
-        type: "object",
-        properties: {
-          maxCalls: { type: "integer", minimum: 0 },
-          maxHops: { type: "integer", minimum: 0 },
-          maxOperators: { type: "integer", minimum: 0 },
-        },
-        additionalProperties: false,
-      },
-    ],
-    messages: {
-      nameCondition: "Name this condition: assign it to a const and test the name.",
-    },
-  },
-  create(context) {
-    const options = context.options?.[0] ?? {};
-    const maxHops = options.maxHops ?? 2;
-    const maxCalls = options.maxCalls ?? 1;
-    const maxOperators = options.maxOperators ?? 2;
-
-    const check = (test) => {
-      if (!test) return;
-      const shape = conditionShape(test);
-      const unreadable =
-        shape.hops > maxHops ||
-        shape.calls > maxCalls ||
-        shape.operators > maxOperators ||
-        shape.nestedTernary;
-      if (!unreadable) return;
-      context.report({ node: test, messageId: "nameCondition" });
-    };
-
-    return {
-      ConditionalExpression: (node) => check(node.test),
-      DoWhileStatement: (node) => check(node.test),
-      ForStatement: (node) => check(node.test),
-      IfStatement: (node) => check(node.test),
-      SwitchStatement: (node) => check(node.discriminant),
-      WhileStatement: (node) => check(node.test),
-    };
-  },
-};
-
 // ---------------------------------------------------------------------------
 // Comment blocks (policy `comment-block-size`).
 //
@@ -1983,7 +1892,7 @@ const commentBlockSizeRule = {
 };
 
 const commentBlockSizeWarningRule = {
-  meta: { type: "suggestion", messages: {} },
+  meta: { type: "suggestion", messages: { commentBlockSize: COMMENT_BLOCK_SIZE_MESSAGE } },
   create(context) {
     if (!commentBlockRuleSetup(context)) return {};
 
@@ -1994,7 +1903,8 @@ const commentBlockSizeWarningRule = {
           if (block.lines >= COMMENT_BLOCK_ERROR_LINES) continue;
           context.report({
             loc: { line: block.line, column: 0 },
-            message: commentBlockSizeMessage(block.lines),
+            messageId: "commentBlockSize",
+            data: { lines: block.lines, max: MAX_COMMENT_BLOCK_LINES },
           });
         }
       },
@@ -2486,6 +2396,42 @@ const typedPrismaSeamRule = {
 };
 
 // ---------------------------------------------------------------------------
+// The raw Hono app behind a SecuredApp. Registering a verb on it mounts a route
+// the access policy never saw: the type system seals the published view and the
+// boot assertion catches a mount that got past it, and this catches the source.
+
+const RAW_HONO_MOUNT = /\.hono\.(?:get|post|put|patch|delete|all|on|use)\s*\(/g;
+
+const noRawHonoMountRule = {
+  meta: {
+    type: "problem",
+    messages: {
+      rawMount: "Mount through `app.access(policy)`; the raw Hono app skips the access policy.",
+    },
+  },
+  create(context) {
+    const filename = normalizedFilename(context);
+    const workspacePath = relative(context.cwd, filename).split(sep).join("/");
+    if (!/^(?:apps|packages)\//.test(workspacePath)) return {};
+
+    return {
+      Program() {
+        const source = context.sourceCode.text;
+        RAW_HONO_MOUNT.lastIndex = 0;
+        let match = RAW_HONO_MOUNT.exec(source);
+        while (match) {
+          context.report({
+            loc: { line: source.slice(0, match.index).split(/\r?\n/).length, column: 0 },
+            messageId: "rawMount",
+          });
+          match = RAW_HONO_MOUNT.exec(source);
+        }
+      },
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Over-abstraction (policies `layer-class`, `overload-by-literal`,
 // `conditional-type-depth`). The detectors are the shared module the CLI's
 // baseline check also imports; here they gate on the same baseline file.
@@ -2558,10 +2504,10 @@ export const rules = {
   "feature-source-layout": featureSourceLayoutRule,
   "feature-source-subject": featureSourceSubjectRule,
   "layer-class": layerClassRule,
+  "no-raw-hono-mount": noRawHonoMountRule,
   "overload-by-literal": overloadByLiteralRule,
   "prisma-containment": prismaContainmentRule,
   "typed-prisma-seam": typedPrismaSeamRule,
-  "api-context-services": apiContextServicesRule,
   "cognitive-complexity": cognitiveComplexityRule,
   "condition-shape": conditionShapeRule,
   "environment-boundaries": environmentBoundariesRule,

@@ -1404,6 +1404,46 @@ tester.run("typed-prisma-seam", plugin.rules["typed-prisma-seam"], {
   ],
 });
 
+/** @scenario "The raw Hono app cannot be mounted around the policy" */
+tester.run("no-raw-hono-mount", plugin.rules["no-raw-hono-mount"], {
+  valid: [
+    {
+      filename: "apps/api/src/features/health/health-probe-rest.ts",
+      code: 'export const app = secured.access(policy).get("/healthz", handler);',
+    },
+    {
+      filename: "apps/api/src/features/health/health-probe-rest.ts",
+      code: "export const mounted = secured.mountInto(parent);",
+    },
+    {
+      // Serving a request through the composed app registers nothing.
+      filename: "packages/features/monitor/server/src/app/__tests__/monitor.transport.unit.test.ts",
+      code: 'export const response = app.hono.request("/api/monitors");',
+    },
+    {
+      filename: "tools/thuishaven/example.ts",
+      code: 'export const smuggled = app.hono.get("/bypass", handler);',
+    },
+  ],
+  invalid: [
+    {
+      filename: "apps/api/src/features/health/health-probe-rest.ts",
+      code: 'export const smuggled = app.hono.get("/bypass", handler);',
+      errors: [{ messageId: "rawMount" }],
+    },
+    {
+      filename: "packages/api/src/rest/example.ts",
+      code: 'export const smuggled = secured.hono.post("/bypass", handler);',
+      errors: [{ messageId: "rawMount" }],
+    },
+    {
+      filename: "apps/api/src/features/health/health-probe-rest.ts",
+      code: 'app.hono.use("/api/*", middleware);\napp.hono.on("HEAD", "/x", handler);\n',
+      errors: [{ messageId: "rawMount" }, { messageId: "rawMount" }],
+    },
+  ],
+});
+
 const layerFilename = "packages/features/project/server/src/services/example.service.ts";
 
 tester.run("layer-class", plugin.rules["layer-class"], {

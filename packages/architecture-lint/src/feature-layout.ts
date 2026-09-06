@@ -8,7 +8,7 @@ import {
   RULES_PATTERN,
   SERVICE_MODULE_PATTERN,
   TEST_DIRECTORY,
-} from "./feature-layout-policy.mjs";
+} from "@langwatch/lint-core/grammar/feature-layout-policy.mjs";
 import {
   createWorkspaceModuleResolver,
   resolveRelativeModule,

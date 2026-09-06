@@ -13,7 +13,7 @@ import {
   marksGeneratedHeader,
   marksLicenseHeader,
   mayContainReviewBlock,
-} from "./comment-block-policy.mjs";
+} from "@langwatch/lint-core/grammar/comment-block-policy.mjs";
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"]);
 

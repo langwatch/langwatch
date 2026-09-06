@@ -3,7 +3,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files";
-import { isLowerKebabFilename } from "./feature-layout-policy.mjs";
+import { isLowerKebabFilename } from "@langwatch/lint-core/grammar/feature-layout-policy.mjs";
 import { discoverClassifiedPackages } from "./workspace";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
