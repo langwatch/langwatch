@@ -27,7 +27,8 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "colocate-tests": "tsx src/colocate-tests.cli.ts",
-    "check:feature-parity": "tsx src/check-feature-parity.ts"
+    "check:feature-parity": "tsx src/check-feature-parity.ts",
+    "docs": "node src/lint-rules-doc.mjs"
   },
   "dependencies": {
     "@langwatch/lint-core": "workspace:*",

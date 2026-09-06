@@ -12,8 +12,8 @@ import {
   lintFeatureLayouts,
   lintManifests,
   lintOxlintBaseline,
-  lintServiceQuality,
-  lintServiceQualityBaseline,
+  lintServiceCeilings,
+  lintServiceCeilingsBaseline,
   lintStrictPortModules,
   lintStrictPortBaseline,
   lintTestQuality,
@@ -28,15 +28,15 @@ function valueAfter(flag: string): string | undefined {
 }
 
 const root = resolve(valueAfter("--root") ?? process.cwd());
-const serviceQualityBaselineReference = valueAfter("--service-quality-baseline-reference");
+const serviceCeilingsBaselineReference = valueAfter("--service-ceilings-baseline-reference");
 const baselineReferenceDirectory = valueAfter("--baseline-reference-dir");
 const portModuleBaselineReference =
   valueAfter("--port-module-baseline-reference") ??
   (baselineReferenceDirectory ? `${baselineReferenceDirectory}/port-module-baseline.json` : void 0);
-const resolvedServiceQualityBaselineReference =
-  serviceQualityBaselineReference ??
+const resolvedServiceCeilingsBaselineReference =
+  serviceCeilingsBaselineReference ??
   (baselineReferenceDirectory
-    ? `${baselineReferenceDirectory}/service-quality-baseline.json`
+    ? `${baselineReferenceDirectory}/service-ceilings-baseline.json`
     : void 0);
 const commentBlockRootsBaselineReference =
   valueAfter("--comment-block-roots-reference") ??
@@ -57,7 +57,7 @@ const commentBlockRoots = lintCommentBlockRoots(root, commentBlockRootsBaselineR
 const oxlintBaselineValidity = lintOxlintBaseline(root);
 const baselineOnly =
   process.argv.includes("--shrinking-baseline-only") ||
-  process.argv.includes("--service-quality-baseline-only");
+  process.argv.includes("--service-ceilings-baseline-only");
 const baselineDiscovery = baselineOnly ? discoverClassifiedPackages(root) : void 0;
 // `lintManifests`/`lintFeatureLayouts` run outside `lintWorkspace` here, so
 // their violations still carry absolute file paths — relativize before
@@ -72,7 +72,7 @@ const baselineBoundaryEdges = baselineDiscovery
   : [];
 const baselineCheck = baselineOnly
   ? {
-      serviceQuality: lintServiceQualityBaseline(root, resolvedServiceQualityBaselineReference),
+      serviceCeilings: lintServiceCeilingsBaseline(root, resolvedServiceCeilingsBaselineReference),
       strictPorts: lintStrictPortBaseline(root, portModuleBaselineReference),
       boundaryEdges: lintBoundaryEdgeBaseline(
         root,
@@ -86,12 +86,12 @@ const baselineCheck = baselineOnly
 const baselinePolicyViolations =
   baselineCheck && baselineDiscovery
     ? [
-        ...baselineCheck.serviceQuality.violations,
+        ...baselineCheck.serviceCeilings.violations,
         ...baselineCheck.strictPorts.violations,
         ...baselineCheck.boundaryEdges.violations,
         ...baselineCheck.oxlintBaseline.violations,
         ...baselineCheck.commentBlockRoots.violations,
-        ...lintServiceQuality(root, baselineDiscovery.packages),
+        ...lintServiceCeilings(root, baselineDiscovery.packages),
         ...lintStrictPortModules(root, baselineDiscovery.packages),
       ]
     : void 0;
@@ -110,7 +110,7 @@ function fullWorkspaceViolations(): ArchitectureViolation[] {
     declarations: !process.argv.includes("--no-declarations"),
     legacyApplicationMigration: !process.argv.includes("--no-legacy-application-migration"),
     legacyFeatureFragments: !process.argv.includes("--no-legacy-feature-fragments"),
-    serviceQualityBaselineReference: resolvedServiceQualityBaselineReference,
+    serviceCeilingsBaselineReference: resolvedServiceCeilingsBaselineReference,
   });
   // `lintWorkspace` already relativized `file`, so its cross-feature/private-runtime-export
   // violations are the current edges as-is.
@@ -160,9 +160,9 @@ if (violations.length === 0) {
     const review = reviewCommentBlocks ? "comment-block" : "test-quality";
     process.stdout.write(`architecture-lint: ${review} review complete\n`);
   } else {
-    if (baselineCheck?.serviceQuality.bootstrapped) {
+    if (baselineCheck?.serviceCeilings.bootstrapped) {
       process.stdout.write(
-        "architecture-lint: accepting the one-time service quality baseline bootstrap; future merge-base checks can only shrink it\n",
+        "architecture-lint: accepting the one-time service ceilings baseline bootstrap; future merge-base checks can only shrink it\n",
       );
     }
 

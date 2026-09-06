@@ -25,7 +25,7 @@ uvx --from ast-grep-cli==0.42.3 ast-grep scan -c dev/lint/ast-grep/sgconfig.yml 
   --filter 'no-identity-function-ts|no-same-name-delegation-ts' --json=compact
 
 # layer-class, conditional-type-depth, overload-by-literal, comment-block-size,
-# service-quality, strict-port-module and the rest
+# service-ceilings, strict-port-module and the rest
 pnpm --filter @langwatch/architecture-lint lint
 pnpm exec oxlint --config .oxlintrc.architecture.json <target>
 ```

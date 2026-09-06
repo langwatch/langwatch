@@ -14,6 +14,7 @@ Project-specific Claude Code configuration for LangWatch.
 │   ├── feature-map/          # Claude-specific feature-map workflow
 │   ├── haven-setup/          # Haven environment setup workflow
 │   ├── langwatch-kanban/     # Manage LangWatch GitHub project board
+│   ├── lint-rule/            # Add or change a langwatch oxlint rule
 │   ├── chakra-ui-builder -> ../../.agents/skills/chakra-ui-builder
 │   ├── chakra-ui-migrate -> ../../.agents/skills/chakra-ui-migrate
 │   └── chakra-ui-refactor -> ../../.agents/skills/chakra-ui-refactor

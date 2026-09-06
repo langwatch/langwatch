@@ -15,7 +15,7 @@ import { lintLegacyFeatureFragments } from "./legacy-feature-fragments";
 import { lintManifests } from "./manifests";
 import { lintOverengineeringBaseline } from "./overengineering";
 import { lintStrictPortModules } from "./port-modules";
-import { lintServiceQuality } from "./service-quality";
+import { lintServiceCeilings } from "./service-ceilings";
 import { lintServiceProjectionBoundaries } from "./service-projection-boundaries";
 import { lintTestQuality } from "./test-quality";
 import type { ArchitectureViolation, LintWorkspaceOptions } from "./types";
@@ -79,13 +79,13 @@ export {
 export { discoverClassifiedPackages } from "./workspace";
 export { lintFeatureLayouts } from "./feature-layout";
 export { lintManifests } from "./manifests";
-export { formatServiceQualityBaseline } from "./service-quality";
-export { collectServiceQualityCeilings } from "./service-quality";
-export { compareServiceQualityBaselines } from "./service-quality";
-export { readServiceQualityBaselineFile } from "./service-quality";
-export { lintServiceQualityBaseline } from "./service-quality";
-export { lintServiceQuality } from "./service-quality";
-export { lintServiceQualityFile } from "./service-quality";
+export { formatServiceCeilingsBaseline } from "./service-ceilings";
+export { collectServiceCeilings } from "./service-ceilings";
+export { compareServiceCeilingsBaselines } from "./service-ceilings";
+export { readServiceCeilingsBaselineFile } from "./service-ceilings";
+export { lintServiceCeilingsBaseline } from "./service-ceilings";
+export { lintServiceCeilings } from "./service-ceilings";
+export { lintServiceCeilingsFile } from "./service-ceilings";
 export { lintServiceProjectionBoundaries } from "./service-projection-boundaries";
 export { lintStrictContractBuildConfigs } from "./contract-build-config";
 export { lintFrontendUiBoundaries } from "./frontend-ui-boundaries";
@@ -156,7 +156,7 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
     ...lintApiTransportBoundaries(root, discovery.packages),
     ...lintApiTransportFramework(root, discovery.packages),
     ...lintServiceProjectionBoundaries(discovery.packages),
-    ...lintServiceQuality(root, discovery.packages, options.serviceQualityBaselineReference),
+    ...lintServiceCeilings(root, discovery.packages, options.serviceCeilingsBaselineReference),
     ...lintCycles(discovery.packages),
     ...lintTestQuality(root, { files: changedFiles }),
     ...(options.declarations === false ? [] : lintDeclarations(discovery.packages)),

@@ -5854,10 +5854,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/service-quality.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/architecture-lint/src/test-colocation.ts",
       "measured": "2026-09-06"
     },

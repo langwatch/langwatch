@@ -7,16 +7,7 @@ const workspace = createFixtureWorkspace({
     agent: { layoutVersion: 0, roles: { server: {} } },
     project: { layoutVersion: 0, roles: { server: {} } },
   },
-  // `createFixtureWorkspace`'s `catalogue` option writes `{ subjects: ... }`,
-  // which does not match the real `catalogue.json` shape
-  // (`{ version, features: [{ id, subjects }] }`) that `subjectOwners`
-  // reads — writing the file directly here until that option is fixed.
-  files: {
-    "packages/features/catalogue.json": JSON.stringify({
-      version: 0,
-      features: [{ id: "project", subjects: ["project"] }],
-    }),
-  },
+  catalogue: { project: ["project"] },
 });
 
 afterAll(() => workspace.cleanup());

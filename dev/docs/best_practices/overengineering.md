@@ -76,7 +76,7 @@ nobody made — it is what happens when the migration path becomes the design.
 | A type alias nesting conditional types past 3                     | `conditional-type-depth`     | same                                                |
 | Overloads differing only by a boolean literal                     | `overload-by-literal`        | same                                                |
 | A comment block over 60 lines                                     | `comment-block-size`         | `src/comment-blocks.ts`                             |
-| A service module over its size ceiling                            | `service-quality`            | `src/service-quality.ts`                            |
+| A service module over its size ceiling                            | `service-ceilings`           | `src/service-ceilings.ts`                            |
 
 The ast-grep rules run from `make lint-rules` and are proved against fixtures
 by `make lint-rules-test`. The architecture-lint policies run from

@@ -4,16 +4,16 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  compareServiceQualityBaselines,
-  lintServiceQualityFile,
-  lintServiceQualityBaseline,
-  readServiceQualityBaselineFile,
+  compareServiceCeilingsBaselines,
+  lintServiceCeilingsFile,
+  lintServiceCeilingsBaseline,
+  readServiceCeilingsBaselineFile,
 } from "../src";
 
 const root = resolve(import.meta.dirname, "../../..");
 const apiKeyService = "packages/features/api-key/server/src/services/api-key.service.ts";
 
-describe("service quality baseline", () => {
+describe("service ceilings baseline", () => {
   const ceiling = {
     file: "packages/features/project/server/src/services/project.service.ts",
     moduleLines: 600,
@@ -25,16 +25,16 @@ describe("service quality baseline", () => {
 
   /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
   it("permits only a shrinking baseline", () => {
-    expect(compareServiceQualityBaselines([ceiling], [], "baseline.json")).toEqual([]);
+    expect(compareServiceCeilingsBaselines([ceiling], [], "baseline.json")).toEqual([]);
     expect(
-      compareServiceQualityBaselines(
+      compareServiceCeilingsBaselines(
         [ceiling],
         [{ ...ceiling, moduleLines: 601 }],
         "baseline.json",
       ),
     ).toHaveLength(1);
     expect(
-      compareServiceQualityBaselines(
+      compareServiceCeilingsBaselines(
         [ceiling],
         [
           {
@@ -48,10 +48,10 @@ describe("service quality baseline", () => {
   });
 
   it("makes the reviewed first baseline an explicit one-time bootstrap", () => {
-    const fixtureRoot = mkdtempSync(join(tmpdir(), "service-quality-bootstrap-"));
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "service-ceilings-bootstrap-"));
     const current = join(
       fixtureRoot,
-      "packages/architecture-lint/src/service-quality-baseline.json",
+      "packages/architecture-lint/src/service-ceilings-baseline.json",
     );
     mkdirSync(join(fixtureRoot, "packages/architecture-lint/src"), {
       recursive: true,
@@ -59,23 +59,23 @@ describe("service quality baseline", () => {
     writeFileSync(current, JSON.stringify({ version: 0, services: [ceiling] }));
 
     expect(
-      lintServiceQualityBaseline(fixtureRoot, join(fixtureRoot, "merge-base-baseline.json")),
+      lintServiceCeilingsBaseline(fixtureRoot, join(fixtureRoot, "merge-base-baseline.json")),
     ).toEqual({ violations: [], bootstrapped: true });
 
     const missingBaselineRoot = mkdtempSync(join(tmpdir(), "missing-baseline-"));
     expect(
-      lintServiceQualityBaseline(
+      lintServiceCeilingsBaseline(
         missingBaselineRoot,
         join(missingBaselineRoot, "merge-base-baseline.json"),
       ),
     ).toMatchObject({
       bootstrapped: false,
-      violations: [{ policy: "service-quality-baseline" }],
+      violations: [{ policy: "service-ceilings-baseline" }],
     });
   });
 
   it("rejects malformed, duplicate, and unsorted baseline files", () => {
-    const directory = mkdtempSync(join(tmpdir(), "service-quality-baseline-"));
+    const directory = mkdtempSync(join(tmpdir(), "service-ceilings-baseline-"));
     const file = join(directory, "baseline.json");
     for (const source of [
       "not json",
@@ -90,13 +90,13 @@ describe("service quality baseline", () => {
       JSON.stringify({ version: 0, services: [{ file: ceiling.file }] }),
     ]) {
       writeFileSync(file, source);
-      expect(readServiceQualityBaselineFile(file).violations).toHaveLength(1);
+      expect(readServiceCeilingsBaselineFile(file).violations).toHaveLength(1);
     }
   });
 
   /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
   it("keeps the api-key service below the measured default ceiling", () => {
-    expect(lintServiceQualityFile(root, apiKeyService)).toEqual([]);
+    expect(lintServiceCeilingsFile(root, apiKeyService)).toEqual([]);
   });
 
   it("keeps the api-key service free of discrete structural violations", () => {
@@ -110,14 +110,14 @@ describe("service quality baseline", () => {
   });
 
   it("rejects a missing or stale ceiling without scanning the workspace", () => {
-    const fixtureRoot = mkdtempSync(join(tmpdir(), "service-quality-file-"));
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "service-ceilings-file-"));
     const service = join(
       fixtureRoot,
       "packages/features/example/server/src/services/example.service.ts",
     );
     const baseline = join(
       fixtureRoot,
-      "packages/architecture-lint/src/service-quality-baseline.json",
+      "packages/architecture-lint/src/service-ceilings-baseline.json",
     );
     mkdirSync(join(fixtureRoot, "packages/architecture-lint/src"), { recursive: true });
     mkdirSync(join(fixtureRoot, "packages/features/example/server/src/services"), {
@@ -125,8 +125,8 @@ describe("service quality baseline", () => {
     });
     writeFileSync(service, `${"\n".repeat(500)}export class ExampleService {}\n`);
 
-    expect(lintServiceQualityFile(fixtureRoot, service)).toMatchObject([
-      { policy: "service-quality" },
+    expect(lintServiceCeilingsFile(fixtureRoot, service)).toMatchObject([
+      { policy: "service-ceilings" },
     ]);
 
     writeFileSync(
@@ -143,8 +143,8 @@ describe("service quality baseline", () => {
     );
     writeFileSync(service, "export class ExampleService {}\n");
 
-    expect(lintServiceQualityFile(fixtureRoot, service)).toMatchObject([
-      { policy: "service-quality-baseline" },
+    expect(lintServiceCeilingsFile(fixtureRoot, service)).toMatchObject([
+      { policy: "service-ceilings-baseline" },
     ]);
   });
 });

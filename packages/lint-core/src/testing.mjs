@@ -96,7 +96,8 @@ function writeFile(root, relativePath, contents) {
  * @param {Record<string, { layoutVersion?: number, roles?: Record<string, { exports?: string[] }> }>} [tree.features]
  *   Feature name to its `feature.json` layout version and the contract/server/web
  *   packages that exist for it.
- * @param {Record<string, string[]>} [tree.catalogue] Subject to the features that claim it.
+ * @param {Record<string, string[]>} [tree.catalogue] Feature id to the subjects it claims,
+ *   written as the real `catalogue.json` shape: `{ version, features: [{ id, subjects }] }`.
  * @param {Record<string, string>} [tree.files] Extra files, keyed by workspace path.
  * @returns {{ cwd: string, write: (path: string, contents: string) => string, cleanup: () => void }}
  */
@@ -121,7 +122,12 @@ export function createFixtureWorkspace({ catalogue = {}, features = {}, files = 
     }
   }
 
-  writeFile(cwd, "packages/features/catalogue.json", JSON.stringify({ subjects: catalogue }));
+  const catalogueFeatures = Object.entries(catalogue).map(([id, subjects]) => ({ id, subjects }));
+  writeFile(
+    cwd,
+    "packages/features/catalogue.json",
+    JSON.stringify({ version: 0, features: catalogueFeatures }),
+  );
   for (const [path, contents] of Object.entries(files)) writeFile(cwd, path, contents);
 
   return {

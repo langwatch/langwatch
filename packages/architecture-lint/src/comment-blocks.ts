@@ -183,7 +183,7 @@ export function compareCommentBlockRoots(
  * own right, which is what turns the burn-down schedule into a promise.
  * With a `baselineReference` (the merge-base copy), the file may only shrink:
  * an entry may be removed, its `blocks` lowered, or its `expires` brought
- * earlier, never the reverse (mirrors `lintServiceQualityBaseline`).
+ * earlier, never the reverse (mirrors `lintServiceCeilingsBaseline`).
  */
 export function lintCommentBlockRoots(
   root: string,

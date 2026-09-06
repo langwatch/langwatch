@@ -66,5 +66,5 @@ export type LintWorkspaceOptions = {
   declarations?: boolean;
   legacyApplicationMigration?: boolean;
   legacyFeatureFragments?: boolean;
-  serviceQualityBaselineReference?: string;
+  serviceCeilingsBaselineReference?: string;
 };

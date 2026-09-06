@@ -54,7 +54,7 @@ oxlint and oxfmt are the only linter and formatter. A repo-wide red is not your 
 ## Baselines
 
 `*-baseline.json` in `packages/architecture-lint/src` (`boundary-edge`,
-`overengineering`, `port-module`, `service-quality`, `typed-prisma-seam`) record
+`overengineering`, `port-module`, `service-ceilings`, `typed-prisma-seam`) record
 pre-existing violations and may only shrink. A new violation in a file you touched is
 yours to fix, not to add. Diff the violation LIST before and after, not the total: a wrong
 placement trades one violation for another.

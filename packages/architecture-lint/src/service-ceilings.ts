@@ -5,14 +5,14 @@ import { z } from "zod";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types";
 import { walkFiles } from "./files";
 
-const BASELINE_FILE = "service-quality-baseline.json";
+const BASELINE_FILE = "service-ceilings-baseline.json";
 const MAX_MODULE_LINES = 500;
 const MAX_METHOD_LINES = 80;
 const MAX_METHOD_STATEMENTS = 24;
 const MAX_METHOD_COMPLEXITY = 24;
 const MAX_SOURCE_LINE_LENGTH = 160;
 
-type ServiceQualityCeiling = {
+type ServiceCeiling = {
   file: string;
   moduleLines: number;
   methodLines: number;
@@ -21,12 +21,12 @@ type ServiceQualityCeiling = {
   lineLength: number;
 };
 
-export type ServiceQualityBaselineCheck = {
+export type ServiceCeilingsBaselineCheck = {
   violations: ArchitectureViolation[];
   bootstrapped: boolean;
 };
 
-type ServiceQuality = {
+type ServiceMeasurement = {
   moduleLines: number;
   methodLines: number;
   statements: number;
@@ -34,7 +34,7 @@ type ServiceQuality = {
   lineLength: number;
 };
 
-const qualityFields = [
+const ceilingFields = [
   "moduleLines",
   "methodLines",
   "statements",
@@ -42,7 +42,7 @@ const qualityFields = [
   "lineLength",
 ] as const;
 
-const defaults: ServiceQuality = {
+const defaults: ServiceMeasurement = {
   moduleLines: MAX_MODULE_LINES,
   methodLines: MAX_METHOD_LINES,
   statements: MAX_METHOD_STATEMENTS,
@@ -67,7 +67,7 @@ const COMPLEXITY_SHORT_CIRCUIT = new Set([
   ts.SyntaxKind.QuestionQuestionToken,
 ]);
 
-const serviceQualityCeilingSchema = z
+const serviceCeilingSchema = z
   .object({
     file: z.string(),
     moduleLines: z.number().positive(),
@@ -78,10 +78,10 @@ const serviceQualityCeilingSchema = z
   })
   .strict();
 
-const serviceQualityBaselineSchema = z
+const serviceCeilingsBaselineSchema = z
   .object({
     version: z.literal(0),
-    services: z.array(serviceQualityCeilingSchema),
+    services: z.array(serviceCeilingSchema),
   })
   .strict()
   .superRefine((baseline, context) => {
@@ -148,9 +148,9 @@ function complexityOf(node: ts.Node): number {
   return complexity;
 }
 
-function serviceQuality(path: string, source: string): ServiceQuality {
+function measureService(path: string, source: string): ServiceMeasurement {
   const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
-  const quality: ServiceQuality = {
+  const measurement: ServiceMeasurement = {
     moduleLines: source.split("\n").length,
     methodLines: 0,
     statements: 0,
@@ -158,26 +158,27 @@ function serviceQuality(path: string, source: string): ServiceQuality {
     lineLength: Math.max(...source.split("\n").map((line) => line.length), 0),
   };
   const visit = (node: ts.Node): void => {
-    if (isFunctionLike(node) && node.body && ts.isBlock(node.body)) {
+    const body = isFunctionLike(node) ? node.body : void 0;
+    if (body !== void 0 && ts.isBlock(body)) {
       const methodLines =
-        file.getLineAndCharacterOfPosition(node.body.end).line -
-        file.getLineAndCharacterOfPosition(node.body.getStart(file)).line +
+        file.getLineAndCharacterOfPosition(body.end).line -
+        file.getLineAndCharacterOfPosition(body.getStart(file)).line +
         1;
-      quality.methodLines = Math.max(quality.methodLines, methodLines);
-      quality.statements = Math.max(quality.statements, node.body.statements.length);
-      quality.complexity = Math.max(quality.complexity, complexityOf(node.body));
+      measurement.methodLines = Math.max(measurement.methodLines, methodLines);
+      measurement.statements = Math.max(measurement.statements, body.statements.length);
+      measurement.complexity = Math.max(measurement.complexity, complexityOf(body));
     }
 
     ts.forEachChild(node, visit);
   };
   visit(file);
 
-  return quality;
+  return measurement;
 }
 
-export function readServiceQualityBaselineFile(file: string): {
+export function readServiceCeilingsBaselineFile(file: string): {
   exists: boolean;
-  baseline: ServiceQualityCeiling[];
+  baseline: ServiceCeiling[];
   violations: ArchitectureViolation[];
 } {
   if (!existsSync(file)) {
@@ -193,15 +194,15 @@ export function readServiceQualityBaselineFile(file: string): {
       baseline: [],
       violations: [
         {
-          policy: "service-quality-baseline",
+          policy: "service-ceilings-baseline",
           file,
-          message: `Service quality baseline must be valid: ${error instanceof Error ? error.message : String(error)}`,
+          message: `Service ceilings baseline must be valid: ${error instanceof Error ? error.message : String(error)}`,
         },
       ],
     };
   }
 
-  const result = serviceQualityBaselineSchema.safeParse(rawBaseline);
+  const result = serviceCeilingsBaselineSchema.safeParse(rawBaseline);
   if (!result.success) {
     const reason = result.error.issues.at(0)?.message ?? "invalid baseline";
 
@@ -210,9 +211,9 @@ export function readServiceQualityBaselineFile(file: string): {
       baseline: [],
       violations: [
         {
-          policy: "service-quality-baseline",
+          policy: "service-ceilings-baseline",
           file,
-          message: `Service quality baseline must be valid: ${reason}`,
+          message: `Service ceilings baseline must be valid: ${reason}`,
         },
       ],
     };
@@ -233,17 +234,17 @@ function baselineFile(root: string): string {
  * comparison. Once the baseline is on the target branch, every subsequent
  * run compares against it and accepts only deletions or lower ceilings.
  */
-export function lintServiceQualityBaseline(
+export function lintServiceCeilingsBaseline(
   root: string,
   baselineReference?: string,
-): ServiceQualityBaselineCheck {
-  const current = readServiceQualityBaselineFile(baselineFile(root));
+): ServiceCeilingsBaselineCheck {
+  const current = readServiceCeilingsBaselineFile(baselineFile(root));
   const violations = [...current.violations];
   if (baselineReference && !current.exists) {
     violations.push({
-      policy: "service-quality-baseline",
+      policy: "service-ceilings-baseline",
       file: baselineFile(root),
-      message: "Service quality baseline must be checked in before it can be compared.",
+      message: "Service ceilings baseline must be checked in before it can be compared.",
       allowed:
         "Commit the reviewed baseline once, then future merge-base checks may only shrink it.",
     });
@@ -253,22 +254,22 @@ export function lintServiceQualityBaseline(
     return { violations, bootstrapped: false };
   }
 
-  const reference = readServiceQualityBaselineFile(resolve(root, baselineReference));
+  const reference = readServiceCeilingsBaselineFile(resolve(root, baselineReference));
   violations.push(...reference.violations);
   if (!reference.exists) {
     return { violations, bootstrapped: current.exists };
   }
 
   violations.push(
-    ...compareServiceQualityBaselines(reference.baseline, current.baseline, baselineFile(root)),
+    ...compareServiceCeilingsBaselines(reference.baseline, current.baseline, baselineFile(root)),
   );
 
   return { violations, bootstrapped: false };
 }
 
-export function compareServiceQualityBaselines(
-  reference: ServiceQualityCeiling[],
-  proposed: ServiceQualityCeiling[],
+export function compareServiceCeilingsBaselines(
+  reference: ServiceCeiling[],
+  proposed: ServiceCeiling[],
   file: string,
 ): ArchitectureViolation[] {
   const referenceByFile = new Map(reference.map((entry) => [entry.file, entry]));
@@ -277,20 +278,20 @@ export function compareServiceQualityBaselines(
     const previous = referenceByFile.get(entry.file);
     if (!previous) {
       violations.push({
-        policy: "service-quality-baseline-growth",
+        policy: "service-ceilings-baseline-growth",
         file,
-        message: `Service quality baseline cannot add ${entry.file}.`,
+        message: `Service ceilings baseline cannot add ${entry.file}.`,
         allowed: "Refactor the service below the default ceiling instead.",
       });
       continue;
     }
 
-    const increased = qualityFields.find((field) => entry[field] > previous[field]);
+    const increased = ceilingFields.find((field) => entry[field] > previous[field]);
     if (increased) {
       violations.push({
-        policy: "service-quality-baseline-growth",
+        policy: "service-ceilings-baseline-growth",
         file,
-        message: `Service quality baseline cannot increase ${entry.file}'s ${increased} ceiling.`,
+        message: `Service ceilings baseline cannot increase ${entry.file}'s ${increased} ceiling.`,
         allowed: "Keep the prior ceiling or reduce it with the implementation.",
       });
     }
@@ -299,28 +300,28 @@ export function compareServiceQualityBaselines(
   return violations;
 }
 
-function exceeds(quality: ServiceQuality, ceiling: ServiceQuality): boolean {
+function exceeds(measurement: ServiceMeasurement, ceiling: ServiceMeasurement): boolean {
   const exceedsSize =
-    quality.moduleLines > ceiling.moduleLines ||
-    quality.methodLines > ceiling.methodLines ||
-    quality.statements > ceiling.statements;
+    measurement.moduleLines > ceiling.moduleLines ||
+    measurement.methodLines > ceiling.methodLines ||
+    measurement.statements > ceiling.statements;
   const exceedsComplexity =
-    quality.complexity > ceiling.complexity || quality.lineLength > ceiling.lineLength;
+    measurement.complexity > ceiling.complexity || measurement.lineLength > ceiling.lineLength;
 
   return exceedsSize || exceedsComplexity;
 }
 
-function expectedCeiling(quality: ServiceQuality): ServiceQuality {
+function expectedCeiling(measurement: ServiceMeasurement): ServiceMeasurement {
   return {
-    moduleLines: Math.max(defaults.moduleLines, quality.moduleLines),
-    methodLines: Math.max(defaults.methodLines, quality.methodLines),
-    statements: Math.max(defaults.statements, quality.statements),
-    complexity: Math.max(defaults.complexity, quality.complexity),
-    lineLength: Math.max(defaults.lineLength, quality.lineLength),
+    moduleLines: Math.max(defaults.moduleLines, measurement.moduleLines),
+    methodLines: Math.max(defaults.methodLines, measurement.methodLines),
+    statements: Math.max(defaults.statements, measurement.statements),
+    complexity: Math.max(defaults.complexity, measurement.complexity),
+    lineLength: Math.max(defaults.lineLength, measurement.lineLength),
   };
 }
 
-function matchesCeiling(entry: ServiceQualityCeiling, expected: ServiceQuality): boolean {
+function matchesCeiling(entry: ServiceCeiling, expected: ServiceMeasurement): boolean {
   const matchesShape =
     entry.moduleLines === expected.moduleLines &&
     entry.methodLines === expected.methodLines &&
@@ -331,30 +332,31 @@ function matchesCeiling(entry: ServiceQualityCeiling, expected: ServiceQuality):
   return matchesShape && matchesComplexity;
 }
 
-function lintServiceQualityFileAgainstBaseline(
+function lintServiceCeilingsFileAgainstBaseline(
   root: string,
   file: string,
-  baseline: ServiceQualityCeiling[],
+  baseline: ServiceCeiling[],
 ): ArchitectureViolation[] {
   const relativeFile = relative(root, file).replaceAll("\\", "/");
-  const quality = serviceQuality(file, readFileSync(file, "utf8"));
+  const measurement = measureService(file, readFileSync(file, "utf8"));
   const entry = new Map(baseline.map((candidate) => [candidate.file, candidate])).get(relativeFile);
   const ceiling = entry ?? defaults;
   const violations: ArchitectureViolation[] = [];
-  if (exceeds(quality, ceiling)) {
+  if (exceeds(measurement, ceiling)) {
     violations.push({
-      policy: "service-quality",
+      policy: "service-ceilings",
       file,
-      message: `Service module exceeds its quality ceiling (lines ${quality.moduleLines}/${ceiling.moduleLines}, longest method ${quality.methodLines}/${ceiling.methodLines}, statements ${quality.statements}/${ceiling.statements}, complexity ${quality.complexity}/${ceiling.complexity}, line length ${quality.lineLength}/${ceiling.lineLength}).`,
+      message: `Service module exceeds its ceiling (lines ${measurement.moduleLines}/${ceiling.moduleLines}, longest method ${measurement.methodLines}/${ceiling.methodLines}, statements ${measurement.statements}/${ceiling.statements}, complexity ${measurement.complexity}/${ceiling.complexity}, line length ${measurement.lineLength}/${ceiling.lineLength}).`,
       allowed: "Split coherent private collaborators. Existing ceiling entries may only shrink.",
     });
   }
 
-  if (entry && !matchesCeiling(entry, expectedCeiling(quality))) {
+  const staleEntry = entry !== void 0 && !matchesCeiling(entry, expectedCeiling(measurement));
+  if (staleEntry) {
     violations.push({
-      policy: "service-quality-baseline",
+      policy: "service-ceilings-baseline",
       file,
-      message: "Service quality baseline entry is stale or leaves growth headroom.",
+      message: "Service ceilings baseline entry is stale or leaves growth headroom.",
       allowed:
         "Set every ceiling to max(default, current), or delete the entry when all values are default.",
     });
@@ -364,23 +366,23 @@ function lintServiceQualityFileAgainstBaseline(
 }
 
 /** Fast exact-path check for focused regression tests and targeted migration batches. */
-export function lintServiceQualityFile(root: string, path: string): ArchitectureViolation[] {
-  const baselineResult = readServiceQualityBaselineFile(baselineFile(root));
+export function lintServiceCeilingsFile(root: string, path: string): ArchitectureViolation[] {
+  const baselineResult = readServiceCeilingsBaselineFile(baselineFile(root));
 
   return [
     ...baselineResult.violations,
-    ...lintServiceQualityFileAgainstBaseline(root, resolve(root, path), baselineResult.baseline),
+    ...lintServiceCeilingsFileAgainstBaseline(root, resolve(root, path), baselineResult.baseline),
   ];
 }
 
-export function lintServiceQuality(
+export function lintServiceCeilings(
   root: string,
   packages: ClassifiedPackage[],
   baselineReference?: string,
 ): ArchitectureViolation[] {
   const currentBaselineFile = baselineFile(root);
-  const current = readServiceQualityBaselineFile(currentBaselineFile);
-  const baselineCheck = lintServiceQualityBaseline(root, baselineReference);
+  const current = readServiceCeilingsBaselineFile(currentBaselineFile);
+  const baselineCheck = lintServiceCeilingsBaseline(root, baselineReference);
   const baseline = current.baseline;
   const violations = [...baselineCheck.violations];
   const serviceFiles = packages
@@ -391,15 +393,15 @@ export function lintServiceQuality(
   for (const file of serviceFiles) {
     const relativeFile = relative(root, file).replaceAll("\\", "/");
     seen.add(relativeFile);
-    violations.push(...lintServiceQualityFileAgainstBaseline(root, file, baseline));
+    violations.push(...lintServiceCeilingsFileAgainstBaseline(root, file, baseline));
   }
 
   for (const entry of baseline) {
     if (!seen.has(entry.file)) {
       violations.push({
-        policy: "service-quality-baseline",
+        policy: "service-ceilings-baseline",
         file: join(root, "packages/architecture-lint/src", BASELINE_FILE),
-        message: `Service quality baseline entry ${entry.file} no longer has a matching service module.`,
+        message: `Service ceilings baseline entry ${entry.file} no longer has a matching service module.`,
         allowed: "Delete stale entries; the baseline only shrinks.",
       });
     }
@@ -408,23 +410,23 @@ export function lintServiceQuality(
   return violations;
 }
 
-export function formatServiceQualityBaseline(entries: ServiceQualityCeiling[]): string {
+export function formatServiceCeilingsBaseline(entries: ServiceCeiling[]): string {
   return `${JSON.stringify({ version: 0, services: entries }, null, 2)}\n`;
 }
 
-export function collectServiceQualityCeilings(
+export function collectServiceCeilings(
   root: string,
   packages: ClassifiedPackage[],
-): ServiceQualityCeiling[] {
+): ServiceCeiling[] {
   return packages
     .filter((pkg) => pkg.kind === "server" && pkg.featureRoot)
     .flatMap((pkg) => walkFiles(pkg.root, isStrictService))
     .map((file) => {
-      const quality = serviceQuality(file, readFileSync(file, "utf8"));
+      const measurement = measureService(file, readFileSync(file, "utf8"));
 
       return {
         file: relative(root, file).replaceAll("\\", "/"),
-        ...expectedCeiling(quality),
+        ...expectedCeiling(measurement),
       };
     })
     .filter((entry) => !matchesCeiling(entry, defaults))
