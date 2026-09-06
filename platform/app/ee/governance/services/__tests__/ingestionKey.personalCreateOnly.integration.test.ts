@@ -17,10 +17,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { registerGovernanceMcpTools } from "~/mcp/governance-tools";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { prisma } from "~/server/db";
-import { registerGovernanceMcpTools } from "~/mcp/governance-tools";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 import { IngestionKeyService } from "../ingestionKey.service";
@@ -38,7 +38,12 @@ const PROJECT_API_KEY = `sk-lw-ikc-${suffix}`;
 async function mintThroughMcp(sourceType: string): Promise<void> {
   const tools = new Map<string, (args: any) => Promise<unknown>>();
   const server = {
-    tool: (name: string, _d: unknown, _s: unknown, cb: (a: any) => Promise<unknown>) => {
+    tool: (
+      name: string,
+      _d: unknown,
+      _s: unknown,
+      cb: (a: any) => Promise<unknown>,
+    ) => {
       tools.set(name, cb);
       return null;
     },
@@ -49,7 +54,8 @@ async function mintThroughMcp(sourceType: string): Promise<void> {
     callerUserId: USER_ID,
   });
   const mint = tools.get("governance_ingestion_keys_mint");
-  if (!mint) throw new Error("governance_ingestion_keys_mint is not registered");
+  if (!mint)
+    throw new Error("governance_ingestion_keys_mint is not registered");
   await mint({ source_type: sourceType });
 }
 
@@ -127,13 +133,16 @@ describe("personal ingest keys minted outside the CLI", () => {
 
   afterAll(async () => {
     for (const del of [
-      () => prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } }),
+      () =>
+        prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } }),
       () => prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } }),
       () => prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } }),
       () => prisma.project.deleteMany({ where: { teamId: TEAM_ID } }),
       () => prisma.team.deleteMany({ where: { organizationId: ORG_ID } }),
       () =>
-        prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } }),
+        prisma.organizationUser.deleteMany({
+          where: { organizationId: ORG_ID },
+        }),
       () => prisma.user.deleteMany({ where: { id: USER_ID } }),
       () => prisma.organization.deleteMany({ where: { id: ORG_ID } }),
     ]) {
